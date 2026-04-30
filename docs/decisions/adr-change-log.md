@@ -39,7 +39,7 @@
 
 - Marked 15 legacy ADRs as `status: Superseded` with `superseded_by` links (ADR-0001 through ADR-0013, ADR-0017, ADR-0020, ADR-0026, ADR-0027).
 - Moved 21 superseded ADRs to `adr/superseded/` (18 newly superseded + 3 previously superseded: ADR-0019, ADR-0029, ADR-0032).
-- Removed 5 `tmp/` file references from `docs/decisions/` ADRs (ADR-0044, ADR-0045, ADR-0048, ADR-0055, ADR-0077) — replaced with inline summaries.
+- Replaced external planning document references in 5 ADRs (ADR-0044, ADR-0045, ADR-0048, ADR-0055, ADR-0077) with inline summaries.
 - Updated 7 superseded file URL paths in ADR-0045 through ADR-0055.
 - Updated ADR-0047 metadata: added `related_packages: [app/packages/access]`.
 - Reclassified ADR-0008: tier Tier-1→Tier-3, decision_type Principle→Pattern.
@@ -61,7 +61,7 @@
 - Amended ADR-0045: added Principle 6 (Protocol-Driven Service Contracts). Amended Principle 3 (infrastructure as shared service platform).
 - Amended ADR-0048: renamed B5 to "Infrastructure Composition Governance", added B7 (Protocol Contract Surface), extended B2 (Protocol type at injection surface).
 - Amended ADR-0056: added ADR-0077 reference to Compliance and Boundaries section.
-- Backstage mental model reconciliation completed — root cause identified: plugin isolation rule misapplied to infrastructure service layer.
+- Root cause analysis completed for ADR-0048 B5 misapplication — plugin isolation rule was incorrectly applied to infrastructure service layer.
 - Round 2 skipped for all 4 Wave 3 ADRs (no normative revisions from R1).
 
 ### Wave 3 Downstream Assessment
@@ -85,12 +85,12 @@
 - Authored ADR-0079 (Queueing and Message-Broker Architecture). Status: Draft. R1 REVISE (phase numbering errors, shutdown ordering). R2 pending.
 - Wave 4 downstream assessment completed. Migration map updated with Wave 4 constraint annotations.
 
-### Analysis Documents Created
+### Supporting Analyses Completed
 
-- `tmp/backstage-mental-model-reconciliation-2026-04-29.md` — Root cause analysis for ADR-0048 B5 misapplication.
-- `tmp/platform-services-assessment-2026-04-29.md` — Rejected InteractionProvider Protocol; defined per-platform concrete service model.
-- `tmp/interaction-provider-abstraction-analysis-2026-04-29.md` — Analysis input for platform services decision.
-- `tmp/legacy-feature-rearchitecting-assessment-2026-04-29.md` — Coupling analysis for Tier-5 ADR sequencing.
+- Root cause analysis for ADR-0048 B5 misapplication — plugin isolation rule incorrectly applied to infrastructure service layer.
+- Platform services assessment — rejected InteractionProvider Protocol; defined per-platform concrete service model.
+- Interaction provider abstraction analysis — input for platform services decision.
+- Legacy feature rearchitecting assessment — coupling analysis for Tier-5 ADR sequencing.
 
 ### ADR-0079 — Revision and R2
 
@@ -107,8 +107,9 @@
 
 ### Managed Services Delegation — Cross-Wave Review
 
-- Trigger: ADR-0079 R2 review revealed a missing Tier-1 foundational principle governing managed service delegation. Analysis documented in `tmp/managed-services-delegation-framework-2026-04-30.md`.
-- Created delegation review tracker at `tmp/managed-services-delegation-adr-review-tracker-2026-04-30.md`. 25 items across 4 phases (3 HIGH, 5 MEDIUM, 3 LOW, 12 NONE, 2 NEW).
+- Trigger: ADR-0079 R2 review revealed a missing Tier-1 foundational principle governing managed service delegation.
+- Managed services delegation framework analysis completed: three-tier delegation model (managed cloud service → industry library → custom implementation).
+- Delegation review tracker established: 25 items across 4 phases (3 HIGH, 5 MEDIUM, 3 LOW, 12 NONE, 2 NEW).
 
 ### ADR-0045 — P7 Amendment (Managed Service Delegation Hierarchy)
 
@@ -317,14 +318,14 @@
 
 ### Feature-Level ADR Structure Migration Analysis
 
-- Completed feature-level ADR structure migration analysis. Planning artifact: `tmp/feature-adr-structure-migration-analysis-2026-04-30.md`.
+- Completed feature-level ADR structure migration analysis.
 - Identified legacy mixed-concern anti-pattern: ADR-0014, ADR-0042, ADR-0043 each conflate multiple tiers into single records.
 - Established Tier-4 derivation methodology: 4-point Derivation Test (tier-bleed, constraint chain, single-concern, domain-specificity).
 - Established complex-feature scoping rules: one ADR per sub-feature concern, shared concerns separate, ADR-per-decision not ADR-per-package.
 - Feature ADR gap assessment completed: P1 (Access/Sync, Access/Request), P2 (Slack Transport/ADR-0067), P3 (Incident, AWS Ops), P4 (SRE Ops, ATIP, Geolocate).
 - Defined 4-phase migration execution order with freeze zone discipline (7 rules, F1–F7).
 - **Template updated:** Added mandatory "Derivation from Higher-Tier ADRs" section to `templates/decision-record-template.md` for Tier-4 ADRs (Constraint Derivation Table, Feature-Specific Decisions table, Derivation Test Checklist, Scoping Rules).
-- **Workflow updated:** Added Tier-4 Feature ADR Derivation section to `adr-authoring-workflow.md` (Derivation Test, Scoping Rules, Mixed-Concern Anti-Pattern, Freeze Zone Discipline, Migration Execution Order). Pre-Author Gate and Draft steps updated with Tier-4 callouts.
+- **Workflow updated:** Added Tier-4 Feature ADR Derivation section to `references/adr-authoring-workflow.md` (Derivation Test, Scoping Rules, Mixed-Concern Anti-Pattern, Freeze Zone Discipline, Migration Execution Order). Pre-Author Gate and Draft steps updated with Tier-4 callouts.
 - **Wave tracker updated:** Added Feature ADR Derivation Methodology note to Wave 6, Feature ADR Gap Assessment section (prioritized backlog, legacy supersession table, migration execution phases, frozen zones inventory).
 - **Migration map updated:** Replaced stale "Pending Supersession (Wave 4)" with "Pending Supersession (Wave 6)" (ADR-0042→0066, ADR-0014→0067). Added ADR-0043 rejection note. Added Feature ADR Coverage Gaps table. Completed Superseded Legacy ADRs table (added Wave 4 supersessions: 0022–0025, 0033–0036, 0039, 0041).
 
@@ -371,7 +372,7 @@ Thorough integration of the feature-level ADR structure migration analysis into 
 
 ### HV Review — Redundancy Consolidation
 
-Prose-level redundancy consolidation applied across 7 ADR files based on HV review findings. Analysis documented in `tmp/adr-redundancy-restructuring-proposal-2026-04-30.md`.
+Prose-level redundancy consolidation applied across 7 ADR files based on HV review findings.
 
 **Protocol norm consolidation (H-001, H-002):**
 
@@ -395,7 +396,6 @@ Prose-level redundancy consolidation applied across 7 ADR files based on HV revi
 
 **Tracking document updates:**
 
-- `tmp/hv-review-tracker-2026-04-30.md`: All 6 formerly "accepted as-is" findings updated with applied status. Completion section updated. Redundancy Consolidation section added.
-- `tmp/adr-horizontal-vertical-review-methodology-2026-04-30.md`: §8 finding index, §9 Amendment Summary, and gate assessment updated. Gate upgraded from CONDITIONAL PASS to PASS.
+- HV review finding index, amendment summary, and gate assessment updated. Gate upgraded from CONDITIONAL PASS to PASS.
 - Migration map: Added "Cross-Cutting ADR Gaps" section with V-017 (Access Domain Contract, Tier-3, HIGH) and H-009 (API Versioning, Tier-2, DEFERRED).
 - Wave tracker: Added Wave 7 Pre-Requisite section for V-017 (Access Domain Contract). Added H-009 and HV redundancy consolidation to Standalone Actions.

@@ -26,7 +26,7 @@ Proposed → Draft → Challenge Review ←→ Revise → Accepted → [Supersed
 - Verify the ADR has an allocated ID in the [migration map](adr-migration-map.md).
 - Confirm all `constrained_by` ADRs are Accepted. If any are Draft or Proposed, author those first (start a new workflow instance for each blocker).
 - Scan for any missing related records or cross-references that should be included in the new ADR.
-- Read the challenge review template at `reviews/adr-challenge-review-template.md`.
+- Read the challenge review template at `templates/adr-challenge-review-template.md`.
 - **Tier-4 only:** Apply the Derivation Test (see §Tier-4 Feature ADR Derivation below) before proceeding.
 
 ### 2. Draft the ADR
@@ -39,7 +39,7 @@ Proposed → Draft → Challenge Review ←→ Revise → Accepted → [Supersed
 
 ### 3. Challenge Review (Round 1)
 
-- Execute review using `reviews/adr-challenge-review-template.md`.
+- Execute review using `templates/adr-challenge-review-template.md`.
 - Search online for authoritative sources to validate all claims and standards. Document findings in the review artifact.
 - Save the review artifact to `reviews/adr-NNNN-review-YYYY-MM-DD.md`.
 - Gate outcomes:
@@ -122,14 +122,14 @@ reviews/adr-NNNN-review-YYYY-MM-DD-rN.md      # Round N
 
 - **ADR-0044:** ADR Governance and Operating Model (Tier-0 authority)
 - **ADR-0051:** ADR Taxonomy and Classification Enforcement Standard
-- **Review template:** `reviews/adr-challenge-review-template.md`
+- **Review template:** `templates/adr-challenge-review-template.md`
 - **Metadata template:** `templates/adr-metadata-reference.md`
 
 ---
 
 ## Tier-4 Feature ADR Derivation
 
-This section applies exclusively to Tier-4 ADRs (`Feature Decision` or `Integration Decision`). It codifies the methodology from the feature-level ADR structure migration analysis.
+This section applies exclusively to Tier-4 ADRs (`Feature Decision` or `Integration Decision`).
 
 ### Core Principle
 

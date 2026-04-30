@@ -9,7 +9,7 @@
 | Field | Value |
 |-------|-------|
 | **ADR Under Review** | ADR-XXXX: [Title] |
-| **Reviewer Name & Title** | [Full Name], [Role/Team] |
+| **Reviewer** | SRE Team, supported by GitHub Copilot |
 | **Secondary Reviewers** | [Optional: comma-separated list] |
 | **Review Date** | [YYYY-MM-DD] |
 | **Revalidation Due** | [YYYY-MM-DD, typically 12 months from review] |
@@ -344,8 +344,7 @@ By signing off below, the reviewer confirms:
 
 | Field | Signature/Value |
 |-------|-----------------|
-| **Reviewer Name** | [Full legal name] |
-| **Reviewer Title** | [Job title / Role] |
+| **Reviewer** | SRE Team, supported by GitHub Copilot |
 | **Organization/Team** | [Team or org affiliation] |
 | **Sign-Off Date** | [YYYY-MM-DD] |
 | **Email** | [Contact for follow-up questions] |

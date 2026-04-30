@@ -101,7 +101,7 @@ Opens after Wave 5.
 
 ### Wave 6 — Feature ADR Derivation Methodology
 
-All Wave 6+ Tier-4 ADRs must follow the derivation methodology documented in the [authoring workflow](adr-authoring-workflow.md#tier-4-feature-adr-derivation). Mandatory checks: Derivation Test (4-point), Constraint Derivation Table, Feature-Specific Decisions table, and complex-feature scoping rules.
+All Wave 6+ Tier-4 ADRs must follow the derivation methodology documented in the [authoring workflow](references/adr-authoring-workflow.md#tier-4-feature-adr-derivation). Mandatory checks: Derivation Test (4-point), Constraint Derivation Table, Feature-Specific Decisions table, and complex-feature scoping rules.
 
 ### Wave 6 — ADR-0043 Rejection Summary
 
@@ -132,7 +132,7 @@ The HV review (finding V-017, Major) identified that the access domain has ~8 do
 |------|-------------|---------|--------|
 | TBD | Access Domain Contract Standard (Tier-3) — adapter Protocol, reconciliation lifecycle, request state machine, entitlement parsing, IDP naming, platform locks, multi-source config, service classification | Phase 1 complete | Not started |
 
-See: [HV review Tier-3 gap analysis](../../tmp/hv-review-tier3-gap-analysis-2026-04-30.md)
+The access domain has ~8 domain-specific contracts (adapter Protocol, reconciliation lifecycle, request state machine, entitlement parsing, IDP naming, platform locks, multi-source config, service classification) with no Tier-3 governance. See also the Cross-Cutting ADR Gaps section in the [migration map](adr-migration-map.md#cross-cutting-adr-gaps-non-feature).
 
 ### Wave 7 — Tier-4 ADRs
 
@@ -159,6 +159,7 @@ See: [HV review Tier-3 gap analysis](../../tmp/hv-review-tier3-gap-analysis-2026
 | TBD | AWS Ops Multi-Service Integration | `modules/aws` → `packages/aws_ops` | Multi-service integration, async access revocation, health monitoring | Phase 2 complete + Rule F4 | Not started |
 
 **Notes:**
+
 - SRE Ops and ATIP may not warrant Tier-4 ADRs (P4 — simple features). Evaluate during Phase 3.
 - Each module thaws one at a time (Rule F5). Migration order: Incident → Webhooks → AWS Ops → SRE Ops/ATIP.
 - Each thaw requires: Tier-4 ADR authored and challenge-reviewed, settings migration (Tier-5 ADRs 0070–0075), infrastructure service abstraction (replace raw DynamoDB/integration calls), plugin registration (hookimpl for routes, commands, jobs), tests for new package structure.
@@ -189,15 +190,15 @@ See: [HV review Tier-3 gap analysis](../../tmp/hv-review-tier3-gap-analysis-2026
 | Event dispatcher fix | `infrastructure/events/dispatcher.py` import-time side effects (ADR-0048 B4 / ADR-0049 S7 violation) | **Not started** — tracked as Phase 1 Item 4 |
 | Settings dissolution (code) | Extract AppSettings, independent singletons, narrow-slice providers (ADR-0055/0056 implementation) | **Not started** — unblocked (Wave 5 gate closed); tracked as Phase 1 Item 1 |
 | Provider restructuring (code) | ADR-0056/0076 Standard 3 violations (composition outside root) | **Not started** — blocked on settings dissolution; tracked as Phase 1 Item 2 |
-| Delegation review | Cross-wave ADR amendments for managed service delegation hierarchy (ADR-0045 P7). Tracker: `tmp/managed-services-delegation-adr-review-tracker-2026-04-30.md` | **Complete** — Phases 1–3 done (8 PASS, 3 Verified, 12 NONE verified). Phase 4 library ADRs deferred (custom interim accepted, flagged for Tier 1 delegation). |
-| HV review — redundancy consolidation | Prose consolidation of 5 redundancy/ambiguity findings across 7 ADR files. Proposal: `tmp/adr-redundancy-restructuring-proposal-2026-04-30.md` | **Complete** — H-001, H-002, H-005, H-007, H-008 all applied. |
+| Delegation review | Cross-wave ADR amendments for managed service delegation hierarchy (ADR-0045 P7) | **Complete** — Phases 1–3 done (8 PASS, 3 Verified, 12 NONE verified). Phase 4 library ADRs deferred (custom interim accepted, flagged for Tier 1 delegation). |
+| HV review — redundancy consolidation | Prose consolidation of 5 redundancy/ambiguity findings across 7 ADR files | **Complete** — H-001, H-002, H-005, H-007, H-008 all applied. |
 | API Versioning Strategy ADR (HV finding H-009) | Tier-2 standard for v2 endpoint introduction, deprecation lifecycle, and client migration. Not needed until first v2 endpoint is planned. | **DEFERRED** — trigger: first v2 endpoint planned |
 
 ---
 
 ## Feature ADR Gap Assessment
 
-Derived from the feature-level ADR structure migration analysis (2026-04-30). Tracks Tier-4 coverage gaps across feature domains.
+Tracks Tier-4 coverage gaps across feature domains.
 
 ### Prioritized Feature ADR Backlog
 
