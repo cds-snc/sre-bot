@@ -1,0 +1,50 @@
+name: Generate ADR Indexes
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - docs/decisions/adr/**
+  workflow_dispatch:
+  schedule:
+    # Every Monday at 9:00 AM EST (14:00 UTC)
+    - cron: "0 14 * * 1"
+
+permissions:
+  contents: write
+
+jobs:
+  generate-indexes:
+    name: Regenerate ADR index files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+        with:
+          # Use a token with push access so the bot commit can trigger downstream workflows
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@b64ffcaf5b410884ad320a9cfac8866006a109aa # v4.8.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install PyYAML==6.*
+
+      - name: Generate ADR indexes
+        run: python .github/scripts/generate_adr_indexes.py
+
+      - name: Commit updated indexes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/decisions/indexes/
+          if git diff --staged --quiet; then
+            echo "No changes to indexes."
+          else
+            git commit -m "chore: regenerate ADR indexes [skip ci]"
+            git push
+          fi

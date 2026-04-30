@@ -1,0 +1,106 @@
+name: ADR Review State Automation
+
+on:
+  schedule:
+    # Every Monday at 9:00 AM EST (14:00 UTC) — aligned with index generation
+    - cron: "0 14 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  update-review-states:
+    name: Update ADR review states and notify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@b64ffcaf5b410884ad320a9cfac8866006a109aa # v4.8.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install PyYAML==6.*
+
+      - name: Update ADR review states
+        run: |
+          python .github/scripts/update_adr_review_states.py \
+            --summary-out /tmp/adr_review_summary.json \
+            --report-out  /tmp/adr_review_report.md
+
+      - name: Commit updated review states
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/decisions/adr/
+          if git diff --staged --quiet; then
+            echo "No review state changes to commit."
+          else
+            git commit -m "chore: update ADR review states [skip ci]"
+            git push
+          fi
+
+      - name: Check whether notification issue is needed
+        id: check
+        run: |
+          python - <<'EOF'
+          import json, os
+          from pathlib import Path
+
+          summary = json.loads(Path("/tmp/adr_review_summary.json").read_text())
+          stale   = len(summary.get("by_state", {}).get("stale", []))
+          expiring = len(summary.get("by_state", {}).get("expiring-soon", []))
+          needs = "true" if (stale + expiring) > 0 else "false"
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+              fh.write(f"needs_review={needs}\n")
+              fh.write(f"stale_count={stale}\n")
+              fh.write(f"expiring_count={expiring}\n")
+
+          print(f"stale={stale}  expiring-soon={expiring}  needs_review={needs}")
+          EOF
+
+      # Ensure the label exists before trying to use it.
+      - name: Ensure adr-review label exists
+        if: steps.check.outputs.needs_review == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create "adr-review" \
+            --description "Scheduled ADR review notification" \
+            --color "e4e669" \
+            || true   # idempotent — ignore error if label already exists
+
+      # Close any previously open review notification issues to avoid stale ones
+      # piling up across weekly runs.
+      - name: Close previous review notification issues
+        if: steps.check.outputs.needs_review == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue list \
+            --label "adr-review" \
+            --state open \
+            --json number \
+            --jq '.[].number' \
+          | xargs -r -I{} gh issue close {} \
+              --comment "Superseded by new ADR review notification for $(date +%Y-%m-%d)."
+
+      - name: Create review notification issue
+        if: steps.check.outputs.needs_review == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STALE_COUNT: ${{ steps.check.outputs.stale_count }}
+          EXPIRING_COUNT: ${{ steps.check.outputs.expiring_count }}
+        run: |
+          gh issue create \
+            --title "ADR Review Required ($(date +%Y-%m-%d)): ${STALE_COUNT} stale, ${EXPIRING_COUNT} expiring soon" \
+            --label "adr-review" \
+            --body-file /tmp/adr_review_report.md
