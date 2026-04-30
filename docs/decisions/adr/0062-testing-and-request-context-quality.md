@@ -11,7 +11,7 @@ secondary_domains:
 owners:
   - SRE Team
 date_created: 2026-04-30
-last_updated: 2026-04-30
+last_updated: 2026-04-30  # R1 revision: S7 auto-mode caveat, S10 sync/async caveat
 last_reviewed: 2026-04-30
 next_review_due: 2026-08-28
 constrained_by:
@@ -199,9 +199,11 @@ Test fixtures construct the narrowest settings slice needed by the code under te
 
 Async route handlers and async services are tested with `pytest-asyncio` using `asyncio_mode = auto`.
 
+> **Configuration dependency:** pytest-asyncio's default mode is `strict`, which requires an explicit `@pytest.mark.asyncio` on every async test. This project opts into `auto` mode via `app/pytest.ini` (`asyncio_mode = auto`, line 3). The `auto` setting auto-discovers coroutine test functions and applies the marker implicitly. If this configuration line is removed or if a future pytest-asyncio version changes `auto` mode semantics, async test functions will be collected but **not awaited** — the coroutine object evaluates as truthy, so tests appear to pass while executing nothing. The project pins `pytest-asyncio==0.26.0` in `requirements_dev.txt` to lock this behavior.
+
 **Rules:**
 
-- `asyncio_mode = auto` is configured in `app/pytest.ini` — explicit `@pytest.mark.asyncio` decorators are not required for coroutine test functions.
+- `asyncio_mode = auto` is configured in `app/pytest.ini` — explicit `@pytest.mark.asyncio` decorators are not required for coroutine test functions. This is an opt-in setting (default is `strict`); the exact configuration line is `asyncio_mode = auto` under the `[pytest]` section.
 - Use `TestClient` for synchronous route handlers and simple integration tests.
 - Use `httpx.AsyncClient` with `asgi-lifespan.LifespanManager` for async routes that exercise `contextvars` propagation, cancellation, or task groups.
 - Background tasks spawned via `asyncio.create_task()` must be tested with the async client to verify correct `contextvars` isolation.
@@ -258,6 +260,12 @@ Request context (correlation ID, user identity, request metadata) propagates thr
 - Call `clear_contextvars()` at the start of each request (middleware responsibility).
 - Re-bind context explicitly in background tasks and scheduled jobs.
 - Honour incoming `X-Request-ID` or `X-Correlation-ID` headers for end-to-end traceability.
+
+> **Sync/async isolation caveat:** structlog documents that in Starlette/FastAPI applications, context variables set in a synchronous execution context are **not visible** in an asynchronous context and vice versa. This is a Python `contextvars` behavior in the Starlette threading model — when a `def` (sync) route handler runs in a thread pool, it receives a *copy* of the context, and mutations do not propagate back to the async context (or to other sync handlers). **Mitigations:**
+>
+> 1. **Prefer `async def` route handlers** so that middleware and handler share the same async context.
+> 2. If sync handlers are required, ensure the middleware binds context **before** Starlette dispatches to the thread pool — context variables *inherited* at thread-pool dispatch time are visible in the sync handler, but variables *bound inside* the sync handler are not visible to async code after the handler returns.
+> 3. When testing sync/async boundary behavior, use `httpx.AsyncClient` (not `TestClient`) to exercise the real ASGI dispatch path and verify context propagation end-to-end.
 
 ### Standard 11: Log Suppression in Tests
 
@@ -396,7 +404,7 @@ The codebase is pre-ADR — existing patterns are ground truth, not violations. 
 | pytest 9.x documentation | Tests inside application package with simple imports | ✅ `app/tests/` with `pythonpath = app` in root `pytest.ini` |
 | pytest fixture best practices | Factory-as-fixture pattern for configurable test data | ✅ Standard 5 codifies factory-as-fixture |
 | FastAPI testing documentation | `TestClient` with `dependency_overrides` for route testing | ✅ Standard 3 codifies this pattern |
-| structlog documentation | `contextvars` for per-request structured logging context | ✅ Standard 10 codifies `structlog.contextvars` binding |
+| structlog documentation | `contextvars` for per-request structured logging context; sync/async isolation caveat | ✅ Standard 10 codifies `structlog.contextvars` binding with sync/async caveat |
 | PEP 544 | Protocol for structural subtyping | ✅ Standard 4 requires Protocol-conformant test doubles |
 | Python typing best practices | Test doubles should satisfy the same interface contract | ✅ Standard 4 aligns test doubles with ADR-0077 categories |
 | Twelve-Factor App (Factor X: Dev/prod parity) | Keep development, staging, production as similar as possible | ✅ Standards 6, 12 ensure test isolation without diverging from production behavior |

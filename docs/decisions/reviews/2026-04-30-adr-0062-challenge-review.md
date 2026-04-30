@@ -13,8 +13,9 @@
 | **Secondary Reviewers** | — |
 | **Review Date** | 2026-04-30 |
 | **Revalidation Due** | 2027-04-30 |
-| **Gate Outcome** | ⚪ **REVISE** |
-| **Outcome Rationale** | Two blockers: (1) Standard 7 claims `asyncio_mode = auto` eliminates the need for `@pytest.mark.asyncio` without noting that auto mode is opt-in (default is strict) and version-dependent; (2) Standard 10 does not address the structlog-documented sync/async contextvars isolation caveat in Starlette/FastAPI apps. |
+| **Gate Outcome** | ✅ **ACCEPT** (revised from ⚪ REVISE) |
+| **Outcome Rationale** | Original R1 identified two blockers. Both resolved in same-day revision: (1) Standard 7 now documents that `asyncio_mode = auto` is opt-in (default `strict`), references exact `pytest.ini` line, and notes pinned `pytest-asyncio==0.26.0`; (2) Standard 10 now includes the structlog-documented sync/async contextvars isolation caveat with three specific mitigations. |
+| **Revision Applied** | 2026-04-30 — same-day R1 revision addressing both blockers |
 
 ---
 
@@ -316,11 +317,11 @@
 
 | Action | Blocker? | Owner | Due Date | Description |
 |--------|----------|-------|----------|-------------|
-| Add structlog sync/async caveat to S10 | ✅ Yes | ADR Author | 2026-05-05 | structlog docs warn about sync/async context isolation in Starlette/FastAPI. S10 must document caveat and mitigation (consistent concurrency model or explicit re-binding). |
-| Clarify pytest-asyncio auto mode in S7 | ✅ Yes | ADR Author | 2026-05-05 | Note `auto` is opt-in (default is `strict`), reference exact `pytest.ini` entry, note pinned version (`pytest-asyncio==0.26.0`). |
+| Add structlog sync/async caveat to S10 | ✅ Yes | ADR Author | 2026-05-05 | ✅ **Resolved 2026-04-30.** Standard 10 now includes sync/async isolation caveat blockquote with three mitigations: prefer `async def` handlers, bind context before thread-pool dispatch, use AsyncClient for boundary testing. |
+| Clarify pytest-asyncio auto mode in S7 | ✅ Yes | ADR Author | 2026-05-05 | ✅ **Resolved 2026-04-30.** Standard 7 now includes configuration-dependency callout noting `auto` is opt-in (default `strict`), references `app/pytest.ini` line 3, and notes pinned `pytest-asyncio==0.26.0`. |
 | ADR-0065 dependency verification | ❌ No | Wave 5 | Wave 5 gate | Once ADR-0065 accepted, verify S4's Category A classification still holds. |
 
-**Blocking Actions Must Resolve Before Step 10 Proceeds.**
+**All blocking actions resolved. ADR-0062 may proceed to Step 10.**
 
 ---
 
@@ -328,14 +329,14 @@
 
 **GATE DECISION:**
 
-⚪ **REVISE** → ADR-0062 requires authoring revision; return to author team with feedback
+✅ **ACCEPT** (revised from ⚪ REVISE)
 
-**Primary Blockers:**
+**Original Blockers (both resolved 2026-04-30):**
 
-1. **Standard 10 missing structlog sync/async caveat:** structlog warns contextvars set in sync context are invisible in async context within Starlette/FastAPI. Standard 10 must add a rule addressing this or the ADR recommends a pattern that can silently fail in production.
-2. **Standard 7 pytest-asyncio auto mode underspecified:** ADR claims auto mode eliminates `@pytest.mark.asyncio` without noting auto is opt-in (default is strict). ADR should be self-contained and reference the required configuration.
+1. ~~**Standard 10 missing structlog sync/async caveat**~~ → Resolved. Standard 10 now includes a dedicated caveat blockquote documenting the sync/async contextvars isolation behavior with three actionable mitigations.
+2. ~~**Standard 7 pytest-asyncio auto mode underspecified**~~ → Resolved. Standard 7 now includes a configuration-dependency callout noting `auto` is opt-in, referencing the exact `pytest.ini` entry, and noting the pinned version.
 
-**Revision Deadline:** 2026-05-05
+**Remaining Non-Blocking:** ADR-0065 dependency verification (Wave 5 gate).
 
 ---
 
