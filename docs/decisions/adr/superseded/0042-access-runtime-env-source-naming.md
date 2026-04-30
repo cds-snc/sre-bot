@@ -1,17 +1,18 @@
 ---
 adr_id: ADR-0042
 title: "Access Runtime Env-Source Variable Naming"
-status: Accepted
+status: Superseded
 decision_type: Feature
 tier: Tier-4
 date_created: 2026-04-27
-last_updated: 2026-04-27
+last_updated: 2026-04-30
 last_reviewed: unknown
 next_review_due: 2026-04-28
 owners:
   - SRE Team
 supersedes: []
-superseded_by: []
+superseded_by:
+  - ADR-0066
 related_records:
   - ADR-0007
   - ADR-0008
@@ -41,6 +42,7 @@ Rename env vars to use `ACCESS_CONFIG_` prefix (semantic match with ACCESS_CONFI
 **Status**: Accepted
 **Applies to**: `app/packages/access/common/config/loaders.py` — `_EnvModel` in `EnvConfigLoader`
 **Context Note**:
+
 - Architecture review notes were in the transition folder (removed from repository history)
 
 ---
