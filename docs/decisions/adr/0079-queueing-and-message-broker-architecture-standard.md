@@ -1,7 +1,7 @@
 ---
 adr_id: ADR-0079
 title: "Queueing and Message-Broker Architecture Standard"
-status: Draft
+status: Accepted
 decision_type: Standard
 tier: Tier-2
 primary_domain: Runtime and Lifecycle

@@ -1,0 +1,290 @@
+# ADR Challenge and Content Review — ADR-0079 (Post-Rework)
+
+**Purpose:** Full challenge review of ADR-0079: Queueing and Message-Broker Architecture Standard in its current post-delegation-rework state. The prior R2 PASS (2026-04-29) was issued before the managed service delegation rework (2026-04-30), which substantially revised 5 of 7 standards. This review evaluates the complete post-rework document.
+
+---
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0079: Queueing and Message-Broker Architecture Standard |
+| **Reviewer Name & Title** | Architecture Review (AI-assisted), SRE Team |
+| **Secondary Reviewers** | — |
+| **Review Date** | 2026-04-30 |
+| **Prior Reviews** | R1 REVISE (2026-04-29), R2 PASS (2026-04-29, pre-rework), delegation rework PASS (2026-04-30, amendment-scoped) |
+| **Revalidation Due** | 2026-08-28 |
+| **Gate Outcome** | ✅ **PASS** |
+| **Outcome Rationale** | All 7 standards are sound in their post-rework state. The delegation rework correctly narrowed Standards 1/3/4/5/6 to respect the managed service's ownership of operational mechanics (delivery semantics, DLQ, visibility timeout, poll intervals) while retaining the application's architectural responsibilities (Protocol contracts, lifecycle integration, handler registration, backend selection). Standard 2 (event dispatcher remediation) is unchanged and remains the only immediate P1 action. Standard 7 evolution phases are correctly reframed around managed service adoption. Codebase audit accurately identifies all violations. No cross-ADR contradictions detected. |
+
+---
+
+## 2. Evidence Gathering & Convention Validation
+
+### 2.A Language & Framework Standards
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| PEP 544 — Protocols | Protocol-based queue abstractions | Protocols for `RetryStore` and `RetryProcessor` already exist in the retry infrastructure. Standard 1 mandates Protocol contract for queue service (Category A). Shape deferred to implementation time — consistent with PEP 544's structural subtyping philosophy. | ✅ Aligned | — |
+| FastAPI Lifespan Events | Consumer lifecycle in lifespan | FastAPI lifespan provides the async context manager for startup/shutdown. Standard 5 correctly integrates queue consumers with lifespan Phase 5 (transport) and shutdown step 2. | ✅ Aligned | — |
+| Pluggy Documentation | Hookspec-based handler registration | Pluggy hookspecs enable zero-touch discovery per ADR-0049. Standard 2's `register_event_handlers` hookspec follows established pluggy patterns. The codebase already uses `register_background_job` hookspec for scheduled tasks. | ✅ Aligned | — |
+| Pydantic BaseSettings | Queue settings partitioning | `QueueSettings` as independent `BaseSettings` class with `@lru_cache` singleton follows ADR-0055/0056 patterns. Existing `RetrySettings` in `app/infrastructure/configuration/infrastructure/retry.py` provides a reference. | ✅ Aligned | — |
+
+### 2.B Infrastructure & Operational Standards
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Twelve-Factor Factor VIII — Concurrency | Process type diversity | Factor VIII distinguishes web and worker process types. ADR-0079 Standard 7 Phase 4 correctly defers worker separation to a future trigger (resource contention), not a current mandate. The colocated model is appropriate for current scale. | ✅ Aligned | Single-process model is an intentional deviation; documented in Revalidation. |
+| AWS SQS Best Practices | At-least-once delivery, DLQ, visibility timeout | SQS provides at-least-once delivery natively. DLQ is configured via infrastructure-as-code (max receive count, redrive policy). Standard 3 correctly positions delivery semantics as managed service responsibility. Standard 4 correctly defers DLQ config to Terraform. | ✅ Aligned | — |
+| Enterprise Integration Patterns | Dead-letter channel, idempotent receiver | DLC pattern is a broker responsibility; idempotent receiver is a consumer responsibility. Standard 3 Rule 2 correctly mandates idempotent consumers. Standard 4 correctly separates DLQ routing (broker) from poison-message logging (app). | ✅ Aligned | — |
+| Cosmic Python Ch. 11 | Handler registration, message bus abstraction | Event handler registration should be explicit (not import-time). Standard 2 aligns with this guidance by mandating startup-driven pluggy-based registration. | ✅ Aligned | — |
+| ADR-0045 P7 — Delegation Hierarchy | Tier 1 managed cloud service preferred | Queue infrastructure is correctly classified as Tier 1 target. Standards 1/3/4/5/6 correctly defer operational mechanics to the managed service. Protocol shape deferred to SDK wrapping (Standard 1 Rule 1). | ✅ Aligned | — |
+| ADR-0046 Invariant 2 — Lifecycle Phases | Phase ordering for consumers | Queue consumer registration in Phase 3 (discovery), handler registration in Phase 4 (feature activation), consumer start in Phase 5 (transport). All phase numbers corrected in R2. | ✅ Aligned | — |
+| ADR-0046 Invariant 4 — Reverse Shutdown | Shutdown ordering | Shutdown step 2 for queue consumers (reverse of Phase 5). Background workers stop in step 1, then transport (including queue consumers) in step 2. | ✅ Aligned | — |
+| ADR-0057 Standard 2 — Shutdown Budgeting | Consumer drain timeout | Standard 5 Rule 3 correctly mandates drain within shutdown timeout budget. Unacknowledged messages returned to queue via visibility timeout expiry. | ✅ Aligned | — |
+| ADR-0077 Standard 1 — Category A | Queue service classification | Queue services classified as Category A (abstract backing service, feature-facing). EventDispatcher classified as Category B (currently in-process, reclassify to A if migrated to durable broker). Correct per ADR-0077 taxonomy. | ✅ Aligned | — |
+
+### 2.C Cross-Cutting Design Patterns
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Hexagonal Architecture — Ports and Adapters | Queue Protocol as port | Standard 1 positions the queue Protocol as the port; managed service SDK wrapper as the adapter; in-memory implementation as the test adapter. This follows the port/adapter pattern. | ✅ Aligned | — |
+| Composition Root | Provider-based queue construction | Queue service construction in provider layer (ADR-0056 Standard 4). `QUEUE_BACKEND` settings-driven factory selects the adapter. | ✅ Aligned | — |
+
+### 2.D Validation Summary
+
+**Total Standards Checked:** 13
+**Aligned with Best Practice:** 13
+**Deliberate Deviations:** 1 (single-process model — documented and justified)
+
+**High-Level Finding:** 🟢 **Fully Grounded** — All standards checked; single deliberate deviation has documented rationale.
+
+---
+
+## 3. Assumptions Challenged
+
+### Assumption 3.1: Deferring Protocol shape to implementation time is sound
+
+- **Stated Norm:** Standard 1 Rule 1: "The Protocol shape should emerge from wrapping the actual managed service SDK, not from pre-designed generic abstractions."
+- **Underlying Assumption:** Pre-designed Protocols risk mismatching the actual SDK surface. Better to let shape emerge.
+- **Challenge:** Could the lack of a pre-defined Protocol slow down implementation or lead to ad-hoc interfaces?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — The retry store's `RetryStore` Protocol already exists and its SQS backend is declared but not implemented. When the SQS backend is built, the Protocol may need revision to accommodate SQS-specific concerns (message attributes, receipt handles). Pre-defining a generic `MessageProducer`/`MessageConsumer` would likely require revision anyway.
+- **Confidence (ADR survives challenge):** 🟢 High
+- **Reviewer Notes:** Standard 1 provides clear architectural guardrails (Protocol contract, Category A, dev/test fallback, lifecycle integration) without pre-designing the interface. This is the correct balance.
+
+### Assumption 3.2: Delivery semantics as a posture statement (not app-level standard) is correct
+
+- **Stated Norm:** Standard 3: "Delivery semantics are properties of the managed queue service, not application-architecture standards."
+- **Underlying Assumption:** The managed service owns delivery guarantees; the application documents reliance.
+- **Challenge:** Could the application need to enforce stronger guarantees than the managed service provides (e.g., exactly-once)?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — SQS standard queues provide at-least-once delivery, which is the expected semantic. If exactly-once is needed, SQS FIFO queues or application-level deduplication (via `IdempotencyService`) are the solutions — both are acknowledged in Standard 3 Rule 2 ("Use the `IdempotencyService` for deduplication where needed").
+- **Confidence (ADR survives challenge):** 🟢 High
+
+### Assumption 3.3: DLQ as infrastructure-as-code is correct
+
+- **Stated Norm:** Standard 4: "DLQ configuration is an infrastructure-as-code concern (Terraform), not an application architecture standard."
+- **Underlying Assumption:** DLQ routing is a broker configuration, not application logic.
+- **Challenge:** Could the application need to influence DLQ behavior at runtime (e.g., conditional redrive)?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — AWS SQS DLQ is configured via queue policy (max receive count, redrive policy) in Terraform. The application's responsibility is to handle poison messages gracefully (log, don't crash) — which Standard 4 Rule 2 mandates. Conditional redrive is an extremely rare pattern that would require explicit justification.
+- **Confidence (ADR survives challenge):** 🟢 High
+
+### Assumption 3.4: Event dispatcher remediation can proceed independently of queue adoption
+
+- **Stated Norm:** Standard 2 Timeline: "The event dispatcher remediation is independent of the durable queue migration."
+- **Underlying Assumption:** Fixing import-time side effects doesn't require a durable broker.
+- **Challenge:** Could the remediation create wasted work if the event dispatcher is later replaced by a managed queue?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — Standard 2 fixes an ADR-0048 B4 violation (import-time side effects). This violation exists regardless of whether a durable broker is adopted. The remediated `EventDispatcher` with pluggy-based registration becomes a cleaner foundation for future queue migration. The codebase confirms only 3 production handlers, making migration scope small.
+- **Confidence (ADR survives challenge):** 🟢 High
+
+### Assumption 3.5: Colocated single-process model is appropriate for current scale
+
+- **Stated Norm:** Standard 7: Worker separation (Phase 4) deferred to resource contention trigger.
+- **Underlying Assumption:** Current workload doesn't require dedicated worker processes.
+- **Challenge:** Could queue consumers on a web process cause request latency issues?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — The current model runs background jobs (schedule-based) in a non-daemon thread alongside the FastAPI web process. ADR-0058 Standard 4 governs the two-tier concurrency classification (singleton-lock vs. idempotent) for colocated workers. Queue consumers in Phase 2 would follow the same colocated model initially, with Phase 4 providing the escape hatch.
+- **Confidence (ADR survives challenge):** 🟢 High
+
+### Assumption 3.6: Lifecycle phase numbers are correct post-R2 correction
+
+- **Stated Norm:** Queue consumers start in Phase 5 (transport), stop in shutdown step 2.
+- **Underlying Assumption:** Phase numbers match ADR-0046 Invariant 2 canonical ordering.
+- **Challenge:** Verify all phase number references are consistent.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — Verified all phase references in the document:
+  - Consumer registration: Phase 3 (discovery and registration) ✅ per ADR-0046
+  - Event handler registration: Phase 4 (feature activation) ✅ per ADR-0046
+  - Consumer start: Phase 5 (transport) ✅ per ADR-0046
+  - Shutdown: step 2 (reverse of Phase 5) ✅ per ADR-0046 Invariant 4
+  - Compliance section: Phase 3/4/5 progression ✅
+- **Confidence (ADR survives challenge):** 🟢 High
+
+---
+
+## 4. Failure Modes Identified
+
+### Failure Mode 4.1: Pre-designed Protocol doesn't match SQS SDK surface
+
+- **If Assumption Fails:** N/A — Standard 1 explicitly defers Protocol design to implementation time, avoiding this failure mode. This was the motivation for the delegation rework.
+- **Platform Impact:** None — mitigated by design.
+- **Probability Estimate:** Eliminated by rework.
+- **Mitigation or Acceptance:** Standard 1 Rule 1 mandates Protocol shape emergence from SDK wrapping.
+
+### Failure Mode 4.2: Event dispatcher remediation breaks existing handler registrations
+
+- **If Assumption Fails:** The 3 production handlers in `app/modules/groups/events/handlers.py` stop receiving events during migration.
+- **Platform Impact:**
+  - Incident management workflow: None
+  - Access synchronization workflow: None (handlers are groups-domain)
+  - Access request workflow: None
+  - Multi-provider integrations: Low (group membership events temporarily disrupted)
+- **Probability Estimate:** Low — the migration is a mechanical transformation (decorator → hookimpl)
+- **Mitigation or Acceptance:** Standard 2 provides explicit migration steps. Only 3 handlers need migration. Test coverage confirms handler behavior.
+
+---
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| None identified | — | — | — |
+
+All upstream constraint references verified:
+
+- ADR-0045 P7 (delegation hierarchy): ✅ Standards 1/3/4/6/7 implement Tier 1 managed service preference
+- ADR-0046 Invariant 2 (lifecycle phases): ✅ Phase numbers corrected in R2, verified
+- ADR-0046 Invariant 4 (reverse shutdown): ✅ Shutdown step 2 for consumers
+- ADR-0048 B4 (no import-time side effects): ✅ Standard 2 remediates violation
+- ADR-0049 S7 (zero-touch extension): ✅ Standard 2 mandates pluggy hookspec
+- ADR-0050 S1 (OperationResult): ✅ Consumer operations use OperationResult
+- ADR-0052 (build-release-run): ✅ Standard 6 mandates release-phase binding
+- ADR-0054 (structured logging): ✅ Error isolation with structured context
+- ADR-0055 S1/S9 (settings): ✅ Standard 6 mandates QueueSettings with backend-selection
+- ADR-0056 S1/S8 (providers): ✅ Backend-selection factory pattern
+- ADR-0057 S2 (shutdown budgeting): ✅ Standard 5 mandates drain within timeout
+- ADR-0058 S4 (concurrency classification): ✅ Referenced for multi-instance consumers
+- ADR-0077 (service classification): ✅ Queue = Category A, EventDispatcher = Category B
+
+### Supersession Ambiguities
+
+- **ADRs this one supersedes:** None
+- **Inheritance Status:** N/A — no superseded ADRs. This is a new standard addressing a previously ungoverned domain.
+- **Gaps Identified:** None
+
+### Ownership Clarity
+
+- **Primary Domain Owner:** SRE Team
+- **Secondary Domain Owners:** None
+- **Plugin/Startup Registration:** Queue consumer registration via pluggy hookspecs (ADR-0049). Event handler registration via `register_event_handlers` hookspec (Standard 2).
+- **Config Owner:** `QueueSettings` (target state). Currently `RetrySettings` exists with `RETRY_BACKEND`.
+- **Audit Result:** ✅ Clear
+
+---
+
+## 6. Scenario Validation Matrix
+
+### Scenario 6.1: Event Dispatch (Current In-Process Model)
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Handler registration | Standard 2: pluggy hookspec during startup | Currently: `@register_event_handler` at import time | ⚠️ Yes | **Known violation** — remediation path defined |
+| Error isolation | Standard 2 Rule 5: catch/log/continue | `safe_run()` wrapper catches and logs exceptions | ✅ No | Existing behavior codified |
+| Correlation propagation | Standard 2 Rule 4: propagate correlation_id | `Event[T]` dataclass carries correlation_id | ✅ No | Existing pattern |
+
+**Validation Summary:** ⚠️ Aligned with documented remediation path (Standard 2 violation is the reason this ADR exists)
+
+### Scenario 6.2: Retry Queue (DynamoDB Backend)
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Protocol contract | Standard 1: Protocol-backed facade | `RetryStore` and `RetryProcessor` Protocols exist | ✅ No | Directionally aligned |
+| Backend selection | Standard 6: `QUEUE_BACKEND` settings | `RETRY_BACKEND: Literal["memory", "dynamodb", "sqs"]` exists | ✅ No | Existing pattern |
+| Dev/test fallback | Standard 1 Rule 4: in-memory fallback | `InMemoryRetryStore` exists | ✅ No | Pattern established |
+
+**Validation Summary:** ✅ Fully aligned (retry infrastructure is the reference pattern)
+
+### Scenario 6.3: Future SQS Queue Consumer (Phase 2)
+
+| Aspect | ADR Requirement | Workflow Reality | Gap? | Notes |
+|--------|-----------------|------------------|------|-------|
+| Protocol contract | Standard 1 Rule 1: shape emerges from SDK wrapping | Not yet implemented | ✅ No | Correctly deferred |
+| Consumer lifecycle | Standard 5: Phase 5 start, shutdown step 2 stop | Existing platform providers demonstrate the pattern | ✅ No | Lifespan integration established |
+| DLQ configuration | Standard 4: Terraform-configured | Existing Terraform infrastructure manages SQS | ✅ No | Pattern exists in terraform/ |
+
+**Validation Summary:** ✅ Standards provide clear architectural guidance for when Phase 2 is triggered
+
+---
+
+## 7. Tradeoffs Accepted
+
+### Tradeoff 7.1: Posture statements vs. prescriptive standards (Standards 3/4)
+
+- **Chosen:** Standards 3 and 4 are posture statements — the app documents reliance on managed service semantics.
+- **Rejected:** Prescriptive at-least-once/DLQ standards with app-level enforcement.
+- **Rationale:** The managed service (SQS) owns delivery semantics and DLQ routing. App-level duplication creates governance overhead without value. ADR-0045 P7 mandates trusting the managed service for its domain.
+- **Risk Accepted:** If the managed service's semantics change, the app may be affected without app-level guards.
+- **Contingency:** Document relied-upon semantics (Standard 3 Rule 1) to make dependencies explicit.
+
+### Tradeoff 7.2: Deferred Protocol shape vs. immediate interface definition
+
+- **Chosen:** Protocol shape deferred to SDK wrapping time (Standard 1 Rule 1).
+- **Rejected:** Pre-defined `MessageProducer`/`MessageConsumer` Protocols.
+- **Rationale:** Pre-designed Protocols risk mismatching actual SDK surface. The delegation rework identified this as the root issue.
+- **Risk Accepted:** No compile-time contract verification until implementation begins.
+- **Contingency:** Existing retry store Protocols provide a reference pattern. Standard 1 provides clear architectural guardrails.
+
+### Tradeoff 7.3: Colocated consumers vs. dedicated workers
+
+- **Chosen:** Queue consumers colocated with web process (Phase 2). Worker separation deferred (Phase 4).
+- **Rejected:** Mandating separate worker processes immediately.
+- **Rationale:** Current ECS Fargate model is single-process. Worker separation adds infrastructure complexity (separate task definition, ALB routing, health checks). Not justified until resource contention is observed.
+- **Risk Accepted:** Queue consumer CPU usage could affect web request latency.
+- **Contingency:** Phase 4 (Standard 7) defines the evaluation trigger and migration path.
+
+---
+
+## 8. Follow-Up Actions
+
+| Action | Blocker? | Owner | Due Date | Description |
+|--------|----------|-------|----------|-------------|
+| Event dispatcher remediation (Standard 2) | ❌ No | SRE Team | After acceptance | P1: encapsulate handler registry, add pluggy hookspec, migrate 3 handlers |
+| Add `register_event_handlers` hookspec | ❌ No | SRE Team | After acceptance | Plugin manager update for event handler registration |
+| Update ADR-0058 `related_records` | ❌ No | SRE Team | After acceptance | Add ADR-0079 to ADR-0058 related_records (already present per evidence) |
+
+**No blocking actions.** All follow-ups are post-acceptance implementation items.
+
+---
+
+## 9. Binary Gate Outcome
+
+**GATE DECISION:**
+
+✅ **PASS** → ADR-0079 is professionally sound and ready for acceptance.
+
+**Summary:**
+
+- 7 standards grounded in 13 authoritative sources with 1 documented deliberate deviation
+- 6 assumptions challenged, all at 🟢 High confidence
+- 1 failure mode with Low probability and defined mitigation; 1 failure mode eliminated by rework
+- Zero cross-ADR contradictions
+- 3 scenarios validated (in-process event dispatch, retry queue, future SQS consumer)
+- All lifecycle phase number references verified against ADR-0046 Invariant 2
+- Delegation rework correctly narrowed standards to respect managed service ownership boundaries
+- Codebase audit accurately identifies the event dispatcher import-time side effect violation
+
+---
+
+## 10. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer Name** | Architecture Review (AI-assisted) |
+| **Reviewer Title** | SRE Architecture Review |
+| **Organization/Team** | SRE Team |
+| **Sign-Off Date** | 2026-04-30 |
