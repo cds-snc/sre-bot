@@ -11,9 +11,9 @@ secondary_domains:
 owners:
  - SRE Team
 date_created: 2026-04-29
-last_updated: 2026-04-29
-last_reviewed: 2026-04-29
-next_review_due: 2026-08-27
+last_updated: 2026-04-30
+last_reviewed: 2026-04-30
+next_review_due: 2026-08-28
 constrained_by:
  - ADR-0044
  - ADR-0048
@@ -30,6 +30,7 @@ related_records:
  - ADR-0047
  - ADR-0049
  - ADR-0054
+ - ADR-0055
  - ADR-0077
 related_packages:
  - app/infrastructure/services
@@ -42,26 +43,26 @@ related_packages:
 
 - Problem statement: The service provider layer in `app/infrastructure/services/providers.py` contains 17 `@lru_cache(maxsize=1)` singleton service providers (18 including `get_settings()`) and 3 non-cached platform provider accessors in a single 700+ line file. This file is the sole location responsible for constructing every infrastructure service. Five providers pass the full `Settings` object to service constructors instead of narrow slices, violating ADR-0047 Principle 4 and ADR-0048 Boundary 3. Every new infrastructure service requires a three-file edit (providers.py + dependencies.py + \_\_init\_\_.py), creating ceremony proportional to service count. The file mixes genuinely shared platform capabilities (AWS clients, storage, identity) with domain-specific services (command, notification, platform) and convenience accessors (get\_slack\_provider, get\_teams\_provider) that don't use `@lru_cache`. Meanwhile, feature packages like `app/packages/access` have independently developed a package-local provider pattern that is proven and deployed but not explicitly permitted by any Tier-1 or Tier-2 ADR. The legacy ADR-0012 (Provider Discovery) defined a rigid load-order model (Groups -> Commands -> Platforms) that is superseded by the pluggy-based registration model in ADR-0049. The legacy ADR-0025 (Interaction Providers Concept) is superseded by ADR-0078 (Platform Services Architecture, 2026-04-29) - the unified `InteractionProvider` interface was rejected in favor of concrete per-platform services (`SlackService`, `TeamsService`). Platform services are Category C infrastructure implementation details (ADR-0077) and may use simpler provider patterns since they are infrastructure-internal.
 - Business/operational drivers:
- - Establish the canonical composition model for singleton service providers after ADR-0055 settings dissolution.
- - Enforce narrow-slice injection: no service constructor may accept the full `Settings` object.
- - Explicitly permit and govern package-local providers for feature packages.
- - Define whether infrastructure providers remain centralized or distribute to their service modules.
- - Simplify or govern the three-file DI alias ceremony (providers.py + dependencies.py + \_\_init\_\_.py).
- - Clarify the role and permissibility of non-cached convenience accessors in the provider layer.
- - Define the provider dependency graph shape and composition depth rules.
+- Establish the canonical composition model for singleton service providers after ADR-0055 settings dissolution.
+- Enforce narrow-slice injection: no service constructor may accept the full `Settings` object.
+- Explicitly permit and govern package-local providers for feature packages.
+- Define whether infrastructure providers remain centralized or distribute to their service modules.
+- Simplify or govern the three-file DI alias ceremony (providers.py + dependencies.py + \_\_init\_\_.py).
+- Clarify the role and permissibility of non-cached convenience accessors in the provider layer.
+- Define the provider dependency graph shape and composition depth rules.
 - Constraints:
- - All provider functions are the sole constructors for their services (ADR-0048 B3: constructor-only dependency receipt).
- - Providers must be consumed through a single injection boundary (ADR-0048 B2).
- - No import-time side effects from provider modules (ADR-0048 B4, ADR-0049 S8).
- - Infrastructure sibling isolation: infrastructure packages must not import from other infrastructure service implementations directly (ADR-0048 B5).
- - Settings dissolution (ADR-0055) replaces the single `get_settings()` call with domain-specific settings providers.
- - Plugin registration and startup ordering follows ADR-0046 and ADR-0049.
- - Dev/prod parity constraints from ADR-0054 apply to provider behavior consistency.
+- All provider functions are the sole constructors for their services (ADR-0048 B3: constructor-only dependency receipt).
+- Providers must be consumed through a single injection boundary (ADR-0048 B2).
+- No import-time side effects from provider modules (ADR-0048 B4, ADR-0049 S8).
+- Infrastructure sibling isolation: infrastructure packages must not import from other infrastructure service implementations directly (ADR-0048 B5).
+- Settings dissolution (ADR-0055) replaces the single `get_settings()` call with domain-specific settings providers.
+- Plugin registration and startup ordering follows ADR-0046 and ADR-0049.
+- Dev/prod parity constraints from ADR-0054 apply to provider behavior consistency.
 - Non-goals:
- - This record does not define specific service constructor signatures or internal service design.
- - This record does not define plugin registration mechanics (governed by ADR-0049).
- - This record does not define settings class structure or ownership (governed by ADR-0055).
- - This record does not define the HTTP-first interaction pattern for platform providers (governed by ADR-0059, Feature Interaction Boundaries and Platform Integration Standard). ADR-0025 (Interaction Providers Concept) is superseded by ADR-0078 (Platform Services Architecture); the provider-layer governance aspects that were in ADR-0025 are covered by this record.
+- This record does not define specific service constructor signatures or internal service design.
+- This record does not define plugin registration mechanics (governed by ADR-0049).
+- This record does not define settings class structure or ownership (governed by ADR-0055).
+- This record does not define the HTTP-first interaction pattern for platform providers (governed by ADR-0059, Feature Interaction Boundaries and Platform Integration Standard). ADR-0025 (Interaction Providers Concept) is superseded by ADR-0078 (Platform Services Architecture); the provider-layer governance aspects that were in ADR-0025 are covered by this record.
 
 ## Decision
 
@@ -226,6 +227,53 @@ Non-cached convenience accessor functions (functions that retrieve a specific pr
 
 **Accessors must not be created for services that can be obtained via direct provider calls.** The accessor pattern is reserved for registry-backed lookups where the identity of the provider is determined at runtime (e.g., platform provider registry). If a service is always the same concrete instance, use a standard `@lru_cache` provider.
 
+### Standard 8: Backend-Selection Logic in Providers
+
+When a Category A service (ADR-0077) supports multiple backing implementations selectable through configuration (ADR-0045 P7, ADR-0047 P6), the provider must implement settings-driven backend selection using a factory pattern.
+
+#### 8.1 Factory Pattern
+
+Backend selection must be a deterministic branch on a `*_BACKEND` settings key (ADR-0055). The factory reads the backend key from the service's settings slice and constructs the appropriate implementation:
+
+```python
+@lru_cache(maxsize=1)
+def get_retry_store() -> RetryStore:  # Returns Protocol type
+    retry_settings = get_retry_settings()
+    backend = retry_settings.backend
+
+    if backend == "memory":
+        return InMemoryRetryStore(config=retry_settings.config)
+    elif backend == "dynamodb":
+        dynamodb = get_aws_clients().dynamodb
+        return DynamoDBRetryStore(
+            config=retry_settings.config,
+            table_name=retry_settings.dynamodb_table_name,
+            dynamodb=dynamodb,
+        )
+    else:
+        raise ValueError(f"Unknown retry backend: {backend}")
+```
+
+#### 8.2 Backend-Selection Rules
+
+| # | Rule | Rationale |
+|---|------|-----------|
+| B1 | Backend selection must read from a dedicated `*_BACKEND` settings key (ADR-0055) | Settings-driven, not code-driven (Twelve-Factor IV) |
+| B2 | The settings key must be a `Literal` type constraining valid values | Fail-fast at startup if invalid (ADR-0047 P3) |
+| B3 | The settings key must default to a dev-safe value (typically `"memory"`) | Dev startup without cloud credentials (ADR-0047 P6) |
+| B4 | The factory must raise `ValueError` for unknown backend values | Fail-fast, not silent fallback |
+| B5 | The factory return type must be the Protocol type, not a concrete class | Backend substitution without consumer code changes (ADR-0077 S2) |
+| B6 | Each backend branch must construct only the dependencies it needs | `"memory"` branch must not call `get_aws_clients()` |
+| B7 | The factory may be inline in the provider or extracted to a module-level factory function | Inline is preferred for simple two-branch selections; extracted factory for complex multi-branch selections |
+
+#### 8.3 Provider Graph Impact
+
+Backend selection does not alter the provider graph shape (Standard 6). The provider function remains at the same composition depth regardless of which backend is selected. Conditional dependencies (e.g., `get_aws_clients()` only for `"dynamodb"` backend) are called inside the branch, not at the provider signature level.
+
+#### 8.4 Reference Implementation
+
+`app/infrastructure/resilience/retry/factory.py` — demonstrates the settings-driven factory pattern for `RetryStore` with `memory` and `dynamodb` backends. After ADR-0055 dissolution and ADR-0077 Protocol migration, this factory will be integrated into the provider function per rule B7.
+
 ### Standard 6: Provider Dependency Graph Shape
 
 The provider dependency graph must follow these structural rules:
@@ -321,50 +369,55 @@ The `t()` function in `providers.py` is a convenience wrapper around `get_transl
 ## Alternatives Considered
 
 1. Distribute infrastructure providers to their service modules:
- - Pros: Providers live next to the code they construct; smaller individual files.
- - Cons: Fragments the single injection surface (ADR-0048 B2). Developers must navigate to N directories to understand the full composition graph. The three-file ceremony is not reduced - it is spread across more locations. Import cycles become harder to prevent when provider modules import from sibling infrastructure modules.
- - Why not chosen: The composition graph is shallow (max depth 3) and the provider count is stable (16 cached + 3 accessors). Centralization's navigation cost is lower than distribution's fragmentation cost at this scale.
 
-2. Eliminate the DI alias ceremony - convention-based aliases:
- - Pros: Each service module exports its own `XDep = Annotated[X, Depends(get_x)]`, eliminating `dependencies.py`.
- - Cons: Breaks the single-import convention (`from infrastructure.services import XDep`). Developers must know which infrastructure module owns which service to find the alias. No curated public API surface.
- - Why not chosen: The ceremony cost (three file edits per new service) is acceptable given the low rate of new infrastructure service additions. The curated `__init__.py` provides significant discoverability value.
+- Pros: Providers live next to the code they construct; smaller individual files.
+- Cons: Fragments the single injection surface (ADR-0048 B2). Developers must navigate to N directories to understand the full composition graph. The three-file ceremony is not reduced - it is spread across more locations. Import cycles become harder to prevent when provider modules import from sibling infrastructure modules.
+- Why not chosen: The composition graph is shallow (max depth 3) and the provider count is stable (16 cached + 3 accessors). Centralization's navigation cost is lower than distribution's fragmentation cost at this scale.
 
-3. Allow package-local providers to register in the central providers.py:
- - Pros: Single location for all providers; complete composition graph visibility.
- - Cons: Violates ownership-follows-code (ADR-0047 P2). Feature package lifecycle decisions would require infrastructure file changes. Package removal would require editing infrastructure files.
- - Why not chosen: Feature packages must own their entire lifecycle, including provider construction. Central registration creates a coupling that contradicts the package autonomy model.
+1. Eliminate the DI alias ceremony - convention-based aliases:
 
-4. Prohibit non-cached convenience accessors:
- - Pros: Every function in `providers.py` has consistent `@lru_cache` semantics.
- - Cons: Forces callers into verbose two-step patterns (`get_platform_service().get_provider("slack")`). Eliminates type-safe accessors that provide concrete return types instead of generic `PlatformProvider`.
- - Why not chosen: Convenience accessors add ergonomic value and type safety. The "not cached" nature is documented and intentional - the underlying registry manages lifecycle.
+- Pros: Each service module exports its own `XDep = Annotated[X, Depends(get_x)]`, eliminating `dependencies.py`.
+- Cons: Breaks the single-import convention (`from infrastructure.services import XDep`). Developers must know which infrastructure module owns which service to find the alias. No curated public API surface.
+- Why not chosen: The ceremony cost (three file edits per new service) is acceptable given the low rate of new infrastructure service additions. The curated `__init__.py` provides significant discoverability value.
 
-5. Prohibit wide injection without mandating constructor refactoring:
- - Pros: Simpler to implement - only provider code changes, not service constructors.
- - Cons: Providers would extract slices and pass them as kwargs while constructors still accept `Settings`. This creates a false narrow-slice appearance while the constructor contract remains wide.
- - Why not chosen: Narrow-slice enforcement must be end-to-end. Provider changes and constructor signature changes must happen together to maintain honesty in the dependency contract.
+1. Allow package-local providers to register in the central providers.py:
+
+- Pros: Single location for all providers; complete composition graph visibility.
+- Cons: Violates ownership-follows-code (ADR-0047 P2). Feature package lifecycle decisions would require infrastructure file changes. Package removal would require editing infrastructure files.
+- Why not chosen: Feature packages must own their entire lifecycle, including provider construction. Central registration creates a coupling that contradicts the package autonomy model.
+
+1. Prohibit non-cached convenience accessors:
+
+- Pros: Every function in `providers.py` has consistent `@lru_cache` semantics.
+- Cons: Forces callers into verbose two-step patterns (`get_platform_service().get_provider("slack")`). Eliminates type-safe accessors that provide concrete return types instead of generic `PlatformProvider`.
+- Why not chosen: Convenience accessors add ergonomic value and type safety. The "not cached" nature is documented and intentional - the underlying registry manages lifecycle.
+
+1. Prohibit wide injection without mandating constructor refactoring:
+
+- Pros: Simpler to implement - only provider code changes, not service constructors.
+- Cons: Providers would extract slices and pass them as kwargs while constructors still accept `Settings`. This creates a false narrow-slice appearance while the constructor contract remains wide.
+- Why not chosen: Narrow-slice enforcement must be end-to-end. Provider changes and constructor signature changes must happen together to maintain honesty in the dependency contract.
 
 ## Consequences
 
 - Positive impacts:
- - Narrow-slice enforcement makes service dependencies explicit and testable. Test fixtures construct only the settings slice a service needs, not the full tree.
- - Package-local provider permission formalizes a proven pattern and gives feature packages full lifecycle autonomy over their services.
- - Centralized infrastructure providers preserve the single injection surface and make the composition graph inspectable.
- - Provider graph shape rules prevent unbounded composition depth and make startup ordering predictable.
- - The DI alias ceremony provides explicit traceability from HTTP handler to service constructor.
+- Narrow-slice enforcement makes service dependencies explicit and testable. Test fixtures construct only the settings slice a service needs, not the full tree.
+- Package-local provider permission formalizes a proven pattern and gives feature packages full lifecycle autonomy over their services.
+- Centralized infrastructure providers preserve the single injection surface and make the composition graph inspectable.
+- Provider graph shape rules prevent unbounded composition depth and make startup ordering predictable.
+- The DI alias ceremony provides explicit traceability from HTTP handler to service constructor.
 - Tradeoffs accepted:
- - The three-file ceremony for new infrastructure services is verbose. This is accepted because new infrastructure services are added infrequently (estimated 1-2 per quarter) and the traceability benefit outweighs the edit cost.
- - Infrastructure providers remain centralized, meaning `providers.py` will continue to grow. At 16 cached providers plus 3 accessors, the file is navigable. If the count exceeds 25 cached providers, this standard should be reassessed.
- - Package-local providers are not visible in the central composition graph. This is accepted because package-local services are consumed only within their package boundary.
+- The three-file ceremony for new infrastructure services is verbose. This is accepted because new infrastructure services are added infrequently (estimated 1-2 per quarter) and the traceability benefit outweighs the edit cost.
+- Infrastructure providers remain centralized, meaning `providers.py` will continue to grow. At 16 cached providers plus 3 accessors, the file is navigable. If the count exceeds 25 cached providers, this standard should be reassessed.
+- Package-local providers are not visible in the central composition graph. This is accepted because package-local services are consumed only within their package boundary.
 - Risks introduced:
- - Constructor signature changes for narrow-slice enforcement may break existing tests. Mitigation: TDD approach - write failing tests with narrow signatures first, then refactor constructors.
- - Package-local providers may diverge from infrastructure patterns over time. Mitigation: Standard 2 rules govern structure; code review enforces consistency.
- - Convenience accessors may proliferate beyond the platform registry pattern. Mitigation: Standard 5 conditions restrict usage to registry-backed lookups only.
+- Constructor signature changes for narrow-slice enforcement may break existing tests. Mitigation: TDD approach - write failing tests with narrow signatures first, then refactor constructors.
+- Package-local providers may diverge from infrastructure patterns over time. Mitigation: Standard 2 rules govern structure; code review enforces consistency.
+- Convenience accessors may proliferate beyond the platform registry pattern. Mitigation: Standard 5 conditions restrict usage to registry-backed lookups only.
 - Mitigations:
- - Narrow-slice enforcement is executed incrementally as part of ADR-0055 settings dissolution (Action 5e in the implementation plan).
- - Package-local provider pattern is validated by the access package reference implementation.
- - Provider graph shape is documented (Standard 6.4) and reviewable.
+- Narrow-slice enforcement is executed incrementally as part of ADR-0055 settings dissolution (Action 5e in the implementation plan).
+- Package-local provider pattern is validated by the access package reference implementation.
+- Provider graph shape is documented (Standard 6.4) and reviewable.
 
 ## Compliance and Boundaries
 
@@ -373,22 +426,24 @@ The `t()` function in `providers.py` is a convenience wrapper around `get_transl
 - Startup/plugin registration impact: Standard 6 (provider graph shape) is compatible with ADR-0046 startup phase ordering. Settings providers (Level 0) are called during Phase 1 (Configuration). Client providers (Level 1) are called during Phase 2 (Client Construction). Composed and high-level providers (Levels 2-3) are called during Phase 3 (Service Wiring). Package-local providers that participate in startup warmup (ADR-0049 S6) are called during the plugin warmup sub-phase.
 - Settings partitioning impact: Standard 1 and Standard 6.3 define the transition from `get_settings()` to domain-specific settings providers as part of ADR-0055 dissolution. After dissolution, `get_settings()` is removed and each provider calls the domain-specific settings provider it needs.
 - Service contract impact: After ADR-0077 Protocol migration, provider return type annotations for Category A services must use the Protocol type, not the concrete implementation class. The `Annotated[..., Depends(...)]` alias in `dependencies.py` must likewise reference the Protocol type. See ADR-0077 Standard 2 (Protocol Contract Pattern) for the canonical pattern and Standard 5 for migration sequencing.
+- Backend-selection impact: Standard 8 formalizes the settings-driven factory pattern for Category A services with configurable backends (ADR-0045 P7). The factory reads a `*_BACKEND` settings key (ADR-0047 P6, ADR-0055) and branches to the appropriate implementation. This is the provider-level implementation of the managed service delegation hierarchy.
 
 ## Best-Practice Revalidation
 
 - Revalidation date: 2026-04-29
 - Sources rechecked:
- - FastAPI Dependency Injection documentation: `Annotated[T, Depends(...)]` pattern, dependency overrides for testing, sub-dependencies.
- - Python 3.12+ `functools.lru_cache(maxsize=1)` for process-scoped singletons.
- - Twelve-Factor App: Factor IV (Backing Services) - treat backing services as attached resources, provisioned via configuration.
- - Martin Fowler, "Inversion of Control Containers and the Dependency Injection pattern" - constructor injection as the preferred DI mechanism.
- - pydantic-settings v2 documentation - independent `BaseSettings` per domain.
+- FastAPI Dependency Injection documentation: `Annotated[T, Depends(...)]` pattern, dependency overrides for testing, sub-dependencies.
+- Python 3.12+ `functools.lru_cache(maxsize=1)` for process-scoped singletons.
+- Twelve-Factor App: Factor IV (Backing Services) - treat backing services as attached resources, provisioned via configuration.
+- Martin Fowler, "Inversion of Control Containers and the Dependency Injection pattern" - constructor injection as the preferred DI mechanism.
+- pydantic-settings v2 documentation - independent `BaseSettings` per domain.
 - Alignment summary:
- - Centralized provider file aligns with FastAPI's documented pattern of a single dependency injection module.
- - `@lru_cache(maxsize=1)` singleton pattern is the Python standard library mechanism for process-scoped instances.
- - Constructor-only injection (Standard 1) aligns with Fowler's constructor injection recommendation.
- - Narrow-slice settings align with Factor IV's resource-specific configuration binding.
- - Package-local providers align with Python package autonomy conventions.
+- Centralized provider file aligns with FastAPI's documented pattern of a single dependency injection module.
+- `@lru_cache(maxsize=1)` singleton pattern is the Python standard library mechanism for process-scoped instances.
+- Constructor-only injection (Standard 1) aligns with Fowler's constructor injection recommendation.
+- Narrow-slice settings align with Factor IV's resource-specific configuration binding.
+- Package-local providers align with Python package autonomy conventions.
+- Backend-selection factory pattern aligns with Factor IV's "swap backing services without code changes" via configuration, and with the Abstract Factory pattern for runtime implementation selection.
 - Intentional deviations: None.
 
 ## Freshness Review
@@ -396,35 +451,54 @@ The `t()` function in `providers.py` is a convenience wrapper around `get_transl
 - Record age at review time (days): 0
 - Is record older than 120 days: No
 - If Yes, status set to stale: No
-- Validation summary: New Tier-2 pattern implementing ADR-0048 dependency composition rules and governing the provider layer post-ADR-0055 settings dissolution. Supersedes ADR-0012 (Provider Discovery - rigid load ordering replaced by ADR-0049 pluggy-based discovery). **ADR-0025 update (2026-04-29):** ADR-0025 (Interaction Providers Concept) is now superseded by ADR-0078 (Platform Services Architecture), not by this record or ADR-0059. This record covered ADR-0025's provider-layer governance aspects; ADR-0078 supersedes the domain concept (platform service abstraction). The unified `InteractionProvider` interface was rejected in favor of concrete per-platform services. ADR-0059 (Feature Interaction Boundaries) governs feature-side interaction patterns and supersedes ADR-0018 and ADR-0028.
+- Validation summary: Tier-2 pattern implementing ADR-0048 dependency composition rules and governing the provider layer post-ADR-0055 settings dissolution. Supersedes ADR-0012. Amended 2026-04-30 to add Standard 8 (backend-selection logic) per ADR-0045 P7 and ADR-0047 P6.
 - Follow-up actions:
- - Mark ADR-0012 as `status: Superseded` and add `superseded_by: [ADR-0056]`.
- - Execute narrow-slice enforcement as part of settings dissolution Action 5e.
- - Review provider count after dissolution completes; reassess centralization if count exceeds 25.
+- Mark ADR-0012 as `status: Superseded` and add `superseded_by: [ADR-0056]`.
+- Execute narrow-slice enforcement as part of settings dissolution Action 5e.
+- Review provider count after dissolution completes; reassess centralization if count exceeds 25.
 
 ## Source References
 
 1. Source title: FastAPI - Dependencies
- URL: https://fastapi.tiangolo.com/tutorial/dependencies/
+ URL: <https://fastapi.tiangolo.com/tutorial/dependencies/>
  Access date: 2026-04-29
  Key takeaway: `Annotated[T, Depends(callable)]` is the canonical DI mechanism. Sub-dependencies compose automatically. `dependency_overrides` enables test-time replacement.
 
 2. Source title: Python 3.12 functools.lru_cache
- URL: https://docs.python.org/3.12/library/functools.html#functools.lru_cache
+ URL: <https://docs.python.org/3.12/library/functools.html#functools.lru_cache>
  Access date: 2026-04-29
  Key takeaway: `@lru_cache(maxsize=1)` ensures a single cached return value - suitable for process-scoped singletons when combined with deterministic input (no arguments).
 
 3. Source title: Twelve-Factor App - IV. Backing Services
- URL: https://12factor.net/backing-services
+ URL: <https://12factor.net/backing-services>
  Access date: 2026-04-29
  Key takeaway: Backing services are attached resources, each configured independently. Aligns with narrow-slice injection - each service receives only its resource configuration.
 
 4. Source title: Martin Fowler - Inversion of Control Containers and the Dependency Injection Pattern
- URL: https://martinfowler.com/articles/injection.html
+ URL: <https://martinfowler.com/articles/injection.html>
  Access date: 2026-04-29
  Key takeaway: Constructor injection makes dependencies explicit, inspectable, and overridable for testing. Preferred over setter injection and interface injection.
 
 5. Source title: pydantic-settings v2 - Settings Management
- URL: https://docs.pydantic.dev/latest/concepts/pydantic_settings/
+ URL: <https://docs.pydantic.dev/latest/concepts/pydantic_settings/>
  Access date: 2026-04-29
  Key takeaway: Each `BaseSettings` class independently loads from environment. Multiple independent settings classes per process is the intended usage pattern.
+
+## Implementation Guidance
+
+- Required changes:
+- Execute narrow-slice enforcement as part of ADR-0055 settings dissolution Action 5e.
+- Integrate retry factory pattern into provider function after ADR-0077 Protocol migration.
+- Apply Standard 8 backend-selection pattern to new Category A services as they adopt configurable backends.
+- Validation and quality gates:
+- mypy verifies provider return types match Protocol types (ADR-0077).
+- Settings `Literal` type validation catches invalid backend values at startup.
+- Test doubles via `dependency_overrides` confirm Protocol substitutability.
+- Test strategy and acceptance criteria impact:
+- Each backend branch must be testable independently.
+- `"memory"` backend must work in CI without cloud credentials.
+
+## Change Log
+
+- 2026-04-29: Created. Establishes provider composition standard with 7 standards: narrow-slice injection, package-local providers, centralized infrastructure providers, DI alias ceremony, convenience accessor posture, provider dependency graph shape, translation helper posture. Supersedes ADR-0012.
+- 2026-04-30: Backend-selection logic amendment. Added Standard 8 (Backend-Selection Logic in Providers) formalizing the settings-driven factory pattern for Category A services with configurable backends per ADR-0045 P7 and ADR-0047 P6. Reference implementation: `app/infrastructure/resilience/retry/factory.py`. Added backend-selection impact to Compliance section. See managed-services-delegation-adr-review-tracker-2026-04-30.md Item #7.
