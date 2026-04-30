@@ -89,7 +89,7 @@ related_packages: []
 - One ADR, one decision, one authority level.
 - Higher-tier ADRs constrain lower-tier ADRs through explicit metadata links.
 - Time-bound migration and deprecation decisions must use Tier-5 and include retirement criteria.
-- Infrastructure library adoption decisions must use Tier-5 and include evaluation criteria (maturity, maintenance status, licensing, type-hint coverage, async compatibility) to govern the long-term dependency commitment. This complements ADR-0045 P7 (Managed Service Delegation Hierarchy), which establishes library delegation as Tier 2 in the three-tier hierarchy.
+- Infrastructure library adoption decisions must use Tier-5 and include evaluation criteria (maturity, maintenance status, license compatibility with the project license, type-hint coverage, async compatibility) to govern the long-term dependency commitment. Library licenses must be compatible with the project's own license (currently MIT); incompatible licenses are grounds for rejection regardless of technical merit. This complements ADR-0045 P7 (Managed Service Delegation Hierarchy), which establishes library delegation as Tier 2 in the three-tier hierarchy.
 - Foundational ADRs remain implementation-agnostic; implementation details belong in lower tiers.
 
 ## Alternatives Considered
@@ -181,3 +181,5 @@ related_packages: []
 ## Change Log
 
 - 2026-04-28: Created Tier-0 governance baseline as canonical authority for ADR lifecycle, ownership, supersession, and downstream rewrite constraints.
+- 2026-04-30: Tier-5 library trigger amendment. Added infrastructure library adoption as an explicit Tier-5 ADR trigger. See delegation tracker Item #3.
+- 2026-04-30: License compatibility amendment (editorial). Strengthened library evaluation criterion: library licenses must be compatible with the project's own license (currently MIT); incompatible licenses are grounds for rejection regardless of technical merit.
