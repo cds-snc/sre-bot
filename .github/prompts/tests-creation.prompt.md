@@ -5,16 +5,18 @@ agent: tests-creation
 model: Auto (copilot)
 ---
 
-Create the fastest deterministic failing test set for the approved feature architecture.
+Create failing tests for the approved feature architecture. Follow the [testing-standards skill](../skills/testing-standards/SKILL.md) and [tests instructions](../instructions/tests-python.instructions.md).
 
-Required output:
-1. Test files created/updated in app/tests.
-2. Acceptance criteria mapping to each test.
+## Output
+
+1. Test files created/updated in `app/tests/`.
+2. Acceptance criteria mapped to each test.
 3. Targeted run results with intended failures.
 4. Implementation backlog implied by failing assertions.
 
-Rules:
+## Rules
+
 - Do not implement production feature behavior.
-- Do not create tests for architecture packet text, sprint naming, or transition-planning artifacts.
-- Keep tests behavior-focused and deterministic.
-- Cover success and failure mapping paths first.
+- Do not test planning artifacts.
+- Cover success, failure mapping, and dependency variation paths.
+- Protocol-conformant doubles for Category A services (ADR-0077).

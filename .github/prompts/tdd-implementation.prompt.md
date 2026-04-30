@@ -5,22 +5,19 @@ agent: implementation
 model: Auto (copilot)
 ---
 
-Implement the approved architecture using this workflow:
+Implement the approved architecture. Follow [copilot-instructions.md](../copilot-instructions.md).
+
+## Workflow
 
 1. Restate acceptance criteria.
-2. Review existing failing tests as the implementation contract.
+2. Review existing failing tests as the contract.
 3. Implement minimal code to pass tests.
 4. Refactor safely.
-5. Run quality gates and report outcomes.
+5. Run [quality gates](./quality-gates.prompt.md).
 
-Quality gates:
-- mypy
-- flake8
-- black --check .
-- pytest app/tests --ignore=app/tests/smoke
+## Rules
 
-Constraints:
-- Keep business logic in app/packages.
-- Avoid new business logic in app/infrastructure.
+- Business logic in `app/packages/` only. No new logic in `app/infrastructure`.
 - Do not rewrite tests unless architecture changed or tests are incorrect.
-- Respect type boundary rules and settings partitioning.
+- Do not add features beyond what is needed to pass tests.
+- Run gates every 3-5 edits and before completion.

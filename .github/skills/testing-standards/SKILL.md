@@ -3,40 +3,34 @@ name: testing-standards
 description: Apply project testing standards for app/tests layout, naming, dependency overrides, and route/service coverage.
 ---
 
-# Testing Standards
+Use when creating or updating tests.
 
-Use this skill when creating or updating tests.
+## Layout (ADR-0062)
 
-## Placement and Naming
+- All tests in `app/tests/` with `unit/` and `integration/`.
+- Names: `test_<feature>_<entity>_<what>.py`. No generic names.
 
-1. Place tests under `app/tests/` only.
-2. Use feature-prefix naming (for example, `test_groups_routes.py`).
-3. Avoid ambiguous names like `test_routes.py`.
+## Route Tests
 
-## Structure Guidance
+1. Success path: response schema + status code.
+2. Failure mapping: OperationResult error → HTTP status + RFC 9457 body.
+3. Dependency variation: auth/permission branches.
 
-- Unit tests: `app/tests/unit/...`
-- Integration tests: `app/tests/integration/...`
-- Fixtures and factories should remain under shared test support locations.
+Use `app.dependency_overrides`; always `finally` clear.
 
-## Route Testing
+## Service Tests
 
-For FastAPI endpoints, cover:
+- Direct service calls with Protocol-conformant fakes for Category A dependencies (ADR-0077).
+- Assert on `OperationResult` status, not provider-specific details (ADR-0050).
+- Deterministic — no network calls.
 
-1. Success path with response schema assertions.
-2. Failure mapping path (status and stable error detail).
-3. Dependency variation path (auth/permission/override where relevant).
+## Fixtures
 
-Use dependency overrides instead of patching unrelated internals when possible.
-
-## Service Testing
-
-- Test business rules with direct service calls.
-- Use protocol/fake implementations for external dependencies.
-- Keep tests deterministic and avoid network dependence.
+- Narrow-slice settings only (ADR-0056).
+- Clear `@lru_cache` between tests via autouse fixtures.
 
 ## Anti-patterns
 
-- Tests outside `app/tests`.
-- Heavy integration setup for pure unit behavior.
-- Asserting only status code without payload/behavior assertions.
+- Tests outside `app/tests/`. Heavy integration for unit behavior.
+- Status-code-only assertions. Missing `dependency_overrides` cleanup.
+- Non-conformant test doubles. Full Settings objects in fixtures.

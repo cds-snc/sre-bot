@@ -5,22 +5,23 @@ agent: feature-architecture
 model: GPT-5.3-Codex (copilot)
 ---
 
-Produce a feature architecture packet from the request.
+Produce a feature architecture packet. ADR index: [adr-index.md](../../docs/decisions/indexes/adr-index.md). Follow [copilot-instructions.md](../copilot-instructions.md).
 
-Required output:
-1. Feature scope and assumptions.
-2. Applicable decision records and constraints.
+## Output
+
+1. Scope and assumptions.
+2. Applicable ADRs cited by number.
 3. Complexity classification (Level 1/2/3) with rationale.
-4. Ingress and egress model definitions.
-5. Interaction flow across layers/channels.
-6. Error taxonomy and mapping.
-7. For Level 3 features, overarching principles mapped to existing decision records or proposed record updates.
+4. Ingress/egress models typed per ADR-0065.
+5. Interaction flow respecting ADR-0045 P3 unidirectional flow.
+6. Error taxonomy and OperationResult mapping (ADR-0050, ADR-0060).
+7. For Level 3: principles mapped to ADRs or proposed updates.
 8. Acceptance criteria.
-9. TDD test specification matrix for tests-creation.
+9. TDD test matrix per ADR-0062.
 10. Implementation handoff checklist.
 
-Rules:
-- Keep design feature-scoped and executable.
-- Enforce type boundary rules and package/infrastructure boundaries.
-- Full compliance with decision records unless explicit deviation proposal is required.
-- For rich workflow (Level 3), do not define persistent architecture policy only in the feature packet; link policy to decision records.
+## Rules
+
+- Feature-scoped and executable.
+- Full ADR compliance; deviations must cite the ADR and propose amendment.
+- Level 3: link durable policy to ADRs, not just the feature packet.

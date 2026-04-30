@@ -1,25 +1,29 @@
 ---
 name: architecture-review
-description: Produce app-level architecture options and source-cited decision-record updates, including mandatory web refresh for records older than 30 days.
+description: Author or revise an ADR following the authoring workflow lifecycle with challenge review and source citations.
 agent: architecture
 model: Claude Sonnet 4.6 (copilot)
 ---
 
-Review the request in app-level architecture mode.
+Author or revise an architecture decision record following the [ADR authoring workflow](../../docs/decisions/references/adr-authoring-workflow.md).
 
-Required output:
-1. App-level context, constraints, and non-goals.
-2. Existing decision records reviewed and relevance status (include age in days).
-3. Freshness audit for records older than 30 days with web validation outcomes.
-4. Options considered (2-3) with tradeoffs.
-5. Recommended approach and why.
-6. Risks and mitigations.
-7. Decision-record updates required (create/update list with sources).
-8. Handoff packet for feature-level architecture.
+ADRs in [docs/decisions/adr/](../../docs/decisions/adr/) are the source of truth. Index: [adr-index.md](../../docs/decisions/indexes/adr-index.md).
 
-Rules:
-- Ignore legacy app/modules patterns for architecture decisions.
-- Align with app/infrastructure shared services and app/packages business domains.
-- Prioritize docs/decisions first; run web research for any relevant decision older than 30 days and for gaps/stale guidance.
-- Include source references for every new or revised decision statement.
-- Validate settings, typing, and startup/plugin registration constraints.
+Follow [copilot-instructions.md](../copilot-instructions.md) for all architectural constraints.
+
+## Output
+
+1. Pre-author gate assessment (ID allocation, dependency check).
+2. Applicable ADRs cited by number — confirm alignment or identify conflicts.
+3. Freshness audit: web-validate any referenced ADR older than 30 days.
+4. Draft or revision with all 18 metadata fields.
+5. Challenge review executed and saved to `reviews/`.
+6. Source references for every decision statement.
+7. ADR create/update list with status changes.
+8. Handoff packet for feature architecture (if applicable).
+
+## Rules
+
+- Classify new ADRs per ADR-0051 taxonomy.
+- Tier-4: apply derivation test before authoring.
+- Challenge reviews require web-validated external standards.

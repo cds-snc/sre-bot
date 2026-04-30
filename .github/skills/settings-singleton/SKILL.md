@@ -3,42 +3,39 @@ name: settings-singleton
 description: Apply partitioned settings and singleton provider patterns; use when adding or refactoring settings and provider wiring.
 ---
 
-# Settings Singleton and Partitioning
+Use when introducing package settings, adjusting providers, or refactoring legacy settings.
 
-Use this skill when introducing settings for new package domains, adjusting providers, or refactoring legacy settings usage.
+## Settings Ownership (ADR-0055)
 
-## Core Rules
+| Owner | Location |
+|-------|----------|
+| Infrastructure | `infrastructure/configuration/infrastructure/` |
+| Integration | `infrastructure/configuration/integrations/` |
+| Feature | `packages/<feature>/settings.py` |
 
-1. New package settings belong in `app/packages/<feature>/settings.py`.
-2. Avoid growing root settings aggregators for package-owned concerns.
-3. Validate settings at startup through lifecycle hooks.
-4. Provider functions should expose cached singletons and inject narrow settings slices.
-5. Services should receive only required settings sections.
+## Provider Pattern (ADR-0055, ADR-0056)
 
-## Provider Pattern
+- One `BaseSettings` + `@lru_cache(maxsize=1)` provider per domain.
+- Infrastructure providers in `providers.py`. Feature packages may have local providers.
+- Services receive narrow settings slices only — never full Settings tree.
 
-- Use `@lru_cache(maxsize=1)` for singleton providers.
-- Keep providers in assembly/dependency layers, not service constructors.
-- Do not call `get_settings()` from within service constructors.
+## Rules
 
-## Migration Safety
-
-When touching legacy settings:
-
-1. Preserve existing runtime behavior first.
-2. Introduce package-local settings for new functionality.
-3. Migrate consumers incrementally to slice-based constructors.
-4. Remove legacy wiring only after full migration and tests.
+- No key duplication across domains (ADR-0047).
+- Never nest `BaseSettings` in `BaseSettings` — use `BaseModel` for sections (ADR-0055).
+- `BaseSettings` for env vars; `@dataclass(frozen=True)` for runtime config documents.
+- Fail-fast: invalid config terminates startup (ADR-0045 P4).
+- Don't call `get_settings()` in service constructors — inject the slice.
 
 ## Anti-patterns
 
-- Adding new package settings directly to central aggregator by default.
-- Passing a broad root settings object into every service.
-- Instantiating settings repeatedly in route or service code.
+- Adding package settings to central aggregator.
+- Passing broad settings objects to services.
+- Instantiating settings repeatedly in routes/services.
 
-## Minimum Tests
+## Tests (ADR-0062)
 
-1. Startup validation passes with valid env.
-2. Startup fails deterministically with invalid env.
-3. Provider returns singleton instance behavior.
-4. Service accepts narrow settings slice and works correctly.
+1. Valid env → startup passes.
+2. Invalid env → startup fails deterministically.
+3. Provider returns singleton (same identity).
+4. `@lru_cache` cleared between tests.

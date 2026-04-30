@@ -4,9 +4,9 @@ description: Use for tests under app/tests; enforces location, naming, and focus
 applyTo: app/tests/**/*.py
 ---
 
-- Keep all tests inside app/tests.
-- Use feature-prefix file names and avoid generic names.
-- Cover both success and failure mapping paths for API tests.
-- Use dependency overrides and fakes where possible for deterministic tests.
-- Prefer minimal, behavior-focused assertions over implementation-detail assertions.
-- Do not run `app/tests/smoke/*` by default; run smoke tests only when explicitly requested and required env vars are configured.
+- Tests in `app/tests/` with `unit/` and `integration/`. Names: `test_<feature>_<entity>_<what>.py` (ADR-0062).
+- Cover success, failure mapping, and dependency variation paths.
+- `app.dependency_overrides` for service substitution; always `finally` clear (ADR-0062).
+- Test doubles must conform to Protocol contracts (ADR-0077). Narrow-slice fixtures only (ADR-0056).
+- Clear `@lru_cache` between tests. Deterministic — no network calls (ADR-0054).
+- No `app/tests/smoke/*` unless explicitly requested with env vars configured.

@@ -5,27 +5,27 @@ agent: feature-architecture
 model: GPT-5.3-Codex (copilot)
 ---
 
-Produce a feature architecture packet from the request.
+Produce a Level 3 (Rich Workflow) feature architecture packet. ADR index: [adr-index.md](../../docs/decisions/indexes/adr-index.md). Follow [copilot-instructions.md](../copilot-instructions.md).
 
-Treat this request as Level 3 (Rich Workflow) by default unless the user explicitly narrows scope.
+Treat as Level 3 unless user explicitly narrows.
 
-Required output:
-1. Feature scope, assumptions, and explicit non-goals.
-2. Applicable decision records and constraints.
-3. Complexity confirmation as Level 3 with rationale.
-4. Ingress and egress model definitions by channel and boundary.
-5. Interaction flow across HTTP endpoints, background processes, and collaboration channels.
-6. Orchestration boundaries (application services, adapters, jobs, transport layers).
-7. Channel parity rules (what behavior must remain consistent across HTTP, Slack, Teams, and webhooks).
-8. Error taxonomy and mapping across channels.
-9. Policy/config model (feature settings partitions, toggles, and ownership).
-10. Overarching principles mapped to existing decision records or explicit decision-record updates.
+## Output
+
+1. Scope, assumptions, non-goals.
+2. Applicable ADRs cited by number.
+3. Level 3 confirmation with rationale.
+4. Ingress/egress by channel typed per ADR-0065.
+5. Interaction flow: HTTP, background, collaboration channels (ADR-0045 P3).
+6. Orchestration boundaries: services, adapters, jobs, transport (ADR-0059).
+7. Channel parity: consistent behavior across HTTP/Slack/Teams/webhooks (ADR-0059, ADR-0078).
+8. Error taxonomy across channels (ADR-0060, ADR-0050).
+9. Settings partitions and ownership (ADR-0047, ADR-0055).
+10. Principles mapped to ADRs or proposed updates (ADR-0051 taxonomy).
 11. Acceptance criteria.
-12. TDD test specification matrix for tests-creation.
+12. TDD test matrix per ADR-0062.
 13. Implementation handoff checklist.
 
-Rules:
-- Keep design feature-scoped and executable.
-- Enforce type boundary rules and package/infrastructure boundaries.
-- Full compliance with decision records unless explicit deviation proposal is required.
-- Do not define persistent architecture policy only in this packet; link all durable principles to decision records.
+## Rules
+
+- Feature-scoped and executable. Full ADR compliance.
+- Link all durable principles to ADRs, not just this packet.

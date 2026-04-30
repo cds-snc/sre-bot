@@ -1,44 +1,41 @@
 ---
 name: implementation
-description: Implementation mode for features with pre-authored failing tests and approved architecture decisions.
-tools: ["search", "edit/editFiles", "execute/getTerminalOutput", "execute/runInTerminal", "read/terminalLastCommand", "read/terminalSelection", "execute/createAndRunTask", "agent"]
+description: TDD implementation anchored in ADRs. Use for red-green-refactor delivery against approved architecture with integrated test authoring and quality gates.
+tools: [search, read/readFile, edit/editFiles, execute/getTerminalOutput, execute/runInTerminal, read/terminalLastCommand, read/terminalSelection, execute/createAndRunTask, agent]
+agents: [tests-creation]
 model: Auto (copilot)
 handoffs:
   - label: Return to Feature Architecture
     agent: feature-architecture
-    prompt: Re-evaluate feature architecture based on implementation findings and test outcomes.
+    prompt: Re-evaluate feature architecture based on implementation findings.
     send: false
 ---
 
-You are in Implementation Mode.
+Deliver production changes using TDD workflow anchored in approved architecture and ADRs.
 
-Objectives:
+## TDD Workflow
 
-- Deliver scoped production changes that satisfy approved architecture and pre-authored failing tests.
-- Keep request usage efficient and avoid unnecessary back-and-forth.
+1. **Red**: Author failing tests from acceptance criteria. Use `@tests-creation` subagent for complex test suites, or author directly for simple cases.
+2. **Green**: Implement minimal code to pass failing tests.
+3. **Refactor**: Improve structure while tests stay green.
+4. **Validate**: Run quality gates.
+5. **Repeat**: Next acceptance criterion.
 
-Workflow:
+## Quality Gates
 
-1. Restate acceptance criteria and failing test backlog.
-2. Implement minimal code changes to satisfy failing tests.
-3. Keep behavior changes inside approved architecture boundaries.
-4. Refactor safely once tests pass.
-5. Run quality gates every 3-5 edits and before completion.
-6. Summarize diffs against acceptance criteria and test outcomes.
+Run every 3-5 edits and before completion:
 
-Quality gates:
+1. `mypy`
+2. `flake8`
+3. `black --check .`
+4. `pytest app/tests --ignore=app/tests/smoke`
 
-- mypy
-- flake8
-- black --check .
-- pytest app/tests --ignore=app/tests/smoke
+## Rules
 
-Hard constraints:
-
-- Enforce imports/settings/logging/async/types patterns.
-- Keep business logic in app/packages.
-- Avoid introducing new business logic in app/infrastructure.
-- Never run git commands unless explicitly requested.
-- Treat existing failing tests as the contract; only modify tests when architecture changed or tests are incorrect.
-- Apply type boundary rules: Protocol contracts, frozen dataclasses for internal canonical models, BaseModel for untrusted I/O.
-- Prefer partitioned package-owned settings for new package domains; avoid growing root settings aggregators for package concerns.
+- Failing tests are the contract. Only modify tests when architecture changed or tests are incorrect.
+- Business logic in `app/packages/` only. No new logic in `app/infrastructure/`.
+- Type boundaries: Protocol contracts, frozen dataclasses internal, BaseModel for I/O (ADR-0065).
+- Partitioned package-owned settings for new domains (ADR-0047, ADR-0055).
+- Unidirectional flow: Application → Service → Infrastructure (ADR-0045).
+- Do not add features beyond what tests require.
+- No git commands unless explicitly requested.

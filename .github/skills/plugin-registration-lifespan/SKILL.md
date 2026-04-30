@@ -3,54 +3,41 @@ name: plugin-registration-lifespan
 description: Apply pluggy registration and lifespan startup patterns for package discovery, initialization ordering, and testable startup behavior.
 ---
 
-Use this skill when adding/refactoring package registration and startup behavior.
+Use when adding/refactoring package registration or startup behavior.
 
-## Core Checklist
+## Startup Phases (ADR-0046)
 
-1. Register package capabilities with pluggy (no file discovery).
-2. Initialize plugin/package resources during lifespan startup.
-3. Keep startup wiring in platform/bootstrap layer, not business modules.
-4. Ensure package contracts are typed and testable.
-5. Add integration tests for startup registration and failure behavior.
+1. Configuration → 2. Infrastructure → 3. Discovery/Registration → 4. Feature Activation → 5. Transport → 6. Background
 
-## Startup Sequence Rules
+Failure in any phase terminates startup (fail-fast). Shutdown is reverse order.
 
-- Register hookspecs before plugin registration.
-- Execute discovery/registration from startup lifecycle, not module import.
-- Run validation checks (`check_pending` or equivalent) to surface invalid hook implementations early.
-- Keep startup behavior deterministic and observable through structured logs.
+## Plugin Registration Checklist (ADR-0049)
 
-## Event Handler Registration Pattern
+1. `auto_discover_plugins` scans `app/packages/*` during phase 3.
+2. Hookspecs registered before plugins.
+3. `pm.check_pending()` after registration.
+4. Singleton plugin manager via `@lru_cache(maxsize=1)`.
+5. Keyword-only hook invocation.
+6. `startup_warmup` failures propagate — no silent continue.
+7. Zero-touch extension: new packages need no lifespan changes.
+8. `__init__.py`: only `@hookimpl` functions. No side effects.
 
-- Register event handlers inside a startup hook (`startup_warmup` or dedicated registration hook), never via import-time decorators in module body.
-- Make registration idempotent by checking existing handlers before registering, to avoid duplicate handlers in tests and repeated startup paths.
-- Keep handler functions import-safe; only registration should happen at startup.
+## Background Jobs (ADR-0058)
 
-## Warmup Failure Policy Pattern
-
-- Choose and document one startup behavior per package: fail-startup (raise) or degrade (log and gate routes).
-- If using degrade mode, expose a deterministic readiness gate so requests return 503 until warmup dependencies are healthy.
-- Do not silently swallow warmup failures; include actionable structured log fields (config source, hint, error type).
+- Register via `register_background_job` hookspec.
+- Tier 1 (idempotent) vs Tier 2 (DynamoDB lock). `safe_run()` error isolation.
+- Production-only (`PREFIX == ""`). Registration in all envs; execution in prod only.
 
 ## Anti-patterns
 
-- Side-effect registrations at import time.
-- Mutable module-level registries populated during imports.
-- Business modules owning bootstrap/service-wiring concerns.
-- Catch-and-continue warmup blocks that only log errors but still allow broken request paths.
+- Import-time registrations or mutable module-level registries.
+- Business modules owning bootstrap wiring.
+- Silent warmup failures. Dynamic registration during request handling.
 
-## Contract Rules
+## Tests (ADR-0062)
 
-- Hook signatures should be explicitly typed.
-- Hook invocations should use keyword arguments for clarity and resilience.
-- Feature packages should be independently registerable without central manual wiring edits.
-
-## Test Requirements
-
-At minimum, include:
-
-1. Startup success path with plugin discovery and route/handler registration.
-2. Startup failure path when a plugin contract is invalid.
-3. Regression test ensuring registration is not import-time side effect driven.
-4. Regression test proving event-handler registration is idempotent across repeated startup/test setup.
-5. Startup warmup failure test for the selected policy (fail-startup or degrade-with-503 gate).
+1. Startup success: plugin discovery + registration verified.
+2. Startup failure: invalid contract triggers fail-fast.
+3. No import-time side effects (regression).
+4. Idempotent handler registration across repeated startup.
+5. Warmup failure policy exercised.

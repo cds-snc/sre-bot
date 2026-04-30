@@ -1,143 +1,101 @@
 # Project AI Operating Contract
 
-## Mission
+**Governance:** ADRs in `docs/decisions/adr/` are the source of truth. If this document and an ADR conflict, the ADR wins.
 
-Produce production-grade Python/FastAPI backend changes with architecture-first decision making, strict typing, deterministic validation, and low premium request waste.
+## Stack
 
-## Priority Order
+Python 3.12+, FastAPI, API/backend only.
 
-1. Safety and correctness
-2. Architecture consistency
-3. Testability and maintainability
-4. Cost-efficient Copilot usage
-5. Speed
+## Architecture (ADR-0045, ADR-0048)
 
-## Product and Architecture Constraints
+- Unidirectional flow: Application → Service → Infrastructure. No reverse imports.
+- Business logic in `app/packages/<domain>`. Shared platform capabilities in `app/infrastructure`.
+- `app/modules` is legacy — no new code, not an architectural reference.
+- Prefer managed cloud service > library > custom code (ADR-0045 P7).
 
-- Runtime target: Python 3.12+.
-- Framework: FastAPI.
-- Focus: API/backend only.
-- Shared platform capabilities belong in `app/infrastructure`.
-- Business logic belongs in `app/packages/<domain>`.
-- Do not place new business logic in `app/infrastructure`.
-- Treat `app/modules` as legacy and do not use it as an architectural reference.
-- Prefer architecture references from `app/infrastructure` and `app/packages`.
-- `app/packages/access` is a useful reference package but not a source of absolute truth.
-- Prefer partitioned settings for new package domains in `app/packages/<feature>/settings.py`.
-- Avoid growing root settings aggregators for new package-owned concerns.
-- Services should receive the narrowest settings slice needed, not broad root settings objects.
+## Type Boundaries (ADR-0065)
 
-## Model Boundary Rules
+| Boundary | Type |
+|----------|------|
+| Service contracts | `typing.Protocol` |
+| Internal domain data | `@dataclass(frozen=True)` |
+| HTTP/webhook I/O | `pydantic.BaseModel` |
+| Env configuration | `pydantic_settings.BaseSettings` |
+| Dict-shaped adapters | `typing.TypedDict` |
 
-- Use `Protocol` for behavior/service contracts.
-- Use `@dataclass(frozen=True)` for canonical internal entities and shared internal data.
-- Use Pydantic `BaseModel` at untrusted I/O boundaries (HTTP, webhook, external payload parsing).
-- Use `TypedDict` only when dictionary semantics are explicitly required.
-- Do not default to Pydantic models for internal service boundaries.
+Do not use Pydantic internally. Keep transport and domain models separate.
 
-## Plugin and Startup Rules
+## Dependencies (ADR-0048, ADR-0056, ADR-0077)
 
-- Package discovery/registration/loading/initialization must be startup-driven via lifespan.
-- Use pluggy-based registration for package capabilities.
-- Use startup-driven filesystem discovery (`auto_discover_plugins`) as the canonical way to register packages.
-- Never perform plugin registration at import time (no side-effecting code in `__init__.py` bodies).
-- Design all new packages to be plugin-registerable from day one.
+- Consume infrastructure via `Annotated[Protocol, Depends(...)]` from `infrastructure.services.dependencies`.
+- Constructor-only injection. No import-time side effects.
+- Service classification (ADR-0077): A = Protocol-required, B = shared utility (concrete OK), C = implementation detail (never exposed to features).
+- Composition in `providers.py` only. Intra-layer value-type imports OK (ADR-0076).
+
+## Settings (ADR-0047, ADR-0055, ADR-0056)
+
+- One `BaseSettings` + `@lru_cache` provider per domain. No key duplication.
+- Three-way ownership: `infrastructure/configuration/infrastructure/`, `infrastructure/configuration/integrations/`, `packages/<feature>/settings.py`.
+- Narrow-slice injection — never pass full Settings tree.
+- Never nest `BaseSettings` in `BaseSettings` — use `BaseModel` for sections.
+
+## Startup (ADR-0046, ADR-0049)
+
+- 6-phase startup: Config → Infra → Discovery → Features → Transport → Background. Reverse shutdown.
+- Fail-fast — phase failure terminates startup. Immutable registries after startup.
+- Pluggy-based: `auto_discover_plugins`, hookspecs before plugins, `check_pending()`, keyword-only invocation.
+- Package `__init__.py`: only `@hookimpl` functions. Zero-touch extension.
+
+## API (ADR-0060, ADR-0063)
+
+- Routes are thin adapters: parse → invoke service → map response. No business logic.
+- RFC 9457 error schema. Exhaustive OperationResult-to-HTTP mapping. 5xx redacts internals.
+- Middleware order: CORS → Rate Limiting → Request Context → Error Handling → Auth (dependency).
+- OpenAPI: one tag per router; summary, description, response_model, status_code on every handler.
+
+## OperationResult (ADR-0050)
+
+External API calls return `OperationResult`; internal logic uses exceptions. Status: `SUCCESS`, `TRANSIENT_ERROR` (requires `retry_after`), `PERMANENT_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`.
+
+## Platform & Features (ADR-0059, ADR-0078)
+
+- Feature interactions in `packages/<feature>/interactions/`. Multi-platform via hookspecs.
+- Per-platform concrete services (no unified Protocol). Infrastructure-owned, settings-driven.
+
+## Background Jobs (ADR-0058)
+
+Colocated in-process. Pluggy `register_background_job` hookspec. Production-only (`PREFIX == ""`). Tier 1 (idempotent) vs Tier 2 (DynamoDB lock). `safe_run()` error isolation.
+
+## Security (ADR-0064) & Identity (ADR-0061)
+
+- JWT via `get_current_user` dependency. Defense-in-depth: WAF/ALB + SlowAPI. 429 with `Retry-After`.
+- Identity resolution: JWT > Platform > Webhook > System. IdentityService is Category A.
+
+## Logging (ADR-0054)
+
+Structured `structlog.contextvars` middleware. No credentials/PII in logs. Unbuffered stdout/stderr.
+
+## Testing (ADR-0062)
+
+- `app/tests/` with `unit/` and `integration/`. Names: `test_<feature>_<entity>_<what>.py`.
+- `app.dependency_overrides` with `finally` clear. Protocol-conformant stubs. Narrow-slice fixtures.
+- Clear `@lru_cache` between tests. Cover success, failure mapping, and dependency variation paths.
 
 ## Working Modes
 
-### Architecture Mode
+**Architecture** — when requirements are unclear or introducing patterns. Architect first, cite ADRs, define acceptance criteria before coding.
 
-Use when requirements are unclear, when introducing/refactoring patterns, or before major implementation.
+**Implementation** — when architecture is clear. TDD: failing tests → implement → green. Run quality gates every 3-5 edits.
 
-Required behavior:
+## Quality Gates
 
-- Architect first, then implement.
-- Research best practices in isolation from current code.
-- Ask clarifying questions before proposing implementation.
-- Produce explicit decisions: context, alternatives, tradeoffs, chosen option, risks, test strategy.
-- Define acceptance criteria before coding begins.
+Run regularly and before completion: `mypy`, `flake8`, `black --check .`, `pytest app/tests --ignore=app/tests/smoke`. Fix root causes before proceeding. No smoke tests unless explicitly requested.
 
-### Implementation Mode
+## Generation Rules
 
-Use when architecture and acceptance criteria are clear.
+Explicit imports, typed interfaces, structured logging, async I/O, centralized settings, ADR-0060 error mapping.
 
-Required behavior:
+## Guardrails
 
-- Follow TDD loop: write or update failing tests first, implement, then iterate to green.
-- Keep changes scoped to the agreed architecture.
-- Maintain strict typing and predictable async behavior.
-- Run validations after every 3-5 meaningful changes and before completion.
-- Prefer reusable prompt files for recurring workflows under `.github/prompts/*.prompt.md`.
-
-## Testing Placement and Naming
-
-- Place tests in `app/tests/` only.
-- Use feature-prefix names (for example, `test_groups_routes.py`, `test_identity_resolver.py`).
-- Avoid ambiguous test file names such as `test_routes.py`.
-- For FastAPI route changes, include success and error-mapping path coverage.
-
-## Request Context and Logging
-
-- Prefer `structlog.contextvars` middleware binding for request context propagation.
-- Avoid threading `request_id` through every signature unless crossing boundaries that require explicit values.
-
-## Dependency Import Boundaries
-
-- Do not import concrete infrastructure service implementations directly from `app/infrastructure/<service>/...` in package/domain/route code.
-- Resolve infrastructure services via singleton provider functions in `app/infrastructure/services/providers.py`.
-- For FastAPI endpoints, consume infrastructure dependencies through `Annotated[..., Depends(...)]` aliases from `app/infrastructure/services/dependencies.py` (or re-exported `infrastructure.services` symbols), not by importing concrete classes.
-- Keep service construction in provider layers only; route and business modules must not instantiate infrastructure clients/services directly.
-
-## OpenAPI and Route Metadata
-
-- Router declarations should include exactly one tag.
-- Route handlers should include concise summary/description and explicit response mapping.
-- Public schema fields should include clear field descriptions.
-
-## Mandatory Generation Patterns (Every Change)
-
-- Imports: explicit, minimal, no unused imports.
-- Settings/config: centralized, typed, no ad-hoc constants scattered in code.
-- Logging: structured, contextual, no sensitive data leakage.
-- Async: non-blocking paths for I/O, explicit await boundaries, cancellation-aware patterns.
-- Types: type hints on public interfaces and internal service boundaries.
-- Errors: explicit domain/application boundaries and predictable API error mapping.
-
-## Tooling Policy
-
-- Use web search/fetch tooling for up-to-date best practices and documentation when making architectural or library decisions.
-- Use Bash for fast repository analysis; prefer `rg` and `rg --files`, fallback to `grep/find` if needed.
-- Use subagents for research/investigation/output-heavy tasks; keep main session focused on decisions and implementation.
-
-## Validation Policy
-
-Run these checks regularly (after each 3-5 edits and before completion):
-
-- `mypy`
-- `flake8`
-- `black --check .`
-- `pytest app/tests --ignore=app/tests/smoke`
-
-Do not run `app/tests/smoke/*` unless explicitly requested and required environment variables are configured.
-
-If a check fails, fix root causes before proceeding.
-
-## Git and File-Change Guardrail
-
-- Never run git commands unless the user explicitly requests a specific git task.
-- Never modify files unless explicitly asked for the task.
-- User controls all git operations manually.
-
-## Customization Paths
-
-- Always-on workspace instructions: `.github/copilot-instructions.md`.
-- Scoped instructions: `.github/instructions/*.instructions.md` with `applyTo` globs.
-- Skills: `.github/skills/<skill-name>/SKILL.md` where frontmatter `name` matches folder name in kebab-case.
-- Custom agents: `.github/agents/*.agent.md`.
-- Prompt files: `.github/prompts/*.prompt.md`.
-- Hooks: `.github/hooks/*.json`.
-- Workspace MCP configuration: `.vscode/mcp.json`.
-
-## Skill Promotion Rule
-
-When a best practice is repeatedly validated and stable, create/update a dedicated skill for it and reference that skill from architecture/implementation workflows.
+- No git commands unless explicitly requested. User controls git.
+- No file modifications unless explicitly asked, or the file is in `docs/decisions/`.

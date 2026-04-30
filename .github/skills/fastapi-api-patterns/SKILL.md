@@ -3,45 +3,36 @@ name: fastapi-api-patterns
 description: Apply typed FastAPI route patterns with clean dependency boundaries, stable error mapping, and test coverage for success/failure paths.
 ---
 
-Use this skill when implementing or reviewing API endpoints.
+Use when implementing or reviewing API endpoints.
 
-## Core Rules
+## Handler Pattern (ADR-0063)
 
-1. Keep transport concerns in router layers only.
-2. Keep business logic in package services.
-3. Use typed schemas at I/O boundaries.
-4. Map domain/application errors to stable HTTP responses.
-5. Ensure async-safe I/O boundaries.
-6. Add or adjust tests for success and failure paths.
+- Routes are thin adapters: parse input → invoke service → map response.
+- Inject via `Annotated[Protocol, Depends(...)]`. Never import concrete Category A classes.
+- Use `BaseModel` for request/response schemas at HTTP boundary only.
 
-## Handler Shape
+## Error Mapping (ADR-0060)
 
-- Prefer explicit request/response models.
-- Keep handlers orchestration-thin.
-- Inject dependencies through providers/dependencies rather than in-handler construction.
+- RFC 9457 schema: `type`, `status`, `title`, `detail`, `error`, `errors`, `retry_after`, `request_id`.
+- Map every `OperationResult` status to HTTP explicitly. No catch-alls.
+- 5xx redacts internals (log separately). 4xx gives client-actionable context.
+- Never return raw `OperationResult` from handlers.
 
-## Error Mapping
+## OpenAPI (ADR-0063)
 
-- Do not return raw internal result envelopes from routes.
-- Normalize domain errors to consistent HTTP status codes and response detail shape.
-- Log contextual, non-sensitive metadata for failures.
+- One tag per router. `summary`, `description`, `response_model`, `status_code` on every handler.
+- Public fields include `Field(description=...)`.
 
-## Forbidden Patterns
+## Forbidden
 
-- Business logic directly in route handlers.
-- Returning raw `OperationResult` objects from HTTP handlers.
-- Accessing `request.app.state` inside handlers when a dependency can be injected.
-- Broad exception catches that collapse distinct error classes.
+- Business logic in route handlers.
+- Importing concrete Category A classes in routes.
+- Broad exception catches collapsing distinct errors.
 
-## Test Matrix (Minimum)
+## Test Coverage (ADR-0062)
 
-1. Success response path with expected schema.
-2. Failure mapping path (at least one domain/application error).
-3. Dependency-driven path (auth/rate limit/permission branch where relevant).
+1. Success path with schema assertions.
+2. Failure mapping (error status → HTTP status + RFC 9457 body).
+3. Dependency variation (auth/permission where relevant).
 
-## OpenAPI Minimum Metadata
-
-- Router includes exactly one tag.
-- Route includes a clear summary and/or description.
-- Route defines expected response mapping for non-2xx conditions.
-- Public request/response fields include descriptions.
+Use `app.dependency_overrides`; always `finally` clear.
