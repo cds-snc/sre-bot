@@ -26,12 +26,12 @@ supersedes:
 superseded_by: []
 review_state: current
 related_records:
- - ADR-0040
  - ADR-0045
  - ADR-0048
  - ADR-0049
  - ADR-0052
  - ADR-0053
+ - ADR-0065
  - ADR-0077
 related_packages:
  - app/packages/access
@@ -54,7 +54,7 @@ related_packages:
 - Environment-variable-first configuration (ADR-0047 P5).
 - Feature package settings must live in their package directories when the package exists in `app/packages/` (ADR-0047 P2).
 - No import-time side effects in package init files (ADR-0049 S8).
-- Type boundary selection follows ADR-0040 (pending promotion to ADR-0065): `BaseSettings` for env-var-sourced config, `BaseModel` for nested sections, `@dataclass(frozen=True)` for runtime config documents.
+- Type boundary selection follows ADR-0065: `BaseSettings` for env-var-sourced config, `BaseModel` for nested sections, `@dataclass(frozen=True)` for runtime config documents.
 - Non-goals:
 - This record does not define the provider composition model (delegated to ADR-0056).
 - This record does not define specific environment variable names or prefixes for individual settings classes.
@@ -101,7 +101,7 @@ Nested settings sections within a `BaseSettings` class must use `BaseModel`, nev
 | `BaseModel` | Nested section within a `BaseSettings` class, populated via `env_nested_delimiter` | `AccessSyncSettings(BaseModel)`, `AccessConfigSettings(BaseModel)` |
 | `@dataclass(frozen=True)` | Runtime configuration documents loaded from external sources (DynamoDB, S3, bundles) | `AccessRuntimeConfig` |
 
-This type boundary selection is consistent with ADR-0040. When ADR-0065 is authored, it will generalize these rules across all type boundaries.
+This type boundary selection is consistent with ADR-0065. These rules are generalized across all type boundaries in ADR-0065.
 
 ### Standard 3: Three-Way Settings Ownership Split
 
@@ -329,7 +329,7 @@ During the Settings aggregator dissolution (Standard 4), backend-selection keys 
 ## Compliance and Boundaries
 
 - Package/infrastructure boundary impact: Standard 3 directly governs where settings classes live. Feature settings migrate to `app/packages/<feature>/` when the owning module migrates. Infrastructure and integration settings remain in `app/infrastructure/configuration/`.
-- Type boundary impact: Standard 2 enforces `BaseSettings` vs `BaseModel` vs `@dataclass(frozen=True)` boundaries. Consistent with ADR-0040; will be generalized by ADR-0065.
+- Type boundary impact: Standard 2 enforces `BaseSettings` vs `BaseModel` vs `@dataclass(frozen=True)` boundaries. Consistent with ADR-0065.
 - Startup/plugin registration impact: Standard 1 (independent singletons) aligns with ADR-0049 Standard 6 (fail-fast warmup) - each feature package validates its own settings during `startup_warmup`. Standard 5 (bootstrap vs runtime config) preserves the startup-phase ordering from ADR-0046 Inv 2.
 - Settings partitioning impact: This is the authoritative implementation standard for ADR-0047's five configuration governance principles.
 - Backend-selection settings impact: Standard 9 formalizes the `*_BACKEND` settings pattern as a recognized settings category alongside bootstrap settings and runtime config documents. Backend-selection keys are infrastructure-owned (K5) and must use `Literal` type constraints (K2) with dev-safe defaults (K3). The dissolution plan (Standard 4, Standard 9.3) accounts for existing and future backend keys. Provider-level factory logic consuming these keys is governed by ADR-0056 Standard 8.

@@ -16,15 +16,15 @@ owners:
   - SRE Team
 constrained_by:
   - ADR-0044
-  - ADR-0040
+  - ADR-0065
 impacts: []
 supersedes: []
 superseded_by: []
 related_records:
   - ADR-0032
   - ADR-0033
-  - ADR-0040
   - ADR-0041
+  - ADR-0065
 related_packages:
   - app/packages/access/admin
   - app/packages/access/sync

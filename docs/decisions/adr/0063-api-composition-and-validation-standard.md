@@ -66,7 +66,7 @@ related_packages:
 - **Constraints:**
   - Route handlers consume infrastructure services through `Annotated[Protocol, Depends(provider)]` aliases from `dependencies.py`, never through direct imports (ADR-0048 B2, ADR-0056 Standard 4).
   - Feature routes register via `register_routes` hookimpl (ADR-0059 Standard 3); they are not placed in `app/api/`.
-  - Request validation uses Pydantic `BaseModel` at the I/O boundary (ADR-0040 / ADR-0045 P4).
+  - Request validation uses Pydantic `BaseModel` at the I/O boundary (ADR-0065 P4).
   - Shared HTTP schemas are value types — permitted for cross-boundary import (ADR-0076 Standard 1). They belong in `infrastructure/http/schemas.py`, not in a feature package or `app/api/`.
   - Middleware must account for request-context binding (ADR-0054) and port exposure (ADR-0053).
   - Settings follow the dissolution model (ADR-0055); no monolithic Settings object in route handlers.

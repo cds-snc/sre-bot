@@ -14,7 +14,7 @@ supersedes: []
 superseded_by: []
 related_records:
   - ADR-0023
-  - ADR-0031
+  - ADR-0062
 related_packages: []
 review_state: stale
 ---
@@ -86,6 +86,7 @@ def validate_jwt_token(
 ```
 
 **Rules**:
+
 - ✅ `JWKSManager` is a singleton — created once via `get_jwks_manager()` in `infrastructure.services`
 - ✅ Keys are cached with `cache_jwk_set=True` — no round-trip per request
 - ✅ `validate_jwt_token` is a plain callable; it is not a FastAPI dependency
@@ -114,6 +115,7 @@ def get_current_user(
 `SecurityScopes` is automatically populated by FastAPI from all `Security()` declarations in the route and its dependency chain.
 
 Scope claims are extracted from either:
+
 - `scope` — space-separated string (RFC 6749 / OAuth 2.0)
 - `scp` — string array (Microsoft / Okta convention)
 
@@ -155,6 +157,7 @@ def endpoint(current_user: CurrentUserDep) -> dict:
 ```
 
 **Rules**:
+
 - ✅ Import `get_current_user` and `CurrentUserDep` from `infrastructure.services` only
 - ✅ Each protected feature package declares its own scope string (`sre-bot:<resource>`)
 - ✅ 401 for missing/invalid token, 403 for insufficient scopes — never 500
@@ -178,6 +181,7 @@ def _initialize_security_services(app, settings, logger) -> None:
 ```
 
 **Rules**:
+
 - ✅ Singletons are populated during lifespan, not on first request
 - ✅ Missing `ISSUER_CONFIG` logs a warning — any authenticated endpoint will return 500 at runtime
 - ✅ Follows the same `get_<service>()` pattern as directory provider warmup

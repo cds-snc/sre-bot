@@ -96,7 +96,7 @@ The identity domain must define a canonical `User` model that normalizes platfor
 | `permissions` | `list[str]` | Resolved permissions/scopes for the current session. Source depends on the identity provider (JWT scopes, platform-resolved roles). |
 | `metadata` | `dict[str, Any]` | Source-specific metadata (Slack team ID, JWT claims, etc.). Available for logging only; must not drive business logic. |
 
-The `User` model is a Pydantic `BaseModel` because it crosses the HTTP I/O boundary (returned by `get_current_user` dependency, serialized in audit logs). This is correct per ADR-0040 type boundary rules.
+The `User` model is a Pydantic `BaseModel` because it crosses the HTTP I/O boundary (returned by `get_current_user` dependency, serialized in audit logs). This is correct per ADR-0065 P4 type boundary rules.
 
 Platform-specific extensions (e.g., `SlackUser` with `slack_user_id`, `slack_team_id`) are permitted as subclasses within the identity infrastructure package. Feature code must depend on the base `User` type, not platform-specific subclasses.
 
@@ -219,7 +219,7 @@ Identity provider credentials follow ADR-0052 (build-release-run):
 ## Compliance and Boundaries
 
 - Package/infrastructure boundary impact: `IdentityService` is infrastructure-owned (`app/infrastructure/identity/`). Feature packages consume it via Protocol (Standard 3) through the injection boundary (ADR-0048 B2). External integration clients are infrastructure-owned and follow the same boundary rules.
-- Type boundary impact: `User` model is Pydantic `BaseModel` (I/O boundary). `IdentityServiceProtocol` is a `Protocol` class (service contract). `IdentitySettings` is Pydantic `BaseSettings` (configuration boundary). These follow ADR-0040 type boundary rules.
+- Type boundary impact: `User` model is Pydantic `BaseModel` (I/O boundary). `IdentityServiceProtocol` is a `Protocol` class (service contract). `IdentitySettings` is Pydantic `BaseSettings` (configuration boundary). These follow ADR-0065 type boundary rules.
 - Startup/plugin registration impact: Identity service initialization happens during lifespan startup (ADR-0046 phase ordering). JWKS client warmup is part of the security initialization phase (current implementation compliant). No import-time side effects (ADR-0048 B4).
 - Settings partitioning impact: Standard 4 mandates `IdentitySettings` extraction from the monolithic `Settings` aggregator. This is a specific instance of ADR-0055 Standard 1.
 - DI alias ceremony impact: Standard 3 mandates updating the DI alias to use Protocol type. This follows ADR-0056 Standard 4.

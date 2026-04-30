@@ -71,7 +71,7 @@ related_packages:
 
 ### Standard 1: Structured Error Response Schema
 
-All HTTP API error responses must use a Pydantic `BaseModel` schema at the I/O boundary (ADR-0040 type boundary rule). The schema adopts RFC 9457 (Problem Details for HTTP APIs) as the base structure with application-specific extension members, following the hybrid pattern established by Zalando's RESTful API Guidelines (Rule #176). This provides standards compliance from day one while preserving domain-specific fields.
+All HTTP API error responses must use a Pydantic `BaseModel` schema at the I/O boundary (ADR-0065 P4 type boundary rule). The schema adopts RFC 9457 (Problem Details for HTTP APIs) as the base structure with application-specific extension members, following the hybrid pattern established by Zalando's RESTful API Guidelines (Rule #176). This provides standards compliance from day one while preserving domain-specific fields.
 
 The canonical error response shape is:
 
@@ -201,7 +201,7 @@ All API routes must document error responses in their OpenAPI schema using FastA
 ## Compliance and Boundaries
 
 - Package/infrastructure boundary impact: The error response schema is defined in `infrastructure/http/schemas.py` as a shared value type (ADR-0076 Standard 1). This placement is consistent with the infrastructure service model — `ErrorResponse` is a cross-cutting HTTP type, not a feature-owned schema or API-layer artifact. `app/api/` is legacy wiring (ADR-0063 Standard 1) and must not contain a `schemas/` directory. Error mapping helpers are stateless utilities (Category B per ADR-0077) or feature-specific presenters (Category C). Infrastructure services return `OperationResult`; route handlers map it to HTTP responses. The `ErrorResponse` schema includes RFC 9457 base fields (`type`, `status`, `title`, `detail`) and application-specific extension members (`error`, `errors`, `retry_after`, `request_id`).
-- Type boundary impact: Error responses use Pydantic `BaseModel` at the HTTP I/O boundary (correct per ADR-0040). `OperationResult` remains a `@dataclass(frozen=True)` at the internal service boundary (ADR-0050). The mapping from dataclass → Pydantic model happens at the route handler level.
+- Type boundary impact: Error responses use Pydantic `BaseModel` at the HTTP I/O boundary (correct per ADR-0065 P4). `OperationResult` remains a `@dataclass(frozen=True)` at the internal service boundary (ADR-0050). The mapping from dataclass → Pydantic model happens at the route handler level.
 - Startup/plugin registration impact: Not directly applicable. Error response schemas are module-level type definitions with no import-time side effects.
 - Settings partitioning impact: Not directly applicable. Error mapping is stateless and does not require configuration. If a future enhancement adds configurable error verbosity levels, those settings must follow ADR-0055.
 - DI alias ceremony impact: If error mapping utilities are exposed as FastAPI dependencies, they must follow ADR-0056 Standard 4. Currently, the mapping is a pure function (no DI needed), but the standard allows for future dependency injection.

@@ -26,10 +26,10 @@ supersedes:
 superseded_by: []
 review_state: current
 related_records:
- - ADR-0031
  - ADR-0039
  - ADR-0055
  - ADR-0056
+ - ADR-0062
  - ADR-0077
 related_packages:
  - app/infrastructure/logging
@@ -103,7 +103,7 @@ Every Category A service (ADR-0077 Standard 1) must provide a dev-safe fallback 
 - Cons: Conflicting authority and weak enforceability.
 - Why not chosen: Step 5 requires explicit ownership of Twelve-Factor gaps.
 
-2. Couple logging retention/indexing policy into application ADRs.
+1. Couple logging retention/indexing policy into application ADRs.
 
 - Pros: Single document for all logging concerns.
 - Cons: Blurs platform vs application ownership and increases churn.
@@ -166,14 +166,14 @@ Every Category A service (ADR-0077 Standard 1) must provide a dev-safe fallback 
 - Accessed date (YYYY-MM-DD): 2026-04-28
 - Relevance summary: Defines minimizing environmental divergence.
 
-2. Source title: The Twelve-Factor App - Logs
+1. Source title: The Twelve-Factor App - Logs
 
 - URL: <https://12factor.net/logs>
 - Publisher/maintainer: 12factor contributors
 - Accessed date (YYYY-MM-DD): 2026-04-28
 - Relevance summary: Defines logs as event streams managed by execution environment.
 
-3. Source title: Logging Standards (OpenTelemetry + structlog)
+1. Source title: Logging Standards (OpenTelemetry + structlog)
 
 - URL: docs/decisions/adr/superseded/0029-logging-standards.md
 - Publisher/maintainer: SRE Team
