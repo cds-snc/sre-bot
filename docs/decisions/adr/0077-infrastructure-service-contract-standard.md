@@ -11,9 +11,9 @@ secondary_domains:
 owners:
  - SRE Team
 date_created: 2026-04-29
-last_updated: 2026-04-29
-last_reviewed: 2026-04-29
-next_review_due: 2026-08-29
+last_updated: 2026-04-30
+last_reviewed: 2026-04-30
+next_review_due: 2026-08-28
 constrained_by:
  - ADR-0044
  - ADR-0045
@@ -32,6 +32,7 @@ related_records:
  - ADR-0050
  - ADR-0056
  - ADR-0076
+ - ADR-0079
 related_packages:
  - app/infrastructure/services
  - app/infrastructure/directory
@@ -81,20 +82,28 @@ Services that abstract over backing services and are consumed by feature package
 - Feature packages depend on the service and would need to change if the backing service changed.
 - The service has at least one plausible alternative implementation (even if not currently built).
 
+**Delegation tier declaration (ADR-0045 P7):** Each Category A service must document which delegation tier its current implementation uses. The delegation tiers are:
+
+- **Tier 1 — Managed cloud service:** The implementation wraps a managed service SDK (e.g., DynamoDB, SQS, Google Workspace API). This is the preferred tier.
+- **Tier 2 — Industry library:** The implementation delegates to a proven, well-maintained library (e.g., `tenacity`, `pybreaker`). Used when no managed service covers the concern.
+- **Tier 3 — Custom code:** The implementation is application-specific custom code. Tier 3 declarations must include a justification stating why no managed service or library applies.
+
+Services whose current implementation is Tier 3 must be flagged for future delegation when a viable Tier 1 or Tier 2 alternative becomes available or is identified.
+
 **Current Category A services:**
 
-| Service | Protocol Exists? | Backing Service | Migration Priority |
-|---------|-----------------|-----------------|-------------------|
-| `DirectoryProvider` | Yes | Google Workspace Directory | - (complete) |
-| `RetryStore` | Yes | DynamoDB | - (complete) |
-| `RetryProcessor` | Yes | Feature-specific | - (complete) |
-| `ResponseChannel` | Yes | Platform-specific | - (complete) |
-| `BackgroundJobRegistry` | Yes | Scheduler | - (complete) |
-| `StorageService` | **No** | DynamoDB | **P0** - stated design goal is storage-agnostic |
-| `IdentityService` | **No** | JWT + platform resolvers | **P1** - identity resolution could have multiple backends |
-| `AuditTrailService` | **No** | DynamoDB (via StorageService) | **P1** - audit backend could change |
-| `NotificationService` | **No** | GC Notify / platform channels | **P2** - channels are abstracted; dispatcher could follow |
-| `IdempotencyService` | **No** | DynamoDB | **P3** - infrastructure concern, lower swap probability |
+| Service | Protocol Exists? | Backing Service | Delegation Tier | Migration Priority |
+|---------|-----------------|-----------------|-----------------|-------------------|
+| `DirectoryProvider` | Yes | Google Workspace Directory | Tier 1 (managed service wrapper) | - (complete) |
+| `RetryStore` | Yes | DynamoDB | Tier 1 (managed service wrapper) | - (complete) |
+| `RetryProcessor` | Yes | Feature-specific | Tier 3 (custom — orchestration logic specific to feature retry semantics; no managed service or library covers domain-specific retry coordination) | - (complete) |
+| `ResponseChannel` | Yes | Platform-specific | Tier 1 (managed service wrapper per platform) | - (complete) |
+| `BackgroundJobRegistry` | Yes | Scheduler | Tier 2 (library — `schedule`) | - (complete) |
+| `StorageService` | **No** | DynamoDB | Tier 1 (managed service wrapper) | **P0** - stated design goal is storage-agnostic |
+| `IdentityService` | **No** | JWT + platform resolvers | Tier 1 (managed service wrappers — Google Workspace, AWS IAM Identity Center) | **P1** - identity resolution could have multiple backends |
+| `AuditTrailService` | **No** | DynamoDB (via StorageService) | Tier 1 (managed service via StorageService) | **P1** - audit backend could change |
+| `NotificationService` | **No** | GC Notify / platform channels | Tier 1 (managed service — GC Notify API) | **P2** - channels are abstracted; dispatcher could follow |
+| `IdempotencyService` | **No** | DynamoDB | Tier 1 (managed service wrapper) | **P3** - infrastructure concern, lower swap probability |
 
 > **Revision (2026-04-29 - Platform Services Assessment):** `PlatformService` was removed from Category A. Per-platform services (`SlackService`, `TeamsService`) are classified as Category C (infrastructure implementation details) because each platform's API surface is fundamentally different - no shared Protocol is appropriate. See ADR-0078 (Platform Services Architecture).
 
@@ -334,6 +343,7 @@ Existing Category A services that lack Protocol contracts must be migrated incre
 - Type boundary impact: Standard 2 mandates Protocol types for Category A services. This is a type-boundary decision that ADR-0065 should reference.
 - Provider composition impact: Standard 2.3 requires provider return types to use Protocol types. ADR-0056 Standard 1 should be amended to reference this requirement.
 - Testing impact: Standard 4 defines the test override pattern using Protocol-based test doubles. This replaces mock-heavy patterns with structural subtyping.
+- Managed service delegation impact: Standard 1 Category A delegation tier declaration implements ADR-0045 P7 at the service classification level. Each Category A service must declare its delegation tier (Tier 1/2/3) and justify any Tier 3 choice. Tier 3 services are flagged for future delegation. Backend-selection settings enabling Tier 1/2 swapping are governed by ADR-0047 P6 and ADR-0055. Provider construction with backend selection is governed by ADR-0056. Dev/test fallback provision for each Category A service is governed by ADR-0054.
 
 ## Best-Practice Revalidation
 
@@ -358,12 +368,13 @@ Existing Category A services that lack Protocol contracts must be migrated incre
 - Record age at review time (days): 0
 - Is record older than 120 days: No
 - If Yes, status set to stale: No
-- Validation summary: New Tier-2 standard implementing ADR-0045 Principle 6 and ADR-0048 Boundary 7. Classifies infrastructure services, defines the Protocol contract pattern, codifies the client-layer boundary, and establishes the migration path.
+- Validation summary: Tier-2 standard implementing ADR-0045 Principle 6 and ADR-0048 Boundary 7. Classifies infrastructure services, defines the Protocol contract pattern, codifies the client-layer boundary, and establishes the migration path. Amended 2026-04-30 to add delegation tier declaration per ADR-0045 P7.
 - Follow-up actions:
  - Amend ADR-0056 to reference Protocol return type requirement (Standard 2.3 of this ADR).
  - Execute P0 migration: StorageService Protocol.
  - Update migration map with ADR-0077 row.
  - Add code review checklist item for Protocol contract requirement on new Category A services.
+ - Cascade delegation tier declarations to ADR-0061 (identity provider tier documentation).
 
 ## Source References
 
@@ -433,3 +444,4 @@ Existing Category A services that lack Protocol contracts must be migrated incre
 
 - 2026-04-29: Created. Establishes service classification (A/B/C), Protocol contract pattern, client-layer boundary, test override pattern, and migration priorities. Root cause: Backstage mental model reconciliation identified that the infrastructure layer lacked Protocol contracts for 9 of 14 feature-facing services, and no ADR articulated the layer's role as a swappable service platform. Backstage's ServiceRef + ServiceFactory pattern maps to Python Protocol + @lru_cache provider; this ADR codifies that mapping. See ADR-0045 P6 for the governing principle and ADR-0076 for the companion intra-layer import standard.
 - 2026-04-29: Platform Services Assessment update. `PlatformService` removed from Category A (was P2). Per-platform services (`SlackService`, `TeamsService`) added to Category C - each platform's API surface is fundamentally different; no shared Protocol is appropriate. Migration priority table updated (P2 PlatformService removed). See the 2026-04-29 Platform Services Assessment findings and ADR-0078 (Platform Services Architecture).
+- 2026-04-30: Delegation tier declaration amendment. Added delegation tier declaration requirement to Standard 1 Category A classification per ADR-0045 P7 (Managed Service Delegation Hierarchy). Each Category A service now documents its delegation tier (Tier 1: managed service, Tier 2: industry library, Tier 3: custom code). Tier 3 declarations require justification. Added Delegation Tier column to Category A table with current assessments. Added managed service delegation impact to Compliance section. See managed-services-delegation-adr-review-tracker-2026-04-30.md Item #6.
