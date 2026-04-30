@@ -198,7 +198,7 @@ All API routes must provide complete OpenAPI metadata for generated clients and 
 - O1: Every `APIRouter` instance must declare exactly one `tags` entry. The tag name must be title-cased and match the feature or concern name (e.g., `tags=["Access Sync"]`, `tags=["System"]`).
 - O2: Every route handler must declare `summary` (imperative verb phrase, ≤8 words) and `description` (1-2 sentences describing behavior and response semantics).
 - O3: Every route handler must declare `response_model` (success response) and `status_code` (success status code). For endpoints returning no body, use `status_code=204` with no `response_model`.
-- O4: Every route handler must declare `responses` parameter documenting all non-2xx status codes it can return, using the canonical error response schema (ADR-0060 Standard 1) as the model.
+- O4: Every route handler must declare `responses` parameter documenting all non-2xx status codes it can return, using the canonical error response schema (ADR-0060 Standard 1) as the model. Error response descriptions must be concise and client-actionable.
 - O5: Internal infrastructure endpoints (health probes, readiness checks, webhook receivers) should use `include_in_schema=False` to exclude from public OpenAPI documentation.
 - O6: Mark deprecated endpoints with `deprecated=True` in the route decorator. Deprecated endpoints must include a deprecation notice in `description` indicating the replacement endpoint or migration path.
 - O7: Function names serve as `operationId` in OpenAPI — keep them descriptive, unique across the application, and stable (renaming is a breaking change for generated clients).

@@ -46,18 +46,18 @@ related_packages: []
 
 - Problem statement: Dependency injection rules and import conventions were split across two legacy ADRs (ADR-0003 and ADR-0004), both containing implementation-level code examples at Tier-1. ADR-0003 defined the three-layer DI architecture and provider patterns. ADR-0004 defined import hierarchy rules and anti-patterns. Both records duplicated guidance about what application code may and may not import, creating ambiguity about the authoritative source for boundary rules. Additionally, neither record addressed the legacy `app/modules` directory or its relationship to the target architecture.
 - Business/operational drivers:
- - Establish a single Tier-1 principle record for dependency injection boundaries and import rules.
- - Define the authoritative import hierarchy as a governance constraint, not implementation guidance.
- - Explicitly address the `app/modules` legacy layer and its posture in the target architecture.
- - Prevent circular dependencies and layer violations through enforceable boundary rules.
+- Establish a single Tier-1 principle record for dependency injection boundaries and import rules.
+- Define the authoritative import hierarchy as a governance constraint, not implementation guidance.
+- Explicitly address the `app/modules` legacy layer and its posture in the target architecture.
+- Prevent circular dependencies and layer violations through enforceable boundary rules.
 - Constraints:
- - Three-layer architecture is established (ADR-0045 Principle 3).
- - DI must be explicit and overridable for testing (ADR-0045 Principle 2).
- - FastAPI `Annotated[T, Depends(...)]` is the framework-level DI mechanism.
- - `app/modules` exists as a legacy layer and must not be used as an architectural reference.
+- Three-layer architecture is established (ADR-0045 Principle 3).
+- DI must be explicit and overridable for testing (ADR-0045 Principle 2).
+- FastAPI `Annotated[T, Depends(...)]` is the framework-level DI mechanism.
+- `app/modules` exists as a legacy layer and must not be used as an architectural reference.
 - Non-goals:
- - This record does not define specific provider function implementations or dependency alias conventions.
- - This record does not define plugin registration mechanics (delegated to ADR-0049).
+- This record does not define specific provider function implementations or dependency alias conventions.
+- This record does not define plugin registration mechanics (delegated to ADR-0049).
 
 ## Decision
 
@@ -71,6 +71,7 @@ Imports must flow in one direction only: Application -> Service/Injection Bounda
 ### Boundary 2: Single Injection Surface
 
 All infrastructure services must be consumed through a single, defined injection boundary. Application code imports only from this boundary - never from infrastructure internals, client packages, or configuration modules directly. The injection boundary provides:
+
 - Provider functions for service construction (used by jobs, background tasks, and non-HTTP contexts).
 - Dependency aliases for framework-managed injection (used by HTTP route handlers).
 
@@ -96,38 +97,43 @@ The `app/modules` directory is a legacy layer that is being retired through migr
 
 ### Boundary 7: Protocol Contract Surface
 
-Infrastructure services that abstract over backing services (storage, directory, identity, notifications, etc.) must expose Protocol types as their public contract. Feature packages must depend on these Protocol types, not on the concrete implementation classes. This ensures that backing-service substitution does not require feature code changes (ADR-0045 Principle 6). Client packages (`infrastructure/clients/*`) are implementation details; feature packages should prefer domain-level services over raw client access. When no suitable domain-level abstraction exists, direct client access is a documented pragmatic exception. The specific service classifications, Protocol requirements, and migration priorities are governed by ADR-0077.
+Infrastructure services that abstract over backing services must expose Protocol types as their public contract (ADR-0065 Principle 2). Feature packages must depend on these Protocol types, not on concrete implementation classes. Client packages (`infrastructure/clients/*`) are implementation details of the infrastructure layer; feature packages should prefer domain-level service abstractions over raw client access. When no suitable domain-level abstraction exists, direct client access is a documented pragmatic exception. Service classifications, Protocol requirements, and migration priorities are governed by ADR-0077.
 
 ## Alternatives Considered
 
 1. Retain two separate DI and import ADRs:
- - Pros: Smaller individual records.
- - Cons: Overlapping authority; developers consult two records for the same boundary question.
- - Why not chosen: The concerns are inseparable - import rules exist to enforce DI boundaries.
+
+- Pros: Smaller individual records.
+- Cons: Overlapping authority; developers consult two records for the same boundary question.
+- Why not chosen: The concerns are inseparable - import rules exist to enforce DI boundaries.
+
 2. Include implementation-level patterns (provider examples, alias conventions) at Tier-1:
- - Pros: Complete guidance in one record.
- - Cons: Implementation changes force Tier-1 amendments; violates one-authority-level-per-record.
- - Why not chosen: Implementation patterns belong in Tier-2 standards.
+
+- Pros: Complete guidance in one record.
+- Cons: Implementation changes force Tier-1 amendments; violates one-authority-level-per-record.
+- Why not chosen: Implementation patterns belong in Tier-2 standards.
+
 3. Ignore the legacy module posture:
- - Pros: Simpler record.
- - Cons: New developers may use `app/modules` as a reference, perpetuating legacy patterns.
- - Why not chosen: Explicit legacy posture prevents architectural regression.
+
+- Pros: Simpler record.
+- Cons: New developers may use `app/modules` as a reference, perpetuating legacy patterns.
+- Why not chosen: Explicit legacy posture prevents architectural regression.
 
 ## Consequences
 
 - Positive impacts:
- - Single authoritative boundary record eliminates contradictions between ADR-0003 and ADR-0004.
- - Boundary rules are governance-enforceable rather than advisory.
- - Legacy module posture is explicitly documented, preventing new code from entering the legacy layer.
+- Single authoritative boundary record eliminates contradictions between ADR-0003 and ADR-0004.
+- Boundary rules are governance-enforceable rather than advisory.
+- Legacy module posture is explicitly documented, preventing new code from entering the legacy layer.
 - Tradeoffs accepted:
- - Seven boundaries are deliberately abstract; implementation-level guidance requires consulting Tier-2 standards.
- - The legacy posture statement creates a migration obligation that must be tracked.
- - Boundary 7 (Protocol contracts) creates a migration obligation for existing concrete-only services. This is accepted because implementation swappability is a core architectural goal.
+- Seven boundaries are deliberately abstract; implementation-level guidance requires consulting Tier-2 standards.
+- The legacy posture statement creates a migration obligation that must be tracked.
+- Boundary 7 (Protocol contracts) creates a migration obligation for existing concrete-only services. This is accepted because implementation swappability is a core architectural goal.
 - Risks introduced:
- - Strict boundaries may create friction when legacy modules need urgent fixes before migration.
+- Strict boundaries may create friction when legacy modules need urgent fixes before migration.
 - Mitigations:
- - Legacy modules may be maintained (bug fixes, security patches) but not extended.
- - Migration progress is tracked in Tier-5 migration ADRs.
+- Legacy modules may be maintained (bug fixes, security patches) but not extended.
+- Migration progress is tracked in Tier-5 migration ADRs.
 
 ## Compliance and Boundaries
 
@@ -141,22 +147,22 @@ Infrastructure services that abstract over backing services (storage, directory,
 
 - Revalidation date: 2026-04-29
 - Sources rechecked:
- - Python PEP 8 and PEP 20 (Zen of Python: "Explicit is better than implicit").
- - Python PEP 544 (Protocols: Structural subtyping).
- - FastAPI Dependency Injection documentation (Annotated + Depends).
- - Twelve-Factor App: Factor III (Config), Factor IV (Backing Services).
- - Clean Architecture / Hexagonal Architecture principles (dependency rule: inner layers do not depend on outer layers).
- - Ports and Adapters / Hexagonal Architecture (Alistair Cockburn) - application core depends on port interfaces, not adapter implementations.
- - Pluggy documentation (hookimpl as metadata marker, no side effects at import time).
- - Backstage backend services architecture - services compose freely through declared deps; plugins are isolated. This distinction informed the correction of B5.
+- Python PEP 8 and PEP 20 (Zen of Python: "Explicit is better than implicit").
+- Python PEP 544 (Protocols: Structural subtyping).
+- FastAPI Dependency Injection documentation (Annotated + Depends).
+- Twelve-Factor App: Factor III (Config), Factor IV (Backing Services).
+- Clean Architecture / Hexagonal Architecture principles (dependency rule: inner layers do not depend on outer layers).
+- Ports and Adapters / Hexagonal Architecture (Alistair Cockburn) - application core depends on port interfaces, not adapter implementations.
+- Pluggy documentation (hookimpl as metadata marker, no side effects at import time).
+- Backstage backend services architecture - services compose freely through declared deps; plugins are isolated. This distinction informed the correction of B5.
 - Alignment summary:
- - Unidirectional import flow aligns with Clean Architecture dependency rule.
- - No import-time side effects aligns with Python best practices and pluggy's design philosophy.
- - Constructor-only dependency receipt aligns with standard DI patterns across frameworks.
- - Protocol contract surface (B7) aligns with Ports and Adapters, PEP 544 structural subtyping, and Backstage's ServiceRef pattern.
- - Infrastructure composition governance (B5) aligns with Backstage's core services model (services compose freely) and Seemann's Composition Root (all wiring in one place). The original "sibling isolation" framing was a misapplication of Backstage's plugin isolation rule to the service layer.
+- Unidirectional import flow aligns with Clean Architecture dependency rule.
+- No import-time side effects aligns with Python best practices and pluggy's design philosophy.
+- Constructor-only dependency receipt aligns with standard DI patterns across frameworks.
+- Protocol contract surface (B7) aligns with Ports and Adapters, PEP 544 structural subtyping, and Backstage's ServiceRef pattern.
+- Infrastructure composition governance (B5) aligns with Backstage's core services model (services compose freely) and Seemann's Composition Root (all wiring in one place). The original "sibling isolation" framing was a misapplication of Backstage's plugin isolation rule to the service layer.
 - Intentional deviations:
- - B5 was renamed from "Infrastructure Sibling Isolation" to "Infrastructure Composition Governance" to correct the mental model. The original framing borrowed Backstage's plugin-to-plugin isolation rule ("plugins must never communicate through code") and applied it to infrastructure services. In Backstage, services freely depend on each other through declared deps - only plugins are isolated. The corrected framing treats infrastructure as a shared service platform with composition governance, not an isolation boundary.
+- B5 was renamed from "Infrastructure Sibling Isolation" to "Infrastructure Composition Governance" to correct the mental model. The original framing borrowed Backstage's plugin-to-plugin isolation rule ("plugins must never communicate through code") and applied it to infrastructure services. In Backstage, services freely depend on each other through declared deps - only plugins are isolated. The corrected framing treats infrastructure as a shared service platform with composition governance, not an isolation boundary.
 
 ## Freshness Review
 
@@ -165,58 +171,71 @@ Infrastructure services that abstract over backing services (storage, directory,
 - If Yes, status set to stale: No
 - Validation summary: Consolidates ADR-0003 and ADR-0004 into one DI/import boundary constitution with explicit legacy-module posture, Protocol contract boundary (B7), and corrected infrastructure composition framing (B5).
 - Follow-up actions:
- - Mark ADR-0003 and ADR-0004 as superseded with `superseded_by: [ADR-0048]`.
- - Ensure downstream standards (ADR-0049, ADR-0059, ADR-0077) reference this record in `constrained_by`.
+- Mark ADR-0003 and ADR-0004 as superseded with `superseded_by: [ADR-0048]`.
+- Ensure downstream standards (ADR-0049, ADR-0059, ADR-0077) reference this record in `constrained_by`.
 
 ## Source References
 
 1. Source title: FastAPI Dependency Injection
- - URL: https://fastapi.tiangolo.com/tutorial/dependencies/
- - Publisher/maintainer: Sebastian Ramirez / FastAPI
- - Accessed date (YYYY-MM-DD): 2026-04-28
- - Relevance summary: Confirms Annotated + Depends as the framework DI mechanism.
+
+- URL: <https://fastapi.tiangolo.com/tutorial/dependencies/>
+- Publisher/maintainer: Sebastian Ramirez / FastAPI
+- Accessed date (YYYY-MM-DD): 2026-04-28
+- Relevance summary: Confirms Annotated + Depends as the framework DI mechanism.
+
 2. Source title: Clean Architecture - The Dependency Rule
- - URL: https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html
- - Publisher/maintainer: Robert C. Martin
- - Accessed date (YYYY-MM-DD): 2026-04-28
- - Relevance summary: Dependency rule (inner layers independent of outer layers) directly informs Boundary 1.
+
+- URL: <https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html>
+- Publisher/maintainer: Robert C. Martin
+- Accessed date (YYYY-MM-DD): 2026-04-28
+- Relevance summary: Dependency rule (inner layers independent of outer layers) directly informs Boundary 1.
+
 3. Source title: Pluggy Documentation - Hook Implementation Markers
- - URL: https://pluggy.readthedocs.io/en/stable/
- - Publisher/maintainer: pytest-dev / pluggy
- - Accessed date (YYYY-MM-DD): 2026-04-28
- - Relevance summary: Confirms @hookimpl is a metadata marker with no import-time side effects.
+
+- URL: <https://pluggy.readthedocs.io/en/stable/>
+- Publisher/maintainer: pytest-dev / pluggy
+- Accessed date (YYYY-MM-DD): 2026-04-28
+- Relevance summary: Confirms @hookimpl is a metadata marker with no import-time side effects.
+
 4. Source title: ADR-0003, ADR-0004 (Legacy)
- - URL: docs/decisions/adr/superseded/
- - Publisher/maintainer: SRE Team
- - Accessed date (YYYY-MM-DD): 2026-04-28
- - Relevance summary: Source records being consolidated; boundary invariants extracted and implementation details removed.
+
+- URL: docs/decisions/adr/superseded/
+- Publisher/maintainer: SRE Team
+- Accessed date (YYYY-MM-DD): 2026-04-28
+- Relevance summary: Source records being consolidated; boundary invariants extracted and implementation details removed.
+
 5. Source title: PEP 544 - Protocols: Structural subtyping (static duck typing)
- - URL: https://peps.python.org/pep-0544/
- - Publisher/maintainer: Python Software Foundation
- - Accessed date (YYYY-MM-DD): 2026-04-29
- - Relevance summary: Defines Python's Protocol mechanism for structural subtyping, providing the language-level foundation for Boundary 7 service contracts.
+
+- URL: <https://peps.python.org/pep-0544/>
+- Publisher/maintainer: Python Software Foundation
+- Accessed date (YYYY-MM-DD): 2026-04-29
+- Relevance summary: Defines Python's Protocol mechanism for structural subtyping, providing the language-level foundation for Boundary 7 service contracts.
+
 6. Source title: Hexagonal Architecture (Ports and Adapters)
- - URL: https://alistair.cockburn.us/hexagonal-architecture/
- - Publisher/maintainer: Alistair Cockburn
- - Accessed date (YYYY-MM-DD): 2026-04-29
- - Relevance summary: Application core depends on port interfaces (Protocols), not adapter implementations (concrete classes). Directly supports Boundary 7.
+
+- URL: <https://alistair.cockburn.us/hexagonal-architecture/>
+- Publisher/maintainer: Alistair Cockburn
+- Accessed date (YYYY-MM-DD): 2026-04-29
+- Relevance summary: Application core depends on port interfaces (Protocols), not adapter implementations (concrete classes). Directly supports Boundary 7.
+
 7. Source title: Backstage Backend Services Architecture
- - URL: https://backstage.io/docs/backend-system/architecture/services
- - Publisher/maintainer: Backstage / CNCF
- - Accessed date (YYYY-MM-DD): 2026-04-29
- - Relevance summary: Backstage services compose freely through declared deps; only plugins are isolated. Informed the correction of B5 from "sibling isolation" to "composition governance".
+
+- URL: <https://backstage.io/docs/backend-system/architecture/services>
+- Publisher/maintainer: Backstage / CNCF
+- Accessed date (YYYY-MM-DD): 2026-04-29
+- Relevance summary: Backstage services compose freely through declared deps; only plugins are isolated. Informed the correction of B5 from "sibling isolation" to "composition governance".
 
 ## Implementation Guidance
 
 - Required changes:
- - Mark ADR-0003 and ADR-0004 as `status: Superseded` and add `superseded_by: [ADR-0048]`.
- - Ensure downstream standards reference this record in `constrained_by`.
+- Mark ADR-0003 and ADR-0004 as `status: Superseded` and add `superseded_by: [ADR-0048]`.
+- Ensure downstream standards reference this record in `constrained_by`.
 - Validation and quality gates:
- - ADR-0051 taxonomy check: confirm no implementation-level code examples in this record.
- - Import boundary compliance can be partially automated via import linting tools.
- - Metadata completeness check: all 18 fields populated.
+- ADR-0051 taxonomy check: confirm no implementation-level code examples in this record.
+- Import boundary compliance can be partially automated via import linting tools.
+- Metadata completeness check: all 18 fields populated.
 - Test strategy and acceptance criteria impact:
- - No direct test changes; boundary invariants are validated through code review and downstream standard compliance.
+- No direct test changes; boundary invariants are validated through code review and downstream standard compliance.
 
 ## Change Log
 

@@ -182,6 +182,8 @@ Infrastructure providers remain centralized in `app/infrastructure/services/prov
 
 **Exceptions:** Infrastructure subsystems that are self-contained and have no cross-service dependencies may define module-level factory functions, but these are internal implementation details, not providers. They must not be exported through `infrastructure.services` and must be called only by the central provider that owns their lifecycle. Example: `build_google_directory_provider()` in `infrastructure/directory/factory.py` is a factory called by `get_directory_provider()`.
 
+For the corresponding prohibition at the package level — what infrastructure packages must NOT do — see ADR-0076 Standard 3.
+
 ### Standard 4: DI Alias Ceremony
 
 The three-file pattern for adding a new infrastructure service remains the canonical approach:

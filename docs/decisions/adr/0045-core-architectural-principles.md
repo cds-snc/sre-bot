@@ -96,7 +96,7 @@ Sensitive data (credentials, tokens, API keys) must never appear in logs, error 
 
 ### Principle 6: Protocol-Driven Service Contracts
 
-Infrastructure services consumed by feature packages must be defined by Protocol contracts. Feature code depends on the Protocol type, never on the concrete implementation class. This enables backing-service substitution (e.g., DynamoDB to RDS, Google Workspace to Entra ID) without modifying feature code. Concrete implementations are internal to the infrastructure layer and assembled in the composition root. The specific contract requirements, service classification, and migration path are governed by ADR-0077.
+Infrastructure services consumed by feature packages must be defined by Protocol contracts, enabling backing-service substitution without modifying feature code. The type-construct rationale and detailed rules are governed by ADR-0065 Principle 2. Service classifications and migration priorities are governed by ADR-0077.
 
 ### Principle 7: Managed Service Delegation Hierarchy
 
@@ -116,13 +116,13 @@ Every Protocol-backed service (Category A per ADR-0077) must support backend sel
 - Cons: Tier-1 scope leakage; implementation changes force Tier-1 amendments; downstream ADRs cannot distinguish binding principles from refinable guidance.
 - Why not chosen: Violates ADR-0044 governance rule of one authority level per record and ADR-0051 taxonomy enforcement.
 
-2. Keep at six principles and handle delegation at Tier-2 only:
+1. Keep at six principles and handle delegation at Tier-2 only:
 
 - Pros: Fewer Tier-1 constraints; less amendment friction.
 - Cons: The delegation hierarchy is a foundational design intent that completes Principle 6. Without a Tier-1 mandate, teams could implement custom infrastructure when managed services or proven libraries exist, accumulating unnecessary operational burden. The pattern parallels Principle 6: Protocol contracts govern the port shape; the delegation hierarchy governs what sits behind the adapter.
 - Why not chosen: The preference for managed services over custom code is a core architectural posture aligned with GC Cloud Adoption Strategy, AWS Well-Architected Framework, and Twelve-Factor backing services. It must constrain all downstream standards.
 
-3. Omit Protocol-driven contracts as a principle and handle at Tier-2 only:
+1. Omit Protocol-driven contracts as a principle and handle at Tier-2 only:
 
 - Pros: Fewer Tier-1 constraints; less amendment friction.
 - Cons: The swappable service layer is a foundational architectural intent, not an implementation detail. Without a Tier-1 mandate, Protocol adoption would be optional and inconsistent.
@@ -197,56 +197,56 @@ Every Protocol-backed service (Category A per ADR-0077) must support backend sel
 - Accessed date (YYYY-MM-DD): 2026-04-28
 - Relevance summary: Factors III, VI, IX directly inform principles 1, 4, and 5.
 
-2. Source title: FastAPI Dependency Injection Documentation
+1. Source title: FastAPI Dependency Injection Documentation
 
 - URL: <https://fastapi.tiangolo.com/tutorial/dependencies/>
 - Publisher/maintainer: Sebastian Ramirez / FastAPI
 - Accessed date (YYYY-MM-DD): 2026-04-28
 - Relevance summary: Confirms framework support for explicit DI pattern (Principle 2).
 
-3. Source title: OWASP Logging Cheat Sheet
+1. Source title: OWASP Logging Cheat Sheet
 
 - URL: <https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html>
 - Publisher/maintainer: OWASP Foundation
 - Accessed date (YYYY-MM-DD): 2026-04-28
 - Relevance summary: Confirms security-by-default logging boundaries (Principle 5).
 
-4. Source title: ADR-0001 (Legacy - Core Architectural Principles)
+1. Source title: ADR-0001 (Legacy - Core Architectural Principles)
 
 - URL: docs/decisions/adr/superseded/0001-core-architectural-principles.md
 - Publisher/maintainer: SRE Team
 - Accessed date (YYYY-MM-DD): 2026-04-28
 - Relevance summary: Source record being superseded; principles extracted and implementation details removed.
 
-5. Source title: PEP 544 - Protocols: Structural subtyping (static duck typing)
+1. Source title: PEP 544 - Protocols: Structural subtyping (static duck typing)
 
 - URL: <https://peps.python.org/pep-0544/>
 - Publisher/maintainer: Python Software Foundation
 - Accessed date (YYYY-MM-DD): 2026-04-29
 - Relevance summary: Defines Python's Protocol mechanism for structural subtyping, providing the language-level foundation for Principle 6 service contracts.
 
-6. Source title: Backstage Backend Services Architecture
+1. Source title: Backstage Backend Services Architecture
 
 - URL: <https://backstage.io/docs/backend-system/architecture/services>
 - Publisher/maintainer: Backstage / CNCF
 - Accessed date (YYYY-MM-DD): 2026-04-29
 - Relevance summary: Original inspiration for the shared service layer mental model. Service interfaces (ServiceRef) + service factories (createServiceFactory) + DI container (backend instance) map to Protocol + provider function + composition root in Python.
 
-7. Source title: AWS Well-Architected Framework — Operational Excellence Pillar
+1. Source title: AWS Well-Architected Framework — Operational Excellence Pillar
 
 - URL: <https://docs.aws.amazon.com/wellarchitected/latest/operational-excellence-pillar/>
 - Publisher/maintainer: Amazon Web Services
 - Accessed date (YYYY-MM-DD): 2026-04-30
 - Relevance summary: "Use managed services to reduce operational burden" — directly informs Principle 7's preference for managed cloud services over custom implementations.
 
-8. Source title: Government of Canada Cloud Adoption Strategy
+1. Source title: Government of Canada Cloud Adoption Strategy
 
 - URL: <https://www.canada.ca/en/government/system/digital-government/digital-government-innovations/cloud-services/government-canada-cloud-adoption-strategy.html>
 - Publisher/maintainer: Treasury Board of Canada Secretariat
 - Accessed date (YYYY-MM-DD): 2026-04-30
 - Relevance summary: Principle 8 (portability and interoperability) and service model priority (SaaS > PaaS > IaaS) directly inform Principle 7's delegation hierarchy and configurable backend requirement.
 
-9. Source title: Twelve-Factor App — Factor IV: Backing Services
+1. Source title: Twelve-Factor App — Factor IV: Backing Services
 
 - URL: <https://12factor.net/backing-services>
 - Publisher/maintainer: 12factor contributors

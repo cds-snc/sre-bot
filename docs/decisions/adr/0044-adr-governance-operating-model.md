@@ -88,6 +88,9 @@ related_packages: []
 - Principles established:
 - One ADR, one decision, one authority level.
 - Higher-tier ADRs constrain lower-tier ADRs through explicit metadata links.
+- Within a tier, later-arriving ADRs may declare `constrained_by` references to earlier same-tier ADRs when they build on established norms. This intra-tier constraint pattern is valid and expected at Tier-1 and Tier-2.
+- Domain-tier ADRs (Tier-3) may constrain cross-cutting ADRs (Tier-2) when the cross-cutting standard operates within the domain's scope. The `impacts`/`constrained_by` metadata records this relationship regardless of tier direction.
+- The `impacts` and `constrained_by` metadata fields must be maintained bidirectionally: if ADR-A declares `impacts: [ADR-B]`, then ADR-B must declare `constrained_by: [ADR-A]`.
 - Time-bound migration and deprecation decisions must use Tier-5 and include retirement criteria.
 - Infrastructure library adoption decisions must use Tier-5 and include evaluation criteria (maturity, maintenance status, license compatibility with the project license, type-hint coverage, async compatibility) to govern the long-term dependency commitment. Library licenses must be compatible with the project's own license (currently MIT); incompatible licenses are grounds for rejection regardless of technical merit. This complements ADR-0045 P7 (Managed Service Delegation Hierarchy), which establishes library delegation as Tier 2 in the three-tier hierarchy.
 - Foundational ADRs remain implementation-agnostic; implementation details belong in lower tiers.
@@ -183,3 +186,4 @@ related_packages: []
 - 2026-04-28: Created Tier-0 governance baseline as canonical authority for ADR lifecycle, ownership, supersession, and downstream rewrite constraints.
 - 2026-04-30: Tier-5 library trigger amendment. Added infrastructure library adoption as an explicit Tier-5 ADR trigger. See delegation tracker Item #3.
 - 2026-04-30: License compatibility amendment (editorial). Strengthened library evaluation criterion: library licenses must be compatible with the project's own license (currently MIT); incompatible licenses are grounds for rejection regardless of technical merit.
+- 2026-04-30: Constraint model clarification (editorial, HV Review findings H-003, H-010, V-016). Acknowledged intra-tier `constrained_by` relationships, upward domain-tier constraint pattern, and bidirectional `impacts`/`constrained_by` metadata invariant.

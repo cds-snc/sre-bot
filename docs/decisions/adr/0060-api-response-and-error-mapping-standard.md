@@ -153,12 +153,7 @@ Error mapping utilities shared across multiple route modules are classified per 
 
 ### Standard 6: OpenAPI Error Documentation
 
-All API routes must document error responses in their OpenAPI schema using FastAPI's `responses` parameter:
-
-1. Every route handler must declare the error response model for each non-2xx status code it can return.
-2. Error response descriptions must be concise and client-actionable.
-3. The shared error response schema (Standard 1) must be used consistently across all routes — not ad-hoc `dict` or string descriptions.
-4. This standard complements ADR-0063 (API Composition and Validation Standard) for route metadata requirements.
+OpenAPI documentation requirements for error responses are governed by ADR-0063 Standard 5, Rule O4. The canonical error response schema defined in Standard 1 of this ADR is the required model for all error response declarations.
 
 ## Alternatives Considered
 
