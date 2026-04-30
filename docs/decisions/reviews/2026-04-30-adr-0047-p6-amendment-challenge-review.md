@@ -1,0 +1,163 @@
+# ADR-0047 P6 Amendment — Challenge Review
+
+**Scope:** Amended sections only (Principle 6 addition and supporting updates per authoring workflow amendment procedure).
+
+---
+
+## 1. Review Metadata
+
+| Field | Value |
+|-------|-------|
+| **ADR Under Review** | ADR-0047: Configuration and Settings Governance — P6 Amendment |
+| **Amendment Type** | Normative (new principle added) |
+| **Reviewer** | Architecture Review (AI-assisted) |
+| **Review Date** | 2026-04-30 |
+| **Revalidation Due** | 2026-08-28 |
+| **Gate Outcome** | ⚪ **PASS** |
+| **Outcome Rationale** | P6 is a direct corollary of ADR-0045 P7, grounded in Twelve-Factor IV and GC portability requirements. It correctly stays at the principle level (no naming conventions or code patterns — those are delegated to ADR-0055). Validated against existing codebase patterns (`RETRY_BACKEND`, `RECONCILIATION_BACKEND`). |
+
+---
+
+## 2. Evidence Gathering (Amended Sections Only)
+
+### 2.B Infrastructure & Operational Standards
+
+| Standard/Doc | Search Query Used | Key Findings | ADR Alignment | Deviation Rationale |
+|--------------|-------------------|--------------|---------------|---------------------|
+| Twelve-Factor Factor III: Config | `store config in the environment` | "Store config in the environment... anything that is likely to vary between deploys" | ✅ Aligned | P5 (existing) covers env-var-first; P6 extends to backend selection as a config concern |
+| Twelve-Factor Factor IV: Backing Services | `backing services attached resources swap` | "Should be able to swap out a local MySQL database with one managed by a third party without any changes to the app's code. Only the resource handle in the config needs to change." | ✅ Aligned | P6 directly implements this — backend selection via config key, not code change |
+| GC Cloud Adoption Strategy Principle 8 | `portability interoperability cloud services` | "Departments and agencies should consider portability and interoperability" | ✅ Aligned | P6's configurable backend enables portability across cloud providers |
+| Pydantic Settings V2 | `Literal type validation BaseSettings` | Pydantic validates `Literal` fields at instantiation — invalid backend values fail fast at startup | ✅ Aligned | P6's "constrained at the type level" leverages pydantic's built-in Literal validation, which aligns with ADR-0047 P3 (fail-fast at startup) |
+
+### 2.D Validation Summary
+
+**Total Standards Checked:** 4
+**Aligned with Best Practice:** 4
+**Deliberate Deviations:** 0
+
+**High-Level Finding:** 🟢 **Fully Grounded**
+
+---
+
+## 3. Assumptions Challenged
+
+### Assumption 3.1: Backend selection belongs in configuration, not in code
+
+- **Stated Norm:** "The selection must be driven by a dedicated configuration key in the service's settings class"
+- **Underlying Assumption:** The choice of backing implementation is a deployment concern, not a code concern.
+- **Challenge:** Some backend selections might be architectural constraints (e.g., "we always use DynamoDB for this") rather than deployment-time choices. Making them configurable adds unnecessary indirection.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — Even single-backend services benefit from a dev/test fallback (in-memory). The existing `RETRY_BACKEND` with `memory`/`dynamodb`/`sqs` validates this pattern in practice. Twelve-Factor IV explicitly frames this as a config concern.
+- **Confidence (ADR survives challenge):** 🟢 High
+
+### Assumption 3.2: Backend-selection keys should default to dev-safe values
+
+- **Stated Norm:** "They must default to a safe dev/test value (typically `'memory'`)"
+- **Underlying Assumption:** Developers should be able to start the app locally without cloud credentials.
+- **Challenge:** Defaulting to `"memory"` means a misconfigured production deploy could silently use in-memory storage, losing data.
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — This is mitigated by ADR-0047 P3 (fail-fast validation at startup) and ADR-0052 (build-release-run: production deploys bind config at release phase, not at runtime defaults). A production release without `RETRY_BACKEND=dynamodb` set would be a release-phase configuration error, caught by deployment validation — not a silent failure. The existing `RETRY_BACKEND` already defaults to `"memory"` and this has not caused production incidents.
+- **Confidence (ADR survives challenge):** 🟢 High
+
+### Assumption 3.3: P6 does not leak into Tier-2 territory
+
+- **Stated Norm:** "Specific naming conventions and typing patterns for backend-selection keys are governed by ADR-0055"
+- **Underlying Assumption:** P6 stays at the principle level and does not prescribe implementation details.
+- **Challenge:** P6 mentions `Literal` type constraint and `"memory"` as a typical default — are these implementation prescriptions?
+- **Evidence Strength:** ⭐ Strong
+- **Counter-Evidence Found:** No — P6 says "constrained at the type level" (a principle: values must be type-safe) and "typically `'memory'`" (a guideline, not a mandate). It does not prescribe `Literal["memory", "dynamodb"]` as a specific pattern — that belongs in ADR-0055. The language is appropriately abstract for Tier-1.
+- **Confidence (ADR survives challenge):** 🟢 High
+
+---
+
+## 4. Failure Modes Identified
+
+No Moderate or Low confidence assumptions. No failure modes to document.
+
+---
+
+## 5. Contradiction Audit
+
+### Cross-ADR Contradictions
+
+| Conflict | ADRs Involved | Severity | Resolution Status |
+|----------|---------------|----------|-------------------|
+| P6 says backend keys default to dev-safe; ADR-0054 says dev/prod parity | ADR-0047 P6, ADR-0054 | 🟢 Low | ✅ Resolved — Dev/prod parity (ADR-0054) is about runtime behavior alignment, not configuration values. Dev defaults enable local startup; production overrides at release phase. The production config is validated at startup (P3). No conflict. |
+| P6 references ADR-0055 for naming patterns, but ADR-0055 does not yet have backend-selection coverage | ADR-0047 P6, ADR-0055 | 🟡 Medium | ⚪ Unresolved — ADR-0055 amendment is Item #8 in the delegation review tracker. Forward-reference to intended state. Acceptable: cascade will resolve. |
+
+### Codebase Validation
+
+| Pattern | Current Code | P6 Alignment |
+|---------|-------------|--------------|
+| `RETRY_BACKEND` | `app/infrastructure/configuration/infrastructure/retry.py` — `str` field, values `memory`/`dynamodb`/`sqs`, default `memory` | ✅ Aligned — infrastructure-owned, dev-safe default. Type constraining (Literal) is a future improvement per ADR-0055. |
+| `RECONCILIATION_BACKEND` | `app/infrastructure/configuration/features/groups.py` — `str` field, default `memory` | ⚠️ Ownership issue — feature backend key in infrastructure config. P2 says feature config belongs in package. Governed by ADR-0070 (groups retirement). |
+
+### Ownership Clarity
+
+- **Primary Domain Owner:** SRE Team
+- **Audit Result:** ✅ Clear
+
+---
+
+## 6. Scenario Validation (Amended Sections Only)
+
+### Scenario 6.1: New Infrastructure Service with Backend Selection
+
+| Aspect | P6 Requirement | Expected Workflow | Gap? | Notes |
+|--------|---------------|-------------------|------|-------|
+| Settings key creation | Dedicated key in infrastructure settings class | Developer adds `QUEUE_BACKEND: Literal["memory", "sqs"] = "memory"` to `QueueSettings` | ✅ No | P6 governs; ADR-0055 will provide naming pattern |
+| Provider reads key | Provider constructs implementation based on key | `get_queue_service()` reads `settings.QUEUE_BACKEND` and returns appropriate impl | ✅ No | ADR-0056 governs provider construction |
+| Local dev experience | Default to dev-safe value | App starts with `QUEUE_BACKEND=memory` without SQS credentials | ✅ No | P6 mandates dev-safe defaults |
+| Production deploy | Override at release phase | Release config sets `QUEUE_BACKEND=sqs` | ✅ No | ADR-0052 governs release-phase binding |
+
+**Validation Summary:** ✅ Fully aligned
+
+---
+
+## 7. Tradeoffs Accepted
+
+### Tradeoff 7.1: Principle Count — Six vs Five
+
+- **Chosen:** Add P6 as sixth configuration principle
+- **Rejected:** Handle backend selection implicitly through P4 (narrow-slice injection)
+- **Rationale:** P4 governs *how* config is injected; P6 governs *what* config must exist for swappable services. These are distinct concerns. Backend selection is a first-class configuration pattern that deserves explicit governance.
+- **Risk Accepted:** Slightly larger governance surface.
+- **Contingency:** P6 only applies when ADR-0045 P7 delegation hierarchy triggers backend selection. Services with no alternative implementations are unaffected.
+
+---
+
+## 8. Follow-Up Actions
+
+| Action | Blocker? | Owner | Due Date | Description |
+|--------|----------|-------|----------|-------------|
+| Cascade P6 naming/typing patterns to ADR-0055 | ❌ No | SRE Team | Per tracker (Item #8) | Add `*_BACKEND` as recognized settings pattern with Literal typing |
+| Cascade P6 to ADR-0056 (provider reads backend key) | ❌ No | SRE Team | Per tracker (Item #7) | Formalize settings-driven factory pattern in providers |
+
+**Blocking Actions:** None.
+
+---
+
+## 9. Binary Gate Outcome
+
+**GATE DECISION:**
+
+⚪ **PASS** → ADR-0047 P6 amendment is professionally sound and ready for acceptance.
+
+**Rationale:**
+
+- P6 is a direct corollary of ADR-0045 P7, grounded in Twelve-Factor IV
+- All 3 assumptions survive challenge with High confidence
+- No failure modes identified
+- Codebase already implements the pattern (`RETRY_BACKEND`), validating the principle
+- One Medium-severity unresolved item (ADR-0055 forward-reference) is acceptable — cascade will resolve
+- No Tier-2 scope leakage — naming/typing patterns correctly delegated to ADR-0055
+
+---
+
+## 10. Reviewer Sign-Off
+
+| Field | Signature/Value |
+|-------|-----------------|
+| **Reviewer** | Architecture Review (AI-assisted) |
+| **Review Date** | 2026-04-30 |
+| **Review Type** | Amendment review (normative change, scoped to amended sections per authoring workflow §Amendment Procedure) |
