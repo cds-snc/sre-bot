@@ -460,3 +460,11 @@ All three follow-up actions from ADR-0080 acceptance completed. All are editoria
 - Constrained by ADR-0044, ADR-0080, ADR-0054, ADR-0081. Related: ADR-0052, ADR-0067.
 - Migration map updated: ADR-0082 Proposed.
 - Status: Draft — awaiting challenge review.
+
+### ADR-0082 — Infrastructure Alerting Architecture (Accepted)
+
+- Challenge review Round 1: REVISE. Findings: restrictive `guardrail_policy_arns` not mandated, `SLACK_BOT_TOKEN` constraint incorrectly scoped to Option A, stale P-code references in alternatives analysis.
+- Revised ADR-0082 to harden governance and resolve review findings: mandated `guardrail_policy_arns` with `ReadOnlyAccess` or stricter, split Slack identity constraints between Option A and Option B, removed stale P-code references, added governance hardening controls, and added a Critical ECS `RunningTaskCount` alarm requirement for task-failure detection.
+- Challenge review Round 2: PASS. Review artifact saved to `reviews/adr-0082-review-2026-05-01-r2.md`.
+- Status set to Accepted. Migration map updated: ADR-0082 Proposed → Accepted. Wave tracker updated.
+- Decision outcome: Option A (Amazon Q Developer / AWS Chatbot) accepted as the primary infrastructure fallback alerting mechanism, with Option B (Lambda) reserved as the pre-approved escalation path.

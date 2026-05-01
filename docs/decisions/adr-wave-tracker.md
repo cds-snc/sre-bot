@@ -12,7 +12,8 @@
 **Parallel activity:** Managed services delegation review — **Complete** (all 7 criteria met)  
 **Structural:** ADR-0080 (Application Portability Boundary) — **Accepted** (2026-05-01)  
 **Infrastructure:** ADR-0081 (CI/CD Pipeline and Deployment Validation) — **Accepted** (2026-05-01)  
-**Next action:** P2 — Infrastructure Alerting Lambda ADR (ADR-0082) — **Draft authored** (2026-05-01)
+**Infrastructure:** ADR-0082 (Infrastructure Alerting Architecture) — **Accepted** (2026-05-01)
+**Recent completion:** P2 — Infrastructure Alerting Architecture (ADR-0082) — **Accepted** (2026-05-01)
 
 **Note:** ADR-0066 narrowed from "Access Runtime Naming and Operator Scope" to "Access Config Env-Source Naming". Lock lifecycle scope removed — governed by ADR-0058 Standard 9. ADR-0043 rejection stands independently.
 

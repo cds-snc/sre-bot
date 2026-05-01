@@ -3,7 +3,7 @@
 ---
 adr_id: ADR-0082
 title: "Infrastructure Alerting Architecture"
-status: Draft
+status: Accepted
 decision_type: Integration Decision
 tier: Tier-4
 governance_domain: infrastructure
