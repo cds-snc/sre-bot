@@ -3,7 +3,7 @@
 ---
 adr_id: ADR-0081
 title: "CI/CD Pipeline and Deployment Validation"
-status: Draft
+status: Accepted
 decision_type: Standard
 tier: Tier-2
 governance_domain: infrastructure
