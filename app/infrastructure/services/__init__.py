@@ -5,6 +5,7 @@ Provides type aliases and provider functions for FastAPI dependency injection.
 """
 
 from infrastructure.services.dependencies import (
+    AppSettingsDep,
     SettingsDep,
     IdentityServiceDep,
     JWKSManagerDep,
@@ -27,6 +28,7 @@ from infrastructure.services.dependencies import (
     DirectoryProviderDep,
 )
 from infrastructure.services.providers import (
+    get_app_settings,
     get_settings,
     get_identity_service,
     get_jwks_manager,
@@ -54,7 +56,6 @@ from infrastructure.services.providers import (
 from infrastructure.security.rate_limiter import get_limiter, setup_rate_limiter
 from infrastructure.security.current_user import get_current_user
 
-
 # Plugin infrastructure
 from infrastructure.services.plugins import (
     hookimpl,
@@ -64,9 +65,9 @@ from infrastructure.services.plugins import (
     register_feature_integrations,
 )
 
-
 __all__ = [
     # Core dependencies
+    "AppSettingsDep",
     "SettingsDep",
     "IdentityServiceDep",
     "JWKSManagerDep",
@@ -89,6 +90,7 @@ __all__ = [
     "DiscordClientDep",
     "DirectoryProviderDep",
     # Core providers
+    "get_app_settings",
     "get_settings",
     "get_identity_service",
     "get_jwks_manager",

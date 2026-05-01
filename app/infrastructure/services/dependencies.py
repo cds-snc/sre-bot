@@ -6,7 +6,7 @@ Provides annotated type hints for common infrastructure dependencies.
 
 from typing import Annotated
 from fastapi import Depends, Security
-from infrastructure.configuration import Settings
+from infrastructure.configuration import AppSettings, Settings
 from infrastructure.identity.models import User
 from infrastructure.identity.service import IdentityService
 from infrastructure.security.jwks import JWKSManager
@@ -30,6 +30,7 @@ from infrastructure.platforms.clients import (
 )
 from infrastructure.directory.provider import DirectoryProvider
 from infrastructure.services.providers import (
+    get_app_settings,
     get_settings,
     get_identity_service,
     get_jwks_manager,
@@ -53,6 +54,7 @@ from infrastructure.services.providers import (
 
 # Settings dependency
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+AppSettingsDep = Annotated[AppSettings, Depends(get_app_settings)]
 
 # Identity service dependency
 IdentityServiceDep = Annotated[IdentityService, Depends(get_identity_service)]
@@ -130,6 +132,7 @@ DirectoryProviderDep = Annotated[DirectoryProvider, Depends(get_directory_provid
 
 __all__ = [
     "SettingsDep",
+    "AppSettingsDep",
     "IdentityServiceDep",
     "JWKSManagerDep",
     "CurrentUserDep",
