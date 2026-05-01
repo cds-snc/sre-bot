@@ -14,7 +14,7 @@ secondary_domains:
 owners:
  - SRE Team
 date_created: 2026-04-28
-last_updated: 2026-04-30
+last_updated: 2026-05-01
 last_reviewed: 2026-04-30
 next_review_due: 2026-08-28
 constrained_by: []
@@ -52,6 +52,7 @@ related_records:
  - ADR-0020
  - ADR-0026
  - ADR-0027
+ - ADR-0080
 related_packages: []
 ---
 # ADR Governance and Operating Model
@@ -187,3 +188,4 @@ related_packages: []
 - 2026-04-30: Tier-5 library trigger amendment. Added infrastructure library adoption as an explicit Tier-5 ADR trigger. See delegation tracker Item #3.
 - 2026-04-30: License compatibility amendment (editorial). Strengthened library evaluation criterion: library licenses must be compatible with the project's own license (currently MIT); incompatible licenses are grounds for rejection regardless of technical merit.
 - 2026-04-30: Constraint model clarification (editorial, HV Review findings H-003, H-010, V-016). Acknowledged intra-tier `constrained_by` relationships, upward domain-tier constraint pattern, and bidirectional `impacts`/`constrained_by` metadata invariant.
+- 2026-05-01: Tier blast radius amendment (editorial, ADR-0080 follow-up). Updated Tier-1 and Tier-2 blast radius descriptions in metadata reference template to cover both application and infrastructure governance domains per ADR-0080. Added ADR-0080 to `related_records`.

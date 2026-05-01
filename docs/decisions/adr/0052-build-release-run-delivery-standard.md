@@ -10,7 +10,7 @@ secondary_domains:
 owners:
  - SRE Team
 date_created: 2026-04-28
-last_updated: 2026-04-28
+last_updated: 2026-05-01
 last_reviewed: 2026-04-28
 next_review_due: 2026-08-26
 constrained_by:
@@ -27,6 +27,7 @@ review_state: current
 related_records:
  - ADR-0046
  - ADR-0057
+ - ADR-0080
 related_packages:
  - app/server
 ---
@@ -145,7 +146,7 @@ related_packages:
 - Keep build, release, and run responsibilities distinct in CI/CD workflows and operational runbooks.
 - Track release identifiers independent of source branch names.
 - Remove SSM parameter retrieval from `app/bin/entry.sh`; configuration must be resolved and injected before the container starts, not assembled at process launch. This migration requires a dedicated Tier-5 ADR. When modifying entry.sh, preserve the `exec` invocation form (PID 1 signal delivery) and the `--timeout-graceful-shutdown` parameter required by ADR-0057.
-- Move release-phase configuration binding to the ECS task definition level (e.g., AWS Secrets Manager injection or task definition environment variables resolved at deploy time).
+- _Infrastructure fulfillment context (ADR-0080 P3):_ Move release-phase configuration binding to the deployment platform's configuration injection mechanism (e.g., ECS task definition environment variables, Kubernetes ConfigMaps, or equivalent). The app-side contract is: configuration must arrive as environment variables before process start (ADR-0047 P5). How the hosting platform fulfills that contract is an infrastructure-domain concern.
 - Ensure deployed release identity (image digest or git SHA) is visible in startup logs and health-check metadata so rollback decisions have a traceable baseline.
 - Validation and quality gates:
 - Verify artifact immutability and reproducibility checks in CI.
@@ -159,3 +160,4 @@ related_packages:
 
 - 2026-04-28: Added Tier-2 standard covering Twelve-Factor build-release-run ownership for Phase A execution.
 - 2026-04-28: Strengthened context, risks, and implementation guidance following challenge review; explicitly named entry.sh SSM-fetch as the primary known violation and defined concrete migration targets.
+- 2026-05-01: Infrastructure fulfillment context labeling (editorial, ADR-0080 follow-up). Reclassified ECS-specific implementation guidance in Implementation Guidance as infrastructure fulfillment context per ADR-0080 P3. App-side contract ("configuration must be resolved and injected before the container starts") remains normative. Added ADR-0080 to `related_records`.

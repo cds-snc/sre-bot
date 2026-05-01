@@ -412,3 +412,24 @@ Prose-level redundancy consolidation applied across 7 ADR files based on HV revi
 - Status set to Accepted. No legacy supersession — this is a new structural ADR.
 - Migration map updated: ADR-0080 status Draft → Accepted.
 - Follow-up actions (non-blocking): ADR-0067 scope clarification to reference ADR-0080; ADR-0052 decomposition assessment for infra-specific guidance; ADR-0044 tier assessment when first infra ADR is authored.
+
+### ADR-0080 Follow-Up Amendments (Editorial)
+
+All three follow-up actions from ADR-0080 acceptance completed. All are editorial amendments (cross-references, scope clarifications, context labeling) — no normative changes, no challenge review required.
+
+**ADR-0067 — Scope clarification:**
+
+- Clarified "any feature or subsystem" principle (line 69) is scoped to code running within the ASGI lifespan per ADR-0080 P3. Infrastructure components deployed independently (e.g., Lambda alerting functions) are explicitly excluded from this ADR's scope.
+- Added ADR-0080 to `related_records`. Updated `last_updated` to 2026-05-01.
+
+**ADR-0052 — Infrastructure fulfillment context labeling:**
+
+- Reclassified ECS-specific implementation guidance ("Move release-phase configuration binding to the ECS task definition level") as infrastructure fulfillment context per ADR-0080 P3. Reframed as platform-neutral: "Move release-phase configuration binding to the deployment platform's configuration injection mechanism."
+- App-side contract ("configuration must be resolved and injected before the container starts") remains normative.
+- Added ADR-0080 to `related_records`. Updated `last_updated` to 2026-05-01.
+
+**ADR-0044 / Metadata reference — Tier blast radius amendment:**
+
+- Updated Tier-1 blast radius in `templates/adr-metadata-reference.md` to include both governance domains: application paths (`app/infrastructure`, `app/server`, `app/packages`) and infrastructure paths (`terraform/`, `.github/workflows/`, deployment configs).
+- Updated Tier-2 blast radius to be domain-neutral ("within one governance domain").
+- Added ADR-0080 to ADR-0044 `related_records`. Updated `last_updated` to 2026-05-01.

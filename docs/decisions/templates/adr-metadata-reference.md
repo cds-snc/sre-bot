@@ -63,8 +63,8 @@ Use exactly one value per ADR.
 | Tier   | Purpose                              | Blast radius                                |
 |--------|--------------------------------------|---------------------------------------------|
 | Tier-0 | Governance and Operating Model       | Entire repository                           |
-| Tier-1 | Platform Principles                  | `app/infrastructure`, `app/server`, `app/packages` |
-| Tier-2 | Platform Standards and Patterns      | Multiple packages and shared platform code  |
+| Tier-1 | Platform Principles                  | Application domain: `app/infrastructure`, `app/server`, `app/packages`. Infrastructure domain: `terraform/`, `.github/workflows/`, deployment configs (ADR-0080). |
+| Tier-2 | Platform Standards and Patterns      | Multiple packages/components and shared platform code within one governance domain |
 | Tier-3 | Domain Architecture                  | One domain and its integration boundaries   |
 | Tier-4 | Feature and Integration Decisions    | One feature or one integration path         |
 | Tier-5 | Time-Bound Migration Decisions       | Temporary cross-tier bridge                 |

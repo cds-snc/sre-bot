@@ -9,7 +9,7 @@ secondary_domains:
   - Runtime and Lifecycle
   - Package and Plugin Architecture
 date_created: 2026-04-30
-last_updated: 2026-04-30
+last_updated: 2026-05-01
 last_reviewed: 2026-04-30
 next_review_due: 2026-08-28
 owners:
@@ -30,6 +30,7 @@ related_records:
   - ADR-0055
   - ADR-0056
   - ADR-0064
+  - ADR-0080
 related_packages:
   - app/infrastructure/platforms/providers
   - app/infrastructure/configuration/infrastructure
@@ -66,7 +67,7 @@ review_state: current
 - Principles established:
   - Slack SDK lifecycle is infrastructure-owned; feature packages consume capabilities, never construct or manage the transport connection.
   - Socket Mode connection is a Transport-phase resource with bounded startup and shutdown windows.
-  - Any feature or subsystem that needs to send Slack messages (including webhooks, incident notifications, or background jobs) consumes the provider's message-sending API. The provider exposes capability; it does not own routing or dispatch logic.
+  - Any feature or subsystem running within the ASGI lifespan (ADR-0080 P3) that needs to send Slack messages (including webhooks, incident notifications, or background jobs) consumes the provider's message-sending API. The provider exposes capability; it does not own routing or dispatch logic. Infrastructure components deployed independently of the FastAPI process (e.g., Lambda alerting functions) that send Slack messages do so through their own Slack API integration and are not governed by this ADR.
 
 ## Alternatives Considered
 
@@ -306,3 +307,4 @@ All Slack transport events use structured logging via `structlog` (ADR-0054).
 - 2026-04-30: R1 challenge review → REVISE. Corrected S2 R4: Slack supports up to 10 simultaneous connections (not 1 as originally claimed). Single connection retained as design choice for operational simplicity. Updated source reference URLs to current docs.slack.dev domain.
 - 2026-04-30: R1 revision applied. S2 R4 expanded: documented multi-task ECS deployment (desired_count=2) as the horizontal scaling model. Slack distributes events across task connections with no duplication. Multi-connection per process not planned. Feature-Specific Decisions table updated to match.
 - 2026-04-30: R2 challenge review → PASS. Status changed from Draft to Accepted. ADR-0014 superseded and moved to `adr/superseded/`. Wave 6 gate closed.
+- 2026-05-01: Scope clarification amendment (editorial, ADR-0080 follow-up). Clarified "any feature or subsystem" is scoped to code running within the ASGI lifespan per ADR-0080 P3. Infrastructure components deployed independently (e.g., Lambda alerting) are explicitly excluded. Added ADR-0080 to `related_records`.
