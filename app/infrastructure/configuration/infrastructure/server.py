@@ -1,5 +1,6 @@
 """Server and development infrastructure settings."""
 
+from functools import lru_cache
 from typing import Any, Dict, Optional
 
 from pydantic import Field, field_validator
@@ -75,3 +76,15 @@ class DevSettings(InfrastructureSettings):
     """
 
     SLACK_DEV_MSG_CHANNEL: str = Field(default="", alias="SLACK_DEV_MSG_CHANNEL")
+
+
+@lru_cache(maxsize=1)
+def get_server_settings() -> ServerSettings:
+    """Singleton provider for server infrastructure settings."""
+    return ServerSettings()
+
+
+@lru_cache(maxsize=1)
+def get_dev_settings() -> DevSettings:
+    """Singleton provider for development infrastructure settings."""
+    return DevSettings()
