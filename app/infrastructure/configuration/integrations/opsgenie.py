@@ -1,5 +1,7 @@
 """OpsGenie integration settings."""
 
+from functools import lru_cache
+
 from pydantic import Field
 
 from infrastructure.configuration.base import IntegrationSettings
@@ -24,3 +26,9 @@ class OpsGenieSettings(IntegrationSettings):
     OPSGENIE_INTEGRATIONS_KEY: str | None = Field(
         default=None, alias="OPSGENIE_INTEGRATIONS_KEY"
     )
+
+
+@lru_cache(maxsize=1)
+def get_opsgenie_settings() -> OpsGenieSettings:
+    """Singleton provider for OpsGenie integration settings."""
+    return OpsGenieSettings()

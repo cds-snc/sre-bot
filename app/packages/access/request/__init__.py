@@ -5,7 +5,8 @@ approved requests are advanced to ``completed`` or ``failed`` once the sync
 provider reports back.
 
 Slack command and interaction registration are deferred to a later iteration
-pending a ``register_slack_interactions(bot)`` hookspec addition.
+pending implementation of a ``register_slack_commands(provider)`` hookimpl
+per ADR-0059 Standard 3.
 """
 
 from infrastructure.services import get_event_dispatcher, hookimpl

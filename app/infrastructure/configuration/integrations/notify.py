@@ -1,5 +1,7 @@
 """GC Notify integration settings."""
 
+from functools import lru_cache
+
 from pydantic import Field
 
 from infrastructure.configuration.base import IntegrationSettings
@@ -29,3 +31,9 @@ class NotifySettings(IntegrationSettings):
         default=None, alias="NOTIFY_SRE_CLIENT_SECRET"
     )
     NOTIFY_API_URL: str = Field(default="", alias="NOTIFY_API_URL")
+
+
+@lru_cache(maxsize=1)
+def get_notify_settings() -> NotifySettings:
+    """Singleton provider for GC Notify integration settings."""
+    return NotifySettings()

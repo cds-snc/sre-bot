@@ -1,5 +1,7 @@
 """Slack integration settings."""
 
+from functools import lru_cache
+
 from infrastructure.configuration.base import IntegrationSettings
 
 
@@ -31,3 +33,9 @@ class SlackSettings(IntegrationSettings):
     SLACK_SECURITY_USER_GROUP_ID: str = ""
     APP_TOKEN: str = ""
     SLACK_TOKEN: str = ""
+
+
+@lru_cache(maxsize=1)
+def get_slack_settings() -> SlackSettings:
+    """Singleton provider for Slack integration settings."""
+    return SlackSettings()
