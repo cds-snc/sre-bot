@@ -1,5 +1,6 @@
 """Directory infrastructure settings."""
 
+from functools import lru_cache
 from typing import Literal
 
 from pydantic import Field
@@ -77,3 +78,9 @@ class DirectorySettings(InfrastructureSettings):
         alias="DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS",
         description="Timeout for the lightweight startup warmup probe",
     )
+
+
+@lru_cache(maxsize=1)
+def get_directory_settings() -> DirectorySettings:
+    """Singleton provider for directory infrastructure settings."""
+    return DirectorySettings()
