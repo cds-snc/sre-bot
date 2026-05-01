@@ -440,3 +440,23 @@ All three follow-up actions from ADR-0080 acceptance completed. All are editoria
 - Updated `templates/decision-record-template.md` to include `governance_domain: application` default.
 - Field count updated from 18 to 19 in both template files.
 - Motivation: first infrastructure-domain ADR (P3 — CI/CD Deployment Validation) requires explicit domain classification at the metadata level.
+
+### ADR-0081 — CI/CD Pipeline and Deployment Validation (Accepted)
+
+- ADR-0081 (CI/CD Pipeline and Deployment Validation, Tier-2 Standard, governance_domain: infrastructure) accepted.
+- 7 standards: S1 (Pre-Merge CI Quality Gates), S2 (Deployment Artifact Integrity), S3 (Deployment Validation Gate), S4 (Deployment Failure Notification), S5 (Deployment Concurrency Control), S6 (Infrastructure-as-Code Validation), S7 (Supply Chain Security).
+- Constrained by ADR-0044, ADR-0080. Related to ADR-0052, ADR-0054, ADR-0062, ADR-0064.
+- Resolves XC-001 (CI/CD deployment validation governance gap) from the Option B ADR Conflict Assessment.
+- Status set to Accepted. Migration map updated: ADR-0081 Draft → Accepted. Wave tracker updated.
+- Next action: P2 — Author Infrastructure Alerting Lambda ADR (ADR-0082).
+
+### ADR-0082 — Infrastructure Alerting Architecture (Draft)
+
+- Authored ADR-0082 (Infrastructure Alerting Architecture, Tier-4 Integration Decision, governance_domain: infrastructure).
+- Problem framing: SRE Bot is the alerting hub for multiple products. When the bot is silently broken, it cannot report its own failure. Current SNS → Slack Webhook fallback delivers raw JSON, has no DLQ, no channel routing, and uses deprecated webhook integration.
+- Tier-4 Derivation Test: all 4 checks pass (tier-bleed, constraint chain, single-concern, domain-specificity).
+- Decision: Option A — Amazon Q Developer (AWS Chatbot) as managed service per ADR-0045 P7. Option B (Lambda) reserved as pre-approved escalation path.
+- Alarm class taxonomy defined: Critical, Warning, Informational with per-class SNS topic routing.
+- Constrained by ADR-0044, ADR-0080, ADR-0054, ADR-0081. Related: ADR-0052, ADR-0067.
+- Migration map updated: ADR-0082 Proposed.
+- Status: Draft — awaiting challenge review.

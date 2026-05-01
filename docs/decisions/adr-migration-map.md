@@ -37,7 +37,8 @@
 | 0066 | Access Config Env-Source Naming | 4 | 6 | 0042 | Accepted |
 | 0067 | Slack Transport Integration Decision | 4 | 6 | 0014 | Accepted |
 | 0080 | Application Portability Boundary | 1 | P0 | — | Accepted |
-| 0081 | CI/CD Pipeline and Deployment Validation | 2 | P3 | — | Draft |
+| 0081 | CI/CD Pipeline and Deployment Validation | 2 | P3 | — | Accepted |
+| 0082 | Infrastructure Alerting Architecture | 4 | P2 | — | Proposed |
 
 ## Tier-5 Records (Migration / Deprecation)
 
