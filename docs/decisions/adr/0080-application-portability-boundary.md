@@ -1,7 +1,7 @@
 ---
 adr_id: ADR-0080
 title: "Application Portability Boundary"
-status: Draft
+status: Accepted
 decision_type: Principle
 tier: Tier-1
 primary_domain: Governance and Operating Model
@@ -218,3 +218,4 @@ This invariant formalizes the active portability refactoring posture and provide
 ## Change Log
 
 - 2026-05-01: Created. Establishes the Application Portability Boundary as a Tier-1 principle defining two governance domains (application architecture vs. hosting infrastructure) with a contract-based interface. Addresses the structural gap identified when investigating CI/CD pipeline governance questions.
+- 2026-05-01: Accepted. Challenge review R1 PASS. User accepted.

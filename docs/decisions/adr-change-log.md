@@ -399,3 +399,16 @@ Prose-level redundancy consolidation applied across 7 ADR files based on HV revi
 - HV review finding index, amendment summary, and gate assessment updated. Gate upgraded from CONDITIONAL PASS to PASS.
 - Migration map: Added "Cross-Cutting ADR Gaps" section with V-017 (Access Domain Contract, Tier-3, HIGH) and H-009 (API Versioning, Tier-2, DEFERRED).
 - Wave tracker: Added Wave 7 Pre-Requisite section for V-017 (Access Domain Contract). Added H-009 and HV redundancy consolidation to Standalone Actions.
+
+---
+
+## 2026-05-01
+
+### ADR-0080 — Application Portability Boundary (Accepted)
+
+- Authored ADR-0080 (Application Portability Boundary, Tier-1, 4 principles). Addresses the structural gap identified when investigating CI/CD pipeline governance questions — no prior ADR defined the boundary between application architecture and hosting infrastructure.
+- Principles: (1) Two Governance Domains — application architecture vs. hosting infrastructure; (2) Contract-Based Interface — app ADRs state contracts, infra ADRs define fulfillment; (3) ADR Scope Constraint — application ADRs govern code within the ASGI lifespan only; (4) Portability Invariant — application ADR corpus must survive a full platform change.
+- Challenge review R1: PASS. 10 standards checked (all aligned), 4 assumptions challenged (3 high confidence, 1 moderate — infra ADR tier fit deferred as follow-up). Zero unresolved contradictions. 4 scenarios validated. Review artifact: `reviews/adr-0080-review-2026-05-01.md`.
+- Status set to Accepted. No legacy supersession — this is a new structural ADR.
+- Migration map updated: ADR-0080 status Draft → Accepted.
+- Follow-up actions (non-blocking): ADR-0067 scope clarification to reference ADR-0080; ADR-0052 decomposition assessment for infra-specific guidance; ADR-0044 tier assessment when first infra ADR is authored.

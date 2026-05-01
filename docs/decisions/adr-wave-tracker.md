@@ -2,7 +2,7 @@
 
 **Purpose:** Track current wave progress and pending actions. Update in-place each cycle.
 
-**Last updated:** 2026-04-30
+**Last updated:** 2026-05-01
 
 ---
 
@@ -10,6 +10,7 @@
 
 **Active wave:** Wave 6  
 **Parallel activity:** Managed services delegation review — **Complete** (all 7 criteria met)  
+**Structural:** ADR-0080 (Application Portability Boundary) — **Accepted** (2026-05-01)  
 **Next gate:** Wave 6 closed → Phase 1 infrastructure foundation
 
 **Note:** ADR-0066 narrowed from "Access Runtime Naming and Operator Scope" to "Access Config Env-Source Naming". Lock lifecycle scope removed — governed by ADR-0058 Standard 9. ADR-0043 rejection stands independently.
@@ -204,6 +205,9 @@ The access domain has ~8 domain-specific contracts (adapter Protocol, reconcilia
 | Delegation review | Cross-wave ADR amendments for managed service delegation hierarchy (ADR-0045 P7) | **Complete** — Phases 1–3 done (8 PASS, 3 Verified, 12 NONE verified). Phase 4 library ADRs deferred (custom interim accepted, flagged for Tier 1 delegation). |
 | HV review — redundancy consolidation | Prose consolidation of 5 redundancy/ambiguity findings across 7 ADR files | **Complete** — H-001, H-002, H-005, H-007, H-008 all applied. |
 | API Versioning Strategy ADR (HV finding H-009) | Tier-2 standard for v2 endpoint introduction, deprecation lifecycle, and client migration. Not needed until first v2 endpoint is planned. | **DEFERRED** — trigger: first v2 endpoint planned |
+| ADR-0080 follow-up: ADR-0067 scope clarification | Update ADR-0067 to reference ADR-0080 and clarify "any feature or subsystem" is scoped to in-process code within ASGI lifespan. | **Not started** — editorial amendment, no challenge review needed |
+| ADR-0080 follow-up: ADR-0052 decomposition assessment | Assess infra-specific guidance in ADR-0052 for reclassification or migration to future infra ADR. | **Not started** |
+| ADR-0080 follow-up: ADR-0044 tier assessment | Assess ADR-0044 tier definitions for infra-domain fit when first infrastructure ADR is authored. | **Not started** — trigger: first infra ADR authored |
 
 ---
 
