@@ -1,5 +1,6 @@
 """AWS integration settings."""
 
+from functools import lru_cache
 from typing import Optional
 
 from pydantic import Field
@@ -76,3 +77,9 @@ class AwsSettings(IntegrationSettings):
             "config": self.AUDIT_ROLE_ARN,
             "guardduty": self.LOGGING_ROLE_ARN,
         }
+
+
+@lru_cache(maxsize=1)
+def get_aws_settings() -> AwsSettings:
+    """Singleton provider for AWS integration settings."""
+    return AwsSettings()
