@@ -36,6 +36,7 @@
 | 0065 | Type-Model Boundaries Canonical Principle | 1 | 5 | 0040 | Accepted |
 | 0066 | Access Config Env-Source Naming | 4 | 6 | 0042 | Accepted |
 | 0067 | Slack Transport Integration Decision | 4 | 6 | 0014 | Accepted |
+| 0080 | Application Portability Boundary | 1 | P0 | — | Draft |
 
 ## Tier-5 Records (Migration / Deprecation)
 
