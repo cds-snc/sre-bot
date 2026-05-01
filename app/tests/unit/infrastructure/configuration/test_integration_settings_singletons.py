@@ -1,6 +1,5 @@
 """Unit tests for integration settings singleton providers (PR-2)."""
 
-
 from infrastructure.configuration.integrations.slack import (
     SlackSettings,
     get_slack_settings,
