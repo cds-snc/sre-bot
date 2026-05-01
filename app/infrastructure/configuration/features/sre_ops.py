@@ -1,5 +1,7 @@
 """SRE operations feature settings."""
 
+from functools import lru_cache
+
 from pydantic import Field
 
 from infrastructure.configuration.base import FeatureSettings
@@ -22,3 +24,9 @@ class SreOpsSettings(FeatureSettings):
     """
 
     SRE_OPS_CHANNEL_ID: str = Field(default="", alias="SRE_OPS_CHANNEL_ID")
+
+
+@lru_cache(maxsize=1)
+def get_sre_ops_settings() -> SreOpsSettings:
+    """Singleton provider for SRE operations feature settings."""
+    return SreOpsSettings()
