@@ -433,3 +433,10 @@ All three follow-up actions from ADR-0080 acceptance completed. All are editoria
 - Updated Tier-1 blast radius in `templates/adr-metadata-reference.md` to include both governance domains: application paths (`app/infrastructure`, `app/server`, `app/packages`) and infrastructure paths (`terraform/`, `.github/workflows/`, deployment configs).
 - Updated Tier-2 blast radius to be domain-neutral ("within one governance domain").
 - Added ADR-0080 to ADR-0044 `related_records`. Updated `last_updated` to 2026-05-01.
+
+### Metadata Schema — `governance_domain` field addition
+
+- Added `governance_domain` field (19th mandatory field) to `templates/adr-metadata-reference.md`. Allowed values: `application | infrastructure`. Classifies which governance domain an ADR belongs to per ADR-0080's Two Governance Domains principle.
+- Updated `templates/decision-record-template.md` to include `governance_domain: application` default.
+- Field count updated from 18 to 19 in both template files.
+- Motivation: first infrastructure-domain ADR (P3 — CI/CD Deployment Validation) requires explicit domain classification at the metadata level.

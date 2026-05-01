@@ -3,7 +3,7 @@
 Authoritative field definitions, allowed values, and enforcement rules for all ADRs.
 Governed by [ADR-0044](../adr/0044-adr-governance-operating-model.md).
 
-All 18 fields are mandatory in every ADR. List fields with no current entries must use
+All 19 fields are mandatory in every ADR. List fields with no current entries must use
 an empty array `[]`, not be omitted.
 
 ---
@@ -16,6 +16,11 @@ an empty array `[]`, not be omitted.
   If `Superseded`, `superseded_by` must contain at least one ADR ID.
 - **`decision_type`**: exactly one value from the catalog below (see Tier Compatibility table).
 - **`tier`**: exactly one of `Tier-0 | Tier-1 | Tier-2 | Tier-3 | Tier-4 | Tier-5`.
+- **`governance_domain`**: exactly one of `application | infrastructure`. Classifies which
+  governance domain the ADR belongs to per ADR-0080's Two Governance Domains principle.
+  `application` — governs the Python FastAPI codebase (`app/`). `infrastructure` — governs
+  hosting, CI/CD, cloud-native components (`terraform/`, `.github/workflows/`, Lambda,
+  deployment configs). Tier-0 records that span both domains use `application` (default).
 - **`primary_domain`**: exactly one domain from the canonical list below.
 - **`secondary_domains`**: zero or more domains from the same canonical list.
 - **`owners`**: one or more responsible team names. SRE Team is the current sole authority.

@@ -1,7 +1,7 @@
 # Decision Record Template
 
 Copy this file to `docs/decisions/adr/NNNN-kebab-case-title.md` and fill in every field.
-All 18 metadata fields are required — see [adr-metadata-reference.md](adr-metadata-reference.md)
+All 19 metadata fields are required — see [adr-metadata-reference.md](adr-metadata-reference.md)
 for allowed values, field definitions, and the tier/decision-type compatibility table.
 
 ---
@@ -10,6 +10,7 @@ title: "Short decision title"
 status: Draft
 decision_type: Principle
 tier: Tier-1
+governance_domain: application
 primary_domain: "Runtime and Lifecycle"
 secondary_domains: []
 owners:
