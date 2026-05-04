@@ -14,8 +14,6 @@ from infrastructure.configuration.infrastructure.idempotency import IdempotencyS
 from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.configuration.infrastructure.platforms import PlatformsSettings
 from infrastructure.configuration.integrations.maxmind import MaxMindSettings
-from infrastructure.configuration.integrations.notify import NotifySettings
-from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
 from infrastructure.configuration.integrations.slack import SlackSettings
 from infrastructure.configuration.features.commands import CommandsSettings
 from infrastructure.identity.service import IdentityService
