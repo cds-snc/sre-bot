@@ -14,6 +14,7 @@ import pytest
 from unittest.mock import MagicMock
 from infrastructure.events import Event
 from modules.groups.events import handlers
+from modules.groups.events.handlers import reset_notification_handler
 
 
 @pytest.fixture
@@ -110,8 +111,6 @@ def mock_idempotency_cache(monkeypatch):
 @pytest.fixture(autouse=True)
 def reset_handler_singleton():
     """Reset notification handler singleton before each test."""
-    from modules.groups.events.handlers import reset_notification_handler
-
     reset_notification_handler()
     yield
     reset_notification_handler()

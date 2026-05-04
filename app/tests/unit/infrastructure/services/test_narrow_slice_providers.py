@@ -23,6 +23,7 @@ from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
 from infrastructure.commands.service import CommandService
 from infrastructure.platforms.service import PlatformService
+from infrastructure.notifications.channels.chat import ChatChannel
 from infrastructure.services.providers import (
     get_command_service,
     get_identity_service,
@@ -123,9 +124,7 @@ class TestNotificationServiceNarrowSlice:
 
     def test_accepts_channels_with_dispatcher(self):
         """NotificationService constructs with pre-built channels + injected dispatcher."""
-        from unittest.mock import MagicMock
-
-        mock_channel = MagicMock()
+        mock_channel = MagicMock(spec=ChatChannel)
         mock_dispatcher = MagicMock()
         service = NotificationService(
             channels={"chat": mock_channel},

@@ -13,6 +13,9 @@ and provide groups-module-specific test data and mocks.
 
 import pytest
 from unittest.mock import MagicMock
+from modules.groups import domain as groups_domain
+from modules.groups import providers as providers_module
+from modules.groups.core import orchestration, service
 
 # ============================================================================
 # Circuit Breaker Mocking
@@ -43,8 +46,6 @@ def groups_module():
     Returns:
         module: Loaded groups module
     """
-    from modules.groups.core import service
-
     return service
 
 
@@ -55,21 +56,17 @@ def groups_orchestration():
     Returns:
         module: Loaded orchestration module
     """
-    from modules.groups.core import orchestration
-
     return orchestration
 
 
 @pytest.fixture
 def groups_validation():
-    """Import the validation module.
+    """Expose the groups domain module.
 
     Returns:
-        module: Loaded validation module
+        module: Loaded domain module
     """
-    from modules.groups.domain import validation
-
-    return validation
+    return groups_domain
 
 
 # ============================================================================
@@ -522,9 +519,6 @@ def mock_sentinel_and_activate_providers(monkeypatch, mock_sentinel_client):
 
     This fixture runs automatically (autouse=True) for all integration tests.
     """
-    from unittest.mock import MagicMock
-    from modules.groups import providers as providers_module
-
     # Create mock primary provider (google)
     mock_google = MagicMock()
     mock_google.prefix = "g"

@@ -11,9 +11,15 @@ Governing ADR: ADR-0076 — Infrastructure Intra-Layer Import Standard.
 import ast
 from pathlib import Path
 from typing import Set
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
+from infrastructure.audit.service import AuditTrailService
+from infrastructure.identity.models import IdentitySource, User
+from infrastructure.notifications.channels.chat import ChatChannel
+from infrastructure.notifications.channels.email import EmailChannel
+from infrastructure.notifications.channels.sms import SMSChannel
+from infrastructure.storage.service import StorageService
 
 _APP_ROOT = Path(__file__).parents[3]  # workspace/app/
 
@@ -83,8 +89,6 @@ class TestStorageServiceCompliance:
 
     def test_storage_service_accepts_dynamodb_via_constructor(self):
         """StorageService still accepts a DynamoDBClient via its constructor."""
-        from infrastructure.storage.service import StorageService
-
         mock_dynamo = MagicMock()
         service = StorageService(dynamodb=mock_dynamo)
         assert service is not None
@@ -105,8 +109,6 @@ class TestAuditServiceCompliance:
 
     def test_audit_service_accepts_storage_via_constructor(self):
         """AuditTrailService still accepts a StorageService via its constructor."""
-        from infrastructure.audit.service import AuditTrailService
-
         mock_storage = MagicMock()
         service = AuditTrailService(storage=mock_storage)
         assert service is not None
@@ -127,8 +129,6 @@ class TestSecurityCurrentUserCompliance:
 
     def test_identity_value_types_may_be_runtime_imported(self):
         """IdentitySource and User (value types) may be imported at runtime (S1)."""
-        from infrastructure.identity.models import IdentitySource, User
-
         assert IdentitySource is not None
         assert User is not None
 
@@ -190,9 +190,6 @@ class TestNotificationChannelCircuitBreakerCompliance:
 
     def test_chat_channel_works_without_circuit_breaker(self):
         """ChatChannel must function when circuit_breaker=None (no-op path)."""
-        from unittest.mock import patch, MagicMock
-        from infrastructure.notifications.channels.chat import ChatChannel
-
         mock_manager = MagicMock()
         with patch(
             "infrastructure.notifications.channels.chat.SlackClientManager",
@@ -203,9 +200,6 @@ class TestNotificationChannelCircuitBreakerCompliance:
 
     def test_email_channel_works_without_circuit_breaker(self):
         """EmailChannel must function when circuit_breaker=None."""
-        from infrastructure.notifications.channels.email import EmailChannel
-        from unittest.mock import MagicMock
-
         mock_settings = MagicMock()
         mock_settings.GOOGLE_DELEGATED_ADMIN_EMAIL = "admin@example.com"
         channel = EmailChannel(
@@ -216,9 +210,6 @@ class TestNotificationChannelCircuitBreakerCompliance:
 
     def test_sms_channel_works_without_circuit_breaker(self):
         """SMSChannel must function when circuit_breaker=None."""
-        from infrastructure.notifications.channels.sms import SMSChannel
-        from unittest.mock import MagicMock
-
         mock_settings = MagicMock()
         mock_settings.NOTIFY_API_URL = "https://notify.example.com"
         channel = SMSChannel(notify_settings=mock_settings, circuit_breaker=None)
