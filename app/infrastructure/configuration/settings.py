@@ -1,5 +1,7 @@
 """SRE Bot configuration settings - main aggregator."""
 
+from typing import Any, Callable
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Integration settings
@@ -13,6 +15,15 @@ from infrastructure.configuration.integrations import (
     OpsGenieSettings,
     SentinelSettings,
     TrelloSettings,
+    get_slack_settings,
+    get_aws_settings,
+    get_google_workspace_settings,
+    get_google_resources_config,
+    get_maxmind_settings,
+    get_notify_settings,
+    get_opsgenie_settings,
+    get_sentinel_settings,
+    get_trello_settings,
 )
 
 # Feature settings
@@ -23,6 +34,12 @@ from infrastructure.configuration.features import (
     AWSFeatureSettings,
     AtipSettings,
     SreOpsSettings,
+    get_groups_settings,
+    get_commands_settings,
+    get_incident_settings,
+    get_aws_feature_settings,
+    get_atip_settings,
+    get_sre_ops_settings,
 )
 
 # Infrastructure settings
@@ -33,7 +50,16 @@ from infrastructure.configuration.infrastructure import (
     DevSettings,
     PlatformsSettings,
     DirectorySettings,
+    get_server_settings,
+    get_dev_settings,
+    get_idempotency_settings,
+    get_retry_settings,
+    get_platforms_settings,
+    get_directory_settings,
 )
+
+# App-level settings
+from infrastructure.configuration.app import get_app_settings
 
 
 class Settings(BaseSettings):
@@ -118,41 +144,51 @@ class Settings(BaseSettings):
         return not bool(self.PREFIX)
 
     def __init__(self, **kwargs):
-        """Initialize Settings with automatic subsettings instantiation.
+        """Initialize Settings by delegating to domain singleton providers.
+
+        Each sub-settings field is sourced from its singleton provider so that
+        ``Settings().slack is get_slack_settings()`` holds true.  Callers may
+        still pass explicit overrides via kwargs (used in tests).
 
         Args:
             **kwargs: Optional overrides for specific settings sections.
         """
-        settings_map = {
+        settings_map: dict[str, Callable[[], Any]] = {
             # Integrations
-            "slack": SlackSettings,
-            "aws": AwsSettings,
-            "google_workspace": GoogleWorkspaceSettings,
-            "maxmind": MaxMindSettings,
-            "notify": NotifySettings,
-            "opsgenie": OpsGenieSettings,
-            "sentinel": SentinelSettings,
-            "trello": TrelloSettings,
-            "google_resources": GoogleResourcesConfig,
+            "slack": get_slack_settings,
+            "aws": get_aws_settings,
+            "google_workspace": get_google_workspace_settings,
+            "maxmind": get_maxmind_settings,
+            "notify": get_notify_settings,
+            "opsgenie": get_opsgenie_settings,
+            "sentinel": get_sentinel_settings,
+            "trello": get_trello_settings,
+            "google_resources": get_google_resources_config,
             # Features
-            "groups": GroupsFeatureSettings,
-            "commands": CommandsSettings,
-            "feat_incident": IncidentFeatureSettings,
-            "aws_feature": AWSFeatureSettings,
-            "atip": AtipSettings,
-            "sre_ops": SreOpsSettings,
+            "groups": get_groups_settings,
+            "commands": get_commands_settings,
+            "feat_incident": get_incident_settings,
+            "aws_feature": get_aws_feature_settings,
+            "atip": get_atip_settings,
+            "sre_ops": get_sre_ops_settings,
             # Infrastructure
-            "server": ServerSettings,
-            "dev": DevSettings,
-            "idempotency": IdempotencySettings,
-            "retry": RetrySettings,
-            "platforms": PlatformsSettings,
-            "directory": DirectorySettings,
+            "server": get_server_settings,
+            "dev": get_dev_settings,
+            "idempotency": get_idempotency_settings,
+            "retry": get_retry_settings,
+            "platforms": get_platforms_settings,
+            "directory": get_directory_settings,
         }
 
-        for setting_name, setting_class in settings_map.items():
-            if setting_name not in kwargs:
-                kwargs[setting_name] = setting_class()
+        for field_name, provider in settings_map.items():
+            if field_name not in kwargs:
+                kwargs[field_name] = provider()
+
+        # App-level scalar fields default from AppSettings singleton.
+        app = get_app_settings()
+        kwargs.setdefault("PREFIX", app.PREFIX)
+        kwargs.setdefault("LOG_LEVEL", app.LOG_LEVEL)
+        kwargs.setdefault("GIT_SHA", app.GIT_SHA)
 
         super().__init__(**kwargs)
 
