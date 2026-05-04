@@ -14,7 +14,7 @@ from geoip2.errors import AddressNotFoundError, GeoIP2Error
 from infrastructure.operations import OperationResult, OperationStatus
 
 if TYPE_CHECKING:
-    from infrastructure.configuration import Settings
+    from infrastructure.configuration.integrations.maxmind import MaxMindSettings
 
 logger = structlog.get_logger()
 
@@ -51,8 +51,8 @@ class MaxMindClient:
         settings: Settings instance with maxmind.MAXMIND_DB_PATH
     """
 
-    def __init__(self, settings: "Settings") -> None:
-        self._db_path = settings.maxmind.MAXMIND_DB_PATH
+    def __init__(self, maxmind_settings: "MaxMindSettings") -> None:
+        self._db_path = maxmind_settings.MAXMIND_DB_PATH
         self._logger = logger.bind(component="maxmind_client")
 
     def geolocate(self, ip_address: str) -> OperationResult:

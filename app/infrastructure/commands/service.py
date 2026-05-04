@@ -3,14 +3,14 @@
 Provides a class-based interface to the command framework for easier DI and testing.
 """
 
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from infrastructure.commands.registry import CommandRegistry
 from infrastructure.commands.models import Command
 from infrastructure.commands.parser import CommandParser
 
 if TYPE_CHECKING:
-    from infrastructure.configuration import Settings
+    from infrastructure.configuration.features.commands import CommandsSettings
 
 import structlog
 
@@ -65,13 +65,13 @@ class CommandService:
         registry = service.get_registry("mymodule")
     """
 
-    def __init__(self, settings: "Settings"):
+    def __init__(self, commands_settings: Optional["CommandsSettings"] = None):
         """Initialize command service.
 
         Args:
-            settings: Settings instance (required, passed from provider).
+            commands_settings: Optional narrow commands settings slice.
         """
-        self._settings = settings
+        self._commands_settings = commands_settings
         self._registries: Dict[str, CommandRegistry] = {}
         self._parser = CommandParser()
 

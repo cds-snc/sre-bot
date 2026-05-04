@@ -15,7 +15,7 @@ from infrastructure.resilience.circuit_breaker import CircuitBreaker
 from integrations.google_workspace import gmail_next
 
 if TYPE_CHECKING:
-    from infrastructure.configuration import Settings
+    from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
 
 logger = structlog.get_logger()
 
@@ -29,13 +29,13 @@ class EmailChannel(NotificationChannel):
 
     def __init__(
         self,
-        settings: "Settings",
-        circuit_breaker: Optional["CircuitBreaker"] = None,
+        google_workspace_settings: "GoogleWorkspaceSettings",
+        circuit_breaker: Optional[CircuitBreaker] = None,
     ):
         """Initialize Gmail email channel.
 
         Args:
-            settings: Settings instance with google_workspace configuration.
+            google_workspace_settings: Narrow Google Workspace settings slice.
             circuit_breaker: Optional circuit breaker for fault tolerance.
                            If not provided, creates a default one.
         """
@@ -47,7 +47,7 @@ class EmailChannel(NotificationChannel):
             )
 
         self._circuit_breaker = circuit_breaker
-        self._sender_email = settings.google_workspace.GOOGLE_DELEGATED_ADMIN_EMAIL
+        self._sender_email = google_workspace_settings.GOOGLE_DELEGATED_ADMIN_EMAIL
         self.log = logger.bind(component="email_channel")
         log = self.log.bind(backend="gmail", sender=self._sender_email)
         log.info("initialized_email_channel")

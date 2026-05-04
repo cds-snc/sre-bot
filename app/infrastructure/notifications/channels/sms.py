@@ -15,7 +15,7 @@ from infrastructure.resilience.circuit_breaker import CircuitBreaker
 from integrations.notify.client import post_event, create_authorization_header
 
 if TYPE_CHECKING:
-    from infrastructure.configuration import Settings
+    from infrastructure.configuration.integrations.notify import NotifySettings
 
 logger = structlog.get_logger()
 
@@ -29,13 +29,13 @@ class SMSChannel(NotificationChannel):
 
     def __init__(
         self,
-        settings: "Settings",
-        circuit_breaker: Optional["CircuitBreaker"] = None,
+        notify_settings: "NotifySettings",
+        circuit_breaker: Optional[CircuitBreaker] = None,
     ):
         """Initialize GC Notify SMS channel.
 
         Args:
-            settings: Settings instance with notify configuration.
+            notify_settings: Narrow Notify settings slice.
             circuit_breaker: Optional circuit breaker for fault tolerance.
                            If not provided, creates a default one.
         """
@@ -47,7 +47,7 @@ class SMSChannel(NotificationChannel):
             )
 
         self._circuit_breaker = circuit_breaker
-        self._api_url = settings.notify.NOTIFY_API_URL
+        self._api_url = notify_settings.NOTIFY_API_URL
         self.log = logger.bind(component="sms_channel")
         self.log.info("initialized_sms_channel", backend="gc_notify")
 

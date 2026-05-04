@@ -2,6 +2,7 @@
 
 import pytest
 import json
+import time
 from unittest.mock import patch
 
 from infrastructure.idempotency.dynamodb import DynamoDBCache
@@ -15,20 +16,22 @@ class TestDynamoDBCacheInitialization:
 
     def test_cache_initializes_with_default_table(self, mock_settings):
         """DynamoDBCache initializes with default table name."""
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         assert cache.table_name == "sre_bot_idempotency"
 
     def test_cache_initializes_with_custom_table(self, mock_settings):
         """DynamoDBCache initializes with custom table name."""
-        cache = DynamoDBCache(settings=mock_settings, table_name="custom_table")
+        cache = DynamoDBCache(
+            idempotency_settings=mock_settings, table_name="custom_table"
+        )
         assert cache.table_name == "custom_table"
 
     def test_cache_loads_ttl_from_settings(self, mock_settings):
         """DynamoDBCache loads TTL from settings."""
         # Mock settings to have specific TTL
-        mock_settings.idempotency.IDEMPOTENCY_TTL_SECONDS = 7200
+        mock_settings.IDEMPOTENCY_TTL_SECONDS = 7200
 
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         assert cache.ttl_seconds == 7200
 
 
@@ -44,7 +47,7 @@ class TestDynamoDBCacheGet:
             data=None,
         )
 
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         result = cache.get("missing-key")
         assert result is None
 
@@ -60,7 +63,7 @@ class TestDynamoDBCacheGet:
             data={"Item": {"response_json": {"S": json.dumps(response)}}},
         )
 
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         result = cache.get("existing-key")
         assert result == response
 
@@ -73,7 +76,7 @@ class TestDynamoDBCacheGet:
             error_code="ServiceUnavailable",
         )
 
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         result = cache.get("key")
         assert result is None
 
@@ -86,7 +89,7 @@ class TestDynamoDBCacheGet:
             data={"Item": {"response_json": {"S": "invalid json"}}},
         )
 
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         result = cache.get("key")
         assert result is None
 
@@ -103,7 +106,7 @@ class TestDynamoDBCacheSet:
         )
 
         response = {"success": True, "data": {"id": "123"}}
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         cache.set("key", response, ttl_seconds=3600)
 
         # Verify put_item was called
@@ -125,7 +128,7 @@ class TestDynamoDBCacheSet:
         )
 
         response = {"success": True}
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         cache.ttl_seconds = 1800  # Set default to 30 minutes
 
         cache.set("key", response)
@@ -133,8 +136,6 @@ class TestDynamoDBCacheSet:
         call_args = mock_put_item.call_args
         # TTL should be current_time + 1800
         ttl_value = int(call_args[1]["Item"]["ttl"]["N"])
-        import time
-
         assert ttl_value > int(time.time())  # TTL is in the future
 
     @patch("infrastructure.idempotency.dynamodb.put_item")
@@ -146,7 +147,7 @@ class TestDynamoDBCacheSet:
             pass
 
         response = NonSerializable()
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         # Should not raise, just log error
         cache.set("key", response)
 
@@ -159,7 +160,7 @@ class TestDynamoDBCacheSet:
             error_code="ThrottlingException",
         )
 
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         # Should not raise, just log error
         cache.set("key", {"success": True})
 
@@ -186,7 +187,7 @@ class TestDynamoDBCacheClear:
             message="deleted",
         )
 
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         cache.clear()
 
         # Should have deleted 2 items
@@ -201,7 +202,7 @@ class TestDynamoDBCacheClear:
             error_code="ServiceUnavailable",
         )
 
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         # Should not raise, just log error
         cache.clear()
 
@@ -211,7 +212,9 @@ class TestDynamoDBCacheStats:
 
     def test_cache_stats_returns_backend_info(self, mock_settings):
         """Cache stats returns backend information."""
-        cache = DynamoDBCache(settings=mock_settings, table_name="test_table")
+        cache = DynamoDBCache(
+            idempotency_settings=mock_settings, table_name="test_table"
+        )
         stats = cache.get_stats()
 
         assert stats["backend"] == "dynamodb"
@@ -221,7 +224,7 @@ class TestDynamoDBCacheStats:
 
     def test_cache_stats_includes_ttl_seconds(self, mock_settings):
         """Cache stats includes configured TTL."""
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         cache.ttl_seconds = 7200
         stats = cache.get_stats()
 

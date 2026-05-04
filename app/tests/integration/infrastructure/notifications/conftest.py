@@ -3,7 +3,10 @@
 import pytest
 from unittest.mock import Mock, MagicMock
 
-from infrastructure.configuration import Settings
+from infrastructure.configuration.integrations.google import (
+    GoogleWorkspaceSettings,
+)
+from infrastructure.configuration.integrations.notify import NotifySettings
 
 
 @pytest.fixture(autouse=True)
@@ -45,13 +48,16 @@ def mock_circuit_breaker(monkeypatch):
 
 @pytest.fixture
 def mock_settings():
-    """Mock Settings instance for testing."""
-    settings = Mock(spec=Settings)
-    settings.LOG_LEVEL = "INFO"
-    settings.google_workspace = Mock()
-    settings.google_workspace.GOOGLE_DELEGATED_ADMIN_EMAIL = "test-email@example.com"
-    settings.is_production = False
-    settings.notify = Mock()
-    settings.notify.NOTIFY_API_KEY = "test-key"
-    settings.notify.NOTIFY_API_URL = "https://api.example.com"
+    """Mock GoogleWorkspaceSettings for EmailChannel."""
+    settings = Mock(spec=GoogleWorkspaceSettings)
+    settings.GOOGLE_DELEGATED_ADMIN_EMAIL = "test-email@example.com"
+    return settings
+
+
+@pytest.fixture
+def mock_notify_settings():
+    """Mock NotifySettings for SMSChannel."""
+    settings = Mock(spec=NotifySettings)
+    settings.NOTIFY_API_KEY = "test-key"
+    settings.NOTIFY_API_URL = "https://api.example.com"
     return settings

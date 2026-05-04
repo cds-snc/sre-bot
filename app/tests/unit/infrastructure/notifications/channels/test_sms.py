@@ -25,7 +25,7 @@ class TestSMSChannel:
         Returns:
             SMSChannel instance
         """
-        return SMSChannel(settings=mock_settings)
+        return SMSChannel(notify_settings=mock_settings)
 
     def test_channel_name(self, sms_channel):
         """Channel name returns 'sms'."""
