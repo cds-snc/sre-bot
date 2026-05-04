@@ -43,7 +43,7 @@ class TestDynamoDBCacheIntegration:
             data={"Item": {"response_json": {"S": json.dumps(response_data)}}},
         )
 
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
 
         # Store response
         cache.set("test-key", response_data, ttl_seconds=3600)
@@ -79,7 +79,7 @@ class TestDynamoDBCacheIntegration:
             data={"Item": {"response_json": {"S": json.dumps(complex_response)}}},
         )
 
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         result = cache.get("complex-key")
 
         assert result == complex_response
@@ -108,7 +108,7 @@ class TestDynamoDBCacheIntegration:
             message="Deleted",
         )
 
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         cache.clear()
 
         # Verify delete was called for each item
@@ -123,7 +123,7 @@ class TestDynamoDBCacheIntegration:
         )
 
         response_data = {"success": True, "value": 42}
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         cache.set("test-key", response_data, ttl_seconds=1800)
 
         # Verify put_item was called with correct DynamoDB format
@@ -155,14 +155,16 @@ class TestDynamoDBCacheIntegration:
             data={},  # Missing Item key
         )
 
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
         result = cache.get("nonexistent-key")
 
         assert result is None
 
     def test_cache_stats_contains_all_fields(self, mock_settings):
         """Test cache stats contains all required fields."""
-        cache = DynamoDBCache(settings=mock_settings, table_name="custom_table")
+        cache = DynamoDBCache(
+            idempotency_settings=mock_settings, table_name="custom_table"
+        )
         cache.ttl_seconds = 7200
 
         stats = cache.get_stats()
@@ -199,7 +201,7 @@ class TestDynamoDBCacheIntegration:
             ),
         ]
 
-        cache = DynamoDBCache(settings=mock_settings)
+        cache = DynamoDBCache(idempotency_settings=mock_settings)
 
         # Store two responses
         cache.set("key-1", response1)

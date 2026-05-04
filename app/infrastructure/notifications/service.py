@@ -5,11 +5,15 @@ Provides a class-based interface to the notification system for easier DI and te
 
 from typing import Dict, List, Optional, TYPE_CHECKING
 
+from infrastructure.notifications.channels.chat import ChatChannel
+from infrastructure.notifications.channels.email import EmailChannel
+from infrastructure.notifications.channels.sms import SMSChannel
 from infrastructure.notifications.dispatcher import NotificationDispatcher
 from infrastructure.notifications.models import Notification, NotificationResult
 
 if TYPE_CHECKING:
-    from infrastructure.configuration import Settings
+    from infrastructure.configuration.integrations.notify import NotifySettings
+    from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
     from infrastructure.notifications.channels.base import NotificationChannel
     from infrastructure.idempotency.service import IdempotencyService
     from infrastructure.resilience.service import ResilienceService
@@ -48,7 +52,8 @@ class NotificationService:
 
     def __init__(
         self,
-        settings: "Settings",
+        notify_settings: "NotifySettings",
+        google_workspace_settings: "GoogleWorkspaceSettings",
         channels: Optional[Dict[str, "NotificationChannel"]] = None,
         dispatcher: Optional[NotificationDispatcher] = None,
         idempotency_service: Optional["IdempotencyService"] = None,
@@ -57,7 +62,8 @@ class NotificationService:
         """Initialize notification service.
 
         Args:
-            settings: Settings instance (required, passed from provider).
+            notify_settings: Narrow Notify settings slice (for SMS channel).
+            google_workspace_settings: Narrow Google Workspace settings slice (for email channel).
             channels: Optional dict of channel name to NotificationChannel instances.
                      If not provided, creates default channels based on settings.
             dispatcher: Optional pre-configured NotificationDispatcher instance.
@@ -68,11 +74,6 @@ class NotificationService:
         if dispatcher is None:
             # Create default channels if not provided
             if channels is None:
-                # Import here to avoid circular dependency at module level
-                from infrastructure.notifications.channels.email import EmailChannel
-                from infrastructure.notifications.channels.sms import SMSChannel
-                from infrastructure.notifications.channels.chat import ChatChannel
-
                 # Get circuit breakers from resilience service if available
                 email_cb = None
                 sms_cb = None
@@ -91,11 +92,11 @@ class NotificationService:
 
                 channels = {
                     "email": EmailChannel(
-                        settings=settings,
+                        google_workspace_settings=google_workspace_settings,
                         circuit_breaker=email_cb,
                     ),
                     "sms": SMSChannel(
-                        settings=settings,
+                        notify_settings=notify_settings,
                         circuit_breaker=sms_cb,
                     ),
                     "chat": ChatChannel(
@@ -117,7 +118,8 @@ class NotificationService:
             )
 
         self._dispatcher = dispatcher
-        self._settings = settings
+        self._notify_settings = notify_settings
+        self._google_workspace_settings = google_workspace_settings
 
     def send(self, notification: Notification) -> List[NotificationResult]:
         """Send notification through appropriate channels.

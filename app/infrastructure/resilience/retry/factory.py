@@ -1,61 +1,56 @@
 """Factory for creating retry stores based on configuration."""
 
 import structlog
-from infrastructure.configuration import Settings
+from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.resilience.retry.config import RetryConfig
 from infrastructure.resilience.retry.store import RetryStore, InMemoryRetryStore
 from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
-
 
 logger = structlog.get_logger()
 
 
 def create_retry_store(
     config: RetryConfig,
-    settings: Settings,
+    retry_settings: RetrySettings | None = None,
     backend: str | None = None,
 ) -> RetryStore:
     """Factory to create appropriate retry store based on configuration.
 
     Args:
         config: Retry configuration (backoff, max attempts, etc.)
-        settings: Settings instance (required for dependency injection).
+        retry_settings: Narrow retry settings slice.
         backend: Optional backend override (memory, dynamodb).
-                If None, uses settings.retry.backend
+                If None, uses retry_settings.backend
 
     Returns:
         Appropriate RetryStore implementation
 
     Raises:
         ValueError: If unknown backend specified
-
-    Examples:
-        >>> from infrastructure.services import get_settings
-        >>> settings = get_settings()
-        >>> config = RetryConfig()
-        >>> store = create_retry_store(config, settings)  # Uses settings.retry.backend
-        >>> store = create_retry_store(config, settings, backend="memory")  # Force memory
-        >>> store = create_retry_store(config, settings, backend="dynamodb")  # Force DynamoDB
     """
-    backend = backend or settings.retry.backend
+    resolved_backend = backend or (
+        retry_settings.backend if retry_settings else "memory"
+    )
 
-    if backend == "memory":
+    if resolved_backend == "memory":
         logger.info("creating_in_memory_retry_store")
         return InMemoryRetryStore(config)
 
-    elif backend == "dynamodb":
+    elif resolved_backend == "dynamodb":
+        if retry_settings is None:
+            raise ValueError("retry_settings is required for DynamoDB backend")
         logger.info(
             "creating_dynamodb_retry_store",
-            table_name=settings.retry.dynamodb_table_name,
+            table_name=retry_settings.dynamodb_table_name,
         )
 
         return DynamoDBRetryStore(
             config=config,
-            table_name=settings.retry.dynamodb_table_name,
-            ttl_days=settings.retry.dynamodb_ttl_days,
+            table_name=retry_settings.dynamodb_table_name,
+            ttl_days=retry_settings.dynamodb_ttl_days,
         )
 
     else:
         raise ValueError(
-            f"Unknown retry backend: {backend}. Supported: memory, dynamodb"
+            f"Unknown retry backend: {resolved_backend}. Supported: memory, dynamodb"
         )

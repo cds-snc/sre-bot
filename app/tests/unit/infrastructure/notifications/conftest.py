@@ -4,6 +4,7 @@ import pytest
 from typing import Optional, List, Dict, Any
 from unittest.mock import MagicMock
 
+from infrastructure.operations import OperationResult
 from infrastructure.notifications.models import (
     Notification,
     Recipient,
@@ -15,15 +16,11 @@ from infrastructure.notifications.models import (
 
 @pytest.fixture
 def mock_settings():
-    """Mock Settings instance for testing channels.
-
-    Returns:
-        Mock settings with notify and google_workspace configurations
-    """
+    """Mock narrow settings instances for testing channels."""
     mock = MagicMock()
-    mock.notify.NOTIFY_API_KEY = "test-api-key"
-    mock.notify.NOTIFY_API_URL = "https://api.notification.canada.ca"
-    mock.google_workspace.GOOGLE_DELEGATED_ADMIN_EMAIL = "admin@example.com"
+    mock.NOTIFY_API_KEY = "test-api-key"
+    mock.NOTIFY_API_URL = "https://api.notification.canada.ca"
+    mock.GOOGLE_DELEGATED_ADMIN_EMAIL = "admin@example.com"
     return mock
 
 
@@ -158,8 +155,6 @@ def mock_notification_channel():
             ]
             results = mock_notification_channel.send(notification)
     """
-    from infrastructure.operations import OperationResult
-
     channel = MagicMock()
     channel.channel_name = "mock"
     channel.send.return_value = []

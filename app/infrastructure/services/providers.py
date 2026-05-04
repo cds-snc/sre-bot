@@ -15,6 +15,21 @@ from infrastructure.configuration.app import (
     AppSettings,
     get_app_settings as _get_app_settings,
 )
+from infrastructure.configuration.infrastructure.server import get_server_settings
+from infrastructure.configuration.infrastructure.idempotency import (
+    get_idempotency_settings,
+)
+from infrastructure.configuration.infrastructure.retry import get_retry_settings
+from infrastructure.configuration.infrastructure.platforms import get_platforms_settings
+from infrastructure.configuration.infrastructure.directory import get_directory_settings
+from infrastructure.configuration.integrations.slack import get_slack_settings
+from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
+from infrastructure.configuration.integrations.aws import get_aws_settings
+from infrastructure.configuration.integrations.notify import get_notify_settings
+from infrastructure.configuration.integrations.google import (
+    get_google_workspace_settings,
+)
+from infrastructure.configuration.features.commands import get_commands_settings
 from infrastructure.identity.service import IdentityService
 from infrastructure.security.jwks import JWKSManager
 from infrastructure.clients.aws import AWSClients
@@ -99,8 +114,7 @@ def get_identity_service() -> IdentityService:
             user = identity.resolve_from_jwt(jwt_payload)
             return {"user": user.model_dump()}
     """
-    settings = get_settings()
-    return IdentityService(settings=settings)
+    return IdentityService(server_settings=get_server_settings())
 
 
 @lru_cache(maxsize=1)
@@ -111,8 +125,8 @@ def get_jwks_manager() -> JWKSManager:
     Returns:
         JWKSManager: Cached JWKS manager configured from application settings.
     """
-    settings = get_settings()
-    issuer_config = settings.server.ISSUER_CONFIG
+    server_settings = get_server_settings()
+    issuer_config = server_settings.ISSUER_CONFIG
     if not issuer_config:
         raise ValueError("ISSUER_CONFIG is not configured in settings.server")
     return JWKSManager(issuer_config=issuer_config)
@@ -143,8 +157,7 @@ def get_aws_clients() -> AWSClients:
             if result.is_success:
                 return {"user": result.data}
     """
-    settings = get_settings()
-    return AWSClients(aws_settings=settings.aws)
+    return AWSClients(aws_settings=get_aws_settings())
 
 
 @lru_cache(maxsize=1)
@@ -184,8 +197,7 @@ def get_google_workspace_clients() -> GoogleWorkspaceClients:
         For Google Workspace types and data classes, import from:
         infrastructure.clients.google_workspace
     """
-    settings = get_settings()
-    return GoogleWorkspaceClients(google_settings=settings.google_workspace)
+    return GoogleWorkspaceClients(google_settings=get_google_workspace_settings())
 
 
 @lru_cache(maxsize=1)
@@ -220,8 +232,7 @@ def get_maxmind_client() -> MaxMindClient:
         For MaxMind types and data classes, import from:
         infrastructure.clients.maxmind
     """
-    settings = get_settings()
-    return MaxMindClient(settings=settings)
+    return MaxMindClient(maxmind_settings=get_maxmind_settings())
 
 
 @lru_cache(maxsize=1)
@@ -318,8 +329,7 @@ def get_idempotency_service() -> IdempotencyService:
     Returns:
         IdempotencyService: Cached idempotency service instance
     """
-    settings = get_settings()
-    return IdempotencyService(settings=settings)
+    return IdempotencyService(idempotency_settings=get_idempotency_settings())
 
 
 @lru_cache(maxsize=1)
@@ -343,8 +353,7 @@ def get_resilience_service() -> ResilienceService:
     Returns:
         ResilienceService: Cached resilience service instance
     """
-    settings = get_settings()
-    return ResilienceService(settings=settings)
+    return ResilienceService(retry_settings=get_retry_settings())
 
 
 @lru_cache(maxsize=1)
@@ -374,11 +383,11 @@ def get_notification_service() -> NotificationService:
     Returns:
         NotificationService: Cached notification service instance
     """
-    settings = get_settings()
     idempotency_service = get_idempotency_service()
     resilience_service = get_resilience_service()
     return NotificationService(
-        settings=settings,
+        notify_settings=get_notify_settings(),
+        google_workspace_settings=get_google_workspace_settings(),
         idempotency_service=idempotency_service,
         resilience_service=resilience_service,
     )
@@ -403,8 +412,7 @@ def get_command_service() -> CommandService:
     Returns:
         CommandService: Cached command service instance
     """
-    settings = get_settings()
-    return CommandService(settings=settings)
+    return CommandService(commands_settings=get_commands_settings())
 
 
 @lru_cache(maxsize=1)
@@ -495,8 +503,7 @@ def get_platform_service():
     Returns:
         PlatformService: Cached platform service instance
     """
-    settings = get_settings()
-    return PlatformService(settings=settings)
+    return PlatformService(platforms_settings=get_platforms_settings())
 
 
 @lru_cache(maxsize=1)
@@ -536,8 +543,7 @@ def get_slack_client():
     Note:
         For advanced use cases, access the raw WebClient via client.raw_client
     """
-    settings = get_settings()
-    return SlackClientFacade(token=settings.slack.SLACK_TOKEN)
+    return SlackClientFacade(token=get_slack_settings().SLACK_TOKEN)
 
 
 @lru_cache(maxsize=1)
@@ -584,10 +590,10 @@ def get_teams_client():
     Note:
         Check facade.is_available before use if SDK availability is uncertain
     """
-    settings = get_settings()
+    platforms_settings = get_platforms_settings()
     return TeamsClientFacade(
-        app_id=settings.platforms.teams.APP_ID,
-        app_password=settings.platforms.teams.APP_PASSWORD,
+        app_id=platforms_settings.teams.APP_ID,
+        app_password=platforms_settings.teams.APP_PASSWORD,
     )
 
 
@@ -653,12 +659,12 @@ def get_directory_provider() -> DirectoryProvider:
             result = directory.get_group_members("sg-ops@example.com")
             return result
     """
-    settings = get_settings()
-    provider_key = settings.directory.provider
+    directory_settings = get_directory_settings()
+    provider_key = directory_settings.provider
     if provider_key == "google":
         return build_google_directory_provider(
             google_clients=get_google_workspace_clients(),
-            directory_settings=settings.directory,
+            directory_settings=directory_settings,
         )
     raise ValueError(f"Unsupported directory provider: {provider_key!r}")
 

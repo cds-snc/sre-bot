@@ -10,7 +10,7 @@ from infrastructure.identity.resolver import IdentityResolver
 from integrations.slack.client import SlackClientManager
 
 if TYPE_CHECKING:
-    from infrastructure.configuration import Settings
+    from infrastructure.configuration.infrastructure.server import ServerSettings
 
 
 class IdentityService:
@@ -47,14 +47,14 @@ class IdentityService:
 
     def __init__(
         self,
-        settings: "Settings",
+        server_settings: Optional["ServerSettings"] = None,
         resolver: Optional[IdentityResolver] = None,
         slack_client_manager: Optional[type] = None,
     ):
         """Initialize identity service.
 
         Args:
-            settings: Settings instance (required, passed from provider).
+            server_settings: Optional ServerSettings for JWKS/issuer configuration.
             resolver: Optional pre-configured IdentityResolver instance.
                      If not provided, creates one with slack_client_manager.
             slack_client_manager: Optional SlackClientManager for Slack identity resolution.

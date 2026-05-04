@@ -2,9 +2,11 @@
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from unittest.mock import Mock
 
 from infrastructure.services import IdentityServiceDep, get_identity_service
 from infrastructure.identity import IdentityService
+from infrastructure.identity.models import IdentitySource, User
 
 
 def test_identity_service_provider_caching():
@@ -46,10 +48,14 @@ def test_identity_service_dep_override():
         return {"user_id": user.user_id}
 
     # Create mock service
-    from unittest.mock import Mock
-
-    mock_settings = Mock()
-    mock_service = IdentityService(settings=mock_settings)
+    mock_service = Mock(spec=IdentityService)
+    mock_service.resolve_from_jwt.return_value = User(
+        user_id="test123",
+        email="test@example.com",
+        display_name="Test",
+        source=IdentitySource.API_JWT,
+        platform_id="test123",
+    )
 
     # Override dependency
     app.dependency_overrides[get_identity_service] = lambda: mock_service

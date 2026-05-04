@@ -18,13 +18,15 @@ def clear_directory_provider_cache():
 def test_get_directory_provider_returns_google_provider_when_configured(monkeypatch):
     """Returns a provider built from the Google builder when provider=google."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.directory.provider = "google"
+    mock_directory_settings = MagicMock()
+    mock_directory_settings.provider = "google"
     mock_google_clients = MagicMock()
     built_provider = MagicMock()
 
     monkeypatch.setattr(
-        providers, "get_settings", MagicMock(return_value=mock_settings)
+        providers,
+        "get_directory_settings",
+        MagicMock(return_value=mock_directory_settings),
     )
     monkeypatch.setattr(
         providers,
@@ -44,18 +46,20 @@ def test_get_directory_provider_returns_google_provider_when_configured(monkeypa
     assert result is built_provider
     providers.build_google_directory_provider.assert_called_once_with(
         google_clients=mock_google_clients,
-        directory_settings=mock_settings.directory,
+        directory_settings=mock_directory_settings,
     )
 
 
 def test_get_directory_provider_raises_for_unsupported_provider(monkeypatch):
     """Raises ValueError for unknown provider keys."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.directory.provider = "unsupported_idp"
+    mock_directory_settings = MagicMock()
+    mock_directory_settings.provider = "unsupported_idp"
 
     monkeypatch.setattr(
-        providers, "get_settings", MagicMock(return_value=mock_settings)
+        providers,
+        "get_directory_settings",
+        MagicMock(return_value=mock_directory_settings),
     )
 
     # Act / Assert
@@ -66,13 +70,15 @@ def test_get_directory_provider_raises_for_unsupported_provider(monkeypatch):
 def test_get_directory_provider_returns_cached_instance(monkeypatch):
     """Provider accessor returns same instance across repeated calls."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.directory.provider = "google"
+    mock_directory_settings = MagicMock()
+    mock_directory_settings.provider = "google"
     mock_google_clients = MagicMock()
     built_provider = MagicMock()
 
     monkeypatch.setattr(
-        providers, "get_settings", MagicMock(return_value=mock_settings)
+        providers,
+        "get_directory_settings",
+        MagicMock(return_value=mock_directory_settings),
     )
     monkeypatch.setattr(
         providers,
@@ -95,14 +101,16 @@ def test_get_directory_provider_returns_cached_instance(monkeypatch):
 def test_get_directory_provider_cache_can_be_cleared(monkeypatch):
     """Cache clear forces a fresh factory build."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.directory.provider = "google"
+    mock_directory_settings = MagicMock()
+    mock_directory_settings.provider = "google"
     mock_google_clients = MagicMock()
     first_provider = MagicMock()
     second_provider = MagicMock()
 
     monkeypatch.setattr(
-        providers, "get_settings", MagicMock(return_value=mock_settings)
+        providers,
+        "get_directory_settings",
+        MagicMock(return_value=mock_directory_settings),
     )
     monkeypatch.setattr(
         providers,

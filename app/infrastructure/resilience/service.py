@@ -6,15 +6,16 @@ Provides a class-based interface to circuit breakers and retry stores for easier
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
 import structlog
+from infrastructure.resilience.retry.config import RetryConfig
+from infrastructure.resilience.retry.factory import create_retry_store
 from infrastructure.resilience.circuit_breaker import (
     CircuitBreaker,
     CircuitState,
 )
 
 if TYPE_CHECKING:
-    from infrastructure.resilience.retry.config import RetryConfig
     from infrastructure.resilience.retry.store import RetryStore
-    from infrastructure.configuration import Settings
+    from infrastructure.configuration.infrastructure.retry import RetrySettings
 
 logger = structlog.get_logger()
 
@@ -55,16 +56,16 @@ class ResilienceService:
 
     def __init__(
         self,
-        settings: "Settings",
+        retry_settings: Optional["RetrySettings"] = None,
         retry_store: Optional["RetryStore"] = None,
         retry_config: Optional["RetryConfig"] = None,
     ):
         """Initialize resilience service.
 
         Args:
-            settings: Settings instance (required, passed from provider).
+            retry_settings: Narrow retry settings slice.
             retry_store: Optional pre-configured RetryStore instance.
-                        If not provided, creates from factory using settings.
+                        If not provided, creates from factory using retry_settings.
             retry_config: Optional RetryConfig for creating retry store.
                          Used only if retry_store is None.
         """
@@ -73,12 +74,8 @@ class ResilienceService:
         if retry_store is not None:
             self._retry_store = retry_store
         else:
-            # Import here to avoid circular dependency
-            from infrastructure.resilience.retry.config import RetryConfig
-            from infrastructure.resilience.retry.factory import create_retry_store
-
             config = retry_config or RetryConfig()
-            self._retry_store = create_retry_store(config, settings)
+            self._retry_store = create_retry_store(config, retry_settings)
 
     def create_circuit_breaker(
         self,
