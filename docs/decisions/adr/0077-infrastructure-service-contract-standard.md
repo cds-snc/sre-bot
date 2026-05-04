@@ -11,9 +11,9 @@ secondary_domains:
 owners:
  - SRE Team
 date_created: 2026-04-29
-last_updated: 2026-04-30
-last_reviewed: 2026-04-30
-next_review_due: 2026-08-28
+last_updated: 2026-05-04
+last_reviewed: 2026-05-04
+next_review_due: 2026-09-01
 constrained_by:
  - ADR-0044
  - ADR-0045
@@ -40,6 +40,7 @@ related_packages:
  - app/infrastructure/storage
  - app/infrastructure/identity
  - app/infrastructure/resilience
+ - app/packages/access
 ---
 
 # Infrastructure Service Contract Standard
@@ -240,6 +241,25 @@ When the pragmatic exception is exercised:
 | `TeamsClientFacade` | Exposed via `TeamsClientDep` | Retain - platform-specific operations require direct access |
 | `DiscordClientFacade` | Exposed via `DiscordClientDep` | Retain - platform-specific operations require direct access |
 
+#### 3.4 Consumption Model for Feature Packages
+
+Feature packages interact with infrastructure through two distinct consumption patterns, chosen based on whether a Category A domain service abstracts the needed operation:
+
+| Pattern | When to use | Example |
+|---------|-------------|---------|
+| **Core service** (Category A) | A domain abstraction exists that covers the operation | `DirectoryProvider` for user/group lookup, `StorageService` for persistence |
+| **Client facade** (Category C via S3.2) | No domain abstraction exists; the operation is domain-specific to the feature | `AWSClients.identitystore` for access sync reconciliation |
+
+**Architectural context:**
+
+- **Client facades** are pre-authenticated SDK wrappers. They own connection credentials and session management. They are configured directly from settings (e.g., `AWSClients` from `AwsSettings`).
+- **Core services** are domain abstractions composed from settings and pre-configured clients. They do not manage credentials — they receive already-authenticated clients via constructor injection (e.g., `DirectoryProvider` receives `GoogleWorkspaceClients`).
+- Features choose based on **domain coverage**, not service tier. If a Category A service covers the operation, use it (S3.1). If the operation is domain-specific and no Category A service exists, use the client facade directly through the injection boundary (S3.2).
+
+This model avoids premature abstraction: creating a Category A service for every possible domain-specific operation would produce thin wrappers that add indirection without value. The pragmatic exception (S3.2) permits direct facade access while maintaining the injection boundary and documentation requirements.
+
+For the corresponding provider location rules — where providers are defined vs where they are consumed — see ADR-0056 Standard 3.
+
 ### Standard 4: Test Override Pattern
 
 Protocol contracts enable clean test overrides through FastAPI's dependency override mechanism:
@@ -348,7 +368,7 @@ Existing Category A services that lack Protocol contracts must be migrated incre
 
 ## Compliance and Boundaries
 
-- Package/infrastructure boundary impact: Standard 1 classifies which services require Protocol contracts. Standard 3 defines the client-layer boundary. Together they determine what feature packages may and may not import from infrastructure.
+- Package/infrastructure boundary impact: Standard 1 classifies which services require Protocol contracts. Standard 3 defines the client-layer boundary and the two-pattern consumption model (S3.4): features use Category A core services when domain coverage exists, or client facades directly when the operation is domain-specific (S3.2 pragmatic exception). Together they determine what feature packages may and may not import from infrastructure. Cross-referenced with ADR-0056 Standard 3 for provider location rules.
 - Type boundary impact: Standard 2 mandates Protocol types for Category A services. This is a type-boundary decision that ADR-0065 should reference.
 - Provider composition impact: Standard 2.3 requires provider return types to use Protocol types. ADR-0056 Standard 1 should be amended to reference this requirement.
 - Testing impact: Standard 4 defines the test override pattern using Protocol-based test doubles. This replaces mock-heavy patterns with structural subtyping.
@@ -464,3 +484,4 @@ Existing Category A services that lack Protocol contracts must be migrated incre
 - 2026-04-29: Created. Establishes service classification (A/B/C), Protocol contract pattern, client-layer boundary, test override pattern, and migration priorities. Root cause: Backstage mental model reconciliation identified that the infrastructure layer lacked Protocol contracts for 9 of 14 feature-facing services, and no ADR articulated the layer's role as a swappable service platform. Backstage's ServiceRef + ServiceFactory pattern maps to Python Protocol + @lru_cache provider; this ADR codifies that mapping. See ADR-0045 P6 for the governing principle and ADR-0076 for the companion intra-layer import standard.
 - 2026-04-29: Platform Services Assessment update. `PlatformService` removed from Category A (was P2). Per-platform services (`SlackService`, `TeamsService`) added to Category C - each platform's API surface is fundamentally different; no shared Protocol is appropriate. Migration priority table updated (P2 PlatformService removed). See the 2026-04-29 Platform Services Assessment findings and ADR-0078 (Platform Services Architecture).
 - 2026-04-30: Delegation tier declaration amendment. Added delegation tier declaration requirement to Standard 1 Category A classification per ADR-0045 P7 (Managed Service Delegation Hierarchy). Each Category A service now documents its delegation tier (Tier 1: managed service, Tier 2: industry library, Tier 3: custom code). Tier 3 declarations require justification. Added Delegation Tier column to Category A table with current assessments. Added managed service delegation impact to Compliance section. See managed-services-delegation-adr-review-tracker-2026-04-30.md Item #6.
+- 2026-05-04: Feature consumption model amendment. Added Standard 3.4 (Consumption Model for Feature Packages) codifying the two-pattern consumption model: core services when domain coverage exists vs client facades via S3.2 pragmatic exception when operations are domain-specific. Documents architectural distinction between client facades (pre-authenticated SDK wrappers owning credentials) and core services (domain abstractions composed from pre-configured clients). Cross-references ADR-0056 S3 for provider location rules. Added `app/packages/access` to related_packages. Updated compliance section.

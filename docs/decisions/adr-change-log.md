@@ -468,3 +468,32 @@ All three follow-up actions from ADR-0080 acceptance completed. All are editoria
 - Challenge review Round 2: PASS. Review artifact saved to `reviews/adr-0082-review-2026-05-01-r2.md`.
 - Status set to Accepted. Migration map updated: ADR-0082 Proposed → Accepted. Wave tracker updated.
 - Decision outcome: Option A (Amazon Q Developer / AWS Chatbot) accepted as the primary infrastructure fallback alerting mechanism, with Option B (Lambda) reserved as the pre-approved escalation path.
+
+---
+
+## 2026-05-04
+
+### ADR-0056 — Standard 3 Amendment (Provider Composition and Location)
+
+- Restructured Standard 3 from "Infrastructure Provider Centralization" (blanket all-in-providers.py rule) to "Infrastructure Provider Composition and Location" (two-tier rule):
+  - **S3.1 (Cross-Service Composition Providers):** Must remain in `providers.py` per ADR-0076 S3 — no infrastructure package may call a sibling's constructor outside the composition root.
+  - **S3.2 (Self-Contained Providers):** May be defined in their own infrastructure package and re-exported through `infrastructure.services.__init__.py`. The consumption surface (ADR-0048 B2) is maintained through re-exports.
+  - **S3.3 (Factory Functions):** Carried forward from prior exception clause — internal implementation details called by the owning provider.
+- Corrected ADR-0048 B2 misapplication: B2 governs the consumption surface (where features import from), not the definition location (where providers are written). Prior S3 conflated "single public API surface" with "single provider definition file."
+- Added Source Reference §6: Seemann Composition Root Pattern — composition root is the application startup function, not `@lru_cache` lazy factories broadly.
+- Updated metadata (`last_updated`, `last_reviewed`, `next_review_due`), Compliance section, Revalidation section, Freshness Review.
+
+### ADR-0077 — Standard 3.4 Amendment (Feature Consumption Model)
+
+- Added Standard 3.4 (Consumption Model for Feature Packages) codifying the two-pattern consumption model for feature packages:
+  - **Core services (Category A):** Used when a domain abstraction covers the operation (e.g., `DirectoryProvider` for user/group lookup).
+  - **Client facades (Category C via S3.2):** Used when the operation is domain-specific and no Category A service exists (e.g., `AWSClients.identitystore` for access sync reconciliation).
+- Documents architectural distinction: client facades are pre-authenticated SDK wrappers owning credentials/session management; core services are domain abstractions composed from pre-configured clients (no credentials in service settings).
+- Added cross-reference to ADR-0056 S3 for provider location rules.
+- Added `app/packages/access` to `related_packages`.
+- Updated metadata (`last_updated`, `last_reviewed`, `next_review_due`), Compliance section.
+
+### Amendment Challenge Reviews
+
+- Challenge reviewed ADR-0056 Standard 3 amendment (normative, S3.1/S3.2/S3.3 two-tier rule + B2 correction). Evidence gathered from 7 external authoritative sources (FastAPI docs, FastAPI Full-Stack Template, PEP 8, Twelve-Factor IV, Seemann Composition Root, Cosmic Python Ch. 13, Fowler DI). All 4 assumptions challenged at High confidence. One non-blocking editorial follow-up (ADR-0076 Compliance phrasing). PASS. Saved to `reviews/adr-0056-review-2026-05-04.md`.
+- Challenge reviewed ADR-0077 Standard 3.4 amendment (normative, feature consumption model: core services vs client facades). Evidence gathered from 7 external authoritative sources (FastAPI docs, FastAPI Full-Stack Template, PEP 544, Twelve-Factor IV, Hexagonal Architecture, Cosmic Python Ch. 2+13, Fowler YAGNI). All 4 assumptions challenged at High confidence. No follow-up actions. PASS. Saved to `reviews/adr-0077-review-2026-05-04.md`.

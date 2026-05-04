@@ -11,9 +11,9 @@ secondary_domains:
 owners:
  - SRE Team
 date_created: 2026-04-29
-last_updated: 2026-04-30
-last_reviewed: 2026-04-30
-next_review_due: 2026-08-28
+last_updated: 2026-05-04
+last_reviewed: 2026-05-04
+next_review_due: 2026-09-01
 constrained_by:
  - ADR-0044
  - ADR-0045
@@ -172,15 +172,44 @@ Package-local providers are **not** registered in the central `infrastructure/se
 
 **Reference implementation:** `app/packages/access/common/providers.py` and `app/packages/access/sync/providers.py`.
 
-### Standard 3: Infrastructure Provider Centralization
+### Standard 3: Infrastructure Provider Composition and Location
 
-Infrastructure providers remain centralized in `app/infrastructure/services/providers.py`. Distributing providers to individual service modules (e.g., `infrastructure/clients/aws/providers.py`) is not permitted because:
+Infrastructure providers follow a two-tier location rule based on composition complexity:
 
-1. **Single injection surface** (ADR-0048 B2) requires one location for all infrastructure providers. Distribution fragments this surface without reducing total code.
-2. **Dependency graph visibility** - a single file makes the full composition graph inspectable and reviewable at a glance.
-3. **Ceremony parity** - distribution still requires the same three-file edit (now spread across more directories), adding navigation cost without reducing edit count.
+#### 3.1 Cross-Service Composition Providers
 
-**Exceptions:** Infrastructure subsystems that are self-contained and have no cross-service dependencies may define module-level factory functions, but these are internal implementation details, not providers. They must not be exported through `infrastructure.services` and must be called only by the central provider that owns their lifecycle. Example: `build_google_directory_provider()` in `infrastructure/directory/factory.py` is a factory called by `get_directory_provider()`.
+Providers that compose multiple sibling infrastructure services **must** remain in `app/infrastructure/services/providers.py`. This is required by ADR-0076 Standard 3 — no infrastructure package may call a sibling package's constructor, factory function, or builder outside of the composition root.
+
+Examples of cross-service composition providers:
+
+- `get_directory_provider()` — composes `get_google_workspace_clients()` + `get_directory_settings()`
+- `get_notification_service()` — composes `get_notify_settings()` + `get_idempotency_service()` + `get_resilience_service()`
+- `get_storage_service()` — composes `get_aws_clients()`
+- `get_audit_trail_service()` — composes `get_storage_service()`
+
+**Rationale:** Centralized composition makes the cross-service dependency graph inspectable and reviewable at a glance, prevents distributed wiring that is difficult to trace, and ensures constructor injection is the only mechanism for sibling dependencies. The correct justification for centralization is ADR-0076 Standard 3 (cross-service composition boundary), not ADR-0048 B2 (which governs the consumption surface, not the definition location).
+
+#### 3.2 Self-Contained Providers
+
+Providers that construct a single service from only their own domain settings (no sibling infrastructure dependencies) **may** be defined in their own infrastructure package and re-exported through `infrastructure.services.__init__.py`.
+
+Examples of self-contained (Level 1) providers:
+
+- `get_aws_clients()` — constructs `AWSClients` from `get_aws_settings()` only
+- `get_slack_client()` — constructs `SlackClientFacade` from `get_slack_settings()` only
+- `get_idempotency_service()` — constructs from `get_idempotency_settings()` only
+
+Self-contained providers must still:
+
+- Follow the DI alias ceremony (Standard 4): provider function → alias in `dependencies.py` → re-export from `__init__.py`.
+- Be re-exported through `infrastructure.services.__init__.py` so the single consumption surface (ADR-0048 B2) is maintained.
+- Use the `@lru_cache(maxsize=1)` singleton pattern.
+
+**Note:** ADR-0048 B2 governs the **consumption surface** (features import from `infrastructure.services`), not the **definition location** (where provider functions are written). Self-contained providers may be defined in their own package while B2 compliance is maintained through re-exports.
+
+#### 3.3 Factory Functions
+
+Infrastructure subsystems may define module-level factory functions as internal implementation details. These are called by the central or self-contained provider that owns the service's lifecycle. Example: `build_google_directory_provider()` in `infrastructure/directory/factory.py` is a factory called by `get_directory_provider()`.
 
 For the corresponding prohibition at the package level — what infrastructure packages must NOT do — see ADR-0076 Standard 3.
 
@@ -425,7 +454,7 @@ The `t()` function in `providers.py` is a convenience wrapper around `get_transl
 
 ## Compliance and Boundaries
 
-- Package/infrastructure boundary impact: Standard 2 explicitly permits and governs package-local providers, closing the gap identified in the decentralization analysis (ADR-0048 B2 gap). Standard 3 confirms infrastructure providers remain centralized. The boundary between package-local and infrastructure providers is clear: infrastructure providers are in `infrastructure/services/providers.py` and exported through `infrastructure/services/__init__.py`; package-local providers are in `packages/<feature>/*/providers.py` and never exported through infrastructure.
+- Package/infrastructure boundary impact: Standard 2 explicitly permits and governs package-local providers, closing the gap identified in the decentralization analysis (ADR-0048 B2 gap). Standard 3 establishes a two-tier location rule: cross-service composition providers must remain in `providers.py` (ADR-0076 S3); self-contained providers may be defined in their own infrastructure package and re-exported. The consumption surface (ADR-0048 B2) is maintained through `infrastructure/services/__init__.py` re-exports regardless of where providers are defined. Package-local providers remain in `packages/<feature>/*/providers.py` and are never exported through infrastructure.
 - Type boundary impact: Standard 1 enforces narrow-slice types at constructor boundaries. After ADR-0055 dissolution, providers pass domain-specific `BaseSettings` instances or scalar values, not aggregated settings objects. This aligns with ADR-0065 type boundaries.
 - Startup/plugin registration impact: Standard 6 (provider graph shape) is compatible with ADR-0046 startup phase ordering. Settings providers (Level 0) are called during Phase 1 (Configuration). Client providers (Level 1) are called during Phase 2 (Client Construction). Composed and high-level providers (Levels 2-3) are called during Phase 3 (Service Wiring). Package-local providers that participate in startup warmup (ADR-0049 S6) are called during the plugin warmup sub-phase.
 - Settings partitioning impact: Standard 1 and Standard 6.3 define the transition from `get_settings()` to domain-specific settings providers as part of ADR-0055 dissolution. After dissolution, `get_settings()` is removed and each provider calls the domain-specific settings provider it needs.
@@ -442,7 +471,7 @@ The `t()` function in `providers.py` is a convenience wrapper around `get_transl
 - Martin Fowler, "Inversion of Control Containers and the Dependency Injection pattern" - constructor injection as the preferred DI mechanism.
 - pydantic-settings v2 documentation - independent `BaseSettings` per domain.
 - Alignment summary:
-- Centralized provider file aligns with FastAPI's documented pattern of a single dependency injection module.
+- Two-tier provider location aligns with FastAPI's distributed provider pattern (each service owns its provider) while centralizing cross-service composition per ADR-0076 S3.
 - `@lru_cache(maxsize=1)` singleton pattern is the Python standard library mechanism for process-scoped instances.
 - Constructor-only injection (Standard 1) aligns with Fowler's constructor injection recommendation.
 - Narrow-slice settings align with Factor IV's resource-specific configuration binding.
@@ -455,7 +484,7 @@ The `t()` function in `providers.py` is a convenience wrapper around `get_transl
 - Record age at review time (days): 0
 - Is record older than 120 days: No
 - If Yes, status set to stale: No
-- Validation summary: Tier-2 pattern implementing ADR-0048 dependency composition rules and governing the provider layer post-ADR-0055 settings dissolution. Supersedes ADR-0012. Amended 2026-04-30 to add Standard 8 (backend-selection logic) per ADR-0045 P7 and ADR-0047 P6.
+- Validation summary: Tier-2 pattern implementing ADR-0048 dependency composition rules and governing the provider layer post-ADR-0055 settings dissolution. Supersedes ADR-0012. Amended 2026-04-30 to add Standard 8 (backend-selection logic) per ADR-0045 P7 and ADR-0047 P6. Amended 2026-05-04: Standard 3 restructured from blanket centralization to two-tier location rule (cross-service composition in providers.py per ADR-0076 S3; self-contained providers may be in their own package). Corrected B2 misapplication — B2 governs consumption surface, not definition location.
 - Follow-up actions:
 - Mark ADR-0012 as `status: Superseded` and add `superseded_by: [ADR-0056]`.
 - Execute narrow-slice enforcement as part of settings dissolution Action 5e.
@@ -488,6 +517,11 @@ The `t()` function in `providers.py` is a convenience wrapper around `get_transl
  Access date: 2026-04-29
  Key takeaway: Each `BaseSettings` class independently loads from environment. Multiple independent settings classes per process is the intended usage pattern.
 
+6. Source title: Mark Seemann - Composition Root Pattern
+ URL: <https://blog.ploeh.dk/2011/07/28/CompositionRoot/>
+ Access date: 2026-05-04
+ Key takeaway: A Composition Root is a unique location in an application where modules are composed together, as close to the entry point as possible. In Python/FastAPI, this maps to the `lifespan` startup function and `providers.py` for cross-service wiring — not to `@lru_cache` lazy factories broadly. Self-contained services that compose only their own settings do not require centralized composition.
+
 ## Implementation Guidance
 
 - Required changes:
@@ -506,3 +540,4 @@ The `t()` function in `providers.py` is a convenience wrapper around `get_transl
 
 - 2026-04-29: Created. Establishes provider composition standard with 7 standards: narrow-slice injection, package-local providers, centralized infrastructure providers, DI alias ceremony, convenience accessor posture, provider dependency graph shape, translation helper posture. Supersedes ADR-0012.
 - 2026-04-30: Backend-selection logic amendment. Added Standard 8 (Backend-Selection Logic in Providers) formalizing the settings-driven factory pattern for Category A services with configurable backends per ADR-0045 P7 and ADR-0047 P6. Reference implementation: `app/infrastructure/resilience/retry/factory.py`. Added backend-selection impact to Compliance section. See managed-services-delegation-adr-review-tracker-2026-04-30.md Item #7.
+- 2026-05-04: Provider location amendment. Restructured Standard 3 from "Infrastructure Provider Centralization" (blanket all-in-providers.py rule) to "Infrastructure Provider Composition and Location" (two-tier rule). Cross-service composition providers must remain in providers.py per ADR-0076 S3. Self-contained providers (Level 1: single constructor, no sibling dependencies) may be defined in their own infrastructure package and re-exported. Corrected ADR-0048 B2 misapplication — B2 governs the consumption surface (where features import from), not the definition location (where providers are written). Added ADR-0077 S3.4 cross-reference for feature consumption patterns.
