@@ -13,7 +13,9 @@ and provide groups-module-specific test data and mocks.
 
 import pytest
 from unittest.mock import MagicMock
-
+from modules.groups import domain as groups_domain
+from modules.groups import providers as providers_module
+from modules.groups.core import orchestration, service
 
 # ============================================================================
 # Circuit Breaker Mocking
@@ -21,39 +23,15 @@ from unittest.mock import MagicMock
 
 
 @pytest.fixture(autouse=True)
-def _auto_patch_circuit_breaker_imports(monkeypatch):
-    """Automatically patch CircuitBreaker imports at channel module level.
+def _auto_patch_circuit_breaker_imports():
+    """No-op fixture retained for test isolation compatibility.
 
-    This ensures that even if tests define their own mock_circuit_breaker fixture,
-    the channel modules will reference the correct mock through their import
-    namespaces.
-
-    Individual tests can override by defining their own mock_circuit_breaker fixture.
+    CircuitBreaker is now injected via constructor (ADR-0076 S3) rather than
+    constructed at the channel module level, so module-level patching is no
+    longer needed.  Channels receive circuit_breaker=None in unit/integration
+    tests unless explicitly provided.
     """
-
-    # Create a pass-through mock that respects the test's specific mock_circuit_breaker
-    def mock_call(func, *args, **kwargs):
-        """Pass through calls directly."""
-        return func(*args, **kwargs)
-
-    mock_breaker = MagicMock()
-    mock_breaker.call = MagicMock(side_effect=mock_call)
-
-    mock_cb_class = MagicMock(return_value=mock_breaker)
-
-    # Patch at channel import locations
-    monkeypatch.setattr(
-        "infrastructure.notifications.channels.chat.CircuitBreaker",
-        mock_cb_class,
-    )
-    monkeypatch.setattr(
-        "infrastructure.notifications.channels.email.CircuitBreaker",
-        mock_cb_class,
-    )
-    monkeypatch.setattr(
-        "infrastructure.notifications.channels.sms.CircuitBreaker",
-        mock_cb_class,
-    )
+    pass
 
 
 # ============================================================================
@@ -68,8 +46,6 @@ def groups_module():
     Returns:
         module: Loaded groups module
     """
-    from modules.groups.core import service
-
     return service
 
 
@@ -80,21 +56,17 @@ def groups_orchestration():
     Returns:
         module: Loaded orchestration module
     """
-    from modules.groups.core import orchestration
-
     return orchestration
 
 
 @pytest.fixture
 def groups_validation():
-    """Import the validation module.
+    """Expose the groups domain module.
 
     Returns:
-        module: Loaded validation module
+        module: Loaded domain module
     """
-    from modules.groups.domain import validation
-
-    return validation
+    return groups_domain
 
 
 # ============================================================================
@@ -547,9 +519,6 @@ def mock_sentinel_and_activate_providers(monkeypatch, mock_sentinel_client):
 
     This fixture runs automatically (autouse=True) for all integration tests.
     """
-    from unittest.mock import MagicMock
-    from modules.groups import providers as providers_module
-
     # Create mock primary provider (google)
     mock_google = MagicMock()
     mock_google.prefix = "g"

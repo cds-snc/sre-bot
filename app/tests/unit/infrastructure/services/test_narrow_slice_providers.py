@@ -14,8 +14,6 @@ from infrastructure.configuration.infrastructure.idempotency import IdempotencyS
 from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.configuration.infrastructure.platforms import PlatformsSettings
 from infrastructure.configuration.integrations.maxmind import MaxMindSettings
-from infrastructure.configuration.integrations.notify import NotifySettings
-from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
 from infrastructure.configuration.integrations.slack import SlackSettings
 from infrastructure.configuration.features.commands import CommandsSettings
 from infrastructure.identity.service import IdentityService
@@ -25,6 +23,7 @@ from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
 from infrastructure.commands.service import CommandService
 from infrastructure.platforms.service import PlatformService
+from infrastructure.notifications.channels.chat import ChatChannel
 from infrastructure.services.providers import (
     get_command_service,
     get_identity_service,
@@ -121,16 +120,14 @@ class TestResilienceServiceNarrowSlice:
 
 
 class TestNotificationServiceNarrowSlice:
-    """NotificationService accepts notify_settings instead of full Settings."""
+    """NotificationService accepts pre-built channels instead of full Settings."""
 
-    def test_accepts_notify_and_google_settings_with_dispatcher(self):
-        """NotificationService constructs with narrow settings + injected dispatcher."""
-        mock_notify = MagicMock(spec=NotifySettings)
-        mock_google = MagicMock(spec=GoogleWorkspaceSettings)
+    def test_accepts_channels_with_dispatcher(self):
+        """NotificationService constructs with pre-built channels + injected dispatcher."""
+        mock_channel = MagicMock(spec=ChatChannel)
         mock_dispatcher = MagicMock()
         service = NotificationService(
-            notify_settings=mock_notify,
-            google_workspace_settings=mock_google,
+            channels={"chat": mock_channel},
             dispatcher=mock_dispatcher,
         )
         assert service is not None

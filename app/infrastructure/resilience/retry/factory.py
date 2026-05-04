@@ -1,17 +1,21 @@
 """Factory for creating retry stores based on configuration."""
 
+from typing import TYPE_CHECKING
+
 import structlog
-from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.resilience.retry.config import RetryConfig
 from infrastructure.resilience.retry.store import RetryStore, InMemoryRetryStore
 from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
+
+if TYPE_CHECKING:
+    from infrastructure.configuration.infrastructure.retry import RetrySettings
 
 logger = structlog.get_logger()
 
 
 def create_retry_store(
     config: RetryConfig,
-    retry_settings: RetrySettings | None = None,
+    retry_settings: "RetrySettings | None" = None,
     backend: str | None = None,
 ) -> RetryStore:
     """Factory to create appropriate retry store based on configuration.

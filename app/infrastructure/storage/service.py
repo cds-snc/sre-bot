@@ -29,14 +29,16 @@ Usage (feature-level repository)::
             return None
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, TYPE_CHECKING
 
 import structlog
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 
-from infrastructure.clients.aws.dynamodb import DynamoDBClient
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
+
+if TYPE_CHECKING:
+    from infrastructure.clients.aws.dynamodb import DynamoDBClient
 
 logger = structlog.get_logger(__name__)
 
@@ -76,7 +78,7 @@ class StorageService:
         dynamodb: Configured ``DynamoDBClient`` instance (injected by provider).
     """
 
-    def __init__(self, dynamodb: DynamoDBClient) -> None:
+    def __init__(self, dynamodb: "DynamoDBClient") -> None:
         self._dynamodb = dynamodb
         logger.info("initialized_storage_service")
 
