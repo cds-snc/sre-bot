@@ -1,6 +1,7 @@
 """Groups module feature settings."""
 
 import json
+from functools import lru_cache
 from typing import Any, Dict, Optional
 
 from pydantic import Field, field_validator
@@ -222,3 +223,9 @@ class GroupsFeatureSettings(FeatureSettings):
         if "providers" in kwargs and "GROUP_PROVIDERS" not in kwargs:
             kwargs["GROUP_PROVIDERS"] = kwargs.pop("providers")
         super().__init__(**kwargs)
+
+
+@lru_cache(maxsize=1)
+def get_groups_settings() -> GroupsFeatureSettings:
+    """Singleton provider for groups feature settings."""
+    return GroupsFeatureSettings()
