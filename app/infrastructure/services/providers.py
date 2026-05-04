@@ -38,6 +38,7 @@ from infrastructure.clients.maxmind import MaxMindClient
 from infrastructure.i18n.service import TranslationService
 from infrastructure.i18n.models import Locale, TranslationKey
 from infrastructure.events.service import EventDispatcher
+from infrastructure.events.registry import get_event_registry
 from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
@@ -257,7 +258,7 @@ def get_event_dispatcher() -> EventDispatcher:
     Returns:
         EventDispatcher: Cached event dispatcher instance
     """
-    return EventDispatcher()
+    return EventDispatcher(registry=get_event_registry())
 
 
 @lru_cache(maxsize=1)

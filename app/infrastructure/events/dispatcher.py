@@ -6,22 +6,21 @@ events are dispatched.
 """
 
 import atexit
-from concurrent.futures import ThreadPoolExecutor
-from threading import Lock
-from typing import Any, Callable, Dict, List, Optional
+from functools import lru_cache
+from typing import Any, Callable
 
 import structlog
 from infrastructure.events.models import Event
+from infrastructure.events.registry import get_event_registry
+from infrastructure.events.service import EventDispatcher
 
 logger = structlog.get_logger()
 
-# Event handler registry: event_type -> list of handlers
-EVENT_HANDLERS: Dict[str, List[Callable]] = {}
 
-# Managed executor for background dispatches
-_EXECUTOR: Optional[ThreadPoolExecutor] = None
-_executor_lock = Lock()
-_executor_shutdown = False
+@lru_cache(maxsize=1)
+def get_default_event_dispatcher() -> EventDispatcher:
+    """Get module-level default dispatcher used by wrapper functions."""
+    return EventDispatcher(registry=get_event_registry())
 
 
 def register_event_handler(event_type: str):
@@ -35,21 +34,20 @@ def register_event_handler(event_type: str):
     """
 
     def decorator(handler_func: Callable) -> Callable:
-        if event_type not in EVENT_HANDLERS:
-            EVENT_HANDLERS[event_type] = []
-        EVENT_HANDLERS[event_type].append(handler_func)
+        registry = get_event_registry()
+        registry.register(event_type, handler_func)
         handler_name = getattr(handler_func, "__name__", "unknown")
         log = logger.bind(handler=handler_name, event_type=event_type)
         log.debug(
             "registered_event_handler",
-            total_handlers=len(EVENT_HANDLERS[event_type]),
+            total_handlers=len(registry.get_handlers_for_event(event_type)),
         )
         return handler_func
 
     return decorator
 
 
-def dispatch_event(event: Event) -> List[Any]:
+def dispatch_event(event: Event) -> list[Any]:
     """Dispatch event synchronously to all registered handlers.
 
     All handlers for the event type are called in order, followed by
@@ -62,63 +60,7 @@ def dispatch_event(event: Event) -> List[Any]:
     Returns:
         List of return values from all handlers.
     """
-    results = []
-    # Get type-specific handlers
-    handlers = EVENT_HANDLERS.get(event.event_type, [])
-    # Also add wildcard handlers that handle all events
-    wildcard_handlers = EVENT_HANDLERS.get("*", [])
-    all_handlers = handlers + wildcard_handlers
-
-    log = logger.bind(
-        event_type=event.event_type, correlation_id=str(event.correlation_id)
-    )
-    log.info("dispatching_event", handler_count=len(all_handlers))
-
-    for handler in all_handlers:
-        try:
-            result = handler(event)
-            results.append(result)
-        except Exception as e:
-            handler_name = getattr(handler, "__name__", "unknown")
-            log.error(
-                "event_handler_failed",
-                handler=handler_name,
-                error=str(e),
-            )
-
-    return results
-
-
-def _background_worker(evt: Event) -> None:
-    """Worker wrapper to call dispatch_event and log exceptions."""
-    try:
-        dispatch_event(evt)
-    except Exception as e:
-        log = logger.bind(
-            event_type=evt.event_type, correlation_id=str(evt.correlation_id)
-        )
-        log.exception("background_event_dispatch_failed", error=str(e))
-
-
-def _get_or_create_executor(max_workers: int = 4) -> Optional[ThreadPoolExecutor]:
-    """Lazily create the module-scoped executor if needed.
-
-    Returns None when the executor has been explicitly shut down.
-
-    Args:
-        max_workers: Maximum number of worker threads.
-
-    Returns:
-        ThreadPoolExecutor instance or None if shutdown.
-    """
-    global _EXECUTOR
-    with _executor_lock:
-        if _executor_shutdown:
-            return None
-        if _EXECUTOR is None:
-            _EXECUTOR = ThreadPoolExecutor(max_workers=max_workers)
-            logger.debug("created_background_event_executor", max_workers=max_workers)
-        return _EXECUTOR
+    return get_default_event_dispatcher().dispatch(event)
 
 
 def start_event_executor(max_workers: int = 4) -> None:
@@ -127,7 +69,7 @@ def start_event_executor(max_workers: int = 4) -> None:
     Args:
         max_workers: Maximum number of worker threads.
     """
-    _get_or_create_executor(max_workers=max_workers)
+    get_default_event_dispatcher().start_executor(max_workers=max_workers)
 
 
 def shutdown_event_executor(wait: bool = True) -> None:
@@ -138,17 +80,7 @@ def shutdown_event_executor(wait: bool = True) -> None:
     Args:
         wait: If True, wait for pending tasks to complete.
     """
-    global _EXECUTOR, _executor_shutdown
-    with _executor_lock:
-        if _EXECUTOR is None:
-            _executor_shutdown = True
-            return
-        try:
-            _EXECUTOR.shutdown(wait=wait)
-            logger.debug("background_event_executor_shut_down", wait=wait)
-        finally:
-            _EXECUTOR = None
-            _executor_shutdown = True
+    get_default_event_dispatcher().shutdown_executor(wait=wait)
 
 
 @atexit.register
@@ -171,32 +103,19 @@ def dispatch_background(event: Event) -> None:
     Args:
         event: The event to dispatch in background.
     """
-    try:
-        executor = _get_or_create_executor()
-        if executor is None:
-            log = logger.bind(
-                event_type=event.event_type, correlation_id=str(event.correlation_id)
-            )
-            log.error("event_executor_unavailable")
-            return
-        executor.submit(_background_worker, event)
-    except Exception:
-        log = logger.bind(
-            event_type=event.event_type, correlation_id=str(event.correlation_id)
-        )
-        log.exception("failed_to_submit_event_to_executor")
+    get_default_event_dispatcher().dispatch_background(event)
 
 
-def get_registered_events() -> List[str]:
+def get_registered_events() -> list[str]:
     """Get list of all registered event types.
 
     Returns:
         List of event type strings.
     """
-    return list(EVENT_HANDLERS.keys())
+    return get_event_registry().get_registered_events()
 
 
-def get_handlers_for_event(event_type: str) -> List[Callable]:
+def get_handlers_for_event(event_type: str) -> list[Callable]:
     """Get all handlers registered for a specific event type.
 
     Args:
@@ -205,7 +124,7 @@ def get_handlers_for_event(event_type: str) -> List[Callable]:
     Returns:
         List of handler functions.
     """
-    return EVENT_HANDLERS.get(event_type, [])
+    return get_event_registry().get_handlers_for_event(event_type)
 
 
 def clear_handlers() -> None:
@@ -213,5 +132,5 @@ def clear_handlers() -> None:
 
     WARNING: This is intended for testing only.
     """
-    EVENT_HANDLERS.clear()
+    get_event_registry().clear()
     logger.debug("cleared_all_event_handlers")

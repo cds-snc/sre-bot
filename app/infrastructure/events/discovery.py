@@ -28,6 +28,7 @@ from typing import Dict, List, Any
 import structlog
 
 from infrastructure.events.dispatcher import get_registered_events
+from infrastructure.events.registry import get_event_registry
 
 
 logger = structlog.get_logger()
@@ -209,10 +210,9 @@ def get_registered_handlers_by_event_type() -> Dict[str, List[str]]:
             "group.listed": ["handle_group_listed"],
         }
     """
-    from infrastructure.events.dispatcher import EVENT_HANDLERS
-
     result = {}
-    for event_type, handlers in EVENT_HANDLERS.items():
+    handlers_by_event = get_event_registry().get_handlers_by_event_type()
+    for event_type, handlers in handlers_by_event.items():
         result[event_type] = [getattr(h, "__name__", "unknown") for h in handlers]
 
     return result
