@@ -43,11 +43,13 @@ from infrastructure.events.discovery import (
     log_registered_handlers,
 )
 from infrastructure.events.models import Event
+from infrastructure.events.registry import EventHandlerRegistry, get_event_registry
 from infrastructure.events.service import EventDispatcher
 
 __all__ = [
     "Event",
     "EventDispatcher",
+    "EventHandlerRegistry",
     "dispatch_event",
     "dispatch_background",
     "register_event_handler",
@@ -59,5 +61,6 @@ __all__ = [
     "get_registered_handlers_by_event_type",
     "log_registered_handlers",
     "register_infrastructure_handlers",
+    "get_event_registry",
     "clear_handlers",
 ]
