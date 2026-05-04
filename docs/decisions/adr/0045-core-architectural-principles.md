@@ -30,6 +30,7 @@ impacts:
  - ADR-0065
  - ADR-0077
  - ADR-0079
+ - ADR-0083
 supersedes:
  - ADR-0001
 superseded_by: []
@@ -149,7 +150,7 @@ Every Protocol-backed service (Category A per ADR-0077) must support backend sel
 - Package/infrastructure boundary impact: Principle 3 (layer separation) directly governs the boundary between `app/packages`, `app/infrastructure`, and `app/server`. Principle 6 (Protocol contracts) governs the contract surface between infrastructure services and feature packages.
 - Type boundary impact: Principle 6 mandates Protocol types for service contracts. Detailed type-boundary rules deferred to ADR-0065 (Type-Model Boundaries Canonical Principle).
 - Service contract impact: Principle 6 establishes the Protocol contract requirement; service classification and migration are governed by ADR-0077. Principle 7 requires each Category A service to declare its delegation tier and justify any Tier 3 (custom) choice.
-- Managed service delegation impact: Principle 7 governs what sits behind Protocol adapters — managed service wrapper, library delegation, or custom code. Backend-selection settings patterns are governed by ADR-0047 and ADR-0055. Provider construction with backend selection is governed by ADR-0056. Dev/test fallback provision is governed by ADR-0054. Library adoption governance is governed by ADR-0044 (Tier-5 trigger). Queue and messaging delegation is governed by ADR-0079.
+- Managed service delegation impact: Principle 7 governs what sits behind Protocol adapters — managed service wrapper, library delegation, or custom code. Backend-selection settings patterns are governed by ADR-0047 and ADR-0055. Provider construction with backend selection is governed by ADR-0056. Dev/test fallback provision is governed by ADR-0054. Library adoption governance is governed by ADR-0044 (Tier-5 trigger). Queue and messaging delegation is governed by ADR-0079. Event dispatcher delegation (custom → blinker library, with facade-owned error-isolated dispatch and async readiness) is governed by ADR-0083.
 - Startup/plugin registration impact: Principle 4 (fail-fast configuration) constrains startup behavior; detailed startup policy is governed by ADR-0046 and ADR-0049.
 - Settings partitioning impact: Principle 4 establishes the configuration validation invariant; partitioning rules are governed by ADR-0047.
 - Infrastructure composition impact: Principle 3 clarifies that infrastructure services collaborate internally through the composition root - the isolation boundary is between layers, not within the infrastructure layer. Detailed composition governance is provided by ADR-0076 and ADR-0056.

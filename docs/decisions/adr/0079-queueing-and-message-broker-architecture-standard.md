@@ -12,8 +12,8 @@ secondary_domains:
 owners:
  - SRE Team
 date_created: 2026-04-29
-last_updated: 2026-04-30
-last_reviewed: 2026-04-30
+last_updated: 2026-05-04
+last_reviewed: 2026-05-04
 next_review_due: 2026-08-28
 constrained_by:
  - ADR-0044
@@ -43,6 +43,7 @@ related_records:
  - ADR-0058
  - ADR-0076
  - ADR-0078
+ - ADR-0083
 related_packages:
  - app/infrastructure/events
  - app/infrastructure/resilience
@@ -115,9 +116,11 @@ The current event dispatcher (`app/infrastructure/events/dispatcher.py`) violate
 2. **Pluggy-based event handler registration**: Event handlers must be discoverable via pluggy hookspecs, consistent with ADR-0049 Standard 7:
    - `register_event_handlers(dispatcher: EventDispatcher)` hookspec — feature packages implement this to register their handlers during startup.
    - Handler registration happens during lifespan phase 4 (feature activation — handlers, event subscribers, integrations), before transport start (phase 5).
-3. **Handler registry encapsulation**: The global `EVENT_HANDLERS` dict must be encapsulated within the `EventDispatcher` class instance, not as a module-level global. The `EventDispatcher` instance is created by the provider and managed by the lifespan.
+3. **Library delegation**: The custom handler registry and dispatch loop must be replaced by an industry-standard in-process pub/sub library per ADR-0045 P7 (Tier 2 — industry library). The library selection and adoption standards are governed by ADR-0083. The `EventDispatcher` service class is retained as a thin facade wrapping library signals, providing error-isolated dispatch, background execution, and async bridging. The facade preserves the DI injection surface.
+
+> **Amendment (2026-05-04 — ADR-0083 Library Adoption, revised):** Point 3 was revised from "encapsulate the global `EVENT_HANDLERS` dict within the `EventDispatcher` class instance" to "delegate to an industry-standard library." ADR-0083 selects blinker as the library and prescribes facade-owned error-isolated dispatch (ADR-0083 Standard 4) because blinker's `send()` propagates exceptions. The facade iterates `receivers_for()` with per-handler try/except. ADR-0083 also prescribes async readiness (Standard 5) for the planned sync → async migration. The pluggy hookspec requirement (point 2) is unchanged — pluggy governs *when* handlers register; blinker governs *how* events are dispatched.
 4. **Correlation propagation**: `dispatch_event()` must propagate the correlation context (correlation_id, user_email) from the originating request to all handler invocations. Handlers must receive the `Event[T]` dataclass which already carries `correlation_id`.
-5. **Error isolation**: Handler exceptions must be caught, logged with structured context (handler name, event_type, correlation_id, error), and must not prevent other handlers from executing. This is the current behavior (`safe_run`) but must be codified.
+5. **Error isolation**: Handler exceptions must be caught, logged with structured context (handler name, event_type, correlation_id, error), and must not prevent other handlers from executing. The `EventDispatcher` facade owns error isolation per ADR-0083 Standard 4.
 
 **Timeline**: The event dispatcher remediation is independent of the durable queue migration. It should be executed during the next event infrastructure touch.
 
@@ -175,7 +178,7 @@ Visibility timeout, max retries, poll interval, and other operational settings a
 The migration from the current in-process model to managed queue-backed processing follows a phased approach aligned with the delegation hierarchy (ADR-0045 P7):
 
 1. **Phase 0 (current — in-process)**: In-process event dispatcher + `schedule`-based background jobs + DynamoDB retry queue. No external message broker. ADR-0058 governs this phase.
-2. **Phase 1 (event dispatcher remediation)**: Fix import-time side effects (Standard 2). Encapsulate handler registry. Add pluggy-based handler registration. No functional change to delivery semantics. **Independent of queue adoption.**
+2. **Phase 1 (event dispatcher remediation)**: Fix import-time side effects (Standard 2). Delegate dispatch to an industry-standard library per ADR-0083. Add pluggy-based handler registration. No functional change to delivery semantics. **Independent of queue adoption.**
 3. **Phase 2 (managed queue adoption)**: Adopt a managed queue service (SQS per Tier 1 preference). Wrap the SDK in a thin Protocol-backed facade (Standard 1). Add `QUEUE_BACKEND` settings (Standard 6). Add in-memory fallback for dev/test. Integrate consumer lifecycle with lifespan (Standard 5). DLQ configured in Terraform (Standard 4).
 4. **Phase 3 (feature migration)**: Individual features opt into managed queue-backed processing for specific operations. Each migration is a Tier-5 ADR. Migration is per-feature and incremental.
 5. **Phase 4 (evaluate worker separation)**: When queue consumer volume or resource contention outgrows the colocated model (ADR-0058 Standard 4), evaluate separating queue consumers into a dedicated worker ECS service.
@@ -233,7 +236,7 @@ The migration from the current in-process model to managed queue-backed processi
 - Startup/plugin registration impact: Queue consumer registration happens during lifespan phase 3 (discovery and registration) via pluggy hookspecs. Event handler registration happens during phase 4 (feature activation). Consumer start happens during phase 5 (transport). No import-time side effects (ADR-0048 B4). Event handler registration must migrate from import-time decorators to startup-driven pluggy hooks (Standard 2).
 - Settings partitioning impact: Standard 6 mandates `QueueSettings` with `QUEUE_BACKEND` and `QUEUE_ENDPOINT_URL` as backend-selection keys. Operational settings (visibility timeout, max retries) are configured in Terraform, not in application settings.
 - DI alias ceremony impact: Queue Protocol follows ADR-0056 Standard 4 — provider function in `providers.py`, `Annotated[..., Depends(...)]` in `dependencies.py`.
-- Service contract impact: Queue services are Category A per ADR-0077 (Standard 1). `EventDispatcher` is Category B (shared utility, concrete OK — it does not abstract a backing service in the current in-process model; reclassify to Category A if migrated to a durable broker).
+- Service contract impact: Queue services are Category A per ADR-0077 (Standard 1). `EventDispatcher` is Category B (shared utility, concrete OK — thin facade over blinker dispatch + background executor per ADR-0083; reclassify to Category A if migrated to a durable broker).
 - Managed service delegation impact: Standards 3 and 4 were narrowed to posture statements — delivery semantics and DLQ configuration are the managed service's responsibility. The application documents relied-upon semantics but does not codify them. Standard 1 defers Protocol shape to implementation time. This aligns with ADR-0045 P7 (Tier 1 — managed cloud service preferred).
 - Graceful shutdown impact: Queue consumers must respect ADR-0057 Standard 2 shutdown timeout budgeting (Standard 5).
 - Background execution relationship: ADR-0058 governs the colocated scheduled worker model. This standard governs queue-backed asynchronous processing. They are complementary.
@@ -245,8 +248,8 @@ The migration from the current in-process model to managed queue-backed processi
 | Component | Status | Violation |
 |-----------|--------|-----------|
 | `app/infrastructure/resilience/retry/` | Retry store with `RetryStore` and `RetryProcessor` Protocols. Multi-backend config (`memory`, `dynamodb`, `sqs`). SQS not implemented. | Standard 1 — aspirational; no immediate violation. Existing Protocols align directionally. |
-| `app/infrastructure/events/dispatcher.py` | Global `EVENT_HANDLERS` dict. `@register_event_handler` decorator registers at import time. `dispatch_event()` with ThreadPoolExecutor. | **Standard 2 violation** — import-time side effects (ADR-0048 B4). |
-| `app/infrastructure/events/service.py` | `EventDispatcher` class wraps module-level functions. | Standard 2 — facade exists but delegates to module-level globals. |
+| `app/infrastructure/events/dispatcher.py` | Custom `EventHandlerRegistry` class (post-`feat/infra-event-dispatcher` merge). `@register_event_handler` decorator registers via registry at import time. `dispatch_event()` with ThreadPoolExecutor. | **Standard 2 violation** — import-time side effects (ADR-0048 B4). Custom registry is Tier 3 per ADR-0045 P7; ADR-0083 governs library delegation. |
+| `app/infrastructure/events/service.py` | `EventDispatcher` class wraps custom registry + executor. | Standard 2 — facade exists but delegates to custom Tier 3 registry. ADR-0083 mandates library delegation. |
 | `app/jobs/scheduled_tasks.py` | `schedule`-library scheduler with pluggy-based `BackgroundJobRegistry`. | No violation — governed by ADR-0058, not this standard. |
 | `app/infrastructure/configuration/infrastructure/retry.py` | `RETRY_BACKEND` with `sqs` option. | Standard 6 — directionally aligned; needs `QueueSettings` extraction when SQS is implemented. |
 
@@ -254,7 +257,7 @@ The migration from the current in-process model to managed queue-backed processi
 
 | Action | Priority | Standard | Dependencies |
 |--------|----------|----------|--------------|
-| Encapsulate `EVENT_HANDLERS` in `EventDispatcher` instance | P1 | Standard 2 | None |
+| Replace custom `EventHandlerRegistry` with blinker signals (ADR-0083) | P1 | Standard 2 | ADR-0083 accepted |
 | Replace `@register_event_handler` with pluggy hookspec | P1 | Standard 2 | ADR-0049 compliance |
 | Add `register_event_handlers` hookspec | P1 | Standard 2 | Plugin manager update |
 | Remove module-level handler registration from all consumers | P1 | Standard 2 | After hookspec available |
@@ -297,7 +300,7 @@ The migration from the current in-process model to managed queue-backed processi
 - If Yes, status set to stale: No
 - Validation summary: Tier-2 standard narrowed by managed service delegation review (2026-04-30). Standards 1/3/4/5/6/7 revised to align with ADR-0045 P7 delegation hierarchy. Pre-designed Protocols deferred to implementation time. Delivery semantics and DLQ configuration delegated to managed service. Evolution phases reframed around managed service adoption. Standard 2 (event dispatcher remediation) unchanged.
 - Follow-up actions:
-- Execute P1 event dispatcher remediation (Standard 2): encapsulate global handler registry, add pluggy hookspec, migrate handler registrations.
+- Execute P1 event dispatcher remediation (Standard 2): replace custom registry with blinker library per ADR-0083, add pluggy hookspec, migrate handler registrations.
 - Add `register_event_handlers` hookspec to plugin manager.
 - Update ADR-0058 related_records to include ADR-0079.
 
@@ -307,6 +310,7 @@ The migration from the current in-process model to managed queue-backed processi
 |------|---------|----------------|
 | 2026-04-29 | All | Initial Draft — full queueing and message-broker architecture standard. |
 | 2026-04-30 | Standards 1, 3, 4, 5, 6, 7, Compliance, Audit, Revalidation | Managed service delegation rework: narrowed Standard 1 from pre-defined Protocols to queue integration standard; narrowed Standards 3/4 to posture statements (managed service owns delivery semantics and DLQ); simplified Standard 5 to essential lifecycle points; narrowed Standard 6 to backend-selection keys only; reframed Standard 7 evolution phases around managed service adoption. Aligned with ADR-0045 P7 delegation hierarchy. |
+| 2026-05-04 | Standard 2, Standard 7, Compliance, Audit, Metadata | ADR-0083 library adoption amendment: Standard 2 point 3 revised from custom registry encapsulation to library delegation per ADR-0045 P7. Standard 7 Phase 1 updated. Codebase audit updated to reflect post-`feat/infra-event-dispatcher` state. Added ADR-0083 to related_records. |
 
 ## Source References
 

@@ -117,7 +117,7 @@ Services that provide cross-cutting utility functions consumed by both infrastru
 | Service | Rationale |
 |---------|-----------|
 | `OperationResult[T]` / `OperationStatus` | Universal result type - shared vocabulary, not a swappable service |
-| `EventDispatcher` | Internal event bus - implementation is fixed |
+| `EventDispatcher` | Thin facade over blinker signals providing error-isolated dispatch, background execution, and async bridging (ADR-0083). Category B (concrete OK) because the facade owns dispatch orchestration; blinker provides the handler registry. Supports sync → async migration via `send_async()` bridging. Reclassify to Category A if migrated to durable broker (ADR-0079 Phase 2). |
 | `TranslationService` | i18n is internal; unlikely to swap |
 | `CommandService` | Command framework is tightly coupled to the registration model |
 | `ResilienceService` | Circuit breaker / retry orchestration - infrastructure concern |
