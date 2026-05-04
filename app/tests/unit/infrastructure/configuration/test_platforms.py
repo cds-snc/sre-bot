@@ -8,6 +8,9 @@ from infrastructure.configuration.infrastructure.platforms import (
     DiscordPlatformSettings,
     PlatformsSettings,
 )
+from infrastructure.configuration.settings import Settings
+from infrastructure.configuration.infrastructure import get_platforms_settings
+from infrastructure.services.providers import get_settings
 
 
 @pytest.mark.unit
@@ -183,12 +186,9 @@ class TestMainSettingsIntegration:
 
     def test_platforms_in_main_settings(self, monkeypatch):
         """Test that platforms settings are accessible from main Settings."""
-        from infrastructure.configuration.settings import Settings
-
-        # Clear any cached settings
-        from infrastructure.services.providers import get_settings
-
+        # Clear any cached settings (including the domain singleton)
         get_settings.cache_clear()
+        get_platforms_settings.cache_clear()
 
         monkeypatch.setenv("SLACK_ENABLED", "true")
         monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-main-test")
@@ -201,12 +201,10 @@ class TestMainSettingsIntegration:
 
         # Clean up
         get_settings.cache_clear()
+        get_platforms_settings.cache_clear()
 
     def test_all_platforms_accessible_from_main(self, monkeypatch):
         """Test all platform settings accessible from main Settings."""
-        from infrastructure.configuration.settings import Settings
-        from infrastructure.services.providers import get_settings
-
         get_settings.cache_clear()
 
         settings = Settings()
