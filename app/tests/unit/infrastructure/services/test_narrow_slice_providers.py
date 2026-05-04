@@ -121,16 +121,15 @@ class TestResilienceServiceNarrowSlice:
 
 
 class TestNotificationServiceNarrowSlice:
-    """NotificationService accepts notify_settings instead of full Settings."""
+    """NotificationService accepts pre-built channels instead of full Settings."""
 
-    def test_accepts_notify_and_google_settings_with_dispatcher(self):
-        """NotificationService constructs with narrow settings + injected dispatcher."""
-        mock_notify = MagicMock(spec=NotifySettings)
-        mock_google = MagicMock(spec=GoogleWorkspaceSettings)
+    def test_accepts_channels_with_dispatcher(self):
+        """NotificationService constructs with pre-built channels + injected dispatcher."""
+        from unittest.mock import MagicMock
+        mock_channel = MagicMock()
         mock_dispatcher = MagicMock()
         service = NotificationService(
-            notify_settings=mock_notify,
-            google_workspace_settings=mock_google,
+            channels={"chat": mock_channel},
             dispatcher=mock_dispatcher,
         )
         assert service is not None

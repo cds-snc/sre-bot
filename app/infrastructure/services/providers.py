@@ -41,6 +41,9 @@ from infrastructure.events.service import EventDispatcher
 from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
+from infrastructure.notifications.channels.chat import ChatChannel
+from infrastructure.notifications.channels.email import EmailChannel
+from infrastructure.notifications.channels.sms import SMSChannel
 from infrastructure.commands.service import CommandService
 from infrastructure.storage.service import StorageService
 from infrastructure.audit.service import AuditTrailService
@@ -363,10 +366,8 @@ def get_notification_service() -> NotificationService:
     Returns a NotificationService instance for multi-channel notification
     delivery with automatic fallback, idempotency, and circuit breakers.
 
-    The service is initialized with injected dependencies:
-    - Settings for configuration
-    - IdempotencyService for preventing duplicate sends
-    - ResilienceService for circuit breakers
+    Channel construction and circuit breaker wiring happen here (composition
+    root — ADR-0076 S3) so NotificationService receives pre-built channels.
 
     Usage:
         from infrastructure.services import NotificationServiceDep
@@ -383,13 +384,34 @@ def get_notification_service() -> NotificationService:
     Returns:
         NotificationService: Cached notification service instance
     """
-    idempotency_service = get_idempotency_service()
     resilience_service = get_resilience_service()
+    idempotency_service = get_idempotency_service()
+
+    email_cb = resilience_service.get_or_create_circuit_breaker(
+        "notification_email", failure_threshold=3, timeout_seconds=60
+    )
+    sms_cb = resilience_service.get_or_create_circuit_breaker(
+        "notification_sms", failure_threshold=3, timeout_seconds=60
+    )
+    chat_cb = resilience_service.get_or_create_circuit_breaker(
+        "notification_chat", failure_threshold=3, timeout_seconds=60
+    )
+
+    channels = {
+        "chat": ChatChannel(circuit_breaker=chat_cb),
+        "email": EmailChannel(
+            google_workspace_settings=get_google_workspace_settings(),
+            circuit_breaker=email_cb,
+        ),
+        "sms": SMSChannel(
+            notify_settings=get_notify_settings(),
+            circuit_breaker=sms_cb,
+        ),
+    }
+
     return NotificationService(
-        notify_settings=get_notify_settings(),
-        google_workspace_settings=get_google_workspace_settings(),
+        channels=channels,
         idempotency_service=idempotency_service,
-        resilience_service=resilience_service,
     )
 
 

@@ -14,46 +14,21 @@ and provide groups-module-specific test data and mocks.
 import pytest
 from unittest.mock import MagicMock
 
-
 # ============================================================================
 # Circuit Breaker Mocking
 # ============================================================================
 
 
 @pytest.fixture(autouse=True)
-def _auto_patch_circuit_breaker_imports(monkeypatch):
-    """Automatically patch CircuitBreaker imports at channel module level.
+def _auto_patch_circuit_breaker_imports():
+    """No-op fixture retained for test isolation compatibility.
 
-    This ensures that even if tests define their own mock_circuit_breaker fixture,
-    the channel modules will reference the correct mock through their import
-    namespaces.
-
-    Individual tests can override by defining their own mock_circuit_breaker fixture.
+    CircuitBreaker is now injected via constructor (ADR-0076 S3) rather than
+    constructed at the channel module level, so module-level patching is no
+    longer needed.  Channels receive circuit_breaker=None in unit/integration
+    tests unless explicitly provided.
     """
-
-    # Create a pass-through mock that respects the test's specific mock_circuit_breaker
-    def mock_call(func, *args, **kwargs):
-        """Pass through calls directly."""
-        return func(*args, **kwargs)
-
-    mock_breaker = MagicMock()
-    mock_breaker.call = MagicMock(side_effect=mock_call)
-
-    mock_cb_class = MagicMock(return_value=mock_breaker)
-
-    # Patch at channel import locations
-    monkeypatch.setattr(
-        "infrastructure.notifications.channels.chat.CircuitBreaker",
-        mock_cb_class,
-    )
-    monkeypatch.setattr(
-        "infrastructure.notifications.channels.email.CircuitBreaker",
-        mock_cb_class,
-    )
-    monkeypatch.setattr(
-        "infrastructure.notifications.channels.sms.CircuitBreaker",
-        mock_cb_class,
-    )
+    pass
 
 
 # ============================================================================
