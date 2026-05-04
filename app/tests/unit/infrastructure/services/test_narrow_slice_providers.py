@@ -126,6 +126,7 @@ class TestNotificationServiceNarrowSlice:
     def test_accepts_channels_with_dispatcher(self):
         """NotificationService constructs with pre-built channels + injected dispatcher."""
         from unittest.mock import MagicMock
+
         mock_channel = MagicMock()
         mock_dispatcher = MagicMock()
         service = NotificationService(
