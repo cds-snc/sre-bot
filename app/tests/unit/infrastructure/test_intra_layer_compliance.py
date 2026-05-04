@@ -19,7 +19,7 @@ from infrastructure.identity.models import IdentitySource, User
 from infrastructure.notifications.channels.chat import ChatChannel
 from infrastructure.notifications.channels.email import EmailChannel
 from infrastructure.notifications.channels.sms import SMSChannel
-from infrastructure.storage.service import StorageService
+from infrastructure.storage.service import DynamoDBStorageService
 
 _APP_ROOT = Path(__file__).parents[3]  # workspace/app/
 
@@ -90,7 +90,7 @@ class TestStorageServiceCompliance:
     def test_storage_service_accepts_dynamodb_via_constructor(self):
         """StorageService still accepts a DynamoDBClient via its constructor."""
         mock_dynamo = MagicMock()
-        service = StorageService(dynamodb=mock_dynamo)
+        service = DynamoDBStorageService(dynamodb=mock_dynamo)
         assert service is not None
 
 
@@ -102,7 +102,7 @@ class TestAuditServiceCompliance:
         """StorageService must be under TYPE_CHECKING only."""
         source = _read_source("infrastructure/audit/service.py")
         runtime = _runtime_imports(source)
-        assert "infrastructure.storage.service" not in runtime, (
+        assert "infrastructure.storage.protocol" not in runtime, (
             "StorageService must not be imported at runtime in audit/service.py "
             "(ADR-0076 S3.3 — use TYPE_CHECKING)."
         )

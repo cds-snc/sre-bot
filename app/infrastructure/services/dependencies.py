@@ -20,7 +20,7 @@ from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
 from infrastructure.commands.service import CommandService
-from infrastructure.storage.service import StorageService
+from infrastructure.storage.protocol import StorageService
 from infrastructure.audit.service import AuditTrailService
 from infrastructure.platforms.service import PlatformService
 from infrastructure.platforms.clients import (

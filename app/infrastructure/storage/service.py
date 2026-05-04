@@ -5,8 +5,9 @@ with automatic Python ↔ DynamoDB type conversion via boto3's built-in
 ``TypeSerializer`` / ``TypeDeserializer``.
 
 Feature packages MUST NOT call ``DynamoDBClient`` or ``dynamodb_next`` directly.
-Instead, define a thin repository class that takes ``StorageService`` as a
-constructor argument and delegates all DynamoDB I/O here.
+Instead, define a thin repository class that takes
+``infrastructure.storage.protocol.StorageService`` as a constructor argument and
+delegates all DynamoDB I/O here.
 
 Usage (feature-level repository)::
 
@@ -64,7 +65,7 @@ def _deserialize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     return {k: _deserializer.deserialize(v) for k, v in item.items()}
 
 
-class StorageService:
+class DynamoDBStorageService:
     """Generic DynamoDB storage service.
 
     Intended as the single infrastructure-level abstraction over DynamoDB for

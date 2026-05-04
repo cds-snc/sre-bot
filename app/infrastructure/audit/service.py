@@ -13,7 +13,7 @@ from infrastructure.audit.models import AuditEvent
 from infrastructure.operations.result import OperationResult
 
 if TYPE_CHECKING:
-    from infrastructure.storage.service import StorageService
+    from infrastructure.storage.protocol import StorageService
 
 logger = structlog.get_logger(__name__)
 
