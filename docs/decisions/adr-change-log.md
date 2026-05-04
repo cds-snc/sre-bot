@@ -497,3 +497,15 @@ All three follow-up actions from ADR-0080 acceptance completed. All are editoria
 
 - Challenge reviewed ADR-0056 Standard 3 amendment (normative, S3.1/S3.2/S3.3 two-tier rule + B2 correction). Evidence gathered from 7 external authoritative sources (FastAPI docs, FastAPI Full-Stack Template, PEP 8, Twelve-Factor IV, Seemann Composition Root, Cosmic Python Ch. 13, Fowler DI). All 4 assumptions challenged at High confidence. One non-blocking editorial follow-up (ADR-0076 Compliance phrasing). PASS. Saved to `reviews/adr-0056-review-2026-05-04.md`.
 - Challenge reviewed ADR-0077 Standard 3.4 amendment (normative, feature consumption model: core services vs client facades). Evidence gathered from 7 external authoritative sources (FastAPI docs, FastAPI Full-Stack Template, PEP 544, Twelve-Factor IV, Hexagonal Architecture, Cosmic Python Ch. 2+13, Fowler YAGNI). All 4 assumptions challenged at High confidence. No follow-up actions. PASS. Saved to `reviews/adr-0077-review-2026-05-04.md`.
+
+### ADR-0083 — Event Dispatcher Library Adoption (Accepted)
+
+- Authored ADR-0083 (Event Dispatcher Library Adoption, Tier-5 Library Adoption Decision, governance_domain: application).
+- Decision: Adopt `blinker` (1.9+) as Tier 2 library for in-process event dispatch, replacing custom Tier 3 implementation per ADR-0045 P7.
+- 7 standards: S1 (Library Adoption — blinker replaces custom registry), S2 (Event Type Ownership — package-owned string constants), S3 (Handler Registration at Startup — pluggy hookspec, no import-time registration), S4 (Error-Isolated Dispatch — facade-owned dispatch loop, not `signal.send()`), S5 (Async Readiness — sync/async handler coexistence), S6 (Cross-Process Event Boundary — blinker is in-process only), S7 (Deprecated Code Inventory).
+- Constrained by ADR-0044, ADR-0045, ADR-0048, ADR-0049, ADR-0054, ADR-0056, ADR-0065, ADR-0077, ADR-0079.
+- Related records: ADR-0046, ADR-0058, ADR-0059, ADR-0067, ADR-0076, ADR-0078.
+- Related packages: `app/infrastructure/events`, `app/packages/access`.
+- Status set to Accepted. Migration map updated: ADR-0083 added to Tier-5 records and Target ADR Registry. Wave tracker updated.
+- Target retirement: 2026-09-01.
+- Follow-up actions: Amend ADR-0079 S2 to reference ADR-0083; amend ADR-0077 Category B table for EventDispatcher; amend ADR-0045 Compliance for event dispatcher delegation.

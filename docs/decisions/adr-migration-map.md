@@ -39,6 +39,7 @@
 | 0080 | Application Portability Boundary | 1 | P0 | — | Accepted |
 | 0081 | CI/CD Pipeline and Deployment Validation | 2 | P3 | — | Accepted |
 | 0082 | Infrastructure Alerting Architecture | 4 | P2 | — | Accepted |
+| 0083 | Event Dispatcher Library Adoption | 5 | P1 | — | Accepted |
 
 ## Tier-5 Records (Migration / Deprecation)
 

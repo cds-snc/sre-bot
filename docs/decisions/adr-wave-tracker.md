@@ -2,7 +2,7 @@
 
 **Purpose:** Track current wave progress and pending actions. Update in-place each cycle.
 
-**Last updated:** 2026-05-01
+**Last updated:** 2026-05-04
 
 ---
 
@@ -13,7 +13,8 @@
 **Structural:** ADR-0080 (Application Portability Boundary) — **Accepted** (2026-05-01)  
 **Infrastructure:** ADR-0081 (CI/CD Pipeline and Deployment Validation) — **Accepted** (2026-05-01)  
 **Infrastructure:** ADR-0082 (Infrastructure Alerting Architecture) — **Accepted** (2026-05-01)
-**Recent completion:** P2 — Infrastructure Alerting Architecture (ADR-0082) — **Accepted** (2026-05-01)
+**Library:** ADR-0083 (Event Dispatcher Library Adoption) — **Accepted** (2026-05-04)
+**Recent completion:** P1 — Event Dispatcher Library Adoption (ADR-0083) — **Accepted** (2026-05-04)
 
 **Note:** ADR-0066 narrowed from "Access Runtime Naming and Operator Scope" to "Access Config Env-Source Naming". Lock lifecycle scope removed — governed by ADR-0058 Standard 9. ADR-0043 rejection stands independently.
 

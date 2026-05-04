@@ -1,7 +1,7 @@
 ---
 adr_id: ADR-0083
 title: "Event Dispatcher Library Adoption"
-status: Draft
+status: Accepted
 decision_type: Library Adoption Decision
 tier: Tier-5
 governance_domain: application
