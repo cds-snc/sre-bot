@@ -5,6 +5,8 @@ instead of the full Settings aggregator.
 """
 
 import pytest
+import tempfile
+import os
 from unittest.mock import MagicMock, patch
 
 from infrastructure.configuration.infrastructure.server import ServerSettings
@@ -62,9 +64,14 @@ class TestMaxMindClientNarrowSlice:
     def test_accepts_maxmind_settings(self):
         """MaxMindClient constructs with maxmind_settings parameter."""
         mock_settings = MagicMock(spec=MaxMindSettings)
-        mock_settings.MAXMIND_DB_PATH = "/tmp/test.mmdb"
-        client = MaxMindClient(maxmind_settings=mock_settings)
-        assert client._db_path == "/tmp/test.mmdb"
+        with tempfile.NamedTemporaryFile(suffix=".mmdb", delete=False) as f:
+            db_path = f.name
+        try:
+            mock_settings.MAXMIND_DB_PATH = db_path
+            client = MaxMindClient(maxmind_settings=mock_settings)
+            assert client._db_path == db_path
+        finally:
+            os.unlink(db_path)
 
     def test_rejects_full_settings_positional(self):
         """MaxMindClient does not accept generic 'settings' kwarg."""
