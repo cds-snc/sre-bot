@@ -45,7 +45,8 @@ from infrastructure.notifications.channels.chat import ChatChannel
 from infrastructure.notifications.channels.email import EmailChannel
 from infrastructure.notifications.channels.sms import SMSChannel
 from infrastructure.commands.service import CommandService
-from infrastructure.storage.service import StorageService
+from infrastructure.storage.protocol import StorageService
+from infrastructure.storage.service import DynamoDBStorageService
 from infrastructure.audit.service import AuditTrailService
 from infrastructure.platforms import PlatformService
 from infrastructure.platforms.providers import (
@@ -458,7 +459,7 @@ def get_storage_service() -> StorageService:
         StorageService: Cached storage service instance.
     """
     aws = get_aws_clients()
-    return StorageService(dynamodb=aws.dynamodb)
+    return DynamoDBStorageService(dynamodb=aws.dynamodb)
 
 
 @lru_cache(maxsize=1)

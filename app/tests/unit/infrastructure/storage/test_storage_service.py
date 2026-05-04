@@ -10,12 +10,12 @@ from unittest.mock import MagicMock
 import pytest
 
 from infrastructure.operations.result import OperationResult
-from infrastructure.storage.service import StorageService
+from infrastructure.storage.service import DynamoDBStorageService
 
 
-def _make_service() -> tuple[StorageService, MagicMock]:
+def _make_service() -> tuple[DynamoDBStorageService, MagicMock]:
     mock_dynamo = MagicMock()
-    return StorageService(dynamodb=mock_dynamo), mock_dynamo
+    return DynamoDBStorageService(dynamodb=mock_dynamo), mock_dynamo
 
 
 @pytest.mark.unit
