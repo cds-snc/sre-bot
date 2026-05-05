@@ -11,6 +11,8 @@ from packages.access.common.config.loaders import (
 )
 from packages.access.common.config.settings import (
     AccessRuntimeConfig,
+    CatalogExtensions,
+    CatalogParserConfig,
     EntitlementMode,
     EntitlementModeOverride,
     EntitlementRule,
@@ -28,6 +30,8 @@ __all__ = [
     "normalize_target_key",
     # runtime config models
     "AccessRuntimeConfig",
+    "CatalogExtensions",
+    "CatalogParserConfig",
     "EntitlementMode",
     "EntitlementModeOverride",
     "EntitlementRule",

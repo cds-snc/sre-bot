@@ -38,7 +38,7 @@ from typing import Any, Dict, List, TYPE_CHECKING
 
 import structlog
 
-from infrastructure.configuration import Settings
+from infrastructure.configuration.infrastructure.platforms import PlatformsSettings
 from infrastructure.operations import OperationResult
 from infrastructure.platforms.capabilities.models import PlatformCapability
 from infrastructure.platforms.exceptions import (
@@ -77,14 +77,14 @@ class PlatformService:
         _registry: Platform registry containing all providers
     """
 
-    def __init__(self, settings: Settings) -> None:
-        """Initialize platform service with settings.
+    def __init__(self, platforms_settings: PlatformsSettings) -> None:
+        """Initialize platform service with platforms settings.
 
         Args:
-            settings: Application settings from infrastructure.configuration
+            platforms_settings: Narrow platforms settings slice.
         """
 
-        self._settings = settings
+        self._settings = platforms_settings
         self._registry = get_platform_registry()  # Use global singleton
         self._logger = logger.bind(component="platform_service")
 
@@ -103,11 +103,11 @@ class PlatformService:
             >>> print(f"Loaded {len(providers)} providers")
         """
         # Create and register Slack provider if configured
-        if self._settings.platforms.slack.ENABLED:
+        if self._settings.slack.ENABLED:
             try:
                 slack_formatter = SlackBlockKitFormatter()
                 slack_provider = SlackPlatformProvider(
-                    settings=self._settings.platforms.slack,
+                    settings=self._settings.slack,
                     formatter=slack_formatter,
                 )
                 self._registry.register_provider(slack_provider)

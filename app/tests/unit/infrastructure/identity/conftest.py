@@ -10,13 +10,13 @@ from infrastructure.identity import (
     User,
     SlackUser,
 )
-from infrastructure.configuration import Settings
+from infrastructure.configuration.infrastructure.server import ServerSettings
 
 
 @pytest.fixture
 def mock_settings():
-    """Mock Settings instance for testing."""
-    return Mock(spec=Settings)
+    """Mock ServerSettings instance for testing."""
+    return Mock(spec=ServerSettings)
 
 
 @pytest.fixture
@@ -38,7 +38,7 @@ def identity_resolver(mock_slack_client_manager):
 def identity_service(mock_settings, mock_slack_client_manager):
     """Create IdentityService with mocked dependencies."""
     return IdentityService(
-        settings=mock_settings, slack_client_manager=mock_slack_client_manager
+        server_settings=mock_settings, slack_client_manager=mock_slack_client_manager
     )
 
 

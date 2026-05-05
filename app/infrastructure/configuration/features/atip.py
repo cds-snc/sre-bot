@@ -1,5 +1,7 @@
 """ATIP feature settings."""
 
+from functools import lru_cache
+
 from pydantic import Field
 
 from infrastructure.configuration.base import FeatureSettings
@@ -24,3 +26,9 @@ class AtipSettings(FeatureSettings):
     ATIP_ANNOUNCE_CHANNEL: str | None = Field(
         default=None, alias="ATIP_ANNOUNCE_CHANNEL"
     )
+
+
+@lru_cache(maxsize=1)
+def get_atip_settings() -> AtipSettings:
+    """Singleton provider for ATIP feature settings."""
+    return AtipSettings()

@@ -13,12 +13,12 @@ from infrastructure.i18n.resources import I18nResourceSpec
 from infrastructure.services import get_event_dispatcher, hookimpl
 from packages.access.common.events import REQUEST_APPROVED
 from packages.access.common.providers import get_access_runtime_config
-from packages.access.sync.transport import slack
+from packages.access.sync.interactions import slack
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
     get_access_sync_settings,
 )
-from packages.access.sync.transport.routes import router as access_sync_router
+from packages.access.sync.interactions.http import router as access_sync_router
 
 
 @hookimpl
@@ -39,10 +39,16 @@ def on_access_request_approved(event) -> None:
 def _register_request_handlers() -> None:
     """Register request-approved handler once during startup warmup."""
     dispatcher = get_event_dispatcher()
-    if on_access_request_approved not in dispatcher.get_handlers_for_event(
-        REQUEST_APPROVED
-    ):
-        dispatcher.register_handler(REQUEST_APPROVED)(on_access_request_approved)
+    if dispatcher.get_handler_count(REQUEST_APPROVED) == 0:
+        dispatcher.register_handler(REQUEST_APPROVED, on_access_request_approved)
+
+
+def _run_reconciliation_job() -> None:
+    """Run full-platform Access Sync reconciliation."""
+    coordinator = get_access_sync_coordinator()
+    runtime_config = get_access_runtime_config()
+    for platform in runtime_config.platforms:
+        coordinator.sync_platform(platform=platform, dry_run=False)
 
 
 @hookimpl
@@ -81,6 +87,20 @@ def startup_warmup(logger) -> None:
 def register_routes(app):
     """Register access sync HTTP routes under /api/v1."""
     app.include_router(access_sync_router, prefix="/api/v1")
+
+
+@hookimpl
+def register_background_job(registry) -> None:
+    """Register reconciliation schedule through the feature job registry."""
+    settings = get_access_sync_settings()
+    if not settings.enabled or not settings.reconciliation_enabled:
+        return
+
+    registry.register(
+        job_name="access_sync_reconciliation",
+        schedule=settings.reconciliation_schedule,
+        job=_run_reconciliation_job,
+    )
 
 
 @hookimpl

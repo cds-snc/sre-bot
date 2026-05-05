@@ -3,6 +3,7 @@
 Configuration for collaboration platform integrations (Slack, Teams, Discord).
 """
 
+from functools import lru_cache
 from typing import Optional
 
 from pydantic import Field, model_validator
@@ -276,3 +277,9 @@ class PlatformsSettings(InfrastructureSettings):
         default_factory=DiscordPlatformSettings,
         description="Discord platform provider settings",
     )
+
+
+@lru_cache(maxsize=1)
+def get_platforms_settings() -> PlatformsSettings:
+    """Singleton provider for platform provider infrastructure settings."""
+    return PlatformsSettings()

@@ -33,6 +33,21 @@ class PlatformPolicy:
 
 
 @dataclass(frozen=True)
+class CatalogParserConfig:
+    """Runtime configuration for a platform's catalog token parser."""
+
+    known_envs: List[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class CatalogExtensions:
+    """Typed runtime extensions for the catalog sub-feature."""
+
+    parsers: Dict[str, CatalogParserConfig] = field(default_factory=dict)
+    platform_display_names: Dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class EntitlementModeOverride:
     """Runtime per-group entitlement mode override record."""
 
@@ -54,8 +69,9 @@ class AccessRuntimeConfig:
     entitlement_mode_overrides: List[EntitlementModeOverride] = field(
         default_factory=list
     )
-    # Optional extension bag for package-specific read-only configuration.
+    # Typed extensions for catalog feature; empty dict when not present.
     extensions: Dict[str, Any] = field(default_factory=dict)
+    catalog_extensions: Optional[CatalogExtensions] = None
 
     def group_prefix(self, platform: str) -> str:
         """Return the IDP group slug prefix for a given platform."""
@@ -75,10 +91,9 @@ class AccessRuntimeConfig:
         )
 
     @property
-    def catalog(self) -> Optional[Any]:
-        """Return optional catalog extension configuration."""
-        value = self.extensions.get("catalog")
-        return value
+    def catalog(self) -> Optional[CatalogExtensions]:
+        """Return typed catalog extension configuration."""
+        return self.catalog_extensions
 
 
 # This file contains only runtime domain models loaded from an external config

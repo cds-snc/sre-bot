@@ -33,7 +33,7 @@ class TestEmailChannel:
             mock_gmail_next,
             raising=False,
         )
-        channel = EmailChannel(settings=mock_settings)
+        channel = EmailChannel(email_provider_settings=mock_settings)
         return channel
 
     def test_channel_name(self, email_channel):

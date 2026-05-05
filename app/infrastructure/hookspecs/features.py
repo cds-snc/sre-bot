@@ -7,17 +7,31 @@ Covers the full lifecycle of a feature package:
 """
 
 import pluggy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Protocol
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
     from structlog.stdlib import BoundLogger
+    from infrastructure.events.service import EventDispatcher
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
     from infrastructure.platforms.providers.teams import TeamsPlatformProvider
     from infrastructure.platforms.providers.discord import DiscordPlatformProvider
     from infrastructure.i18n.resources import I18nResourceRegistry
 
 hookspec = pluggy.HookspecMarker("sre_bot")
+
+
+class BackgroundJobRegistry(Protocol):
+    """Scheduler-agnostic registry for feature background jobs."""
+
+    def register(
+        self,
+        *,
+        job_name: str,
+        schedule: str,
+        job: Callable[[], None],
+    ) -> None:
+        """Register a recurring background job by name and schedule."""
 
 
 @hookspec
@@ -77,6 +91,18 @@ def startup_warmup(logger: "BoundLogger") -> None:
 
 
 @hookspec
+def register_background_job(registry: "BackgroundJobRegistry") -> None:
+    """Register recurring feature jobs through the scheduler boundary.
+
+    Called during scheduler initialization at startup. Implementations should
+    register deterministic recurring jobs when feature settings require them.
+
+    Args:
+        registry: Scheduler-agnostic registry adapter used to register jobs.
+    """
+
+
+@hookspec
 def register_i18n_resources(registry: "I18nResourceRegistry") -> None:
     """Register feature translation resource locations.
 
@@ -104,4 +130,15 @@ def register_i18n_resources(registry: "I18nResourceRegistry") -> None:
                     domain="geolocate",
                 )
             )
+    """
+
+
+@hookspec
+def register_event_handlers(dispatcher: "EventDispatcher") -> None:
+    """Register feature event handlers with the application dispatcher.
+
+    Called during feature integration after plugins are discovered.
+
+    Args:
+        dispatcher: The application-scoped event dispatcher.
     """

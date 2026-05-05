@@ -5,8 +5,8 @@ from typing import get_args, get_origin, get_type_hints
 
 import pytest
 
-from infrastructure.events import clear_handlers, get_handlers_for_event
 from infrastructure.operations import OperationResult
+from infrastructure.services import get_event_dispatcher
 from packages.access.common.events import SYNC_COMPLETED, SYNC_FAILED
 from packages.access.request.domain import AccessRequest, ApprovalDecision
 from packages.access.request.service import AccessRequestServicePort
@@ -19,19 +19,20 @@ def _reload_request_package():
 
 @pytest.mark.unit
 def test_request_package_import_has_no_event_registration_side_effects():
-    clear_handlers()
+    get_event_dispatcher.cache_clear()
 
     _reload_request_package()
+    dispatcher = get_event_dispatcher()
 
-    assert get_handlers_for_event(SYNC_COMPLETED) == []
-    assert get_handlers_for_event(SYNC_FAILED) == []
+    assert dispatcher.get_handler_count(SYNC_COMPLETED) == 0
+    assert dispatcher.get_handler_count(SYNC_FAILED) == 0
 
 
 @pytest.mark.unit
 def test_request_startup_warmup_registers_handlers_and_warms_runtime_config(
     monkeypatch,
 ):
-    clear_handlers()
+    get_event_dispatcher.cache_clear()
     request_pkg = _reload_request_package()
 
     runtime_config_called = False
@@ -74,8 +75,9 @@ def test_request_startup_warmup_registers_handlers_and_warms_runtime_config(
 
     assert runtime_config_called is True
     assert provider_warm_called is True
-    assert len(get_handlers_for_event(SYNC_COMPLETED)) == 1
-    assert len(get_handlers_for_event(SYNC_FAILED)) == 1
+    dispatcher = get_event_dispatcher()
+    assert dispatcher.get_handler_count(SYNC_COMPLETED) == 1
+    assert dispatcher.get_handler_count(SYNC_FAILED) == 1
 
 
 @pytest.mark.unit
@@ -93,15 +95,11 @@ def test_request_startup_warmup_registers_handlers_via_event_dispatcher(monkeypa
         def __init__(self) -> None:
             self._handlers: dict[str, list[object]] = {}
 
-        def get_handlers_for_event(self, event_type: str):
-            return self._handlers.get(event_type, [])
+        def get_handler_count(self, event_type: str) -> int:
+            return len(self._handlers.get(event_type, []))
 
-        def register_handler(self, event_type: str):
-            def _decorator(handler):
-                self._handlers.setdefault(event_type, []).append(handler)
-                return handler
-
-            return _decorator
+        def register_handler(self, event_type: str, handler) -> None:
+            self._handlers.setdefault(event_type, []).append(handler)
 
     dispatcher = _Dispatcher()
 
@@ -140,8 +138,8 @@ def test_request_startup_warmup_registers_handlers_via_event_dispatcher(monkeypa
         )()
     )
 
-    assert len(dispatcher.get_handlers_for_event(SYNC_COMPLETED)) == 1
-    assert len(dispatcher.get_handlers_for_event(SYNC_FAILED)) == 1
+    assert dispatcher.get_handler_count(SYNC_COMPLETED) == 1
+    assert dispatcher.get_handler_count(SYNC_FAILED) == 1
 
 
 @pytest.mark.unit

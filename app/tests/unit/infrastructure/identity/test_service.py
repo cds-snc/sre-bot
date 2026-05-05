@@ -11,14 +11,15 @@ class TestIdentityServiceInit:
     def test_init_with_resolver(self, mock_settings):
         """IdentityService accepts pre-configured resolver."""
         mock_resolver = Mock()
-        service = IdentityService(settings=mock_settings, resolver=mock_resolver)
+        service = IdentityService(server_settings=mock_settings, resolver=mock_resolver)
 
         assert service.resolver is mock_resolver
 
     def test_init_without_resolver(self, mock_settings, mock_slack_client_manager):
         """IdentityService creates resolver when not provided."""
         service = IdentityService(
-            settings=mock_settings, slack_client_manager=mock_slack_client_manager
+            server_settings=mock_settings,
+            slack_client_manager=mock_slack_client_manager,
         )
 
         assert service.resolver is not None
@@ -26,7 +27,7 @@ class TestIdentityServiceInit:
     def test_init_creates_resolver_with_default_slack_client(self, mock_settings):
         """IdentityService creates resolver with SlackClientManager when not provided."""
         # This tests that the service can initialize without any optional params
-        service = IdentityService(settings=mock_settings)
+        service = IdentityService(server_settings=mock_settings)
 
         assert service.resolver is not None
 

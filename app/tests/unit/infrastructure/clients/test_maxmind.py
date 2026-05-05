@@ -12,7 +12,7 @@ from infrastructure.operations import OperationStatus
 def mock_settings():
     """Create mock settings for MaxMind client."""
     settings = MagicMock()
-    settings.maxmind.MAXMIND_DB_PATH = "/path/to/GeoLite2-City.mmdb"
+    settings.MAXMIND_DB_PATH = "/path/to/GeoLite2-City.mmdb"
     return settings
 
 
@@ -34,7 +34,7 @@ def test_maxmind_client_success(mock_settings, monkeypatch):
 
     monkeypatch.setattr("geoip2.database.Reader", mock_reader_class)
 
-    client = MaxMindClient(settings=mock_settings)
+    client = MaxMindClient(maxmind_settings=mock_settings)
     result = client.geolocate(ip_address="8.8.8.8")
 
     assert result.is_success
@@ -57,7 +57,7 @@ def test_maxmind_client_not_found(mock_settings, monkeypatch):
 
     monkeypatch.setattr("geoip2.database.Reader", mock_reader_class)
 
-    client = MaxMindClient(settings=mock_settings)
+    client = MaxMindClient(maxmind_settings=mock_settings)
     result = client.geolocate(ip_address="192.168.1.1")
 
     assert result.status == OperationStatus.NOT_FOUND
@@ -75,7 +75,7 @@ def test_maxmind_client_invalid_ip(mock_settings, monkeypatch):
 
     monkeypatch.setattr("geoip2.database.Reader", mock_reader_class)
 
-    client = MaxMindClient(settings=mock_settings)
+    client = MaxMindClient(maxmind_settings=mock_settings)
     result = client.geolocate(ip_address="not-an-ip")
 
     assert result.status == OperationStatus.PERMANENT_ERROR
@@ -92,7 +92,7 @@ def test_maxmind_client_geoip2_error(mock_settings, monkeypatch):
 
     monkeypatch.setattr("geoip2.database.Reader", mock_reader_class)
 
-    client = MaxMindClient(settings=mock_settings)
+    client = MaxMindClient(maxmind_settings=mock_settings)
     result = client.geolocate(ip_address="8.8.8.8")
 
     assert result.status == OperationStatus.TRANSIENT_ERROR
@@ -106,7 +106,7 @@ def test_maxmind_client_db_file_error(mock_settings, monkeypatch):
     mock_reader_class = Mock(side_effect=FileNotFoundError("DB not found"))
     monkeypatch.setattr("geoip2.database.Reader", mock_reader_class)
 
-    client = MaxMindClient(settings=mock_settings)
+    client = MaxMindClient(maxmind_settings=mock_settings)
     result = client.geolocate(ip_address="8.8.8.8")
 
     assert result.status == OperationStatus.TRANSIENT_ERROR
@@ -131,7 +131,7 @@ def test_maxmind_client_healthcheck_success(mock_settings, monkeypatch):
 
     monkeypatch.setattr("geoip2.database.Reader", mock_reader_class)
 
-    client = MaxMindClient(settings=mock_settings)
+    client = MaxMindClient(maxmind_settings=mock_settings)
     result = client.healthcheck()
 
     assert result.is_success
@@ -145,7 +145,7 @@ def test_maxmind_client_healthcheck_failed(mock_settings, monkeypatch):
     mock_reader_class = Mock(side_effect=FileNotFoundError("DB not found"))
     monkeypatch.setattr("geoip2.database.Reader", mock_reader_class)
 
-    client = MaxMindClient(settings=mock_settings)
+    client = MaxMindClient(maxmind_settings=mock_settings)
     result = client.healthcheck()
 
     assert result.status == OperationStatus.PERMANENT_ERROR

@@ -1,17 +1,13 @@
 """Fixtures for idempotency integration tests."""
 
 import pytest
+from unittest.mock import MagicMock
+from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
 
 
 @pytest.fixture
-def mock_settings(make_mock_settings):
-    """Create mock settings for idempotency integration tests.
-
-    Uses the factory from root conftest to avoid duplication
-    across different test packages.
-    """
-    return make_mock_settings(
-        **{
-            "idempotency.IDEMPOTENCY_TTL_SECONDS": 3600,
-        }
-    )
+def mock_settings():
+    """Create mock IdempotencySettings for idempotency integration tests."""
+    mock = MagicMock(spec=IdempotencySettings)
+    mock.IDEMPOTENCY_TTL_SECONDS = 3600
+    return mock

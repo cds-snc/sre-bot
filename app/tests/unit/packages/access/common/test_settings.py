@@ -16,38 +16,6 @@ from packages.access.common.settings import (
     AccessSyncSettings,
 )
 
-# ---------------------------------------------------------------------------
-# Env isolation — strip all ACCESS_* vars before every test so a local .env
-# or CI environment cannot silently influence results.
-# ---------------------------------------------------------------------------
-_ACCESS_ENV_KEYS = [
-    "ACCESS_CONFIG_SOURCE",
-    "ACCESS_CONFIG_REF",
-    "ACCESS_CONFIG_REFRESH_SECONDS",
-    "ACCESS_SYNC_ENABLED",
-    "ACCESS_SYNC_RECONCILIATION_ENABLED",
-    "ACCESS_SYNC_RECONCILIATION_SCHEDULE",
-    "ACCESS_SYNC_JOB_TTL_SECONDS",
-    "ACCESS_SYNC_LOCK_STALE_SECONDS",
-    "ACCESS_REQUESTS_ENABLED",
-    "ACCESS_REQUESTS_MANAGER_GROUP_SLUG",
-    "ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG",
-    "ACCESS_REQUESTS_MIN_APPROVER_COUNT",
-    "ACCESS_REQUESTS_REQUEST_TTL_HOURS",
-    "ACCESS_CATALOG_ENABLED",
-    # Sub-model JSON vars
-    "ACCESS_CONFIG",
-    "ACCESS_SYNC",
-    "ACCESS_REQUESTS",
-    "ACCESS_CATALOG",
-]
-
-
-@pytest.fixture(autouse=True)
-def _access_env_isolation(monkeypatch: pytest.MonkeyPatch) -> None:
-    for key in _ACCESS_ENV_KEYS:
-        monkeypatch.delenv(key, raising=False)
-
 
 # ---------------------------------------------------------------------------
 # Sub-model plain BaseModel defaults (no env reads needed)

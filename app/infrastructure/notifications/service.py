@@ -1,6 +1,7 @@
 """Notification service for dependency injection.
 
 Provides a class-based interface to the notification system for easier DI and testing.
+Channel construction and circuit breaker wiring belong in providers.py (ADR-0076 S3).
 """
 
 from typing import Dict, List, Optional, TYPE_CHECKING
@@ -9,10 +10,8 @@ from infrastructure.notifications.dispatcher import NotificationDispatcher
 from infrastructure.notifications.models import Notification, NotificationResult
 
 if TYPE_CHECKING:
-    from infrastructure.configuration import Settings
     from infrastructure.notifications.channels.base import NotificationChannel
     from infrastructure.idempotency.service import IdempotencyService
-    from infrastructure.resilience.service import ResilienceService
 
 
 class NotificationService:
@@ -21,8 +20,9 @@ class NotificationService:
     Wraps the NotificationDispatcher with a service interface to support
     dependency injection and easier testing with mocks.
 
-    This is a thin facade - all actual work is delegated to the underlying
-    NotificationDispatcher instance.
+    Channel instances (ChatChannel, EmailChannel, SMSChannel) and circuit
+    breakers are constructed in providers.py and injected here via the
+    ``channels`` parameter (ADR-0076 S3 — composition root pattern).
 
     Usage:
         # Via dependency injection
@@ -36,79 +36,28 @@ class NotificationService:
             results = notification_service.send(notification)
             success_count = sum(1 for r in results if r.is_success)
             return {"sent": success_count, "total": len(results)}
-
-        # Direct instantiation
-        from infrastructure.services import get_settings
-        from infrastructure.notifications import NotificationService
-
-        settings = get_settings()
-        service = NotificationService(settings)
-        results = service.send(notification)
     """
 
     def __init__(
         self,
-        settings: "Settings",
-        channels: Optional[Dict[str, "NotificationChannel"]] = None,
-        dispatcher: Optional[NotificationDispatcher] = None,
+        channels: Dict[str, "NotificationChannel"],
         idempotency_service: Optional["IdempotencyService"] = None,
-        resilience_service: Optional["ResilienceService"] = None,
+        dispatcher: Optional[NotificationDispatcher] = None,
     ):
         """Initialize notification service.
 
         Args:
-            settings: Settings instance (required, passed from provider).
-            channels: Optional dict of channel name to NotificationChannel instances.
-                     If not provided, creates default channels based on settings.
-            dispatcher: Optional pre-configured NotificationDispatcher instance.
-                       If not provided, creates one with channels.
+            channels: Pre-built channel instances keyed by channel name.
+                      Constructed and wired by providers.py.
             idempotency_service: Optional IdempotencyService for preventing duplicates.
-            resilience_service: Optional ResilienceService for circuit breakers.
+            dispatcher: Optional pre-configured NotificationDispatcher instance.
+                       If not provided, one is created from ``channels``.
         """
         if dispatcher is None:
-            # Create default channels if not provided
-            if channels is None:
-                # Import here to avoid circular dependency at module level
-                from infrastructure.notifications.channels.email import EmailChannel
-                from infrastructure.notifications.channels.sms import SMSChannel
-                from infrastructure.notifications.channels.chat import ChatChannel
-
-                # Get circuit breakers from resilience service if available
-                email_cb = None
-                sms_cb = None
-                chat_cb = None
-
-                if resilience_service is not None:
-                    email_cb = resilience_service.get_or_create_circuit_breaker(
-                        "notification_email", failure_threshold=3, timeout_seconds=60
-                    )
-                    sms_cb = resilience_service.get_or_create_circuit_breaker(
-                        "notification_sms", failure_threshold=3, timeout_seconds=60
-                    )
-                    chat_cb = resilience_service.get_or_create_circuit_breaker(
-                        "notification_chat", failure_threshold=3, timeout_seconds=60
-                    )
-
-                channels = {
-                    "email": EmailChannel(
-                        settings=settings,
-                        circuit_breaker=email_cb,
-                    ),
-                    "sms": SMSChannel(
-                        settings=settings,
-                        circuit_breaker=sms_cb,
-                    ),
-                    "chat": ChatChannel(
-                        circuit_breaker=chat_cb,
-                    ),
-                }
-
-            # Get idempotency cache from service if available
             idempotency_cache = None
             if idempotency_service is not None:
                 idempotency_cache = idempotency_service.cache
 
-            # Create dispatcher with channels
             dispatcher = NotificationDispatcher(
                 channels=channels,
                 fallback_order=["chat", "email", "sms"],
@@ -117,7 +66,6 @@ class NotificationService:
             )
 
         self._dispatcher = dispatcher
-        self._settings = settings
 
     def send(self, notification: Notification) -> List[NotificationResult]:
         """Send notification through appropriate channels.

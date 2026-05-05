@@ -1,5 +1,7 @@
 """Incident feature settings."""
 
+from functools import lru_cache
+
 from pydantic import Field
 
 from infrastructure.configuration.base import FeatureSettings
@@ -27,3 +29,9 @@ class IncidentFeatureSettings(FeatureSettings):
     SLACK_SECURITY_USER_GROUP_ID: str | None = Field(
         default=None, alias="SLACK_SECURITY_USER_GROUP_ID"
     )
+
+
+@lru_cache(maxsize=1)
+def get_incident_settings() -> IncidentFeatureSettings:
+    """Singleton provider for incident feature settings."""
+    return IncidentFeatureSettings()

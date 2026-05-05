@@ -11,11 +11,11 @@ from infrastructure.notifications.models import (
     Recipient,
 )
 from infrastructure.operations import OperationResult
-from infrastructure.resilience.circuit_breaker import CircuitBreaker
 from integrations.notify.client import post_event, create_authorization_header
 
 if TYPE_CHECKING:
-    from infrastructure.configuration import Settings
+    from infrastructure.configuration.integrations.notify import NotifySettings
+    from infrastructure.resilience.circuit_breaker import CircuitBreaker
 
 logger = structlog.get_logger()
 
@@ -29,25 +29,18 @@ class SMSChannel(NotificationChannel):
 
     def __init__(
         self,
-        settings: "Settings",
+        notify_settings: "NotifySettings",
         circuit_breaker: Optional["CircuitBreaker"] = None,
     ):
         """Initialize GC Notify SMS channel.
 
         Args:
-            settings: Settings instance with notify configuration.
+            notify_settings: Narrow Notify settings slice.
             circuit_breaker: Optional circuit breaker for fault tolerance.
-                           If not provided, creates a default one.
+                           Injected by providers.py; pass None to disable circuit breaking.
         """
-        if circuit_breaker is None:
-            circuit_breaker = CircuitBreaker(
-                name="gc_notify_sms_channel",
-                failure_threshold=5,
-                timeout_seconds=60,
-            )
-
         self._circuit_breaker = circuit_breaker
-        self._api_url = settings.notify.NOTIFY_API_URL
+        self._api_url = notify_settings.NOTIFY_API_URL
         self.log = logger.bind(component="sms_channel")
         self.log.info("initialized_sms_channel", backend="gc_notify")
 
@@ -84,13 +77,20 @@ class SMSChannel(NotificationChannel):
 
             phone_number = resolve_result.data.get("phone_number")
 
-            # Send SMS via circuit breaker
-            send_result = self._circuit_breaker.call(
-                self._send_sms,
-                phone_number=phone_number,
-                message=notification.message,
-                subject=notification.subject,
-            )
+            # Send SMS via circuit breaker (if injected) or directly
+            if self._circuit_breaker is not None:
+                send_result = self._circuit_breaker.call(
+                    self._send_sms,
+                    phone_number=phone_number,
+                    message=notification.message,
+                    subject=notification.subject,
+                )
+            else:
+                send_result = self._send_sms(
+                    phone_number=phone_number,
+                    message=notification.message,
+                    subject=notification.subject,
+                )
 
             if send_result.is_success:
                 results.append(

@@ -53,7 +53,6 @@ test-new:
 test-legacy:
 	python3 -m coverage run -m pytest \
 		tests/api \
-		tests/core \
 		tests/modules \
 		tests/integrations \
 		tests/utils \

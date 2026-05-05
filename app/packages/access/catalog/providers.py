@@ -30,23 +30,21 @@ def get_catalog_settings() -> AccessCatalogSettings:
 def _build_parser_map() -> Dict[str, CatalogSlugParser]:
     """Build the platform key → parser mapping from runtime config.
 
-    Parser config (``known_envs``) is read from the ``catalog`` extension
-    block in the Access Sync runtime config JSON when present.  Platforms
-    without parser config fall back to ``FallbackCatalogSlugParser``.
+    Parser config (``known_envs``) is read from the typed ``catalog_extensions``
+    in the Access runtime config when present.  Platforms without parser config
+    fall back to ``FallbackCatalogSlugParser``.
     """
     runtime_config = get_access_runtime_config()
-    catalog_ext = getattr(runtime_config, "catalog", None)
     parsers: Dict[str, CatalogSlugParser] = {}
 
     for platform_key in runtime_config.platforms:
-        parser_config = None
-        if catalog_ext and hasattr(catalog_ext, "parsers"):
-            parser_config = getattr(catalog_ext.parsers, platform_key, None)
+        known_envs = set()
+        if runtime_config.catalog_extensions:
+            parser_config = runtime_config.catalog_extensions.parsers.get(platform_key)
+            if parser_config:
+                known_envs = set(parser_config.known_envs)
 
         if platform_key == "aws":
-            known_envs = set()
-            if parser_config and hasattr(parser_config, "known_envs"):
-                known_envs = set(parser_config.known_envs)
             parsers[platform_key] = AwsCatalogSlugParser(known_envs=known_envs)
         else:
             parsers[platform_key] = FallbackCatalogSlugParser()
@@ -59,20 +57,18 @@ def get_catalog_service() -> CatalogService:
     """Return the singleton CatalogService.
 
     Wires together:
-    - AccessSyncRuntimeConfig (platform policy and group naming).
+    - AccessRuntimeConfig (platform policy and group naming).
     - DirectoryProvider (IDP group discovery and membership checks).
     - Parser map (token decomposition per platform).
-    - Display names from catalog extension config (optional).
+    - Display names from typed catalog extensions (optional).
     """
     runtime_config = get_access_runtime_config()
     directory = get_directory_provider()
     parser_map = _build_parser_map()
 
     display_names: Dict[str, str] = {}
-    catalog_ext = getattr(runtime_config, "catalog", None)
-    if catalog_ext and hasattr(catalog_ext, "platform_display_names"):
-        raw = getattr(catalog_ext, "platform_display_names", {})
-        display_names = dict(raw) if raw else {}
+    if runtime_config.catalog_extensions:
+        display_names = dict(runtime_config.catalog_extensions.platform_display_names)
 
     return CatalogService(
         runtime_config=runtime_config,

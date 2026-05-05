@@ -1,4 +1,4 @@
-"""Unit tests for AccessSyncCoordinator.
+"""Unit tests for AccessSyncApplicationService.
 
 Covers:
   F-01  sync_user returns OperationResult[SyncOutcome]
@@ -19,7 +19,7 @@ from infrastructure.directory.models import (
 )
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig, PlatformPolicy
-from packages.access.sync.application import AccessSyncCoordinator
+from packages.access.sync.application import AccessSyncApplicationService
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
 from packages.access.sync.domain import (
     AdapterAssessment,
@@ -354,7 +354,7 @@ def make_coordinator(
         user_group_slugs=user_group_slugs,
     )
     directory_provider: Any = directory
-    coordinator = AccessSyncCoordinator(
+    coordinator = AccessSyncApplicationService(
         adapters={platform: adapter},
         config=config,
         membership_builder=DirectoryMembershipBuilder(directory_provider),
@@ -426,7 +426,7 @@ def test_sync_user_adapter_not_found():
         platforms={"aws": PlatformPolicy()},
     )
     directory_provider: Any = FakeDirectory()
-    coordinator = AccessSyncCoordinator(
+    coordinator = AccessSyncApplicationService(
         adapters={},
         config=config,
         membership_builder=DirectoryMembershipBuilder(directory_provider),

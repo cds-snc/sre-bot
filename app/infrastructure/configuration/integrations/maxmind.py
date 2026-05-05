@@ -1,5 +1,7 @@
 """MaxMind integration settings."""
 
+from functools import lru_cache
+
 from pydantic import Field
 
 from infrastructure.configuration.base import IntegrationSettings
@@ -24,3 +26,9 @@ class MaxMindSettings(IntegrationSettings):
     MAXMIND_DB_PATH: str = Field(
         default="./geodb/GeoLite2-City.mmdb", alias="MAXMIND_DB_PATH"
     )
+
+
+@lru_cache(maxsize=1)
+def get_maxmind_settings() -> MaxMindSettings:
+    """Singleton provider for MaxMind integration settings."""
+    return MaxMindSettings()

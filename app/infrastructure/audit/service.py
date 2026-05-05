@@ -5,13 +5,15 @@ Delegates all I/O to ``StorageService`` — no direct boto3 or dynamodb_next cal
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 import structlog
 
 from infrastructure.audit.models import AuditEvent
 from infrastructure.operations.result import OperationResult
-from infrastructure.storage.service import StorageService
+
+if TYPE_CHECKING:
+    from infrastructure.storage.protocol import StorageService
 
 logger = structlog.get_logger(__name__)
 
@@ -39,7 +41,7 @@ class AuditTrailService:
             return {"written": success}
     """
 
-    def __init__(self, storage: StorageService) -> None:
+    def __init__(self, storage: "StorageService") -> None:
         self._storage = storage
         logger.info("initialized_audit_trail_service")
 

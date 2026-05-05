@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 import structlog
 from infrastructure.idempotency.cache import IdempotencyCache
-from infrastructure.configuration import Settings
+from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
 from integrations.aws.dynamodb_next import get_item, put_item, delete_item, scan
 
 logger = structlog.get_logger().bind(component="idempotency.dynamodb")
@@ -26,21 +26,23 @@ class DynamoDBCache(IdempotencyCache):
     Suitable for multi-instance deployments where cache must be shared across all ECS tasks.
     """
 
-    def __init__(self, settings: Settings, table_name: str = IDEMPOTENCY_TABLE):
+    def __init__(
+        self,
+        idempotency_settings: IdempotencySettings,
+        table_name: str = IDEMPOTENCY_TABLE,
+    ):
         """Initialize DynamoDB cache.
 
         Args:
-            settings: Settings instance (required for dependency injection).
+            idempotency_settings: Narrow idempotency settings slice.
             table_name: DynamoDB table name (default: sre_bot_idempotency).
         """
         self.table_name = table_name
-        self.ttl_seconds = settings.idempotency.IDEMPOTENCY_TTL_SECONDS
+        self.ttl_seconds = idempotency_settings.IDEMPOTENCY_TTL_SECONDS
         self.log = logger.bind(table_name=table_name)
-        log = self.log.bind(
-            ttl_seconds=self.ttl_seconds,
-            region=settings.aws.AWS_REGION,
+        self.log.bind(ttl_seconds=self.ttl_seconds).info(
+            "initialized_dynamodb_idempotency_cache"
         )
-        log.info("initialized_dynamodb_idempotency_cache")
 
     def get(self, key: str) -> Optional[Dict[str, Any]]:
         """Get cached response for idempotency key.

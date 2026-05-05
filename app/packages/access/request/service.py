@@ -57,7 +57,7 @@ class AccessRequestServicePort(Protocol):
     """Structural contract for the access request service.
 
     Route handlers and test stubs depend on this Protocol rather than the
-    concrete class, mirroring the ``AccessSyncCoordinatorPort`` pattern.
+    concrete class, mirroring the ``AccessSyncApplicationServicePort`` pattern.
     """
 
     def submit_request(
