@@ -4,7 +4,7 @@ import importlib
 
 import pytest
 
-from infrastructure.events import clear_handlers, get_handlers_for_event
+from infrastructure.services import get_event_dispatcher
 from packages.access.common.events import REQUEST_APPROVED
 
 
@@ -15,16 +15,17 @@ def _reload_sync_package():
 
 @pytest.mark.unit
 def test_sync_package_import_has_no_event_registration_side_effects():
-    clear_handlers()
+    get_event_dispatcher.cache_clear()
 
     _reload_sync_package()
+    dispatcher = get_event_dispatcher()
 
-    assert get_handlers_for_event(REQUEST_APPROVED) == []
+    assert dispatcher.get_handler_count(REQUEST_APPROVED) == 0
 
 
 @pytest.mark.unit
 def test_sync_startup_warmup_registers_handlers_and_warms_runtime_config(monkeypatch):
-    clear_handlers()
+    get_event_dispatcher.cache_clear()
     sync_pkg = _reload_sync_package()
 
     runtime_config_called = False
@@ -65,7 +66,8 @@ def test_sync_startup_warmup_registers_handlers_and_warms_runtime_config(monkeyp
 
     assert runtime_config_called is True
     assert provider_warm_called is True
-    assert len(get_handlers_for_event(REQUEST_APPROVED)) == 1
+    dispatcher = get_event_dispatcher()
+    assert dispatcher.get_handler_count(REQUEST_APPROVED) == 1
 
 
 @pytest.mark.unit
@@ -81,15 +83,11 @@ def test_sync_startup_warmup_registers_handlers_via_event_dispatcher(monkeypatch
         def __init__(self) -> None:
             self._handlers: dict[str, list[object]] = {}
 
-        def get_handlers_for_event(self, event_type: str):
-            return self._handlers.get(event_type, [])
+        def get_handler_count(self, event_type: str) -> int:
+            return len(self._handlers.get(event_type, []))
 
-        def register_handler(self, event_type: str):
-            def _decorator(handler):
-                self._handlers.setdefault(event_type, []).append(handler)
-                return handler
-
-            return _decorator
+        def register_handler(self, event_type: str, handler) -> None:
+            self._handlers.setdefault(event_type, []).append(handler)
 
     dispatcher = _Dispatcher()
 
@@ -128,7 +126,7 @@ def test_sync_startup_warmup_registers_handlers_via_event_dispatcher(monkeypatch
         )()
     )
 
-    assert len(dispatcher.get_handlers_for_event(REQUEST_APPROVED)) == 1
+    assert dispatcher.get_handler_count(REQUEST_APPROVED) == 1
 
 
 @pytest.mark.unit
@@ -160,3 +158,65 @@ def test_sync_startup_warmup_raises_when_enabled_runtime_config_is_invalid(monke
                 },
             )()
         )
+
+
+@pytest.mark.unit
+def test_sync_register_background_job_registers_reconciliation_when_enabled(
+    monkeypatch,
+) -> None:
+    sync_pkg = _reload_sync_package()
+
+    class _Settings:
+        enabled = True
+        reconciliation_enabled = True
+        reconciliation_schedule = "03:30"
+
+    registrations: list[dict[str, object]] = []
+
+    class _BackgroundJobRegistry:
+        def register(self, *, job_name: str, schedule: str, job) -> None:
+            registrations.append(
+                {"job_name": job_name, "schedule": schedule, "job": job}
+            )
+
+    monkeypatch.setattr(sync_pkg, "get_access_sync_settings", lambda: _Settings())
+
+    sync_pkg.register_background_job(registry=_BackgroundJobRegistry())
+
+    assert len(registrations) == 1
+    assert registrations[0]["job_name"] == "access_sync_reconciliation"
+    assert registrations[0]["schedule"] == "03:30"
+    assert callable(registrations[0]["job"])
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("enabled", "reconciliation_enabled"),
+    [(False, True), (True, False), (False, False)],
+)
+def test_sync_register_background_job_skips_registration_when_disabled(
+    monkeypatch,
+    enabled: bool,
+    reconciliation_enabled: bool,
+) -> None:
+    sync_pkg = _reload_sync_package()
+
+    class _Settings:
+        reconciliation_schedule = "03:30"
+
+    _Settings.enabled = enabled
+    _Settings.reconciliation_enabled = reconciliation_enabled
+
+    registrations: list[dict[str, object]] = []
+
+    class _BackgroundJobRegistry:
+        def register(self, *, job_name: str, schedule: str, job) -> None:
+            registrations.append(
+                {"job_name": job_name, "schedule": schedule, "job": job}
+            )
+
+    monkeypatch.setattr(sync_pkg, "get_access_sync_settings", lambda: _Settings())
+
+    sync_pkg.register_background_job(registry=_BackgroundJobRegistry())
+
+    assert registrations == []

@@ -6,7 +6,7 @@ model: [GPT-5.3-Codex (copilot), Claude Sonnet 4.6 (copilot)]
 handoffs:
   - label: Create Failing Tests
     agent: tests-creation
-    prompt: Implement failing tests only from this feature architecture packet and coding conventions.
+    prompt: Create failing behavior tests only from this feature architecture packet and coding conventions; do not create tests for packet text, sprint labels, or planning artifacts.
     send: false
   - label: Start Implementation
     agent: implementation

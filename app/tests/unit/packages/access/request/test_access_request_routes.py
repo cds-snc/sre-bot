@@ -1,4 +1,4 @@
-"""Unit tests for packages.access.request.transport.routes.
+"""Unit tests for packages.access.request.interactions.http.
 
 Tests invoke route handlers directly with fakes to validate HTTP mapping and
 response-shape behavior at the transport boundary.
@@ -10,6 +10,7 @@ from typing import Optional
 import pytest
 from fastapi import FastAPI
 from fastapi import HTTPException
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from infrastructure.identity.models import IdentitySource, User
@@ -21,11 +22,22 @@ from packages.access.request.providers import (
     get_access_request_settings,
 )
 from packages.access.request.schemas import ApproveRequestBody, SubmitAccessRequestBody
-from packages.access.request.transport.routes import (
+from packages.access.request.interactions.http import (
     approve_request,
     router,
     submit_request,
 )
+
+
+def _get_route(path: str, method: str) -> APIRoute:
+    for route in router.routes:
+        if (
+            isinstance(route, APIRoute)
+            and route.path == path
+            and method in route.methods
+        ):
+            return route
+    raise AssertionError(f"Route {method} {path} not found")
 
 
 class _FakeSettings:
@@ -191,3 +203,42 @@ def test_submit_request_returns_503_without_service_dependency_assembly() -> Non
     assert response.status_code == 503
     assert response.json()["detail"] == "Access Requests feature is disabled."
     assert service_provider_called is False
+
+
+@pytest.mark.unit
+def test_access_request_routes_expose_explicit_openapi_metadata() -> None:
+    mutation_expected_codes = {403, 404, 409, 503}
+    cases = [
+        ("/access/requests/{request_id}/approve", "POST", 200, mutation_expected_codes),
+        ("/access/requests/{request_id}/reject", "POST", 200, mutation_expected_codes),
+        ("/access/requests/{request_id}/cancel", "POST", 200, mutation_expected_codes),
+        ("/access/requests/{request_id}/retry", "POST", 200, mutation_expected_codes),
+        ("/access/requests/{request_id}", "GET", 200, {404, 503}),
+    ]
+
+    for path, method, expected_status, expected_non_2xx_codes in cases:
+        route = _get_route(path, method)
+
+        assert route.summary
+        assert route.description
+        assert route.status_code == expected_status
+
+        documented_codes = {int(code) for code in route.responses}
+        assert expected_non_2xx_codes.issubset(documented_codes)
+
+
+@pytest.mark.unit
+def test_request_status_openapi_schema_documents_decisions_invariant() -> None:
+    app = FastAPI()
+    app.include_router(router)
+
+    openapi = app.openapi()
+    status_schema = openapi["components"]["schemas"]["AccessRequestStatusResponse"]
+    decisions_schema = status_schema["properties"]["decisions"]
+
+    description = decisions_schema.get("description")
+    assert description
+    description_lower = description.lower()
+    assert "cancel" in description_lower
+    assert "retry" in description_lower
+    assert "empty" in description_lower

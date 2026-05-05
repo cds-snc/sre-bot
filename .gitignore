@@ -223,3 +223,7 @@ geodb
 
 
 credentials.json
+
+# Local scratch and temporary working notes
+tmp/
+tmp.json

@@ -1,6 +1,6 @@
 ---
 name: tests-creation
-description: Fast tests-only mode. Use to create or update failing tests from approved feature architecture; do not implement feature code.
+description: Fast tests-only mode. Use to create or update failing behavior tests from approved feature architecture; do not implement feature code and do not author tests for planning artifacts.
 tools: [search, read/readFile, edit/editFiles, execute/getTerminalOutput, execute/runInTerminal]
 model: Auto (copilot)
 handoffs:
@@ -31,6 +31,7 @@ Hard constraints:
 
 - Do not edit non-test files except for essential test fixtures/fakes under test scope.
 - Do not implement feature behavior in production modules.
+- Do not author tests that validate architecture packet wording, sprint labels, or documentation metadata.
 - Keep assertions behavior-focused and deterministic.
 - Follow dependency override and fake patterns where possible.
 - Respect the smoke test policy (do not run app/tests/smoke unless explicitly requested).
