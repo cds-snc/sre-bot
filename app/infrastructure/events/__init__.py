@@ -1,66 +1,13 @@
-"""Infrastructure event system - centralized event dispatcher.
+"""Infrastructure event system facade.
 
-The event system provides a lightweight, in-process event dispatcher
-for audit trails, notifications, and cross-module communication.
-
-Usage:
-
-    from infrastructure.events import Event, register_event_handler, dispatch_event
-
-    # Define a handler
-    @register_event_handler("group.member.added")
-    def handle_member_added(event: Event) -> None:
-        # Process the event
-        pass
-
-    # Dispatch an event
-    event = Event(
-        event_type="group.member.added",
-        user_email="user@example.com",
-        metadata={"group_id": "123", "member": "newmember@example.com"}
-    )
-    dispatch_event(event)
-
-    # Or dispatch in background
-    from infrastructure.events import dispatch_background
-    dispatch_background(event)
+The event system provides error-isolated, in-process dispatch for
+cross-feature communication.
 """
 
-from infrastructure.events.bootstrap import register_infrastructure_handlers
-from infrastructure.events.dispatcher import (
-    dispatch_background,
-    dispatch_event,
-    get_handlers_for_event,
-    get_registered_events,
-    register_event_handler,
-    shutdown_event_executor,
-    start_event_executor,
-    clear_handlers,
-)
-from infrastructure.events.discovery import (
-    discover_and_register_handlers,
-    get_registered_handlers_by_event_type,
-    log_registered_handlers,
-)
 from infrastructure.events.models import Event
-from infrastructure.events.registry import EventHandlerRegistry, get_event_registry
 from infrastructure.events.service import EventDispatcher
 
 __all__ = [
     "Event",
     "EventDispatcher",
-    "EventHandlerRegistry",
-    "dispatch_event",
-    "dispatch_background",
-    "register_event_handler",
-    "get_registered_events",
-    "get_handlers_for_event",
-    "start_event_executor",
-    "shutdown_event_executor",
-    "discover_and_register_handlers",
-    "get_registered_handlers_by_event_type",
-    "log_registered_handlers",
-    "register_infrastructure_handlers",
-    "get_event_registry",
-    "clear_handlers",
 ]
