@@ -3,7 +3,6 @@ import logging
 from typing import Any, Optional
 import pytest
 
-
 # Ensure project root is on path BEFORE importing test factories.
 project_root = "/workspace/app"
 if project_root not in sys.path:
@@ -20,11 +19,6 @@ from tests.factories.aws import (  # noqa: E402
     make_aws_groups_memberships,
     make_aws_groups_w_users,
     make_aws_groups_w_users_with_legacy,
-)
-from tests.factories.commands import (  # noqa: E402
-    make_argument,
-    make_command,
-    make_command_context,
 )
 
 # Ensure the application package root is on sys.path so importing application
@@ -86,137 +80,6 @@ def suppress_structlog_output():
 
     # Restore original level after test
     root_logger.setLevel(original_level)
-
-
-@pytest.fixture
-def reset_provider_registries(monkeypatch):
-    """Reset provider registries to clean state between tests.
-
-    Use this fixture when tests manipulate provider registration to ensure
-    isolation. Not autouse to avoid overhead for tests that don't need it.
-    """
-    import modules.groups.providers as providers
-
-    baseline_primary_discovered = dict(providers._primary_discovered)
-    baseline_primary_active = providers._primary_active
-    baseline_secondary_discovered = dict(providers._secondary_discovered)
-    baseline_secondary_active = dict(providers._secondary_active)
-
-    try:
-        yield
-    finally:
-        providers._primary_discovered.clear()
-        providers._primary_discovered.update(baseline_primary_discovered)
-        providers._primary_active = baseline_primary_active
-        providers._secondary_discovered.clear()
-        providers._secondary_discovered.update(baseline_secondary_discovered)
-        providers._secondary_active.clear()
-        providers._secondary_active.update(baseline_secondary_active)
-
-
-@pytest.fixture
-def mock_provider_config():
-    """Factory for creating provider configuration dictionaries.
-
-    Returns a function that generates provider config dicts with
-    sensible defaults for testing configuration-driven activation.
-
-    Usage:
-        config = mock_provider_config(
-            provider_name="google",
-            enabled=True,
-            primary=True,
-            prefix="g",
-            capabilities={"supports_member_management": True}
-        )
-    """
-
-    def _factory(
-        provider_name: str,
-        enabled: bool = True,
-        primary: bool = False,
-        prefix: Optional[str] = None,
-        capabilities: Optional[dict] = None,
-    ) -> dict:
-        config: dict[str, Any] = {"enabled": enabled}
-
-        if primary:
-            config["primary"] = True
-
-        if prefix:
-            config["prefix"] = prefix
-
-        if capabilities:
-            config["capabilities"] = capabilities
-
-        return {provider_name: config}
-
-    return _factory
-
-
-@pytest.fixture
-def single_provider_config(mock_provider_config):
-    """Provider configuration with single enabled primary provider.
-
-    Returns:
-        dict: Configuration for a single Google Workspace provider
-    """
-    return mock_provider_config(
-        provider_name="google",
-        enabled=True,
-        primary=True,
-        capabilities={"supports_member_management": True, "provides_role_info": True},
-    )
-
-
-@pytest.fixture
-def multi_provider_config(mock_provider_config):
-    """Provider configuration with multiple enabled providers.
-
-    Returns:
-        dict: Configuration for Google (primary) and AWS (secondary) providers
-    """
-    google_cfg = mock_provider_config(
-        provider_name="google",
-        enabled=True,
-        primary=True,
-        capabilities={"supports_member_management": True, "provides_role_info": True},
-    )
-
-    aws_cfg = mock_provider_config(
-        provider_name="aws",
-        enabled=True,
-        primary=False,
-        prefix="aws",
-        capabilities={
-            "supports_member_management": True,
-            "supports_batch_operations": True,
-            "max_batch_size": 100,
-        },
-    )
-
-    # Merge both configs
-    config = {**google_cfg, **aws_cfg}
-    return config
-
-
-@pytest.fixture
-def disabled_provider_config(mock_provider_config):
-    """Provider configuration with one enabled and one disabled provider.
-
-    Returns:
-        dict: Configuration with Google enabled (primary) and AWS disabled
-    """
-    google_cfg = mock_provider_config(
-        provider_name="google", enabled=True, primary=True
-    )
-
-    aws_cfg = mock_provider_config(
-        provider_name="aws", enabled=False, prefix="aws"  # Explicitly disabled
-    )
-
-    config = {**google_cfg, **aws_cfg}
-    return config
 
 
 # Google API Python Client
@@ -503,38 +366,6 @@ def aws_groups_w_users_with_legacy():
         )
 
     return _wrapper
-
-
-# --- Command Framework Factories (Level 1 fixtures) ---
-
-
-@pytest.fixture
-def argument_factory():
-    """Factory for creating Argument instances."""
-    return make_argument
-
-
-@pytest.fixture
-def command_factory():
-    """Factory for creating Command instances."""
-    return make_command
-
-
-@pytest.fixture
-def command_context_factory():
-    """Factory for creating CommandContext instances."""
-    return make_command_context
-
-
-@pytest.fixture
-def command_registry_factory():
-    """Factory for creating CommandRegistry instances."""
-    from infrastructure.commands.registry import CommandRegistry
-
-    def _factory(namespace: str = "test") -> CommandRegistry:
-        return CommandRegistry(namespace=namespace)
-
-    return _factory
 
 
 # --- Settings Mock Factory (Level 1 - for all tests) ---

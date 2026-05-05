@@ -21,8 +21,6 @@ from infrastructure.configuration.integrations import (
     get_trello_settings,
 )
 from infrastructure.configuration.features import (
-    get_groups_settings,
-    get_commands_settings,
     get_incident_settings,
     get_aws_feature_settings,
     get_atip_settings,
@@ -51,8 +49,6 @@ def clear_all_caches():
     get_opsgenie_settings.cache_clear()
     get_sentinel_settings.cache_clear()
     get_trello_settings.cache_clear()
-    get_groups_settings.cache_clear()
-    get_commands_settings.cache_clear()
     get_incident_settings.cache_clear()
     get_aws_feature_settings.cache_clear()
     get_atip_settings.cache_clear()
@@ -74,8 +70,6 @@ def clear_all_caches():
     get_opsgenie_settings.cache_clear()
     get_sentinel_settings.cache_clear()
     get_trello_settings.cache_clear()
-    get_groups_settings.cache_clear()
-    get_commands_settings.cache_clear()
     get_incident_settings.cache_clear()
     get_aws_feature_settings.cache_clear()
     get_atip_settings.cache_clear()
@@ -118,12 +112,6 @@ class TestSettingsDelegation:
 
     def test_settings_trello_is_singleton(self):
         assert Settings().trello is get_trello_settings()
-
-    def test_settings_groups_is_singleton(self):
-        assert Settings().groups is get_groups_settings()
-
-    def test_settings_commands_is_singleton(self):
-        assert Settings().commands is get_commands_settings()
 
     def test_settings_feat_incident_is_singleton(self):
         assert Settings().feat_incident is get_incident_settings()
