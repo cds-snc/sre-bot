@@ -85,6 +85,8 @@ Services that abstract over backing services and are consumed by feature package
 - Feature packages depend on the service and would need to change if the backing service changed.
 - The service has at least one plausible alternative implementation (even if not currently built).
 
+**Single-provider rule:** Category A core services must expose a provider-agnostic contract at the feature boundary, but they may ship with a single default implementation for the current operating environment. Additional provider implementations are added only when justified by a concrete business or operational need; speculative parity implementations are out of scope.
+
 **Delegation tier declaration (ADR-0045 P7):** Each Category A service must document which delegation tier its current implementation uses. The delegation tiers are:
 
 - **Tier 1 — Managed cloud service:** The implementation wraps a managed service SDK (e.g., DynamoDB, SQS, Google Workspace API). This is the preferred tier.
