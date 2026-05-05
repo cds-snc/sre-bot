@@ -274,7 +274,6 @@ def classify_integration_error(exc: Exception) -> OperationResult:
         retry_after (if applicable)
 
     Example:
-        from modules.groups.domain.errors import IntegrationError
         from infrastructure.operations.classifiers import classify_integration_error
 
         try:

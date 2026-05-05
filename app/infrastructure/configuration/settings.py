@@ -28,14 +28,10 @@ from infrastructure.configuration.integrations import (
 
 # Feature settings
 from infrastructure.configuration.features import (
-    GroupsFeatureSettings,
-    CommandsSettings,
     IncidentFeatureSettings,
     AWSFeatureSettings,
     AtipSettings,
     SreOpsSettings,
-    get_groups_settings,
-    get_commands_settings,
     get_incident_settings,
     get_aws_feature_settings,
     get_atip_settings,
@@ -119,8 +115,6 @@ class Settings(BaseSettings):
     google_resources: GoogleResourcesConfig
 
     # Feature settings
-    groups: GroupsFeatureSettings
-    commands: CommandsSettings
     feat_incident: IncidentFeatureSettings
     aws_feature: AWSFeatureSettings
     atip: AtipSettings
@@ -165,8 +159,6 @@ class Settings(BaseSettings):
             "trello": get_trello_settings,
             "google_resources": get_google_resources_config,
             # Features
-            "groups": get_groups_settings,
-            "commands": get_commands_settings,
             "feat_incident": get_incident_settings,
             "aws_feature": get_aws_feature_settings,
             "atip": get_atip_settings,

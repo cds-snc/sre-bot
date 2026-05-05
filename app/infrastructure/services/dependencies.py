@@ -19,7 +19,6 @@ from infrastructure.i18n.service import TranslationService
 from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
-from infrastructure.commands.service import CommandService
 from infrastructure.storage.protocol import StorageService
 from infrastructure.audit.service import AuditTrailService
 from infrastructure.platforms.service import PlatformService
@@ -42,7 +41,6 @@ from infrastructure.services.providers import (
     get_idempotency_service,
     get_resilience_service,
     get_notification_service,
-    get_command_service,
     get_storage_service,
     get_audit_trail_service,
     get_platform_service,
@@ -105,9 +103,6 @@ NotificationServiceDep = Annotated[
     NotificationService, Depends(get_notification_service)
 ]
 
-# Command service dependency
-CommandServiceDep = Annotated[CommandService, Depends(get_command_service)]
-
 # Storage service dependency
 StorageServiceDep = Annotated[StorageService, Depends(get_storage_service)]
 
@@ -143,7 +138,6 @@ __all__ = [
     "IdempotencyServiceDep",
     "ResilienceServiceDep",
     "NotificationServiceDep",
-    "CommandServiceDep",
     "StorageServiceDep",
     "PlatformServiceDep",
     "SlackClientDep",
