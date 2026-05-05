@@ -45,7 +45,8 @@ from infrastructure.notifications.channels.email import EmailChannel
 from infrastructure.notifications.channels.sms import SMSChannel
 from infrastructure.storage.protocol import StorageService
 from infrastructure.storage.service import DynamoDBStorageService
-from infrastructure.audit.service import AuditTrailService
+from infrastructure.audit.protocol import AuditTrailService
+from infrastructure.audit.service import DynamoDBAuditTrailService
 from infrastructure.platforms import PlatformService
 from infrastructure.platforms.providers import (
     SlackPlatformProvider,
@@ -417,8 +418,9 @@ def get_storage_service() -> StorageService:
 def get_audit_trail_service() -> AuditTrailService:
     """Get application-scoped audit trail service singleton.
 
-    Returns an AuditTrailService instance for writing and querying audit
-    events in DynamoDB.
+    Returns an AuditTrailService Protocol instance for writing and querying audit
+    events. The implementation uses DynamoDB, but can be swapped for alternative
+    audit backends that satisfy the Protocol.
 
     Usage:
         from infrastructure.services import AuditTrailServiceDep
@@ -432,10 +434,10 @@ def get_audit_trail_service() -> AuditTrailService:
             return {"written": success}
 
     Returns:
-        AuditTrailService: Cached audit trail service instance
+        AuditTrailService: Cached audit trail service instance (implements Protocol)
     """
     storage = get_storage_service()
-    return AuditTrailService(storage=storage)
+    return DynamoDBAuditTrailService(storage=storage)
 
 
 @lru_cache(maxsize=1)
