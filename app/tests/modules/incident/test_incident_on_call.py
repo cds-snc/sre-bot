@@ -119,3 +119,29 @@ def test_get_on_call_user_from_folder_any_type(
     assert not result
     mock_opsgenie_get_on_call_users.assert_not_called()
     client.users_lookupByEmail.assert_not_called()
+
+
+@patch("modules.incident.on_call.get_on_call_users")
+@patch("modules.incident.on_call.get_folder_metadata")
+def test_get_on_call_user_from_folder_handles_slack_lookup_exception(
+    mock_get_folder_metadata,
+    mock_opsgenie_get_on_call_users,
+):
+    client = MagicMock()
+    folder = "folder_id"
+    email = "missing-user@example.com"
+
+    mock_get_folder_metadata.return_value = {
+        "appProperties": {"genie_schedule": "schedule_id"}
+    }
+    mock_opsgenie_get_on_call_users.return_value = [email]
+    client.users_lookupByEmail.side_effect = Exception(
+        "The request to the Slack API failed. (url: https://slack.com/api/users.lookupByEmail) "
+        "The server responded with: {'ok': False, 'error': 'users_not_found'}"
+    )
+
+    result = on_call.get_on_call_users_from_folder(client, folder)
+
+    assert result == []
+    mock_opsgenie_get_on_call_users.assert_called_once_with("schedule_id")
+    client.users_lookupByEmail.assert_called_once_with(email=email)
