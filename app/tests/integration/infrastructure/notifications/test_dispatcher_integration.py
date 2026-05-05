@@ -131,7 +131,7 @@ class TestDispatcherWithRealChannels:
             raising=False,
         )
 
-        email_channel = EmailChannel(google_workspace_settings=mock_settings)
+        email_channel = EmailChannel(email_provider_settings=mock_settings)
         dispatcher = NotificationDispatcher(channels={"email": email_channel})
 
         notification = Notification(
@@ -227,7 +227,7 @@ class TestDispatcherWithRealChannels:
         )
 
         chat_channel = ChatChannel()
-        email_channel = EmailChannel(google_workspace_settings=mock_settings)
+        email_channel = EmailChannel(email_provider_settings=mock_settings)
 
         dispatcher = NotificationDispatcher(
             channels={"chat": chat_channel, "email": email_channel},
@@ -525,7 +525,7 @@ class TestDispatcherHealthCheck:
         )
 
         chat_channel = ChatChannel()
-        email_channel = EmailChannel(google_workspace_settings=mock_settings)
+        email_channel = EmailChannel(email_provider_settings=mock_settings)
 
         dispatcher = NotificationDispatcher(
             channels={"chat": chat_channel, "email": email_channel}
@@ -574,7 +574,7 @@ class TestDispatcherHealthCheck:
         )
 
         chat_channel = ChatChannel()
-        email_channel = EmailChannel(google_workspace_settings=mock_settings)
+        email_channel = EmailChannel(email_provider_settings=mock_settings)
 
         dispatcher = NotificationDispatcher(
             channels={"chat": chat_channel, "email": email_channel}

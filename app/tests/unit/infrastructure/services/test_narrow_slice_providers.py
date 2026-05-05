@@ -15,6 +15,8 @@ from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.configuration.infrastructure.platforms import PlatformsSettings
 from infrastructure.configuration.integrations.maxmind import MaxMindSettings
 from infrastructure.configuration.integrations.slack import SlackSettings
+from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
+from infrastructure.configuration.integrations.notify import NotifySettings
 from infrastructure.configuration.features.commands import CommandsSettings
 from infrastructure.identity.service import IdentityService
 from infrastructure.clients.maxmind.client import MaxMindClient
@@ -30,6 +32,7 @@ from infrastructure.services.providers import (
     get_idempotency_service,
     get_jwks_manager,
     get_maxmind_client,
+    get_notification_service,
     get_platform_service,
     get_resilience_service,
     get_slack_client,
@@ -257,6 +260,64 @@ class TestProvidersDontCallGetSettings:
             mock_get_settings.assert_not_called()
             mock_retry.assert_called_once()
         get_resilience_service.cache_clear()
+
+    def test_get_notification_service_uses_narrow_slices(self):
+        """get_notification_service uses domain slices, not get_settings."""
+        get_notification_service.cache_clear()
+        with (
+            patch(
+                "infrastructure.services.providers.get_settings"
+            ) as mock_get_settings,
+            patch(
+                "infrastructure.services.providers.get_google_workspace_settings"
+            ) as mock_google_settings,
+            patch(
+                "infrastructure.services.providers.get_notify_settings"
+            ) as mock_notify_settings,
+            patch(
+                "infrastructure.services.providers.get_resilience_service"
+            ) as mock_resilience,
+            patch(
+                "infrastructure.services.providers.get_idempotency_service"
+            ) as mock_idempotency,
+            patch(
+                "infrastructure.services.providers.EmailChannel.__init__",
+                return_value=None,
+            ) as mock_email_ctor,
+            patch(
+                "infrastructure.services.providers.SMSChannel.__init__",
+                return_value=None,
+            ) as mock_sms_ctor,
+            patch(
+                "infrastructure.services.providers.ChatChannel.__init__",
+                return_value=None,
+            ),
+            patch(
+                "infrastructure.notifications.service.NotificationService.__init__",
+                return_value=None,
+            ) as mock_notification_ctor,
+        ):
+            mock_google_settings.return_value = MagicMock(spec=GoogleWorkspaceSettings)
+            mock_notify_settings.return_value = MagicMock(spec=NotifySettings)
+
+            mock_resilience_service = MagicMock()
+            mock_circuit_breaker = MagicMock()
+            mock_resilience_service.get_or_create_circuit_breaker.return_value = (
+                mock_circuit_breaker
+            )
+            mock_resilience.return_value = mock_resilience_service
+            mock_idempotency.return_value = MagicMock()
+
+            get_notification_service()
+
+            mock_get_settings.assert_not_called()
+            mock_google_settings.assert_called_once()
+            mock_notify_settings.assert_called_once()
+            assert mock_email_ctor.call_count == 1
+            assert mock_sms_ctor.call_count == 1
+            mock_notification_ctor.assert_called_once()
+
+        get_notification_service.cache_clear()
 
     def test_get_command_service_uses_commands_settings(self):
         """get_command_service uses get_commands_settings, not get_settings."""

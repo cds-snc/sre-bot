@@ -29,18 +29,18 @@ class EmailChannel(NotificationChannel):
 
     def __init__(
         self,
-        google_workspace_settings: "GoogleWorkspaceSettings",
+        email_provider_settings: "GoogleWorkspaceSettings",
         circuit_breaker: Optional["CircuitBreaker"] = None,
     ):
         """Initialize Gmail email channel.
 
         Args:
-            google_workspace_settings: Narrow Google Workspace settings slice.
+            email_provider_settings: Narrow email provider settings slice.
             circuit_breaker: Optional circuit breaker for fault tolerance.
                            Injected by providers.py; pass None to disable circuit breaking.
         """
         self._circuit_breaker = circuit_breaker
-        self._sender_email = google_workspace_settings.GOOGLE_DELEGATED_ADMIN_EMAIL
+        self._sender_email = email_provider_settings.GOOGLE_DELEGATED_ADMIN_EMAIL
         self.log = logger.bind(component="email_channel")
         log = self.log.bind(backend="gmail", sender=self._sender_email)
         log.info("initialized_email_channel")
