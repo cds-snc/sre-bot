@@ -11,8 +11,8 @@ secondary_domains:
 owners:
  - SRE Team
 date_created: 2026-04-29
-last_updated: 2026-05-04
-last_reviewed: 2026-05-04
+last_updated: 2026-05-05
+last_reviewed: 2026-05-05
 next_review_due: 2026-09-01
 constrained_by:
  - ADR-0044
@@ -38,7 +38,6 @@ related_packages:
  - app/infrastructure/services
  - app/infrastructure/directory
  - app/infrastructure/storage
- - app/infrastructure/identity
  - app/infrastructure/resilience
  - app/packages/access
 ---
@@ -105,7 +104,6 @@ Services whose current implementation is Tier 3 must be flagged for future deleg
 | `ResponseChannel` | Yes | Platform-specific | Tier 1 (managed service wrapper per platform) | - (complete) |
 | `BackgroundJobRegistry` | Yes | Scheduler | Tier 2 (library — `schedule`) | - (complete) |
 | `StorageService` | **No** | DynamoDB | Tier 1 (managed service wrapper) | **P0** - stated design goal is storage-agnostic |
-| `IdentityService` | **No** | JWT + platform resolvers | Tier 1 (managed service wrappers — JWT/JWKS endpoints, Slack API) | **P1** - identity resolution could have multiple backends |
 | `AuditTrailService` | **No** | DynamoDB (via StorageService) | Tier 1 (managed service via StorageService) | **P1** - audit backend could change |
 | `NotificationService` | **No** | GC Notify / platform channels | Tier 1 (managed service — GC Notify API) | **P2** - channels are abstracted; dispatcher could follow |
 | `IdempotencyService` | **No** | DynamoDB | Tier 1 (managed service wrapper) | **P3** - infrastructure concern, lower swap probability |
@@ -216,7 +214,7 @@ Client packages (`infrastructure/clients/aws/`, `infrastructure/clients/google_w
 
 #### 3.1 Default Rule
 
-Feature packages should consume Category A domain services (StorageService, DirectoryProvider, IdentityService), not raw client facades.
+Feature packages should consume Category A domain services (StorageService, DirectoryProvider), not raw client facades.
 
 #### 3.2 Pragmatic Exception
 
@@ -310,12 +308,14 @@ Existing Category A services that lack Protocol contracts must be migrated incre
 | Priority | Service | Sequencing Notes |
 |----------|---------|-----------------|
 | P0 | StorageService | Foundational - other services (AuditTrailService, IdempotencyService) depend on storage |
-| P1 | IdentityService | Independent - can be migrated in parallel with P0 |
+
 | P1 | AuditTrailService | Depends on StorageService Protocol being complete first |
 | P2 | NotificationService | Independent - channels already partially abstracted |
 | P3 | IdempotencyService | Depends on StorageService Protocol being complete first |
 
 > **Note (2026-04-29):** `PlatformService` was removed from migration priorities. Per-platform services are Category C and do not require Protocol contracts. See Category A table revision note.
+
+> **Note (2026-05-05):** `IdentityService` removed from migration priorities. JWT claim extraction is a private helper (`_build_user_from_jwt_payload`) in `infrastructure/security/current_user.py` — not a DI-injected service. Fails both Category A criteria (no external backing service abstraction; no feature-package consumer). See ADR-0061 S3 (2026-05-05 amendment).
 
 **Migration constraint:** Each migration must be an independently deployable change. No migration may break existing tests or require simultaneous changes across multiple services.
 

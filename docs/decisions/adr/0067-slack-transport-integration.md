@@ -9,9 +9,9 @@ secondary_domains:
   - Runtime and Lifecycle
   - Package and Plugin Architecture
 date_created: 2026-04-30
-last_updated: 2026-05-01
-last_reviewed: 2026-04-30
-next_review_due: 2026-08-28
+last_updated: 2026-05-05
+  last_reviewed: 2026-05-05
+  next_review_due: 2026-09-01
 owners:
   - SRE Team
 constrained_by:
@@ -29,6 +29,7 @@ superseded_by: []
 related_records:
   - ADR-0055
   - ADR-0056
+  - ADR-0061
   - ADR-0064
   - ADR-0080
 related_packages:
@@ -179,6 +180,21 @@ All Slack transport events use structured logging via `structlog` (ADR-0054).
 - R3: Mandatory shutdown events: `slack_shutdown_initiated`, `slack_socket_mode_close_requested`, `slack_socket_mode_thread_joined(duration_seconds=X)` or `slack_socket_mode_shutdown_timeout(budget_seconds=5)`, `slack_shutdown_complete(duration_seconds=X)`.
 - R4: Runtime events: `slack_command_received(command=X)`, `slack_action_received(action_id=X)`, `slack_view_submitted(callback_id=X)`. These are emitted by the provider's middleware layer, not by feature handlers.
 - R5: No sensitive data in log events. Token values, user PII, and message content must never appear in logs. Log command names, action IDs, and callback IDs only.
+
+### S8 — Slack User Identity Resolution
+
+> **Added 2026-05-05** — Governs resolution of a Slack `user_id` to a canonical `User`. Introduced to close the gap identified during the ADR-0061 amendment: `IdentityService` is narrowed to JWT/HTTP auth only; Slack-specific user resolution is a Category C responsibility of `SlackPlatformProvider`.
+
+Slack commands and interactions carry a `user_id` in the Bolt event payload, delivered over the Socket Mode WebSocket connection. In Socket Mode, trust is established at the connection level via `SLACK_APP_TOKEN` — individual event messages are **not** HMAC-signed (signing secrets apply only to HTTP Events API mode, which this application does not use; see S5-R2 and S5-R5). The `user_id` is trusted because it arrives over the authenticated Socket Mode tunnel managed by the Bolt SDK. When a feature handler requires a canonical `User`, `SlackPlatformProvider` resolves the `user_id` via the Slack `users.info` API.
+
+**Rules:**
+
+- R1: Slack user identity resolution is a Category C capability of `SlackPlatformProvider` (ADR-0078). It must NOT be routed through `IdentityService` (which is scoped to JWT/HTTP auth only, per ADR-0061 Standard 3).
+- R2: The provider exposes a `resolve_user(user_id: str, team_id: Optional[str] = None) -> User` method. The return type is the canonical `User` model from `infrastructure.identity.models` with `source=IdentitySource.SLACK`.
+- R3: The method calls Slack `users.info` API via the existing `WebClient`. Failures must be returned as `OperationResult` with appropriate status (ADR-0050 Standard 1 — external service boundary rule applies).
+- R4: The resolved `user_id` (canonical key) is the user's email address from the Slack profile. If the Slack profile has no email, resolution fails with `OperationResult.permanent_error()`.
+- R5: Resolution results may be cached per request context but must not be cached across requests (Slack profile data can change; no TTL-based shared cache).
+- R6: Feature handlers that receive a `user_id` from a Slack event must call `provider.resolve_user(user_id)` to obtain the canonical `User`. Direct use of the Slack `user_id` as a business key is prohibited.
 
 ## Derivation from Higher-Tier ADRs
 

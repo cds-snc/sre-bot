@@ -540,3 +540,20 @@ All three follow-up actions from ADR-0080 acceptance completed. All are editoria
 - PR-12 is now a pure deletion: remove `app/infrastructure/configuration/features/commands.py` and strip `TestCommandsSettingsSingleton` from the singleton test file. No new code required.
 - Analogous cleanup for `groups.py` settings file is now identified as a parallel Phase 2 task (same pattern, same scope).
 - No frozen zone files (particularly `app/core/config.py`) may be touched during Phase 2.
+
+### ADR-0061 + ADR-0077 — Identity Architecture Correction
+
+- `infrastructure/identity/` package dissolved entirely. Fails both ADR-0077 Category A criteria: zero external backing service abstraction (JWT claim extraction is 6 dict lookups, zero I/O); zero feature-package consumers (`IdentityServiceDep` has no imports in `app/packages/**` or `app/api/**`).
+- ADR-0061 Standard 1: canonical `User` model relocated to `infrastructure/security/models.py`; `IdentitySource` enum renamed `AuthPrincipalSource` (better describes transport-mechanism semantics).
+- ADR-0061 Standard 2: HTTP identity resolution mechanism corrected — `IdentityService.resolve_from_jwt()` replaced by `_build_user_from_jwt_payload()` private helper in `security/current_user.py`; `IdentityService` removed as transport owner.
+- ADR-0061 Standard 3: rewritten from "IdentityService Protocol Contract" to "JWT Claim Extraction". No Protocol, no DI service, no provider. `JWKSManager` confirmed as sole Category A service in this domain.
+- ADR-0061 Standard 4 (IdentitySettings dissolution): deleted — no service to configure.
+- ADR-0061 Standard 4 (renumbered from 5, client classification): removed `IdentityService` (Category A) and `IdentityResolver` (Category C) rows.
+- ADR-0077 Standard 1: removed `IdentityService` row from Category A table entirely.
+- ADR-0077 Standard 3.1: removed `IdentityService` from the default rule.
+- ADR-0077 Standard 5: removed `IdentityService` row from migration priority table.
+- Review artifacts `adr-0061-review-2026-05-05.md` and `adr-0077-review-2026-05-05.md` annotated as superseded.
+- Combined replacement review created: `reviews/adr-0061-adr-0077-review-2026-05-05.md`.
+- ADR-0067 S8 (Slack user identity resolution in `SlackPlatformProvider`) unchanged — independently valid.
+- Phase B code corrections (dissolve `infrastructure/identity/`, create `infrastructure/security/models.py`, update `get_current_user`, update import paths) deferred to `feat/infra-identity-settings` branch.
+- ADR-0064 S10 follow-up identified (non-blocking editorial amendment): platform-transport reference should point to ADR-0067 S8 + ADR-0078, not ADR-0061 S3.
