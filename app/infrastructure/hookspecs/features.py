@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Callable, Protocol
 if TYPE_CHECKING:
     from fastapi import FastAPI
     from structlog.stdlib import BoundLogger
+    from infrastructure.events.service import EventDispatcher
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
     from infrastructure.platforms.providers.teams import TeamsPlatformProvider
     from infrastructure.platforms.providers.discord import DiscordPlatformProvider
@@ -129,4 +130,15 @@ def register_i18n_resources(registry: "I18nResourceRegistry") -> None:
                     domain="geolocate",
                 )
             )
+    """
+
+
+@hookspec
+def register_event_handlers(dispatcher: "EventDispatcher") -> None:
+    """Register feature event handlers with the application dispatcher.
+
+    Called during feature integration after plugins are discovered.
+
+    Args:
+        dispatcher: The application-scoped event dispatcher.
     """

@@ -39,10 +39,8 @@ def on_access_request_approved(event) -> None:
 def _register_request_handlers() -> None:
     """Register request-approved handler once during startup warmup."""
     dispatcher = get_event_dispatcher()
-    if on_access_request_approved not in dispatcher.get_handlers_for_event(
-        REQUEST_APPROVED
-    ):
-        dispatcher.register_handler(REQUEST_APPROVED)(on_access_request_approved)
+    if dispatcher.get_handler_count(REQUEST_APPROVED) == 0:
+        dispatcher.register_handler(REQUEST_APPROVED, on_access_request_approved)
 
 
 def _run_reconciliation_job() -> None:

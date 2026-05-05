@@ -17,6 +17,7 @@ from infrastructure.i18n.resources import I18nResourceRegistry
 if TYPE_CHECKING:
     from fastapi import FastAPI
     from structlog.stdlib import BoundLogger
+    from infrastructure.events.service import EventDispatcher
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
     from infrastructure.platforms.providers.teams import TeamsPlatformProvider
     from infrastructure.platforms.providers.discord import DiscordPlatformProvider
@@ -72,6 +73,7 @@ def register_feature_integrations(
     slack_provider: "SlackPlatformProvider | None" = None,
     teams_provider: "TeamsPlatformProvider | None" = None,
     discord_provider: "DiscordPlatformProvider | None" = None,
+    event_dispatcher: "EventDispatcher | None" = None,
 ) -> None:
     """Phase 2 — Register commands, routes, and run startup warmup.
 
@@ -100,6 +102,10 @@ def register_feature_integrations(
         pm.hook.register_discord_commands(provider=discord_provider)
         logger.info("discord_commands_registered")
 
+    if event_dispatcher:
+        pm.hook.register_event_handlers(dispatcher=event_dispatcher)
+        logger.info("event_handlers_registered")
+
     pm.hook.register_routes(app=app)
     logger.info("feature_routes_registered")
 
@@ -113,6 +119,7 @@ def discover_and_init_features(
     slack_provider: "SlackPlatformProvider | None" = None,
     teams_provider: "TeamsPlatformProvider | None" = None,
     discord_provider: "DiscordPlatformProvider | None" = None,
+    event_dispatcher: "EventDispatcher | None" = None,
 ) -> I18nResourceRegistry:
     """Discover all feature packages and run their full startup lifecycle.
 
@@ -130,5 +137,6 @@ def discover_and_init_features(
         slack_provider=slack_provider,
         teams_provider=teams_provider,
         discord_provider=discord_provider,
+        event_dispatcher=event_dispatcher,
     )
     return i18n_registry

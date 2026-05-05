@@ -111,9 +111,13 @@ def mock_event_dispatch(monkeypatch):
     mock.get_dispatched = lambda: dispatched_events
     mock.clear_dispatched = lambda: dispatched_events.clear()
 
+    class _Dispatcher:
+        def dispatch_background(self, event: Any) -> None:
+            mock(event)
+
     monkeypatch.setattr(
-        "modules.groups.core.service.dispatch_background",
-        mock,
+        "modules.groups.core.service.get_event_dispatcher",
+        lambda: _Dispatcher(),
         raising=False,
     )
 

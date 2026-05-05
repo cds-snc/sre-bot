@@ -8,7 +8,7 @@ idempotency, and delivery.
 from typing import Optional
 
 import structlog
-from infrastructure.events import register_event_handler, Event
+from infrastructure.events import Event
 from infrastructure.notifications import (
     NotificationDispatcher,
     Notification,
@@ -17,6 +17,7 @@ from infrastructure.notifications import (
 )
 from infrastructure.i18n import Translator, LocaleResolver, TranslationKey
 from infrastructure.idempotency import IdempotencyKeyBuilder
+from infrastructure.services import hookimpl
 
 
 logger = structlog.get_logger()
@@ -239,21 +240,26 @@ def reset_notification_handler() -> None:
     _notification_handler = None
 
 
-@register_event_handler("group.member.added")
 def handle_member_added(payload: Event) -> None:
     """Handle member added event."""
     handler = get_notification_handler()
     handler.handle_member_added(payload)
 
 
-@register_event_handler("group.member.removed")
 def handle_member_removed(payload: Event) -> None:
     """Handle member removed event."""
     handler = get_notification_handler()
     handler.handle_member_removed(payload)
 
 
-@register_event_handler("group.listed")
 def handle_group_listed(payload: Event) -> None:
     """Handle group listed event (no notifications needed)."""
     pass
+
+
+@hookimpl
+def register_event_handlers(dispatcher) -> None:
+    """Register groups event handlers with the shared dispatcher."""
+    dispatcher.register_handler("group.member.added", handle_member_added)
+    dispatcher.register_handler("group.member.removed", handle_member_removed)
+    dispatcher.register_handler("group.listed", handle_group_listed)

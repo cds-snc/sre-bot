@@ -12,7 +12,7 @@ Features:
 - Comprehensive audit logging
 """
 
-from infrastructure.events import register_event_handler, dispatch_event
+from modules.groups.events.system import register_event_handler, dispatch_event
 from modules.groups.core.orchestration import (
     add_member_to_group,
     remove_member_from_group,
@@ -23,7 +23,6 @@ from modules.groups.providers import get_provider, get_active_providers
 
 # Import event handlers to register them
 from modules.groups import events  # noqa: F401
-
 
 __all__ = [
     # Orchestration

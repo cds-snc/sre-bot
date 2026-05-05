@@ -4,8 +4,8 @@ This module re-exports infrastructure event system for backward compatibility
 and provides groups-specific event types.
 """
 
-from infrastructure.events import (
-    Event,
+from infrastructure.events import Event
+from modules.groups.events.system import (
     dispatch_background,
     dispatch_event,
     register_event_handler,

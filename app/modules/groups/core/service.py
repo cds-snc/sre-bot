@@ -12,8 +12,9 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, List, Optional
 from uuid import uuid4
 import structlog
-from infrastructure.events import dispatch_background, Event
+from infrastructure.events import Event
 from infrastructure.idempotency import get_cache
+from infrastructure.services import get_event_dispatcher
 from modules.groups.core import orchestration
 from modules.groups.api import schemas
 from modules.groups.domain.errors import ValidationError
@@ -23,7 +24,6 @@ from modules.groups.providers.base import (
     OperationResult,
 )
 from infrastructure.services import get_settings
-
 
 if TYPE_CHECKING:
     from modules.groups.domain.types import (
@@ -202,7 +202,7 @@ def add_member(request: schemas.AddMemberRequest) -> schemas.ActionResponse:
                     "request": request.model_dump(),
                 },
             )
-            dispatch_background(event)
+            get_event_dispatcher().dispatch_background(event)
             idempotency_cache.set(
                 request.idempotency_key,
                 response.model_dump(mode="json"),
@@ -284,7 +284,7 @@ def remove_member(
                     "request": request.model_dump(),
                 },
             )
-            dispatch_background(event)
+            get_event_dispatcher().dispatch_background(event)
             idempotency_cache.set(
                 request.idempotency_key,
                 response.model_dump(mode="json"),
@@ -355,7 +355,7 @@ def list_groups(request: schemas.ListGroupsRequest) -> List[Any]:
             },
         },
     )
-    dispatch_background(event)
+    get_event_dispatcher().dispatch_background(event)
 
     return groups
 
