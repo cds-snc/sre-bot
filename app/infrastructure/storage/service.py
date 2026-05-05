@@ -5,8 +5,9 @@ with automatic Python ↔ DynamoDB type conversion via boto3's built-in
 ``TypeSerializer`` / ``TypeDeserializer``.
 
 Feature packages MUST NOT call ``DynamoDBClient`` or ``dynamodb_next`` directly.
-Instead, define a thin repository class that takes ``StorageService`` as a
-constructor argument and delegates all DynamoDB I/O here.
+Instead, define a thin repository class that takes
+``infrastructure.storage.protocol.StorageService`` as a constructor argument and
+delegates all DynamoDB I/O here.
 
 Usage (feature-level repository)::
 
@@ -29,14 +30,16 @@ Usage (feature-level repository)::
             return None
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, TYPE_CHECKING
 
 import structlog
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 
-from infrastructure.clients.aws.dynamodb import DynamoDBClient
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
+
+if TYPE_CHECKING:
+    from infrastructure.clients.aws.dynamodb import DynamoDBClient
 
 logger = structlog.get_logger(__name__)
 
@@ -62,7 +65,7 @@ def _deserialize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     return {k: _deserializer.deserialize(v) for k, v in item.items()}
 
 
-class StorageService:
+class DynamoDBStorageService:
     """Generic DynamoDB storage service.
 
     Intended as the single infrastructure-level abstraction over DynamoDB for
@@ -76,7 +79,7 @@ class StorageService:
         dynamodb: Configured ``DynamoDBClient`` instance (injected by provider).
     """
 
-    def __init__(self, dynamodb: DynamoDBClient) -> None:
+    def __init__(self, dynamodb: "DynamoDBClient") -> None:
         self._dynamodb = dynamodb
         logger.info("initialized_storage_service")
 

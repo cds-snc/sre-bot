@@ -11,11 +11,11 @@ from infrastructure.notifications.models import (
     Recipient,
 )
 from infrastructure.operations import OperationResult
-from infrastructure.resilience.circuit_breaker import CircuitBreaker
 from integrations.google_workspace import gmail_next
 
 if TYPE_CHECKING:
-    from infrastructure.configuration import Settings
+    from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
+    from infrastructure.resilience.circuit_breaker import CircuitBreaker
 
 logger = structlog.get_logger()
 
@@ -29,25 +29,18 @@ class EmailChannel(NotificationChannel):
 
     def __init__(
         self,
-        settings: "Settings",
+        email_provider_settings: "GoogleWorkspaceSettings",
         circuit_breaker: Optional["CircuitBreaker"] = None,
     ):
         """Initialize Gmail email channel.
 
         Args:
-            settings: Settings instance with google_workspace configuration.
+            email_provider_settings: Narrow email provider settings slice.
             circuit_breaker: Optional circuit breaker for fault tolerance.
-                           If not provided, creates a default one.
+                           Injected by providers.py; pass None to disable circuit breaking.
         """
-        if circuit_breaker is None:
-            circuit_breaker = CircuitBreaker(
-                name="gmail_email_channel",
-                failure_threshold=5,
-                timeout_seconds=60,
-            )
-
         self._circuit_breaker = circuit_breaker
-        self._sender_email = settings.google_workspace.GOOGLE_DELEGATED_ADMIN_EMAIL
+        self._sender_email = email_provider_settings.GOOGLE_DELEGATED_ADMIN_EMAIL
         self.log = logger.bind(component="email_channel")
         log = self.log.bind(backend="gmail", sender=self._sender_email)
         log.info("initialized_email_channel")
@@ -85,14 +78,22 @@ class EmailChannel(NotificationChannel):
 
             recipient_email = resolve_result.data.get("email")
 
-            # Send email via circuit breaker
-            send_result = self._circuit_breaker.call(
-                self._send_gmail,
-                subject=notification.subject or "Notification",
-                message=notification.message,
-                recipient=recipient_email,
-                sender=self._sender_email,
-            )
+            # Send email via circuit breaker (if injected) or directly
+            if self._circuit_breaker is not None:
+                send_result = self._circuit_breaker.call(
+                    self._send_gmail,
+                    subject=notification.subject or "Notification",
+                    message=notification.message,
+                    recipient=recipient_email,
+                    sender=self._sender_email,
+                )
+            else:
+                send_result = self._send_gmail(
+                    subject=notification.subject or "Notification",
+                    message=notification.message,
+                    recipient=recipient_email,
+                    sender=self._sender_email,
+                )
 
             if send_result.is_success:
                 results.append(

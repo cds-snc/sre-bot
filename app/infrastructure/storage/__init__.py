@@ -12,6 +12,6 @@ Usage::
             self._storage = storage
 """
 
-from infrastructure.storage.service import StorageService
+from infrastructure.storage.protocol import StorageService
 
 __all__ = ["StorageService"]

@@ -6,7 +6,7 @@ Provides annotated type hints for common infrastructure dependencies.
 
 from typing import Annotated
 from fastapi import Depends, Security
-from infrastructure.configuration import Settings
+from infrastructure.configuration import AppSettings, Settings
 from infrastructure.identity.models import User
 from infrastructure.identity.service import IdentityService
 from infrastructure.security.jwks import JWKSManager
@@ -19,8 +19,7 @@ from infrastructure.i18n.service import TranslationService
 from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
-from infrastructure.commands.service import CommandService
-from infrastructure.storage.service import StorageService
+from infrastructure.storage.protocol import StorageService
 from infrastructure.audit.service import AuditTrailService
 from infrastructure.platforms.service import PlatformService
 from infrastructure.platforms.clients import (
@@ -30,6 +29,7 @@ from infrastructure.platforms.clients import (
 )
 from infrastructure.directory.provider import DirectoryProvider
 from infrastructure.services.providers import (
+    get_app_settings,
     get_settings,
     get_identity_service,
     get_jwks_manager,
@@ -41,7 +41,6 @@ from infrastructure.services.providers import (
     get_idempotency_service,
     get_resilience_service,
     get_notification_service,
-    get_command_service,
     get_storage_service,
     get_audit_trail_service,
     get_platform_service,
@@ -53,6 +52,7 @@ from infrastructure.services.providers import (
 
 # Settings dependency
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+AppSettingsDep = Annotated[AppSettings, Depends(get_app_settings)]
 
 # Identity service dependency
 IdentityServiceDep = Annotated[IdentityService, Depends(get_identity_service)]
@@ -103,9 +103,6 @@ NotificationServiceDep = Annotated[
     NotificationService, Depends(get_notification_service)
 ]
 
-# Command service dependency
-CommandServiceDep = Annotated[CommandService, Depends(get_command_service)]
-
 # Storage service dependency
 StorageServiceDep = Annotated[StorageService, Depends(get_storage_service)]
 
@@ -130,6 +127,7 @@ DirectoryProviderDep = Annotated[DirectoryProvider, Depends(get_directory_provid
 
 __all__ = [
     "SettingsDep",
+    "AppSettingsDep",
     "IdentityServiceDep",
     "JWKSManagerDep",
     "CurrentUserDep",
@@ -140,7 +138,6 @@ __all__ = [
     "IdempotencyServiceDep",
     "ResilienceServiceDep",
     "NotificationServiceDep",
-    "CommandServiceDep",
     "StorageServiceDep",
     "PlatformServiceDep",
     "SlackClientDep",

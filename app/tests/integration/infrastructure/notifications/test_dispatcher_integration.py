@@ -131,7 +131,7 @@ class TestDispatcherWithRealChannels:
             raising=False,
         )
 
-        email_channel = EmailChannel(settings=mock_settings)
+        email_channel = EmailChannel(email_provider_settings=mock_settings)
         dispatcher = NotificationDispatcher(channels={"email": email_channel})
 
         notification = Notification(
@@ -148,7 +148,9 @@ class TestDispatcherWithRealChannels:
         assert results[0].channel == "email"
         assert results[0].external_id is not None
 
-    def test_send_notification_through_sms_channel(self, monkeypatch, mock_settings):
+    def test_send_notification_through_sms_channel(
+        self, monkeypatch, mock_settings, mock_notify_settings
+    ):
         """Test end-to-end SMS notification."""
         mock_post_event = MagicMock()
         mock_response = MagicMock()
@@ -162,7 +164,7 @@ class TestDispatcherWithRealChannels:
             raising=False,
         )
 
-        sms_channel = SMSChannel(settings=mock_settings)
+        sms_channel = SMSChannel(notify_settings=mock_notify_settings)
         dispatcher = NotificationDispatcher(channels={"sms": sms_channel})
 
         notification = Notification(
@@ -225,7 +227,7 @@ class TestDispatcherWithRealChannels:
         )
 
         chat_channel = ChatChannel()
-        email_channel = EmailChannel(settings=mock_settings)
+        email_channel = EmailChannel(email_provider_settings=mock_settings)
 
         dispatcher = NotificationDispatcher(
             channels={"chat": chat_channel, "email": email_channel},
@@ -523,7 +525,7 @@ class TestDispatcherHealthCheck:
         )
 
         chat_channel = ChatChannel()
-        email_channel = EmailChannel(settings=mock_settings)
+        email_channel = EmailChannel(email_provider_settings=mock_settings)
 
         dispatcher = NotificationDispatcher(
             channels={"chat": chat_channel, "email": email_channel}
@@ -572,7 +574,7 @@ class TestDispatcherHealthCheck:
         )
 
         chat_channel = ChatChannel()
-        email_channel = EmailChannel(settings=mock_settings)
+        email_channel = EmailChannel(email_provider_settings=mock_settings)
 
         dispatcher = NotificationDispatcher(
             channels={"chat": chat_channel, "email": email_channel}

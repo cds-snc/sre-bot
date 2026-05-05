@@ -1,6 +1,6 @@
 """Chat channel implementation using Slack."""
 
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
@@ -13,8 +13,10 @@ from infrastructure.notifications.models import (
     Recipient,
 )
 from infrastructure.operations import OperationResult
-from infrastructure.resilience.circuit_breaker import CircuitBreaker
 from integrations.slack.client import SlackClientManager
+
+if TYPE_CHECKING:
+    from infrastructure.resilience.circuit_breaker import CircuitBreaker
 
 logger = structlog.get_logger()
 
@@ -31,17 +33,9 @@ class ChatChannel(NotificationChannel):
 
         Args:
             circuit_breaker: Optional circuit breaker for fault tolerance.
-                           If not provided, creates a default one.
+                           Injected by providers.py; pass None to disable circuit breaking.
         """
         self._client_manager = SlackClientManager()
-
-        if circuit_breaker is None:
-            circuit_breaker = CircuitBreaker(
-                name="slack_chat_channel",
-                failure_threshold=5,
-                timeout_seconds=60,
-            )
-
         self._circuit_breaker = circuit_breaker
         self.log = logger.bind(component="chat_channel")
         self.log.info("initialized_chat_channel", backend="slack")
@@ -80,14 +74,22 @@ class ChatChannel(NotificationChannel):
 
             slack_user_id = resolve_result.data.get("slack_user_id")
 
-            # Send DM via circuit breaker
-            send_result = self._circuit_breaker.call(
-                self._send_slack_dm,
-                client=client,
-                user_id=slack_user_id,
-                message=notification.message,
-                subject=notification.subject,
-            )
+            # Send DM via circuit breaker (if injected) or directly
+            if self._circuit_breaker is not None:
+                send_result = self._circuit_breaker.call(
+                    self._send_slack_dm,
+                    client=client,
+                    user_id=slack_user_id,
+                    message=notification.message,
+                    subject=notification.subject,
+                )
+            else:
+                send_result = self._send_slack_dm(
+                    client=client,
+                    user_id=slack_user_id,
+                    message=notification.message,
+                    subject=notification.subject,
+                )
 
             if send_result.is_success:
                 results.append(

@@ -5,7 +5,8 @@ approved requests are advanced to ``completed`` or ``failed`` once the sync
 provider reports back.
 
 Slack command and interaction registration are deferred to a later iteration
-pending a ``register_slack_interactions(bot)`` hookspec addition.
+pending implementation of a ``register_slack_commands(provider)`` hookimpl
+per ADR-0059 Standard 3.
 """
 
 from infrastructure.services import get_event_dispatcher, hookimpl
@@ -37,10 +38,10 @@ def on_sync_failed(event) -> None:
 def _register_sync_event_handlers() -> None:
     """Register sync result handlers once during startup warmup."""
     dispatcher = get_event_dispatcher()
-    if on_sync_completed not in dispatcher.get_handlers_for_event(SYNC_COMPLETED):
-        dispatcher.register_handler(SYNC_COMPLETED)(on_sync_completed)
-    if on_sync_failed not in dispatcher.get_handlers_for_event(SYNC_FAILED):
-        dispatcher.register_handler(SYNC_FAILED)(on_sync_failed)
+    if dispatcher.get_handler_count(SYNC_COMPLETED) == 0:
+        dispatcher.register_handler(SYNC_COMPLETED, on_sync_completed)
+    if dispatcher.get_handler_count(SYNC_FAILED) == 0:
+        dispatcher.register_handler(SYNC_FAILED, on_sync_failed)
 
 
 @hookimpl

@@ -30,8 +30,11 @@ def get_on_call_users_from_folder(client: WebClient, folder: str) -> list:
     # Get OpsGenie data
     if "genie_schedule" in folder_metadata:
         for email in get_on_call_users(folder_metadata["genie_schedule"]):
-            r = client.users_lookupByEmail(email=email)
-            if r.get("ok"):
-                oncall.append(r["user"])
+            try:
+                r = client.users_lookupByEmail(email=email)
+                if r.get("ok"):
+                    oncall.append(r["user"])
+            except Exception as e:
+                log.error("error_lookup_user_by_email", email=email, error=str(e))
     log.info("oncall_users_resolved", count=len(oncall))
     return oncall

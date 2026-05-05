@@ -1,5 +1,7 @@
 """Azure Sentinel integration settings."""
 
+from functools import lru_cache
+
 from pydantic import Field
 
 from infrastructure.configuration.base import IntegrationSettings
@@ -27,3 +29,9 @@ class SentinelSettings(IntegrationSettings):
     SENTINEL_CUSTOMER_ID: str | None = Field(default=None, alias="SENTINEL_CUSTOMER_ID")
     SENTINEL_LOG_TYPE: str = Field(default="DevSREBot", alias="SENTINEL_LOG_TYPE")
     SENTINEL_SHARED_KEY: str | None = Field(default=None, alias="SENTINEL_SHARED_KEY")
+
+
+@lru_cache(maxsize=1)
+def get_sentinel_settings() -> SentinelSettings:
+    """Singleton provider for Azure Sentinel integration settings."""
+    return SentinelSettings()

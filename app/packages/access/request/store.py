@@ -28,7 +28,7 @@ from typing import List, Optional
 
 import structlog
 
-from infrastructure.storage.service import StorageService
+from infrastructure.storage.protocol import StorageService
 from packages.access.request.domain import (
     AccessRequest,
     ApprovalDecision,

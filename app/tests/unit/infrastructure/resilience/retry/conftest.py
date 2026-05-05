@@ -4,6 +4,9 @@ import pytest
 from typing import Dict, Any
 from unittest.mock import MagicMock
 
+from infrastructure.configuration.infrastructure.retry import RetrySettings
+from infrastructure.operations import OperationResult
+from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
 from infrastructure.resilience.retry import (
     RetryConfig,
     RetryRecord,
@@ -92,9 +95,6 @@ def mock_processor():
 @pytest.fixture
 def mock_dynamodb_next():
     """Mock dynamodb_next module for testing."""
-    from unittest.mock import MagicMock
-    from infrastructure.operations import OperationResult
-
     mock = MagicMock()
 
     # Default successful responses
@@ -115,8 +115,6 @@ def dynamodb_retry_store(retry_config_factory, mock_dynamodb_next, monkeypatch):
         mock_dynamodb_next,
     )
 
-    from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
-
     config = retry_config_factory()
     store = DynamoDBRetryStore(
         config=config,
@@ -129,31 +127,31 @@ def dynamodb_retry_store(retry_config_factory, mock_dynamodb_next, monkeypatch):
 
 @pytest.fixture
 def mock_settings():
-    """Create mock settings object for retry tests with memory backend."""
-    settings = MagicMock()
-    settings.retry.backend = "memory"
-    settings.retry.max_attempts = 5
-    settings.retry.base_delay_seconds = 60
-    settings.retry.max_delay_seconds = 3600
-    settings.retry.batch_size = 10
-    settings.retry.claim_lease_seconds = 300
-    settings.retry.dynamodb_table_name = "retry-records"
-    settings.retry.dynamodb_region = "ca-central-1"
-    settings.retry.dynamodb_ttl_days = 30
+    """Create mock RetrySettings for retry tests with memory backend."""
+    settings = MagicMock(spec=RetrySettings)
+    settings.backend = "memory"
+    settings.max_attempts = 5
+    settings.base_delay_seconds = 60
+    settings.max_delay_seconds = 3600
+    settings.batch_size = 10
+    settings.claim_lease_seconds = 300
+    settings.dynamodb_table_name = "retry-records"
+    settings.dynamodb_region = "ca-central-1"
+    settings.dynamodb_ttl_days = 30
     return settings
 
 
 @pytest.fixture
 def mock_settings_with_dynamodb():
-    """Create mock settings object for retry tests with DynamoDB backend."""
-    settings = MagicMock()
-    settings.retry.backend = "dynamodb"
-    settings.retry.max_attempts = 5
-    settings.retry.base_delay_seconds = 60
-    settings.retry.max_delay_seconds = 3600
-    settings.retry.batch_size = 10
-    settings.retry.claim_lease_seconds = 300
-    settings.retry.dynamodb_table_name = "test-retry-records"
-    settings.retry.dynamodb_region = "ca-central-1"
-    settings.retry.dynamodb_ttl_days = 30
+    """Create mock RetrySettings for retry tests with DynamoDB backend."""
+    settings = MagicMock(spec=RetrySettings)
+    settings.backend = "dynamodb"
+    settings.max_attempts = 5
+    settings.base_delay_seconds = 60
+    settings.max_delay_seconds = 3600
+    settings.batch_size = 10
+    settings.claim_lease_seconds = 300
+    settings.dynamodb_table_name = "test-retry-records"
+    settings.dynamodb_region = "ca-central-1"
+    settings.dynamodb_ttl_days = 30
     return settings

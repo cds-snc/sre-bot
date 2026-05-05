@@ -33,21 +33,24 @@ secret verification before command handlers are invoked. The CommandPayload.user
 carries the verified Slack user identity — no JWT dependency needed in Slack handlers.
 """
 
-from typing import Annotated, List, Optional
+from typing import Annotated, List, Optional, TYPE_CHECKING
 
 import structlog
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, SecurityScopes
 
 from infrastructure.identity.models import IdentitySource, User
-from infrastructure.identity.service import IdentityService
 from infrastructure.security.jwks import JWKSManager
 from infrastructure.security.jwt import validate_jwt_token
 from infrastructure.services.providers import (
+    get_app_settings,
     get_identity_service,
     get_jwks_manager,
-    get_settings,
+    get_server_settings,
 )
+
+if TYPE_CHECKING:
+    from infrastructure.identity.service import IdentityService
 
 logger = structlog.get_logger()
 
@@ -59,7 +62,7 @@ def get_current_user(
     security_scopes: SecurityScopes,
     credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(_bearer)],
     jwks_manager: Annotated[JWKSManager, Depends(get_jwks_manager)],
-    identity_service: Annotated[IdentityService, Depends(get_identity_service)],
+    identity_service: Annotated["IdentityService", Depends(get_identity_service)],
 ) -> User:
     """Validate a JWT Bearer token and return the authenticated principal.
 
@@ -104,9 +107,10 @@ def get_current_user(
         )
 
     # Non-production static bypass — allows local smoke testing without Backstage.
-    settings = get_settings()
-    if not settings.is_production and settings.server.DEV_BYPASS_TOKEN:
-        if credentials.credentials == settings.server.DEV_BYPASS_TOKEN:
+    server_settings = get_server_settings()
+    app_settings = get_app_settings()
+    if not app_settings.is_production and server_settings.DEV_BYPASS_TOKEN:
+        if credentials.credentials == server_settings.DEV_BYPASS_TOKEN:
             log = logger.bind(bypass="dev_token")
             log.warning("dev_bypass_token_used")
             return User(

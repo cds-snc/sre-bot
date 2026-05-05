@@ -1,6 +1,7 @@
 """Google Workspace integration settings."""
 
 import json
+from functools import lru_cache
 from typing import Any, Optional, cast
 
 from pydantic import Field, field_validator
@@ -218,3 +219,15 @@ class GoogleResourcesConfig(IntegrationSettings):
     def sre_calendar_id(self) -> str:
         """SRE Calendar ID."""
         return self._get_resource("cal", "sre")
+
+
+@lru_cache(maxsize=1)
+def get_google_workspace_settings() -> GoogleWorkspaceSettings:
+    """Singleton provider for Google Workspace integration settings."""
+    return GoogleWorkspaceSettings()
+
+
+@lru_cache(maxsize=1)
+def get_google_resources_config() -> GoogleResourcesConfig:
+    """Singleton provider for Google Resources configuration."""
+    return GoogleResourcesConfig()

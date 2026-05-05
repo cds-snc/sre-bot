@@ -1,12 +1,22 @@
 """Fixtures for infrastructure event system tests."""
 
-import pytest
 from datetime import datetime
 from uuid import uuid4
 from unittest.mock import MagicMock
 
+import pytest
+
 from infrastructure.events.models import Event
-from infrastructure.events.dispatcher import clear_handlers
+from infrastructure.events.service import EventDispatcher
+from infrastructure.services.providers import get_event_dispatcher
+
+
+@pytest.fixture(autouse=True)
+def clear_event_dispatcher_cache() -> None:
+    """Clear cached dispatcher singleton between tests for isolation."""
+    get_event_dispatcher.cache_clear()
+    yield
+    get_event_dispatcher.cache_clear()
 
 
 @pytest.fixture
@@ -15,11 +25,11 @@ def event_factory():
 
     def _factory(
         event_type: str = "test.event",
-        timestamp: datetime = None,
+        timestamp: datetime | None = None,
         correlation_id=None,
         user_email: str = "test@example.com",
-        metadata: dict = None,
-    ):
+        metadata: dict | None = None,
+    ) -> Event[dict]:
         return Event(
             event_type=event_type,
             timestamp=timestamp or datetime.now(),
@@ -32,60 +42,16 @@ def event_factory():
 
 
 @pytest.fixture
-def clear_event_handlers():
-    """Clear event handlers before and after test."""
-    clear_handlers()
-    yield
-    clear_handlers()
+def dispatcher() -> EventDispatcher:
+    """Fresh EventDispatcher instance for each test."""
+    event_dispatcher = EventDispatcher()
+    yield event_dispatcher
+    event_dispatcher.shutdown_executor(wait=False)
 
 
 @pytest.fixture
-def mock_event_handler():
-    """Mock event handler function."""
-    return MagicMock()
-
-
-@pytest.fixture
-def mock_sentinel_client():
-    """Mock Sentinel client for audit handler testing."""
-    mock = MagicMock()
-    mock.log_to_sentinel = MagicMock(return_value={"success": True})
-    return mock
-
-
-@pytest.fixture
-def discovery_fixture_path(tmp_path):
-    """Create a temporary module structure for discovery testing.
-
-    Returns a Path to a temporary modules directory with test handlers.
-    """
-    # Create temporary module structure
-    modules_dir = tmp_path / "modules"
-    modules_dir.mkdir()
-
-    # Create __init__.py
-    (modules_dir / "__init__.py").write_text("")
-
-    # Create a test feature module
-    test_module_dir = modules_dir / "test_feature"
-    test_module_dir.mkdir()
-    (test_module_dir / "__init__.py").write_text("")
-
-    # Create events.handlers module
-    events_dir = test_module_dir / "events"
-    events_dir.mkdir()
-    (events_dir / "__init__.py").write_text("")
-
-    handlers_file = events_dir / "handlers.py"
-    handlers_file.write_text(
-        '''
-from infrastructure.events import register_event_handler, Event
-
-@register_event_handler("test.event")
-def handle_test_event(event: Event) -> None:
-    """Test event handler."""
-    pass
-'''
-    )
-
-    return modules_dir
+def mock_handler() -> MagicMock:
+    """Mock event handler with a stable function name for logging assertions."""
+    handler = MagicMock()
+    handler.__name__ = "mock_handler"
+    return handler

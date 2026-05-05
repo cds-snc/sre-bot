@@ -1,6 +1,7 @@
 """Commands feature settings."""
 
 import json
+from functools import lru_cache
 from typing import Any, Optional
 
 from pydantic import Field, field_validator
@@ -76,3 +77,9 @@ class CommandsSettings(FeatureSettings):
                     f"Invalid COMMAND_PROVIDERS JSON: {e} (value: {s[:80]}...)"
                 ) from e
         raise ValueError("COMMAND_PROVIDERS must be a JSON string or a mapping")
+
+
+@lru_cache(maxsize=1)
+def get_commands_settings() -> CommandsSettings:
+    """Singleton provider for commands feature settings."""
+    return CommandsSettings()

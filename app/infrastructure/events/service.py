@@ -1,118 +1,130 @@
-"""Event dispatcher service for dependency injection.
+"""Blinker-backed event dispatcher facade.
 
-Provides a class-based interface to the event system for easier DI and testing.
+Provides error-isolated in-process event dispatch with a DI-friendly API.
 """
 
-from typing import Any, Callable, List
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
+from typing import Any, Callable
+
+import blinker
+import structlog
 
 from infrastructure.events.models import Event
-from infrastructure.events.dispatcher import (
-    dispatch_event,
-    dispatch_background,
-    register_event_handler,
-    start_event_executor,
-    shutdown_event_executor,
-    get_registered_events,
-    get_handlers_for_event,
-)
+
+logger = structlog.get_logger()
 
 
 class EventDispatcher:
-    """Class-based event dispatcher service.
+    """Event dispatcher that wraps blinker signals behind a stable facade."""
 
-    Wraps the module-level event functions in a class interface to support
-    dependency injection and easier testing with mocks.
+    def __init__(self) -> None:
+        self._namespace = blinker.Namespace()
+        self._executor: ThreadPoolExecutor | None = None
+        self._executor_lock = Lock()
+        self._executor_shutdown = False
 
-    This is a thin facade - all actual work is delegated to the module-level
-    functions in infrastructure.events.dispatcher.
+    def _get_signal(self, event_type: str) -> blinker.NamedSignal:
+        """Get or create a signal for the event type."""
+        return self._namespace.signal(event_type)
 
-    Usage:
-        # Via dependency injection
-        from infrastructure.services import EventDispatcherDep
+    def register_handler(
+        self, event_type: str, handler: Callable[[Event], Any]
+    ) -> None:
+        """Register a handler for an event type."""
+        signal = self._get_signal(event_type)
+        signal.connect(handler, weak=False)
 
-        @router.post("/action")
-        def perform_action(dispatcher: EventDispatcherDep):
-            event = Event(event_type="action.performed", user_email="user@example.com")
-            dispatcher.dispatch(event)
+        handler_name = getattr(handler, "__name__", repr(handler))
+        log = logger.bind(handler=handler_name, event_type=event_type)
+        log.info(
+            "event_handler_registered",
+            handler_count=len(list(signal.receivers_for(blinker.ANY))),
+        )
 
-        # Direct instantiation
-        from infrastructure.events import EventDispatcher
+    def dispatch(self, event: Event) -> None:
+        """Dispatch synchronously with per-handler error isolation."""
+        signal = self._get_signal(event.event_type)
+        log = logger.bind(
+            event_type=event.event_type,
+            correlation_id=str(event.correlation_id),
+        )
 
-        dispatcher = EventDispatcher()
-        dispatcher.dispatch(event)
-    """
+        receivers = list(signal.receivers_for(blinker.ANY))
+        log.info("dispatching_event", handler_count=len(receivers))
 
-    def dispatch(self, event: Event) -> List[Any]:
-        """Dispatch event synchronously to all registered handlers.
-
-        Args:
-            event: Event to dispatch
-
-        Returns:
-            List of return values from all handlers
-        """
-        return dispatch_event(event)
+        for receiver in receivers:
+            try:
+                receiver(event)
+            except Exception:
+                handler_name = getattr(receiver, "__name__", repr(receiver))
+                log.exception("event_handler_failed", handler=handler_name)
 
     def dispatch_background(self, event: Event) -> None:
-        """Dispatch event asynchronously in background thread.
+        """Submit dispatch work to the background executor."""
+        executor = self._get_or_create_executor()
+        if executor is None:
+            log = logger.bind(
+                event_type=event.event_type,
+                correlation_id=str(event.correlation_id),
+            )
+            log.error("event_executor_unavailable")
+            return
 
-        Fire-and-forget semantics. Exceptions are caught and logged.
+        try:
+            executor.submit(self._background_worker, event)
+        except Exception:
+            log = logger.bind(
+                event_type=event.event_type,
+                correlation_id=str(event.correlation_id),
+            )
+            log.exception("failed_to_submit_event_to_executor")
 
-        Args:
-            event: Event to dispatch
-        """
-        dispatch_background(event)
+    def _background_worker(self, event: Event) -> None:
+        """Worker that reuses synchronous dispatch behavior."""
+        self.dispatch(event)
 
-    def register_handler(self, event_type: str) -> Callable:
-        """Decorator to register an event handler.
-
-        Args:
-            event_type: Type of event to handle (e.g., 'group.member.added')
-
-        Returns:
-            Decorator function that registers the handler
-
-        Usage:
-            dispatcher = EventDispatcher()
-
-            @dispatcher.register_handler("my.event")
-            def handle_my_event(event: Event):
-                # Handle the event
-                pass
-        """
-        return register_event_handler(event_type)
+    def _get_or_create_executor(
+        self, max_workers: int = 4
+    ) -> ThreadPoolExecutor | None:
+        """Lazily create the background executor unless shutdown was requested."""
+        with self._executor_lock:
+            if self._executor_shutdown:
+                return None
+            if self._executor is None:
+                self._executor = ThreadPoolExecutor(max_workers=max_workers)
+                logger.debug(
+                    "created_background_event_executor",
+                    max_workers=max_workers,
+                )
+            return self._executor
 
     def start_executor(self, max_workers: int = 4) -> None:
-        """Start the background thread pool executor.
-
-        Args:
-            max_workers: Maximum number of worker threads
-        """
-        start_event_executor(max_workers=max_workers)
+        """Explicitly start the background executor."""
+        self._get_or_create_executor(max_workers=max_workers)
 
     def shutdown_executor(self, wait: bool = True) -> None:
-        """Shutdown the background executor.
+        """Shut down the background executor. Idempotent."""
+        with self._executor_lock:
+            if self._executor is None:
+                self._executor_shutdown = True
+                return
+            try:
+                self._executor.shutdown(wait=wait)
+                logger.debug("background_event_executor_shut_down", wait=wait)
+            finally:
+                self._executor = None
+                self._executor_shutdown = True
 
-        Args:
-            wait: If True, wait for pending tasks to complete
-        """
-        shutdown_event_executor(wait=wait)
+    def get_registered_event_types(self) -> list[str]:
+        """Get event types that currently have at least one handler."""
+        return [
+            name
+            for name, signal in self._namespace.items()
+            if list(signal.receivers_for(blinker.ANY))
+        ]
 
-    def get_registered_events(self) -> List[str]:
-        """Get list of all registered event types.
-
-        Returns:
-            List of event type strings
-        """
-        return get_registered_events()
-
-    def get_handlers_for_event(self, event_type: str) -> List[Callable]:
-        """Get all handlers registered for a specific event type.
-
-        Args:
-            event_type: Event type to query
-
-        Returns:
-            List of handler functions
-        """
-        return get_handlers_for_event(event_type)
+    def get_handler_count(self, event_type: str) -> int:
+        """Get number of handlers registered for an event type."""
+        signal = self._get_signal(event_type)
+        return len(list(signal.receivers_for(blinker.ANY)))

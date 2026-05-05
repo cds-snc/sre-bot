@@ -1,5 +1,7 @@
 """Retry system infrastructure settings."""
 
+from functools import lru_cache
+
 from pydantic import Field
 
 from infrastructure.configuration.base import InfrastructureSettings
@@ -95,3 +97,9 @@ class RetrySettings(InfrastructureSettings):
         alias="RETRY_CLAIM_LEASE_SECONDS",
         description="Duration to hold claim on retry record (seconds, 5 minutes)",
     )
+
+
+@lru_cache(maxsize=1)
+def get_retry_settings() -> RetrySettings:
+    """Singleton provider for retry infrastructure settings."""
+    return RetrySettings()

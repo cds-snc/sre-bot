@@ -167,30 +167,6 @@ def handle_webhooks_command(payload: CommandPayload) -> CommandResponse:
         return CommandResponse(message="Webhooks command executed", ephemeral=True)
 
 
-def handle_groups_command(payload: CommandPayload) -> CommandResponse:
-    """Handle /sre groups Slack command.
-
-    Args:
-        payload: Command payload from Slack platform provider
-
-    Returns:
-        CommandResponse formatted for Slack
-    """
-    logger.info("command_received", command="groups", text=payload.text)
-
-    # Groups module uses the new architecture with its own command registry
-    # For now, direct users to use the full groups interface
-    # TODO: Migrate groups module to use platform providers instead of legacy commands
-    return CommandResponse(
-        message=(
-            "Groups management is available through the comprehensive groups interface.\n"
-            "For now, please use the legacy command structure or API endpoints.\n"
-            "Full platform migration coming soon."
-        ),
-        ephemeral=True,
-    )
-
-
 def register_commands(provider: "SlackPlatformProvider") -> None:
     """Register SRE module commands with Slack provider.
 
@@ -227,13 +203,4 @@ def register_commands(provider: "SlackPlatformProvider") -> None:
         description="Manage webhooks",
         description_key="sre.subcommands.webhooks.description",
         legacy_mode=True,
-    )
-
-    provider.register_command(
-        command="groups",
-        handler=handle_groups_command,
-        parent="sre",
-        description="Manage user groups",
-        description_key="sre.subcommands.groups.description",
-        legacy_mode=True,  # TODO: Migrate to new command architecture
     )

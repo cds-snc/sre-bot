@@ -65,8 +65,8 @@ class TestCreateRetryStore:
         config = retry_config_factory()
 
         # Update settings for DynamoDB
-        mock_settings.retry.backend = "dynamodb"
-        mock_settings.retry.dynamodb_table_name = "explicit-table"
+        mock_settings.backend = "dynamodb"
+        mock_settings.dynamodb_table_name = "explicit-table"
 
         monkeypatch.setattr(
             "infrastructure.resilience.retry.dynamodb_store.dynamodb_next",

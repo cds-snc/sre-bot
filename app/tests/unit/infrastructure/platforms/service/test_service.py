@@ -1,9 +1,12 @@
 """Tests for PlatformService."""
 
 import pytest
+from unittest.mock import MagicMock
 
+from infrastructure.configuration.infrastructure.platforms import PlatformsSettings
 from infrastructure.operations import OperationResult
 from infrastructure.platforms.capabilities.models import PlatformCapability
+from infrastructure.platforms.capabilities.models import create_capability_declaration
 from infrastructure.platforms.exceptions import (
     CapabilityNotSupportedError,
     ProviderNotFoundError,
@@ -17,10 +20,6 @@ class MockProvider(BasePlatformProvider):
     """Mock provider for testing."""
 
     def __init__(self, name="mock", version="1.0.0", enabled=True):
-        from infrastructure.platforms.capabilities.models import (
-            create_capability_declaration,
-        )
-
         self._name = name
         self._version = version
         self._enabled = enabled
@@ -91,21 +90,22 @@ def clear_registry():
 
 
 @pytest.fixture
-def mock_settings(make_mock_settings):
-    """Create mock settings with platforms configuration."""
-    return make_mock_settings(
-        **{
-            "platforms.slack.ENABLED": False,
-            "platforms.teams.ENABLED": False,
-            "platforms.discord.ENABLED": False,
-        }
-    )
+def mock_settings():
+    """Create mock PlatformsSettings for platform service tests."""
+    settings = MagicMock(spec=PlatformsSettings)
+    settings.slack = MagicMock()
+    settings.slack.ENABLED = False
+    settings.teams = MagicMock()
+    settings.teams.ENABLED = False
+    settings.discord = MagicMock()
+    settings.discord.ENABLED = False
+    return settings
 
 
 @pytest.fixture
 def service(mock_settings):
     """Create PlatformService instance."""
-    return PlatformService(settings=mock_settings)
+    return PlatformService(platforms_settings=mock_settings)
 
 
 @pytest.mark.unit
@@ -114,7 +114,7 @@ class TestPlatformServiceInitialization:
 
     def test_initialization(self, mock_settings):
         """Test service initializes with settings."""
-        service = PlatformService(settings=mock_settings)
+        service = PlatformService(platforms_settings=mock_settings)
 
         assert service._settings is mock_settings
         assert service._registry is not None

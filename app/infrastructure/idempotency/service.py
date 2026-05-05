@@ -5,9 +5,13 @@ Provides a class-based interface to the idempotency cache for easier DI and test
 
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
+from infrastructure.idempotency.dynamodb import DynamoDBCache
+
 if TYPE_CHECKING:
     from infrastructure.idempotency.cache import IdempotencyCache
-    from infrastructure.configuration import Settings
+    from infrastructure.configuration.infrastructure.idempotency import (
+        IdempotencySettings,
+    )
 
 
 class IdempotencyService:
@@ -44,20 +48,19 @@ class IdempotencyService:
     """
 
     def __init__(
-        self, settings: "Settings", cache: Optional["IdempotencyCache"] = None
+        self,
+        idempotency_settings: "IdempotencySettings",
+        cache: Optional["IdempotencyCache"] = None,
     ):
         """Initialize idempotency service.
 
         Args:
-            settings: Settings instance (required, passed from provider).
+            idempotency_settings: Narrow idempotency settings slice.
             cache: Optional pre-configured IdempotencyCache instance.
                   If not provided, creates DynamoDBCache with settings.
         """
         if cache is None:
-            # Import here to avoid circular dependency
-            from infrastructure.idempotency.dynamodb import DynamoDBCache
-
-            cache = DynamoDBCache(settings=settings)
+            cache = DynamoDBCache(idempotency_settings=idempotency_settings)
 
         self._cache = cache
 
