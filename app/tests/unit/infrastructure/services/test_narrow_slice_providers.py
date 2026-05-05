@@ -80,23 +80,25 @@ class TestMaxMindClientNarrowSlice:
 
 
 class TestIdempotencyServiceNarrowSlice:
-    """IdempotencyService accepts idempotency_settings instead of full Settings."""
+    """IdempotencyService accepts only a pre-constructed cache (no settings)."""
 
-    def test_accepts_idempotency_settings_with_cache(self):
-        """IdempotencyService constructs with idempotency_settings + injected cache."""
-        mock_settings = MagicMock(spec=IdempotencySettings)
+    def test_accepts_injected_cache(self):
+        """IdempotencyService constructs with a pre-built cache."""
         mock_cache = MagicMock()
-        service = IdempotencyService(
-            idempotency_settings=mock_settings, cache=mock_cache
-        )
+        service = IdempotencyService(cache=mock_cache)
         assert service is not None
 
-    def test_rejects_full_settings_kwarg(self):
-        """IdempotencyService does not accept 'settings' kwarg."""
-        mock_settings = MagicMock()
+    def test_rejects_settings_kwarg(self):
+        """IdempotencyService does not accept 'settings' or 'idempotency_settings' kwargs."""
         mock_cache = MagicMock()
         with pytest.raises(TypeError):
-            IdempotencyService(settings=mock_settings, cache=mock_cache)
+            IdempotencyService(settings=MagicMock(), cache=mock_cache)
+
+    def test_rejects_idempotency_settings_kwarg(self):
+        """IdempotencyService no longer accepts idempotency_settings (moved to providers)."""
+        mock_cache = MagicMock()
+        with pytest.raises(TypeError):
+            IdempotencyService(idempotency_settings=MagicMock(), cache=mock_cache)
 
 
 class TestResilienceServiceNarrowSlice:
@@ -207,13 +209,13 @@ class TestProvidersDontCallGetSettings:
             patch(
                 "infrastructure.services.providers.get_idempotency_settings"
             ) as mock_idempotency,
+            patch(
+                "infrastructure.services.providers.DynamoDBCache"
+            ) as mock_dynamodb_cache,
         ):
             mock_idempotency.return_value = MagicMock(spec=IdempotencySettings)
-            with patch(
-                "infrastructure.idempotency.service.IdempotencyService.__init__",
-                return_value=None,
-            ):
-                get_idempotency_service()
+            mock_dynamodb_cache.return_value = MagicMock()
+            get_idempotency_service()
             mock_get_settings.assert_not_called()
             mock_idempotency.assert_called_once()
         get_idempotency_service.cache_clear()
