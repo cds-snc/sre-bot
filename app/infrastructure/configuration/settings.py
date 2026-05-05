@@ -1,5 +1,6 @@
 """SRE Bot configuration settings - main aggregator."""
 
+import warnings
 from typing import Any, Callable
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -147,6 +148,14 @@ class Settings(BaseSettings):
         Args:
             **kwargs: Optional overrides for specific settings sections.
         """
+        warnings.warn(
+            "Settings aggregator is deprecated. Use domain-specific providers "
+            "(e.g., get_slack_settings(), get_server_settings()). "
+            "See ADR-0055 Standard 4.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         settings_map: dict[str, Callable[[], Any]] = {
             # Integrations
             "slack": get_slack_settings,
