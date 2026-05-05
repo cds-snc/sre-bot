@@ -1,5 +1,7 @@
 """Idempotency cache factory."""
 
+from typing import Optional
+
 import structlog
 from infrastructure.idempotency.cache import IdempotencyCache
 from infrastructure.idempotency.dynamodb import DynamoDBCache
@@ -8,7 +10,7 @@ from infrastructure.configuration.infrastructure.idempotency import IdempotencyS
 logger = structlog.get_logger().bind(component="idempotency.factory")
 
 # Singleton cache instance
-_cache_instance: IdempotencyCache = None
+_cache_instance: Optional[IdempotencyCache] = None
 
 
 def get_cache(idempotency_settings: IdempotencySettings) -> IdempotencyCache:

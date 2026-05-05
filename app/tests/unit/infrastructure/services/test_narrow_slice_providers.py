@@ -209,13 +209,13 @@ class TestProvidersDontCallGetSettings:
             patch(
                 "infrastructure.services.providers.get_idempotency_settings"
             ) as mock_idempotency,
+            patch(
+                "infrastructure.services.providers.DynamoDBCache"
+            ) as mock_dynamodb_cache,
         ):
             mock_idempotency.return_value = MagicMock(spec=IdempotencySettings)
-            with patch(
-                "infrastructure.idempotency.service.IdempotencyService.__init__",
-                return_value=None,
-            ):
-                get_idempotency_service()
+            mock_dynamodb_cache.return_value = MagicMock()
+            get_idempotency_service()
             mock_get_settings.assert_not_called()
             mock_idempotency.assert_called_once()
         get_idempotency_service.cache_clear()
