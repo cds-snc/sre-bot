@@ -31,7 +31,6 @@ class TestSRECommandRegistration:
         assert "sre.version" in registered_commands
         assert "sre.incident" in registered_commands
         assert "sre.webhooks" in registered_commands
-        assert "sre.groups" in registered_commands
 
     def test_should_set_correct_description_keys(self, slack_provider):
         """SRE commands should have translation keys for i18n."""
@@ -209,41 +208,3 @@ class TestWebhooksCommandHandler:
         # Assert
         call_args = mock_webhook_handler.call_args
         assert call_args[1]["args"] == []
-
-
-@pytest.mark.integration
-class TestGroupsCommandHandler:
-    """Test /sre groups command handler integration."""
-
-    def test_should_return_migration_message(self):
-        """Groups handler should inform about migration to new architecture."""
-        # Arrange
-        payload = CommandPayload(
-            text="list",
-            user_id="U12345",
-            channel_id="C12345",
-        )
-
-        # Act
-        response = sre_slack.handle_groups_command(payload)
-
-        # Assert
-        assert isinstance(response, CommandResponse)
-        assert "Groups management" in response.message
-        assert response.ephemeral is True
-
-    def test_should_handle_any_subcommand_text(self):
-        """Groups handler should respond consistently regardless of text."""
-        # Arrange
-        payload = CommandPayload(
-            text="create test-group",
-            user_id="U12345",
-            channel_id="C12345",
-        )
-
-        # Act
-        response = sre_slack.handle_groups_command(payload)
-
-        # Assert
-        assert response.message is not None
-        assert response.ephemeral is True
