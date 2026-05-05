@@ -11,7 +11,8 @@ from uuid import uuid4
 import pytest
 
 from infrastructure.audit.models import AuditEvent
-from infrastructure.audit.service import AuditTrailService
+from infrastructure.audit.protocol import AuditTrailService
+from infrastructure.audit.service import DynamoDBAuditTrailService
 from infrastructure.operations.result import OperationResult
 
 
@@ -28,7 +29,7 @@ def _make_event(**kwargs) -> AuditEvent:
 
 
 def _make_service(storage: MagicMock) -> AuditTrailService:
-    return AuditTrailService(storage=storage)
+    return DynamoDBAuditTrailService(storage=storage)
 
 
 @pytest.mark.unit

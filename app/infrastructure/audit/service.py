@@ -25,8 +25,8 @@ def _compute_ttl_timestamp(retention_days: int) -> int:
     return int(expiry.timestamp())
 
 
-class AuditTrailService:
-    """Audit trail service for structured event storage and retrieval.
+class DynamoDBAuditTrailService:
+    """DynamoDB implementation of audit trail service for structured event storage and retrieval.
 
     Uses ``StorageService`` for all DynamoDB I/O so serialization,
     pagination, and error normalisation are handled consistently.
@@ -39,6 +39,7 @@ class AuditTrailService:
         def write_event(audit_trail: AuditTrailServiceDep, event: AuditEvent):
             success = audit_trail.write_audit_event(event)
             return {"written": success}
+
     """
 
     def __init__(self, storage: "StorageService") -> None:

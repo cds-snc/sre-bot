@@ -8,6 +8,6 @@ This package provides:
 """
 
 from infrastructure.audit.models import AuditEvent
-from infrastructure.audit.service import AuditTrailService
+from infrastructure.audit.protocol import AuditTrailService
 
 __all__ = ["AuditEvent", "AuditTrailService"]
