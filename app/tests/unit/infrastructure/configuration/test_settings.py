@@ -106,7 +106,6 @@ class TestSettings:
         assert hasattr(settings, "slack")
         assert hasattr(settings, "aws")
         assert hasattr(settings, "server")
-        assert hasattr(settings, "groups")
 
 
 @pytest.mark.unit

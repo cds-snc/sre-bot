@@ -17,17 +17,14 @@ from infrastructure.configuration.integrations.maxmind import MaxMindSettings
 from infrastructure.configuration.integrations.slack import SlackSettings
 from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
 from infrastructure.configuration.integrations.notify import NotifySettings
-from infrastructure.configuration.features.commands import CommandsSettings
 from infrastructure.identity.service import IdentityService
 from infrastructure.clients.maxmind.client import MaxMindClient
 from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
-from infrastructure.commands.service import CommandService
 from infrastructure.platforms.service import PlatformService
 from infrastructure.notifications.channels.chat import ChatChannel
 from infrastructure.services.providers import (
-    get_command_service,
     get_identity_service,
     get_idempotency_service,
     get_jwks_manager,
@@ -141,27 +138,6 @@ class TestNotificationServiceNarrowSlice:
         mock_dispatcher = MagicMock()
         with pytest.raises(TypeError):
             NotificationService(settings=mock_settings, dispatcher=mock_dispatcher)
-
-
-class TestCommandServiceNarrowSlice:
-    """CommandService accepts commands_settings instead of full Settings."""
-
-    def test_accepts_commands_settings(self):
-        """CommandService constructs with commands_settings parameter."""
-        mock_settings = MagicMock(spec=CommandsSettings)
-        service = CommandService(commands_settings=mock_settings)
-        assert service is not None
-
-    def test_constructs_without_settings(self):
-        """CommandService can construct with no settings (settings unused)."""
-        service = CommandService()
-        assert service is not None
-
-    def test_rejects_full_settings_kwarg(self):
-        """CommandService does not accept 'settings' kwarg."""
-        mock_settings = MagicMock()
-        with pytest.raises(TypeError):
-            CommandService(settings=mock_settings)
 
 
 class TestPlatformServiceNarrowSlice:
@@ -318,23 +294,6 @@ class TestProvidersDontCallGetSettings:
             mock_notification_ctor.assert_called_once()
 
         get_notification_service.cache_clear()
-
-    def test_get_command_service_uses_commands_settings(self):
-        """get_command_service uses get_commands_settings, not get_settings."""
-        get_command_service.cache_clear()
-        with (
-            patch(
-                "infrastructure.services.providers.get_settings"
-            ) as mock_get_settings,
-            patch(
-                "infrastructure.services.providers.get_commands_settings"
-            ) as mock_commands,
-        ):
-            mock_commands.return_value = MagicMock(spec=CommandsSettings)
-            get_command_service()
-            mock_get_settings.assert_not_called()
-            mock_commands.assert_called_once()
-        get_command_service.cache_clear()
 
     def test_get_platform_service_uses_platforms_settings(self):
         """get_platform_service uses get_platforms_settings, not get_settings."""

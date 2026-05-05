@@ -23,8 +23,6 @@ from infrastructure.configuration.integrations import (
     TrelloSettings,
 )
 from infrastructure.configuration.features import (
-    GroupsFeatureSettings,
-    CommandsSettings,
     IncidentFeatureSettings,
     AWSFeatureSettings,
     AtipSettings,
@@ -58,8 +56,6 @@ class TestSettingsStructure:
         """Verify all feature settings sections load correctly."""
         settings = get_settings()
         # Feature settings
-        assert hasattr(settings, "groups")
-        assert hasattr(settings, "commands")
         assert hasattr(settings, "feat_incident")
         assert hasattr(settings, "aws_feature")
         assert hasattr(settings, "atip")
@@ -80,11 +76,6 @@ class TestSettingsStructure:
         assert hasattr(settings.slack, "SLACK_TOKEN")
         assert hasattr(settings.aws, "AWS_REGION")
         assert hasattr(settings.google_workspace, "GOOGLE_DELEGATED_ADMIN_EMAIL")
-
-        # Feature fields
-        assert hasattr(settings.groups, "providers")
-        assert hasattr(settings.groups, "circuit_breaker_enabled")
-        assert hasattr(settings.commands, "providers")
 
         # Infrastructure fields
         assert hasattr(settings.retry, "enabled")
@@ -111,7 +102,6 @@ class TestSettingsStructure:
         """Verify settings classes inherit from appropriate base classes."""
         # Check inheritance
         assert issubclass(SlackSettings, IntegrationSettings)
-        assert issubclass(GroupsFeatureSettings, FeatureSettings)
         assert issubclass(RetrySettings, InfrastructureSettings)
 
     def test_settings_singleton_still_works(self):
@@ -152,8 +142,6 @@ class TestSettingsStructure:
         """Verify all feature settings classes can be instantiated."""
         # Test that all feature settings classes are functional
         instances = [
-            GroupsFeatureSettings(),
-            CommandsSettings(),
             IncidentFeatureSettings(),
             AWSFeatureSettings(),
             AtipSettings(),

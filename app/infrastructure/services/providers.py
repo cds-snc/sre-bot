@@ -29,7 +29,6 @@ from infrastructure.configuration.integrations.notify import get_notify_settings
 from infrastructure.configuration.integrations.google import (
     get_google_workspace_settings,
 )
-from infrastructure.configuration.features.commands import get_commands_settings
 from infrastructure.identity.service import IdentityService
 from infrastructure.security.jwks import JWKSManager
 from infrastructure.clients.aws import AWSClients
@@ -44,7 +43,6 @@ from infrastructure.notifications.service import NotificationService
 from infrastructure.notifications.channels.chat import ChatChannel
 from infrastructure.notifications.channels.email import EmailChannel
 from infrastructure.notifications.channels.sms import SMSChannel
-from infrastructure.commands.service import CommandService
 from infrastructure.storage.protocol import StorageService
 from infrastructure.storage.service import DynamoDBStorageService
 from infrastructure.audit.service import AuditTrailService
@@ -415,28 +413,6 @@ def get_notification_service() -> NotificationService:
         channels=channels,
         idempotency_service=idempotency_service,
     )
-
-
-@lru_cache(maxsize=1)
-def get_command_service() -> CommandService:
-    """Get application-scoped command service singleton.
-
-    Returns a CommandService instance that provides centralized command
-    registration and execution for all modules.
-
-    Usage:
-        from infrastructure.services import CommandServiceDep
-
-        @router.post("/commands/register")
-        def register_command(command_service: CommandServiceDep, module: str):
-            registry = command_service.get_registry(module)
-            commands = registry.get_all_commands()
-            return {"module": module, "commands": len(commands)}
-
-    Returns:
-        CommandService: Cached command service instance
-    """
-    return CommandService(commands_settings=get_commands_settings())
 
 
 @lru_cache(maxsize=1)
