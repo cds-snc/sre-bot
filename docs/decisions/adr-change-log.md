@@ -509,3 +509,34 @@ All three follow-up actions from ADR-0080 acceptance completed. All are editoria
 - Status set to Accepted. Migration map updated: ADR-0083 added to Tier-5 records and Target ADR Registry. Wave tracker updated.
 - Target retirement: 2026-09-01.
 - Follow-up actions: Amend ADR-0079 S2 to reference ADR-0083; amend ADR-0077 Category B table for EventDispatcher; amend ADR-0045 Compliance for event dispatcher delegation.
+
+---
+
+## 2026-05-05
+
+### ADR-0070 — GroupsFeatureSettings Retirement (Execution Progress)
+
+- `app/modules/groups/` fully removed from the codebase. Retirement criterion 1 complete.
+- `GroupsFeatureSettings` was already absent from `infrastructure/configuration/features/__init__.py`. Criterion 3 confirmed complete.
+- Blocking Prerequisite met: `app/packages/access/` has achieved feature parity for all group management operations previously served by the groups module.
+- ADR-0070 updated: `last_updated` set to 2026-05-05. `Blocking Prerequisite` section updated to reflect completion. `Execution Progress` section added with per-criterion checklist.
+- Remaining criteria: criterion 2 (`groups.py` settings file deletion — Phase 2 cleanup), criteria 4+5 (`core/config.py` frozen zone — Phase 3), criterion 6 (env var removal from deployment configs), criterion 7 (quality gates after cleanup).
+- Migration map updated: ADR-0070 status `Accepted` → `Executing (2/7 criteria met)`, target date `2026-09-30` → `Phase 2`.
+- Wave tracker updated: Wave 3.5 execution progress section added.
+
+### ADR-0071 — CommandsSettings Retirement (Execution Progress)
+
+- `app/infrastructure/commands/` package fully removed from the codebase (all Python source files deleted, including `service.py`, `providers/slack.py`, `providers/__init__.py`). Retirement criterion 1 complete.
+- `CommandsSettings` was already absent from `infrastructure/configuration/features/__init__.py`. Criterion 3 confirmed complete.
+- Blocking Prerequisites met: ADR-0059 and ADR-0078 accepted (Wave 4); per-platform hookimpl registration pattern (`SlackService`/`TeamsService`) fully replaces command infrastructure dispatch capabilities.
+- ADR-0071 updated: `last_updated` set to 2026-05-05. `Execution Progress` section added with per-criterion checklist and blocking prerequisite status.
+- Remaining criteria: criterion 2 (`commands.py` settings file deletion — Phase 2 PR-12), criteria 4+5 (`core/config.py` frozen zone — Phase 3), criterion 6 (`COMMAND_PROVIDERS` env var removal from deployment configs), criterion 7 (quality gates after cleanup).
+- Migration map updated: ADR-0071 status `Accepted` → `Executing (2/7 criteria met)`, target date `2026-09-30` → `Phase 2`.
+
+### Phase 2 Plan — PR-12 Revised
+
+- Phase 2 implementation plan updated to reflect commands infrastructure deletion.
+- PR-12 revised from "Command Providers — Deep Settings Dissolution" (service/provider refactoring, ~160 lines) to "Command Settings Cleanup — Dead Code Removal" (settings file deletion, ~90 lines deleted).
+- PR-12 is now a pure deletion: remove `app/infrastructure/configuration/features/commands.py` and strip `TestCommandsSettingsSingleton` from the singleton test file. No new code required.
+- Analogous cleanup for `groups.py` settings file is now identified as a parallel Phase 2 task (same pattern, same scope).
+- No frozen zone files (particularly `app/core/config.py`) may be touched during Phase 2.

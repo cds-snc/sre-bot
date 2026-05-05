@@ -73,6 +73,19 @@ Note: ADR-0025 was superseded by ADR-0078 and moved to `superseded/` during Wave
 
 ---
 
+## Wave 3.5 — Execution Progress
+
+ADR authoring complete. Code execution underway ahead of original 2026-09-30 schedule.
+
+| ADR | Title | Criteria Met | Remaining |
+|-----|-------|-------------|-----------|
+| 0070 | GroupsFeatureSettings Retirement | 2/7 (module deleted, `__init__.py` export removed) | groups.py settings file (Phase 2), `core/config.py` field (Phase 3 frozen zone), env var cleanup, quality gates |
+| 0071 | CommandsSettings Retirement | 2/7 (infrastructure package deleted, `__init__.py` export removed) | commands.py settings file (Phase 2 PR-12), `core/config.py` field (Phase 3 frozen zone), env var cleanup, quality gates |
+
+**Unblocked ahead of schedule:** Both blocking prerequisites have been met — `app/modules/groups/` removed (access parity achieved) and `app/infrastructure/commands/` removed (per-platform hookimpl migration complete per ADR-0059 + ADR-0078). Settings file cleanup (criteria 2) is the next actionable step for both, targeted in Phase 2.
+
+---
+
 ## Wave 5 — Pending Items
 
 Opens now (Wave 4 gate closed 2026-04-30).

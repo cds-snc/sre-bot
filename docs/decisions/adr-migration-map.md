@@ -47,8 +47,8 @@
 |----|-------|------|------|--------|-------------|
 | 0068 | Runtime Bootstrap SSM-to-Release-Phase Migration | Migration | 2.5 | Approved | 2026-05-12 |
 | 0069 | Port Binding Settings-Driven Contract Migration | Migration | 2.5 | Approved | 2026-05-12 |
-| 0070 | GroupsFeatureSettings Retirement | Deprecation | 3.5 | Accepted | 2026-09-30 |
-| 0071 | CommandsSettings Retirement | Deprecation | 3.5 | Accepted | 2026-09-30 |
+| 0070 | GroupsFeatureSettings Retirement | Deprecation | 3.5 | Executing (2/7 criteria met) | Phase 2 |
+| 0071 | CommandsSettings Retirement | Deprecation | 3.5 | Executing (2/7 criteria met) | Phase 2 |
 | 0072 | IncidentFeatureSettings Migration | Migration | 3.5 | Accepted | Phase C |
 | 0073 | AWSFeatureSettings Migration | Migration | 3.5 | Accepted | Phase C |
 | 0074 | AtipSettings Migration | Migration | 3.5 | Accepted | Phase C |

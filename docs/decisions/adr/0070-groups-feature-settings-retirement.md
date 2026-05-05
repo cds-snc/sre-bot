@@ -10,7 +10,7 @@ secondary_domains:
 owners:
  - SRE Team
 date_created: 2026-04-29
-last_updated: 2026-04-29
+last_updated: 2026-05-05
 last_reviewed: 2026-04-29
 next_review_due: 2026-08-27
 constrained_by:
@@ -80,7 +80,7 @@ ADR-0055 Standard 4 requires a Tier-5 record for each feature settings class in 
 
 ### Blocking Prerequisite
 
-Full removal of `app/modules/groups/`. The access package (`app/packages/access/`) must have achieved feature parity for all group management operations currently served by the groups module.
+Full removal of `app/modules/groups/`. ✅ **Complete (2026-05-05)** — `app/modules/groups/` has been deleted. The access package (`app/packages/access/`) has achieved feature parity for all group management operations previously served by the groups module.
 
 ### Retirement Criteria
 
@@ -97,6 +97,20 @@ All conditions must be true:
 ### Target Date
 
 2026-09-30 (contingent on access feature parity and groups module removal).
+
+## Execution Progress
+
+Tracked against the Retirement Criteria (2026-05-05):
+
+| # | Criterion | Status | Notes |
+|---|-----------|--------|-------|
+| 1 | `app/modules/groups/` deleted | ✅ Complete | Module removed; access package has feature parity |
+| 2 | `app/infrastructure/configuration/features/groups.py` deleted | ⏳ Pending | Analogous to PR-12 (settings dead-code cleanup) — targeted in Phase 2 |
+| 3 | `GroupsFeatureSettings` removed from `features/__init__.py` | ✅ Complete | Already absent from exports |
+| 4 | `Settings.groups` field removed from aggregator | ⏳ Blocked | `app/core/config.py` is frozen zone — deferred to Phase 3 thaw |
+| 5 | No `GroupsFeatureSettings` imports in codebase | ⏳ Pending | Residual imports in: frozen `app/core/config.py` (Phase 3) and singleton test (Phase 2 cleanup) |
+| 6 | All 13 env vars removed from deployment configs | ⏳ Pending | ECS task definitions, `.env` templates, SSM parameters to be cleaned up |
+| 7 | Quality gates pass | ⏳ Pending | After criteria 2 and test cleanup are complete |
 
 ## Consequences
 

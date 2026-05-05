@@ -10,7 +10,7 @@ secondary_domains:
 owners:
  - SRE Team
 date_created: 2026-04-29
-last_updated: 2026-04-29
+last_updated: 2026-05-05
 last_reviewed: 2026-04-29
 next_review_due: 2026-08-27
 constrained_by:
@@ -88,6 +88,25 @@ All conditions must be true:
 ### Target Date
 
 2026-09-30 (contingent on ADR-0059 and ADR-0078 authoring and per-platform hookimpl migration).
+
+## Execution Progress
+
+Tracked against the Retirement Criteria (2026-05-05):
+
+| # | Criterion | Status | Notes |
+|---|-----------|--------|-------|
+| 1 | `app/infrastructure/commands/` deleted | ✅ Complete | Package emptied — all Python source files removed |
+| 2 | `app/infrastructure/configuration/features/commands.py` deleted | ⏳ Pending | Targeted by Phase 2 PR-12 (settings dead-code cleanup) |
+| 3 | `CommandsSettings` removed from `features/__init__.py` | ✅ Complete | Already absent from exports |
+| 4 | `Settings.commands` field removed from aggregator | ⏳ Blocked | `app/core/config.py` is frozen zone — deferred to Phase 3 thaw |
+| 5 | No `CommandsSettings` imports in codebase | ⏳ Pending | Residual imports in: frozen `app/core/config.py` (Phase 3) and singleton test (PR-12) |
+| 6 | `COMMAND_PROVIDERS` env var removed from deployment configs | ⏳ Pending | ECS task definitions and SSM parameters to be cleaned up |
+| 7 | Quality gates pass | ⏳ Pending | After criteria 2 and test cleanup are complete |
+
+**Blocking Prerequisite status:**
+- ADR-0059 and ADR-0078 accepted: ✅ Complete (Wave 4)
+- Per-platform hookimpl migration complete: ✅ Complete — `app/infrastructure/commands/` removed
+- All command registrations migrated: ✅ Complete — per-platform `SlackService`/`TeamsService` hookimpl pattern in place
 
 ## Consequences
 
