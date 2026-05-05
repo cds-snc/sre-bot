@@ -7,7 +7,7 @@ from fastapi import Response
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
-from infrastructure.identity.models import IdentitySource, User
+from infrastructure.security.models import AuthPrincipalSource, User
 from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.services import get_current_user
 from packages.access.sync.providers import (
@@ -81,7 +81,7 @@ def _make_user() -> User:
         user_id="svc-account@example.com",
         email="svc-account@example.com",
         display_name="Test Service Account",
-        source=IdentitySource.API_JWT,
+        source=AuthPrincipalSource.API_JWT,
         platform_id="svc-account",
     )
 
