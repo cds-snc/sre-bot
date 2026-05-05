@@ -64,12 +64,14 @@ Note: ADR-0025 was superseded by ADR-0078 and moved to `superseded/` during Wave
 
 ---
 
-## Wave 2.5 — Pending Execution
+## Wave 2.5 — On Hold (Pending Full Infrastructure/Packages Refactoring)
 
 | ADR | Title | Due | Status |
 |-----|-------|-----|--------|
-| 0068 | Runtime Bootstrap SSM-to-Release-Phase Migration | 2026-05-12 | Approved (code change required) |
-| 0069 | Port Binding Settings-Driven Contract Migration | 2026-05-12 | Approved (atomic 4-file change) |
+| 0068 | Runtime Bootstrap SSM-to-Release-Phase Migration | Deferred | ⏸️ **ON HOLD** — Awaiting full infrastructure/packages refactoring + frozen packages migration decision |
+| 0069 | Port Binding Settings-Driven Contract Migration | Deferred | ⏸️ **ON HOLD** — Awaiting full infrastructure/packages refactoring + frozen packages migration decision |
+
+**Hold Notice (2026-05-05):** Both ADRs are approved and technically ready for implementation, but code changes to entry.sh and ECS task definitions are deferred pending architectural consolidation and frozen packages migration strategy. These are coordinated with Phase 3 planning.
 
 ---
 

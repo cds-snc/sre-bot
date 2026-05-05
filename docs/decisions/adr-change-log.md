@@ -119,6 +119,20 @@
 - Challenge review (amendment, normative): PASS. Saved to `reviews/adr-0045-review-2026-04-30.md`.
 - Delegation tracker Item #1 marked PASS.
 
+---
+
+## 2026-05-05
+
+### Phase 2 PR-15 & PR-16 — Strategic Hold (Entry.sh Track)
+
+- **Decision:** PR-15 (SSM migration — ADR-0068) and PR-16 (Port binding — ADR-0069) placed on indefinite hold.
+- **Rationale:** Full infrastructure/packages architectural refactoring must complete before entry.sh changes; additionally, team is considering further deferral until frozen packages (`app/modules/`) are migrated to new architecture.
+- **Impact:** Entry.sh related work is blocked; no SSM fetch or port binding task definition changes to be started.
+- **Documents Updated:**
+  - `tmp/phase2-implementation-plan.md`: Updated PR-15/16 status to "ON HOLD"; added "Work Hold Notice" section with entry.sh work guardrails.
+  - `docs/decisions/adr-wave-tracker.md`: Updated Wave 2.5 section with hold status and blocker notes.
+- **Related:** PR-13 (identity dissolution) completed 2026-05-05; Phase 2 remains on track for PR-14 (Protocol work) and PR-17 (deprecation warning).
+
 ### ADR-0047 — P6 Amendment (Backend-Selection Configuration)
 
 - Amended ADR-0047: added Principle 6 (Backend-Selection Configuration). When infrastructure services support multiple backing implementations (ADR-0045 P7), selection must be driven by a dedicated configuration key with dev-safe defaults.
