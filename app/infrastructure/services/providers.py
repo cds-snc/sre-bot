@@ -38,6 +38,7 @@ from infrastructure.i18n.service import TranslationService
 from infrastructure.i18n.models import Locale, TranslationKey
 from infrastructure.events.service import EventDispatcher
 from infrastructure.idempotency.service import IdempotencyService
+from infrastructure.idempotency.dynamodb import DynamoDBCache
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
 from infrastructure.notifications.channels.chat import ChatChannel
@@ -330,7 +331,9 @@ def get_idempotency_service() -> IdempotencyService:
     Returns:
         IdempotencyService: Cached idempotency service instance
     """
-    return IdempotencyService(idempotency_settings=get_idempotency_settings())
+    return IdempotencyService(
+        cache=DynamoDBCache(idempotency_settings=get_idempotency_settings())
+    )
 
 
 @lru_cache(maxsize=1)
