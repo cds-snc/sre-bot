@@ -7,7 +7,6 @@ Provides type aliases and provider functions for FastAPI dependency injection.
 from infrastructure.services.dependencies import (
     AppSettingsDep,
     SettingsDep,
-    IdentityServiceDep,
     JWKSManagerDep,
     CurrentUserDep,
     AWSClientsDep,
@@ -29,7 +28,6 @@ from infrastructure.services.dependencies import (
 from infrastructure.services.providers import (
     get_app_settings,
     get_settings,
-    get_identity_service,
     get_jwks_manager,
     get_aws_clients,
     get_google_workspace_clients,
@@ -67,7 +65,6 @@ __all__ = [
     # Core dependencies
     "AppSettingsDep",
     "SettingsDep",
-    "IdentityServiceDep",
     "JWKSManagerDep",
     "CurrentUserDep",
     "AWSClientsDep",
@@ -89,7 +86,6 @@ __all__ = [
     # Core providers
     "get_app_settings",
     "get_settings",
-    "get_identity_service",
     "get_jwks_manager",
     "get_aws_clients",
     "get_google_workspace_clients",

@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
-from infrastructure.identity.models import IdentitySource, User
+from infrastructure.security.models import AuthPrincipalSource, User
 from infrastructure.services import get_current_user
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.request.domain import AccessRequest, ApprovalDecision
@@ -86,7 +86,7 @@ def _make_user(email: str = "approver@example.com") -> User:
         user_id=email,
         email=email,
         display_name="Approver",
-        source=IdentitySource.API_JWT,
+        source=AuthPrincipalSource.API_JWT,
         platform_id=email,
     )
 

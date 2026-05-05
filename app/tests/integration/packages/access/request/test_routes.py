@@ -13,7 +13,7 @@ from typing import List
 import pytest
 from fastapi import HTTPException
 
-from infrastructure.identity.models import IdentitySource, User
+from infrastructure.security.models import AuthPrincipalSource, User
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.request.domain import AccessRequest, ApprovalDecision
 from packages.access.request.schemas import (
@@ -48,7 +48,7 @@ def _make_user(email: str = "actor@example.com") -> User:
         user_id=email,
         email=email,
         display_name="Test User",
-        source=IdentitySource.API_JWT,
+        source=AuthPrincipalSource.API_JWT,
         platform_id=email,
     )
 

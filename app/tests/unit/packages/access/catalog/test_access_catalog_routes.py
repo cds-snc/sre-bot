@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
-from infrastructure.identity.models import IdentitySource, User
+from infrastructure.security.models import AuthPrincipalSource, User
 from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.services import get_current_user
 from packages.access.catalog.providers import get_catalog_service, get_catalog_settings
@@ -74,7 +74,7 @@ def _make_user(email: str = "caller@example.com") -> User:
         user_id=email,
         email=email,
         display_name="Test Caller",
-        source=IdentitySource.API_JWT,
+        source=AuthPrincipalSource.API_JWT,
         platform_id=email,
     )
 

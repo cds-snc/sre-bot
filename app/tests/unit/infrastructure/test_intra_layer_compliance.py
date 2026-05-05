@@ -15,10 +15,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from infrastructure.audit.service import AuditTrailService
-from infrastructure.identity.models import IdentitySource, User
 from infrastructure.notifications.channels.chat import ChatChannel
 from infrastructure.notifications.channels.email import EmailChannel
 from infrastructure.notifications.channels.sms import SMSChannel
+from infrastructure.security.models import AuthPrincipalSource, User
 from infrastructure.storage.service import DynamoDBStorageService
 
 _APP_ROOT = Path(__file__).parents[3]  # workspace/app/
@@ -116,20 +116,19 @@ class TestAuditServiceCompliance:
 
 @pytest.mark.unit
 class TestSecurityCurrentUserCompliance:
-    """security/current_user.py must not runtime-import IdentityService."""
+    """security/current_user.py must not runtime-import dissolved identity services."""
 
     def test_identity_service_not_runtime_imported(self):
-        """IdentityService must be under TYPE_CHECKING only."""
+        """Identity service package must not be runtime-imported."""
         source = _read_source("infrastructure/security/current_user.py")
         runtime = _runtime_imports(source)
-        assert "infrastructure.identity.service" not in runtime, (
-            "IdentityService must not be runtime-imported in security/current_user.py "
-            "(ADR-0076 S3.3 — use TYPE_CHECKING)."
-        )
+        assert (
+            "infrastructure.identity.service" not in runtime
+        ), "IdentityService must not be runtime-imported in security/current_user.py."
 
     def test_identity_value_types_may_be_runtime_imported(self):
-        """IdentitySource and User (value types) may be imported at runtime (S1)."""
-        assert IdentitySource is not None
+        """Security principal value types may be imported at runtime (S1)."""
+        assert AuthPrincipalSource is not None
         assert User is not None
 
 
