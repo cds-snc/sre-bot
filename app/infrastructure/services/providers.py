@@ -65,7 +65,7 @@ from infrastructure.directory.provider import DirectoryProvider
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """
-    Get application-scoped settings singleton.
+    Deprecated: get application-scoped settings singleton.
 
     This is the single source of truth for settings across the entire application.
     The @lru_cache decorator ensures only ONE instance is created per process,
@@ -83,6 +83,10 @@ def get_settings() -> Settings:
 
     Returns:
         Settings: Cached settings instance loaded from environment.
+
+    Note:
+        Deprecated in ADR-0055 Standard 4. Prefer domain-specific settings
+        providers (for example get_slack_settings(), get_server_settings()).
     """
     return Settings()
 
