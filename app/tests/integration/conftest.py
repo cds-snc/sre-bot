@@ -7,6 +7,8 @@ application lifespan initialization.
 from unittest.mock import MagicMock
 
 import pytest
+from fastapi.testclient import TestClient
+from server.server import handler
 
 
 @pytest.fixture(autouse=True)
@@ -19,7 +21,7 @@ def _autouse_mock_dynamodb_audit(monkeypatch):
     """
     mock = MagicMock()
     monkeypatch.setattr(
-        "infrastructure.audit.service.AuditTrailService.write_audit_event",
+        "infrastructure.audit.service.DynamoDBAuditTrailService.write_audit_event",
         mock,
         raising=False,
     )
@@ -129,9 +131,6 @@ def app_with_lifespan(monkeypatch):
     Returns:
         TestClient: FastAPI TestClient with real app initialized
     """
-    from fastapi.testclient import TestClient
-    from server.server import handler
-
     mock_directory_provider = MagicMock()
     mock_directory_provider.warmup.return_value = MagicMock(
         is_success=True,

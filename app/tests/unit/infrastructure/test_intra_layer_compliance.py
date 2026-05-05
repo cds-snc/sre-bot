@@ -14,7 +14,7 @@ from typing import Set
 from unittest.mock import MagicMock, patch
 
 import pytest
-from infrastructure.audit.service import AuditTrailService
+from infrastructure.audit.service import DynamoDBAuditTrailService
 from infrastructure.notifications.channels.chat import ChatChannel
 from infrastructure.notifications.channels.email import EmailChannel
 from infrastructure.notifications.channels.sms import SMSChannel
@@ -110,7 +110,7 @@ class TestAuditServiceCompliance:
     def test_audit_service_accepts_storage_via_constructor(self):
         """AuditTrailService still accepts a StorageService via its constructor."""
         mock_storage = MagicMock()
-        service = AuditTrailService(storage=mock_storage)
+        service = DynamoDBAuditTrailService(storage=mock_storage)
         assert service is not None
 
 
