@@ -203,7 +203,7 @@ class TestNotificationChannelCircuitBreakerCompliance:
         mock_settings = MagicMock()
         mock_settings.GOOGLE_DELEGATED_ADMIN_EMAIL = "admin@example.com"
         channel = EmailChannel(
-            google_workspace_settings=mock_settings,
+            email_provider_settings=mock_settings,
             circuit_breaker=None,
         )
         assert channel is not None
