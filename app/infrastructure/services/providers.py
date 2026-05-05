@@ -384,6 +384,8 @@ def get_notification_service() -> NotificationService:
     Returns:
         NotificationService: Cached notification service instance
     """
+    email_provider_settings = get_google_workspace_settings()
+    notify_settings = get_notify_settings()
     resilience_service = get_resilience_service()
     idempotency_service = get_idempotency_service()
 
@@ -400,11 +402,11 @@ def get_notification_service() -> NotificationService:
     channels = {
         "chat": ChatChannel(circuit_breaker=chat_cb),
         "email": EmailChannel(
-            google_workspace_settings=get_google_workspace_settings(),
+            email_provider_settings=email_provider_settings,
             circuit_breaker=email_cb,
         ),
         "sms": SMSChannel(
-            notify_settings=get_notify_settings(),
+            notify_settings=notify_settings,
             circuit_breaker=sms_cb,
         ),
     }
