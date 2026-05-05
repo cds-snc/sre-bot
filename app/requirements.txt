@@ -1,6 +1,6 @@
 arrow==1.4.0
 awscli==1.44.74
-Authlib==1.6.8
+Authlib==1.6.11
 aws-sns-message-validator==0.0.5
 blinker==1.9
 boto3==1.42.84
