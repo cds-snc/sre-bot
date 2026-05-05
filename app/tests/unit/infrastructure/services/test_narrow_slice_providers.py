@@ -17,7 +17,6 @@ from infrastructure.configuration.integrations.maxmind import MaxMindSettings
 from infrastructure.configuration.integrations.slack import SlackSettings
 from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
 from infrastructure.configuration.integrations.notify import NotifySettings
-from infrastructure.configuration.features.commands import CommandsSettings
 from infrastructure.identity.service import IdentityService
 from infrastructure.clients.maxmind.client import MaxMindClient
 from infrastructure.idempotency.service import IdempotencyService
@@ -295,7 +294,7 @@ class TestProvidersDontCallGetSettings:
             mock_notification_ctor.assert_called_once()
 
         get_notification_service.cache_clear()
-        
+
     def test_get_platform_service_uses_platforms_settings(self):
         """get_platform_service uses get_platforms_settings, not get_settings."""
         get_platform_service.cache_clear()
