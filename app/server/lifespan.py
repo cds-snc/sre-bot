@@ -13,7 +13,6 @@ from infrastructure.services import (
     collect_feature_i18n_resources,
     register_feature_integrations,
     get_directory_provider,
-    get_identity_service,
     get_jwks_manager,
     get_platform_service,
     get_settings,
@@ -116,7 +115,6 @@ def _initialize_security_services(
 
     jwks_manager = get_jwks_manager()
     jwks_manager.warmup()
-    get_identity_service()
     log.info(
         "security_services_initialized",
         issuer_count=len(settings.server.ISSUER_CONFIG),

@@ -4,10 +4,11 @@ Verifies each provider calls only its domain singleton
 instead of the full Settings aggregator.
 """
 
-import pytest
-import tempfile
 import os
+import tempfile
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from infrastructure.configuration.infrastructure.server import ServerSettings
 from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
@@ -17,7 +18,6 @@ from infrastructure.configuration.integrations.maxmind import MaxMindSettings
 from infrastructure.configuration.integrations.slack import SlackSettings
 from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
 from infrastructure.configuration.integrations.notify import NotifySettings
-from infrastructure.identity.service import IdentityService
 from infrastructure.clients.maxmind.client import MaxMindClient
 from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
@@ -25,7 +25,6 @@ from infrastructure.notifications.service import NotificationService
 from infrastructure.platforms.service import PlatformService
 from infrastructure.notifications.channels.chat import ChatChannel
 from infrastructure.services.providers import (
-    get_identity_service,
     get_idempotency_service,
     get_jwks_manager,
     get_maxmind_client,
@@ -36,25 +35,6 @@ from infrastructure.services.providers import (
 )
 
 pytestmark = pytest.mark.unit
-
-
-class TestIdentityServiceNarrowSlice:
-    """IdentityService accepts server_settings instead of full Settings."""
-
-    def test_accepts_server_settings_kwarg(self):
-        """IdentityService constructs with server_settings parameter."""
-        mock_server_settings = MagicMock(spec=ServerSettings)
-        resolver = MagicMock()
-        service = IdentityService(
-            server_settings=mock_server_settings, resolver=resolver
-        )
-        assert service is not None
-
-    def test_constructs_without_settings(self):
-        """IdentityService can construct with no settings (settings unused)."""
-        resolver = MagicMock()
-        service = IdentityService(resolver=resolver)
-        assert service is not None
 
 
 class TestMaxMindClientNarrowSlice:
@@ -80,23 +60,25 @@ class TestMaxMindClientNarrowSlice:
 
 
 class TestIdempotencyServiceNarrowSlice:
-    """IdempotencyService accepts idempotency_settings instead of full Settings."""
+    """IdempotencyService accepts only a pre-constructed cache (no settings)."""
 
-    def test_accepts_idempotency_settings_with_cache(self):
-        """IdempotencyService constructs with idempotency_settings + injected cache."""
-        mock_settings = MagicMock(spec=IdempotencySettings)
+    def test_accepts_injected_cache(self):
+        """IdempotencyService constructs with a pre-built cache."""
         mock_cache = MagicMock()
-        service = IdempotencyService(
-            idempotency_settings=mock_settings, cache=mock_cache
-        )
+        service = IdempotencyService(cache=mock_cache)
         assert service is not None
 
-    def test_rejects_full_settings_kwarg(self):
-        """IdempotencyService does not accept 'settings' kwarg."""
-        mock_settings = MagicMock()
+    def test_rejects_settings_kwarg(self):
+        """IdempotencyService does not accept 'settings' or 'idempotency_settings' kwargs."""
         mock_cache = MagicMock()
         with pytest.raises(TypeError):
-            IdempotencyService(settings=mock_settings, cache=mock_cache)
+            IdempotencyService(settings=MagicMock(), cache=mock_cache)
+
+    def test_rejects_idempotency_settings_kwarg(self):
+        """IdempotencyService no longer accepts idempotency_settings (moved to providers)."""
+        mock_cache = MagicMock()
+        with pytest.raises(TypeError):
+            IdempotencyService(idempotency_settings=MagicMock(), cache=mock_cache)
 
 
 class TestResilienceServiceNarrowSlice:
@@ -161,21 +143,6 @@ class TestPlatformServiceNarrowSlice:
 class TestProvidersDontCallGetSettings:
     """Providers in providers.py use domain singletons, not get_settings()."""
 
-    def test_get_identity_service_calls_server_settings_not_get_settings(self):
-        """get_identity_service uses get_server_settings, not get_settings."""
-        get_identity_service.cache_clear()
-        with (
-            patch(
-                "infrastructure.services.providers.get_settings"
-            ) as mock_get_settings,
-            patch(
-                "infrastructure.configuration.infrastructure.server.get_server_settings"
-            ),
-        ):
-            get_identity_service()
-            mock_get_settings.assert_not_called()
-        get_identity_service.cache_clear()
-
     def test_get_maxmind_client_uses_maxmind_settings(self):
         """get_maxmind_client uses get_maxmind_settings, not get_settings."""
         get_maxmind_client.cache_clear()
@@ -207,13 +174,13 @@ class TestProvidersDontCallGetSettings:
             patch(
                 "infrastructure.services.providers.get_idempotency_settings"
             ) as mock_idempotency,
+            patch(
+                "infrastructure.services.providers.DynamoDBCache"
+            ) as mock_dynamodb_cache,
         ):
             mock_idempotency.return_value = MagicMock(spec=IdempotencySettings)
-            with patch(
-                "infrastructure.idempotency.service.IdempotencyService.__init__",
-                return_value=None,
-            ):
-                get_idempotency_service()
+            mock_dynamodb_cache.return_value = MagicMock()
+            get_idempotency_service()
             mock_get_settings.assert_not_called()
             mock_idempotency.assert_called_once()
         get_idempotency_service.cache_clear()

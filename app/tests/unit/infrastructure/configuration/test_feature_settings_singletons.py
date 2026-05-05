@@ -4,10 +4,6 @@ from infrastructure.configuration.features.groups import (
     GroupsFeatureSettings,
     get_groups_settings,
 )
-from infrastructure.configuration.features.commands import (
-    CommandsSettings,
-    get_commands_settings,
-)
 from infrastructure.configuration.features.incident import (
     IncidentFeatureSettings,
     get_incident_settings,
@@ -40,22 +36,6 @@ class TestGroupsFeatureSettingsSingleton:
         monkeypatch.setenv("GROUP_DOMAIN", "example.com")
         settings = GroupsFeatureSettings()
         assert settings.group_domain == "example.com"
-
-
-class TestCommandsSettingsSingleton:
-    def test_singleton_returns_same_instance(self):
-        get_commands_settings.cache_clear()
-        assert get_commands_settings() is get_commands_settings()
-
-    def test_has_required_model_config(self):
-        config = CommandsSettings.model_config
-        assert config.get("env_file") == ".env"
-        assert config.get("extra") == "ignore"
-
-    def test_reads_from_env(self, monkeypatch):
-        monkeypatch.setenv("COMMAND_PROVIDERS", '{"slack": {"enabled": true}}')
-        settings = CommandsSettings()
-        assert "slack" in settings.providers
 
 
 class TestIncidentFeatureSettingsSingleton:

@@ -8,7 +8,7 @@ Usage in route handlers:
 
     from fastapi import Security
     from typing import Annotated
-    from infrastructure.identity.models import User
+    from infrastructure.security.models import User
     from infrastructure.services import get_current_user
 
     # Authentication only (valid JWT required, no scope check):
@@ -33,18 +33,17 @@ secret verification before command handlers are invoked. The CommandPayload.user
 carries the verified Slack user identity — no JWT dependency needed in Slack handlers.
 """
 
-from typing import Annotated, List, Optional, TYPE_CHECKING
+from typing import Any, Annotated, List, Optional
 
 import structlog
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, SecurityScopes
 
-from infrastructure.identity.models import IdentitySource, User
+from infrastructure.security.models import AuthPrincipalSource, User
 from infrastructure.security.jwks import JWKSManager
 from infrastructure.security.jwt import validate_jwt_token
 from infrastructure.services.providers import (
     get_app_settings,
-    get_identity_service,
     get_jwks_manager,
     get_server_settings,
 )
@@ -62,7 +61,6 @@ def get_current_user(
     security_scopes: SecurityScopes,
     credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(_bearer)],
     jwks_manager: Annotated[JWKSManager, Depends(get_jwks_manager)],
-    identity_service: Annotated["IdentityService", Depends(get_identity_service)],
 ) -> User:
     """Validate a JWT Bearer token and return the authenticated principal.
 
@@ -84,8 +82,6 @@ def get_current_user(
             from all Security() declarations in the dependency chain.
         credentials: HTTP bearer credentials from the Authorization header.
         jwks_manager: JWKS manager singleton — injected, never constructed here.
-        identity_service: Identity service — injected, never constructed here.
-
     Returns:
         Authenticated User with identity resolved from JWT claims.
 
@@ -117,7 +113,7 @@ def get_current_user(
                 user_id="dev@local",
                 email="dev@local",
                 display_name="Dev Bypass User",
-                source=IdentitySource.API_JWT,
+                source=AuthPrincipalSource.API_JWT,
                 platform_id="dev-bypass",
                 permissions=list(security_scopes.scopes),
             )
@@ -138,7 +134,24 @@ def get_current_user(
             headers={"WWW-Authenticate": authenticate_value},
         )
 
-    return identity_service.resolve_from_jwt(payload)
+    return _build_user_from_jwt_payload(payload)
+
+
+def _build_user_from_jwt_payload(payload: dict[str, Any]) -> User:
+    """Build a normalized principal from a verified JWT payload."""
+    user_id = str(payload.get("sub", "unknown"))
+    email = str(payload.get("email", "unknown"))
+    display_name = str(payload.get("name", user_id))
+
+    return User(
+        user_id=user_id,
+        email=email,
+        display_name=display_name,
+        source=AuthPrincipalSource.API_JWT,
+        platform_id=user_id,
+        permissions=list(payload.get("permissions", [])),
+        metadata={"jwt_iss": payload.get("iss", "")},
+    )
 
 
 def _extract_token_scopes(payload: dict) -> List[str]:

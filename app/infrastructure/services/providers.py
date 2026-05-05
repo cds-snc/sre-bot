@@ -29,7 +29,6 @@ from infrastructure.configuration.integrations.notify import get_notify_settings
 from infrastructure.configuration.integrations.google import (
     get_google_workspace_settings,
 )
-from infrastructure.identity.service import IdentityService
 from infrastructure.security.jwks import JWKSManager
 from infrastructure.clients.aws import AWSClients
 from infrastructure.clients.google_workspace import GoogleWorkspaceClients
@@ -38,6 +37,7 @@ from infrastructure.i18n.service import TranslationService
 from infrastructure.i18n.models import Locale, TranslationKey
 from infrastructure.events.service import EventDispatcher
 from infrastructure.idempotency.service import IdempotencyService
+from infrastructure.idempotency.dynamodb import DynamoDBCache
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
 from infrastructure.notifications.channels.chat import ChatChannel
@@ -91,32 +91,9 @@ def get_app_settings() -> AppSettings:
     return _get_app_settings()
 
 
-@lru_cache(maxsize=1)
-def get_identity_service() -> IdentityService:
-    """
-    Get application-scoped identity service singleton.
-
-    Returns an IdentityService instance with configured IdentityResolver
-    for resolving user identities from Slack, JWT, webhooks, and system contexts.
-
-    Returns:
-        IdentityService: Cached identity service instance with injected dependencies.
-
-    Usage:
-        # Via dependency injection
-        from infrastructure.services import IdentityServiceDep
-
-        @router.post("/identity/slack")
-        def resolve_user(identity: IdentityServiceDep, slack_user_id: str):
-            user = identity.resolve_from_slack(slack_user_id)
-            return {"user": user.model_dump()}
-
-        @router.post("/identity/jwt")
-        def resolve_jwt_user(identity: IdentityServiceDep, jwt_payload: dict):
-            user = identity.resolve_from_jwt(jwt_payload)
-            return {"user": user.model_dump()}
-    """
-    return IdentityService(server_settings=get_server_settings())
+def get_app_settings() -> AppSettings:
+    """Get application-scoped app settings singleton."""
+    return _get_app_settings()
 
 
 @lru_cache(maxsize=1)
@@ -330,7 +307,9 @@ def get_idempotency_service() -> IdempotencyService:
     Returns:
         IdempotencyService: Cached idempotency service instance
     """
-    return IdempotencyService(idempotency_settings=get_idempotency_settings())
+    return IdempotencyService(
+        cache=DynamoDBCache(idempotency_settings=get_idempotency_settings())
+    )
 
 
 @lru_cache(maxsize=1)

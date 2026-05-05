@@ -14,7 +14,7 @@ from typing import Annotated, List, Protocol
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Security
 
-from infrastructure.identity.models import User
+from infrastructure.security.models import User
 from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.services import get_current_user
 from packages.access.catalog.domain import EntitlementEntry, PlatformSummary
