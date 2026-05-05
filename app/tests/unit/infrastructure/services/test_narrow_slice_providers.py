@@ -15,7 +15,6 @@ from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.configuration.infrastructure.platforms import PlatformsSettings
 from infrastructure.configuration.integrations.maxmind import MaxMindSettings
 from infrastructure.configuration.integrations.slack import SlackSettings
-from infrastructure.configuration.features.commands import CommandsSettings
 from infrastructure.identity.service import IdentityService
 from infrastructure.clients.maxmind.client import MaxMindClient
 from infrastructure.idempotency.service import IdempotencyService
