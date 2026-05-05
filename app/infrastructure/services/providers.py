@@ -38,7 +38,6 @@ from infrastructure.clients.maxmind import MaxMindClient
 from infrastructure.i18n.service import TranslationService
 from infrastructure.i18n.models import Locale, TranslationKey
 from infrastructure.events.service import EventDispatcher
-from infrastructure.events.registry import get_event_registry
 from infrastructure.idempotency.service import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
@@ -244,8 +243,7 @@ def get_maxmind_client() -> MaxMindClient:
 def get_event_dispatcher() -> EventDispatcher:
     """Get application-scoped event dispatcher singleton.
 
-    Returns an EventDispatcher instance that wraps the module-level event
-    functions for dependency injection and testing.
+    Returns an EventDispatcher instance for dependency injection and testing.
 
     Usage:
         from infrastructure.services import EventDispatcherDep
@@ -258,7 +256,7 @@ def get_event_dispatcher() -> EventDispatcher:
     Returns:
         EventDispatcher: Cached event dispatcher instance
     """
-    return EventDispatcher(registry=get_event_registry())
+    return EventDispatcher()
 
 
 @lru_cache(maxsize=1)

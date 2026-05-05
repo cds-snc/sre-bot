@@ -28,7 +28,6 @@ from pydantic import ValidationError
 from modules.groups.core import service
 from modules.groups.api import schemas
 
-
 # ============================================================================
 # TestAddMemberService: add_member operation integration tests
 # ============================================================================
@@ -545,9 +544,14 @@ class TestServiceErrorHandling:
         request = schemas.AddMemberRequest(**add_member_request)
 
         # Mock event dispatch to fail
+        class _FailingDispatcher:
+            def dispatch_background(self, _event) -> None:
+                raise Exception("Event dispatch failed")
+
         monkeypatch.setattr(
-            "modules.groups.events.event_system.dispatch_background",
-            MagicMock(side_effect=Exception("Event dispatch failed")),
+            "modules.groups.core.service.get_event_dispatcher",
+            lambda: _FailingDispatcher(),
+            raising=False,
         )
 
         # ACT
