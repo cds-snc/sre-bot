@@ -19,15 +19,15 @@ constrained_by:
   - ADR-0044
   - ADR-0045
   - ADR-0048
-  - ADR-0056
   - ADR-0076
 impacts:
-  - ADR-0056
   - ADR-0086
-supersedes: []
+supersedes:
+  - ADR-0056 (partial: Standard 3.2 re-export requirement; Standard 4 ceremony rules C2, C3)
 superseded_by: []
 review_state: current
 related_records:
+  - ADR-0046
   - ADR-0048
   - ADR-0056
   - ADR-0076
@@ -78,8 +78,9 @@ related_packages:
 
   **Missing governance identified by cross-ADR analysis:**
 
-  The previous draft of this ADR and ADR-0086 addressed overlapping concerns (barrel
-  structure and consumption mechanics) as separate local optimizations without:
+  Earlier iterations of barrel governance and service consumption addressed overlapping
+  concerns (barrel structure and consumption mechanics) as separate local optimizations
+  without:
 
   1. A composition root placement policy — no decision criterion for when restructuring
      the composition root location is justified vs when depth signals ownership.
@@ -129,15 +130,25 @@ contract prevents regression.
 
 | Symbol | Source Module | Ownership Rationale |
 |--------|--------------|---------------------|
-| `hookimpl` | `infrastructure.services.plugin` | Plugin lifecycle owned by this package |
-| `get_plugin_manager` | `infrastructure.services.plugin` | Plugin lifecycle owned by this package |
-| `discover_and_init_features` | `infrastructure.services.plugin` | Feature discovery owned by this package |
-| `collect_feature_i18n_resources` | `infrastructure.services.plugin` | Feature discovery owned by this package |
+| `hookimpl` | `infrastructure.services.plugins` | Plugin lifecycle owned by this package |
+| `get_plugin_manager` | `infrastructure.services.plugins` | Plugin lifecycle owned by this package |
+| `discover_and_init_features` | `infrastructure.services.plugins` | Feature discovery owned by this package |
+| `collect_feature_i18n_resources` | `infrastructure.services.plugins` | Feature discovery owned by this package |
+| `register_feature_integrations` | `infrastructure.services.plugins` | Feature integration registration owned by this package |
 
 **Symbols removed (not owned — must use deep imports):**
 
 All provider functions, all DI aliases, all Protocol types, all client facades, and all
 utility functions originating in sibling packages.
+
+Notable migration targets for widely used non-owned symbols:
+
+| Current Barrel Import | Deep Import Target |
+|---|---|
+| `from infrastructure.services import get_event_dispatcher` | `from infrastructure.services.providers import get_event_dispatcher` |
+| `from infrastructure.services import t` | `from infrastructure.services.providers import t` |
+| `from infrastructure.services import get_current_user` | `from infrastructure.security.current_user import get_current_user` |
+| `from infrastructure.services import get_limiter` | `from infrastructure.security.rate_limiter import get_limiter` |
 
 **Constraints:**
 
@@ -247,6 +258,10 @@ a measurable baseline to prevent future regression.
   lazy initialization inside the `@lru_cache` function body, not at module import time.
 - S6.3: No module in `infrastructure/services/` may execute network calls, file I/O,
   or SDK client construction at import time.
+- S6.4: These constraints complement ADR-0046 startup phase ordering. Provider
+  functions that trigger heavy initialization at import time would bypass the
+  lifespan's managed startup sequence (ADR-0046 Invariant 2). S6.1–S6.3 ensure
+  service construction occurs during lifespan execution, not during module loading.
 
 ## Alternatives Considered
 
@@ -312,6 +327,41 @@ a measurable baseline to prevent future regression.
 - Import-time performance constraints.
 - Backward compatibility for the frozen zone.
 
+**Supersession of ADR-0056 provisions:**
+
+This ADR partially supersedes ADR-0056. Specifically:
+
+- ADR-0056 Standard 3.2 required self-contained providers to be re-exported through
+  `infrastructure.services.__init__.py` for ADR-0048 B2 compliance. This ADR's
+  Standard 1 replaces that requirement: `__init__.py` re-exports only owned symbols.
+  The evidence (PEP 8 explicit imports, Google Style Guide §2.2.4, Seemann's
+  Composition Root pattern) supports deep imports over barrel re-exports.
+- ADR-0056 Standard 4 ceremony rules C2 ("every alias in `dependencies.py` must be
+  re-exported from `__init__.py`") and C3 ("every provider in `providers.py` must be
+  re-exported from `__init__.py`") are superseded by Standards 1–3 of this ADR.
+  Consumer-owned DI aliases (ADR-0086 S6) replace the centralized ceremony.
+
+ADR-0056 provisions that remain in force: Standard 1 (narrow-slice injection),
+Standard 2 (package-local providers), Standard 3.1 (cross-service composition in
+`providers.py`), Standard 5 (convenience accessors), Standard 6 (graph shape),
+Standard 7 (translation helper), Standard 8 (backend selection).
+
+**Injection surface after dissolution (ADR-0048 B2 evolution):**
+
+ADR-0048 Boundary 2 defines a single injection surface for feature consumers. After
+barrel dissolution, the injection surface is redefined as:
+
+| Permitted Import Path | Content | Consumer |
+|---|---|---|
+| `infrastructure.services` | Owned symbols only: `hookimpl`, `get_plugin_manager`, `discover_and_init_features`, `collect_feature_i18n_resources` | All feature packages |
+| `infrastructure.services.providers` | All `@lru_cache` provider functions | Hookimpls, background jobs, feature providers |
+| `infrastructure.<domain>.protocol` | Protocol types for Category A services | Route handler DI aliases, type annotations |
+
+Concrete implementation modules (`infrastructure.<domain>.service`,
+`infrastructure.<domain>.dynamodb`, etc.) remain **off-limits** for feature consumers.
+This redefinition narrows ADR-0048 B2 from "one barrel address" to "three explicit
+import categories" — each with clear ownership and purpose.
+
 **This ADR does not govern:**
 
 - How consumers call provider functions (governed by ADR-0086).
@@ -323,7 +373,8 @@ a measurable baseline to prevent future regression.
 
 - Lint rule should flag imports from `infrastructure.services` that reference non-owned
   symbols (anything other than `hookimpl`, `get_plugin_manager`,
-  `discover_and_init_features`, `collect_feature_i18n_resources`).
+  `discover_and_init_features`, `collect_feature_i18n_resources`). This includes
+  frozen-zone compatibility re-exports (S5.1) used by non-frozen-zone code.
 - Code review must verify deep imports from `providers.py` in new code.
 
 ## Best-Practice Revalidation
@@ -342,10 +393,9 @@ a measurable baseline to prevent future regression.
 - Record age at review time (days): 0
 - Is record older than 120 days: No
 - If Yes, status set to stale: No
-- Validation summary: Draft record. Full rewrite from deprecated draft. Pending author review.
+- Validation summary: Draft record. Pending challenge review.
 - Follow-up actions:
-  - Author review of new scope.
-  - Challenge review after author approval.
+  - Challenge review pending.
 
 ## Source References
 
@@ -374,7 +424,13 @@ a measurable baseline to prevent future regression.
 
 ## Change Log
 
-- 2026-05-06: Full rewrite from deprecated draft. Scope expanded to include composition
-  root placement policy (Standard 4) and import-time performance contract (Standard 6).
-  Previous draft addressed only barrel dissolution; new version addresses the cross-ADR
-  governance gaps identified in the 0085-0088 conflict analysis.
+- 2026-05-06: Created. Scope includes barrel dissolution (Standards 1–3), composition
+  root placement policy (Standard 4), frozen zone compatibility (Standard 5), and
+  import-time performance contract (Standard 6). Addresses cross-ADR governance gaps
+  identified in the 0085-0088 conflict analysis.
+- 2026-05-06: Challenge review revisions. Declared partial supersession of ADR-0056
+  S3.2 and S4 C2/C3 (barrel re-export ceremony). Added injection surface definition
+  to Compliance section (ADR-0048 B2 evolution). Added `register_feature_integrations`
+  to retained symbols list. Added migration target table for widely used non-owned
+  symbols (`t`, `get_current_user`, `get_limiter`). Fixed metadata: removed ADR-0056
+  from `constrained_by`, added to `supersedes` (partial).
