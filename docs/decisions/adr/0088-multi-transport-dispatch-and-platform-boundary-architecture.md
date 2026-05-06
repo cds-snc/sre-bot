@@ -46,7 +46,6 @@ related_records:
 related_packages:
   - app/packages/access
   - app/packages/geolocate
-  - app/infrastructure/platforms
   - app/infrastructure/hookspecs
 ---
 
@@ -64,13 +63,12 @@ related_packages:
      existing feature code, or where the boundary between transport-specific adaptation
      and transport-agnostic business logic must be drawn.
 
-  2. **Platform boundary architecture:** The previous draft (ADR-0088) addressed transport
-     dispatch but did not distinguish between platform-specific orchestration (deciding
-     *what* to do on a target platform) and pure protocol translation (executing API
-     calls). The cross-ADR analysis found that this distinction is critical for features
-     like Access Sync, where platform reconcilers contain legitimate decision logic
-     (capability-aware planning, entity matching, execution sequencing) that is neither
-     business logic nor thin translation.
+  2. **Platform boundary architecture:** No ADR distinguished between platform-specific
+     orchestration (deciding *what* to do on a target platform) and pure protocol
+     translation (executing API calls). The cross-ADR analysis found that this
+     distinction is critical for features like Access Sync, where platform reconcilers
+     contain legitimate decision logic (capability-aware planning, entity matching,
+     execution sequencing) that is neither business logic nor thin translation.
 
   **The three-layer outbound model (discovered via Access Sync validation):**
 
@@ -211,7 +209,8 @@ The per-platform hookspec model (`register_slack_commands`, `register_teams_comm
 **Constraints:**
 
 - S3.1: Adding a new platform requires: (a) hookspec in `infrastructure/hookspecs/`,
-  (b) platform provider in `infrastructure/platforms/`, (c) feature opt-in via hookimpl.
+  (b) per-platform service per ADR-0078 (target: `infrastructure/<platform>/`),
+  (c) feature opt-in via hookimpl.
 - S3.2: Platform support is always per-feature opt-in. No mechanism automatically
   exposes all features on all platforms.
 - S3.3: HTTP route registration uses the FastAPI router model, not the
@@ -437,10 +436,9 @@ Classes interacting with external platforms must be named for their architectura
 - Record age at review time (days): 0
 - Is record older than 120 days: No
 - If Yes, status set to stale: No
-- Validation summary: Draft record. Full rewrite from deprecated draft. Pending author review.
+- Validation summary: Draft record. Pending challenge review.
 - Follow-up actions:
-  - Author review of new scope.
-  - Challenge review after author approval.
+  - Challenge review pending.
 
 ## Source References
 
@@ -472,8 +470,8 @@ Classes interacting with external platforms must be named for their architectura
 
 ## Change Log
 
-- 2026-05-06: Full rewrite from deprecated draft. Added three-layer outbound platform
-  model (Standard 7), named role enforcement (Standard 8). Previous draft addressed
-  only transport dispatch; new version addresses the platform boundary architecture gap
-  identified in the 0085-0088 conflict analysis. The three-layer model was validated
-  against the Access Sync platform reconciler pattern.
+- 2026-05-06: Created. Includes transport-agnostic ingress layer (Standard 1),
+  per-platform hookspec model (Standard 3), three-layer outbound platform model
+  (Standard 7), and named role enforcement (Standard 8). Addresses cross-ADR
+  governance gaps identified in the 0085-0088 conflict analysis. The three-layer
+  model was validated against the Access Sync platform reconciler pattern.

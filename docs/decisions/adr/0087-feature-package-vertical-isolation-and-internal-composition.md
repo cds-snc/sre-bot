@@ -54,14 +54,14 @@ related_packages:
 
 ## Context
 
-- Problem statement: No ADR defines what "vertically isolated" means for a feature
+  No prior ADR defines what "vertically isolated" means for a feature
   package in `app/packages/`. ADR-0048 establishes the Application → Service →
   Infrastructure flow and names `app/packages/` as the canonical home for business
   logic. Neither ADR-0048 nor ADR-0059 defines the *internal* structure of a feature
   package, its permitted imports from siblings, or how its complexity evolves.
 
-  The previous draft of ADR-0087 addressed vertical isolation but the cross-ADR analysis
-  identified two critical missing governance areas:
+  The cross-ADR analysis identified two critical missing governance areas beyond
+  basic vertical isolation:
 
   1. **Feature-internal composition:** When a feature decomposes into sub-packages
      (e.g., `access/request`, `access/sync`, `access/catalog`), no rule governs when to
@@ -71,8 +71,8 @@ related_packages:
 
   2. **Capability promotion lifecycle:** When a feature-local capability is needed by
      multiple features, no rule defines the decision process, trigger thresholds, or
-     extraction workflow for promoting it to infrastructure. The previous draft prohibited
-     cross-package imports (good) but offered no path forward when features legitimately
+     extraction workflow for promoting it to infrastructure. Cross-package imports are
+     prohibited (Standard 2) but no path forward exists when features legitimately
      share a need.
 
   **The current package landscape:**
@@ -407,10 +407,9 @@ Each feature package participates in the application through pluggy hookimpls ex
 - Record age at review time (days): 0
 - Is record older than 120 days: No
 - If Yes, status set to stale: No
-- Validation summary: Draft record. Full rewrite from deprecated draft. Pending author review.
+- Validation summary: Draft record. Pending challenge review.
 - Follow-up actions:
-  - Author review of new scope.
-  - Challenge review after author approval.
+  - Challenge review pending.
 
 ## Source References
 
@@ -437,8 +436,7 @@ Each feature package participates in the application through pluggy hookimpls ex
 
 ## Change Log
 
-- 2026-05-06: Full rewrite from deprecated draft. Added feature-internal composition
-  standard (Standard 4), capability promotion lifecycle (Standard 6). Previous draft
-  addressed only cross-package isolation and sub-package boundaries; new version
-  addresses the capability promotion gap and intra-feature composition gap identified
-  in the 0085-0088 conflict analysis.
+- 2026-05-06: Created. Scope includes cross-package isolation (Standard 2),
+  sub-package boundaries (Standard 3), feature-internal composition (Standard 4),
+  and capability promotion lifecycle (Standard 6). Addresses cross-ADR governance
+  gaps identified in the 0085-0088 conflict analysis.

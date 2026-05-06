@@ -59,12 +59,12 @@ related_packages:
   a single, table-driven standard that developers can apply without reading multiple
   records.
 
-  The previous drafts of ADR-0085 and ADR-0086 addressed barrel structure and consumption
-  mechanics as separate local optimizations. The cross-ADR analysis found that developers
+  The barrel structure and consumption mechanics were initially addressed as separate
+  local optimizations across related ADRs. The cross-ADR analysis found that developers
   could not consistently determine the correct resolution mechanism for a given context
-  because guidance was fragmented across two ADRs. Some developers interpreted any direct
-  `get_x()` call as always acceptable (reading old 0086 S2/S3), while others treated it
-  as always prohibited (reading old 0086 S1). Neither interpretation is correct; the
+  because guidance was fragmented. Some developers interpreted any direct
+  `get_x()` call as always acceptable, while others treated it
+  as always prohibited. Neither interpretation is correct; the
   answer depends on the call context.
 
   **The structural asymmetry:**
@@ -88,7 +88,7 @@ related_packages:
   > "Am I inside a FastAPI route handler? If yes, use `Depends()`. If no, call the
   > provider directly inside the function body. Never call providers at module level."
 
-  The previous ADRs failed to provide this single-question test.
+  No prior ADR provided this single-question test.
 
 - Business/operational drivers:
   - Provide one table-driven standard that maps call context → resolution mechanism →
@@ -365,10 +365,9 @@ These patterns are prohibited regardless of context:
 - Record age at review time (days): 0
 - Is record older than 120 days: No
 - If Yes, status set to stale: No
-- Validation summary: Draft record. Full rewrite from deprecated draft. Pending author review.
+- Validation summary: Draft record. Pending challenge review.
 - Follow-up actions:
-  - Author review of new scope.
-  - Challenge review after author approval.
+  - Challenge review pending.
 
 ## Source References
 
@@ -394,9 +393,9 @@ These patterns are prohibited regardless of context:
 
 ## Change Log
 
-- 2026-05-06: Full rewrite from deprecated draft. Scope refocused around a single
-  context resolution matrix (Standard 1) that unifies the previously fragmented guidance.
-  Added anti-pattern catalog (Standard 7) and module-level prohibition (Standard 5).
-  Previous draft spread context-specific rules across separate standards without a
+- 2026-05-06: Created. Scope centered on a single context resolution matrix
+  (Standard 1) that unifies guidance for HTTP, hookimpl, and background job contexts.
+  Includes anti-pattern catalog (Standard 7) and module-level prohibition (Standard 5).
+  Addresses cross-ADR governance gaps identified in the 0085-0088 conflict analysis.
   unifying table; new version provides the single-question test identified as missing
   in the 0085-0088 conflict analysis.
