@@ -41,7 +41,9 @@ Proposed → Draft → Challenge Review ←→ Revise → Accepted → [Supersed
 
 - Execute review using `templates/adr-challenge-review-template.md`.
 - Search online for authoritative sources to validate all claims and standards. Document findings in the review artifact.
+- Assume prior ADRs may be incomplete or inaccurate. If you find gaps or conflicts in the constraining ADRs, log them as blockers to be reassessed.
 - Save the review artifact to `reviews/adr-NNNN-review-YYYY-MM-DD.md`.
+- User must accept analysis and findings for the review to PASS.
 - Gate outcomes:
   - **PASS** → proceed to user decision (step 5).
   - **REVISE** → proceed to revision (step 4).
