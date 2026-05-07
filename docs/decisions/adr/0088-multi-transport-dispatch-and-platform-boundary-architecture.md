@@ -54,7 +54,7 @@ related_packages:
 ## Context
 
 - Problem statement: The codebase supports two live interaction transports (FastAPI HTTP
-  and Slack Bolt websocket) with stub support for Teams and Discord. As Teams moves to
+  and Slack Bolt Socket Mode over WebSocket) with stub support for Teams and Discord. As Teams moves to
   production, the absence of a governing model for multi-transport dispatch and platform
   boundary architecture creates two concrete problems:
 
@@ -387,7 +387,7 @@ Classes interacting with external platforms must be named for their architectura
 
 **Neutral:**
 
-- Slack Bolt websocket lifecycle remains platform-specific.
+- Slack transport lifecycle remains platform-specific and mode-aware (Socket Mode and HTTP Events API) behind a single SlackPlatform service.
 - HTTP routes continue to use FastAPI `APIRouter` conventions.
 - Background jobs remain hookspec-based, not treated as "transports."
 
@@ -449,7 +449,7 @@ Classes interacting with external platforms must be named for their architectura
 | 3 | Percival & Gregory, Appendix B (Project Structure) | <https://www.cosmicpython.com/book/appendix_project_structure.html> | `entrypoints/` directory pattern for multi-transport |
 | 4 | FastAPI, "Bigger Applications — Multiple Files" | <https://fastapi.tiangolo.com/tutorial/bigger-applications/> | `APIRouter` per feature; `include_router()` |
 | 5 | Pluggy Documentation | <https://pluggy.readthedocs.io/en/stable/> | Per-hookspec opt-in; hookimpls accept fewer args than spec |
-| 6 | Slack Bolt for Python | <https://slack.dev/bolt-python/concepts> | Slack command handling; ack/say pattern; websocket mode |
+| 6 | Slack Bolt for Python | <https://slack.dev/bolt-python/concepts> | Slack command handling; ack/say pattern; Socket Mode and HTTP mode support |
 | 7 | Microsoft Bot Framework SDK | <https://learn.microsoft.com/en-us/azure/bot-service/> | Teams TurnContext; Adaptive Cards response model |
 | 8 | Eric Evans, *Domain-Driven Design* (2003) | — (book, ISBN 978-0321125217) | Anti-corruption layer; domain/external model separation |
 | 9 | Vaughn Vernon, *Implementing Domain-Driven Design* (2013) | — (book, ISBN 978-0321834577) | Adapter role clarity; bounded context integration patterns |
@@ -467,6 +467,9 @@ Classes interacting with external platforms must be named for their architectura
    `*Adapter` that contains reconciliation logic should be evaluated for rename to
    `*Reconciler` per Standard 8. If a class mixes reconciliation and SDK calls, split
    per Standard 7.
+5. **Slack transport evolution tracking:** Implement dual transport mode (Socket + HTTP)
+  in the upcoming SlackPlatform service under `app/infrastructure/slack/`. Do not add
+  new Slack transport behavior under deprecated `app/infrastructure/platforms/` paths.
 
 ## Change Log
 
