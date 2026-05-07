@@ -54,7 +54,7 @@ def test_access_plugins_register_routes_and_slack_commands_from_interactions() -
     slack_provider = _FakeSlackProvider()
 
     pm.hook.register_routes(app=app)
-    pm.hook.register_slack_commands(provider=slack_provider)
+    pm.hook.register_slack_interactions(provider=slack_provider)
 
     expected_routers = [
         importlib.import_module("packages.access.catalog.interactions.http").router,

@@ -91,16 +91,16 @@ def register_feature_integrations(
     pm = get_plugin_manager()
 
     if slack_provider:
-        pm.hook.register_slack_commands(provider=slack_provider)
-        logger.info("slack_commands_registered")
+        pm.hook.register_slack_interactions(provider=slack_provider)
+        logger.info("slack_interactions_registered")
 
     if teams_provider:
-        pm.hook.register_teams_commands(provider=teams_provider)
-        logger.info("teams_commands_registered")
+        pm.hook.register_teams_interactions(provider=teams_provider)
+        logger.info("teams_interactions_registered")
 
     if discord_provider:
-        pm.hook.register_discord_commands(provider=discord_provider)
-        logger.info("discord_commands_registered")
+        pm.hook.register_discord_interactions(provider=discord_provider)
+        logger.info("discord_interactions_registered")
 
     if event_dispatcher:
         pm.hook.register_event_handlers(dispatcher=event_dispatcher)

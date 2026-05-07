@@ -22,8 +22,8 @@ from packages.access.sync.interactions.http import router as access_sync_router
 
 
 @hookimpl
-def register_slack_commands(provider) -> None:
-    """Register access-sync Slack commands."""
+def register_slack_interactions(provider) -> None:
+    """Register access-sync Slack interactions."""
     slack.register_commands(provider)
 
 

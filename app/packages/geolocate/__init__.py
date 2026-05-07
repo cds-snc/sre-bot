@@ -11,8 +11,8 @@ from packages.geolocate.platforms import slack, teams
 
 
 @hookimpl
-def register_slack_commands(provider):
-    """Register geolocate Slack commands.
+def register_slack_interactions(provider):
+    """Register geolocate Slack interactions.
 
     Args:
         provider: Slack platform provider instance.
@@ -21,8 +21,8 @@ def register_slack_commands(provider):
 
 
 @hookimpl
-def register_teams_commands(provider):
-    """Register geolocate Teams commands (experimental).
+def register_teams_interactions(provider):
+    """Register geolocate Teams interactions (experimental).
 
     Args:
         provider: Teams platform provider instance.
