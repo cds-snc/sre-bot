@@ -1,7 +1,7 @@
 ---
 adr_id: ADR-0090
 title: "Cross-Channel Correlation and HTTP Coordination Standard"
-status: Draft
+status: Accepted
 decision_type: Standard
 tier: Tier-2
 governance_domain: application
@@ -12,8 +12,8 @@ secondary_domains:
 owners:
   - SRE Team
 date_created: 2026-05-06
-last_updated: 2026-05-06
-last_reviewed: 2026-05-06
+last_updated: 2026-05-07
+last_reviewed: 2026-05-07
 next_review_due: 2026-09-03
 constrained_by:
   - ADR-0044
@@ -168,6 +168,12 @@ feature-level decision, documented in the feature's Tier-4 ADR.
   first platform payload (e.g., the initial Slack modal's `private_metadata`, the Teams card
   data) before any subsequent interaction step can occur.
 
+> **Feature ADR forward reference:** The specific channel authorised to mint and the
+> business key deduplication logic are documented in each feature's Tier-4 ADR (e.g.,
+> ADR-0096 for Slack handler constraints; ADR-0097 for Teams interaction integration).
+> ADR-0091 Standard 2 governs the DynamoDB conditional write that enforces creation
+> idempotency at the infrastructure level.
+
 ---
 
 ### Standard 3: Payload Carrier Contract
@@ -233,6 +239,10 @@ CREATED → [feature-defined intermediate states] → TERMINAL_STATE
   are automatically deleted by DynamoDB — no application-level cleanup is required.
 - T5: The idempotency record (ADR-0091 Standard 1) has an independent 24-hour TTL from its
   write time. The entity TTL and idempotency record TTL are separate DynamoDB TTL attributes.
+
+> **ADR boundary note:** This standard governs the 24-hour TTL *value* for idempotency
+> records and the entity TTL policy. The DynamoDB write mechanics (TransactWriteItems,
+> conditional expressions, ClientRequestToken) are specified in ADR-0091 Standard 2.
 - T6: Features that require a hard "active window" for user interaction (e.g., access request
   must be approved within 48 hours) must set the entity TTL accordingly and define a
   background job (Phase 6 lifespan, ADR-0058) that transitions `PENDING_APPROVAL` entities
@@ -289,7 +299,12 @@ class EntityStatusResponse(BaseModel):
 - Q5: The route follows ADR-0063 conventions: one OpenAPI tag per router, `summary`,
   `description`, `response_model`, and `status_code` on every handler. The route is
   registered via `register_routes` hookimpl (ADR-0089 Standard 3).
-- Q6: Backstage polling MUST use exponential backoff with jitter. The recommended interval
+- Q6: Backstage polling MUST use exponential backoff with jitter.
+
+> **Endpoint naming guidance:** The `/feature/entities/{correlation_id}` path pattern uses
+> generic placeholders. Feature ADRs (Tier-4) specify the concrete noun (e.g.,
+> `/access/requests/{correlation_id}`). All features must use `{correlation_id}` as the
+> path parameter name — no aliases (`id`, `request_id`, `entity_id`) are permitted. The recommended interval
   starts at 5 seconds and caps at 60 seconds. This is an operational convention, not
   enforced at the API layer.
 
