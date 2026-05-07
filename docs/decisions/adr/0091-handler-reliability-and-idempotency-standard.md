@@ -158,11 +158,20 @@ Examples:
 
 ```python
 {
-    "pk": "<feature>:<intent>:<correlation_id>",  # Idempotency key
+    "pk": "<feature>:<intent>:<correlation_id>",  # Logical idempotency key attribute
     "result": "<serialized OperationResult>",      # Original success result (JSON)
     "ttl": <unix_epoch_seconds>,                   # 24-hour TTL from write time
 }
 ```
+
+**Physical attribute mapping note:**
+
+- In this ADR, `pk` is logical shorthand for the DynamoDB partition-key attribute used
+  by the idempotency table item.
+- In the current deployed Terraform-backed table (`sre_bot_idempotency`), the physical
+  partition-key attribute is `idempotency_key`.
+- Implementations MUST use the table's configured key attribute name (for example via
+  settings/provider wiring) when building items and condition expressions.
 
 **Rules:**
 
@@ -206,7 +215,7 @@ dynamodb.transact_write_items(
             "Put": {
                 "TableName": IDEMPOTENCY_TABLE,
                 "Item": idempotency_item,
-                "ConditionExpression": "attribute_not_exists(pk)"  # first-writer-wins
+            "ConditionExpression": "attribute_not_exists(<idempotency_pk_attr>)"  # first-writer-wins
             }
         },
     ],
@@ -216,9 +225,12 @@ dynamodb.transact_write_items(
 
 **Rules:**
 
-- AW1: The idempotency key write uses `ConditionExpression: "attribute_not_exists(pk)"`.
-  If the idempotency key already exists, DynamoDB raises `TransactionCanceledException`.
-  This is the first-writer-wins enforcement.
+- AW1: The idempotency key write uses
+  `ConditionExpression: "attribute_not_exists(<idempotency_pk_attr>)"`, where
+  `<idempotency_pk_attr>` is the configured idempotency table partition-key attribute
+  (currently `idempotency_key` in this repository's Terraform). If the idempotency key
+  already exists, DynamoDB raises `TransactionCanceledException`. This is the
+  first-writer-wins enforcement.
 - AW2: On `TransactionCanceledException` with reason `ConditionalCheckFailed` on the
   idempotency item, `ingress.py` (ADR-0089 Standard 5 I2) reads the existing idempotency
   record and returns its stored `OperationResult` as a semantically equivalent response
@@ -473,7 +485,9 @@ An implementation is compliant with this standard if and only if:
 1. Every mutable platform event produces an idempotency key of the form
    `<feature>:<intent>:<correlation_id>` (Standard 1).
 2. The domain entity write and idempotency key write occur in a single `TransactWriteItems`
-   call with `attribute_not_exists(pk)` condition on the idempotency item (Standard 2).
+  call with `attribute_not_exists(<idempotency_pk_attr>)` condition on the idempotency
+  item (Standard 2), where `<idempotency_pk_attr>` resolves to the configured table key
+  attribute (currently `idempotency_key`).
 3. Duplicate detection returns `SUCCESS` with the stored `OperationResult`, not an error
    (Standard 3).
 4. SQS continuation messages carry only `feature`, `intent`, `correlation_id` with the
