@@ -1,7 +1,7 @@
 ---
 adr_id: ADR-0059
 title: "Feature Interaction Boundaries and Platform Integration Standard"
-status: Accepted
+status: Superseded
 decision_type: Standard
 tier: Tier-2
 primary_domain: Package and Plugin Architecture
@@ -27,8 +27,8 @@ impacts:
  - ADR-0071
 supersedes:
  - ADR-0028
-superseded_by: []
-review_state: current
+superseded_by: ADR-0089
+review_state: superseded
 related_records:
  - ADR-0045
  - ADR-0046
