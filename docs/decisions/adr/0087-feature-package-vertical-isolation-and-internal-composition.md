@@ -138,7 +138,8 @@ Every feature package must conform to this directory layout:
 
 ```
 packages/<feature>/
-    __init__.py          # @hookimpl functions only (registration entry point)
+    __init__.py          # @hookimpl functions only; for complex features, THIS IS the
+                         # sole registration entry point (governs all sub-capabilities)
     providers.py         # Package-local @lru_cache singleton providers
     settings.py          # Package-local BaseSettings + provider function
     service.py           # Core business logic (or domain/ for complex packages)
@@ -155,6 +156,11 @@ packages/<feature>/
 
 - S1.1: `__init__.py` must contain only `@hookimpl` functions and the imports required
   to implement them. No business logic, no service instantiation, no class definitions.
+- S1.1a (for simple features): `__init__.py` has all hookimpls for the feature.
+- S1.1b (for complex multi-sub-capability features): The umbrella `__init__.py` is the
+  **sole** registration entry point. Sub-capability `__init__.py` files are empty.
+  Settings-based gating for sub-capabilities is performed inside umbrella hookimpls
+  using `@lru_cache` settings providers (see Standard 3).
 - S1.2: `providers.py` is the package-local composition point. It provides `@lru_cache`
   singleton factories for package-internal services and settings.
 - S1.3: A package may omit files it does not need. The structure is additive.
@@ -192,7 +198,9 @@ that share a bounded intra-package kernel.
 
 | Rule | Description |
 |------|-------------|
-| S3.1 | Each registerable sub-package must have its own `__init__.py` with `@hookimpl` functions and its own `providers.py`. |
+| S3.1 | For complex multi-sub-capability features, the umbrella `packages/<feature>/__init__.py` is the **sole** registration entry point. It holds all `@hookimpl` functions for the module. Sub-capability `__init__.py` files are empty — they mark directories as Python packages but contain no hookimpls. |
+| S3.1a | Sub-capability gating: Settings-based feature gating for individual sub-capabilities is performed inside the umbrella hookimpl, using `@lru_cache` settings providers, **before** any `include_router` or command registration call. This is the only mechanism that guarantees disabled routes are absent from the FastAPI route table and OpenAPI schema. |
+| S3.1b | Import discipline: The umbrella `__init__.py` imports sub-capability providers and routers at module level. Lazy imports inside hookimpl bodies are only permitted when a sub-capability module has a documented heavy import cost; they must include a comment explaining the reason. |
 | S3.2 | Sub-packages must not import from each other's internal modules. `access/sync` must not import from `access/request/service.py`. |
 | S3.3 | A `common/` (or `_shared/`) sub-package is permitted as an intra-bounded-context shared kernel. |
 | S3.4 | The shared kernel may contain only: value types (dataclasses, enums), event definitions, settings classes, and provider functions. It must never contain service implementations. |
@@ -201,11 +209,50 @@ that share a bounded intra-package kernel.
 **When to decompose into sub-packages:**
 
 1. Distinct operational sub-domains with independent lifecycles exist.
-2. Each sub-domain independently registers hookimpls.
+2. The umbrella `__init__.py` will register all sub-capabilities conditionally (see S3.1a).
 3. The sub-domains share value types and events but not service implementations.
 
 If sub-domains require shared service instances (not just value types), they are too
 tightly coupled for sub-package separation and must remain a single package.
+
+**Practical example (umbrella registration with gating):**
+
+For `packages/access/` with sub-capabilities `sync`, `request`, and `catalog`:
+
+```python
+# packages/access/__init__.py (sole hookimpl entry point)
+
+from infrastructure.services import hookimpl
+from packages.access.sync.interactions.http import router as sync_router
+from packages.access.sync.providers import get_access_sync_settings
+from packages.access.request.interactions.http import router as request_router
+from packages.access.request.providers import get_access_request_settings
+from packages.access.catalog.interactions.http import router as catalog_router
+from packages.access.catalog.providers import get_catalog_settings
+
+@hookimpl
+def register_routes(app) -> None:
+    # Settings-gating before include_router ensures disabled routes are not registered
+    if get_access_sync_settings().enabled:
+        app.include_router(sync_router, prefix="/api/v1")
+    if get_access_request_settings().enabled:
+        app.include_router(request_router, prefix="/api/v1")
+    if get_catalog_settings().enabled:
+        app.include_router(catalog_router, prefix="/api/v1")
+
+@hookimpl
+def startup_warmup(logger) -> None:
+    # Warm providers for enabled sub-capabilities only
+    if get_access_sync_settings().enabled:
+        _warmup_sync(logger)
+    # ... etc for other sub-capabilities
+```
+
+```python
+# packages/access/sync/__init__.py (empty — no hookimpls)
+# packages/access/request/__init__.py (empty)
+# packages/access/catalog/__init__.py (empty)
+```
 
 ### Standard 4: Feature-Internal Composition
 
@@ -304,11 +351,17 @@ Each feature package participates in the application through pluggy hookimpls ex
 
 **Constraints:**
 
-- S7.1: A package's only entry point is its `__init__.py` hookimpl functions.
+- S7.1: For simple features, `__init__.py` is the sole entry point. For complex features,
+  the umbrella `__init__.py` is the sole entry point; sub-capability `__init__.py` files
+  contain no hookimpls.
 - S7.2: Packages must not be imported directly by other application code outside plugin
   discovery. No module may write `from packages.access.sync.service import SyncService`.
 - S7.3: HTTP route, platform command, event handler, and background job registration
-  must each occur through their respective hookspec implementations.
+  must each occur through their respective hookspec implementations, invoked from the
+  umbrella (for complex features) or package-level (for simple features) `__init__.py`.
+- S7.4: `auto_discover_plugins` continues to walk the full package tree recursively.
+  Sub-capability `__init__.py` files without hookimpls are discovered but contribute
+  nothing to the hook call loop — they are implementation details, not plugins.
 
 ## Alternatives Considered
 
