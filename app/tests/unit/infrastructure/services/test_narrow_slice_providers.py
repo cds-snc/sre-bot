@@ -19,7 +19,7 @@ from infrastructure.configuration.integrations.slack import SlackSettings
 from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
 from infrastructure.configuration.integrations.notify import NotifySettings
 from infrastructure.clients.maxmind.client import MaxMindClient
-from infrastructure.idempotency.service import IdempotencyService
+from infrastructure.idempotency.service import DynamoDBIdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
 from infrastructure.platforms.service import PlatformService
@@ -60,25 +60,27 @@ class TestMaxMindClientNarrowSlice:
 
 
 class TestIdempotencyServiceNarrowSlice:
-    """IdempotencyService accepts only a pre-constructed cache (no settings)."""
+    """DynamoDBIdempotencyService accepts only a pre-constructed cache (no settings)."""
 
     def test_accepts_injected_cache(self):
-        """IdempotencyService constructs with a pre-built cache."""
+        """DynamoDBIdempotencyService constructs with a pre-built cache."""
         mock_cache = MagicMock()
-        service = IdempotencyService(cache=mock_cache)
+        service = DynamoDBIdempotencyService(cache=mock_cache)
         assert service is not None
 
     def test_rejects_settings_kwarg(self):
-        """IdempotencyService does not accept 'settings' or 'idempotency_settings' kwargs."""
+        """DynamoDBIdempotencyService does not accept 'settings' or 'idempotency_settings' kwargs."""
         mock_cache = MagicMock()
         with pytest.raises(TypeError):
-            IdempotencyService(settings=MagicMock(), cache=mock_cache)
+            DynamoDBIdempotencyService(settings=MagicMock(), cache=mock_cache)
 
     def test_rejects_idempotency_settings_kwarg(self):
-        """IdempotencyService no longer accepts idempotency_settings (moved to providers)."""
+        """DynamoDBIdempotencyService no longer accepts idempotency_settings (moved to providers)."""
         mock_cache = MagicMock()
         with pytest.raises(TypeError):
-            IdempotencyService(idempotency_settings=MagicMock(), cache=mock_cache)
+            DynamoDBIdempotencyService(
+                idempotency_settings=MagicMock(), cache=mock_cache
+            )
 
 
 class TestResilienceServiceNarrowSlice:

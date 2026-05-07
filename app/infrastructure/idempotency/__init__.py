@@ -27,7 +27,8 @@ Usage:
 from infrastructure.idempotency.cache import IdempotencyCache
 from infrastructure.idempotency.dynamodb import DynamoDBCache
 from infrastructure.idempotency.key_builder import IdempotencyKeyBuilder
-from infrastructure.idempotency.service import IdempotencyService
+from infrastructure.idempotency.protocol import IdempotencyService
+from infrastructure.idempotency.service import DynamoDBIdempotencyService
 
 # Factory functions available via direct import to avoid circular deps
 from infrastructure.idempotency.factory import get_cache, reset_cache
@@ -37,6 +38,7 @@ __all__ = [
     "DynamoDBCache",
     "IdempotencyKeyBuilder",
     "IdempotencyService",
+    "DynamoDBIdempotencyService",
     "get_cache",
     "reset_cache",
 ]

@@ -15,7 +15,7 @@ from infrastructure.clients.google_workspace import GoogleWorkspaceClients
 from infrastructure.clients.maxmind import MaxMindClient
 from infrastructure.events.service import EventDispatcher
 from infrastructure.i18n.service import TranslationService
-from infrastructure.idempotency.service import IdempotencyService
+from infrastructure.idempotency.protocol import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
 from infrastructure.storage.protocol import StorageService

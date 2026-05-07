@@ -1,6 +1,8 @@
-"""Idempotency service for dependency injection.
+"""Concrete idempotency service implementation.
 
 Provides a class-based interface to the idempotency cache for easier DI and testing.
+This is the DynamoDB-backed concrete implementation. The Protocol contract is defined
+in infrastructure.idempotency.protocol.
 """
 
 from typing import Any, Dict, Optional
@@ -8,8 +10,8 @@ from typing import Any, Dict, Optional
 from infrastructure.idempotency.cache import IdempotencyCache
 
 
-class IdempotencyService:
-    """Class-based idempotency service.
+class DynamoDBIdempotencyService:
+    """DynamoDB-backed idempotency service.
 
     Wraps the IdempotencyCache interface with a service class to support
     dependency injection and easier testing with mocks.
@@ -35,10 +37,9 @@ class IdempotencyService:
             return result
 
         # Direct instantiation
-        from infrastructure.idempotency import IdempotencyService
+        from infrastructure.idempotency.service import DynamoDBIdempotencyService
 
-        service = IdempotencyService()
-        cached_response = service.get(key)
+        service = DynamoDBIdempotencyService(cache)
     """
 
     def __init__(
