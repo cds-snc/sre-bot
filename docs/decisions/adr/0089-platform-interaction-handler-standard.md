@@ -22,11 +22,11 @@ constrained_by:
   - ADR-0048
   - ADR-0049
   - ADR-0050
-  - ADR-0059
   - ADR-0065
   - ADR-0077
   - ADR-0079
   - ADR-0083
+  - ADR-0088
 impacts:
   - ADR-0059
   - ADR-0067
@@ -127,9 +127,7 @@ related_packages:
     for in-process coordination only.
   - ADR-0083: the `EventDispatcher` facade (blinker) provides error-isolated in-process event
     dispatch. Subscriber failures do not propagate to the publisher.
-  - ADR-0085–0088 (Draft): barrel governance, service resolution context, vertical isolation,
-    and multi-transport dispatch. These are related but not yet Accepted; they are referenced
-    in `related_records` and their constraints are respected in this standard.
+  - ADR-0085–0087 (Draft): barrel governance, service resolution context, and vertical isolation. ADR-0088 (Accepted 2026-05-07): multi-transport dispatch and platform boundary architecture. These are related and referenced in `related_records`; their constraints are respected in this standard.
 
 - **Non-goals:**
   - This ADR does not define `correlation_id` cardinality, minting authority, or payload
