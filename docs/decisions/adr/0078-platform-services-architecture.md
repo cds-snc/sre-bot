@@ -113,7 +113,7 @@ Features consume platform services via pluggy hookspec injection during startup.
 **Registration flow:**
 
 1. Lifespan constructs the platform service (settings-driven, per Standard 2).
-2. Lifespan calls `pm.hook.register_slack_commands(provider=slack_provider)`.
+2. Lifespan calls `pm.hook.register_slack_interactions(provider=slack_provider)`.
 3. Each feature's `@hookimpl` receives the provider and registers its handlers.
 4. Features that don't implement the hookimpl are simply unaffected.
 

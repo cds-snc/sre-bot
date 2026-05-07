@@ -9,7 +9,7 @@ secondary_domains:
   - Runtime and Lifecycle
   - Package and Plugin Architecture
 date_created: 2026-04-30
-last_updated: 2026-05-05
+last_updated: 2026-05-06
   last_reviewed: 2026-05-05
   next_review_due: 2026-09-01
 owners:
@@ -41,7 +41,7 @@ review_state: current
 
 ## Context
 
-- Problem statement: The application integrates with Slack via the Bolt Python SDK using Socket Mode (WebSocket transport). Legacy ADR-0014 established the daemon-thread Socket Mode pattern but predates the canonical lifecycle model (ADR-0046), graceful shutdown contract (ADR-0057), platform services architecture (ADR-0078), and feature interaction boundaries (ADR-0059). The current implementation works but lacks explicit lifecycle phase alignment, shutdown budget compliance, and codified feature registration semantics.
+- Problem statement: The application integrates with Slack via the Bolt Python SDK using Socket Mode (WebSocket transport). Legacy ADR-0014 established the daemon-thread Socket Mode pattern but predates the canonical lifecycle model (ADR-0046), graceful shutdown contract (ADR-0057), platform services architecture (ADR-0078), and feature interaction boundaries (ADR-0059). The current implementation works but lacks explicit lifecycle phase alignment, shutdown budget compliance, and codified feature registration semantics. Long-term, Slack transport must support both Socket Mode and HTTP Events API mode via configuration without feature-level code changes.
 - Business/operational drivers: Slack is the primary real-time interaction transport for SRE operations (incident management, access requests, operational commands). Reliable startup, deterministic shutdown, and structured observability for the Slack connection are operational necessities.
 - Constraints:
   - Must operate within ADR-0046 sequential phase model (Socket Mode connects in Transport phase after all feature hookimpls register handlers).
@@ -54,12 +54,12 @@ review_state: current
   - This record does not redesign the Block Kit formatting or presenter layer.
   - This record does not govern legacy module migration (frozen zones thaw under Phase 3 Tier-4 ADRs).
   - This record does not define feature-specific Slack command semantics (those belong in per-feature Tier-4 ADRs).
-  - This record does not introduce HTTP webhook ingress for Slack Events API (Socket Mode is the chosen transport).
+  - This record does not require immediate migration to HTTP Events API mode. Socket Mode remains the current default transport; long-term support for both transport modes is tracked through settings-driven provider behavior.
   - This record does not govern SRE Bot webhooks (`POST /hook/{webhook_id}`). Webhooks are a platform-agnostic ingress feature with their own DynamoDB registry, payload validation, and action routing. Today most webhook actions post to Slack channels, but the webhook subsystem is not coupled to Slack — it is an independent feature that consumes the Slack provider as one possible output channel. Webhook architecture belongs in a future Tier-4 ADR when `modules/webhooks` thaws (Wave 8).
 
 ## Decision
 
-- Chosen approach: Codify `SlackPlatformProvider` as the single Slack integration surface, wrapping Slack Bolt Python SDK in Socket Mode. Provider lifecycle aligns to ADR-0046 phases; shutdown complies with ADR-0057 budget; feature registration uses ADR-0059 hookspec injection.
+- Chosen approach: Codify `SlackPlatformProvider` as the single Slack integration surface, wrapping Slack Bolt Python SDK with Socket Mode as the current default and HTTP Events API as a planned alternate mode. Provider lifecycle aligns to ADR-0046 phases; shutdown complies with ADR-0057 budget; feature registration uses ADR-0059 hookspec injection.
 - Why this approach:
   - Socket Mode eliminates public HTTPS endpoint requirements for Slack event delivery, simplifying network security in private VPC deployments.
   - Bolt SDK provides a well-maintained, officially supported abstraction over Slack's WebSocket and Web API surfaces.
@@ -97,7 +97,7 @@ The `SlackPlatformProvider` lifecycle aligns to ADR-0046 sequential phases:
 |---|---|
 | Phase 1 — Configuration | `SlackPlatformSettings` loaded and validated. If `SLACK_ENABLED` is false or credentials missing, provider construction skipped entirely (ADR-0078 S2). |
 | Phase 2 — Infrastructure | No Slack-specific action. |
-| Phase 3 — Discovery/Registration | Provider instantiated. `initialize_app()` creates Bolt `App(token=BOT_TOKEN)` and prepares `SocketModeHandler(app, APP_TOKEN)`. Hookspec `register_slack_commands(provider)` fired — features register commands, actions, views, and shortcuts. Registries frozen after phase completes (ADR-0046 I5). |
+| Phase 3 — Discovery/Registration | Provider instantiated. `initialize_app()` creates Bolt `App(token=BOT_TOKEN)` and prepares `SocketModeHandler(app, APP_TOKEN)`. Hookspec `register_slack_interactions(provider)` fired — features register commands, actions, views, and shortcuts. Registries frozen after phase completes (ADR-0046 I5). |
 | Phase 4 — Feature Activation | No Slack-specific action. |
 | Phase 5 — Transport | `start()` spawns daemon thread running `handler.connect()`. Connection established only after all feature handlers are registered. |
 | Phase 6 — Background | No Slack-specific action. Background jobs that send Slack messages use the provider's `client` property; they do not manage the connection. |
@@ -105,7 +105,7 @@ The `SlackPlatformProvider` lifecycle aligns to ADR-0046 sequential phases:
 **Rules:**
 
 - R1: Socket Mode connection must not be established before phase 5. Feature hookimpls must complete registration in phase 3 before the transport connects.
-- R2: If `SLACK_ENABLED` is false, no Slack objects are constructed. Hookspec `register_slack_commands` does not fire. Features run HTTP-only.
+- R2: If `SLACK_ENABLED` is false, no Slack objects are constructed. Hookspec `register_slack_interactions` does not fire. Features run HTTP-only.
 - R3: If `SLACK_ENABLED` is true but credentials are invalid (missing `APP_TOKEN` or `BOT_TOKEN`), `initialize_app()` must return a failing `OperationResult` and startup must fail fast (ADR-0046 I3). Slack is not a degraded-start service.
 - R4: Provider emits structured lifecycle log events at each phase transition: `slack_provider_settings_loaded`, `slack_provider_app_initialized`, `slack_provider_handlers_registered`, `slack_provider_transport_started`, `slack_provider_transport_connected` (ADR-0046 I6).
 
@@ -140,7 +140,7 @@ Feature packages register Slack capabilities through the pluggy hookspec defined
 
 **Rules:**
 
-- R1: The hookspec signature is `register_slack_commands(provider: SlackPlatformProvider) -> None`. The parameter type is the concrete class, not a Protocol (ADR-0078 S1).
+- R1: The hookspec signature is `register_slack_interactions(provider: SlackPlatformProvider) -> None`. The parameter type is the concrete class, not a Protocol (ADR-0078 S1).
 - R2: Feature hookimpls call provider registration methods to declare commands, actions, view submissions, and shortcuts. The provider translates these into Bolt SDK handler registrations.
 - R3: Registration methods on `SlackPlatformProvider` must validate inputs eagerly (during phase 3). Invalid registrations (duplicate command names, missing handler callables) raise immediately — they are startup-fatal per ADR-0046 I3.
 - R4: After phase 3 completes, the command/action/view registry is frozen (ADR-0046 I5). Dynamic registration during request handling is prohibited.
@@ -156,7 +156,8 @@ Slack configuration follows ADR-0055 dissolution model with a partitioned `Slack
 - R2: Required fields when `SLACK_ENABLED` is true: `SLACK_BOT_TOKEN` (xoxb-…), `SLACK_APP_TOKEN` (xapp-…). Optional: `SLACK_SIGNING_SECRET` (only needed if HTTP webhook verification is added in future).
 - R3: Validation must reject startup if `SLACK_ENABLED` is true but required tokens are missing or malformed (cross-field validation via Pydantic `model_validator`).
 - R4: Settings are consumed by `SlackPlatformProvider` constructor as the narrowest slice needed (ADR-0055 pattern). The provider does not receive root settings.
-- R5: `SLACK_SOCKET_MODE` field defaults to `True`. When false, the provider creates the Bolt `App` but does not prepare `SocketModeHandler` or spawn the daemon thread. This supports future HTTP Events API mode without architectural change.
+- R5: `SLACK_SOCKET_MODE` is the transport-mode selector and defaults to `True`. When true, the provider uses Socket Mode (`SocketModeHandler` + daemon thread). When false, the provider runs in HTTP Events API mode with request-signature verification using `SLACK_SIGNING_SECRET`. Feature handlers remain unchanged across transport modes.
+- R6: New dual-mode transport behavior (Socket + HTTP) must be implemented in the upcoming SlackPlatform service under `app/infrastructure/slack/`, not by adding new transport logic to deprecated `app/infrastructure/platforms/` packages.
 
 ### S6 — Outbound Message Delivery
 
@@ -212,7 +213,7 @@ Slack commands and interactions carry a `user_id` in the Bolt event payload, del
 | ADR-0057 S5 | Shutdown Observability | Structured shutdown events with duration | S3 R5, S7 R3 |
 | ADR-0058 S1 | Colocated Worker Model | Socket Mode thread shares process with FastAPI; must not starve event loop | S2 R1 |
 | ADR-0059 S1 | HTTP-First Bridge | Business logic testable via HTTP; Slack handlers are thin adapters | (architectural constraint — not restated) |
-| ADR-0059 S3 | Hookspec Contract | `register_slack_commands(provider: SlackPlatformProvider)` concrete type | S4 R1 |
+| ADR-0059 S3 | Hookspec Contract | `register_slack_interactions(provider: SlackPlatformProvider)` concrete type | S4 R1 |
 | ADR-0059 S5 | Platform Transport Lifecycle | Transport connects only after handler registration completes | S1 R1 |
 | ADR-0059 S6 | Outbound Notification Routing | Features own routing; provider exposes sending capability only | S6 R2 |
 | ADR-0065 P3 | Pydantic at I/O Boundaries | Settings class is `BaseModel` (env vars are untrusted) | S5 R1 |
@@ -247,12 +248,12 @@ Slack commands and interactions carry a `user_id` in the Bolt event payload, del
 - Mitigations:
   - Bolt SDK reconnection handles transient network failures automatically.
   - Shutdown timeout logging enables alerting when budget is consistently exceeded.
-  - `SLACK_SOCKET_MODE` field provides an escape hatch for future HTTP Events API migration if Socket Mode proves operationally problematic.
+  - `SLACK_SOCKET_MODE` enables intentional dual-mode operation as the system evolves toward first-class support for both Socket Mode and HTTP Events API mode.
 
 ## Compliance and Boundaries
 
 - Package/infrastructure boundary impact:
-  - `SlackPlatformProvider` remains in `app/infrastructure/platforms/providers/`. No new cross-feature dependency edges.
+  - Current implementation remains in `app/infrastructure/platforms/providers/`, but new dual-mode transport work (Socket + HTTP) must be implemented in the upcoming SlackPlatform service under `app/infrastructure/slack/` instead of extending deprecated `app/infrastructure/platforms/` packages.
   - `SlackPlatformSettings` remains in `app/infrastructure/configuration/infrastructure/`.
   - Feature packages consume via hookspec injection only.
 - Type boundary impact (Protocol/dataclass/BaseModel/TypedDict):
@@ -261,7 +262,7 @@ Slack commands and interactions carry a `user_id` in the Bolt event payload, del
   - Feature registration parameters: plain Python types (command names as `str`, handler callables as `Callable`).
 - Startup/plugin registration impact:
   - No import-time side effects. Provider constructed during lifespan phase 3.
-  - `register_slack_commands` hookspec fired during phase 3 discovery/registration.
+  - `register_slack_interactions` hookspec fired during phase 3 discovery/registration.
   - Socket Mode daemon thread spawned during phase 5 transport.
 - Settings partitioning impact:
   - `SlackPlatformSettings` is a partitioned settings class (ADR-0055). Not aggregated into root settings.
@@ -323,4 +324,5 @@ Slack commands and interactions carry a `user_id` in the Bolt event payload, del
 - 2026-04-30: R1 challenge review → REVISE. Corrected S2 R4: Slack supports up to 10 simultaneous connections (not 1 as originally claimed). Single connection retained as design choice for operational simplicity. Updated source reference URLs to current docs.slack.dev domain.
 - 2026-04-30: R1 revision applied. S2 R4 expanded: documented multi-task ECS deployment (desired_count=2) as the horizontal scaling model. Slack distributes events across task connections with no duplication. Multi-connection per process not planned. Feature-Specific Decisions table updated to match.
 - 2026-04-30: R2 challenge review → PASS. Status changed from Draft to Accepted. ADR-0014 superseded and moved to `adr/superseded/`. Wave 6 gate closed.
+- 2026-05-06: Amendment added to track long-term dual transport support (Socket Mode + HTTP Events API) via `SLACK_SOCKET_MODE`, with implementation target in upcoming `app/infrastructure/slack/` SlackPlatform service rather than deprecated `app/infrastructure/platforms/` packages.
 - 2026-05-01: Scope clarification amendment (editorial, ADR-0080 follow-up). Clarified "any feature or subsystem" is scoped to code running within the ASGI lifespan per ADR-0080 P3. Infrastructure components deployed independently (e.g., Lambda alerting) are explicitly excluded. Added ADR-0080 to `related_records`.
