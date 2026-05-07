@@ -44,9 +44,9 @@
 | 0086 | Service Resolution Context Standard | 2 | 7 | — | Draft |
 | 0087 | Feature Package Vertical Isolation and Internal Composition | 2 | 7 | — | Draft |
 | 0088 | Multi-Transport Dispatch and Platform Boundary Architecture | 2 | 7 | — | Accepted |
-| 0089 | Platform Interaction Handler Standard | 2 | 9 | 0059 | Draft |
+| 0089 | Platform Interaction Handler Standard | 2 | 9 | 0059 | Accepted |
 | 0090 | Cross-Channel Correlation and HTTP Coordination Standard | 2 | 9 | — | Accepted |
-| 0091 | Handler Reliability and Idempotency Standard | 2 | 9 | — | Draft |
+| 0091 | Handler Reliability and Idempotency Standard | 2 | 9 | — | Accepted |
 | 0092 | Handler Lifecycle and Startup Ordering | 2 | 9 | — | Not started |
 | 0093 | Operational Observability Standard | 2 | 9 | — | Not started |
 | 0094 | tenacity Retry Library Adoption | 5 | 9 | — | Not started |

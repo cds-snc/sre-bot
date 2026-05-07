@@ -1,7 +1,7 @@
 ---
 adr_id: ADR-0089
 title: "Platform Interaction Handler Standard"
-status: Draft
+status: Accepted
 decision_type: Standard
 tier: Tier-2
 governance_domain: application
@@ -13,8 +13,8 @@ secondary_domains:
 owners:
   - SRE Team
 date_created: 2026-05-06
-last_updated: 2026-05-06
-last_reviewed: 2026-05-06
+last_updated: 2026-05-07
+last_reviewed: 2026-05-07
 next_review_due: 2026-09-03
 constrained_by:
   - ADR-0044

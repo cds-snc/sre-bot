@@ -6,6 +6,43 @@
 
 ## 2026-05-07
 
+### ADR-0089 — Accepted (Wave 9 Tier-2)
+
+- **Status change:** Draft → Accepted (2026-05-07).
+- **Review pathway:** Challenge Review Round 1 (2026-05-06) gate: 🟡 REVISE. One pre-acceptance condition identified: `app/packages/access/sync/interactions/ingress.py` contains lock-gating (`check_lock`, `platform_lock_key`) that must migrate to `service.py` per Standard 1 A3/A4. This is tracked as a **code work item** (not an ADR blocker) in the Migration section.
+- **Normative content:** All nine standards are well-grounded and architecturally sound. Standards 1–6 govern the four-layer inbound handler architecture; Standards 7–8 are cross-referenced to ADR-0088. No normative revisions required. ADR is implementable as written.
+- **Supersession:** ADR-0089 supersedes ADR-0059 (already moved to `adr/superseded/` and marked `status: Superseded` before this session).
+- **Metadata:** `status: Accepted`, `last_updated: 2026-05-07`, `last_reviewed: 2026-05-07`, `next_review_due: 2027-05-07`.
+- **Wave 9 Wave 1 complete:** ADR-0089, ADR-0090, and ADR-0091 all Accepted. Wave 9 Wave 2 (ADRs 0092–0094) now unblocked.
+
+---
+
+### ADR-0091 — Accepted (Wave 9 Tier-2)
+
+- **Status change:** Draft → Accepted (2026-05-07).
+- **Review artifact:** `reviews/adr-0091-review-2026-05-07.md` (🟡 REVISE gate → all blockers resolved in-session).
+- **Pre-acceptance items applied (2026-05-07):**
+  - **PR-1:** Migration section added for `IdempotencyKeyBuilder` key schema divergence. New handlers use Standard 1 `<feature>:<intent>:<correlation_id>` directly; existing callers grandfathered; tracked as code work item.
+  - **PR-2:** Migration section added for `IdempotencyService` `put_item` vs `TransactWriteItems` gap. Protocol must be extended with `transact_write()` method; existing `set()` grandfathered for legacy callers; tracked as code work item.
+  - **PR-3:** Fixed Standard 4 SM5 cross-reference "ADR-0089 Standard 8 S2" → "ADR-0089 Standard 8 stateless handler invariant — side-effect sequencing".
+- **Normative content:** Standards 1–7 are well-grounded; 6 assumptions survived challenge; no normative changes required. ADR is implementable as written. Code migrations (key schema, `TransactWriteItems` protocol extension) are tracked separately and do not block ADR acceptance.
+- **Metadata:** `status: Accepted`, `last_updated: 2026-05-07`, `last_reviewed: 2026-05-07`, `next_review_due: 2027-05-07`.
+
+---
+
+### ADR-0091 — Challenge Review Round 1 Completed (Wave 9 Tier-2)
+
+- **Review artifact created:** `reviews/adr-0091-review-2026-05-07.md`.
+- **Gate outcome:** 🟡 **REVISE** — Three pre-acceptance items identified; all resolved in-session:
+  1. **PR-1 (Migration — key schema divergence):** `IdempotencyKeyBuilder` hash schema (`namespace:operation:sha256_hash`) is incompatible with Standard 1's `<feature>:<intent>:<correlation_id>` schema. Migration section added: new handlers use Standard 1 directly; existing callers grandfathered; tracked as code work item.
+  2. **PR-2 (Migration — `TransactWriteItems` gap):** Existing `IdempotencyService.set()` uses simple `put_item` — not `TransactWriteItems`. Migration section added: Protocol must be extended with `transact_write(entity_item, idempotency_item, client_token)` method; existing `set()` grandfathered for legacy callers.
+  3. **PR-3 (SM5 cross-reference fix):** "ADR-0089 Standard 8 S2" was invalid. Corrected to "ADR-0089 Standard 8 stateless handler invariant — side-effect sequencing".
+- **Normative content:** Standards 1–7 are well-grounded; all assumptions survived challenge; no normative changes required.
+- **Key evidence sources:** AWS DynamoDB TransactWriteItems docs (atomicity, serializable isolation), AWS Builders Library (idempotent APIs, semantically equivalent response), Slack Socket Mode docs (multi-connection at-most-once delivery), SQS FIFO docs (5-min dedup window, at-least-once), microservices.io Transactional Outbox.
+- **Status:** Ready for user acceptance. No round 2 review required after PR-1/PR-2/PR-3 fixes (all applied in-session).
+
+---
+
 ### ADR-0090 — Accepted (Wave 9 Tier-2)
 
 - **Challenge review R1 (2026-05-07):** 🟢 PASS — all five standards validated, no revisions required. Review artifact: `reviews/adr-0090-review-2026-05-07.md`.

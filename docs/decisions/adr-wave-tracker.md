@@ -12,7 +12,7 @@
 **Parallel activity:** Wave 7 (Access Sub-Feature Decisions) — blocked on Phase 1 implementation
 **Recent completion:** Wave 6 — all feature and integration decisions accepted (ADR-0066, ADR-0067)
 
-**Wave 9 status:** ADR-0089 Draft (review R1 REVISE, pre-conditions pending). ADR-0090 Accepted (2026-05-07). ADR-0091 challenge review in progress (2026-05-07).
+**Wave 9 status:** ADR-0089 Accepted (2026-05-07). ADR-0090 Accepted (2026-05-07). ADR-0091 Accepted (2026-05-07). Wave 9 Wave 1 complete; Wave 2 (ADRs 0092–0094) unblocked.
 
 **Note:** ADR-0059 superseded by ADR-0089 (2026-05-07). ADR-0067, ADR-0078 are pending supersession by ADR-0096, ADR-0095 respectively. Supersession for ADR-0067 and ADR-0078 executes after Wave 9 Wave-1 ADRs (0090–0091) are Accepted.
 
@@ -248,7 +248,7 @@ The access domain has ~8 domain-specific contracts (adapter Protocol, reconcilia
 |-----|-------|------|--------|----------------|
 | 0097 | Teams Interaction Integration | 4 | Not started | 0044, 0045, 0048, 0064, 0077, 0089, 0090, 0091, 0095 |
 
-**SDK note (ADR-0097):** Bot Framework SDK archived Dec 31, 2025. ADR-0097 must specify Microsoft 365 Agents SDK for Python (`microsoft-agents-hosting-fastapi` + `microsoft-agents-hosting-teams`, v0.9.0, Python 3.12+ compatible) as the implementation SDK. Reference: https://learn.microsoft.com/en-us/python/api/agent-sdk-python/agents-overview?view=agent-sdk-python-latest
+**SDK note (ADR-0097):** Bot Framework SDK archived Dec 31, 2025. ADR-0097 must specify Microsoft 365 Agents SDK for Python (`microsoft-agents-hosting-fastapi` + `microsoft-agents-hosting-teams`, v0.9.0, Python 3.12+ compatible) as the implementation SDK. Reference: <https://learn.microsoft.com/en-us/python/api/agent-sdk-python/agents-overview?view=agent-sdk-python-latest>
 
 ### Wave 9 — Pending Supersessions (execute after Wave 1 Accepted)
 
