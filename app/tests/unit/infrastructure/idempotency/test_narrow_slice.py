@@ -5,7 +5,8 @@ from unittest.mock import MagicMock
 
 from infrastructure.idempotency.cache import IdempotencyCache
 from infrastructure.idempotency.dynamodb import DynamoDBCache
-from infrastructure.idempotency.service import IdempotencyService
+from infrastructure.idempotency.protocol import IdempotencyService
+from infrastructure.idempotency.service import DynamoDBIdempotencyService
 from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
 
 pytestmark = pytest.mark.unit
@@ -35,32 +36,34 @@ class TestDynamoDBCacheAcceptsInjectedSettings:
 
 
 class TestIdempotencyServiceReceivesConstructedCache:
-    """IdempotencyService accepts only a pre-built cache (composition root in providers.py)."""
+    """DynamoDBIdempotencyService accepts only a pre-built cache (composition root in providers.py)."""
 
     def test_service_constructs_with_pre_built_cache(self):
-        """IdempotencyService constructs with an injected cache."""
+        """DynamoDBIdempotencyService constructs with an injected cache."""
         mock_cache = MagicMock(spec=IdempotencyCache)
-        service = IdempotencyService(cache=mock_cache)
+        service = DynamoDBIdempotencyService(cache=mock_cache)
         assert service is not None
 
     def test_service_delegates_get_to_cache(self):
-        """IdempotencyService.get() delegates to the injected cache."""
+        """DynamoDBIdempotencyService.get() delegates to the injected cache."""
         mock_cache = MagicMock(spec=IdempotencyCache)
         mock_cache.get.return_value = {"status": "ok"}
-        service = IdempotencyService(cache=mock_cache)
+        service = DynamoDBIdempotencyService(cache=mock_cache)
         result = service.get("some-key")
         mock_cache.get.assert_called_once_with("some-key")
         assert result == {"status": "ok"}
 
     def test_service_delegates_set_to_cache(self):
-        """IdempotencyService.set() delegates to the injected cache."""
+        """DynamoDBIdempotencyService.set() delegates to the injected cache."""
         mock_cache = MagicMock(spec=IdempotencyCache)
-        service = IdempotencyService(cache=mock_cache)
+        service = DynamoDBIdempotencyService(cache=mock_cache)
         service.set("key", {"data": 1}, ttl_seconds=3600)
         mock_cache.set.assert_called_once_with("key", {"data": 1}, 3600)
 
     def test_service_no_idempotency_settings_parameter(self):
-        """IdempotencyService no longer accepts idempotency_settings (moved to providers)."""
+        """DynamoDBIdempotencyService no longer accepts idempotency_settings (moved to providers)."""
         mock_cache = MagicMock(spec=IdempotencyCache)
         with pytest.raises(TypeError):
-            IdempotencyService(idempotency_settings=MagicMock(), cache=mock_cache)
+            DynamoDBIdempotencyService(
+                idempotency_settings=MagicMock(), cache=mock_cache
+            )
