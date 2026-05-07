@@ -43,7 +43,16 @@
 | 0085 | Infrastructure Import and Barrel Governance | 2 | 7 | — | Draft |
 | 0086 | Service Resolution Context Standard | 2 | 7 | — | Draft |
 | 0087 | Feature Package Vertical Isolation and Internal Composition | 2 | 7 | — | Draft |
-| 0088 | Multi-Transport Dispatch and Platform Boundary Architecture | 2 | 7 | — | Draft |
+| 0088 | Multi-Transport Dispatch and Platform Boundary Architecture | 2 | 7 | — | Accepted |
+| 0089 | Platform Interaction Handler Standard | 2 | 9 | 0059 | Draft |
+| 0090 | Cross-Channel Correlation and HTTP Coordination Standard | 2 | 9 | — | Accepted |
+| 0091 | Handler Reliability and Idempotency Standard | 2 | 9 | — | Draft |
+| 0092 | Handler Lifecycle and Startup Ordering | 2 | 9 | — | Not started |
+| 0093 | Operational Observability Standard | 2 | 9 | — | Not started |
+| 0094 | tenacity Retry Library Adoption | 5 | 9 | — | Not started |
+| 0095 | Standalone Platform Service Model | 2 | 9 | 0078 | Not started |
+| 0096 | Slack Handler Constraints | 4 | 9 | 0067 | Not started |
+| 0097 | Teams Interaction Integration | 4 | 9 | — | Not started |
 
 ## Tier-5 Records (Migration / Deprecation)
 
@@ -109,7 +118,11 @@ All files in `adr/superseded/`. Each has `status: Superseded` and `superseded_by
 
 ## Pending Supersession
 
-No legacy ADRs pending supersession. All legacy ADRs have been superseded.
+| ADR | Pending Supersession By | Scope | Wave |
+|-----|------------------------|-------|------|
+| 0059 | ADR-0089 | Full supersession — handler layer model, multi-step interaction pattern, directory structure | 9 |
+| 0067 | ADR-0096 | Full supersession — Slack handler constraints, private_metadata schema, signing | 9 |
+| 0078 | ADR-0095 | Full supersession — standalone per-platform service model | 9 |
 
 ### ADR-0043 — Rejected (Not Superseded)
 
@@ -138,3 +151,9 @@ ADRs identified by the Horizontal-Vertical review as needed but not yet allocate
 |----------------|------|------------|----------|---------|------------|
 | Access Domain Contract Standard | 3 | V-017 | HIGH | Access domain has ~8 domain-specific contracts (adapter Protocol, reconciliation lifecycle, request state machine, entitlement parsing, IDP naming, platform locks, multi-source config, service classification) with no Tier-3 governance | Phase 1 complete |
 | API Versioning Strategy | 2 | H-009 | DEFERRED | No standard governs v2 endpoint introduction, deprecation lifecycle, or client migration. Not needed until first v2 endpoint is planned | First v2 endpoint planned |
+
+### Wave 9 ADR Allocations (Platform Interaction Architecture)
+
+Allocated 2026-05-06. IDs 0089–0097 reserved. ADR-NEW-1/2/3 from the target-state architecture map to 0089/0090/0091 respectively. Wave 2/3/4 extensions (0092–0097) are blocked on Wave 1 (0089–0091) challenge review and acceptance.
+
+**Wave 9 constraint chain:** ADR-0089 is constrained by ADR-0045, 0048, 0049, 0050, 0059 (superseded), 0065, 0077, 0079, 0083, 0088 (**Accepted**). ADR-0090 and 0091 are additionally constrained by ADR-0089. All Wave 2/3/4 ADRs (0092–0097) are constrained by at least one of 0089–0091.

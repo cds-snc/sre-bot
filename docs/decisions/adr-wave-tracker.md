@@ -2,21 +2,19 @@
 
 **Purpose:** Track current wave progress and pending actions. Update in-place each cycle.
 
-**Last updated:** 2026-05-04
+**Last updated:** 2026-05-07
 
 ---
 
 ## Current Focus
 
-**Active wave:** Wave 6  
-**Parallel activity:** Managed services delegation review — **Complete** (all 7 criteria met)  
-**Structural:** ADR-0080 (Application Portability Boundary) — **Accepted** (2026-05-01)  
-**Infrastructure:** ADR-0081 (CI/CD Pipeline and Deployment Validation) — **Accepted** (2026-05-01)  
-**Infrastructure:** ADR-0082 (Infrastructure Alerting Architecture) — **Accepted** (2026-05-01)
-**Library:** ADR-0083 (Event Dispatcher Library Adoption) — **Accepted** (2026-05-04)
-**Recent completion:** P1 — Event Dispatcher Library Adoption (ADR-0083) — **Accepted** (2026-05-04)
+**Active wave:** Wave 9 (Platform Interaction Architecture — authoring)
+**Parallel activity:** Wave 7 (Access Sub-Feature Decisions) — blocked on Phase 1 implementation
+**Recent completion:** Wave 6 — all feature and integration decisions accepted (ADR-0066, ADR-0067)
 
-**Note:** ADR-0066 narrowed from "Access Runtime Naming and Operator Scope" to "Access Config Env-Source Naming". Lock lifecycle scope removed — governed by ADR-0058 Standard 9. ADR-0043 rejection stands independently.
+**Wave 9 status:** ADR-0089 Draft (review R1 REVISE, pre-conditions pending). ADR-0090 Accepted (2026-05-07). ADR-0091 challenge review in progress (2026-05-07).
+
+**Note:** ADR-0059 superseded by ADR-0089 (2026-05-07). ADR-0067, ADR-0078 are pending supersession by ADR-0096, ADR-0095 respectively. Supersession for ADR-0067 and ADR-0078 executes after Wave 9 Wave-1 ADRs (0090–0091) are Accepted.
 
 ---
 
@@ -34,6 +32,7 @@
 | 6 | Feature + Integration Decisions (0066, 0067) | **Complete** |
 | 7 | Access Sub-Feature Decisions (P1 Tier-4) | Planning — blocked on Phase 1 |
 | 8 | Legacy Module Migration Decisions (P3 Tier-4) | Planning — blocked on Phase 3 thaw |
+| 9 | Platform Interaction Architecture (Tier-2 + Tier-4) | **Active — ADR-0089 review R1 in progress; 0090, 0091 pending** |
 
 ---
 
@@ -154,6 +153,21 @@ ADR-0043 (Proposed → Rejected) proposed feature-scoped lock release under `acc
 **Prerequisite:** Phase 1 infrastructure foundation complete (standalone actions below).  
 **Scope:** P1 Tier-4 ADRs for access sub-features — domain-specific decisions not governed by higher tiers.
 
+### Wave 7 — Tier-2 Platform Governance ADRs (Cross-Cutting Pre-Requisites)
+
+Four Tier-2 standards authored 2026-05-06 as cross-cutting pre-requisites for Wave 7 Tier-4 and Wave 9. These govern infrastructure composition, service resolution, package isolation, and platform boundary architecture.
+
+| ADR | Title | Status |
+|-----|-------|--------|
+| 0085 | Infrastructure Import and Barrel Governance | Draft — R1 REVISE; revision pending |
+| 0086 | Service Resolution Context Standard | Draft — R1 PASS; acceptance pending |
+| 0087 | Feature Package Vertical Isolation and Internal Composition | Draft — R1 PASS; acceptance pending |
+| 0088 | Multi-Transport Dispatch and Platform Boundary Architecture | **Accepted (2026-05-07)** — R3 PASS |
+
+**Note on ADR-0088 acceptance:** Scope narrowed to Standards 7–8 (outbound three-layer platform model + named role enforcement). Standards 1–6 (inbound handler architecture) delegated to ADR-0089. Challenge review completed R1→R2→R3 PASS.
+
+---
+
 ### Wave 7 Pre-Requisite — Access Domain Contract (Tier-3)
 
 The HV review (finding V-017, Major) identified that the access domain has ~8 domain-specific contracts with no Tier-3 governance. A Tier-3 Access Domain Contract Standard must be authored and accepted before Wave 7 Tier-4 ADRs can be scoped, since the Tier-4 records will derive constraints from it.
@@ -193,6 +207,56 @@ The access domain has ~8 domain-specific contracts (adapter Protocol, reconcilia
 - SRE Ops and ATIP may not warrant Tier-4 ADRs (P4 — simple features). Evaluate during Phase 3.
 - Each module thaws one at a time (Rule F5). Migration order: Incident → Webhooks → AWS Ops → SRE Ops/ATIP.
 - Each thaw requires: Tier-4 ADR authored and challenge-reviewed, settings migration (Tier-5 ADRs 0070–0075), infrastructure service abstraction (replace raw DynamoDB/integration calls), plugin registration (hookimpl for routes, commands, jobs), tests for new package structure.
+
+---
+
+## Wave 9 — Platform Interaction Architecture
+
+**Status:** Active — ADR-0089 challenge review R1 in progress; ADR-0090, ADR-0091 pending.
+**Scope:** Stateless event-driven platform interaction model for multi-channel, multi-step interactions (HTTP, Slack, Teams). Covers handler behavioral standards, cross-channel correlation, and reliability/idempotency. Blocks Wave 7 Access Sub-Feature Decisions that depend on request state machine and approval interaction patterns.
+
+**Research base:** `tmp/target-state-architecture-stateless-2026-05-06.md` and five research documents: concurrent-command-idempotency, correlation-id-lifecycle-cardinality, partial-failure-compensation, teams-correlation-id-authority, slack-private-metadata-signing-versioning.
+
+### Wave 9 — Wave 1 (Foundation, must precede all other sub-waves)
+
+| ADR | Title | Tier | Status | Supersedes | Constrained By |
+|-----|-------|------|--------|------------|----------------|
+| 0089 | Platform Interaction Handler Standard | 2 | **Draft — R1 in progress** | ADR-0059 | 0044, 0045, 0048, 0049, 0050, 0059, 0065, 0077, 0079, 0083, 0088 |
+| 0090 | Cross-Channel Correlation and HTTP Coordination Standard | 2 | **Draft** | — | 0044, 0045, 0048, 0050, 0063, 0065, 0077, 0089 |
+| 0091 | Handler Reliability and Idempotency Standard | 2 | **Draft** | — | 0044, 0045, 0048, 0050, 0058, 0077, 0079, 0083, 0089 |
+
+**Gate:** All three must be Accepted before Wave 2/3/4 ADRs can be authored.
+
+### Wave 9 — Wave 2 (Infrastructure Extensions, blocked on Wave 1)
+
+| ADR | Title | Tier | Status | Constrained By |
+|-----|-------|------|--------|----------------|
+| 0092 | Handler Lifecycle and Startup Ordering | 2 | Not started | 0044, 0045, 0046, 0049, 0089 |
+| 0093 | Operational Observability Standard | 2 | Not started | 0044, 0045, 0054, 0077, 0089, 0090, 0091 |
+| 0094 | tenacity Retry Library Adoption | 5 | Not started | 0044, 0045, 0077, 0091 |
+
+### Wave 9 — Wave 3 (Platform Extensions, blocked on Wave 1)
+
+| ADR | Title | Tier | Status | Supersedes | Constrained By |
+|-----|-------|------|--------|------------|----------------|
+| 0095 | Standalone Platform Service Model | 2 | Not started | ADR-0078 | 0044, 0045, 0048, 0049, 0056, 0077, 0089 |
+| 0096 | Slack Handler Constraints | 4 | Not started | ADR-0067 | 0044, 0045, 0048, 0064, 0077, 0089, 0090, 0091, 0095 |
+
+### Wave 9 — Wave 4 (Teams Integration, blocked on Wave 1)
+
+| ADR | Title | Tier | Status | Constrained By |
+|-----|-------|------|--------|----------------|
+| 0097 | Teams Interaction Integration | 4 | Not started | 0044, 0045, 0048, 0064, 0077, 0089, 0090, 0091, 0095 |
+
+**SDK note (ADR-0097):** Bot Framework SDK archived Dec 31, 2025. ADR-0097 must specify Microsoft 365 Agents SDK for Python (`microsoft-agents-hosting-fastapi` + `microsoft-agents-hosting-teams`, v0.9.0, Python 3.12+ compatible) as the implementation SDK. Reference: https://learn.microsoft.com/en-us/python/api/agent-sdk-python/agents-overview?view=agent-sdk-python-latest
+
+### Wave 9 — Pending Supersessions (execute after Wave 1 Accepted)
+
+| ADR | Superseded By | Scope |
+|-----|--------------|-------|
+| 0059 | ADR-0089 | Full supersession |
+| 0067 | ADR-0096 | Full supersession |
+| 0078 | ADR-0095 | Full supersession |
 
 ---
 

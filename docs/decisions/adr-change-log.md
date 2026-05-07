@@ -4,6 +4,169 @@
 
 ---
 
+## 2026-05-07
+
+### ADR-0090 — Accepted (Wave 9 Tier-2)
+
+- **Challenge review R1 (2026-05-07):** 🟢 PASS — all five standards validated, no revisions required. Review artifact: `reviews/adr-0090-review-2026-05-07.md`.
+
+- **Editorial changes applied (2026-05-07):** Three non-blocking items from the review:
+  1. Standard 2 — Added feature ADR forward reference block (Tier-4 minting authority documented in ADR-0096/0097; ADR-0091 Standard 2 governs creation idempotency write).
+  2. Standard 4 — Added ADR boundary note clarifying this standard governs TTL *value*; write mechanics are ADR-0091 Standard 2.
+  3. Standard 5 — Added endpoint naming guidance note: `{correlation_id}` path parameter name is mandatory; feature ADRs specify the concrete noun.
+  All changes are editorial; no normative content altered.
+
+- **Status set to Accepted. Migration map and wave tracker updated.**
+
+- ADR-0090 does not supersede any legacy ADRs.
+
+---
+
+### ADR-0090 — Challenge Review Round 1 Completed (Wave 9 Tier-2)
+
+- **Review artifact created:** `reviews/adr-0090-review-2026-05-07.md`.
+- **Gate outcome:** 🟢 **PASS** — All five standards (Correlation ID Cardinality, Minting Authority, Payload Carrier Contract, Lifecycle & TTL, HTTP Query API) are normatively sound and grounded in authoritative sources (Slack Bolt, Teams Adaptive Cards, AWS Builders Library, RFC 4122, HTTP/REST semantics).
+- **Evidence grounding:** Slack `private_metadata` (3,000 chars, HMAC-SHA256 protected); Teams Adaptive Card data field (not archived conversation state); DynamoDB TTL (24-hour window); HTTP GET safety and idempotence.
+- **Cross-ADR consistency:** Verified against ADR-0089 (handler architecture), ADR-0091 (idempotency standard), ADR-0063 (API composition), ADR-0061 (identity), ADR-0054 (logging). No conflicts.
+- **Assumptions challenged:** Six core assumptions tested (single correlation_id, minting authority, Slack metadata integrity, Teams data field reliability, 24-hour TTL, GET side-effect-free). All survived challenge with high confidence (🟢 High).
+- **Failure modes:** Three identified (multi-channel creation race, DynamoDB TTL variance, metadata tampering). All mitigated by downstream ADRs (0089, 0091) or operational tolerances.
+- **Editorial items:** Three noted (minting authority forward references, TTL minting clarity, endpoint naming consistency). All non-blocking.
+- **Status:** Ready for user acceptance and Accepted status transition. No revisions required.
+
+---
+
+### ADR-0088 — Accepted (Wave 7 Tier-2 governance closure)
+
+- **Round 1 review (2026-05-06):** 🔴 REVISE — Primary blockers: S5.2 callable signature
+  inaccuracy (`Callable[[CommandPayload], CommandResponse]` vs. runtime arity dispatch in
+  `base.py`); `CommandPayload` not `frozen=True` (ADR-0065 violation).
+
+- **Round 2 review (2026-05-07):** 🟡 REVISE (scope narrowing) — Both Round 1 blockers
+  architecturally resolved by ADR-0089's `NormalisedIntent` model. New blockers: Standards 1–6
+  competing with ADR-0089 (wrong hookspec names, stale ingress framing); `constrained_by`
+  referencing superseded ADR-0059.
+
+- **Revision applied (2026-05-07):** Scope narrowed to Standards 7–8 only (outbound
+  three-layer platform model + named role enforcement). Standards 1–6 replaced with forward
+  reference block to ADR-0089. Metadata updated: ADR-0049/0063 removed from `constrained_by`;
+  ADR-0056/0088/0090/0091 added. Context, Alternatives, and Source References pruned to
+  outbound scope only. Eight editorial fixes applied (problem statement, stale hookspec
+  code block, inbound table, alternatives 1–3, metadata, source references, non-goals,
+  change log).
+
+- **Round 3 review (2026-05-07):** 🟢 PASS — Standards 7–8 well-grounded in Cockburn (2005),
+  Evans DDD §14, Vernon IDDD Ch. 13, ADR-0065, ADR-0077, ADR-0091. No cross-ADR contradictions
+  in narrowed scope. All three assumptions survived challenge. Saved to
+  `reviews/adr-0088-review-2026-05-07-r3.md`.
+
+- **Status set to Accepted. Migration map updated. Wave tracker updated.**
+
+- ADR-0088 does not supersede any legacy ADRs.
+
+### Wave 7 Tier-2 ADRs — Status Update (2026-05-07)
+
+ADR-0088 is the first of the four Wave 7 Tier-2 ADRs to be Accepted. Status of remaining:
+
+| ADR | Title | Status |
+|-----|-------|--------|
+| 0085 | Infrastructure Import and Barrel Governance | Draft — R1 REVISE; revision pending |
+| 0086 | Service Resolution Context Standard | Draft — R1 PASS; acceptance pending |
+| 0087 | Feature Package Vertical Isolation and Internal Composition | Draft — R1 PASS; acceptance pending |
+| 0088 | Multi-Transport Dispatch and Platform Boundary Architecture | **Accepted** |
+
+### ADR-0089 — Challenge Review Round 1 Started
+
+- Review artifact created: `reviews/adr-0089-review-2026-05-07.md`.
+- Status: 🟡 REVISE — Two editorial/metadata fixes required before acceptance. Normative
+  content (Standards 1–9) is fully grounded and has no cross-ADR contradictions.
+- Primary findings:
+  1. `constrained_by` lists ADR-0059 (the ADR that ADR-0089 supersedes) — semantically
+     inconsistent; must be removed. ADR-0088 (now Accepted) governs the `adapters/` directory
+     structure referenced in Standard 2 and should be added to `constrained_by`.
+  2. Context Constraints text describes ADR-0085–0088 as "Draft" — ADR-0088 is now Accepted.
+     Text must be updated.
+  3. Migration pre-condition: existing `ingress.py` lock-gating call pattern must be verified
+     as migrated (or tracked as a code work item) before status can be set to Accepted.
+
+---
+
+## 2026-05-06
+
+### Wave 9 — Platform Interaction Architecture — Wave 1 ADRs Authored (Draft)
+
+**Scope:** Stateless event-driven platform interaction model for multi-channel, multi-step
+interactions (HTTP, Slack, Teams).
+
+#### ADR ID Allocation (0089–0097)
+
+- Added ADR-0089 through ADR-0097 to `adr-migration-map.md` Target ADR Registry.
+- Added Pending Supersession entries: ADR-0059 → 0089, ADR-0067 → 0096, ADR-0078 → 0095.
+- Added Wave 9 notes to Cross-Cutting ADR Gaps section.
+
+#### Wave Tracker Update
+
+- Updated `adr-wave-tracker.md`: `last_updated` set to 2026-05-06; Current Focus updated to
+  reflect Wave 9 active; Wave 9 added to Wave Status Summary table.
+- Appended Wave 9 section to tracker (Wave 1–4 sub-waves, research source references,
+  pending supersession table).
+
+#### ADR-0089 — Platform Interaction Handler Standard (Draft)
+
+- Created `adr/0089-platform-interaction-handler-standard.md`. Status: Draft.
+- Supersedes: ADR-0059 (full supersession — not yet applied; execute after ADR-0089 Accepted).
+- Tier-2 Standard. 9 Standards: Handler Layer Architecture, Feature-Side Directory Structure,
+  Hookspec Registration Contract, Platform Transport Lifecycle, ingress.py Contract,
+  Ack-First Contract, Normalised Intent Contract, Stateless Handler Invariant,
+  Side-Effect Compensation Framework.
+- Key decision: stateless event-driven model (12-Factor VI). `WorkflowState` coordinator
+  rejected. Domain entity `status` field in DynamoDB is the continuation model.
+- Slack HTTP mode documented as production recommendation per Slack official guidance.
+- Research basis: `tmp/target-state-architecture-stateless-2026-05-06.md`,
+  `tmp/research-partial-failure-compensation-2026-05-06.md`.
+
+#### ADR-0090 — Cross-Channel Correlation and HTTP Coordination Standard (Draft)
+
+- Created `adr/0090-cross-channel-correlation-and-http-coordination-standard.md`. Status: Draft.
+- Tier-2 Standard. 5 Standards: Correlation ID Cardinality Model, Minting Authority, Payload
+  Carrier Contract, Lifecycle and TTL, HTTP Query API Pattern.
+- Key decisions: single UUID v4 `correlation_id` per entity (domain PK); minted once at
+  creation by `service.py`; platform carrier fields (HTTP path param, Slack `private_metadata`,
+  Teams `Action.Submit` data); observe-only `GET /feature/entities/{correlation_id}`.
+- Explicitly documents that Bot Framework `ConversationState` is NOT a valid carrier for
+  `correlation_id` (archived SDK); Adaptive Card data field is correct.
+- Research basis: `tmp/research-correlation-id-lifecycle-cardinality-2026-05-06.md`,
+  `tmp/research-teams-correlation-id-authority-2026-05-06.md`.
+
+#### ADR-0091 — Handler Reliability and Idempotency Standard (Draft)
+
+- Created `adr/0091-handler-reliability-and-idempotency-standard.md`. Status: Draft.
+- Tier-2 Standard. 7 Standards: Idempotency Key Schema and Window, Atomic Write Invariant,
+  Semantically Equivalent Response, SQS Continuation Message Schema, Visibility Timeout and
+  Heartbeating, Dead-Letter Queue Policy, Multi-Connection and At-Least-Once Delivery Handling.
+- Key decisions: idempotency key schema `<feature>:<intent>:<correlation_id>`; atomic
+  `TransactWriteItems` dual-write (entity + idempotency key); first-writer-wins; 24-hour TTL;
+  SQS messages carry routing keys only (no domain state); `maxReceiveCount=3` DLQ.
+- Semantically equivalent response (not DUPLICATE error) on replay — AWS Builders Library
+  principle.
+- Research basis: `tmp/research-concurrent-command-idempotency-strategy-2026-05-06.md`.
+
+#### Research Document Updates (earlier in session)
+
+- `tmp/research-teams-correlation-id-authority-2026-05-06.md`: Updated R1 with Microsoft 365
+  Agents SDK for Python packages/versions (replaces archived Bot Framework SDK, archived
+  Dec 31, 2025). Updated R4 to document that successor SDK also uses Azure-native storage
+  (moot — correlation_id is in Adaptive Card data field, not conversation state).
+- `tmp/research-correlation-id-lifecycle-cardinality-2026-05-06.md`: Updated R3 Teams path
+  with M365 Agents SDK reference.
+
+#### Status
+
+- Challenge review: NOT started. User must review draft ADRs first.
+- Wave 9 Wave 2 (ADR-0092–0094), Wave 3 (ADR-0095–0096), Wave 4 (ADR-0097): blocked pending
+  Wave 1 acceptance.
+
+---
+
 ## 2026-04-28
 
 ### ADR-0044 — Governance Baseline
