@@ -21,12 +21,11 @@ from infrastructure.notifications.service import NotificationService
 from infrastructure.storage.protocol import StorageService
 from infrastructure.audit.protocol import AuditTrailService
 from infrastructure.platforms.service import PlatformService
-from infrastructure.platforms.clients import (
-    SlackClientFacade,
-    TeamsClientFacade,
-    DiscordClientFacade,
-)
+from infrastructure.platforms.clients.slack import SlackClientFacade
+from infrastructure.platforms.clients.teams import TeamsClientFacade
+from infrastructure.platforms.clients.discord import DiscordClientFacade
 from infrastructure.directory.provider import DirectoryProvider
+from infrastructure.slack.service import SlackBot
 from infrastructure.services.providers import (
     get_app_settings,
     get_settings,
@@ -42,6 +41,7 @@ from infrastructure.services.providers import (
     get_storage_service,
     get_audit_trail_service,
     get_platform_service,
+    get_slack_bot,
     get_slack_client,
     get_teams_client,
     get_discord_client,
@@ -108,6 +108,9 @@ AuditTrailServiceDep = Annotated[AuditTrailService, Depends(get_audit_trail_serv
 PlatformServiceDep = Annotated[PlatformService, Depends(get_platform_service)]
 
 # Platform client facades - wrap platform SDKs with OperationResult APIs
+# Standalone Slack bot dependency
+SlackBotDep = Annotated[SlackBot, Depends(get_slack_bot)]
+
 # Slack client facade dependency
 SlackClientDep = Annotated[SlackClientFacade, Depends(get_slack_client)]
 
@@ -134,6 +137,7 @@ __all__ = [
     "NotificationServiceDep",
     "StorageServiceDep",
     "PlatformServiceDep",
+    "SlackBotDep",
     "SlackClientDep",
     "TeamsClientDep",
     "DiscordClientDep",

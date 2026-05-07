@@ -6,6 +6,7 @@ Provides application-scoped singleton providers for core infrastructure services
 
 from functools import lru_cache
 from typing import Any
+import warnings
 from infrastructure.platforms.exceptions import ProviderNotFoundError
 from typing import cast
 
@@ -55,12 +56,13 @@ from infrastructure.platforms.providers import (
     DiscordPlatformProvider,
 )
 from infrastructure.platforms.clients import (
-    SlackClientFacade,
     TeamsClientFacade,
     DiscordClientFacade,
 )
+from infrastructure.platforms.clients.slack import SlackClientFacade
 from infrastructure.directory.factory import build_google_directory_provider
 from infrastructure.directory.provider import DirectoryProvider
+from infrastructure.slack.service import SlackBot
 
 
 @lru_cache(maxsize=1)
@@ -86,8 +88,8 @@ def get_settings() -> Settings:
         Settings: Cached settings instance loaded from environment.
 
     Note:
-        Deprecated in ADR-0055 Standard 4. Prefer domain-specific settings
-        providers (for example get_slack_settings(), get_server_settings()).
+        Deprecated. Prefer domain-specific settings providers
+        (for example get_slack_settings(), get_server_settings()).
     """
     return Settings()
 
@@ -345,7 +347,7 @@ def get_notification_service() -> NotificationService:
     delivery with automatic fallback, idempotency, and circuit breakers.
 
     Channel construction and circuit breaker wiring happen here (composition
-    root — ADR-0076 S3) so NotificationService receives pre-built channels.
+    root) so NotificationService receives pre-built channels.
 
     Usage:
         from infrastructure.services import NotificationServiceDep
@@ -662,10 +664,29 @@ def get_slack_provider() -> SlackPlatformProvider:
     Raises:
         ProviderNotFoundError: If Slack provider has not been registered.
     """
+    warnings.warn(
+        "get_slack_provider() is deprecated; prefer get_slack_bot() for "
+        "standalone Slack interaction registration.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     provider = get_platform_service()._registry.get_provider("slack")
     if provider is None:
         raise ProviderNotFoundError("No provider registered with name 'slack'")
     return cast(SlackPlatformProvider, provider)
+
+
+@lru_cache(maxsize=1)
+def get_slack_bot() -> SlackBot:
+    """Get application-scoped standalone SlackBot singleton.
+
+    Returns:
+        SlackBot: Cached standalone Slack service.
+    """
+    return SlackBot(
+        slack_settings=get_slack_settings(),
+        slack_client=get_slack_client(),
+    )
 
 
 def get_teams_provider() -> TeamsPlatformProvider:

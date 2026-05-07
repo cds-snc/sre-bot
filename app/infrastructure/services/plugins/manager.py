@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
     from infrastructure.platforms.providers.teams import TeamsPlatformProvider
     from infrastructure.platforms.providers.discord import DiscordPlatformProvider
+    from infrastructure.slack.service import SlackBot
 
 logger = structlog.get_logger()
 
@@ -70,6 +71,7 @@ def collect_feature_i18n_resources(
 def register_feature_integrations(
     app: "FastAPI",
     logger: "BoundLogger",
+    slack_bot: "SlackBot | None" = None,
     slack_provider: "SlackPlatformProvider | None" = None,
     teams_provider: "TeamsPlatformProvider | None" = None,
     discord_provider: "DiscordPlatformProvider | None" = None,
@@ -94,6 +96,10 @@ def register_feature_integrations(
         pm.hook.register_slack_commands(provider=slack_provider)
         logger.info("slack_commands_registered")
 
+    if slack_bot:
+        pm.hook.register_slack_agent_interactions(provider=slack_bot)
+        logger.info("slack_agent_interactions_registered")
+
     if teams_provider:
         pm.hook.register_teams_commands(provider=teams_provider)
         logger.info("teams_commands_registered")
@@ -116,6 +122,7 @@ def register_feature_integrations(
 def discover_and_init_features(
     app: "FastAPI",
     logger: "BoundLogger",
+    slack_bot: "SlackBot | None" = None,
     slack_provider: "SlackPlatformProvider | None" = None,
     teams_provider: "TeamsPlatformProvider | None" = None,
     discord_provider: "DiscordPlatformProvider | None" = None,
@@ -134,6 +141,7 @@ def discover_and_init_features(
     register_feature_integrations(
         app=app,
         logger=logger,
+        slack_bot=slack_bot,
         slack_provider=slack_provider,
         teams_provider=teams_provider,
         discord_provider=discord_provider,
