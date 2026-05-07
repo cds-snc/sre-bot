@@ -35,29 +35,35 @@ class BackgroundJobRegistry(Protocol):
 
 
 @hookspec
-def register_slack_commands(provider: "SlackPlatformProvider") -> None:
-    """Register Slack commands with the provider.
+def register_slack_interactions(provider: "SlackPlatformProvider") -> None:
+    """Register Slack interactions (commands, actions, views) with the provider.
+
+    Renamed from register_slack_commands per ADR-0089 Standard 3.
 
     Args:
-        provider: Slack provider instance to register commands with.
+        provider: Slack provider instance to register interactions with.
     """
 
 
 @hookspec
-def register_teams_commands(provider: "TeamsPlatformProvider") -> None:
-    """Register Teams commands with the provider.
+def register_teams_interactions(provider: "TeamsPlatformProvider") -> None:
+    """Register Teams interactions (commands, adaptive cards) with the provider.
+
+    Renamed from register_teams_commands per ADR-0089 Standard 3.
 
     Args:
-        provider: Teams provider instance to register commands with.
+        provider: Teams provider instance to register interactions with.
     """
 
 
 @hookspec
-def register_discord_commands(provider: "DiscordPlatformProvider") -> None:
-    """Register Discord commands with the provider.
+def register_discord_interactions(provider: "DiscordPlatformProvider") -> None:
+    """Register Discord interactions (slash commands, etc.) with the provider.
+
+    Renamed from register_discord_commands per ADR-0089 Standard 3.
 
     Args:
-        provider: Discord provider instance to register commands with.
+        provider: Discord provider instance to register interactions with.
     """
 
 
