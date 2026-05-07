@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
     from infrastructure.platforms.providers.teams import TeamsPlatformProvider
     from infrastructure.platforms.providers.discord import DiscordPlatformProvider
+    from infrastructure.slack.service import SlackBot
     from infrastructure.i18n.resources import I18nResourceRegistry
 
 hookspec = pluggy.HookspecMarker("sre_bot")
@@ -40,6 +41,18 @@ def register_slack_commands(provider: "SlackPlatformProvider") -> None:
 
     Args:
         provider: Slack provider instance to register commands with.
+    """
+
+
+@hookspec
+def register_slack_agent_interactions(provider: "SlackBot") -> None:
+    """Register Slack agent interactions via the standalone SlackBot service.
+
+    This hookspec supports agent-first interaction registration through the
+    standalone SlackBot service while preserving legacy hookspec compatibility.
+
+    Args:
+        provider: Standalone SlackBot service used by feature hookimpls.
     """
 
 
