@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 
 from infrastructure.idempotency.cache import IdempotencyCache
 from infrastructure.idempotency.dynamodb import DynamoDBCache
-from infrastructure.idempotency.protocol import IdempotencyService
 from infrastructure.idempotency.service import DynamoDBIdempotencyService
 from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
 

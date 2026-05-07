@@ -19,7 +19,6 @@ from infrastructure.configuration.integrations.slack import SlackSettings
 from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
 from infrastructure.configuration.integrations.notify import NotifySettings
 from infrastructure.clients.maxmind.client import MaxMindClient
-from infrastructure.idempotency.protocol import IdempotencyService
 from infrastructure.idempotency.service import DynamoDBIdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
