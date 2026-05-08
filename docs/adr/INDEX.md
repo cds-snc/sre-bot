@@ -1,6 +1,6 @@
 # Decision Record Index
 
-**Generated:** 2026-05-08 · **Total records:** 30
+**Generated:** 2026-05-08 · **Total records:** 32
 
 ---
 
@@ -9,8 +9,8 @@
 | Tier | Application | Operations | Cross-domain |
 |------|-------------|------------|--------------|
 | Tier-0 (Governance) | — | — | 1 |
-| Tier-1 (Foundational) | 2 | 0 | 1 |
-| Tier-2 (Cross-cutting) | 20 | 2 | 4 |
+| Tier-1 (Foundational) | 3 | 0 | 0 |
+| Tier-2 (Cross-cutting) | 22 | 2 | 4 |
 | Tier-3 (Scoped) | 0 | 0 | 0 |
 
 ---
@@ -20,14 +20,14 @@
 ### Tier-0: Governance
 
 - [decision-record-governance.md](decision-record-governance.md) — **Decision Record Governance**
-  - `Governance` · `Draft` · —
+  - `Governance` · `Accepted` · —
 
 ### Application
 
 #### Tier-1: Foundational
 
 - [cloud-portability.md](cloud-portability.md) — **Cloud Portability**
-  - `Principle` · `Draft` · `architecture`
+  - `Principle` · `Accepted` · `architecture`
 - [layered-architecture.md](layered-architecture.md) — **Layered Architecture**
   - `Principle` · `Draft` · `architecture`
 - [type-boundaries.md](type-boundaries.md) — **Type Boundaries**
@@ -43,6 +43,10 @@
   - `Standard` · `Draft` · `lifecycle`, `architecture`
 - [background-execution.md](background-execution.md) — **Background Execution**
   - `Standard` · `Draft` · `lifecycle`, `architecture`
+- [client-adapter-responsibilities.md](client-adapter-responsibilities.md) — **Client and Adapter Responsibilities**
+  - `Standard` · `Draft` · `architecture`
+- [client-module-placement.md](client-module-placement.md) — **Client Module Placement**
+  - `Selection` · `Draft` · `architecture`
 - [configuration-ownership.md](configuration-ownership.md) — **Configuration Ownership and Settings**
   - `Standard` · `Draft` · `configuration`, `architecture`
 - [cross-channel-correlation.md](cross-channel-correlation.md) — **Cross-Channel Correlation**
@@ -85,11 +89,6 @@
   - `Standard` · `Draft` · `testing`, `architecture`
 
 ### Operations
-
-#### Tier-1: Foundational
-
-- [cloud-portability.md](cloud-portability.md) — **Cloud Portability**
-  - `Principle` · `Draft` · `architecture`
 
 #### Tier-2: Cross-cutting
 
@@ -135,8 +134,12 @@
   - `Standard` · `Draft` · `lifecycle`, `architecture`
 - [background-execution.md](background-execution.md) — **Background Execution**
   - `Standard` · `Draft` · `lifecycle`, `architecture`
+- [client-adapter-responsibilities.md](client-adapter-responsibilities.md) — **Client and Adapter Responsibilities**
+  - `Standard` · `Draft` · `architecture`
+- [client-module-placement.md](client-module-placement.md) — **Client Module Placement**
+  - `Selection` · `Draft` · `architecture`
 - [cloud-portability.md](cloud-portability.md) — **Cloud Portability**
-  - `Principle` · `Draft` · `architecture`
+  - `Principle` · `Accepted` · `architecture`
 - [configuration-ownership.md](configuration-ownership.md) — **Configuration Ownership and Settings**
   - `Standard` · `Draft` · `configuration`, `architecture`
 - [cross-channel-correlation.md](cross-channel-correlation.md) — **Cross-Channel Correlation**
