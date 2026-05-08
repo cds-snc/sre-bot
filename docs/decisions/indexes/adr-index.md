@@ -1,6 +1,6 @@
 # ADR Index
 
-**Last Updated:** 2026-04-30
+**Last Updated:** 2026-05-08
 
 This is the complete index of all Architecture Decision Records.
 
@@ -8,7 +8,7 @@ This is the complete index of all Architecture Decision Records.
 
 | ID | Title | Status | Tier | Type |
 |---|---|---|---|---|
-| [ADR-0043](../adr/0043-access-admin-operator-stuck-lock-scope.md) | Access Admin Operator Stuck-Lock Scope | Rejected | 4 | Feature Decision |
+| [ADR-0043](../adr/superseded/0043-access-admin-operator-stuck-lock-scope.md) | Access Admin Operator Stuck-Lock Scope | Rejected | 4 | Feature Decision |
 | [ADR-0044](../adr/0044-adr-governance-operating-model.md) | ADR Governance and Operating Model | Accepted | 0 | Governance Policy |
 | [ADR-0045](../adr/0045-core-architectural-principles.md) | Core Architectural Principles (Canonical Rewrite) | Accepted | 1 | Principle |
 | [ADR-0046](../adr/0046-runtime-lifecycle-and-lifespan-canonical-model.md) | Runtime Lifecycle and Lifespan Canonical Model | Accepted | 1 | Principle |
@@ -24,7 +24,6 @@ This is the complete index of all Architecture Decision Records.
 | [ADR-0056](../adr/0056-provider-discovery-and-composition-standard.md) | Provider Discovery and Composition Standard | Accepted | 2 | Pattern |
 | [ADR-0057](../adr/0057-runtime-disposability-and-graceful-shutdown-standard.md) | Runtime Disposability and Graceful Shutdown Standard | Accepted | 2 | Standard |
 | [ADR-0058](../adr/0058-background-execution-and-worker-isolation-standard.md) | Background Execution and Worker Isolation Standard | Accepted | 2 | Standard |
-| [ADR-0059](../adr/0059-feature-interaction-boundaries-and-platform-integration-standard.md) | Feature Interaction Boundaries and Platform Integration Standard | Accepted | 2 | Standard |
 | [ADR-0060](../adr/0060-api-response-and-error-mapping-standard.md) | API Response and Error Mapping Standard | Accepted | 2 | Standard |
 | [ADR-0061](../adr/0061-identity-and-external-integration-contract-standard.md) | Identity and External Integration Contract Standard | Accepted | 3 | Domain Standard |
 | [ADR-0062](../adr/0062-testing-and-request-context-quality.md) | Testing and Request Context Quality | Accepted | 2 | Standard |
@@ -43,6 +42,16 @@ This is the complete index of all Architecture Decision Records.
 | [ADR-0077](../adr/0077-infrastructure-service-contract-standard.md) | Infrastructure Service Contract Standard | Accepted | 2 | Standard |
 | [ADR-0078](../adr/0078-platform-services-architecture.md) | Platform Services Architecture | Accepted | 2 | Standard |
 | [ADR-0079](../adr/0079-queueing-and-message-broker-architecture-standard.md) | Queueing and Message-Broker Architecture Standard | Accepted | 2 | Standard |
+| [ADR-0080](../adr/0080-application-portability-boundary.md) | Application Portability Boundary | Accepted | 1 | Principle |
+| [ADR-0083](../adr/0083-event-dispatcher-library-adoption.md) | Event Dispatcher Library Adoption | Accepted | 5 | Library Adoption Decision |
+| [ADR-0084](../adr/0084-platform-interaction-identity-resolution-standard.md) | Platform Interaction Identity Resolution Standard | Draft | 3 | Domain Standard |
+| [ADR-0085](../adr/0085-infrastructure-import-and-barrel-governance.md) | Infrastructure Import and Barrel Governance | Draft | 2 | Standard |
+| [ADR-0086](../adr/0086-service-resolution-context-standard.md) | Service Resolution Context Standard | Draft | 2 | Standard |
+| [ADR-0087](../adr/0087-feature-package-vertical-isolation-and-internal-composition.md) | Feature Package Vertical Isolation and Internal Composition | Draft | 2 | Standard |
+| [ADR-0088](../adr/0088-multi-transport-dispatch-and-platform-boundary-architecture.md) | Multi-Transport Dispatch and Platform Boundary Architecture | Accepted | 2 | Standard |
+| [ADR-0089](../adr/0089-platform-interaction-handler-standard.md) | Platform Interaction Handler Standard | Accepted | 2 | Standard |
+| [ADR-0090](../adr/0090-cross-channel-correlation-and-http-coordination-standard.md) | Cross-Channel Correlation and HTTP Coordination Standard | Accepted | 2 | Standard |
+| [ADR-0091](../adr/0091-handler-reliability-and-idempotency-standard.md) | Handler Reliability and Idempotency Standard | Accepted | 2 | Standard |
 
 ## Superseded ADRs
 
@@ -84,11 +93,10 @@ This is the complete index of all Architecture Decision Records.
 | [ADR-0034](../adr/superseded/0034-validation-patterns.md) | Validation Patterns | ADR-0063 |
 | [ADR-0035](../adr/superseded/0035-http-response-patterns.md) | HTTP Response Patterns | ADR-0060 |
 | [ADR-0036](../adr/superseded/0036-dual-interface-error-handling.md) | Dual-Interface Error Handling | ADR-0060 |
-| [ADR-0037](../adr/0037-security-and-authentication.md) | Security & Authentication | ADR-0064 |
 | [ADR-0037](../adr/superseded/0037-security-and-authentication.md) | Security & Authentication | ADR-0064 |
-| [ADR-0038](../adr/0038-rate-limiting.md) | Rate Limiting | ADR-0064 |
 | [ADR-0038](../adr/superseded/0038-rate-limiting.md) | Rate Limiting | ADR-0064 |
 | [ADR-0039](../adr/superseded/0039-middleware-and-request-pipeline.md) | Middleware & Request Pipeline | ADR-0063 |
 | [ADR-0040](../adr/superseded/0040-type-model-boundaries.md) | Type Model Boundaries | ADR-0065 |
 | [ADR-0041](../adr/superseded/0041-openapi-documentation-standards.md) | OpenAPI Documentation Standards | ADR-0063 |
 | [ADR-0042](../adr/superseded/0042-access-runtime-env-source-naming.md) | Access Runtime Env-Source Variable Naming | ADR-0066 |
+| [ADR-0059](../adr/superseded/0059-feature-interaction-boundaries-and-platform-integration-standard.md) | Feature Interaction Boundaries and Platform Integration Standard | A, D, R, -, 0, 0, 8, 9 |
