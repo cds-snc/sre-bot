@@ -58,6 +58,8 @@ Clients pass through SDK return values and exceptions without translation. Adapt
 
 This allocation tracks the Ports and Adapters separation: ports (Protocols) describe what the application needs in domain terms; secondary adapters translate between vendor semantics and domain semantics; the client surface inside the adapter is the vendor-specific layer below. Putting domain translation in the adapter — not in the client — keeps the client free to be replaced on its own axis and keeps each capability's mapping policy in one place.
 
+The contract is path-agnostic. A Path A composed-service implementation (a vendor-specific backing for a portable capability — e.g., a DynamoDB-backed `StorageService`) and a Path B feature-owned adapter (a feature whose domain is to act on a specific third-party API — e.g., the AWS Identity Center adapter in `app/packages/access/sync`) are both *secondary adapters* under this allocation. The responsibility split between client and adapter is the same in either case; only the *purpose* of the integration (per [layered-architecture.md](layered-architecture.md)) differs.
+
 ### Vendor client responsibilities
 
 A vendor client owns transport-level and SDK-level concerns:
@@ -182,4 +184,4 @@ Compliance is verified by:
 
 ## Change Log
 
-- 2026-05-08: Created. Establishes the responsibility contract for vendor clients (transport-level concerns including authentication, retry, pagination) and secondary adapters (typed-exception → `OperationResult` mapping, type translation, capability-level error semantics). Adopts an exception-based client surface with adapter-level translation, grounded in Ports and Adapters and the Repository Pattern.
+- 2026-05-08: Created. Establishes the responsibility contract for vendor clients (transport-level concerns including authentication, retry, pagination) and secondary adapters (typed-exception → `OperationResult` mapping, type translation, capability-level error semantics). Adopts an exception-based client surface with adapter-level translation, grounded in Ports and Adapters and the Repository Pattern. Anchored to the path-agnostic application of the contract: it applies identically to Path A composed-service implementations and Path B feature-owned adapters defined in layered-architecture.md.
