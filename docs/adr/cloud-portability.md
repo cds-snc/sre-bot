@@ -1,6 +1,6 @@
 ---
 title: "Cloud Portability"
-status: Draft
+status: Accepted
 type: Principle
 tier: Tier-1
 governance_domain: [application]
