@@ -81,8 +81,8 @@ Records at Tier-1 and below must declare one or more governance domains.
 
 | Domain | Governs | Boundary test | Files |
 |--------|---------|---------------|-------|
-| `application` | The software artifact and all practices to produce it correctly | "If we handed this app to a different ops team, would this decision travel with the code?" | `app/`, `pytest.ini`, `mypy.ini`, `.flake8`, coding standards, security scanning tool choices |
-| `operations` | Running the artifact in environments and the delivery pipeline | "Does this decision stay with the infrastructure, not the code?" | `terraform/`, `.github/workflows/`, `Dockerfile`, `docker-compose.yml`, devcontainer, cloud services, deployment strategy |
+| `application` | The software artifact and all practices to produce it correctly | "If we handed this app to a different ops team, would this decision travel with the code?" | `app/`, `pytest.ini`, `mypy.ini`, `.flake8`, coding standards, security scanning tool choices, devcontainer |
+| `operations` | Running the artifact in environments and the delivery pipeline | "Does this decision stay with the infrastructure, not the code?" | `terraform/`, `.github/workflows/`, `Dockerfile`, `docker-compose.yml`, cloud services, deployment strategy |
 
 **Rules:**
 
