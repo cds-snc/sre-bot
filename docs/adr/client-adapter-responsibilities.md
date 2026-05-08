@@ -1,6 +1,6 @@
 ---
 title: "Client and Adapter Responsibilities"
-status: Draft
+status: Accepted
 type: Standard
 tier: Tier-2
 governance_domain: [application]
