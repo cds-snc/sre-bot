@@ -1,30 +1,49 @@
 #!/usr/bin/env python3
-"""Generate ADR index files from frontmatter in docs/decisions/adr/.
+"""Generate a unified ADR index from frontmatter in docs/adr/.
 
-Reads all ADR markdown files, parses YAML frontmatter, and writes:
-  - docs/decisions/indexes/adr-index.md
-  - docs/decisions/indexes/adr-by-domain.md
-  - docs/decisions/indexes/adr-review-calendar.md
+Reads all ADR markdown files, parses YAML frontmatter, and writes a single
+index file: docs/adr/INDEX.md
+
+The index is organized by governance domain → tier → concern tags, providing
+multiple views into the same corpus for discoverability.
 """
 
 import re
 import sys
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 from typing import Any
 
 import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-ADR_DIR = REPO_ROOT / "docs/decisions/adr"
-SUPERSEDED_DIR = ADR_DIR / "superseded"
-INDEX_DIR = REPO_ROOT / "docs/decisions/indexes"
+ADR_DIR = REPO_ROOT / "docs/adr"
 
 TODAY = date.today()
 TODAY_STR = TODAY.isoformat()
 
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---", re.DOTALL)
+
+VALID_TIERS = {"Tier-0", "Tier-1", "Tier-2", "Tier-3"}
+VALID_TYPES = {"Governance", "Principle", "Standard", "Selection", "Deprecation"}
+VALID_DOMAINS = {"application", "operations"}
+VALID_STATUSES = {
+    "Draft",
+    "Proposed",
+    "Accepted",
+    "Superseded",
+    "Deprecated",
+    "Rejected",
+}
+
+TIER_ORDER = {"Tier-0": 0, "Tier-1": 1, "Tier-2": 2, "Tier-3": 3}
+TIER_NAMES = {
+    "Tier-0": "Governance",
+    "Tier-1": "Foundational",
+    "Tier-2": "Cross-cutting",
+    "Tier-3": "Scoped",
+}
 
 
 def parse_frontmatter(filepath: Path) -> dict[str, Any] | None:
@@ -41,183 +60,245 @@ def parse_frontmatter(filepath: Path) -> dict[str, Any] | None:
         return None
 
 
-def _parse_date(value: Any) -> date | None:
-    if isinstance(value, date):
-        return value
-    if isinstance(value, str):
-        try:
-            return date.fromisoformat(value)
-        except ValueError:
-            return None
-    return None
+def validate_frontmatter(fm: dict, filename: str) -> list[str]:
+    """Validate frontmatter against the governance metadata contract."""
+    errors: list[str] = []
 
+    # Required fields
+    for field in ("title", "status", "type", "tier", "date", "decision_makers"):
+        if not fm.get(field):
+            errors.append(f"Missing required field: {field}")
 
-def compute_review_state(next_review_due: Any) -> str:
-    due = _parse_date(next_review_due)
-    if due is None:
-        return "unknown"
-    if due <= TODAY:
-        return "stale"
-    if due <= TODAY + timedelta(days=30):
-        return "expiring-soon"
-    return "current"
+    # Enum validations
+    if fm.get("tier") and fm["tier"] not in VALID_TIERS:
+        errors.append(f"Invalid tier: {fm['tier']} (allowed: {VALID_TIERS})")
 
+    if fm.get("type") and fm["type"] not in VALID_TYPES:
+        errors.append(f"Invalid type: {fm['type']} (allowed: {VALID_TYPES})")
 
-def _adr_sort_key(adr: dict) -> int:
-    try:
-        return int(adr["adr_id"].split("-")[1])
-    except (KeyError, IndexError, ValueError):
-        return 9999
+    if fm.get("status") and fm["status"] not in VALID_STATUSES:
+        errors.append(f"Invalid status: {fm['status']} (allowed: {VALID_STATUSES})")
+
+    # Tier-1+ must have governance_domain and concerns
+    tier = fm.get("tier", "")
+    if tier in ("Tier-1", "Tier-2", "Tier-3"):
+        domains = fm.get("governance_domain", [])
+        if not domains:
+            errors.append("Tier-1+ records must declare governance_domain")
+        elif isinstance(domains, list):
+            for d in domains:
+                if d not in VALID_DOMAINS:
+                    errors.append(f"Invalid governance_domain: {d}")
+        elif isinstance(domains, str):
+            if domains not in VALID_DOMAINS:
+                errors.append(f"Invalid governance_domain: {domains}")
+
+        if not fm.get("concerns"):
+            errors.append("Tier-1+ records must declare concerns")
+
+    # Deprecation type must have retirement_date
+    if fm.get("type") == "Deprecation" and not fm.get("retirement_date"):
+        errors.append("Deprecation type requires retirement_date")
+
+    return errors
 
 
 def load_adrs() -> list[dict]:
+    """Load all ADRs from docs/adr/, excluding template/index files."""
     adrs: list[dict] = []
+    skip_dirs = {"templates", "superseded"}
+    skip_prefixes = ("index-", "INDEX")
 
     for filepath in sorted(ADR_DIR.glob("*.md")):
-        fm = parse_frontmatter(filepath)
-        if not fm or not fm.get("adr_id"):
+        if filepath.name.startswith(tuple(skip_prefixes)):
             continue
-        fm["_rel_link"] = f"../adr/{filepath.name}"
+        if any(part in skip_dirs for part in filepath.parts):
+            continue
+
+        fm = parse_frontmatter(filepath)
+        if not fm:
+            continue
+
+        # Only include records with minimum required fields
+        if not fm.get("title") or not fm.get("tier"):
+            continue
+
+        fm["_filename"] = filepath.name
+        fm["_errors"] = validate_frontmatter(fm, filepath.name)
         adrs.append(fm)
 
-    for filepath in sorted(SUPERSEDED_DIR.glob("*.md")):
-        fm = parse_frontmatter(filepath)
-        if not fm or not fm.get("adr_id"):
-            continue
-        fm["_rel_link"] = f"../adr/superseded/{filepath.name}"
-        adrs.append(fm)
-
-    adrs.sort(key=_adr_sort_key)
     return adrs
 
 
-# ---------------------------------------------------------------------------
-# Index writers
-# ---------------------------------------------------------------------------
+def normalize_list(value: Any) -> list[str]:
+    """Normalize a field value to a list of strings."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, list):
+        return [str(v) for v in value]
+    return [str(value)]
 
 
-def write_adr_index(adrs: list[dict]) -> None:
-    active = [a for a in adrs if a.get("status", "").lower() != "superseded"]
-    superseded = [a for a in adrs if a.get("status", "").lower() == "superseded"]
+def format_adr_entry(adr: dict) -> str:
+    """Format a single ADR as a markdown list item."""
+    filename = adr["_filename"]
+    title = adr.get("title", "").strip('"')
+    status = adr.get("status", "Draft")
+    adr_type = adr.get("type", "Unknown")
+    concerns = normalize_list(adr.get("concerns"))
 
-    lines = [
-        "# ADR Index",
-        "",
-        f"**Last Updated:** {TODAY_STR}",
-        "",
-        "This is the complete index of all Architecture Decision Records.",
-        "",
-        "## Active ADRs (Accepted & Proposed)",
-        "",
-        "| ID | Title | Status | Tier | Type |",
-        "|---|---|---|---|---|",
-    ]
+    status_badge = f"`{status}`"
+    type_badge = f"`{adr_type}`"
+    concern_str = ", ".join(f"`{c}`" for c in concerns) if concerns else "—"
 
-    for a in active:
-        adr_id = a["adr_id"]
-        title = a.get("title", "").strip('"')
-        status = a.get("status", "")
-        tier = a.get("tier", "").replace("Tier-", "")
-        dtype = a.get("decision_type", "")
-        link = a["_rel_link"]
-        lines.append(f"| [{adr_id}]({link}) | {title} | {status} | {tier} | {dtype} |")
-
-    if superseded:
-        lines += [
-            "",
-            "## Superseded ADRs",
-            "",
-            "| ID | Title | Superseded By |",
-            "|---|---|---|",
-        ]
-        for a in superseded:
-            adr_id = a["adr_id"]
-            title = a.get("title", "").strip('"')
-            link = a["_rel_link"]
-            superseded_by: list[str] = a.get("superseded_by") or []
-            by_str = ", ".join(str(x) for x in superseded_by) if superseded_by else "—"
-            lines.append(f"| [{adr_id}]({link}) | {title} | {by_str} |")
-
-    lines.append("")
-    (INDEX_DIR / "adr-index.md").write_text("\n".join(lines), encoding="utf-8")
-    print("  Written: adr-index.md")
-
-
-def write_adr_by_domain(adrs: list[dict]) -> None:
-    active = [a for a in adrs if a.get("status", "").lower() != "superseded"]
-    tiers: dict[str, dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
-
-    for a in active:
-        tier = a.get("tier", "Unknown")
-        dtype = a.get("decision_type", "Unknown")
-        tiers[tier][dtype].append(a)
-
-    def tier_sort_key(t: str) -> int:
-        parts = t.split("-")
-        return int(parts[1]) if len(parts) == 2 and parts[1].isdigit() else 99
-
-    lines = [
-        "# ADRs by Tier and Type",
-        "",
-        f"**Last Updated:** {TODAY_STR}",
-        "",
-    ]
-
-    for tier in sorted(tiers.keys(), key=tier_sort_key):
-        lines.append(f"## {tier}")
-        lines.append("")
-        for dtype in sorted(tiers[tier].keys()):
-            # Pluralise heading: Principle -> Principles, Standard -> Standards, etc.
-            heading = dtype + "s" if not dtype.endswith("s") else dtype
-            lines.append(f"### {heading}")
-            lines.append("")
-            for a in tiers[tier][dtype]:
-                adr_id = a["adr_id"]
-                title = a.get("title", "").strip('"')
-                status = a.get("status", "")
-                link = a["_rel_link"]
-                lines.append(f"- [{adr_id}]({link}): {title} - **{status}**")
-            lines.append("")
-
-    (INDEX_DIR / "adr-by-domain.md").write_text("\n".join(lines), encoding="utf-8")
-    print("  Written: adr-by-domain.md")
-
-
-def write_review_calendar(adrs: list[dict]) -> None:
-    active = [a for a in adrs if a.get("status", "").lower() != "superseded"]
-
-    def calendar_sort_key(a: dict) -> str:
-        due = _parse_date(a.get("next_review_due"))
-        return due.isoformat() if due else "9999-12-31"
-
-    lines = [
-        "# ADR Review Calendar",
-        "",
-        f"**Last Updated:** {TODAY_STR}",
-        "",
-        "| ID | Title | Due Date | Status | Review State |",
-        "|---|---|---|---|---|",
-    ]
-
-    for a in sorted(active, key=calendar_sort_key):
-        adr_id = a["adr_id"]
-        title = a.get("title", "").strip('"')
-        link = a["_rel_link"]
-        due_raw = a.get("next_review_due", "")
-        due_str = (
-            _parse_date(due_raw).isoformat() if _parse_date(due_raw) else str(due_raw)
-        )
-        status = a.get("status", "")
-        review_state = compute_review_state(due_raw)
-        lines.append(
-            f"| [{adr_id}]({link}) | {title} | {due_str} | {status} | {review_state} |"
-        )
-
-    lines.append("")
-    (INDEX_DIR / "adr-review-calendar.md").write_text(
-        "\n".join(lines), encoding="utf-8"
+    return (
+        f"- [{filename}]({filename}) — **{title}**\n"
+        f"  - {type_badge} · {status_badge} · {concern_str}"
     )
-    print("  Written: adr-review-calendar.md")
+
+
+def write_index(adrs: list[dict]) -> None:
+    """Write the unified INDEX.md file."""
+    lines = [
+        "# Decision Record Index",
+        "",
+        f"**Generated:** {TODAY_STR} · **Total records:** {len(adrs)}",
+        "",
+        "---",
+        "",
+    ]
+
+    # --- Summary table ---
+    lines.append("## Summary")
+    lines.append("")
+    lines.append("| Tier | Application | Operations | Cross-domain |")
+    lines.append("|------|-------------|------------|--------------|")
+
+    for tier in sorted(VALID_TIERS, key=lambda t: TIER_ORDER[t]):
+        tier_adrs = [a for a in adrs if a.get("tier") == tier]
+        if tier == "Tier-0":
+            lines.append(f"| {tier} ({TIER_NAMES[tier]}) | — | — | {len(tier_adrs)} |")
+        else:
+            app_count = sum(
+                1
+                for a in tier_adrs
+                if "application" in normalize_list(a.get("governance_domain"))
+                and "operations" not in normalize_list(a.get("governance_domain"))
+            )
+            ops_count = sum(
+                1
+                for a in tier_adrs
+                if "operations" in normalize_list(a.get("governance_domain"))
+                and "application" not in normalize_list(a.get("governance_domain"))
+            )
+            cross_count = sum(
+                1
+                for a in tier_adrs
+                if "application" in normalize_list(a.get("governance_domain"))
+                and "operations" in normalize_list(a.get("governance_domain"))
+            )
+            lines.append(
+                f"| {tier} ({TIER_NAMES[tier]}) | {app_count} | {ops_count} | {cross_count} |"
+            )
+
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+
+    # --- By Domain → Tier ---
+    lines.append("## By Domain")
+    lines.append("")
+
+    # Tier-0 (no domain)
+    tier0_adrs = [a for a in adrs if a.get("tier") == "Tier-0"]
+    if tier0_adrs:
+        lines.append("### Tier-0: Governance")
+        lines.append("")
+        for adr in tier0_adrs:
+            lines.append(format_adr_entry(adr))
+        lines.append("")
+
+    # Application domain
+    app_adrs = [
+        a
+        for a in adrs
+        if a.get("tier") != "Tier-0"
+        and "application" in normalize_list(a.get("governance_domain"))
+    ]
+    if app_adrs:
+        lines.append("### Application")
+        lines.append("")
+        for tier in ("Tier-1", "Tier-2", "Tier-3"):
+            tier_subset = [a for a in app_adrs if a.get("tier") == tier]
+            if tier_subset:
+                lines.append(f"#### {tier}: {TIER_NAMES[tier]}")
+                lines.append("")
+                for adr in tier_subset:
+                    lines.append(format_adr_entry(adr))
+                lines.append("")
+
+    # Operations domain
+    ops_adrs = [
+        a
+        for a in adrs
+        if a.get("tier") != "Tier-0"
+        and "operations" in normalize_list(a.get("governance_domain"))
+    ]
+    if ops_adrs:
+        lines.append("### Operations")
+        lines.append("")
+        for tier in ("Tier-1", "Tier-2", "Tier-3"):
+            tier_subset = [a for a in ops_adrs if a.get("tier") == tier]
+            if tier_subset:
+                lines.append(f"#### {tier}: {TIER_NAMES[tier]}")
+                lines.append("")
+                for adr in tier_subset:
+                    lines.append(format_adr_entry(adr))
+                lines.append("")
+
+    lines.append("---")
+    lines.append("")
+
+    # --- By Concern Tag ---
+    lines.append("## By Concern")
+    lines.append("")
+
+    concern_map: dict[str, list[dict]] = defaultdict(list)
+    for adr in adrs:
+        for concern in normalize_list(adr.get("concerns")):
+            concern_map[concern].append(adr)
+
+    for concern in sorted(concern_map.keys()):
+        lines.append(f"### `{concern}`")
+        lines.append("")
+        for adr in concern_map[concern]:
+            lines.append(format_adr_entry(adr))
+        lines.append("")
+
+    # --- Validation errors ---
+    error_adrs = [a for a in adrs if a.get("_errors")]
+    if error_adrs:
+        lines.append("---")
+        lines.append("")
+        lines.append("## Validation Issues")
+        lines.append("")
+        lines.append(
+            "The following records have metadata issues per "
+            "[decision-record-governance.md](decision-record-governance.md):"
+        )
+        lines.append("")
+        for adr in error_adrs:
+            filename = adr["_filename"]
+            lines.append(f"- **{filename}**")
+            for err in adr["_errors"]:
+                lines.append(f"  - ⚠️ {err}")
+        lines.append("")
+
+    output_path = ADR_DIR / "INDEX.md"
+    output_path.write_text("\n".join(lines), encoding="utf-8")
+    print(f"  Written: INDEX.md ({len(adrs)} records)")
 
 
 # ---------------------------------------------------------------------------
@@ -232,15 +313,23 @@ def main() -> None:
 
     adrs = load_adrs()
     if not adrs:
-        print("ERROR: No ADRs with valid frontmatter found.", file=sys.stderr)
-        sys.exit(1)
+        print("WARN: No ADRs with valid frontmatter found.", file=sys.stderr)
+        # Write an empty index rather than failing
+        (ADR_DIR / "INDEX.md").write_text(
+            f"# Decision Record Index\n\n**Generated:** {TODAY_STR} · **Total records:** 0\n\nNo decision records found.\n",
+            encoding="utf-8",
+        )
+        print("  Written: INDEX.md (empty)")
+        return
 
-    INDEX_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"Generating index for {len(adrs)} ADRs...")
+    write_index(adrs)
 
-    print(f"Generating indexes for {len(adrs)} ADRs...")
-    write_adr_index(adrs)
-    write_adr_by_domain(adrs)
-    write_review_calendar(adrs)
+    # Report validation summary
+    error_count = sum(1 for a in adrs if a.get("_errors"))
+    if error_count:
+        print(f"  ⚠️  {error_count} record(s) have validation issues.")
+
     print("Done.")
 
 
