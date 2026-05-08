@@ -15,7 +15,7 @@ decision_makers:
 
 ## Context and Problem Statement
 
-The application reads its configuration from environment variables (per [cloud-portability.md](cloud-portability.md) Contract 1). Different parts of the codebase consume different slices of that configuration: a feature package needs its own behavioral switches and credentials; a composed infrastructure service needs the connection parameters for its backing provider; a small set of values (environment label, log level, deployment identifier) genuinely spans the whole process. Each consumer needs only the slice relevant to it, validated at startup, and constructed once per process.
+The application reads its configuration from environment variables (per [cloud-portability.md](cloud-portability.md) Contract 1). Different parts of the codebase consume different slices of that configuration: a vendor client needs credentials and endpoint parameters to authenticate with its third-party API; a composed infrastructure service needs the non-credential connection parameters for its backing provider (table names, key prefixes, capacity hints); a feature package needs its own behavioral switches and feature-specific identifiers (e.g., which target resource ID to operate on); a small set of values (environment label, log level, deployment identifier) genuinely spans the whole process. Each consumer needs only the slice relevant to it, validated at startup, and constructed once per process.
 
 The problem this record addresses: **how is configuration partitioned, who owns each slice, and how is each slice made available to its consumers?** The answer determines three things at once:
 
@@ -52,10 +52,11 @@ The unit of ownership is the *domain*: a feature package, a composed infrastruct
 
 ### Partitioning and ownership
 
-- A feature package owns a `settings.py` (or `settings/` module) inside the package: `app/packages/<feature>/settings.py`. The feature's `BaseSettings` declares only the env vars the feature consumes.
-- A composed infrastructure service owns a settings module co-located with the service: `app/infrastructure/<service>/settings.py`. The service's `BaseSettings` declares only the env vars the service consumes.
-- A single `AppSettings` at `app/settings.py` declares truly cross-cutting values — values that have no single owning domain (e.g., environment label, deployment identifier, base log level).
-- No env var is declared in more than one `BaseSettings` class. When two domains read the same value, one owns it and the other calls that domain's provider to read it. The most common case for shared reads is `AppSettings`, which any domain may consume.
+- **Vendor credentials and connectivity parameters** (access keys, role ARNs, tokens, region, endpoint URL) are declared in a `BaseSettings` class located in the **infrastructure layer**, co-located with the provider function that constructs the corresponding vendor client (e.g., `app/infrastructure/connections/<vendor>.py` or an equivalent infrastructure module). Vendor credentials are declared *only* here; no other settings class re-declares them. The vendor client *class* itself, at `app/clients/<vendor>/`, receives scalar credential values (`region: str`, `aws_access_key_id: str | None`, etc.) through its constructor — the client never imports `pydantic_settings`. This keeps the `app/clients/` boundary rule from [client-module-placement.md](client-module-placement.md) intact (clients import only vendor SDKs and the Python standard library) and aligns with the Composition Root pattern: credentials are resolved at the composition point and injected downward as scalars. Where the SDK supports an ambient credential chain (e.g., boto3's chained provider, Google ADC), the settings class declares only the parameters that are not satisfied by the chain (typically: region, account or project identifier).
+- A **composed infrastructure service** owns a settings module co-located with the service: `app/infrastructure/<service>/settings.py`. The service's `BaseSettings` declares the *non-credential* connection parameters specific to that service (table names, key prefixes, capacity hints, retry budgets, feature flags). The service reaches its vendor through a vendor client and never re-declares vendor credentials.
+- A **feature package** owns a `settings.py` (or `settings/` module) inside the package: `app/packages/<feature>/settings.py`. The feature's `BaseSettings` declares behavioral switches and feature-specific identifiers (e.g., which target Identity Store ID this feature syncs to, batch sizes, feature toggles). It does *not* declare vendor credentials — when the feature acts on a third-party system through a Path B adapter, the credentials reach the adapter through the vendor client, not through feature settings.
+- A single **`AppSettings`** at `app/settings.py` declares truly cross-cutting values that have no single owning domain (e.g., environment label, deployment identifier, base log level).
+- No env var is declared in more than one `BaseSettings` class. When two consumers read the same value, exactly one owns it and the other calls that owner's provider. The most common cases for shared reads are vendor credentials (owned by the client) and `AppSettings` (cross-cutting); both may be consumed by anyone who legitimately needs them.
 
 ### Provider: `@lru_cache(maxsize=1)`
 
@@ -77,7 +78,7 @@ Consumers depend on the provider for the slice they need, not on a wider setting
 - **Background jobs, hookimpls, and startup code** call the provider directly: `settings = get_my_feature_settings()`.
 - **An infrastructure service or feature provider that composes multiple slices** (e.g., a notification service needing its own settings and `AppSettings`) calls each provider in its own provider function. Composition is explicit at the construction site governed by [dependency-injection.md](dependency-injection.md).
 
-A consumer does not depend on a settings class outside its own domain except for `AppSettings`, which any domain may read.
+A consumer does not depend on a settings class outside its own domain except for `AppSettings`, which any domain may read. Vendor-client credentials are an internal concern of the infrastructure provider that constructs the client: the provider reads the credential `BaseSettings`, extracts scalars, and calls the client constructor. Feature packages and infrastructure services obtain authenticated client instances through composition (constructor injection of the constructed client), not by reading vendor credentials directly.
 
 ### Validation timing: fail-fast at startup
 
@@ -153,8 +154,13 @@ Compliance is verified by:
 5. Composition Root — Mark Seemann
    - URL: <https://blog.ploeh.dk/2011/07/28/CompositionRoot/>
    - Accessed: 2026-05-04
-   - Relevance: Establishes that dependencies (including configuration) are constructed at a single composition point and injected into the consumers that need them. Grounds the rule that settings reach consumers through providers and dependency injection, not through global access.
+   - Relevance: Establishes that dependencies (including configuration) are constructed at a single composition point and injected into the consumers that need them. Grounds the rule that settings reach consumers through providers and dependency injection, not through global access — including the rule that vendor credentials are resolved by an infrastructure provider and injected as scalars into the vendor client, rather than the client reading settings itself.
+
+6. AWS SDKs and Tools — Standardized Credentials
+   - URL: <https://docs.aws.amazon.com/sdkref/latest/guide/standardized-credentials.html>
+   - Accessed: 2026-05-08
+   - Relevance: Establishes that the AWS SDK resolves credentials through a chained provider (environment variables, container credentials, instance metadata, configuration files) rather than requiring explicit credentials in application code. Grounds the rule that the vendor-client credential `BaseSettings` typically declares only what the SDK's ambient chain does not provide (e.g., region, account or project identifier), and that the client itself accepts scalars rather than coupling to a settings type.
 
 ## Change Log
 
-- 2026-05-08: Created. Establishes per-domain partitioning of `BaseSettings` (one settings class per feature package, per composed infrastructure service, plus a single cross-cutting `AppSettings`), `@lru_cache(maxsize=1)` providers as the only public access path, narrow-slice injection through providers (FastAPI `Depends` for HTTP consumers; direct calls for background and startup code), startup-time validation, and a uniform test-substitution pattern using dependency overrides or cache-clearing depending on consumer type.
+- 2026-05-08: Created. Establishes per-domain partitioning of `BaseSettings` across four ownership categories — vendor connectivity (credentials and connectivity parameters; `BaseSettings` and provider live in the infrastructure layer, the vendor client class itself receives scalars and never imports `pydantic_settings`), composed infrastructure service (non-credential backing parameters), feature package (behavioral switches and feature-specific identifiers), and a single cross-cutting `AppSettings`. The vendor-credential placement preserves the `app/clients/` import boundary from client-module-placement.md and follows the Composition Root pattern: credentials are resolved at the composition point and injected downward as scalars; ambient SDK credential chains (e.g., boto3, Google ADC) cover what the settings class does not declare. `@lru_cache(maxsize=1)` providers are the only public access path; injection is narrow-slice (FastAPI `Depends` for HTTP consumers; direct calls for background and startup code); validation is fail-fast at startup; test substitution uses dependency overrides or cache-clearing depending on consumer type.
