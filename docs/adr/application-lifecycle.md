@@ -1,6 +1,6 @@
 ---
 title: "Application Lifecycle"
-status: Accept
+status: Accepted
 type: Standard
 tier: Tier-2
 governance_domain: [application]

@@ -29,9 +29,9 @@
 - [cloud-portability.md](cloud-portability.md) — **Cloud Portability**
   - `Principle` · `Accepted` · `architecture`
 - [layered-architecture.md](layered-architecture.md) — **Layered Architecture**
-  - `Principle` · `Draft` · `architecture`
+  - `Principle` · `Accepted` · `architecture`
 - [type-boundaries.md](type-boundaries.md) — **Type Boundaries**
-  - `Principle` · `Draft` · `architecture`
+  - `Principle` · `Accepted` · `architecture`
 
 #### Tier-2: Cross-cutting
 
@@ -40,19 +40,19 @@
 - [api-security.md](api-security.md) — **API Security**
   - `Standard` · `Draft` · `api`, `security`
 - [application-lifecycle.md](application-lifecycle.md) — **Application Lifecycle**
-  - `Standard` · `Draft` · `lifecycle`, `architecture`
+  - `Standard` · `Accepted` · `lifecycle`, `architecture`
 - [background-execution.md](background-execution.md) — **Background Execution**
   - `Standard` · `Draft` · `lifecycle`, `architecture`
 - [client-adapter-responsibilities.md](client-adapter-responsibilities.md) — **Client and Adapter Responsibilities**
-  - `Standard` · `Draft` · `architecture`
+  - `Standard` · `Accepted` · `architecture`
 - [client-module-placement.md](client-module-placement.md) — **Client Module Placement**
-  - `Selection` · `Draft` · `architecture`
+  - `Selection` · `Accepted` · `architecture`
 - [configuration-ownership.md](configuration-ownership.md) — **Configuration Ownership and Settings**
   - `Standard` · `Draft` · `configuration`, `architecture`
 - [cross-channel-correlation.md](cross-channel-correlation.md) — **Cross-Channel Correlation**
   - `Standard` · `Draft` · `observability`, `architecture`
 - [dependency-injection.md](dependency-injection.md) — **Dependency Injection**
-  - `Standard` · `Draft` · `architecture`
+  - `Standard` · `Accepted` · `architecture`
 - [environment-parity.md](environment-parity.md) — **Environment Parity**
   - `Standard` · `Draft` · `configuration`
 - [event-dispatch.md](event-dispatch.md) — **Event Dispatch**
@@ -74,7 +74,7 @@
 - [multi-transport-architecture.md](multi-transport-architecture.md) — **Multi-Transport Architecture**
   - `Standard` · `Draft` · `api`, `architecture`
 - [operation-result-pattern.md](operation-result-pattern.md) — **Operation Result Pattern**
-  - `Standard` · `Draft` · `architecture`, `api`
+  - `Standard` · `Accepted` · `architecture`, `api`
 - [platform-interaction-handlers.md](platform-interaction-handlers.md) — **Platform Interaction Handlers**
   - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 - [plugin-registration-discovery.md](plugin-registration-discovery.md) — **Plugin Registration and Discovery**
@@ -120,7 +120,7 @@
 - [multi-transport-architecture.md](multi-transport-architecture.md) — **Multi-Transport Architecture**
   - `Standard` · `Draft` · `api`, `architecture`
 - [operation-result-pattern.md](operation-result-pattern.md) — **Operation Result Pattern**
-  - `Standard` · `Draft` · `architecture`, `api`
+  - `Standard` · `Accepted` · `architecture`, `api`
 - [platform-interaction-handlers.md](platform-interaction-handlers.md) — **Platform Interaction Handlers**
   - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 - [technology-slowapi.md](technology-slowapi.md) — **Technology Selection: SlowAPI**
@@ -131,13 +131,13 @@
 - [api-design-error-mapping.md](api-design-error-mapping.md) — **API Design and Error Mapping**
   - `Standard` · `Draft` · `api`, `architecture`
 - [application-lifecycle.md](application-lifecycle.md) — **Application Lifecycle**
-  - `Standard` · `Draft` · `lifecycle`, `architecture`
+  - `Standard` · `Accepted` · `lifecycle`, `architecture`
 - [background-execution.md](background-execution.md) — **Background Execution**
   - `Standard` · `Draft` · `lifecycle`, `architecture`
 - [client-adapter-responsibilities.md](client-adapter-responsibilities.md) — **Client and Adapter Responsibilities**
-  - `Standard` · `Draft` · `architecture`
+  - `Standard` · `Accepted` · `architecture`
 - [client-module-placement.md](client-module-placement.md) — **Client Module Placement**
-  - `Selection` · `Draft` · `architecture`
+  - `Selection` · `Accepted` · `architecture`
 - [cloud-portability.md](cloud-portability.md) — **Cloud Portability**
   - `Principle` · `Accepted` · `architecture`
 - [configuration-ownership.md](configuration-ownership.md) — **Configuration Ownership and Settings**
@@ -145,7 +145,7 @@
 - [cross-channel-correlation.md](cross-channel-correlation.md) — **Cross-Channel Correlation**
   - `Standard` · `Draft` · `observability`, `architecture`
 - [dependency-injection.md](dependency-injection.md) — **Dependency Injection**
-  - `Standard` · `Draft` · `architecture`
+  - `Standard` · `Accepted` · `architecture`
 - [event-dispatch.md](event-dispatch.md) — **Event Dispatch**
   - `Standard` · `Draft` · `architecture`
 - [feature-package-structure.md](feature-package-structure.md) — **Feature Package Structure**
@@ -157,13 +157,13 @@
 - [infrastructure-service-classification.md](infrastructure-service-classification.md) — **Infrastructure Service Classification**
   - `Standard` · `Draft` · `architecture`
 - [layered-architecture.md](layered-architecture.md) — **Layered Architecture**
-  - `Principle` · `Draft` · `architecture`
+  - `Principle` · `Accepted` · `architecture`
 - [message-queuing.md](message-queuing.md) — **Message Queuing**
   - `Standard` · `Draft` · `architecture`, `data`
 - [multi-transport-architecture.md](multi-transport-architecture.md) — **Multi-Transport Architecture**
   - `Standard` · `Draft` · `api`, `architecture`
 - [operation-result-pattern.md](operation-result-pattern.md) — **Operation Result Pattern**
-  - `Standard` · `Draft` · `architecture`, `api`
+  - `Standard` · `Accepted` · `architecture`, `api`
 - [platform-interaction-handlers.md](platform-interaction-handlers.md) — **Platform Interaction Handlers**
   - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 - [plugin-registration-discovery.md](plugin-registration-discovery.md) — **Plugin Registration and Discovery**
@@ -175,7 +175,7 @@
 - [testing-standards.md](testing-standards.md) — **Testing Standards**
   - `Standard` · `Draft` · `testing`, `architecture`
 - [type-boundaries.md](type-boundaries.md) — **Type Boundaries**
-  - `Principle` · `Draft` · `architecture`
+  - `Principle` · `Accepted` · `architecture`
 
 ### `cicd`
 
@@ -206,7 +206,7 @@
 ### `lifecycle`
 
 - [application-lifecycle.md](application-lifecycle.md) — **Application Lifecycle**
-  - `Standard` · `Draft` · `lifecycle`, `architecture`
+  - `Standard` · `Accepted` · `lifecycle`, `architecture`
 - [background-execution.md](background-execution.md) — **Background Execution**
   - `Standard` · `Draft` · `lifecycle`, `architecture`
 
