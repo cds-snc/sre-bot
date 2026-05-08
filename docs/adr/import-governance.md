@@ -5,7 +5,7 @@ type: Standard
 tier: Tier-2
 governance_domain: [application]
 concerns: [architecture]
-constrained_by: [layered-architecture.md, client-module-placement.md, dependency-injection.md, configuration-ownership.md, application-lifecycle.md]
+constrained_by: [layered-architecture.md, client-module-placement.md, dependency-injection.md, configuration-ownership.md, application-lifecycle.md, package-management.md, code-quality-tooling.md]
 date: 2026-05-08
 decision_makers:
   - SRE Team
@@ -33,8 +33,8 @@ The problem this record addresses: **how are the codebase's import rules express
 **Non-goals:**
 
 - This record does not define the architectural rules themselves — those live in the peer ADRs that constrain this one.
-- This record does not pick the file format for the contract configuration in detail (e.g., the exact `pyproject.toml` keys); the configuration's content is what matters.
 - This record does not enumerate every allowed and forbidden edge in the import graph; it specifies the *categories* of contract that must exist and the rule each category encodes.
+- This record does not pick the project's tool-orchestration framework, dev-dependency declaration format, or CI execution model — those are decided by the package-management and code-quality-tooling decisions and are inherited here.
 
 ## Considered Options
 
@@ -101,7 +101,7 @@ A feature's domain and service code (route handlers, hookimpls, presenters, serv
 
 Provider functions and `BaseSettings()` constructors must be invoked from inside functions called by the lifespan or by request handlers — never at module import time.
 
-- This rule is harder to encode purely as an import-graph contract. The complementary mechanism is a CI lint step (e.g., a small AST-based check or a `pytest` boot-time test) that asserts:
+- This rule is not an import-graph rule and `import-linter` does not enforce it. The complementary mechanism is a **project-local `pre-commit` hook** that runs a small AST-based check (a Python script committed to the repository, e.g., under `tools/`) and asserts:
   - No top-level call to a `get_<x>()` provider function exists in any application module.
   - No top-level instantiation of a `BaseSettings` subclass exists.
   - No top-level `boto3.client(...)` (or equivalent vendor SDK constructor) exists.
@@ -122,6 +122,15 @@ Tests live under `tests/` (or an equivalent location outside `app/`). The contra
 - Tests may import a concrete implementation directly when **constructing a test double for it** or **asserting parsing behavior of a `BaseSettings` class**. Tests do not exercise application logic against a concrete reference; they substitute via `app.dependency_overrides` or `cache_clear()` per [configuration-ownership.md](configuration-ownership.md) and [dependency-injection.md](dependency-injection.md).
 - A test that instantiates `DynamoDBStorageService` directly is acceptable when the test's purpose is "verify `DynamoDBStorageService`'s mapping of SDK exceptions to `OperationResult`." That same instantiation in application code is forbidden.
 - The contracts described above are scoped to `app/` (or the equivalent application root). The `tests/` tree is outside that scope and does not need to satisfy the per-service-surface or the no-vendor-import rules.
+
+### Toolchain integration
+
+Orchestration, dependency declaration, and configuration location for `import-linter` and the complementary AST check follow the project's accepted toolchain rules:
+
+- **Configuration location.** `import-linter`'s contract definitions live in `pyproject.toml` under `[tool.importlinter]` (and `[[tool.importlinter.contracts]]` for individual contracts). No `.importlinter` sidecar file is used; this is consistent with the project-wide rule that every static-quality tool's configuration lives in `pyproject.toml`.
+- **Dev-dependency declaration.** `import-linter` is declared in `pyproject.toml [dependency-groups] dev` with its version pinned by the lockfile, the same as every other quality tool. The complementary AST-check script lives in the repository (e.g., `tools/check_no_module_level_boot.py`); any third-party libraries it depends on are also declared in the `dev` group.
+- **Hook orchestration.** `import-linter` and the complementary AST check run as **`pre-commit` hooks** in the same hook set as the other static-quality hooks. They are not separate top-level CI steps; the single `uv run pre-commit run --all-files` step in CI executes them alongside the format/lint/type/security hooks.
+- **Version pinning across local and CI.** The `.pre-commit-config.yaml` `rev` field for the `import-linter` hook is kept in sync with the version pinned in `[dependency-groups] dev`. Bumps move both fields in the same PR.
 
 ### Contract evolution
 
@@ -150,8 +159,9 @@ When a new ADR adds a boundary rule that is statically enforceable, the import-g
 
 Compliance is verified by:
 
-- **CI step.** `import-linter` runs against the application source tree on every PR. Contract violations fail the build.
-- **Complementary AST check.** A small lint step asserts no module-level provider calls, no module-level `BaseSettings()` instantiation, no module-level vendor-SDK constructor invocation.
+- **Repository contents.** `pyproject.toml` contains `[tool.importlinter]` with a `[[tool.importlinter.contracts]]` entry per named contract above. No `.importlinter` sidecar file exists. `import-linter` is declared in `[dependency-groups] dev`. The complementary AST-check script exists in the repository (e.g., `tools/check_no_module_level_boot.py`), and `.pre-commit-config.yaml` declares both the `import-linter` hook and the local AST-check hook.
+- **CI step.** Both checks run as part of the single `uv run pre-commit run --all-files` step established by the toolchain decision; contract violations and module-level-boot-work violations fail the build alongside format/lint/type/security violations. There is no separate top-level CI step dedicated to either check.
+- **Version sync.** The `rev` field for the `import-linter` hook in `.pre-commit-config.yaml` matches the version pinned in `[dependency-groups] dev`; bumps are made together.
 - **Code review.** Reviewers do not need to re-derive the boundary rules; the contract file is the source of truth. PRs that change the contract file get scrutiny on whether the rule change is justified by an ADR change in the same PR.
 
 ## Source References
@@ -194,3 +204,4 @@ Compliance is verified by:
 ## Change Log
 
 - 2026-05-08: Created. Establishes `import-linter` as the static enforcement tool for the codebase's import-graph rules; encodes the three-layer ordering (`packages → infrastructure → clients`), per-service consumption surface, sibling-service imports scoped to `providers.py`, feature-package independence, vendor-client purity, and no-feature-imports-vendor-types invariants as named contracts. Establishes a complementary AST-based check for the no-module-level-boot-work rule. Tests are exempt from the production rules within their own tree, with the rationale that test substitution still goes through provider/dependency-override mechanisms when exercising application logic. Contract evolution is paired with ADR changes in the same PR.
+- 2026-05-08: Aligned with the package-management and code-quality-tooling decisions (added to `constrained_by`). Named `pyproject.toml [tool.importlinter]` as the canonical configuration location (no `.importlinter` sidecar). Specified that `import-linter` is declared in `[dependency-groups] dev` with its version pinned by the lockfile. Specified that `import-linter` and the complementary AST check run as `pre-commit` hooks inside the project's single `uv run pre-commit run --all-files` CI step rather than as separate top-level CI steps. Added the rule that the `.pre-commit-config.yaml` `rev` field for the `import-linter` hook is bumped in lockstep with its `dev`-group version. Removed the prior non-goal that left configuration-file format open and replaced it with a non-goal acknowledging that orchestration, dev-dependency declaration, and CI execution are inherited from the toolchain decisions. No architectural rules changed.
