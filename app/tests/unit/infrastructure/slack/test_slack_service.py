@@ -4,40 +4,27 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from infrastructure.configuration.integrations.slack import SlackSettings
-from infrastructure.platforms.clients.slack import SlackClientFacade
+from infrastructure.clients.slack import SlackSettings
 from infrastructure.platforms.service import PlatformService
-from infrastructure.services.providers import get_slack_bot
 from infrastructure.slack.service import SlackBot
 
 pytestmark = pytest.mark.unit
 
 
-def test_slack_service_constructs_with_settings_and_client() -> None:
+def test_slack_service_constructs_with_settings() -> None:
     slack_settings = MagicMock(spec=SlackSettings)
     slack_settings.ENABLED = True
     slack_settings.SOCKET_MODE = True
     slack_settings.APP_TOKEN = "xapp-test"
-    slack_settings.SLACK_TOKEN = "xoxb-test"
-    slack_client = MagicMock(spec=SlackClientFacade)
+    slack_settings.effective_bot_token = "xoxb-test"
 
-    slack_bot = SlackBot(slack_settings=slack_settings, slack_client=slack_client)
+    slack_bot = SlackBot(settings=slack_settings)
 
     assert slack_bot is not None
 
 
 def test_slack_service_is_not_platform_service() -> None:
     assert not issubclass(SlackBot, PlatformService)
-
-
-def test_get_slack_bot_singleton() -> None:
-    get_slack_bot.cache_clear()
-    first = get_slack_bot()
-    second = get_slack_bot()
-
-    assert first is second
-
-    get_slack_bot.cache_clear()
 
 
 def test_slack_service_exposes_registration_methods() -> None:
