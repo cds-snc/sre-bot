@@ -1,6 +1,6 @@
 # Decision Record Index
 
-**Generated:** 2026-05-08 · **Total records:** 32
+**Generated:** 2026-05-08 · **Total records:** 35
 
 ---
 
@@ -10,7 +10,7 @@
 |------|-------------|------------|--------------|
 | Tier-0 (Governance) | — | — | 1 |
 | Tier-1 (Foundational) | 3 | 0 | 0 |
-| Tier-2 (Cross-cutting) | 22 | 2 | 4 |
+| Tier-2 (Cross-cutting) | 25 | 2 | 4 |
 | Tier-3 (Scoped) | 0 | 0 | 0 |
 
 ---
@@ -47,8 +47,10 @@
   - `Standard` · `Accepted` · `architecture`
 - [client-module-placement.md](client-module-placement.md) — **Client Module Placement**
   - `Selection` · `Accepted` · `architecture`
+- [code-quality-tooling.md](code-quality-tooling.md) — **Code Quality Tooling**
+  - `Selection` · `Draft` · `quality-gates`
 - [configuration-ownership.md](configuration-ownership.md) — **Configuration Ownership and Settings**
-  - `Standard` · `Draft` · `configuration`, `architecture`
+  - `Standard` · `Accepted` · `configuration`, `architecture`
 - [cross-channel-correlation.md](cross-channel-correlation.md) — **Cross-Channel Correlation**
   - `Standard` · `Draft` · `observability`, `architecture`
 - [dependency-injection.md](dependency-injection.md) — **Dependency Injection**
@@ -64,7 +66,7 @@
 - [identity-resolution.md](identity-resolution.md) — **Identity Resolution**
   - `Standard` · `Draft` · `security`, `api`
 - [import-governance.md](import-governance.md) — **Import Governance**
-  - `Standard` · `Draft` · `architecture`
+  - `Standard` · `Accepted` · `architecture`
 - [infrastructure-service-classification.md](infrastructure-service-classification.md) — **Infrastructure Service Classification**
   - `Standard` · `Draft` · `architecture`
 - [logging-observability.md](logging-observability.md) — **Logging and Observability**
@@ -75,10 +77,14 @@
   - `Standard` · `Draft` · `api`, `architecture`
 - [operation-result-pattern.md](operation-result-pattern.md) — **Operation Result Pattern**
   - `Standard` · `Accepted` · `architecture`, `api`
+- [package-management.md](package-management.md) — **Package Management**
+  - `Selection` · `Accepted` · `quality-gates`, `configuration`
 - [platform-interaction-handlers.md](platform-interaction-handlers.md) — **Platform Interaction Handlers**
   - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 - [plugin-registration-discovery.md](plugin-registration-discovery.md) — **Plugin Registration and Discovery**
   - `Standard` · `Draft` · `plugins`, `architecture`
+- [project-metadata.md](project-metadata.md) — **Project Metadata**
+  - `Standard` · `Accepted` · `configuration`
 - [technology-blinker.md](technology-blinker.md) — **Technology Selection: Blinker**
   - `Selection` · `Draft` · `architecture`
 - [technology-pluggy.md](technology-pluggy.md) — **Technology Selection: Pluggy**
@@ -141,7 +147,7 @@
 - [cloud-portability.md](cloud-portability.md) — **Cloud Portability**
   - `Principle` · `Accepted` · `architecture`
 - [configuration-ownership.md](configuration-ownership.md) — **Configuration Ownership and Settings**
-  - `Standard` · `Draft` · `configuration`, `architecture`
+  - `Standard` · `Accepted` · `configuration`, `architecture`
 - [cross-channel-correlation.md](cross-channel-correlation.md) — **Cross-Channel Correlation**
   - `Standard` · `Draft` · `observability`, `architecture`
 - [dependency-injection.md](dependency-injection.md) — **Dependency Injection**
@@ -153,7 +159,7 @@
 - [handler-idempotency.md](handler-idempotency.md) — **Handler Idempotency**
   - `Standard` · `Draft` · `architecture`, `data`
 - [import-governance.md](import-governance.md) — **Import Governance**
-  - `Standard` · `Draft` · `architecture`
+  - `Standard` · `Accepted` · `architecture`
 - [infrastructure-service-classification.md](infrastructure-service-classification.md) — **Infrastructure Service Classification**
   - `Standard` · `Draft` · `architecture`
 - [layered-architecture.md](layered-architecture.md) — **Layered Architecture**
@@ -192,9 +198,13 @@
 ### `configuration`
 
 - [configuration-ownership.md](configuration-ownership.md) — **Configuration Ownership and Settings**
-  - `Standard` · `Draft` · `configuration`, `architecture`
+  - `Standard` · `Accepted` · `configuration`, `architecture`
 - [environment-parity.md](environment-parity.md) — **Environment Parity**
   - `Standard` · `Draft` · `configuration`
+- [package-management.md](package-management.md) — **Package Management**
+  - `Selection` · `Accepted` · `quality-gates`, `configuration`
+- [project-metadata.md](project-metadata.md) — **Project Metadata**
+  - `Standard` · `Accepted` · `configuration`
 
 ### `data`
 
@@ -227,6 +237,13 @@
   - `Standard` · `Draft` · `plugins`, `architecture`
 - [technology-pluggy.md](technology-pluggy.md) — **Technology Selection: Pluggy**
   - `Selection` · `Draft` · `plugins`, `architecture`
+
+### `quality-gates`
+
+- [code-quality-tooling.md](code-quality-tooling.md) — **Code Quality Tooling**
+  - `Selection` · `Draft` · `quality-gates`
+- [package-management.md](package-management.md) — **Package Management**
+  - `Selection` · `Accepted` · `quality-gates`, `configuration`
 
 ### `security`
 
