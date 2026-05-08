@@ -41,9 +41,9 @@ The core problem: **changes in vendor connectivity must not cascade into feature
 
 Feature code calls cloud SDKs and platform clients without abstraction. Vendor-specific concerns are scattered throughout the codebase.
 
-**Option 2: Strict layered architecture with a Protocol-based boundary and two integration paths.**
+**Option 2: Strict layered architecture with a Protocol-based boundary and two purpose-distinguished integration paths.**
 
-The codebase is organized into two layers — Application and Infrastructure — sitting above a shared layer of vendor connectivity primitives. Feature code crosses the boundary only through `typing.Protocol` interfaces, by one of two integration paths: a shared service Protocol owned by infrastructure, or a feature-owned Protocol satisfied by a feature-owned adapter.
+The codebase is organized into two layers — Application and Infrastructure — sitting above a shared layer of vendor connectivity primitives. Feature code crosses the boundary only through `typing.Protocol` interfaces, by one of two paths: a Protocol describing a portable capability (owned by infrastructure, satisfied by a vendor-specific implementation chosen per deployment), or a Protocol describing a domain-specific external integration (owned by the feature, satisfied by a feature-owned adapter coupled to that specific third-party API).
 
 ## Decision Outcome
 
@@ -65,13 +65,15 @@ Source-code dependencies point in one direction: **feature → Protocol → seco
 
 ### Two integration paths
 
-Feature code reaches the outside world through one of two paths, depending on whether the integration is shared or feature-specific.
+The two paths differ by **purpose**, not by how many features consume them.
 
-**Path A — Shared infrastructure service.** For capabilities used by more than one feature (queuing, idempotency, identity, storage, eventing), the infrastructure layer owns the Protocol and at least one vendor-specific concrete implementation. Feature code depends on the Protocol. The provider-swappability boundary lives at the Protocol: replacing the backing provider replaces the concrete implementation and its client; the Protocol and feature code do not change.
+**Path A — Cloud-portable capability.** Some external dependencies exist because every deployment must provide a generic capability — storage, queuing, identity, idempotency, eventing — regardless of where the application runs. The infrastructure layer owns the Protocol (the capability contract) and one or more vendor-specific implementations. If one deployment runs on AWS and another on Azure, the implementation and its client change; the Protocol and feature code do not. This is the mechanism that makes the application portable across hosting environments.
 
-**Path B — Feature-owned outbound adapter.** For external systems consumed by a single feature whose integration is domain-specific (Separated Interface, Fowler; Outbound Port + Adapter, Cockburn), the feature package owns both the Protocol and the concrete adapter. The feature defines the operations its domain logic needs; the adapter satisfies them, holding the vendor client received via constructor injection. Domain and service code in the feature operate against the Protocol only.
+**Path B — Feature bound to a specific external system.** Some external integrations exist because acting on a specific third-party system *is the feature's purpose*. A feature that provisions identities into AWS Identity Center is not interchangeable across providers the way a storage capability is — its domain is the AWS Identity Center API itself. The feature owns the Protocol (describing the operations its domain logic needs) and the concrete adapter that calls the SDK. (Separated Interface, Fowler; Outbound Port + Adapter, Cockburn.)
 
-A feature-owned adapter is promoted to a shared infrastructure service when a second independent feature needs the same external system, or when the integration acquires operational ownership requirements (SLA, monitoring, security) that belong to the platform layer.
+A single feature commonly uses both paths. The `app/packages/access/sync` feature, for example, consumes Path A services (storage, queue, idempotency — for which the backing provider is a deployment choice it does not care about) alongside a Path B adapter to AWS Identity Center, because provisioning users and groups into AWS Identity Center is the feature's reason to exist.
+
+A Path B integration is reclassified as Path A only when its *purpose* changes — when the external system stops being the target of a specific domain action and becomes a portable capability the application could obtain from any provider. A second feature also acting on the same third-party system does not by itself reclassify the adapter: the second feature's domain remains coupled to that specific provider.
 
 ### The invariant
 
@@ -138,7 +140,5 @@ Compliance with this principle is verified by the rules and tooling defined in [
 
 ## Change Log
 
-- 2026-05-08: Created as placeholder.
-- 2026-05-08: Drafted with three-layer model, unidirectional flow, and enforcement rules grounded in Clean Architecture and Ports and Adapters patterns.
-- 2026-05-08: Revised. Corrected the conceptual relationship between composed services and raw client facades — composed services are the provider-swappability boundary; clients are the concrete vendor primitives consumed by both composed-service implementations and feature-owned adapters.
-- 2026-05-08: Restructured per one-concern-per-record rule. Reduced scope to the layer model, unidirectional flow, and the two integration paths. Feature package internals deferred to feature-package-structure.md; composition root and DI mechanics deferred to dependency-injection.md; Category A/B/C taxonomy deferred to infrastructure-service-classification.md; import rules deferred to import-governance.md; client/adapter responsibility split deferred to new client-adapter-responsibilities.md; client physical placement deferred to new client-module-placement.md.
+- 2026-05-08: Created. Three-layer model (Application, Infrastructure, vendor clients), unidirectional dependency flow, and two integration paths grounded in Clean Architecture, Hexagonal Architecture, and Separated Interface. Concerns outside the layer principle are deferred: feature internals to feature-package-structure.md, DI mechanics to dependency-injection.md, Category A/B/C taxonomy to infrastructure-service-classification.md, import rules to import-governance.md, client/adapter responsibility split to client-adapter-responsibilities.md, and physical client placement to client-module-placement.md.
+- 2026-05-08: Reframed the two integration paths by *purpose* rather than by reach: Path A is the cloud-portability mechanism for capabilities every deployment must provide; Path B is for features whose domain is to act on a specific third-party API. A single feature commonly uses both. The "promotion on second consumer" rule is replaced by a purpose-change rule.
