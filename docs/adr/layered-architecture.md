@@ -1,6 +1,6 @@
 ---
 title: "Layered Architecture"
-status: Draft
+status: Accepted
 type: Principle
 tier: Tier-1
 governance_domain: [application]
