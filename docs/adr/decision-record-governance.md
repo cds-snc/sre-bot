@@ -1,6 +1,6 @@
 ---
 title: "Decision Record Governance"
-status: Draft
+status: Accepted
 type: Governance
 tier: Tier-0
 date: 2026-05-08
