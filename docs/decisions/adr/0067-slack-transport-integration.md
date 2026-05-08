@@ -10,8 +10,8 @@ secondary_domains:
   - Package and Plugin Architecture
 date_created: 2026-04-30
 last_updated: 2026-05-06
-  last_reviewed: 2026-05-05
-  next_review_due: 2026-09-01
+last_reviewed: 2026-05-05
+next_review_due: 2026-09-01
 owners:
   - SRE Team
 constrained_by:
