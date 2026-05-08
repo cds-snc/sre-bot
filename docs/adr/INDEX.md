@@ -36,7 +36,7 @@
 #### Tier-2: Cross-cutting
 
 - [api-design-error-mapping.md](api-design-error-mapping.md) — **API Design and Error Mapping**
-  - `Standard` · `Draft` · `api`, `architecture`
+  - `Standard` · `Accepted` · `api`, `architecture`
 - [api-security.md](api-security.md) — **API Security**
   - `Standard` · `Draft` · `api`, `security`
 - [application-lifecycle.md](application-lifecycle.md) — **Application Lifecycle**
@@ -52,7 +52,7 @@
 - [configuration-ownership.md](configuration-ownership.md) — **Configuration Ownership and Settings**
   - `Standard` · `Accepted` · `configuration`, `architecture`
 - [cross-channel-correlation.md](cross-channel-correlation.md) — **Cross-Channel Correlation**
-  - `Standard` · `Draft` · `observability`, `architecture`
+  - `Standard` · `Accepted` · `observability`, `architecture`
 - [dependency-injection.md](dependency-injection.md) — **Dependency Injection**
   - `Standard` · `Accepted` · `architecture`
 - [environment-parity.md](environment-parity.md) — **Environment Parity**
@@ -101,7 +101,7 @@
 - [build-release-run-pipeline.md](build-release-run-pipeline.md) — **Build-Release-Run Pipeline**
   - `Standard` · `Draft` · `cicd`, `compute`
 - [cross-channel-correlation.md](cross-channel-correlation.md) — **Cross-Channel Correlation**
-  - `Standard` · `Draft` · `observability`, `architecture`
+  - `Standard` · `Accepted` · `observability`, `architecture`
 - [environment-parity.md](environment-parity.md) — **Environment Parity**
   - `Standard` · `Draft` · `configuration`
 - [logging-observability.md](logging-observability.md) — **Logging and Observability**
@@ -118,7 +118,7 @@
 ### `api`
 
 - [api-design-error-mapping.md](api-design-error-mapping.md) — **API Design and Error Mapping**
-  - `Standard` · `Draft` · `api`, `architecture`
+  - `Standard` · `Accepted` · `api`, `architecture`
 - [api-security.md](api-security.md) — **API Security**
   - `Standard` · `Draft` · `api`, `security`
 - [identity-resolution.md](identity-resolution.md) — **Identity Resolution**
@@ -135,7 +135,7 @@
 ### `architecture`
 
 - [api-design-error-mapping.md](api-design-error-mapping.md) — **API Design and Error Mapping**
-  - `Standard` · `Draft` · `api`, `architecture`
+  - `Standard` · `Accepted` · `api`, `architecture`
 - [application-lifecycle.md](application-lifecycle.md) — **Application Lifecycle**
   - `Standard` · `Accepted` · `lifecycle`, `architecture`
 - [background-execution.md](background-execution.md) — **Background Execution**
@@ -149,7 +149,7 @@
 - [configuration-ownership.md](configuration-ownership.md) — **Configuration Ownership and Settings**
   - `Standard` · `Accepted` · `configuration`, `architecture`
 - [cross-channel-correlation.md](cross-channel-correlation.md) — **Cross-Channel Correlation**
-  - `Standard` · `Draft` · `observability`, `architecture`
+  - `Standard` · `Accepted` · `observability`, `architecture`
 - [dependency-injection.md](dependency-injection.md) — **Dependency Injection**
   - `Standard` · `Accepted` · `architecture`
 - [event-dispatch.md](event-dispatch.md) — **Event Dispatch**
@@ -223,7 +223,7 @@
 ### `observability`
 
 - [cross-channel-correlation.md](cross-channel-correlation.md) — **Cross-Channel Correlation**
-  - `Standard` · `Draft` · `observability`, `architecture`
+  - `Standard` · `Accepted` · `observability`, `architecture`
 - [logging-observability.md](logging-observability.md) — **Logging and Observability**
   - `Standard` · `Draft` · `observability`, `security`
 
