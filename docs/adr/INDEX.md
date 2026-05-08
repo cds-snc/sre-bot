@@ -48,7 +48,7 @@
 - [client-module-placement.md](client-module-placement.md) — **Client Module Placement**
   - `Selection` · `Accepted` · `architecture`
 - [code-quality-tooling.md](code-quality-tooling.md) — **Code Quality Tooling**
-  - `Selection` · `Draft` · `quality-gates`
+  - `Selection` · `Accepted` · `quality-gates`
 - [configuration-ownership.md](configuration-ownership.md) — **Configuration Ownership and Settings**
   - `Standard` · `Accepted` · `configuration`, `architecture`
 - [cross-channel-correlation.md](cross-channel-correlation.md) — **Cross-Channel Correlation**
@@ -60,7 +60,7 @@
 - [event-dispatch.md](event-dispatch.md) — **Event Dispatch**
   - `Standard` · `Draft` · `architecture`
 - [feature-package-structure.md](feature-package-structure.md) — **Feature Package Structure**
-  - `Standard` · `Draft` · `architecture`, `plugins`
+  - `Standard` · `Accepted` · `architecture`, `plugins`
 - [handler-idempotency.md](handler-idempotency.md) — **Handler Idempotency**
   - `Standard` · `Draft` · `architecture`, `data`
 - [identity-resolution.md](identity-resolution.md) — **Identity Resolution**
@@ -82,7 +82,7 @@
 - [platform-interaction-handlers.md](platform-interaction-handlers.md) — **Platform Interaction Handlers**
   - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 - [plugin-registration-discovery.md](plugin-registration-discovery.md) — **Plugin Registration and Discovery**
-  - `Standard` · `Draft` · `plugins`, `architecture`
+  - `Standard` · `Accepted` · `plugins`, `architecture`
 - [project-metadata.md](project-metadata.md) — **Project Metadata**
   - `Standard` · `Accepted` · `configuration`
 - [technology-blinker.md](technology-blinker.md) — **Technology Selection: Blinker**
@@ -155,7 +155,7 @@
 - [event-dispatch.md](event-dispatch.md) — **Event Dispatch**
   - `Standard` · `Draft` · `architecture`
 - [feature-package-structure.md](feature-package-structure.md) — **Feature Package Structure**
-  - `Standard` · `Draft` · `architecture`, `plugins`
+  - `Standard` · `Accepted` · `architecture`, `plugins`
 - [handler-idempotency.md](handler-idempotency.md) — **Handler Idempotency**
   - `Standard` · `Draft` · `architecture`, `data`
 - [import-governance.md](import-governance.md) — **Import Governance**
@@ -173,7 +173,7 @@
 - [platform-interaction-handlers.md](platform-interaction-handlers.md) — **Platform Interaction Handlers**
   - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 - [plugin-registration-discovery.md](plugin-registration-discovery.md) — **Plugin Registration and Discovery**
-  - `Standard` · `Draft` · `plugins`, `architecture`
+  - `Standard` · `Accepted` · `plugins`, `architecture`
 - [technology-blinker.md](technology-blinker.md) — **Technology Selection: Blinker**
   - `Selection` · `Draft` · `architecture`
 - [technology-pluggy.md](technology-pluggy.md) — **Technology Selection: Pluggy**
@@ -230,18 +230,18 @@
 ### `plugins`
 
 - [feature-package-structure.md](feature-package-structure.md) — **Feature Package Structure**
-  - `Standard` · `Draft` · `architecture`, `plugins`
+  - `Standard` · `Accepted` · `architecture`, `plugins`
 - [platform-interaction-handlers.md](platform-interaction-handlers.md) — **Platform Interaction Handlers**
   - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 - [plugin-registration-discovery.md](plugin-registration-discovery.md) — **Plugin Registration and Discovery**
-  - `Standard` · `Draft` · `plugins`, `architecture`
+  - `Standard` · `Accepted` · `plugins`, `architecture`
 - [technology-pluggy.md](technology-pluggy.md) — **Technology Selection: Pluggy**
   - `Selection` · `Draft` · `plugins`, `architecture`
 
 ### `quality-gates`
 
 - [code-quality-tooling.md](code-quality-tooling.md) — **Code Quality Tooling**
-  - `Selection` · `Draft` · `quality-gates`
+  - `Selection` · `Accepted` · `quality-gates`
 - [package-management.md](package-management.md) — **Package Management**
   - `Selection` · `Accepted` · `quality-gates`, `configuration`
 
