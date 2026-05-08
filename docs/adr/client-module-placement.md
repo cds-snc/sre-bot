@@ -1,6 +1,6 @@
 ---
 title: "Client Module Placement"
-status: Draft
+status: Accepted
 type: Selection
 tier: Tier-2
 governance_domain: [application]
