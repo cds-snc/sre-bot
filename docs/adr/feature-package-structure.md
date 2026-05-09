@@ -5,7 +5,7 @@ type: Standard
 tier: Tier-2
 governance_domain: [application]
 concerns: [architecture, plugins]
-constrained_by: [layered-architecture.md, import-governance.md, dependency-injection.md, configuration-ownership.md, type-boundaries.md, application-lifecycle.md]
+constrained_by: [layered-architecture.md, import-governance.md, dependency-injection.md, configuration-ownership.md, type-boundaries.md, application-lifecycle.md, plugin-registration-discovery.md, multi-transport-architecture.md]
 date: 2026-05-08
 decision_makers:
   - SRE Team
@@ -68,11 +68,18 @@ app/packages/<feature>/
   models.py            # optional: pydantic request/response schemas (HTTP boundary)
   domain.py            # optional: frozen dataclasses, Enums, Literals (internal value types)
   routes.py            # optional: FastAPI routes; HTTP-only features
-  interactions/        # optional: per-transport entry points (multi-transport features)
+  slack/               # optional: Slack handlers, organized by Slack's native method categories
     __init__.py
-    http.py
-    slack.py
-    teams.py
+    commands.py        # slash command handlers
+    events.py          # Slack event handlers
+    actions.py         # message-action / block-action handlers
+    shortcuts.py       # global / message shortcut handlers
+    views.py           # view submission / closure handlers
+  teams/               # optional: Teams handlers, organized by Teams' native method categories
+    __init__.py
+    messages.py        # text / attachment messages
+    card_actions.py    # Adaptive Card Action.Submit handlers
+    invokes.py         # task-module fetch/submit, message-extension queries, etc.
   adapters/            # optional: feature-owned outbound adapters
     __init__.py
     <provider>.py
@@ -82,7 +89,9 @@ app/packages/<feature>/
 
 **Required.** `__init__.py` and `service.py` are the irreducible minimum. `__init__.py` declares the public surface; `service.py` holds the feature's business logic.
 
-**Optional.** Other submodules exist only when the feature has the corresponding concern. A feature with no HTTP transport has no `routes.py` and no `interactions/`. A feature with no outbound integration has no `adapters/`. A feature with no per-feature configuration has no `settings.py`.
+**Optional.** Other submodules exist only when the feature has the corresponding concern. A feature with no HTTP transport has no `routes.py`. A feature with no Slack handlers has no `slack/` directory; same for `teams/` and any other platform. A feature with no outbound integration has no `adapters/`. A feature with no per-feature configuration has no `settings.py`.
+
+**Per-platform layout.** Each platform the feature handles gets its own subdirectory whose internal files mirror that platform's native method categorization. Slack's categories (commands, events, actions, shortcuts, views) become files under `slack/`; Teams' categories (messages, card actions, invokes) become files under `teams/`. The categorization is owned by the platform's own ADR (`transport-slack.md`, `transport-teams.md`); this record names the *location* where those files live. There is no `interactions/` umbrella directory — the previously proposed unified-transport abstraction was rejected because platforms are heterogeneous and a single file per platform is too coarse once each platform has multiple native categories.
 
 **Naming is fixed.** A feature does not use alternative names (`controllers.py`, `handlers.py`, `repository.py`, `clients.py`) for the same concept. The fixed names are how the codebase scales — every feature reads the same way.
 
@@ -103,8 +112,9 @@ app/packages/<feature>/
     __init__.py        # empty package marker; no hookimpls here
     service.py
     domain.py          # subdomain-private types
-    interactions/      # or routes.py for HTTP-only subdomains
-      http.py
+    routes.py          # optional: subdomain HTTP routes
+    slack/             # optional: subdomain-local Slack handlers (commands.py, events.py, …)
+    teams/             # optional: subdomain-local Teams handlers (messages.py, card_actions.py, …)
     adapters/          # subdomain-local outbound adapters
     providers.py       # subdomain-local composition
     settings.py        # optional subdomain-specific settings
@@ -136,16 +146,20 @@ A subdomain's `__init__.py` (in a complex feature) is an empty package marker (n
 
 ### Transport entry points
 
-The placement of transport-handling code follows the number of transports the feature serves:
+The placement of inbound handler code follows the platform model: each platform gets its own subdirectory under the feature, with internal files mirroring that platform's native method categories. HTTP is the exception — its single category (route handlers) lives in a top-level `routes.py`.
 
-| Feature shape | File / directory | Contents |
+| Platform | Location | Internal organization |
 | --- | --- | --- |
-| HTTP only | `routes.py` | `APIRouter` and route functions |
-| Two or more transports | `interactions/<transport>.py` | One file per transport (`http.py`, `slack.py`, `teams.py`, …); each exposes the transport-specific entry point |
+| HTTP | `routes.py` | A single `APIRouter` and its route functions. Mounted by the feature's `register_routes` hookimpl. |
+| Slack | `slack/` | One file per native Slack category: `commands.py`, `events.py`, `actions.py`, `shortcuts.py`, `views.py`. Each platform-specific hookimpl in `__init__.py` (e.g., `register_slack_command`) imports from the relevant file. |
+| Teams | `teams/` | One file per native Teams category: `messages.py`, `card_actions.py`, `invokes.py`, `installation_update.py`. Same pattern. |
+| Other platforms | `<platform>/` | Same pattern: one subdirectory per platform, internal files mirror the platform's native method categorization, owned by that platform's ADR. |
 
-A feature with multiple transports does not also keep a separate `routes.py`; HTTP routes for a multi-transport feature live in `interactions/http.py`. The single-transport `routes.py` short form exists only because most simple features start HTTP-only and the single-file form is lighter.
+A feature that handles HTTP and Slack has both `routes.py` and `slack/`. A feature that handles only Slack has only `slack/` — there is no requirement to create empty parallel directories.
 
-Transport files are the boundary between transport-specific shape (a FastAPI `Request`, a Slack payload, a Teams card-action body) and the feature's `service.py`. They map inbound shapes to service-method arguments and service-method return values to outbound shapes. Business logic does not live in transport files.
+Handler files are the boundary between platform-specific shape (a FastAPI `Request`, a Slack payload, a Teams card-action body) and the feature's `service.py`. They map inbound shapes to service-method arguments and service-method return values to platform-specific outbound shapes. Business logic does not live in handler files.
+
+The internal categorization of any platform's subdirectory (e.g., the choice to split Slack handlers into `commands.py` / `events.py` / `actions.py`) follows that platform's native model and is owned by the platform's own ADR. This record specifies that *each platform has its own subdirectory*; the catalogue of files inside is platform-shaped.
 
 ### Feature-owned outbound adapters
 
@@ -252,3 +266,4 @@ Compliance is verified by:
 ## Change Log
 
 - 2026-05-08: Created. Establishes two canonical feature-package layouts: simple (flat) and complex (multi-subdomain with `common/` shared kernel). Names submodule files (`__init__.py`, `service.py`, `models.py`, `domain.py`, `routes.py`, `interactions/`, `adapters/`, `providers.py`, `settings.py`) and pins their meanings; alternative names (`controllers.py`, `handlers.py`, `repository.py`) are not used. Establishes umbrella-only hookimpl registration for complex features, with subdomain `__init__.py` files as empty package markers. Establishes that cross-subdomain communication in a complex feature uses one of three channels (domain events from `common/events.py`, shared types from `common/`, shared infrastructure services). Pins the location of feature-owned outbound adapters at `adapters/<provider>.py` (or `<subdomain>/adapters/<provider>.py` for complex features), making the existing vendor-import contract trivially enforceable. Removes `plugin-registration-discovery.md` from `constrained_by` (the relationship is reversed: plugin registration consumes the layout this record defines).
+- 2026-05-08: Replaced the `interactions/<transport>.py` umbrella with **per-platform directories**. Each platform a feature handles gets its own subdirectory (`slack/`, `teams/`, `<platform>/`) whose internal files mirror that platform's native method categories (Slack: `commands.py` / `events.py` / `actions.py` / `shortcuts.py` / `views.py`; Teams: `messages.py` / `card_actions.py` / `invokes.py`). HTTP retains its single `routes.py` short form. Reason: the corpus rejected the unified-platform abstraction the `interactions/<transport>.py` rule implied — platforms are heterogeneous and a single file per platform is too coarse once each platform has multiple native categories. The categorization inside any platform's subdirectory is owned by that platform's own ADR (`transport-slack.md`, `transport-teams.md`); this record names only the directory's location and that its contents follow the platform's native model. Added `plugin-registration-discovery.md` and `multi-transport-architecture.md` to `constrained_by` to reflect the now-accepted records this layout depends on. Subdomain layouts in complex features follow the same per-platform-directory rule.
