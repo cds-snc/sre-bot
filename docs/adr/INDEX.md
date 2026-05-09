@@ -1,6 +1,6 @@
 # Decision Record Index
 
-**Generated:** 2026-05-08 · **Total records:** 35
+**Generated:** 2026-05-08 · **Total records:** 39
 
 ---
 
@@ -10,7 +10,7 @@
 |------|-------------|------------|--------------|
 | Tier-0 (Governance) | — | — | 1 |
 | Tier-1 (Foundational) | 3 | 0 | 0 |
-| Tier-2 (Cross-cutting) | 25 | 2 | 4 |
+| Tier-2 (Cross-cutting) | 28 | 2 | 5 |
 | Tier-3 (Scoped) | 0 | 0 | 0 |
 
 ---
@@ -38,7 +38,7 @@
 - [api-design-error-mapping.md](api-design-error-mapping.md) — **API Design and Error Mapping**
   - `Standard` · `Accepted` · `api`, `architecture`
 - [api-security.md](api-security.md) — **API Security**
-  - `Standard` · `Draft` · `api`, `security`
+  - `Standard` · `Accepted` · `api`, `security`
 - [application-lifecycle.md](application-lifecycle.md) — **Application Lifecycle**
   - `Standard` · `Accepted` · `lifecycle`, `architecture`
 - [background-execution.md](background-execution.md) — **Background Execution**
@@ -53,12 +53,16 @@
   - `Standard` · `Accepted` · `configuration`, `architecture`
 - [cross-channel-correlation.md](cross-channel-correlation.md) — **Cross-Channel Correlation**
   - `Standard` · `Accepted` · `observability`, `architecture`
+- [data-redaction-policy.md](data-redaction-policy.md) — **Data Redaction Policy**
+  - `Standard` · `Accepted` · `security`, `observability`
 - [dependency-injection.md](dependency-injection.md) — **Dependency Injection**
   - `Standard` · `Accepted` · `architecture`
 - [environment-parity.md](environment-parity.md) — **Environment Parity**
   - `Standard` · `Draft` · `configuration`
 - [event-dispatch.md](event-dispatch.md) — **Event Dispatch**
   - `Standard` · `Draft` · `architecture`
+- [feature-handler-standard.md](feature-handler-standard.md) — **Feature Handler Standard**
+  - `Standard` · `Accepted` · `api`, `architecture`, `plugins`
 - [feature-package-structure.md](feature-package-structure.md) — **Feature Package Structure**
   - `Standard` · `Accepted` · `architecture`, `plugins`
 - [handler-idempotency.md](handler-idempotency.md) — **Handler Idempotency**
@@ -67,20 +71,20 @@
   - `Standard` · `Draft` · `security`, `api`
 - [import-governance.md](import-governance.md) — **Import Governance**
   - `Standard` · `Accepted` · `architecture`
+- [infrastructure-i18n.md](infrastructure-i18n.md) — **Infrastructure I18n**
+  - `Selection` · `Draft` · `architecture`, `configuration`
 - [infrastructure-service-classification.md](infrastructure-service-classification.md) — **Infrastructure Service Classification**
-  - `Standard` · `Draft` · `architecture`
+  - `Standard` · `Accepted` · `architecture`
 - [logging-observability.md](logging-observability.md) — **Logging and Observability**
-  - `Standard` · `Draft` · `observability`, `security`
+  - `Standard` · `Accepted` · `observability`
 - [message-queuing.md](message-queuing.md) — **Message Queuing**
   - `Standard` · `Draft` · `architecture`, `data`
 - [multi-transport-architecture.md](multi-transport-architecture.md) — **Multi-Transport Architecture**
-  - `Standard` · `Draft` · `api`, `architecture`
+  - `Standard` · `Accepted` · `api`, `architecture`
 - [operation-result-pattern.md](operation-result-pattern.md) — **Operation Result Pattern**
   - `Standard` · `Accepted` · `architecture`, `api`
 - [package-management.md](package-management.md) — **Package Management**
   - `Selection` · `Accepted` · `quality-gates`, `configuration`
-- [platform-interaction-handlers.md](platform-interaction-handlers.md) — **Platform Interaction Handlers**
-  - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 - [plugin-registration-discovery.md](plugin-registration-discovery.md) — **Plugin Registration and Discovery**
   - `Standard` · `Accepted` · `plugins`, `architecture`
 - [project-metadata.md](project-metadata.md) — **Project Metadata**
@@ -92,7 +96,11 @@
 - [technology-slowapi.md](technology-slowapi.md) — **Technology Selection: SlowAPI**
   - `Selection` · `Draft` · `security`, `api`
 - [testing-standards.md](testing-standards.md) — **Testing Standards**
-  - `Standard` · `Draft` · `testing`, `architecture`
+  - `Standard` · `Accepted` · `testing`, `architecture`
+- [transport-slack.md](transport-slack.md) — **Slack Transport**
+  - `Standard` · `Accepted` · `api`, `architecture`, `plugins`
+- [transport-teams.md](transport-teams.md) — **Teams Transport**
+  - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 
 ### Operations
 
@@ -102,10 +110,12 @@
   - `Standard` · `Draft` · `cicd`, `compute`
 - [cross-channel-correlation.md](cross-channel-correlation.md) — **Cross-Channel Correlation**
   - `Standard` · `Accepted` · `observability`, `architecture`
+- [data-redaction-policy.md](data-redaction-policy.md) — **Data Redaction Policy**
+  - `Standard` · `Accepted` · `security`, `observability`
 - [environment-parity.md](environment-parity.md) — **Environment Parity**
   - `Standard` · `Draft` · `configuration`
 - [logging-observability.md](logging-observability.md) — **Logging and Observability**
-  - `Standard` · `Draft` · `observability`, `security`
+  - `Standard` · `Accepted` · `observability`
 - [message-queuing.md](message-queuing.md) — **Message Queuing**
   - `Standard` · `Draft` · `architecture`, `data`
 - [port-binding-exposure.md](port-binding-exposure.md) — **Port Binding and Exposure**
@@ -120,17 +130,21 @@
 - [api-design-error-mapping.md](api-design-error-mapping.md) — **API Design and Error Mapping**
   - `Standard` · `Accepted` · `api`, `architecture`
 - [api-security.md](api-security.md) — **API Security**
-  - `Standard` · `Draft` · `api`, `security`
+  - `Standard` · `Accepted` · `api`, `security`
+- [feature-handler-standard.md](feature-handler-standard.md) — **Feature Handler Standard**
+  - `Standard` · `Accepted` · `api`, `architecture`, `plugins`
 - [identity-resolution.md](identity-resolution.md) — **Identity Resolution**
   - `Standard` · `Draft` · `security`, `api`
 - [multi-transport-architecture.md](multi-transport-architecture.md) — **Multi-Transport Architecture**
-  - `Standard` · `Draft` · `api`, `architecture`
+  - `Standard` · `Accepted` · `api`, `architecture`
 - [operation-result-pattern.md](operation-result-pattern.md) — **Operation Result Pattern**
   - `Standard` · `Accepted` · `architecture`, `api`
-- [platform-interaction-handlers.md](platform-interaction-handlers.md) — **Platform Interaction Handlers**
-  - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 - [technology-slowapi.md](technology-slowapi.md) — **Technology Selection: SlowAPI**
   - `Selection` · `Draft` · `security`, `api`
+- [transport-slack.md](transport-slack.md) — **Slack Transport**
+  - `Standard` · `Accepted` · `api`, `architecture`, `plugins`
+- [transport-teams.md](transport-teams.md) — **Teams Transport**
+  - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 
 ### `architecture`
 
@@ -154,24 +168,26 @@
   - `Standard` · `Accepted` · `architecture`
 - [event-dispatch.md](event-dispatch.md) — **Event Dispatch**
   - `Standard` · `Draft` · `architecture`
+- [feature-handler-standard.md](feature-handler-standard.md) — **Feature Handler Standard**
+  - `Standard` · `Accepted` · `api`, `architecture`, `plugins`
 - [feature-package-structure.md](feature-package-structure.md) — **Feature Package Structure**
   - `Standard` · `Accepted` · `architecture`, `plugins`
 - [handler-idempotency.md](handler-idempotency.md) — **Handler Idempotency**
   - `Standard` · `Draft` · `architecture`, `data`
 - [import-governance.md](import-governance.md) — **Import Governance**
   - `Standard` · `Accepted` · `architecture`
+- [infrastructure-i18n.md](infrastructure-i18n.md) — **Infrastructure I18n**
+  - `Selection` · `Draft` · `architecture`, `configuration`
 - [infrastructure-service-classification.md](infrastructure-service-classification.md) — **Infrastructure Service Classification**
-  - `Standard` · `Draft` · `architecture`
+  - `Standard` · `Accepted` · `architecture`
 - [layered-architecture.md](layered-architecture.md) — **Layered Architecture**
   - `Principle` · `Accepted` · `architecture`
 - [message-queuing.md](message-queuing.md) — **Message Queuing**
   - `Standard` · `Draft` · `architecture`, `data`
 - [multi-transport-architecture.md](multi-transport-architecture.md) — **Multi-Transport Architecture**
-  - `Standard` · `Draft` · `api`, `architecture`
+  - `Standard` · `Accepted` · `api`, `architecture`
 - [operation-result-pattern.md](operation-result-pattern.md) — **Operation Result Pattern**
   - `Standard` · `Accepted` · `architecture`, `api`
-- [platform-interaction-handlers.md](platform-interaction-handlers.md) — **Platform Interaction Handlers**
-  - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 - [plugin-registration-discovery.md](plugin-registration-discovery.md) — **Plugin Registration and Discovery**
   - `Standard` · `Accepted` · `plugins`, `architecture`
 - [technology-blinker.md](technology-blinker.md) — **Technology Selection: Blinker**
@@ -179,7 +195,11 @@
 - [technology-pluggy.md](technology-pluggy.md) — **Technology Selection: Pluggy**
   - `Selection` · `Draft` · `plugins`, `architecture`
 - [testing-standards.md](testing-standards.md) — **Testing Standards**
-  - `Standard` · `Draft` · `testing`, `architecture`
+  - `Standard` · `Accepted` · `testing`, `architecture`
+- [transport-slack.md](transport-slack.md) — **Slack Transport**
+  - `Standard` · `Accepted` · `api`, `architecture`, `plugins`
+- [transport-teams.md](transport-teams.md) — **Teams Transport**
+  - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 - [type-boundaries.md](type-boundaries.md) — **Type Boundaries**
   - `Principle` · `Accepted` · `architecture`
 
@@ -201,6 +221,8 @@
   - `Standard` · `Accepted` · `configuration`, `architecture`
 - [environment-parity.md](environment-parity.md) — **Environment Parity**
   - `Standard` · `Draft` · `configuration`
+- [infrastructure-i18n.md](infrastructure-i18n.md) — **Infrastructure I18n**
+  - `Selection` · `Draft` · `architecture`, `configuration`
 - [package-management.md](package-management.md) — **Package Management**
   - `Selection` · `Accepted` · `quality-gates`, `configuration`
 - [project-metadata.md](project-metadata.md) — **Project Metadata**
@@ -224,19 +246,25 @@
 
 - [cross-channel-correlation.md](cross-channel-correlation.md) — **Cross-Channel Correlation**
   - `Standard` · `Accepted` · `observability`, `architecture`
+- [data-redaction-policy.md](data-redaction-policy.md) — **Data Redaction Policy**
+  - `Standard` · `Accepted` · `security`, `observability`
 - [logging-observability.md](logging-observability.md) — **Logging and Observability**
-  - `Standard` · `Draft` · `observability`, `security`
+  - `Standard` · `Accepted` · `observability`
 
 ### `plugins`
 
+- [feature-handler-standard.md](feature-handler-standard.md) — **Feature Handler Standard**
+  - `Standard` · `Accepted` · `api`, `architecture`, `plugins`
 - [feature-package-structure.md](feature-package-structure.md) — **Feature Package Structure**
   - `Standard` · `Accepted` · `architecture`, `plugins`
-- [platform-interaction-handlers.md](platform-interaction-handlers.md) — **Platform Interaction Handlers**
-  - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 - [plugin-registration-discovery.md](plugin-registration-discovery.md) — **Plugin Registration and Discovery**
   - `Standard` · `Accepted` · `plugins`, `architecture`
 - [technology-pluggy.md](technology-pluggy.md) — **Technology Selection: Pluggy**
   - `Selection` · `Draft` · `plugins`, `architecture`
+- [transport-slack.md](transport-slack.md) — **Slack Transport**
+  - `Standard` · `Accepted` · `api`, `architecture`, `plugins`
+- [transport-teams.md](transport-teams.md) — **Teams Transport**
+  - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 
 ### `quality-gates`
 
@@ -248,15 +276,15 @@
 ### `security`
 
 - [api-security.md](api-security.md) — **API Security**
-  - `Standard` · `Draft` · `api`, `security`
+  - `Standard` · `Accepted` · `api`, `security`
+- [data-redaction-policy.md](data-redaction-policy.md) — **Data Redaction Policy**
+  - `Standard` · `Accepted` · `security`, `observability`
 - [identity-resolution.md](identity-resolution.md) — **Identity Resolution**
   - `Standard` · `Draft` · `security`, `api`
-- [logging-observability.md](logging-observability.md) — **Logging and Observability**
-  - `Standard` · `Draft` · `observability`, `security`
 - [technology-slowapi.md](technology-slowapi.md) — **Technology Selection: SlowAPI**
   - `Selection` · `Draft` · `security`, `api`
 
 ### `testing`
 
 - [testing-standards.md](testing-standards.md) — **Testing Standards**
-  - `Standard` · `Draft` · `testing`, `architecture`
+  - `Standard` · `Accepted` · `testing`, `architecture`

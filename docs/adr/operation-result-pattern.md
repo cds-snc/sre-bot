@@ -25,7 +25,7 @@ The problem this record addresses: **what shape and status set does that uniform
 
 **Constraints:**
 
-- `OperationResult` is the uniform cross-layer return contract for outbound integration calls. It is the type that secondary-adapter Protocol methods return and that feature services consume.
+- `OperationResult` is the uniform cross-layer return contract for outbound integration outcomes. It is returned by secondary-adapter Protocol methods to feature services, and by feature services to handlers (see Boundary scope below).
 - Vendor clients do not return `OperationResult`. They raise typed SDK exceptions that the adapter catches and maps ([client-adapter-responsibilities.md](client-adapter-responsibilities.md)).
 - Internal application logic uses Python exceptions for programming errors and invariant violations; `OperationResult` is for *expected* integration outcomes only.
 - The status set must be closed (a fixed enumeration) so that consumer branching can be exhaustive and HTTP/platform-edge mapping can be total.
@@ -78,14 +78,20 @@ The exact type construct (frozen dataclass, Pydantic model, etc.) is governed by
 
 ### Boundary scope
 
-`OperationResult` appears at exactly one boundary: **the return type of secondary-adapter Protocol methods that perform outbound integration**. It does not appear:
+`OperationResult` is the **internal** contract between an outbound-integration boundary and the layer that consumes it. It appears at two such boundaries:
+
+1. **Secondary adapter → feature service.** The return type of secondary-adapter Protocol methods (Path A composed-service implementations and Path B feature-owned adapters). The adapter is the place where SDK exceptions are caught and mapped onto the closed status set per [client-adapter-responsibilities.md](client-adapter-responsibilities.md).
+2. **Feature service → handler.** The return type of the feature-service methods that handlers call. Handlers receive `OperationResult` and pass it to the platform-specific rendering helper (HTTP via the helper governed by [api-design-error-mapping.md](api-design-error-mapping.md); per-platform helpers governed by their respective transport records). Handlers do not synthesize, unwrap to a different envelope, or branch into ad-hoc shapes.
+
+It does not appear:
 
 - Inside vendor client modules under `app/clients/` (which raise typed SDK exceptions — see [client-adapter-responsibilities.md](client-adapter-responsibilities.md) and [client-module-placement.md](client-module-placement.md)).
-- Inside feature domain or service logic (which uses Python exceptions for programming errors and branches on adapter-returned `OperationResult` for expected outcomes).
+- Inside the feature service's **internal** control flow. The service consumes adapter-returned `OperationResult` and branches on it; for its own invariant violations and programming errors, the service uses Python exceptions (which propagate to the host's central exception handler when uncaught). The envelope is the service's **output** contract, not its internal coordination type.
+- Inside feature domain types. Domain values are frozen dataclasses or Pydantic value types per [type-boundaries.md](type-boundaries.md); they do not depend on `OperationResult`.
 - On HTTP route response bodies (mapped to RFC 9457 Problem Details — see [api-design-error-mapping.md](api-design-error-mapping.md)).
-- On platform-message bodies sent to Slack, Teams, or other channels (presenter-formatted by the feature layer).
+- On platform-message bodies sent to Slack, Teams, or other channels (rendered by per-platform helpers; the envelope itself does not cross the wire).
 
-The envelope is the *internal* contract between an adapter and the layer that consumes it. The edges of the application translate it to and from external wire formats.
+The envelope is internal at every boundary it appears on; the application's edges (HTTP responses, platform messages) translate it into wire-format outputs through dedicated per-platform rendering helpers.
 
 ### Relationship with exceptions
 
@@ -178,3 +184,4 @@ Compliance is verified by:
 ## Change Log
 
 - 2026-05-08: Created. Establishes `OperationResult` as the uniform cross-layer return contract for outbound integration calls, with a closed five-status set (`SUCCESS`, `NOT_FOUND`, `TRANSIENT_ERROR`, `PERMANENT_ERROR`, `UNAUTHORIZED`) and a shape carrying `payload`, `error_code`, `message`, and `retry_after`. The envelope is scoped to the secondary-adapter return; clients raise SDK exceptions, internal logic uses Python exceptions, and HTTP/platform edges translate to wire formats. Composition is per-call branching by default, with railway-style chaining permitted but not mandated.
+- 2026-05-08: Broadened the Boundary scope rule from "exactly one boundary" to two. The envelope appears at (1) secondary-adapter → feature service (the original primary boundary, where SDK exceptions are mapped) and (2) feature service → handler (the boundary `api-design-error-mapping.md` and `feature-handler-standard.md` presuppose when they require route handlers to call `operation_result_to_response(result, request_id)` — handlers can only do that if they have an `OperationResult` in hand, which means the service returned one). The "does not appear inside service logic" rule is preserved as "does not appear in the service's **internal** control flow" — the service's *output* contract is `OperationResult`, but its internal flow uses Python exceptions for invariant violations and branches on adapter-returned envelopes for expected outcomes. No architectural change; the wording now matches how the corpus already uses the envelope across both boundaries. The Constraints bullet was updated correspondingly.
