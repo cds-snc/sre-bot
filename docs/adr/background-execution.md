@@ -31,7 +31,8 @@ The problem this record addresses: **what is the standard pattern for in-process
 - Plugins register via Pluggy entry-points and `hookimpl`s ([plugin-registration-discovery.md](plugin-registration-discovery.md)); registration is fail-fast and frozen at lifespan yield.
 - Service-layer outcomes are returned as a closed five-status envelope ([operation-result-pattern.md](operation-result-pattern.md)). Background jobs invoke the same service layer that handlers do; their outcome handling must be coherent with the envelope contract.
 - Logging is structured JSONL with correlation context bound to a `ContextVar` ([logging-observability.md](logging-observability.md), [cross-channel-correlation.md](cross-channel-correlation.md)). Job log records inherit the scheduler context, not request context.
-- Settings live with the service that consumes them ([configuration-ownership.md](configuration-ownership.md)); the production-only switch and lock-table identifiers are settings owned at the appropriate layer, not ad-hoc env-var reads scattered across jobs.
+- Settings live with the service that consumes them ([configuration-ownership.md](configuration-ownership.md)); the production-only switch and lock-backend identifiers are settings owned at the appropriate layer, not ad-hoc env-var reads scattered across jobs.
+- Composed infrastructure services are vendor-portable in shape ([infrastructure-service-classification.md](infrastructure-service-classification.md): Path A; [cloud-portability.md](cloud-portability.md)). The singleton-lock utility is exposed to jobs as a Protocol that names the *capability* (conditional-write coordination with TTL-bounded leases), not a vendor's API. AWS is the day-0 implementation; the architecture must support swappable providers (Redis, PostgreSQL, Azure Cosmos DB, GCP Firestore, in-process for local/CI) without job-code changes.
 
 **Non-goals:**
 
@@ -42,7 +43,7 @@ The problem this record addresses: **what is the standard pattern for in-process
 
 ## Considered Options
 
-**Option 1 — Hookspec-registered, in-process, two-tier-classified jobs with infrastructure-owned singleton lock.** Each feature declares its jobs through a `register_background_job` hookspec at phase 3. Jobs self-classify as Tier-1 (concurrent-safe across N tasks) or Tier-2 (singleton; one task at a time). A shared infrastructure utility wraps Tier-2 jobs with a DynamoDB conditional-write lock keyed by job name. A shared error boundary wraps every job and converts exceptions to structured log records without propagation. The runner starts in phase 6 only when the production-equivalent settings flag is set; shutdown signals via `threading.Event` with a ≤5-second join.
+**Option 1 — Hookspec-registered, in-process, two-tier-classified jobs with infrastructure-owned singleton lock.** Each feature declares its jobs through a `register_background_job` hookspec at phase 3. Jobs self-classify as Tier-1 (concurrent-safe across N tasks) or Tier-2 (singleton; one task at a time). A shared infrastructure utility wraps Tier-2 jobs with a capability-shaped conditional-write lock with TTL-bounded leases — exposed to jobs as a Path-A Protocol, with AWS DynamoDB as the day-0 implementation and other providers (Redis, PostgreSQL, Cosmos DB) substitutable behind the same Protocol. A shared error boundary wraps every job and converts exceptions to structured log records without propagation. The runner starts in phase 6 only when the production-equivalent settings flag is set; shutdown signals via `threading.Event` with a ≤5-second join.
 
 **Option 2 — Per-feature, ad-hoc job runners.** Each feature wires its own scheduler (thread or task), its own lock (or none), and its own error handling. The host has no shared registration, no shared classification, and no shared shutdown contract.
 
@@ -91,19 +92,57 @@ A job whose classification is uncertain is registered as Tier-2. The bias is int
 
 **Idempotent design is mandatory regardless of tier.** Locks reduce duplication; they do not establish exactly-once semantics. A lock-holding task may crash mid-run, drop the lock via TTL, and a subsequent run on a different task must produce a coherent end state. Idempotency rules are governed by [handler-idempotency.md](handler-idempotency.md) and apply to background jobs with the same force as to request handlers.
 
-### Singleton lock — infrastructure utility
+### Singleton lock — capability-shaped infrastructure utility
 
-The singleton lock is a **shared infrastructure utility** ([infrastructure-service-classification.md](infrastructure-service-classification.md): Path A, Shared) — a single implementation in `app/infrastructure/<lock-service>/` consumed by every Tier-2 job. Features do not implement their own locks; they receive the utility through dependency injection.
+The singleton lock is a **shared infrastructure capability** ([infrastructure-service-classification.md](infrastructure-service-classification.md): Path A, Shared). Features depend on the Protocol; the implementation behind the Protocol is selected by configuration. Tier-2 jobs do not import any vendor SDK to acquire a lock; they receive a `SingletonLock` handle through dependency injection.
 
-The utility is implemented over DynamoDB conditional writes with an item-level TTL attribute (the production data store; portable to any backing store that supports conditional writes plus TTL):
+```text
+app/infrastructure/locks/
+    __init__.py          # public surface: SingletonLock Protocol, LockHandle value type
+    in_memory.py         # in-process backend for local dev and CI
+    aws.py               # AWS DynamoDB-backed implementation (day-0 production)
+    # redis.py, postgres.py, cosmos.py … future provider implementations live here
+    settings.py          # backend selector, TTL defaults, table/key-prefix
+```
 
-- **Acquire:** `PutItem` with `ConditionExpression="attribute_not_exists(<lock_key>) OR ttl < :now"`. The condition allows a lapsed lock to be reclaimed without an out-of-band cleanup step. The item carries `task_id`, `acquired_at`, `ttl`.
-- **Hold semantics:** the TTL is the lock's lifetime cap. Setting TTL ≥ 2× the expected job duration accommodates cold-start latency without leaving the lock held past plausible job completion. Setting TTL strictly less than the schedule interval is the contract that prevents permanent lockout from a killed task.
-- **Release:** `DeleteItem` with `ConditionExpression="task_id = :self"`. A task only deletes its own lock; a TTL-expired lock owned by a dead task is reclaimed by the next acquire, not a release.
-- **Non-acquisition:** if the conditional acquire fails, the calling task logs at debug-level (`singleton_lock_skipped` with `held_by_task_id`) and skips the run. This is the expected, non-exceptional path on N-1 of N tasks every interval.
-- **Operator override:** a documented utility (CLI entry point, optionally exposed through an admin route or operator command) deletes the lock unconditionally and emits `singleton_lock_operator_released` with `operator_id`, `reason`, `lock_key`. The override is idempotent: deleting an already-free lock is a no-op success.
+**The Protocol contract.** The lock exposes three operations:
 
-The lock utility is a Path-A capability — vendor-portable in shape, even though the current backing store is DynamoDB. A Tier-2 job's contract names the lock by capability ("singleton coordination"), not by store.
+- **`acquire(lock_key, ttl_seconds, holder_id) -> LockHandle | None`** — atomically acquires the lock if it is free or lapsed; returns a handle on success, `None` on contention. The handle carries the holder identity and the absolute expiry.
+- **`release(handle) -> None`** — releases a lock the caller holds. Idempotent: releasing an already-free or expired lock is a no-op success. A lock held by a different `holder_id` is not released; this is enforced at the implementation layer.
+- **`extend(handle, additional_seconds) -> bool`** — extends the lease on a held lock. Used by long-running jobs whose duration may approach the initial TTL. Returns `False` if the lock has already lapsed and been reclaimed by another holder.
+
+**Semantic guarantees the Protocol promises (and every implementation must satisfy):**
+
+- **Mutual exclusion.** At most one `holder_id` observes a successful `acquire` for a given `lock_key` at a given moment.
+- **TTL-bounded recovery.** A holder that crashes without releasing has its lock auto-reclaimed after `ttl_seconds`; no out-of-band cleanup is required.
+- **First-writer-wins atomicity.** Two simultaneous `acquire` calls have a deterministic winner; the loser receives `None`.
+- **Non-acquisition is non-exceptional.** Contention is observable as a `None` return (or equivalent), not a raised exception. This is the expected, normal path on N-1 of N tasks every scheduling interval.
+
+**Calibration rule (independent of provider):**
+
+- TTL ≥ 2× the expected job duration so a slow run does not lapse mid-flight.
+- TTL strictly less than the schedule interval so a killed task does not lock the next interval out.
+- A successor task acquires on the next interval after the TTL elapses; idempotent design ([handler-idempotency.md](handler-idempotency.md)) absorbs any work the previous holder may have partially completed.
+
+**Operator override.** A documented utility (CLI entry point, optionally exposed through an admin route or operator command) forcibly releases a lock by `lock_key` regardless of holder; emits `singleton_lock_operator_released` with `operator_id`, `reason`, `lock_key`. The override is idempotent: forcing a release on an already-free lock is a no-op success. Each implementation provides this operation; its mechanics differ but the contract is identical.
+
+#### Day-0 implementation: AWS DynamoDB
+
+The day-0 backend is DynamoDB conditional writes with an item-level TTL attribute. The implementation in `app/infrastructure/locks/aws.py`:
+
+- **Acquire** is `PutItem` with `ConditionExpression="attribute_not_exists(<lock_key>) OR ttl < :now"`. The condition allows a lapsed lock to be reclaimed without an out-of-band cleanup step. The item carries `holder_id`, `acquired_at`, `ttl`. A `ConditionalCheckFailedException` is the contention signal and translates to `acquire → None`.
+- **Release** is `DeleteItem` with `ConditionExpression="holder_id = :self"`. A task only deletes its own lock; a TTL-expired lock owned by a dead task is reclaimed by the next acquire, not by a release.
+- **Extend** is `UpdateItem` with `ConditionExpression="holder_id = :self"` setting a new `ttl`. A failed condition (held by another, or already lapsed) translates to `extend → False`.
+
+#### Provider mappings (substitutable behind the Protocol)
+
+- **Redis (in-cluster or managed):** `acquire` uses `SET <key> <holder_id> NX PX <ttl_ms>`; `release` uses a Lua script that compares `holder_id` and deletes atomically (the canonical "Redlock-style" compare-and-delete idiom); `extend` uses a similar compare-and-`PEXPIRE` Lua script.
+- **PostgreSQL:** `acquire` uses `INSERT INTO locks (key, holder_id, expires_at) VALUES (...) ON CONFLICT (key) DO UPDATE SET holder_id = EXCLUDED.holder_id, expires_at = EXCLUDED.expires_at WHERE locks.expires_at < now() RETURNING ...`; `release` is a conditional `DELETE` checking `holder_id`; `extend` is a conditional `UPDATE` of `expires_at`.
+- **Azure Cosmos DB:** an item with the lock key as `id` and a `holder_id` property; `acquire` uses an upsert with a `pre-trigger` or stored procedure that enforces "free-or-expired"; `release` is a conditional delete via `If-Match` on the holder eTag.
+- **GCP Firestore:** a transaction that reads the lock document, checks `holder_id` and expiry, and writes if the condition holds; `release` is the symmetric transaction.
+- **In-memory (local dev and CI):** a process-local dictionary protected by a `threading.Lock`; satisfies the Protocol contract within a single process. Sufficient for the local-development single-process posture per [environment-parity.md](environment-parity.md).
+
+The Protocol's contract tests (mutual exclusion under simulated contention, TTL-bounded recovery after holder crash, idempotent release) run against every provider implementation. A provider that fails a contract test is not a valid backend.
 
 ### Error isolation — `safe_run`
 
@@ -212,36 +251,46 @@ Compliance is verified by:
    - Accessed: 2026-04-29
    - Relevance: "Processes shut down gracefully when they receive a SIGTERM signal from the process manager. […] Processes should also be robust against sudden death, in the case of a failure in the underlying hardware. […] A queueing backend such as Beanstalkd that returns jobs to the queue when clients disconnect or time out is the ideal." Grounds the bounded-shutdown contract and the lock-with-TTL recovery model.
 
-3. AWS DynamoDB — Conditional Writes
-   - URL: <https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.ConditionExpressions.html>
-   - Accessed: 2026-05-08
-   - Relevance: Documents the `ConditionExpression` semantics used by the singleton lock — `attribute_not_exists` and equality comparison on item attributes for atomic acquire and release. Establishes that `PutItem` with a failed condition is a non-error outcome (`ConditionalCheckFailedException`), which is the mechanism by which non-acquiring tasks discover contention without an exception path.
-
-4. AWS DynamoDB — Time To Live (TTL)
-   - URL: <https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html>
-   - Accessed: 2026-05-08
-   - Relevance: Documents item-level TTL as a numeric attribute interpreted in epoch seconds, with item deletion handled by the service "typically within a few days" of expiration. The lock utility uses TTL as a *lifetime cap on visibility for acquire purposes* (the acquire condition checks `ttl < :now`), so reclamation is immediate at the API surface even though physical deletion lags. Grounds the rule that TTL must be shorter than the schedule interval.
-
-5. AWS Builders' Library — Reliability, Constant Work, and a Good Cup of Coffee
+3. AWS Builders' Library — Reliability, Constant Work, and a Good Cup of Coffee
    - URL: <https://aws.amazon.com/builders-library/reliability-and-constant-work/>
    - Accessed: 2026-05-08
    - Relevance: Argues for steady, bounded background work that does not vary with load — the operational property the scheduler-driven model produces. Grounds the design preference for fixed-interval, bounded-duration jobs over event-burst processing.
 
-6. Amazon ECS — Task Lifecycle and Stop Timeout
+4. Amazon ECS — Task Lifecycle and Stop Timeout
    - URL: <https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_lifecycle.html>
    - Accessed: 2026-05-08
    - Relevance: Documents the `SIGTERM → stopTimeout (default 30s) → SIGKILL` contract enforced by ECS. The ≤5-second runner-join budget composes inside this window with the ≤10-second request-drain budget defined by the lifespan record, leaving headroom for resource teardown and SIGKILL margin.
 
-7. Python — `threading.Event`
+5. Python — `threading.Event`
    - URL: <https://docs.python.org/3/library/threading.html#event-objects>
    - Accessed: 2026-05-08
    - Relevance: Documents `Event.set()` / `Event.is_set()` / `Event.wait(timeout)` as a thread-safe signaling primitive. Grounds the runner-shutdown signaling contract: lifespan reverse phase 6 calls `event.set()`, the runner observes `event.is_set()` between dispatches, and the lifespan calls `Thread.join(timeout=5)` to bound shutdown.
 
-8. Python — `time.monotonic`
+6. Python — `time.monotonic`
    - URL: <https://docs.python.org/3/library/time.html#time.monotonic>
    - Accessed: 2026-05-08
    - Relevance: Documents the monotonic clock as the correct source for elapsed-duration measurement (immune to wall-clock adjustments). Grounds the rule that `duration_seconds` in `job_completed` and `job_failed` records is computed from `time.monotonic()` deltas, not `time.time()`.
 
+7. AWS DynamoDB — Conditional Writes (day-0 implementation)
+   - URL: <https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.ConditionExpressions.html>
+   - Accessed: 2026-05-08
+   - Relevance: Documents the `ConditionExpression` semantics used by the day-0 singleton-lock implementation — `attribute_not_exists` and equality comparison on item attributes for atomic acquire and release. Establishes that `PutItem` with a failed condition is a non-error outcome (`ConditionalCheckFailedException`), which is the mechanism by which non-acquiring tasks discover contention without an exception path.
+
+8. AWS DynamoDB — Time To Live (TTL) (day-0 implementation)
+   - URL: <https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/TTL.html>
+   - Accessed: 2026-05-08
+   - Relevance: Documents item-level TTL as a numeric attribute interpreted in epoch seconds, with item deletion handled by the service "typically within a few days" of expiration. The day-0 lock implementation uses TTL as a *lifetime cap on visibility for acquire purposes* (the acquire condition checks `ttl < :now`), so reclamation is immediate at the API surface even though physical deletion lags. Grounds the rule that TTL must be shorter than the schedule interval.
+
+9. Redis — `SET` Command with `NX` and `PX` (alternate-provider mapping)
+   - URL: <https://redis.io/commands/set/>
+   - Accessed: 2026-05-08
+   - Relevance: Documents `SET key value NX PX milliseconds` as the canonical primitive for "acquire if absent, with TTL." Grounds the Redis provider mapping for the singleton-lock Protocol; the compare-and-delete idiom for safe release is documented under the Lua-scripting pattern at <https://redis.io/docs/latest/develop/use/patterns/distributed-locks/>.
+
+10. PostgreSQL — `INSERT ... ON CONFLICT` (UPSERT) (alternate-provider mapping)
+    - URL: <https://www.postgresql.org/docs/current/sql-insert.html#SQL-ON-CONFLICT>
+    - Accessed: 2026-05-08
+    - Relevance: Documents `ON CONFLICT (key) DO UPDATE ... WHERE` as the conditional-write primitive used by a PostgreSQL-backed singleton-lock implementation. Grounds the alternate-provider mapping; an `expires_at` column plus the `WHERE locks.expires_at < now()` clause provides the TTL-bounded recovery contract.
+
 ## Change Log
 
-- 2026-05-08: Created. Establishes hookspec-registered, in-process background jobs with two-tier concurrency classification (Tier-1 concurrent-safe vs. Tier-2 singleton), an infrastructure-owned conditional-write singleton lock with TTL-based recovery, a shared `safe_run` error boundary that bounds blast radius to a single invocation, a `threading.Event` shutdown contract bounded to ≤5 seconds, a production-only execution gate that still exercises registration in non-production, and a fixed observability event vocabulary. Defers per-job idempotency mechanics to handler-idempotency.md, queue-driven worker postures to message-queuing.md, and the lifespan ordering and budgets to application-lifecycle.md.
+- 2026-05-08: Created. Establishes hookspec-registered, in-process background jobs with two-tier concurrency classification (Tier-1 concurrent-safe vs. Tier-2 singleton). The singleton-lock utility is exposed as a capability-shaped Path-A Protocol (`SingletonLock` with `acquire` / `release` / `extend` operations and TTL-bounded leases); AWS DynamoDB conditional writes are the day-0 implementation, with Redis (`SET NX PX`), PostgreSQL (`INSERT ... ON CONFLICT`), Azure Cosmos DB, GCP Firestore, and an in-memory backend explicitly substitutable behind the same Protocol. Adds a shared `safe_run` error boundary that bounds blast radius to a single invocation, a `threading.Event` shutdown contract bounded to ≤5 seconds, a production-only execution gate that still exercises registration in non-production, and a fixed observability event vocabulary. Defers per-job idempotency mechanics to handler-idempotency.md, queue-driven worker postures to message-queuing.md, and the lifespan ordering and budgets to application-lifecycle.md.
