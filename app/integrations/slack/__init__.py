@@ -7,3 +7,8 @@ This package contains the Slack integration modules. Contains:
 - commands: Module containing the command related functionality for the Slack integration.
 - blocks: Module containing Slack Block Kit utilities and validation.
 """
+
+from integrations.slack.client import SlackClient
+from integrations.slack.settings import SlackSettings, get_slack_settings
+
+__all__ = ["SlackClient", "SlackSettings", "get_slack_settings"]

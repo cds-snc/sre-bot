@@ -7,7 +7,7 @@ import structlog
 from slack_bolt import Ack, App, Respond
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
-from infrastructure.clients.slack import SlackSettings
+from integrations.slack import SlackSettings
 from infrastructure.operations import OperationResult
 from infrastructure.slack.formatter import SlackBlockKitFormatter
 from infrastructure.slack.models import CommandPayload, CommandResponse
