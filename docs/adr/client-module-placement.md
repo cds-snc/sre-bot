@@ -32,26 +32,26 @@ The problem this record addresses: **at what physical location in the source tre
 
 ## Considered Options
 
-**Option 1 — Top-level sibling: `app/clients/`.** Vendor clients sit alongside `app/infrastructure/` and `app/packages/`. Both consumers import from `app.clients.<vendor>`; neither is treated as crossing into a layer that owns the client.
+**Option 1 — Top-level sibling: `app/integrations/`.** Vendor clients sit alongside `app/infrastructure/` and `app/packages/`. Both consumers import from `integrations.<vendor>`; neither is treated as crossing into a layer that owns the client.
 
-**Option 2 — Nested under infrastructure: `app/infrastructure/clients/`.** Composed-service implementations import freely from siblings. Feature-owned adapter files require a documented exception to import from `app.infrastructure.clients`, since feature packages otherwise cannot import from infrastructure.
+**Option 2 — Nested under infrastructure: `app/infrastructure/clients/`.** Composed-service implementations import freely from siblings. Feature-owned adapter files require a documented exception to import from `infrastructure.clients`, since feature packages otherwise cannot import from infrastructure.
 
 **Option 3 — Per-vendor under infrastructure: `app/infrastructure/aws/clients/`, `app/infrastructure/google/clients/`, …** Co-locates vendor-specific code under one tree per vendor. Mixes "client" with "composed-service implementation" inside the same vendor folder, removing the architectural distinction between connectivity primitive and capability implementation.
 
 ## Decision Outcome
 
-**Chosen: Option 1 — top-level `app/clients/`.**
+**Chosen: Option 1 — top-level `app/integrations/`.**
 
-Vendor clients are neither part of the behavior layer (where features live) nor part of the capability layer (where composed services live). They are vendor connectivity primitives consumed by both. Placing them at `app/clients/` makes that relationship structural: a feature-owned adapter importing a vendor client is not crossing a layer boundary — it is depending on a shared primitive that sits below both layers.
+Vendor clients are neither part of the behavior layer (where features live) nor part of the capability layer (where composed services live). They are vendor connectivity primitives consumed by both. Placing them at `app/integrations/` makes that relationship structural: a feature-owned adapter importing a vendor client is not crossing a layer boundary — it is depending on a shared primitive that sits below both layers.
 
 This layout follows the canonical project structure in *Architecture Patterns with Python* (Percival and Gregory), where adapters and connectivity primitives live at project boundary level rather than nested under a service subdirectory. It also tracks Mark Seemann's framing that layered-architecture constraints apply *between* layers; modules within the same boundary tier may depend on each other without restriction.
 
 ### Rules implied by this placement
 
-- `app/clients/<vendor>/` contains only vendor SDK wrapping. It does not import domain types, `OperationResult`, or Protocols, and it does not import from `app/infrastructure/` or `app/packages/`.
-- Composed-service implementations under `app/infrastructure/<service>/` and feature-owned adapter files at `app/packages/<feature>/adapters/<provider>.py` both import from `app.clients`. This is an ordinary downward dependency for both.
-- Feature service, domain, model, route, hook, and presentation modules do not import from `app/clients/`. The boundary remains the adapter file.
-- `app/infrastructure/` and `app/packages/` do not import each other. `app/clients/` is the only directory both layers may depend on.
+- `app/integrations/<vendor>/` contains only vendor SDK wrapping. It does not import domain types, `OperationResult`, or Protocols, and it does not import from `app/infrastructure/` or `app/packages/`.
+- Composed-service implementations under `app/infrastructure/<service>/` and feature-owned adapter files at `app/packages/<feature>/adapters/<provider>.py` both import from `integrations`. This is an ordinary downward dependency for both.
+- Feature service, domain, model, route, hook, and presentation modules do not import from `app/integrations/`. The boundary remains the adapter file.
+- `app/infrastructure/` and `app/packages/` do not import each other. `app/integrations/` is the only directory both layers may depend on.
 
 ## Consequences
 
@@ -59,31 +59,31 @@ This layout follows the canonical project structure in *Architecture Patterns wi
 
 - No "permitted exception" is needed for feature-owned adapters to consume vendor clients; the dependency is structural.
 - The three-position layer model declared in [layered-architecture.md](layered-architecture.md) is visible in the source tree: three top-level directories under `app/`, each with one role.
-- The placement is statically enforceable by a single import-linter `layers` contract (`clients < infrastructure < packages`), accompanied by a narrower contract restricting `app.clients` imports inside `app/packages/` to adapter files.
+- The placement is statically enforceable by a single import-linter `layers` contract (`clients < infrastructure < packages`), accompanied by a narrower contract restricting `integrations` imports inside `app/packages/` to adapter files.
 
 **Tradeoffs accepted:**
 
 - A fourth top-level directory under `app/` (alongside `infrastructure/`, `packages/`, and the application server module). Structural cost: one extra entry. Structural benefit: one fewer rule exception, one fewer special case for code review to remember.
-- Imports of the form `from app.infrastructure.clients.<vendor> import …` are expressed instead as `from app.clients.<vendor> import …`. The rename is mechanical and verifiable by tooling.
+- Imports of the form `from infrastructure.clients.<vendor> import …` are expressed instead as `from integrations.<vendor> import …`. The rename is mechanical and verifiable by tooling.
 
 **Risks:**
 
-- Domain or capability logic could accumulate inside `app/clients/` over time, eroding the connectivity-only boundary the placement is meant to enforce. Mitigation: an import-linter contract forbids `app.clients` from importing `app.infrastructure`, `app.packages`, or `OperationResult`; code review confirms that client modules only wrap vendor SDKs.
+- Domain or capability logic could accumulate inside `app/integrations/` over time, eroding the connectivity-only boundary the placement is meant to enforce. Mitigation: an import-linter contract forbids `integrations` from importing `infrastructure`, `packages`, or `OperationResult`; code review confirms that client modules only wrap vendor SDKs.
 
 ## Confirmation
 
 Compliance is verified by:
 
-- **Static import analysis.** An import-linter `layers` contract enforces the ordering `clients < infrastructure < packages`. A `forbidden` contract restricts `app.clients` imports inside `app/packages/` to files matching `**/adapters/*.py`.
-- **Code review (clients).** Modules under `app/clients/` import only vendor SDKs and the Python standard library. They do not import from `app/infrastructure/`, `app/packages/`, or any domain or `OperationResult` type.
-- **Code review (features).** Outside of `app/packages/<feature>/adapters/<provider>.py`, no module inside a feature package imports from `app.clients`.
+- **Static import analysis.** An import-linter `layers` contract enforces the ordering `clients < infrastructure < packages`. A `forbidden` contract restricts `integrations` imports inside `app/packages/` to files matching `**/adapters/*.py`.
+- **Code review (clients).** Modules under `app/integrations/` import only vendor SDKs and the Python standard library. They do not import from `app/infrastructure/`, `app/packages/`, or any domain or `OperationResult` type.
+- **Code review (features).** Outside of `app/packages/<feature>/adapters/<provider>.py`, no module inside a feature package imports from `integrations`.
 
 ## Source References
 
 1. Architecture Patterns with Python (Cosmic Python) — Dependency Injection and Bootstrapping (Chapter 13) — Percival and Gregory
    - URL: <https://www.cosmicpython.com/book/chapter_13_dependency_injection.html>
    - Accessed: 2026-04-29
-   - Relevance: Establishes the canonical project layout — adapters and connectivity primitives live at project boundary level alongside repository implementations, not nested inside a "services" subdirectory. Direct support for top-level `app/clients/`.
+   - Relevance: Establishes the canonical project layout — adapters and connectivity primitives live at project boundary level alongside repository implementations, not nested inside a "services" subdirectory. Direct support for top-level `app/integrations/`.
 
 2. Architecture Patterns with Python (Cosmic Python) — Repository Pattern (Chapter 2) — Percival and Gregory
    - URL: <https://www.cosmicpython.com/book/chapter_02_repository.html>
@@ -93,7 +93,7 @@ Compliance is verified by:
 3. Layers, Onions, Ports, Adapters — Mark Seemann
    - URL: <https://blog.ploeh.dk/2013/12/03/layers-onions-ports-adapters-its-all-the-same/>
    - Accessed: 2026-04-29
-   - Relevance: Layered-architecture constraints apply *between* layers; modules within the same boundary tier may depend on each other freely. Grounds the rule that both composed-service implementations and feature-owned adapters may depend on `app/clients/` without an exception.
+   - Relevance: Layered-architecture constraints apply *between* layers; modules within the same boundary tier may depend on each other freely. Grounds the rule that both composed-service implementations and feature-owned adapters may depend on `app/integrations/` without an exception.
 
 4. The Clean Architecture — Robert C. Martin
    - URL: <https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html>
@@ -108,13 +108,13 @@ Compliance is verified by:
 6. import-linter — Layers Contract
    - URL: <https://import-linter.readthedocs.io/en/stable/contract_types.html#layers>
    - Accessed: 2026-05-08
-   - Relevance: Defines the `layers` contract type for enforcing strict ordering between Python packages. Confirms that the rule `clients < infrastructure < packages` is expressible as a single contract — the placement is statically enforceable.
+   - Relevance: Defines the `layers` contract type for enforcing strict ordering between Python packages. Confirms that the rule `integrations < infrastructure < packages` is expressible as a single contract — the placement is statically enforceable.
 
 7. PEP 8 — Imports
    - URL: <https://peps.python.org/pep-0008/#imports>
    - Accessed: 2026-04-29
-   - Relevance: Python imports should be explicit and traceable. A top-level path (`from app.clients.aws import AWSClients`) is decodable from the path alone, without resolving an internal subdirectory of a parent module.
+   - Relevance: Python imports should be explicit and traceable. A top-level path (`from integrations.aws import AWSClients`) is decodable from the path alone, without resolving an internal subdirectory of a parent module.
 
 ## Change Log
 
-- 2026-05-08: Created. Selects top-level `app/clients/` placement for vendor connectivity primitives, making them a sibling of `app/infrastructure/` and `app/packages/` consistent with the three-position layer model in layered-architecture.md. Removes the need for a "permitted exception" in import rules for feature-owned adapters; the placement is enforceable by a single import-linter `layers` contract.
+- 2026-05-08: Created. Selects top-level `app/integrations/` placement for vendor connectivity primitives, making them a sibling of `app/infrastructure/` and `app/packages/` consistent with the three-position layer model in layered-architecture.md. Removes the need for a "permitted exception" in import rules for feature-owned adapters; the placement is enforceable by a single import-linter `layers` contract.
