@@ -28,6 +28,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install uv
+        run: pipx install uv
+
       - name: Install dev dependencies
         working-directory: ./app
         run: make install-dev
