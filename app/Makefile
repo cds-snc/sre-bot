@@ -1,94 +1,87 @@
-.PHONY: dev dev-local dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit
+.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit
 
 dev:
-	PREFIX="dev-" python3 -m uvicorn main:server_app --reload
-
-dev-local:
-	@python3 bin/dev-token.py & \
-	sleep 0.5 && \
-	PREFIX="dev-" python3 -m uvicorn main:server_app --reload; \
-	kill %1 2>/dev/null; \
-	wait
+	PREFIX="dev-" uv run uvicorn main:server_app --reload
 
 dev-setup: # Requires to be signed in to AWS
-	pip3 install --user -r requirements_dev.txt
-	pip3 install --user -r requirements.txt
+	uv sync --extra dev
 	sh ../.devcontainer/maxmind-create.sh
 	sh ../.devcontainer/dynamodb-create.sh
 
 debug:
-	PREFIX="dev-" LOG_LEVEL=DEBUG python3 -m uvicorn main:server_app --reload
+	PREFIX="dev-" LOG_LEVEL=DEBUG uv run uvicorn main:server_app --reload
 
 fmt:
-	black . $(ARGS) --target-version py311
+	uv run black . $(ARGS) --target-version py311
 
 install:
-	pip3 install --user -r requirements.txt
+	uv sync
 
 install-dev:
-	pip3 install --user -r requirements_dev.txt
+	uv sync --extra dev
 
 lint:
-	flake8 .
+	uv run ruff check .
 
 lint-types:
-	@command -v mypy >/dev/null 2>&1 && mypy . --check-untyped-defs --explicit-package-bases || echo "⚠️  mypy not installed. Run 'make install-dev' to enable type checking."
+	@command -v uv >/dev/null 2>&1 && uv run mypy . --check-untyped-defs --explicit-package-bases || echo "⚠️  uv not installed. Run 'make install-dev' to enable type checking."
 
 # NEW STRUCTURE: Pure unit tests
 test-unit:
-	python3 -m coverage run -m pytest tests/unit --show-capture=log --log-level=INFO -r fE && \
-	python3 -m coverage report -m
+	uv run coverage run -m pytest tests/unit --show-capture=log --log-level=INFO -r fE && \
+	uv run coverage report -m
 
 # NEW STRUCTURE: Integration tests
 test-integration:
-	python3 -m coverage run -m pytest tests/integration --show-capture=log --log-level=INFO -r fE && \
-	python3 -m coverage report -m
+	uv run coverage run -m pytest tests/integration --show-capture=log --log-level=INFO -r fE && \
+	uv run coverage report -m
 
 # NEW STRUCTURE: Both unit and integration (recommended going forward)
 test-new:
-	python3 -m coverage run -m pytest tests/unit tests/integration --show-capture=log --log-level=INFO -r fE && \
-	python3 -m coverage report -m
+	uv run coverage run -m pytest tests/unit tests/integration --show-capture=log --log-level=INFO -r fE && \
+	uv run coverage report -m
 
 # LEGACY: All legacy tests (gradual phase-out)
 test-legacy:
-	python3 -m coverage run -m pytest \
+	uv run coverage run -m pytest \
 		tests/api \
+		tests/core \
 		tests/modules \
 		tests/integrations \
 		tests/utils \
 		tests/test_factory_validation.py \
 		--show-capture=log --log-level=INFO -r fE && \
-	python3 -m coverage report -m
+	uv run coverage report -m
 
 # RUN ALL: New + legacy (default, maintain backward compatibility)
 test: test-new test-legacy
 
 # ALL tests including smoke, load, performance (explicit opt-in for slower tests)
 test-all:
-	python3 -m coverage run -m pytest tests --show-capture=log --log-level=INFO -r fE && \
-	python3 -m coverage report -m
+	uv run coverage run -m pytest tests --show-capture=log --log-level=INFO -r fE && \
+	uv run coverage report -m
 
 # Coverage reports with focus on new structure
 test-coverage-unit:
-	python3 -m coverage run -m pytest tests/unit --cov=modules --cov=core --cov=api --show-capture=log --log-level=INFO -r fE && \
-	python3 -m coverage report -m && \
-	python3 -m coverage html
+	uv run coverage run -m pytest tests/unit --cov=modules --cov=core --cov=api --show-capture=log --log-level=INFO -r fE && \
+	uv run coverage report -m && \
+	uv run coverage html
 
 test-coverage-integration:
-	python3 -m coverage run -m pytest tests/integration --cov=modules --cov=integrations --show-capture=log --log-level=INFO -r fE && \
-	python3 -m coverage report -m && \
-	python3 -m coverage html
+	uv run coverage run -m pytest tests/integration --cov=modules --cov=integrations --show-capture=log --log-level=INFO -r fE && \
+	uv run coverage report -m && \
+	uv run coverage html
 
 test-coverage-all:
-	python3 -m coverage run -m pytest tests/unit tests/integration --cov --cov-report=html --show-capture=log --log-level=INFO -r fE && \
-	python3 -m coverage report -m
+	uv run coverage run -m pytest tests/unit tests/integration --cov --cov-report=html --show-capture=log --log-level=INFO -r fE && \
+	uv run coverage report -m
 
 lint-ci:
-	flake8 .
-	@command -v mypy >/dev/null 2>&1 && mypy . --check-untyped-defs || true
+	uv run ruff check .
+	@command -v uv >/dev/null 2>&1 && uv run mypy . --check-untyped-defs || true
 
 fmt-ci:
-	black --check . --target-version py311
+	uv run black --check . --target-version py311
 
 run:
-	uvicorn main:server_app
+	uv run uvicorn main:server_app
