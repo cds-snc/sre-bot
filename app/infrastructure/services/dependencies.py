@@ -22,8 +22,6 @@ from infrastructure.storage.protocol import StorageService
 from infrastructure.audit.protocol import AuditTrailService
 from infrastructure.platforms.service import PlatformService
 from infrastructure.platforms.clients.slack import SlackClientFacade
-from infrastructure.platforms.clients.teams import TeamsClientFacade
-from infrastructure.platforms.clients.discord import DiscordClientFacade
 from infrastructure.directory.provider import DirectoryProvider
 from infrastructure.slack.service import SlackBot
 from infrastructure.services.providers import (
@@ -43,8 +41,6 @@ from infrastructure.services.providers import (
     get_platform_service,
     get_slack_bot,
     get_slack_client,
-    get_teams_client,
-    get_discord_client,
     get_directory_provider,
 )
 
@@ -114,12 +110,6 @@ SlackBotDep = Annotated[SlackBot, Depends(get_slack_bot)]
 # Slack client facade dependency
 SlackClientDep = Annotated[SlackClientFacade, Depends(get_slack_client)]
 
-# Teams client facade dependency
-TeamsClientDep = Annotated[TeamsClientFacade, Depends(get_teams_client)]
-
-# Discord client facade dependency (placeholder - not implemented)
-DiscordClientDep = Annotated[DiscordClientFacade, Depends(get_discord_client)]
-
 # Directory provider dependency — IDP-agnostic group membership and listing
 DirectoryProviderDep = Annotated[DirectoryProvider, Depends(get_directory_provider)]
 
@@ -139,7 +129,5 @@ __all__ = [
     "PlatformServiceDep",
     "SlackBotDep",
     "SlackClientDep",
-    "TeamsClientDep",
-    "DiscordClientDep",
     "DirectoryProviderDep",
 ]

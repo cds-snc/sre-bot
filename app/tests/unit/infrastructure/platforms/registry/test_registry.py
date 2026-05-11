@@ -10,8 +10,6 @@ from infrastructure.platforms.capabilities.models import (
     CapabilityDeclaration,
     PlatformCapability,
     PLATFORM_SLACK,
-    PLATFORM_TEAMS,
-    PLATFORM_DISCORD,
     create_capability_declaration,
 )
 from infrastructure.platforms.providers.base import BasePlatformProvider
@@ -102,17 +100,11 @@ class TestPlatformProviderRegistry:
     def test_register_multiple_providers(self, registry):
         """Test registering multiple providers."""
         slack_provider = MockPlatformProvider(PLATFORM_SLACK, name="Slack")
-        teams_provider = MockPlatformProvider(PLATFORM_TEAMS, name="Teams")
-        discord_provider = MockPlatformProvider(PLATFORM_DISCORD, name="Discord")
 
         registry.register_provider(slack_provider)
-        registry.register_provider(teams_provider)
-        registry.register_provider(discord_provider)
 
-        assert registry.count() == 3
+        assert registry.count() == 1
         assert registry.has_provider(PLATFORM_SLACK) is True
-        assert registry.has_provider(PLATFORM_TEAMS) is True
-        assert registry.has_provider(PLATFORM_DISCORD) is True
 
     def test_register_duplicate_raises_error(self, registry):
         """Test registering duplicate platform_id raises ValueError."""
@@ -168,17 +160,14 @@ class TestPlatformProviderRegistry:
     def test_list_providers(self, registry):
         """Test listing all providers."""
         slack = MockPlatformProvider(PLATFORM_SLACK, name="Slack")
-        teams = MockPlatformProvider(PLATFORM_TEAMS, name="Teams")
 
         registry.register_provider(slack)
-        registry.register_provider(teams)
 
         providers = registry.list_providers()
 
-        assert len(providers) == 2
+        assert len(providers) == 1
         provider_names = [p.name for p in providers]
         assert "Slack" in provider_names
-        assert "Teams" in provider_names
 
     def test_list_providers_empty(self, registry):
         """Test listing providers when none registered."""
@@ -196,29 +185,15 @@ class TestPlatformProviderRegistry:
                 PlatformCapability.VIEWS_MODALS,
             ],
         )
-        teams = MockPlatformProvider(
-            PLATFORM_TEAMS,
-            name="Teams",
-            capabilities=[PlatformCapability.COMMANDS],
-        )
-        discord = MockPlatformProvider(
-            PLATFORM_DISCORD,
-            name="Discord",
-            capabilities=[PlatformCapability.MESSAGING],
-        )
-
         registry.register_provider(slack)
-        registry.register_provider(teams)
-        registry.register_provider(discord)
 
         # Get providers that support COMMANDS
         command_providers = registry.get_providers_by_capability(
             PlatformCapability.COMMANDS
         )
-        assert len(command_providers) == 2
+        assert len(command_providers) == 1
         names = [p.name for p in command_providers]
         assert "Slack" in names
-        assert "Teams" in names
 
         # Get providers that support VIEWS_MODALS
         modal_providers = registry.get_providers_by_capability(
@@ -231,8 +206,7 @@ class TestPlatformProviderRegistry:
         messaging_providers = registry.get_providers_by_capability(
             PlatformCapability.MESSAGING
         )
-        assert len(messaging_providers) == 1
-        assert messaging_providers[0].name == "Discord"
+        assert len(messaging_providers) == 0  # No providers support MESSAGING capability
 
     def test_get_providers_by_capability_none_match(self, registry):
         """Test filtering when no providers match capability."""
@@ -252,9 +226,8 @@ class TestPlatformProviderRegistry:
     def test_clear(self, registry):
         """Test clearing all providers."""
         registry.register_provider(MockPlatformProvider(PLATFORM_SLACK))
-        registry.register_provider(MockPlatformProvider(PLATFORM_TEAMS))
 
-        assert registry.count() == 2
+        assert registry.count() == 1
 
         registry.clear()
 
@@ -267,7 +240,6 @@ class TestPlatformProviderRegistry:
         registry.register_provider(provider)
 
         assert registry.has_provider(PLATFORM_SLACK) is True
-        assert registry.has_provider(PLATFORM_TEAMS) is False
 
 
 @pytest.mark.unit

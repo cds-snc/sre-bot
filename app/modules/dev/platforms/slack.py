@@ -16,7 +16,6 @@ from modules.dev import (
     incident,
     slack as slack_dev,
 )
-from modules.dev.aws_dev import aws_dev_router
 
 if TYPE_CHECKING:
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
@@ -237,51 +236,51 @@ def handle_add_incident_command(payload: CommandPayload) -> CommandResponse:
     return _call_legacy_handler(payload, incident.add_incident, noop_ack, logger=logger)
 
 
-def handle_aws_dev_command(payload: CommandPayload) -> CommandResponse:
-    """Handle /sre dev aws - test AWS client integrations.
+# def handle_aws_dev_command(payload: CommandPayload) -> CommandResponse:
+#     """Handle /sre dev aws - test AWS client integrations.
 
-    Routes to subcommands: identitystore, organizations, sso, health
-    """
-    logger.info("command_received", command="aws", text=payload.text)
+#     Routes to subcommands: identitystore, organizations, sso, health
+#     """
+#     logger.info("command_received", command="aws", text=payload.text)
 
-    if error := _require_dev_environment(payload):
-        return error
+#     if error := _require_dev_environment(payload):
+#         return error
 
-    captured_responses: List[str] = []
+#     captured_responses: List[str] = []
 
-    def capture_respond(text: str | None = None, **kwargs):
-        if text:
-            captured_responses.append(text)
+#     def capture_respond(text: str | None = None, **kwargs):
+#         if text:
+#             captured_responses.append(text)
 
-    slack_facade = get_slack_client()
-    client = slack_facade.raw_client
+#     slack_facade = get_slack_client()
+#     client = slack_facade.raw_client
 
-    # Build payload for legacy router
-    router_payload = {
-        "command": {
-            "text": payload.text or "",
-            "user_id": payload.user_id,
-            "channel_id": payload.channel_id,
-            **(payload.platform_metadata or {}),
-        },
-        "client": client,
-        "respond": capture_respond,
-        "ack": lambda: None,
-    }
+#     # Build payload for legacy router
+#     router_payload = {
+#         "command": {
+#             "text": payload.text or "",
+#             "user_id": payload.user_id,
+#             "channel_id": payload.channel_id,
+#             **(payload.platform_metadata or {}),
+#         },
+#         "client": client,
+#         "respond": capture_respond,
+#         "ack": lambda: None,
+#     }
 
-    try:
-        aws_dev_router.handle(router_payload)
-    except Exception as e:
-        logger.error("aws_dev_router_error", error=str(e), exc_info=True)
-        return CommandResponse(
-            message=f"AWS command error: {str(e)}",
-            ephemeral=True,
-        )
+#     try:
+#         aws_dev_router.handle(router_payload)
+#     except Exception as e:
+#         logger.error("aws_dev_router_error", error=str(e), exc_info=True)
+#         return CommandResponse(
+#             message=f"AWS command error: {str(e)}",
+#             ephemeral=True,
+#         )
 
-    message = (
-        "\n".join(captured_responses) if captured_responses else "AWS command executed"
-    )
-    return CommandResponse(message=message, ephemeral=True)
+#     message = (
+#         "\n".join(captured_responses) if captured_responses else "AWS command executed"
+#     )
+#     return CommandResponse(message=message, ephemeral=True)
 
 
 def register_commands(provider: "SlackPlatformProvider") -> None:
@@ -347,10 +346,10 @@ def register_commands(provider: "SlackPlatformProvider") -> None:
         description_key="dev.subcommands.add_incident.description",
     )
 
-    provider.register_command(
-        command="aws",
-        handler=handle_aws_dev_command,
-        parent="sre.dev",
-        description="Test AWS client integrations (identitystore, organizations, sso, health)",
-        description_key="dev.subcommands.aws.description",
-    )
+    # provider.register_command(
+    #     command="aws",
+    #     handler=handle_aws_dev_command,
+    #     parent="sre.dev",
+    #     description="Test AWS client integrations (identitystore, organizations, sso, health)",
+    #     description_key="dev.subcommands.aws.description",
+    # )

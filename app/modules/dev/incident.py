@@ -84,7 +84,7 @@ def add_incident(ack, logger, respond, client: WebClient, body):
     if not incident.get("report_url"):
         logger.info("getting_report_url")
         incident["report_url"] = incident_conversation.get_incident_document_id(
-            client, incident["channel_id"], logger
+            client, incident["channel_id"]
         )
     incident_data = {
         "channel_id": incident["channel_id"],

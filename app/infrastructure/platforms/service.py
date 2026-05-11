@@ -48,13 +48,9 @@ from infrastructure.platforms.exceptions import (
 from infrastructure.platforms.providers.base import BasePlatformProvider
 from infrastructure.platforms.providers import (
     SlackPlatformProvider,
-    # TeamsPlatformProvider,  # Out of scope
-    # DiscordPlatformProvider,  # Out of scope
 )
 from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
 
-# from infrastructure.platforms.formatters.teams import TeamsAdaptiveCardsFormatter  # Out of scope
-# from infrastructure.platforms.formatters.discord import DiscordEmbedFormatter  # Out of scope
 from infrastructure.platforms.registry import PlatformRegistry, get_platform_registry
 
 if TYPE_CHECKING:
@@ -114,20 +110,6 @@ class PlatformService:
                 self._logger.debug("slack_provider_registered")
             except Exception as e:
                 self._logger.warning("slack_provider_registration_failed", error=str(e))
-
-        # Create and register Teams provider if configured
-        # Teams support coming soon
-        # if self._settings.teams.TEAMS_TOKEN:
-        #     teams_formatter = TeamsAdaptiveCardsFormatter()
-        #     teams_provider = TeamsPlatformProvider(...)
-        #     self._registry.register_provider(teams_provider)
-
-        # Create and register Discord provider if configured
-        # Discord support coming soon
-        # if self._settings.discord.DISCORD_TOKEN:
-        #     discord_formatter = DiscordEmbedFormatter()
-        #     discord_provider = DiscordPlatformProvider(...)
-        #     self._registry.register_provider(discord_provider)
 
         provider_list = self._registry.list_providers()
         # Convert list to dict keyed by platform_id

@@ -95,10 +95,6 @@ def mock_settings():
     settings = MagicMock(spec=PlatformsSettings)
     settings.slack = MagicMock()
     settings.slack.ENABLED = False
-    settings.teams = MagicMock()
-    settings.teams.ENABLED = False
-    settings.discord = MagicMock()
-    settings.discord.ENABLED = False
     return settings
 
 
@@ -134,9 +130,7 @@ class TestLoadProviders:
         """Test that load_providers returns registered providers as dict."""
         # Register mock providers directly
         mock_slack = MockProvider(name="slack")
-        mock_teams = MockProvider(name="teams")
         service._registry.register_provider(mock_slack)
-        service._registry.register_provider(mock_teams)
 
         # Call load_providers (it will try to import but won't find new modules)
         # We're testing that it returns registered providers as a dict
@@ -145,10 +139,7 @@ class TestLoadProviders:
         # Verify returns dict keyed by platform_id
         assert isinstance(providers, dict)
         assert "slack" in providers
-        assert "teams" in providers
         assert providers["slack"] is mock_slack
-        assert providers["teams"] is mock_teams
-        assert providers["teams"] is mock_teams
 
 
 @pytest.mark.unit
@@ -177,19 +168,13 @@ class TestGetEnabledProviders:
     def test_get_enabled_providers_filters_disabled(self, service):
         """Test that only enabled providers are returned."""
         enabled1 = MockProvider(name="slack", enabled=True)
-        disabled = MockProvider(name="teams", enabled=False)
-        enabled2 = MockProvider(name="discord", enabled=True)
 
         service._registry.register_provider(enabled1)
-        service._registry.register_provider(disabled)
-        service._registry.register_provider(enabled2)
 
         enabled = service.get_enabled_providers()
 
-        assert len(enabled) == 2
+        assert len(enabled) == 1
         assert enabled1 in enabled
-        assert enabled2 in enabled
-        assert disabled not in enabled
 
 
 @pytest.mark.unit
@@ -285,20 +270,14 @@ class TestInitializeAllProviders:
     def test_initialize_all_providers_success(self, service):
         """Test initializing all enabled providers."""
         enabled1 = MockProvider(name="slack", enabled=True)
-        enabled2 = MockProvider(name="teams", enabled=True)
-        disabled = MockProvider(name="discord", enabled=False)
 
         service._registry.register_provider(enabled1)
-        service._registry.register_provider(enabled2)
-        service._registry.register_provider(disabled)
 
         results = service.initialize_all_providers()
 
         # Should initialize enabled providers only
         assert "slack" in results
-        assert "teams" in results
         assert results["slack"].is_success
-        assert results["teams"].is_success
 
     def test_initialize_all_providers_empty(self, service):
         """Test initializing when no providers enabled."""

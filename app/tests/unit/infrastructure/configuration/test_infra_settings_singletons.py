@@ -101,8 +101,6 @@ class TestPlatformsSettingsSingleton:
     def test_default_providers_disabled(self):
         settings = PlatformsSettings()
         assert settings.slack.ENABLED is False
-        assert settings.teams.ENABLED is False
-        assert settings.discord.ENABLED is False
 
 
 class TestDirectorySettingsSingleton:

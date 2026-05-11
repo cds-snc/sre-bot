@@ -9,7 +9,6 @@ import pytest
 from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
 from infrastructure.platforms.formatters.teams import TeamsAdaptiveCardsFormatter
 
-
 # ─────────────────────────────────────────────────────────────────────────────
 # MOCK SETTINGS FACTORIES
 # ─────────────────────────────────────────────────────────────────────────────
@@ -33,38 +32,6 @@ class MockSlackSettings:
         self.SIGNING_SECRET = signing_secret
 
 
-class MockTeamsSettings:
-    """Mock Teams platform settings for testing."""
-
-    def __init__(
-        self,
-        enabled=True,
-        app_id="test-app-id",
-        app_password="test-app-password",
-        tenant_id="test-tenant-id",
-    ):
-        self.ENABLED = enabled
-        self.APP_ID = app_id
-        self.APP_PASSWORD = app_password
-        self.TENANT_ID = tenant_id
-
-
-class MockDiscordSettings:
-    """Mock Discord platform settings for testing."""
-
-    def __init__(
-        self,
-        enabled=False,
-        bot_token=None,
-        application_id=None,
-        public_key=None,
-    ):
-        self.ENABLED = enabled
-        self.BOT_TOKEN = bot_token
-        self.APPLICATION_ID = application_id
-        self.PUBLIC_KEY = public_key
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # FIXTURE: SLACK SETTINGS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -86,34 +53,6 @@ def slack_settings_disabled():
 def slack_settings_http_mode():
     """Provide mock Slack settings in HTTP webhook mode."""
     return MockSlackSettings(socket_mode=False, signing_secret="webhook-secret")
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FIXTURE: TEAMS SETTINGS
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-@pytest.fixture
-def teams_settings():
-    """Provide mock Teams settings with defaults."""
-    return MockTeamsSettings()
-
-
-@pytest.fixture
-def teams_settings_disabled():
-    """Provide mock Teams settings with provider disabled."""
-    return MockTeamsSettings(enabled=False)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# FIXTURE: DISCORD SETTINGS
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-@pytest.fixture
-def discord_settings():
-    """Provide mock Discord settings (out of scope, defaults to disabled)."""
-    return MockDiscordSettings()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -7,8 +7,6 @@ from infrastructure.platforms.capabilities.models import (
     PlatformCapability,
     PlatformFeatureType,
     PLATFORM_SLACK,
-    PLATFORM_TEAMS,
-    PLATFORM_DISCORD,
     PLATFORM_API,
     create_capability_declaration,
 )
@@ -79,8 +77,6 @@ class TestPlatformConstants:
     def test_platform_constants_exist(self):
         """Test that all platform constants are defined."""
         assert PLATFORM_SLACK == "slack"
-        assert PLATFORM_TEAMS == "teams"
-        assert PLATFORM_DISCORD == "discord"
         assert PLATFORM_API == "api"
 
 
@@ -109,7 +105,7 @@ class TestCapabilityDeclaration:
         """Test CapabilityDeclaration with metadata."""
         metadata = {"version": "1.0.0", "author": "SRE Team"}
         decl = CapabilityDeclaration(
-            platform_id=PLATFORM_TEAMS,
+            platform_id=PLATFORM_SLACK,
             capabilities=frozenset([PlatformCapability.COMMANDS]),
             metadata=metadata,
         )
@@ -226,7 +222,7 @@ class TestCreateCapabilityDeclaration:
     def test_create_with_multiple_capabilities(self):
         """Test factory with multiple capabilities."""
         decl = create_capability_declaration(
-            PLATFORM_TEAMS,
+            PLATFORM_SLACK,
             PlatformCapability.COMMANDS,
             PlatformCapability.MESSAGING,
             PlatformCapability.INTERACTIVE_CARDS,
@@ -258,7 +254,7 @@ class TestCreateCapabilityDeclaration:
     def test_factory_returns_frozen_set(self):
         """Test that factory returns immutable frozenset for capabilities."""
         decl = create_capability_declaration(
-            PLATFORM_DISCORD,
+            PLATFORM_SLACK,
             PlatformCapability.COMMANDS,
             PlatformCapability.MESSAGING,
         )

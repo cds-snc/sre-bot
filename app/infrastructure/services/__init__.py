@@ -21,8 +21,6 @@ from infrastructure.services.dependencies import (
     AuditTrailServiceDep,
     PlatformServiceDep,
     SlackClientDep,
-    TeamsClientDep,
-    DiscordClientDep,
     DirectoryProviderDep,
 )
 from infrastructure.services.providers import (
@@ -41,12 +39,8 @@ from infrastructure.services.providers import (
     get_audit_trail_service,
     get_platform_service,
     get_slack_client,
-    get_teams_client,
-    get_discord_client,
     get_directory_provider,
     get_slack_provider,
-    get_teams_provider,
-    get_discord_provider,
     t,
 )
 from infrastructure.security.rate_limiter import get_limiter, setup_rate_limiter
@@ -80,8 +74,6 @@ __all__ = [
     "PlatformServiceDep",
     # Platform client facades
     "SlackClientDep",
-    "TeamsClientDep",
-    "DiscordClientDep",
     "DirectoryProviderDep",
     # Core providers
     "get_app_settings",
@@ -101,12 +93,8 @@ __all__ = [
     "get_directory_provider",
     # Platform client providers
     "get_slack_client",
-    "get_teams_client",
-    "get_discord_client",
     # Platform provider accessors (ergonomic improvement)
     "get_slack_provider",
-    "get_teams_provider",
-    "get_discord_provider",
     # Translation helper
     "t",
     # Security utilities
