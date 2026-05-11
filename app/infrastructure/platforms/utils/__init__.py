@@ -11,9 +11,6 @@ from infrastructure.platforms.utils.slack_help import (
     generate_usage_line,
     get_argument_by_name,
 )
-from infrastructure.platforms.utils.schema_inference import (
-    infer_arguments_from_schema,
-)
 
 __all__ = [
     "SlackHelpGenerator",
@@ -22,5 +19,4 @@ __all__ = [
     "generate_slack_help_text",
     "generate_usage_line",
     "get_argument_by_name",
-    "infer_arguments_from_schema",
 ]
