@@ -1,6 +1,6 @@
 # Decision Record Index
 
-**Generated:** 2026-05-08 · **Total records:** 40
+**Generated:** 2026-05-11 · **Total records:** 40
 
 ---
 
