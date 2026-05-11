@@ -23,9 +23,13 @@ services:
         LICENSE_KEY: '${MAXMIND_KEY}'
     volumes:
       - ..:/workspace:cached
+      - sre-bot-app-.venv:/workspace/app/.venv
     command: sleep infinity
     environment:
       AWS_ACCESS_KEY_ID: 'AWSACCESSKEYID'
       AWS_SECRET_ACCESS_KEY: 'AWSSECRETACCESSKEY'
       SHELL: /bin/zsh
       ENVIRONMENT: 'dev'
+
+volumes:
+  sre-bot-app-.venv:
