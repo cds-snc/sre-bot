@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from infrastructure.clients.slack import SlackSettings
+from integrations.slack import SlackSettings
 from infrastructure.platforms.service import PlatformService
 from infrastructure.slack.service import SlackBot
 
