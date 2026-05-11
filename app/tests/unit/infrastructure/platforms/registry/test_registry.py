@@ -206,7 +206,9 @@ class TestPlatformProviderRegistry:
         messaging_providers = registry.get_providers_by_capability(
             PlatformCapability.MESSAGING
         )
-        assert len(messaging_providers) == 0  # No providers support MESSAGING capability
+        assert (
+            len(messaging_providers) == 0
+        )  # No providers support MESSAGING capability
 
     def test_get_providers_by_capability_none_match(self, registry):
         """Test filtering when no providers match capability."""
