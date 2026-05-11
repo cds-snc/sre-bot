@@ -18,9 +18,9 @@ class TestSlackPlatformSettings:
     def test_default_values(self, monkeypatch):
         """Test SlackPlatformSettings with default values (unset optional fields)."""
         # Remove optional token env vars to test defaults
-        # monkeypatch.delenv("SLACK_APP_TOKEN", raising=False)
-        # monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
-        # monkeypatch.delenv("SLACK_SIGNING_SECRET", raising=False)
+        monkeypatch.delenv("SLACK_APP_TOKEN", raising=False)
+        monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
+        monkeypatch.delenv("SLACK_SIGNING_SECRET", raising=False)
 
         settings = SlackPlatformSettings(_env_file=None)
 
