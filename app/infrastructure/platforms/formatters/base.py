@@ -20,8 +20,8 @@ class BaseResponseFormatter(ABC):
 
     Formatters convert generic data dictionaries into platform-native message formats:
     - Slack: Block Kit JSON
-    - Teams: Adaptive Cards JSON
-    - Discord: Embed objects
+    - Teams: Adaptive Cards JSON (Deprecated: Teams support is deprecated and Platforms services will be split)
+    - Discord: Embed objects (Placeholder, not implemented)
 
     All formatters must:
     - Implement format_success() for success messages

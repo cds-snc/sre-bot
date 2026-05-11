@@ -22,8 +22,6 @@ from infrastructure.platforms.capabilities.models import (
 from infrastructure.platforms.clients import (
     InternalHttpClient,
     SlackClientFacade,
-    TeamsClientFacade,
-    DiscordClientFacade,
 )
 from infrastructure.platforms.exceptions import (
     AuthenticationError,
@@ -60,9 +58,7 @@ from infrastructure.platforms.models import (
 )
 from infrastructure.platforms.providers import (
     BasePlatformProvider,
-    DiscordPlatformProvider,
     SlackPlatformProvider,
-    TeamsPlatformProvider,
 )
 from infrastructure.platforms.registry import (
     PlatformRegistry,
@@ -77,8 +73,6 @@ __all__ = [
     # Providers
     "BasePlatformProvider",
     "SlackPlatformProvider",
-    "TeamsPlatformProvider",
-    "DiscordPlatformProvider",
     # Capabilities
     "PlatformCapability",
     "CapabilityDeclaration",
@@ -91,8 +85,6 @@ __all__ = [
     # Clients
     "InternalHttpClient",
     "SlackClientFacade",
-    "TeamsClientFacade",
-    "DiscordClientFacade",
     # Models - Command
     "CommandPayload",
     "CommandResponse",

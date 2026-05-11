@@ -18,7 +18,7 @@ class PlatformCapability(str, Enum):
 
     COMMANDS = "commands"  # Text-based command execution (/slash, @mention)
     HIERARCHICAL_TEXT_COMMANDS = "hierarchical_text_commands"  # Slack-style text
-    STRUCTURED_COMMANDS = "structured_commands"  # Structured options (Teams, Discord)
+    STRUCTURED_COMMANDS = "structured_commands"  # Structured options (Slack)
     VIEWS_MODALS = "views_modals"  # Rich form-based interactions
     INTERACTIVE_CARDS = "interactive_cards"  # Rich messages with buttons/actions
     MESSAGING = "messaging"  # Send messages to channels/users
@@ -45,8 +45,6 @@ class PlatformFeatureType(str, Enum):
 
 # Platform identifier constants
 PLATFORM_SLACK = "slack"
-PLATFORM_TEAMS = "teams"
-PLATFORM_DISCORD = "discord"
 PLATFORM_API = "api"  # HTTP API (platform-agnostic)
 
 
@@ -55,7 +53,7 @@ class CapabilityDeclaration:
     """Declares the capabilities supported by a platform provider.
 
     Attributes:
-        platform_id: Unique identifier for the platform (slack, teams, discord).
+        platform_id: Unique identifier for the platform (slack).
         capabilities: Set of PlatformCapability values this provider supports.
         metadata: Optional additional metadata about the provider.
     """

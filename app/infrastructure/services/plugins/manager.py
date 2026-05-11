@@ -19,8 +19,6 @@ if TYPE_CHECKING:
     from structlog.stdlib import BoundLogger
     from infrastructure.events.service import EventDispatcher
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
-    from infrastructure.platforms.providers.teams import TeamsPlatformProvider
-    from infrastructure.platforms.providers.discord import DiscordPlatformProvider
     from infrastructure.slack.service import SlackBot
 
 logger = structlog.get_logger()
@@ -73,8 +71,6 @@ def register_feature_integrations(
     logger: "BoundLogger",
     slack_bot: "SlackBot | None" = None,
     slack_provider: "SlackPlatformProvider | None" = None,
-    teams_provider: "TeamsPlatformProvider | None" = None,
-    discord_provider: "DiscordPlatformProvider | None" = None,
     event_dispatcher: "EventDispatcher | None" = None,
 ) -> None:
     """Phase 2 — Register commands, routes, and run startup warmup.
@@ -87,8 +83,6 @@ def register_feature_integrations(
         app: FastAPI application instance passed to register_routes hookimpls.
         logger: Structured logger passed to startup_warmup hookimpls.
         slack_provider: Slack provider, if initialized.
-        teams_provider: Teams provider, if initialized.
-        discord_provider: Discord provider, if initialized.
     """
     pm = get_plugin_manager()
 
@@ -99,14 +93,6 @@ def register_feature_integrations(
     if slack_bot:
         pm.hook.register_slack_agent_interactions(provider=slack_bot)
         logger.info("slack_agent_interactions_registered")
-
-    if teams_provider:
-        pm.hook.register_teams_commands(provider=teams_provider)
-        logger.info("teams_commands_registered")
-
-    if discord_provider:
-        pm.hook.register_discord_commands(provider=discord_provider)
-        logger.info("discord_commands_registered")
 
     if event_dispatcher:
         pm.hook.register_event_handlers(dispatcher=event_dispatcher)
@@ -124,8 +110,6 @@ def discover_and_init_features(
     logger: "BoundLogger",
     slack_bot: "SlackBot | None" = None,
     slack_provider: "SlackPlatformProvider | None" = None,
-    teams_provider: "TeamsPlatformProvider | None" = None,
-    discord_provider: "DiscordPlatformProvider | None" = None,
     event_dispatcher: "EventDispatcher | None" = None,
 ) -> I18nResourceRegistry:
     """Discover all feature packages and run their full startup lifecycle.
@@ -143,8 +127,6 @@ def discover_and_init_features(
         logger=logger,
         slack_bot=slack_bot,
         slack_provider=slack_provider,
-        teams_provider=teams_provider,
-        discord_provider=discord_provider,
         event_dispatcher=event_dispatcher,
     )
     return i18n_registry

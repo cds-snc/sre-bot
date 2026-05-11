@@ -7,7 +7,7 @@ from infrastructure.i18n.resources import I18nResourceSpec
 from packages.geolocate.routes import router as geolocate_router
 from packages.geolocate.schemas import GeolocateRequest, GeolocateResponse
 from packages.geolocate.service import geolocate_ip
-from packages.geolocate.platforms import slack, teams
+from packages.geolocate.platforms import slack
 
 
 @hookimpl
@@ -18,16 +18,6 @@ def register_slack_commands(provider):
         provider: Slack platform provider instance.
     """
     slack.register_commands(provider)
-
-
-@hookimpl
-def register_teams_commands(provider):
-    """Register geolocate Teams commands (experimental).
-
-    Args:
-        provider: Teams platform provider instance.
-    """
-    teams.register_commands(provider)
 
 
 @hookimpl

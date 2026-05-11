@@ -219,8 +219,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app=app,
         logger=logger,
         slack_provider=platform_providers.get("slack"),
-        teams_provider=platform_providers.get("teams"),
-        discord_provider=platform_providers.get("discord"),
     )
     log.info("feature_integrations_registered")
 

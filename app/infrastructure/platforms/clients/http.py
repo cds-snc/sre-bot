@@ -1,7 +1,7 @@
 """Internal HTTP client for platform-to-endpoint communication.
 
 This client handles HTTP calls from platform providers to internal FastAPI endpoints.
-All platform interactions (Slack commands, Teams messages, Discord slashes) ultimately
+All platform interactions (Slack commands) ultimately
 translate to HTTP requests to the FastAPI application running on localhost.
 
 Architecture:

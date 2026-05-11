@@ -21,8 +21,6 @@ from infrastructure.configuration.infrastructure.server import (
 from infrastructure.configuration.infrastructure.platforms import (
     PlatformsSettings,
     SlackPlatformSettings,
-    TeamsPlatformSettings,
-    DiscordPlatformSettings,
     get_platforms_settings,
 )
 
@@ -39,7 +37,5 @@ __all__ = [
     "get_dev_settings",
     "PlatformsSettings",
     "SlackPlatformSettings",
-    "TeamsPlatformSettings",
-    "DiscordPlatformSettings",
     "get_platforms_settings",
 ]

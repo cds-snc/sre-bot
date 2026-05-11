@@ -4,8 +4,6 @@ import pytest
 
 from infrastructure.configuration.infrastructure.platforms import (
     SlackPlatformSettings,
-    TeamsPlatformSettings,
-    DiscordPlatformSettings,
     PlatformsSettings,
 )
 from infrastructure.configuration.settings import Settings
@@ -57,62 +55,6 @@ class TestSlackPlatformSettings:
 
 
 @pytest.mark.unit
-class TestTeamsPlatformSettings:
-    """Test TeamsPlatformSettings configuration."""
-
-    def test_default_values(self):
-        """Test TeamsPlatformSettings with default values."""
-        settings = TeamsPlatformSettings()
-
-        assert settings.ENABLED is False
-        assert settings.APP_ID is None
-        assert settings.APP_PASSWORD is None
-        assert settings.TENANT_ID is None
-
-    def test_enabled_with_credentials(self, monkeypatch):
-        """Test TeamsPlatformSettings with enabled and credentials set."""
-        monkeypatch.setenv("TEAMS_ENABLED", "true")
-        monkeypatch.setenv("TEAMS_APP_ID", "test-app-id")
-        monkeypatch.setenv("TEAMS_APP_PASSWORD", "test-password")
-        monkeypatch.setenv("TEAMS_TENANT_ID", "test-tenant-id")
-
-        settings = TeamsPlatformSettings()
-
-        assert settings.ENABLED is True
-        assert settings.APP_ID == "test-app-id"
-        assert settings.APP_PASSWORD == "test-password"
-        assert settings.TENANT_ID == "test-tenant-id"
-
-
-@pytest.mark.unit
-class TestDiscordPlatformSettings:
-    """Test DiscordPlatformSettings configuration."""
-
-    def test_default_values(self):
-        """Test DiscordPlatformSettings with default values."""
-        settings = DiscordPlatformSettings()
-
-        assert settings.ENABLED is False
-        assert settings.BOT_TOKEN is None
-        assert settings.APPLICATION_ID is None
-        assert settings.PUBLIC_KEY is None
-
-    def test_enabled_with_credentials(self, monkeypatch):
-        """Test DiscordPlatformSettings with enabled and credentials set."""
-        monkeypatch.setenv("DISCORD_ENABLED", "true")
-        monkeypatch.setenv("DISCORD_BOT_TOKEN", "test-bot-token")
-        monkeypatch.setenv("DISCORD_APPLICATION_ID", "123456789")
-        monkeypatch.setenv("DISCORD_PUBLIC_KEY", "test-public-key")
-
-        settings = DiscordPlatformSettings()
-
-        assert settings.ENABLED is True
-        assert settings.BOT_TOKEN == "test-bot-token"
-        assert settings.APPLICATION_ID == "123456789"
-        assert settings.PUBLIC_KEY == "test-public-key"
-
-
-@pytest.mark.unit
 class TestPlatformsSettings:
     """Test PlatformsSettings container."""
 
@@ -121,16 +63,12 @@ class TestPlatformsSettings:
         settings = PlatformsSettings()
 
         assert settings.slack.ENABLED is False
-        assert settings.teams.ENABLED is False
-        assert settings.discord.ENABLED is False
 
     def test_nested_settings_initialization(self):
         """Test PlatformsSettings initializes nested settings objects."""
         settings = PlatformsSettings()
 
         assert isinstance(settings.slack, SlackPlatformSettings)
-        assert isinstance(settings.teams, TeamsPlatformSettings)
-        assert isinstance(settings.discord, DiscordPlatformSettings)
 
     def test_enable_slack_only(self, monkeypatch):
         """Test enabling only Slack platform."""
@@ -140,20 +78,14 @@ class TestPlatformsSettings:
         settings = PlatformsSettings()
 
         assert settings.slack.ENABLED is True
-        assert settings.teams.ENABLED is False
-        assert settings.discord.ENABLED is False
 
     def test_enable_multiple_platforms(self, monkeypatch):
         """Test enabling multiple platforms simultaneously."""
         monkeypatch.setenv("SLACK_ENABLED", "true")
-        monkeypatch.setenv("TEAMS_ENABLED", "true")
-        monkeypatch.setenv("DISCORD_ENABLED", "true")
 
         settings = PlatformsSettings()
 
         assert settings.slack.ENABLED is True
-        assert settings.teams.ENABLED is True
-        assert settings.discord.ENABLED is True
 
     def test_slack_settings_accessible(self, monkeypatch):
         """Test accessing Slack settings through PlatformsSettings."""
@@ -162,22 +94,6 @@ class TestPlatformsSettings:
         settings = PlatformsSettings()
 
         assert settings.slack.BOT_TOKEN == "xoxb-test"
-
-    def test_teams_settings_accessible(self, monkeypatch):
-        """Test accessing Teams settings through PlatformsSettings."""
-        monkeypatch.setenv("TEAMS_APP_ID", "teams-app-id")
-
-        settings = PlatformsSettings()
-
-        assert settings.teams.APP_ID == "teams-app-id"
-
-    def test_discord_settings_accessible(self, monkeypatch):
-        """Test accessing Discord settings through PlatformsSettings."""
-        monkeypatch.setenv("DISCORD_APPLICATION_ID", "123456")
-
-        settings = PlatformsSettings()
-
-        assert settings.discord.APPLICATION_ID == "123456"
 
 
 @pytest.mark.unit
@@ -211,7 +127,5 @@ class TestMainSettingsIntegration:
 
         # All platform sub-settings should exist
         assert hasattr(settings.platforms, "slack")
-        assert hasattr(settings.platforms, "teams")
-        assert hasattr(settings.platforms, "discord")
 
         get_settings.cache_clear()

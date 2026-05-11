@@ -1,7 +1,7 @@
 """Hook specifications for feature plugin lifecycle.
 
 Covers the full lifecycle of a feature package:
-  - Platform command registration (Slack, Teams, Discord)
+  - Platform command registration (Slack, etc.)
   - HTTP route registration
   - Startup settings validation / cache warmup
 """
@@ -14,8 +14,6 @@ if TYPE_CHECKING:
     from structlog.stdlib import BoundLogger
     from infrastructure.events.service import EventDispatcher
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
-    from infrastructure.platforms.providers.teams import TeamsPlatformProvider
-    from infrastructure.platforms.providers.discord import DiscordPlatformProvider
     from infrastructure.slack.service import SlackBot
     from infrastructure.i18n.resources import I18nResourceRegistry
 
@@ -53,24 +51,6 @@ def register_slack_agent_interactions(provider: "SlackBot") -> None:
 
     Args:
         provider: Standalone SlackBot service used by feature hookimpls.
-    """
-
-
-@hookspec
-def register_teams_commands(provider: "TeamsPlatformProvider") -> None:
-    """Register Teams commands with the provider.
-
-    Args:
-        provider: Teams provider instance to register commands with.
-    """
-
-
-@hookspec
-def register_discord_commands(provider: "DiscordPlatformProvider") -> None:
-    """Register Discord commands with the provider.
-
-    Args:
-        provider: Discord provider instance to register commands with.
     """
 
 

@@ -50,15 +50,7 @@ from infrastructure.storage.service import DynamoDBStorageService
 from infrastructure.audit.protocol import AuditTrailService
 from infrastructure.audit.service import DynamoDBAuditTrailService
 from infrastructure.platforms import PlatformService
-from infrastructure.platforms.providers import (
-    SlackPlatformProvider,
-    TeamsPlatformProvider,
-    DiscordPlatformProvider,
-)
-from infrastructure.platforms.clients import (
-    TeamsClientFacade,
-    DiscordClientFacade,
-)
+from infrastructure.platforms.providers import SlackPlatformProvider
 from infrastructure.platforms.clients.slack import SlackClientFacade
 from infrastructure.directory.factory import build_google_directory_provider
 from infrastructure.directory.provider import DirectoryProvider
@@ -452,7 +444,7 @@ def get_platform_service():
     """Get application-scoped platform service singleton.
 
     Returns a PlatformService instance for managing collaboration platform
-    providers (Slack, Teams, Discord) with unified interfaces for messaging,
+    providers (Slack) with unified interfaces for messaging,
     capability detection, and provider initialization.
 
     The service is initialized with injected dependencies from settings
@@ -527,83 +519,6 @@ def get_slack_client():
         For advanced use cases, access the raw WebClient via client.raw_client
     """
     return SlackClientFacade(token=get_slack_settings().SLACK_TOKEN)
-
-
-@lru_cache(maxsize=1)
-def get_teams_client():
-    """Get application-scoped Teams client facade singleton.
-
-    Returns a TeamsClientFacade instance that wraps the Bot Framework SDK
-    with OperationResult-based APIs for consistent error handling.
-
-    Note:
-        This facade requires botbuilder-core to be installed.
-        If the SDK is not available, facade methods return error results.
-
-    Credentials are loaded from settings.teams (APP_ID, APP_PASSWORD).
-    The facade provides methods for sending activities, updating activities,
-    deleting activities, and sending adaptive cards.
-
-    Usage:
-        # FastAPI route handlers (dependency injection)
-        from infrastructure.services import TeamsClientDep
-
-        @router.post("/teams/activity")
-        def send_activity(
-            teams: TeamsClientDep,
-            turn_context: TurnContext,
-            text: str
-        ):
-            result = teams.send_activity(turn_context, text=text)
-            if result.is_success:
-                return {"id": result.data["id"]}
-            return {"error": result.message}
-
-        # Application code (webhook handlers)
-        from infrastructure.services import get_teams_client
-
-        def handle_teams_message(turn_context):
-            teams = get_teams_client()  # Singleton
-            result = teams.send_activity(turn_context, text="Received!")
-            return result
-
-    Returns:
-        TeamsClientFacade: Cached Teams client instance
-
-    Note:
-        Check facade.is_available before use if SDK availability is uncertain
-    """
-    platforms_settings = get_platforms_settings()
-    return TeamsClientFacade(
-        app_id=platforms_settings.teams.APP_ID,
-        app_password=platforms_settings.teams.APP_PASSWORD,
-    )
-
-
-@lru_cache(maxsize=1)
-def get_discord_client():
-    """Get application-scoped Discord client facade singleton.
-
-    Returns a DiscordClientFacade placeholder instance.
-
-    Note:
-        Discord integration is currently out of scope per project requirements.
-        All facade methods return NotImplementedError results.
-
-    Usage:
-        # Not yet implemented
-        from infrastructure.services import DiscordClientDep
-
-        @router.post("/discord/message")
-        def send_message(discord: DiscordClientDep, channel: str, text: str):
-            result = discord.send_message(channel=channel, content=text)
-            # Will always return permanent_error with DISCORD_NOT_IMPLEMENTED
-
-    Returns:
-        DiscordClientFacade: Placeholder instance (not implemented)
-    """
-    # Discord token not yet in settings - use empty string for placeholder
-    return DiscordClientFacade(token="")
 
 
 @lru_cache(maxsize=1)
@@ -687,33 +602,3 @@ def get_slack_bot() -> SlackBot:
         slack_settings=get_slack_settings(),
         slack_client=get_slack_client(),
     )
-
-
-def get_teams_provider() -> TeamsPlatformProvider:
-    """Get Microsoft Teams platform provider from the platform service registry.
-
-    Returns:
-        TeamsPlatformProvider instance.
-
-    Raises:
-        ProviderNotFoundError: If Teams provider has not been registered.
-    """
-    provider = get_platform_service()._registry.get_provider("teams")
-    if provider is None:
-        raise ProviderNotFoundError("No provider registered with name 'teams'")
-    return cast(TeamsPlatformProvider, provider)
-
-
-def get_discord_provider() -> DiscordPlatformProvider:
-    """Get Discord platform provider from the platform service registry.
-
-    Returns:
-        DiscordPlatformProvider instance.
-
-    Raises:
-        ProviderNotFoundError: If Discord provider has not been registered.
-    """
-    provider = get_platform_service()._registry.get_provider("discord")
-    if provider is None:
-        raise ProviderNotFoundError("No provider registered with name 'discord'")
-    return cast(DiscordPlatformProvider, provider)

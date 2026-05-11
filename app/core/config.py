@@ -666,11 +666,11 @@ class CommandsSettings(BaseSettings):
     Command Providers Configuration (COMMAND_PROVIDERS):
     ---------------------------------------------------
     Configure per-provider behavior including enable/disable and platform-specific
-    settings for command adapters (Slack, Teams, Discord, etc.).
+    settings for command adapters (Slack, etc.).
 
     Schema:
         providers: Dict[str, Dict[str, Any]]
-            Key: Provider name (e.g., "slack", "teams", "discord")
+            Key: Provider name (e.g., "slack")
             Value: Provider configuration dict with the following fields:
 
             - enabled (bool, optional): Whether to activate this command provider.
@@ -682,9 +682,6 @@ class CommandsSettings(BaseSettings):
         COMMAND_PROVIDERS = {
             "slack": {
                 "enabled": True
-            },
-            "teams": {
-                "enabled": False
             }
         }
 

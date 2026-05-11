@@ -1,6 +1,6 @@
 """Base platform provider abstract class.
 
-All platform-specific providers (Slack, Teams, Discord) inherit from this base class.
+All platform-specific providers (Slack) inherit from this base class.
 """
 
 from abc import ABC, abstractmethod

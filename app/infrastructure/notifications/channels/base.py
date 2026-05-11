@@ -17,7 +17,7 @@ class NotificationChannel(ABC):
     """Abstract base class for notification channels.
 
     Each channel handles delivery through a specific platform:
-    - ChatChannel: Slack/Teams/Discord DMs
+    - ChatChannel: Slack DMs
     - EmailChannel: Gmail/MS365 email
     - SMSChannel: GC Notify SMS
 
