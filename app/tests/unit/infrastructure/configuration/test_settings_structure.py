@@ -134,7 +134,7 @@ class TestSettingsStructure:
         """Verify Google Workspace customer ID defaults to the stable customer alias."""
         monkeypatch.delenv("GOOGLE_WORKSPACE_CUSTOMER_ID", raising=False)
 
-        settings = GoogleWorkspaceSettings()
+        settings = GoogleWorkspaceSettings(_env_file=None)
 
         assert settings.GOOGLE_WORKSPACE_CUSTOMER_ID == "my_customer"
 
