@@ -39,7 +39,6 @@
 		}
 	},
 	"features": {
-		"ghcr.io/va-h/devcontainers-features/uv:1": {},
 		"ghcr.io/devcontainers/features/aws-cli:1": {
 			"version": "2.32.6"
 		},
