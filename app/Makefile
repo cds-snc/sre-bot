@@ -1,14 +1,7 @@
-.PHONY: dev dev-local dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit
+.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit
 
 dev:
 	PREFIX="dev-" uv run uvicorn main:server_app --reload
-
-dev-local:
-	@python3 bin/dev-token.py & \
-	sleep 0.5 && \
-	PREFIX="dev-" python3 -m uvicorn main:server_app --reload; \
-	kill %1 2>/dev/null; \
-	wait
 
 dev-setup: # Requires to be signed in to AWS
 	uv sync --extra dev
@@ -52,6 +45,7 @@ test-new:
 test-legacy:
 	uv run coverage run -m pytest \
 		tests/api \
+		tests/core \
 		tests/modules \
 		tests/integrations \
 		tests/utils \
