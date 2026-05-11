@@ -1,0 +1,167 @@
+[project]
+name = "sre-bot"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "arrow==1.4.0",
+    "awscli==1.44.44",
+    "Authlib==1.6.8",
+    "aws-sns-message-validator==0.0.5",
+    "blinker==1.9.0",
+    "boto3==1.42.54",
+    "botocore==1.42.54",
+    "fastapi==0.133.1",
+    "geoip2==4.8.1",
+    "google-api-python-client==2.190.0",
+    "google-auth-httplib2==0.3.0",
+    "google-auth-oauthlib==0.8.0",
+    "google-api-core==2.30.0",
+    "google-auth==2.48.0",
+    "httpx==0.28.1",
+    "pandas==2.3.3",
+    "pluggy==1.6.0",
+    "pydantic-settings==2.13.1",
+    "PyJWT==2.12.0",
+    "PyYAML!=6.0.0,!=5.4.0,!=5.4.1",
+    "python-dotenv==0.21.1",
+    "python-i18n==0.3.9",
+    "pytz==2023.4",
+    "requests==2.32.5",
+    "slowapi==0.1.9",
+    "schedule==1.2.2",
+    "slack-bolt==1.27.0",
+    "structlog==25.5.0",
+    "trello==0.9.7.3",
+    "uvicorn==0.41.0",
+    "email-validator==2.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.11.0",
+    "black==24.10.0",
+    "mypy==1.19.1",
+    "pytest==8.4.2",
+    "pytest-asyncio==0.26.0",
+    "pytest-env==0.8.2",
+    "coverage==6.5.0",
+    "pytest-cov==4.1.0",
+    "freezegun==1.5.5",
+    "requests-mock==1.12.1",
+    "boto3_stubs==1.42.54",
+    "checkov",
+    "setuptools==78.1.1",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 130
+exclude = [
+    "venv*",
+    "__pycache__",
+    "node_modules",
+    "cache",
+    "migrations",
+    "build",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501"]
+mccabe.max-complexity = 16
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = true
+exclude = ["^tests/"]
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+module = ["google.oauth2.service_account", "googleapiclient.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["yaml", "pandas.*", "requests", "pytz", "sns_message_validator"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+log_cli = false
+log_cli_level = "WARNING"
+log_level = "WARNING"
+markers = [
+    "unit: Pure unit tests with no external dependencies",
+    "integration: Integration tests combining multiple components",
+    "legacy: Legacy test structure maintained for transition period",
+]
+env = [
+    "SLACK_ENABLED=false",
+    "SLACK_TOKEN=xoxb-test-token-for-tests",
+    "SLACK_BOT_TOKEN=xoxb-test-token-for-tests",
+    "SLACK_APP_TOKEN=xapp-test-token",
+    "SLACK_SIGNING_SECRET=test-signing-secret",
+    "APP_TOKEN=APP_TOKEN",
+    "SRE_DRIVE_ID=SRE_DRIVE_ID",
+    "SRE_INCIDENT_FOLDER=SRE_INCIDENT_FOLDER",
+    "INCIDENT_TEMPLATE=INCIDENT_TEMPLATE",
+    "INCIDENT_LIST=INCIDENT_LIST",
+    "PICKLE_STRING=PICKLE_STRING",
+    "SENTINEL_CUSTOMER_ID=SENTINEL_CUSTOMER_ID",
+    "SENTINEL_LOG_TYPE=SENTINEL_LOG_TYPE",
+    "SENTINEL_SHARED_KEY=SENTINEL_SHARED_KEY",
+    "SLACK_SECURITY_USER_GROUP_ID=SLACK_SECURITY_USER_GROUP_ID",
+    "INCIDENT_HANDBOOK_URL=INCIDENT_HANDBOOK_URL",
+    "AWS_ORG_ACCOUNT_ROLE_ARN=AWS_ORG_ACCOUNT_ROLE_ARN",
+    "AWS_LOGGING_ACCOUNT_ROLE_ARN=AWS_LOGGING_ACCOUNT_ROLE_ARN",
+    "AWS_AUDIT_ACCOUNT_ROLE_ARN=AWS_AUDIT_ACCOUNT_ROLE_ARN",
+    "ATIP_ANNOUNCE_CHANNEL=ATIP_ANNOUNCE_CHANNEL",
+    "TRELLO_APP_KEY=TRELLO_APP_KEY",
+    "TRELLO_TOKEN=TRELLO_TOKEN",
+    "TRELLO_ATIP_BOARD=TRELLO_ATIP_BOARD",
+    "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE=GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+    "SLACK__SLACK_TOKEN=xoxb-test-token-for-tests",
+    "SLACK__APP_TOKEN=xapp-test-token",
+    "AWS__AWS_REGION=us-east-1",
+    "NOTIFY_OPS_CHANNEL_ID=C1234567890",
+    "NOTIFY_SRE_USER_NAME=NOTIFY_SRE_USER_NAME",
+    "NOTIFY_SRE_CLIENT_SECRET=NOTIFY_SRE_CLIENT_SECRET",
+    "SENTINEL__SENTINEL_CUSTOMER_ID=SENTINEL_CUSTOMER_ID",
+    "SENTINEL__SENTINEL_LOG_TYPE=SENTINEL_LOG_TYPE",
+    "SENTINEL__SENTINEL_SHARED_KEY=SENTINEL_SHARED_KEY",
+    "SLACK__SLACK_SECURITY_USER_GROUP_ID=SLACK_SECURITY_USER_GROUP_ID",
+    "AWS__ORG_ROLE_ARN=AWS_ORG_ACCOUNT_ROLE_ARN",
+    "AWS__LOGGING_ROLE_ARN=AWS_LOGGING_ACCOUNT_ROLE_ARN",
+    "AWS__AUDIT_ROLE_ARN=AWS_AUDIT_ACCOUNT_ROLE_ARN",
+    "ATIP__ATIP_ANNOUNCE_CHANNEL=ATIP_ANNOUNCE_CHANNEL",
+    "TRELLO__TRELLO_APP_KEY=TRELLO_APP_KEY",
+    "TRELLO__TRELLO_TOKEN=TRELLO_TOKEN",
+    "TRELLO__TRELLO_ATIP_BOARD=TRELLO_ATIP_BOARD",
+    "GOOGLE_WORKSPACE__GCP_SRE_SERVICE_ACCOUNT_KEY_FILE=GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+    "GROUP_PROVIDERS={{\"google\": {{\"enabled\": true, \"primary\": true}}}}",
+]
+norecursedirs = ["tests/smoke"]
+filterwarnings = [
+    "ignore::DeprecationWarning:pydantic._internal._config",
+]
+
+[tool.coverage.run]
+source = ["./"]
+omit = ["./tests/*"]
+
+[tool.coverage.html]
+directory = "coverage_html_report"
+
+[tool.coverage.report]
+exclude_lines = ["if __name__ == .__main__.:"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["api", "core", "infrastructure", "integrations", "jobs", "models", "modules", "packages", "server", "utils"]

@@ -11,10 +11,17 @@ echo "Creating DynamoDB tables for local development..."
 
 # Helper function to check if table exists
 table_exists() {
-  aws dynamodb describe-table \
-    --table-name "$1" \
-    --endpoint-url "$ENDPOINT" \
-    --no-cli-pager &>/dev/null
+  local output
+  if output=$(aws dynamodb describe-table --table-name "$1" --endpoint-url "$ENDPOINT" --no-cli-pager 2>&1); then
+    return 0
+  fi
+
+  if echo "$output" | grep -q -E 'ResourceNotFoundException|Cannot do operations on a non-existent table'; then
+    return 1
+  fi
+
+  echo "Warning: aws describe-table failed for '$1': $output" >&2
+  return 1
 }
 
 # webhooks table - Simple hash key

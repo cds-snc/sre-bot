@@ -22,7 +22,7 @@ class TestSlackPlatformSettings:
         monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
         monkeypatch.delenv("SLACK_SIGNING_SECRET", raising=False)
 
-        settings = SlackPlatformSettings()
+        settings = SlackPlatformSettings(_env_file=None)
 
         assert settings.ENABLED is False
         assert settings.SOCKET_MODE is True
