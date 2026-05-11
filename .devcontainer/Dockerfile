@@ -1,6 +1,6 @@
 # See here for image contents: https://github.com/microsoft/vscode-dev-containers/tree/v0.183.0/containers/python-3/.devcontainer/base.Dockerfile
 
-ARG VARIANT="3.12"
+ARG VARIANT="3.14"
 FROM mcr.microsoft.com/devcontainers/python:3-${VARIANT}-bookworm
 
 # Install packages
