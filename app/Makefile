@@ -45,7 +45,6 @@ test-new:
 test-legacy:
 	uv run coverage run -m pytest \
 		tests/api \
-		tests/core \
 		tests/modules \
 		tests/integrations \
 		tests/utils \
