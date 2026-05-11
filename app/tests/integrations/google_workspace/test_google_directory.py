@@ -329,7 +329,7 @@ def test_list_groups_with_members_filtered(
         google_directory.list_groups_with_members(groups_filters=groups_filters)
         == groups_with_users
     )
-    assert mock_filter_by_condition.called_once_with(groups, groups_filters)
+    mock_filter_by_condition.assert_called_once_with(groups, groups_filters[0])
     assert mock_retry_request.call_count == 2
     assert mock_list_users.call_count == 1
 
