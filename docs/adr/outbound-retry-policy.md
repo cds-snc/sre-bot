@@ -106,7 +106,19 @@ config = Config(
 client = boto3.client("dynamodb", config=config)
 ```
 
-Boto3's "standard" mode implements exponential backoff with full jitter, retries on the documented set of transient errors, and respects throttling responses. The application does not wrap boto3 calls in Tenacity; that would be a second retry layer over a working one.
+Boto3's "standard" mode implements exponential backoff with full jitter, retries on the documented set of transient errors, and respects throttling responses. The application does not wrap boto3 calls in **any** retry loop on top — neither a Tenacity decorator nor a hand-rolled `for attempt in range(): try: ... except: time.sleep(...)` pattern. Either would stack a second retry layer on top of a working one, producing nested attempts (3 application-level × 3 SDK-level = 9 uncoordinated tries on a single transient failure) and, with non-jittered hand-rolled backoff, correlated retry storms across N processes.
+
+The same rule applies to every SDK that ships native retry primitives. Wire them at construction; do not loop above them.
+
+| SDK | Native retry mechanism | Configured at |
+| --- | --- | --- |
+| boto3 / botocore | `Config(retries={"max_attempts": N, "mode": "standard"})` | `boto3.client(...)` construction |
+| `slack_sdk` (`AsyncWebClient`) | `AsyncConnectionErrorRetryHandler`, `AsyncRateLimitErrorRetryHandler`, `AsyncServerErrorRetryHandler` | `AsyncWebClient(retry_handlers=[...])` construction |
+| `google-api-python-client` (Admin SDK, Drive, Calendar, Gmail) | `HttpRequest.execute(num_retries=N)` — retries 429 and 5xx with jittered exponential backoff | Per-call (passed by the client's executor) |
+| `google-api-core` (`google-cloud-*` libraries) | `retry=Retry(...)` keyword on each method | Per-call |
+| Microsoft Graph (`msgraph-sdk` / kiota) | `RetryHandlerOption(max_retry=N, max_delay=..., should_retry=...)` middleware | `GraphServiceClient` construction |
+
+Where an SDK exposes its retry mechanism at construction (boto3, slack_sdk, kiota), it is wired at construction in the client module and inherited by every call through that client. Where it is exposed per-call (googleapiclient, google-api-core), the client's executor passes the configured value through each `execute()` invocation. In every case, the application's own code contains **no `for attempt in range()`, no `time.sleep`, and no equivalent**.
 
 #### Shape B — HTTP clients without native retry (Slack `slack_sdk`, `httpx`, raw `requests`)
 
@@ -132,6 +144,10 @@ The decorated method handles retries inline. The adapter calling `client.post_me
 #### Shape C — Async HTTP via `httpx.AsyncClient` transport hooks
 
 For purely-async HTTP clients, the retry is implemented either as a Tenacity decorator (Shape B) or as a transport-level hook on `httpx.AsyncClient`'s `Retry`-like configuration. The chosen primitive is documented per client; both compose with the same policy parameters.
+
+#### All shapes converge at the executor boundary
+
+The three shapes are implementation variations of *where* retry runs (inside the SDK, inside a Tenacity decorator on a curated facade, inside a transport hook). They produce **the same `OperationResult` envelope** from the consumer's perspective: the client's executor awaits the post-retry final state, classifies the typed exception (or success), and returns. The adapter that consumes the envelope cannot tell which shape produced it — by design. The shape is a property of the client; the consumer contract is uniform. This is what lets mature SDKs (boto3, `slack_sdk`, googleapiclient — Shape A) and less mature integrations (GC Notify, Trello, Opsgenie — Shape B/C) coexist behind the same adapter contract from [client-adapter-responsibilities.md](client-adapter-responsibilities.md).
 
 ### What the adapter sees
 
@@ -199,8 +215,8 @@ Per-client retry overrides live in the client's settings module (`app/clients/<v
 
 Compliance is verified by:
 
-- **Code review.** Retry decorators or SDK retry config appear in `app/clients/<vendor>/`, not in `app/infrastructure/<service>/` adapters and not in `app/packages/<feature>/` handlers. No nested retry: the adapter does not wrap a Tenacity-decorated client method in another Tenacity decorator.
-- **Static analysis.** A check forbids `tenacity` imports outside `app/clients/` (and the small shared retry utility module).
+- **Code review.** Retry decorators or SDK retry config appear in the vendor client module (`app/clients/<vendor>/` or `app/infrastructure/clients/<vendor>/`), not in `app/infrastructure/<service>/` adapters and not in `app/packages/<feature>/` handlers. **No retry-on-retry stacking of any kind**: an adapter does not wrap a retry-configured SDK client method in a Tenacity decorator or a hand-rolled loop; a client with SDK-native retry does not have an additional retry loop above the SDK call. Hand-rolled `for attempt in range(): try: ... except: time.sleep(...)` patterns are forbidden under this record — they duplicate SDK behaviour less correctly (typically without jitter, with blocking sleep that stalls async event loops, and with mis-classified exhaustion) and silently nest on top of native retry.
+- **Static analysis.** A check forbids `tenacity` imports outside `app/clients/` (and the small shared retry utility module). A lint rule flags `time.sleep` inside vendor client modules as a likely hand-rolled retry loop pending refactor.
 - **Tests.** Per-client tests exercise both success-on-retry and exhaustion paths for the documented retriable-error set. The adapter's tests run against a client mock that returns either success or the final exception — never an intermediate retry; tests rely on the policy rather than re-asserting it at the adapter.
 - **Observability checks.** Dashboards visualize `outbound_call_retry` rate per vendor; alarms fire when retries succeed but the rate climbs (signal of upstream degradation) or when `outbound_call_failed` rate climbs (signal of upstream outage).
 
@@ -244,3 +260,4 @@ Compliance is verified by:
 ## Change Log
 
 - 2026-05-08: Created. Establishes a single retry policy applied at the vendor-client layer: max 3 attempts, exponential backoff with full jitter (1 s base, 30 s max), 60-second total per-call budget, 10-second default per-attempt timeout. Defines the retriable-error catalogue (network errors, HTTP 5xx, HTTP 429 with `Retry-After` honored, SDK-typed transient exceptions) and the non-retriable catalogue (4xx other than 429, `PERMANENT_ERROR`/`UNAUTHORIZED`/`NOT_FOUND` SDK shapes, application bugs). Specifies two implementation shapes — SDK-native retry configured against the policy (boto3 standard mode), and Tenacity-decorated methods for HTTP clients without native retry. Names the observability event vocabulary (`outbound_call_retry`, `outbound_call_failed`, `outbound_call_succeeded_after_retry`). Defers circuit-breaker semantics to a future record. Composes with handler-idempotency.md (the inbound dedup mechanism absorbs the residual duplicate-side-effect risk of retrying non-idempotent calls without upstream idempotency tokens).
+- 2026-05-12: Strengthened Shape A from "do not wrap boto3 in Tenacity" to "do not wrap any SDK with native retry in any retry loop, including hand-rolled ones." Background: an SDK-capability audit (research-shield-pattern-sdk-capabilities.md) found that the existing Google Workspace and AWS executors hand-roll `for attempt in range(): try: ... except: time.sleep(...)` loops above SDKs that already retry natively — producing nested attempts (worst case 3 × 3 = 9 uncoordinated tries on a single transient failure), correlated retry storms (no jitter on the hand-rolled backoff), blocking sleep that would stall async event loops, and mis-classified exhausted-transient outcomes. The original Shape A wording explicitly forbade Tenacity wrapping but did not foreclose hand-rolled loops; the closure had been read more narrowly than intended. Added an explicit SDK retry mechanism table (boto3 / slack_sdk / googleapiclient / google-api-core / Microsoft Graph kiota) naming where each SDK's retry is configured. Confirmation section updated to explicitly forbid retry-on-retry stacking of any kind and flag `time.sleep` inside vendor client modules as a likely hand-rolled loop pending refactor. No change to retry parameters (max 3, exponential with full jitter, 1s base, 30s max, 60s budget, 10s per-attempt timeout), the retriable/non-retriable catalogue, or the observability vocabulary.

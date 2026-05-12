@@ -68,7 +68,7 @@ Resilience and connection-level error handling are *boundary concerns*, not appl
 
 This allocation preserves the Ports and Adapters separation: **the port (Protocol) describes what the application needs in domain terms; the adapter translates between the Protocol and the vendor surface; the client is the executor layer that makes all calls to the vendor resilient by default.**
 
-The pattern is exemplified by [executor.py](../infrastructure/clients/google_workspace/executor.py) in the Google Workspace implementation: `execute_google_api_call()` encapsulates retry logic, backoff, SDK exception handling, and `OperationResult` production, so that facade methods expose `OperationResult`-returning operations without individually handling exceptions.
+The pattern's canonical shape is defined in [client-sdk-shield-pattern.md](client-sdk-shield-pattern.md) : the vendor client wires SDK-native retry at construction and exposes `execute(awaitable) -> OperationResult` as a thin classification boundary. The current [Google Workspace executor](../infrastructure/clients/google_workspace/executor.py) and [AWS executor](../infrastructure/clients/aws/executor.py) hand-roll retry loops above the SDK using `time.sleep` and predate the construction-time-retry decision; they are pending refactor and are **not** reference implementations of this contract.
 
 ### Path-agnostic application
 
@@ -88,14 +88,21 @@ A vendor client owns transport-level resilience and the initial boundary transla
 
 - **Authentication and session management.** Acquiring credentials (from environment-supplied configuration), creating and reusing authenticated sessions, refreshing tokens. Authentication is performed once per client lifetime, not per call.
 - **SDK initialization.** Instantiating boto3, Google API client, Slack/Teams SDK objects with the chosen configuration (region, timeouts, connection pooling). Holding those instances for reuse.
-- **Resilient execution with retry and backoff.** Implementing an executor or facade layer (per the [Google Workspace executor.py](../infrastructure/clients/google_workspace/executor.py) pattern) that:
-  - Wraps each SDK call in a retry loop with configurable max attempts.
-  - Applies exponential backoff for transient errors (5xx, rate limits, timeouts).
-  - Catches typed SDK exceptions (e.g., `botocore.exceptions.ClientError`, `googleapiclient.errors.HttpError`, `slack_sdk.errors.SlackApiError`).
-  - Classifies exceptions into transport-level statuses: is this retriable? Is this a permanent failure? Is this an authorization failure?
-  - Produces `OperationResult` with appropriate status, error code, and message.
+- **Resilience by construction (not by loop).** Wiring the SDK's native retry, backoff, jitter, and `Retry-After` handling at construction time, against the standard parameters in [outbound-retry-policy.md](outbound-retry-policy.md). Concretely:
+  - boto3: `Config(retries={"max_attempts": ..., "mode": "standard"})` on the client at construction.
+  - `slack_sdk` `AsyncWebClient`: `AsyncConnectionErrorRetryHandler`, `AsyncRateLimitErrorRetryHandler`, `AsyncServerErrorRetryHandler` passed via `retry_handlers=[...]` at construction.
+  - `google-api-python-client`: `request.execute(num_retries=N)` at the call site, threaded by the client's executor.
+  - Microsoft Graph (`msgraph-sdk` / kiota): `RetryHandlerOption` configured on the middleware chain at construction.
+  Hand-rolled retry loops above SDK calls — `for attempt in range(): try: ... except: time.sleep(...)` — are explicitly forbidden by [outbound-retry-policy.md](outbound-retry-policy.md) and not appropriate at this layer. They duplicate SDK behaviour less correctly (typically without jitter and with blocking sleep that stalls async event loops) and nest on top of working SDK retry to produce multiplicative attempts.
+- **Transport-level classification (the client's executor).** Implementing a thin classifier — the awaitable-wrapping executor named in [client-sdk-shield-pattern.md](client-sdk-shield-pattern.md)  — that:
+  - Awaits the SDK call (or invokes a sync callable for sync SDKs).
+  - Applies the per-call wall-clock budget from [outbound-retry-policy.md](outbound-retry-policy.md) via `asyncio.wait_for(...)` for async paths.
+  - Catches typed SDK exceptions (e.g., `botocore.exceptions.ClientError`, `googleapiclient.errors.HttpError`, `slack_sdk.errors.SlackApiError`) **after** the SDK's native retry has run inside the call.
+  - Classifies the exception (or, where the SDK signals failure in-band, the response shape) into the closed five-status set from [operation-result-pattern.md](operation-result-pattern.md): is this retriable? Is this a permanent failure? Is this an authorization failure?
+  - Produces `OperationResult` with appropriate status, error code, message, and `retry_after` on `TRANSIENT_ERROR`.
   - Ensures that **all SDK calls return `OperationResult`, never raise exceptions above the client boundary.**
-- **Pagination.** Iterating SDK pagination tokens to produce a complete result set; surfacing the result as a normal Python iterable or collecting into a single response. Pagination semantics are vendor-specific and do not belong in domain code.
+  The executor does not retry. It classifies. Retry happens inside the awaitable, configured at SDK construction time per the bullet above.
+- **Pagination.** Iterating SDK pagination tokens to produce a complete result set; surfacing the result as a normal Python iterable or collecting into a single response. Pagination semantics are vendor-specific (boto3 `client.get_paginator(...)`, googleapiclient `service.<resource>().list_next(prev_req, prev_resp)`) and do not belong in domain code.
 - **Concurrency and rate-limit primitives where the SDK does not provide them.** When required, applying low-level concurrency controls (semaphores, pool sizing) at the transport level.
 
 A vendor client does **not**:
@@ -104,7 +111,7 @@ A vendor client does **not**:
 - Decide what "not found" means in the context of a specific business capability.
 - Depend on any module from `app/packages/` or `app/infrastructure/<service>/` (except for injected configuration).
 
-**The executor pattern is the canonical implementation.** Each vendor client should expose facade methods that return `OperationResult`. Each facade method invokes SDK operations through a resilient executor that handles retry, backoff, and exception mapping. This centralizes resilience as a boundary concern.
+**The thin classification executor is the canonical implementation.** Each vendor client wires SDK-native retry at construction and exposes — per [client-sdk-shield-pattern.md](client-sdk-shield-pattern.md)  — both a typed SDK handle and an `execute(awaitable) -> OperationResult` classifier. The executor does not retry; it awaits, applies the per-call wall-clock budget, catches typed SDK exceptions, classifies, returns. Resilience is centralized at the *construction* boundary (one SDK config per vendor); classification is centralized at the *call* boundary (one executor per vendor). Optional curated facades may sit alongside the executor for high-frequency or composed capabilities.
 
 ### Secondary adapter responsibilities
 
@@ -218,14 +225,39 @@ Compliance is verified by:
 - Accessed: 2026-04-28
 - Relevance: Backing services are attached resources reachable through a uniform interface. The client executor and adapter together produce that uniform interface (the Protocol surface) regardless of which SDK or provider is configured against.
 
-1. Google Workspace Clients — Executor Pattern Reference Implementation
+1. Google Workspace Clients — Pending-Refactor Executor (Not Canonical)
 
 - URL: [../infrastructure/clients/google_workspace/executor.py](../infrastructure/clients/google_workspace/executor.py)
-- Accessed: 2026-05-11
-- Relevance: Demonstrates the canonical executor pattern for this record: `execute_google_api_call()` wraps SDK operations in retry/backoff logic, catches typed SDK exceptions (`HttpError`), and returns `OperationResult` with transport-level status classification. The pattern is reusable across AWS, Slack, Teams, and other vendors.
+- Accessed: 2026-05-12
+- Relevance: Current implementation. Hand-rolls a retry loop above the SDK using `time.sleep`, lacks jitter, ignores any `Retry-After` hint (hardcoded 60s on 429), and mis-classifies exhausted-transient outcomes as `PERMANENT_ERROR`. **Not** the canonical reference for this record. The `google-api-python-client` SDK ships native retry via `HttpRequest.execute(num_retries=N)` which this executor duplicates less correctly. The canonical client shape is defined in [client-sdk-shield-pattern.md](client-sdk-shield-pattern.md); this executor is a pending refactor target.
+
+1. AWS Clients — Pending-Refactor Executor (Not Canonical)
+
+- URL: [../infrastructure/clients/aws/executor.py](../infrastructure/clients/aws/executor.py)
+- Accessed: 2026-05-12
+- Relevance: Current implementation. Hand-rolls a retry loop with blocking `time.sleep` above boto3 calls that are not configured with a `botocore.config.Config(retries=...)`, so boto3's own retry mode runs alongside ours (nested attempts). Re-creates the boto3 client (and re-runs `sts.assume_role` for cross-account paths) on every retry attempt — wasteful and STS-rate-limit-prone. Leaks the `treat_conflict_as_success` flag and `conflict_callback` into the executor — domain interpretation that belongs in adapters. **Not** the canonical reference. Pending refactor to configure boto3's `standard` retry mode at construction and reduce the executor to a thin classifier.
+
+1. Slack Python SDK — `RetryHandler` framework
+
+- URL: <https://tools.slack.dev/python-slack-sdk/web/#retryhandler>
+- Accessed: 2026-05-12
+- Relevance: Documents the `slack_sdk` native retry primitives — `AsyncConnectionErrorRetryHandler`, `AsyncRateLimitErrorRetryHandler`, `AsyncServerErrorRetryHandler` — wired onto `AsyncWebClient` at construction via the `retry_handlers=[...]` kwarg. Grounds the construction-time wiring for the Slack shield: native retry lives inside the SDK; the shield's executor only awaits + classifies.
+
+1. google-api-python-client — `HttpRequest.execute(num_retries=N)`
+
+- URL: <https://googleapis.github.io/google-api-python-client/docs/epy/googleapiclient.http.HttpRequest-class.html#execute>
+- Accessed: 2026-05-12
+- Relevance: Documents the SDK-native retry primitive for the discovery-based Google client (Admin SDK, Drive, Calendar, Gmail). When `num_retries > 0`, the SDK retries `HttpError` 429 and 5xx with jittered exponential backoff (`random.random() * 2^retry_num`). Grounds the rule that the Google Workspace executor refactor uses `num_retries=` rather than a hand-rolled loop.
+
+1. SDK Capability Audit — Research Document
+
+- URL: [../../tmp/research-shield-pattern-sdk-capabilities.md](../../tmp/research-shield-pattern-sdk-capabilities.md)
+- Accessed: 2026-05-12
+- Relevance: SDK-by-SDK audit (Slack, AWS, Google Workspace, Microsoft Graph) confirming that every SDK we depend on ships first-class retry primitives the application currently does not use. Identifies the concrete regressions in the existing Google Workspace and AWS executors and grounds the 2026-05-12 revision of this record from "client implements resilient execution" to "client is resilient by construction; executor is a thin classifier."
 
 ## Change Log
 
 - 2026-05-08: Created. Establishes the responsibility contract for vendor clients (transport-level concerns including authentication, retry, pagination) and secondary adapters (typed-exception → `OperationResult` mapping, type translation, capability-level error semantics). Adopts an exception-based client surface with adapter-level translation, grounded in Ports and Adapters and the Repository Pattern. Anchored to the path-agnostic application of the contract: it applies identically to Path A composed-service implementations and Path B feature-owned adapters defined in layered-architecture.md.
 
 - 2026-05-11: **Reassessed and revised.** Recognized that `OperationResult` should be the primary integration boundary contract at the client layer (not just at the adapter layer). Clients should implement resilient execution using the executor pattern, returning `OperationResult` directly rather than raising exceptions. This ensures both Path A (composed services) and Path B (feature-owned adapters) benefit from consistent retry, backoff, and error classification out of the box. Adapters now focus on domain-level result interpretation rather than rebuilding transport resilience. The Google Workspace executor.py is adopted as the canonical reference implementation. Decision shifts from Option 1 (exception-based clients) to Option 2 (resilient-execution clients returning OperationResult).
+- 2026-05-12: **Clarified — resilience is construction-time, classification is call-time.** An SDK-capability audit ([../../tmp/research-shield-pattern-sdk-capabilities.md](../../tmp/research-shield-pattern-sdk-capabilities.md)) established that every SDK the application depends on (boto3, `slack_sdk`, `google-api-python-client`, Microsoft Graph `msgraph-sdk` / kiota) ships first-class retry, backoff, and `Retry-After` handling — and that the existing Google Workspace and AWS executors hand-roll retry loops above the SDK that duplicate these primitives less correctly (no jitter, blocking `time.sleep`, mis-classified exhausted-transient as `PERMANENT_ERROR`, nested attempts when SDK retry is also active, repeated client reconstruction including `sts.assume_role` on every retry). The 2026-05-11 framing ("clients implement resilient execution using the executor pattern") was read as a license to hand-roll those loops; that reading is incorrect. The decision (Option 2 — clients return `OperationResult` directly) is unchanged, but the vendor-client responsibility is now split into two distinct bullets: (a) **Resilience by construction** — the client wires the SDK's native retry/backoff/`Retry-After` primitives at construction time, per the standard policy in [outbound-retry-policy.md](outbound-retry-policy.md) Shape A; (b) **Transport-level classification** — the client exposes the thin awaitable-wrapping executor named in [client-sdk-shield-pattern.md](client-sdk-shield-pattern.md)  that awaits, applies the per-call wall-clock budget via `asyncio.wait_for`, catches typed SDK exceptions, classifies, and returns `OperationResult`. The executor does not retry. The Google Workspace and AWS executors are reclassified as pending-refactor pre-canonical implementations, not reference implementations. The contract for adapters is unchanged.
