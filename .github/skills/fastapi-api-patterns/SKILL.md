@@ -3,36 +3,39 @@ name: fastapi-api-patterns
 description: Apply typed FastAPI route patterns with clean dependency boundaries, stable error mapping, and test coverage for success/failure paths.
 ---
 
-Use when implementing or reviewing API endpoints.
+## Handler Implementation
 
-## Handler Pattern (ADR-0063)
+Routes parse input → call service → map OperationResult to HTTP.
 
-- Routes are thin adapters: parse input → invoke service → map response.
-- Inject via `Annotated[Protocol, Depends(...)]`. Never import concrete Category A classes.
-- Use `BaseModel` for request/response schemas at HTTP boundary only.
+```python
+@router.get("/{id}", response_model=MyResponse)
+async def get_item(
+    item_id: str,
+    service: Annotated[ItemService, Depends(get_item_service)]
+) -> MyResponse:
+    result = await service.fetch(item_id)
+    return map_result(result, MyResponse)
+```
 
-## Error Mapping (ADR-0060)
+Never import concrete implementations. Inject via `Annotated[Protocol, Depends(...)]` only.
 
-- RFC 9457 schema: `type`, `status`, `title`, `detail`, `error`, `errors`, `retry_after`, `request_id`.
-- Map every `OperationResult` status to HTTP explicitly. No catch-alls.
-- 5xx redacts internals (log separately). 4xx gives client-actionable context.
-- Never return raw `OperationResult` from handlers.
+## OperationResult → HTTP Mapping
 
-## OpenAPI (ADR-0063)
+| Status | HTTP | Body type |
+|--------|------|-----------|
+| SUCCESS | 200/201/202/204 | application/json (response_model) |
+| NOT_FOUND | 404 | RFC 9457 problem+json |
+| UNAUTHORIZED | 401/403 | RFC 9457 problem+json |
+| PERMANENT_ERROR | 400/409/422 | RFC 9457 problem+json |
+| TRANSIENT_ERROR | 503 + Retry-After | RFC 9457 problem+json |
 
-- One tag per router. `summary`, `description`, `response_model`, `status_code` on every handler.
-- Public fields include `Field(description=...)`.
+RFC 9457 body includes: `type`, `status`, `title`, `detail`, `error_code`, `request_id`, `retry_after` (transient only).
+
+Exhaustive mapping — no unmapped statuses.
 
 ## Forbidden
 
-- Business logic in route handlers.
-- Importing concrete Category A classes in routes.
-- Broad exception catches collapsing distinct errors.
-
-## Test Coverage (ADR-0062)
-
-1. Success path with schema assertions.
-2. Failure mapping (error status → HTTP status + RFC 9457 body).
-3. Dependency variation (auth/permission where relevant).
-
-Use `app.dependency_overrides`; always `finally` clear.
+- Business logic in handlers.
+- Concrete implementation imports.
+- Returning raw OperationResult from routes.
+- Validator-level HTTP status codes.

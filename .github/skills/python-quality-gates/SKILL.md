@@ -3,34 +3,29 @@ name: python-quality-gates
 description: Run and triage Python quality gates with minimal, root-cause fixes; use when validating feature work before completion.
 ---
 
-Use after each 3-5 meaningful edits and before task completion.
-
 ## Gate Sequence
 
-1. `mypy`
-2. `flake8`
-3. `black --check .`
-4. `pytest app/tests --ignore=app/tests/smoke`
-
-No smoke tests unless explicitly requested with env vars confirmed.
+Run after each feature section:
+1. `mypy` — type correctness
+2. `flake8` — style, unused imports
+3. `black --check` — formatting
+4. `pytest app/tests --ignore=app/tests/smoke` — behavior
 
 ## Triage
 
-- Group failures by root cause, not file count.
-- Fix the smallest change that resolves the root cause.
-- Do not refactor unrelated areas.
-- Re-run affected checks first, then full sequence before completion.
+Group failures by root cause. Fix the smallest change resolving the root cause. No unrelated refactoring.
 
-## Common Root Causes
+## Common Causes
 
-| Gate | Cause | ADR |
-|------|-------|-----|
-| mypy | Missing Protocol method / wrong return type | ADR-0065, ADR-0077 |
-| mypy | `BaseSettings` nested in `BaseSettings` | ADR-0055 |
-| pytest | `@lru_cache` state leak between tests | ADR-0062 |
-| pytest | Missing `dependency_overrides` cleanup | ADR-0062 |
+| Gate | Cause |
+|------|-------|
+| mypy | Missing Protocol method; wrong return type |
+| mypy | Nested BaseSettings in BaseSettings |
+| mypy | Pydantic BaseModel in domain module |
+| pytest | @lru_cache state leak between tests |
+| pytest | Unfrozen dataclass crossing boundary |
+| flake8 | Unused import; bare except |
 
 ## Stop Conditions
 
-- Pre-existing unrelated failures: report clearly, skip.
-- No convergence after reasonable retries: stop and request direction.
+Pre-existing failures: report, skip. No convergence: stop, request direction.

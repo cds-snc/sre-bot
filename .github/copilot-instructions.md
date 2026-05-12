@@ -1,101 +1,85 @@
-# Project AI Operating Contract
+# Copilot Agent Instructions
 
-**Governance:** ADRs in `docs/decisions/adr/` are the source of truth. If this document and an ADR conflict, the ADR wins.
+## Architecture Principles
 
-## Stack
+**Layered architecture with unidirectional dependencies:**
+- Application layer (features in `app/packages/`) → Infrastructure layer (Protocols, services) → Vendor clients (`app/clients/`) → External services
+- Reverse imports prohibited
+- No feature imports from other features
 
-Python 3.12+, FastAPI, API/backend only.
+**Type boundaries by purpose, not shape:**
+- Service contracts: `typing.Protocol`
+- Internal domain types: `@dataclass(frozen=True)`
+- HTTP I/O: `pydantic.BaseModel`
+- Configuration: `pydantic_settings.BaseSettings`
+- Adapter internals: `typing.TypedDict`
+- Status enums: `enum.Enum`
 
-## Architecture (ADR-0045, ADR-0048)
+**Integration boundaries use OperationResult:**
+- Five-status closed enum: SUCCESS, NOT_FOUND, TRANSIENT_ERROR, PERMANENT_ERROR, UNAUTHORIZED
+- Appears: adapter Protocol methods → feature services → handlers
+- Not: inside domain logic, routes, feature contracts
 
-- Unidirectional flow: Application → Service → Infrastructure. No reverse imports.
-- Business logic in `app/packages/<domain>`. Shared platform capabilities in `app/infrastructure`.
-- `app/modules` is legacy — no new code, not an architectural reference.
-- Prefer managed cloud service > library > custom code (ADR-0045 P7).
+## Feature Package Structure
 
-## Type Boundaries (ADR-0065)
+Required:
+- `__init__.py` (public surface, hookimpls)
+- `service.py` (business logic)
 
-| Boundary | Type |
-|----------|------|
-| Service contracts | `typing.Protocol` |
-| Internal domain data | `@dataclass(frozen=True)` |
-| HTTP/webhook I/O | `pydantic.BaseModel` |
-| Env configuration | `pydantic_settings.BaseSettings` |
-| Dict-shaped adapters | `typing.TypedDict` |
+Optional by concern:
+- `models.py` (Pydantic request/response)
+- `domain.py` (frozen dataclasses, enums)
+- `routes.py` (FastAPI handlers)
+- `adapters/` (feature-owned outbound adapters)
+- `providers.py` (per-feature DI/composition)
+- `settings.py` (feature BaseSettings)
+- `slack/`, `teams/` (transport handlers by platform)
 
-Do not use Pydantic internally. Keep transport and domain models separate.
+One feature = one Pluggy plugin; plugins registered via entry-points in pyproject.toml.
 
-## Dependencies (ADR-0048, ADR-0056, ADR-0077)
+## HTTP API Pattern
 
-- Consume infrastructure via `Annotated[Protocol, Depends(...)]` from `infrastructure.services.dependencies`.
-- Constructor-only injection. No import-time side effects.
-- Service classification (ADR-0077): A = Protocol-required, B = shared utility (concrete OK), C = implementation detail (never exposed to features).
-- Composition in `providers.py` only. Intra-layer value-type imports OK (ADR-0076).
+- Routes: thin adapters (parse → service → map response)
+- Inject via `Annotated[Protocol, Depends(...)]`
+- Map `OperationResult` to RFC 9457 Problem Details + HTTP status:
+  - SUCCESS → 200/201/202/204 (application/json)
+  - NOT_FOUND → 404
+  - UNAUTHORIZED → 401/403
+  - PERMANENT_ERROR → 400/409/422
+  - TRANSIENT_ERROR → 503 + Retry-After header/extension
+- Error bodies include: type, status, title, detail, error_code, request_id, retry_after
 
-## Settings (ADR-0047, ADR-0055, ADR-0056)
+## Testing
 
-- One `BaseSettings` + `@lru_cache` provider per domain. No key duplication.
-- Three-way ownership: `infrastructure/configuration/infrastructure/`, `infrastructure/configuration/integrations/`, `packages/<feature>/settings.py`.
-- Narrow-slice injection — never pass full Settings tree.
-- Never nest `BaseSettings` in `BaseSettings` — use `BaseModel` for sections.
+Three layers:
+- **Unit** (<50ms): isolated units with Protocol fakes
+- **Integration** (<500ms): feature + infrastructure Protocols with real internal composition; stub external deps
+- **Smoke**: live system validation
 
-## Startup (ADR-0046, ADR-0049)
+Layout: `tests/unit/`, `tests/integration/`, `tests/smoke/` mirror `app/` structure.
 
-- 6-phase startup: Config → Infra → Discovery → Features → Transport → Background. Reverse shutdown.
-- Fail-fast — phase failure terminates startup. Immutable registries after startup.
-- Pluggy-based: `auto_discover_plugins`, hookspecs before plugins, `check_pending()`, keyword-only invocation.
-- Package `__init__.py`: only `@hookimpl` functions. Zero-touch extension.
+Use `app.dependency_overrides` for Protocol substitution; clear in finally block.
 
-## API (ADR-0060, ADR-0063)
+## Startup & Plugin Lifecycle
 
-- Routes are thin adapters: parse → invoke service → map response. No business logic.
-- RFC 9457 error schema. Exhaustive OperationResult-to-HTTP mapping. 5xx redacts internals.
-- Middleware order: CORS → Rate Limiting → Request Context → Error Handling → Auth (dependency).
-- OpenAPI: one tag per router; summary, description, response_model, status_code on every handler.
+Phases (fail-fast):
+1. Configuration (env vars)
+2. Infrastructure (composed services)
+3. Discovery/Registration (entry-points plugin load)
+4. Feature Activation (hookimpls)
+5. Transport (route/handler binding)
+6. Background (task registration)
 
-## OperationResult (ADR-0050)
+- Pluggy `PluginManager` singleton via `@lru_cache`
+- No import-time side effects
+- Hookspecs centralized; plugins own hookimpls
+- `startup_warmup` hook allows warmup; failures propagate
 
-External API calls return `OperationResult`; internal logic uses exceptions. Status: `SUCCESS`, `TRANSIENT_ERROR` (requires `retry_after`), `PERMANENT_ERROR`, `UNAUTHORIZED`, `NOT_FOUND`.
+## Static Analysis & Quality
 
-## Platform & Features (ADR-0059, ADR-0078)
-
-- Feature interactions in `packages/<feature>/interactions/`. Multi-platform via hookspecs.
-- Per-platform concrete services (no unified Protocol). Infrastructure-owned, settings-driven.
-
-## Background Jobs (ADR-0058)
-
-Colocated in-process. Pluggy `register_background_job` hookspec. Production-only (`PREFIX == ""`). Tier 1 (idempotent) vs Tier 2 (DynamoDB lock). `safe_run()` error isolation.
-
-## Security (ADR-0064) & Identity (ADR-0061)
-
-- JWT via `get_current_user` dependency. Defense-in-depth: WAF/ALB + SlowAPI. 429 with `Retry-After`.
-- Identity resolution: JWT > Platform > Webhook > System. IdentityService is Category A.
-
-## Logging (ADR-0054)
-
-Structured `structlog.contextvars` middleware. No credentials/PII in logs. Unbuffered stdout/stderr.
-
-## Testing (ADR-0062)
-
-- `app/tests/` with `unit/` and `integration/`. Names: `test_<feature>_<entity>_<what>.py`.
-- `app.dependency_overrides` with `finally` clear. Protocol-conformant stubs. Narrow-slice fixtures.
-- Clear `@lru_cache` between tests. Cover success, failure mapping, and dependency variation paths.
-
-## Working Modes
-
-**Architecture** — when requirements are unclear or introducing patterns. Architect first, cite ADRs, define acceptance criteria before coding.
-
-**Implementation** — when architecture is clear. TDD: failing tests → implement → green. Run quality gates every 3-5 edits.
-
-## Quality Gates
-
-Run regularly and before completion: `mypy`, `flake8`, `black --check .`, `pytest app/tests --ignore=app/tests/smoke`. Fix root causes before proceeding. No smoke tests unless explicitly requested.
-
-## Generation Rules
-
-Explicit imports, typed interfaces, structured logging, async I/O, centralized settings, ADR-0060 error mapping.
-
-## Guardrails
-
-- No git commands unless explicitly requested. User controls git.
-- No file modifications unless explicitly asked, or the file is in `docs/decisions/`.
+- No Pydantic in domain modules (only at trust boundaries)
+- No vendor types above infrastructure layer
+- Feature packages don't import each other
+- `OperationResult` only at integration boundaries
+- No nested `BaseSettings`
+- Feature imports follow entry-points declaration

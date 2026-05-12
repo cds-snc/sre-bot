@@ -1,0 +1,24 @@
+{
+    "servers": {
+        "github/github-mcp-server": {
+            "type": "http",
+            "url": "https://api.githubcopilot.com/mcp/",
+            "gallery": "https://api.mcp.github.com/v0/servers/ab12cd34-5678-90ef-1234-567890abcdef",
+            "version": "0.13.0"
+        },
+        "io.github.github/github-mcp-server": {
+            "type": "http",
+            "url": "https://api.githubcopilot.com/mcp/",
+            "gallery": "https://api.mcp.github.com",
+            "version": "0.33.0"
+        }
+    },
+    "inputs": [
+        {
+            "id": "github_token",
+            "type": "promptString",
+            "description": "GitHub Personal Access Token",
+            "password": true
+        }
+    ]
+}
