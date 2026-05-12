@@ -57,7 +57,7 @@ The codebase has two layers of *behavior*, sitting above a shared layer of *vend
 - **Infrastructure layer** — composed services that abstract a capability behind a Protocol (e.g. `StorageService`, `DirectoryProvider`). The Protocol is the stable, capability-focused interface; the concrete implementation is a vendor-specific secondary adapter.
 - **Vendor connectivity primitives ("clients")** — pre-authenticated, vendor-specific SDK wrappers (e.g. `AWSClients`, `GoogleWorkspaceClients`). Clients are not abstractions; they *are* the concrete vendor layer. They serve composed-service concrete implementations and feature-owned concrete adapters via constructor injection.
 
-Clients are a shared primitive: composed-service implementations and feature-owned adapters both depend on them. They do not belong inside feature packages, and they sit logically below the layer of behavior. Their physical module placement (top-level `app/clients/` vs nested under `app/infrastructure/`) is governed separately in [client-module-placement.md](client-module-placement.md).
+Clients are a shared primitive: composed-service implementations and feature-owned adapters both depend on them. They do not belong inside feature packages, and they sit logically below the layer of behavior. Their physical module placement (top-level `app/integrations/` vs nested under `app/infrastructure/`) is governed separately in [client-module-placement.md](client-module-placement.md).
 
 ### Unidirectional dependency flow
 
@@ -142,3 +142,4 @@ Compliance with this principle is verified by the rules and tooling defined in [
 
 - 2026-05-08: Created. Three-layer model (Application, Infrastructure, vendor clients), unidirectional dependency flow, and two integration paths grounded in Clean Architecture, Hexagonal Architecture, and Separated Interface. Concerns outside the layer principle are deferred: feature internals to feature-package-structure.md, DI mechanics to dependency-injection.md, Category A/B/C taxonomy to infrastructure-service-classification.md, import rules to import-governance.md, client/adapter responsibility split to client-adapter-responsibilities.md, and physical client placement to client-module-placement.md.
 - 2026-05-08: Reframed the two integration paths by *purpose* rather than by reach: Path A is the cloud-portability mechanism for capabilities every deployment must provide; Path B is for features whose domain is to act on a specific third-party API. A single feature commonly uses both. The "promotion on second consumer" rule is replaced by a purpose-change rule.
+- 2026-05-12: Updated all `app/integrations/` path references that were incorrectly written as `app/clients/`.

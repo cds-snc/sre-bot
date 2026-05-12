@@ -26,7 +26,7 @@ The problem this record addresses: **what is the canonical internal layout of a 
 
 **Constraints:**
 
-- The corpus has accepted three position layers (`app/clients/`, `app/infrastructure/`, `app/packages/`) with strict downward dependency flow. Feature packages live in the topmost layer and consume infrastructure through Protocols, never via concrete vendor types.
+- The corpus has accepted three position layers (`app/integrations/`, `app/infrastructure/`, `app/packages/`) with strict downward dependency flow. Feature packages live in the topmost layer and consume infrastructure through Protocols, never via concrete vendor types.
 - Feature packages are independent: no feature imports from another feature; cross-feature coordination goes through shared infrastructure or domain events.
 - Per-feature configuration is owned by the feature (its own `BaseSettings` subclass); cross-feature configuration is not introduced.
 - Feature settings and feature-local composition obey the no-module-level-boot-work rule: provider functions and `BaseSettings()` constructors are invoked from inside functions called by the lifespan or by request handlers.
@@ -39,7 +39,7 @@ The problem this record addresses: **what is the canonical internal layout of a 
 - This record does not define HTTP API conventions, error mapping, or validation rules. It specifies that a feature's HTTP routes live at a known location; the API conventions are separate.
 - This record does not define test layout, fixtures, or coverage standards.
 - This record does not define the background-execution placement (long-running tasks, scheduled jobs).
-- This record does not redefine the `app/packages/<feature>/adapters/` rule — that the adapter is the only feature-side file permitted to import from `app/clients/` is already established by the import contract. This record specifies the directory's location and naming.
+- This record does not redefine the `app/packages/<feature>/adapters/` rule — that the adapter is the only feature-side file permitted to import from `app/integrations/` is already established by the import contract. This record specifies the directory's location and naming.
 
 ## Considered Options
 
@@ -166,8 +166,8 @@ The internal categorization of any platform's subdirectory (e.g., the choice to 
 Some features integrate with an external system that no other feature uses. The adapter (Protocol + concrete implementation) for that integration lives inside the feature, not in `app/infrastructure/`:
 
 - **Location.** `app/packages/<feature>/adapters/<provider>.py` for simple features. `app/packages/<feature>/<subdomain>/adapters/<provider>.py` for subdomain-local adapters in complex features. (A complex feature may also place a feature-shared adapter under `common/adapters/<provider>.py` if multiple subdomains use the same external system.)
-- **Shape.** Each adapter file exposes a `typing.Protocol` describing the operation the feature needs and a concrete implementation that wraps a vendor client from `app/clients/`. The Protocol is the only thing the feature's `service.py` imports; the concrete implementation is wired via the feature's `providers.py`.
-- **Vendor-import rule.** The adapter file is the only feature-side file permitted to import from `app/clients/`. This is enforced by the import contract; the location rule in this record makes that contract trivially satisfiable.
+- **Shape.** Each adapter file exposes a `typing.Protocol` describing the operation the feature needs and a concrete implementation that wraps a vendor client from `app/integrations/`. The Protocol is the only thing the feature's `service.py` imports; the concrete implementation is wired via the feature's `providers.py`.
+- **Vendor-import rule.** The adapter file is the only feature-side file permitted to import from `app/integrations/`. This is enforced by the import contract; the location rule in this record makes that contract trivially satisfiable.
 - **Promotion to infrastructure.** When a second feature needs the same external system, the Protocol and implementation are promoted to `app/infrastructure/<service>/` and become a shared infrastructure service. The first feature switches its service to consume the infrastructure Protocol; the feature-local adapter file is deleted. The trigger is the second consumer, not a count, a pattern, or a guess at future need.
 
 ### Feature-local settings
@@ -182,7 +182,7 @@ A feature with internal composition (lru-cached singletons, internal wiring of s
 
 - The provider function returns a Protocol type, never a concrete class. (The concrete class is an implementation detail behind the provider.)
 - The provider function calls into infrastructure providers (`from app.infrastructure.<service> import get_<service>`) when the feature's service depends on infrastructure. It does not import infrastructure concrete-implementation files directly.
-- The provider function may call into the feature's own `adapters/<provider>.py` to instantiate a feature-owned adapter, passing in vendor clients obtained from `app/clients/` provider functions.
+- The provider function may call into the feature's own `adapters/<provider>.py` to instantiate a feature-owned adapter, passing in vendor clients obtained from `app/integrations/` provider functions.
 - No top-level call to a provider function exists in `providers.py` itself; provider functions execute when the lifespan or a request handler invokes them.
 
 A feature with no internal composition (its service holds no dependencies that need wiring beyond an injected infrastructure Protocol) has no `providers.py`. Direct `Annotated[Protocol, Depends(get_<service>)]` injection on the route handler is sufficient and idiomatic.
@@ -207,7 +207,7 @@ This table is a flattening of the `type-boundaries` decision into the layout: ea
 - A new contributor can navigate any feature by reading one layout and one set of name conventions; the cost of context-switching between features is bounded.
 - A feature that grows from simple to complex has a documented migration path: introduce `common/`, move shared types and events into it, add subdomain directories, and lift hookimpls to the umbrella. The change is mechanical and produces a single reviewable PR.
 - The umbrella-only registration rule keeps Pluggy registration uniform — the framework discovers hookimpls at one location per feature, regardless of how many subdomains the feature contains.
-- Feature-owned outbound adapters have a fixed location, which makes the import contract trivially enforceable: the only feature-side file allowed to import from `app/clients/` is `adapters/<provider>.py`.
+- Feature-owned outbound adapters have a fixed location, which makes the import contract trivially enforceable: the only feature-side file allowed to import from `app/integrations/` is `adapters/<provider>.py`.
 - The simple/complex distinction stops the "what if we add another piece later" anxiety that would otherwise push every feature toward over-structured layouts. A simple feature is allowed to be simple.
 
 **Tradeoffs accepted:**
@@ -267,3 +267,4 @@ Compliance is verified by:
 
 - 2026-05-08: Created. Establishes two canonical feature-package layouts: simple (flat) and complex (multi-subdomain with `common/` shared kernel). Names submodule files (`__init__.py`, `service.py`, `models.py`, `domain.py`, `routes.py`, `interactions/`, `adapters/`, `providers.py`, `settings.py`) and pins their meanings; alternative names (`controllers.py`, `handlers.py`, `repository.py`) are not used. Establishes umbrella-only hookimpl registration for complex features, with subdomain `__init__.py` files as empty package markers. Establishes that cross-subdomain communication in a complex feature uses one of three channels (domain events from `common/events.py`, shared types from `common/`, shared infrastructure services). Pins the location of feature-owned outbound adapters at `adapters/<provider>.py` (or `<subdomain>/adapters/<provider>.py` for complex features), making the existing vendor-import contract trivially enforceable. Removes `plugin-registration-discovery.md` from `constrained_by` (the relationship is reversed: plugin registration consumes the layout this record defines).
 - 2026-05-08: Replaced the `interactions/<transport>.py` umbrella with **per-platform directories**. Each platform a feature handles gets its own subdirectory (`slack/`, `teams/`, `<platform>/`) whose internal files mirror that platform's native method categories (Slack: `commands.py` / `events.py` / `actions.py` / `shortcuts.py` / `views.py`; Teams: `messages.py` / `card_actions.py` / `invokes.py`). HTTP retains its single `routes.py` short form. Reason: the corpus rejected the unified-platform abstraction the `interactions/<transport>.py` rule implied — platforms are heterogeneous and a single file per platform is too coarse once each platform has multiple native categories. The categorization inside any platform's subdirectory is owned by that platform's own ADR (`transport-slack.md`, `transport-teams.md`); this record names only the directory's location and that its contents follow the platform's native model. Added `plugin-registration-discovery.md` and `multi-transport-architecture.md` to `constrained_by` to reflect the now-accepted records this layout depends on. Subdomain layouts in complex features follow the same per-platform-directory rule.
+- 2026-05-12: Updated all `app/integrations/` path references that were incorrectly written as `app/clients/`.
