@@ -5,12 +5,12 @@ variable "billing_code" {
 
 variable "fargate_cpu" {
   type    = number
-  default = 512
+  default = 1024
 }
 
 variable "fargate_memory" {
   type    = number
-  default = 1024
+  default = 2048
 }
 
 variable "gcp_sre_service_account_key" {
