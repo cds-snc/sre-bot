@@ -24,12 +24,12 @@ The problem this record addresses: **what is the canonical taxonomy for classify
 1. Whether a contributor adding a new integration can decide its placement (`app/infrastructure/<service>/` vs `app/packages/<feature>/adapters/<provider>.py`) by reading one rule, or must consult prior art ad hoc.
 2. Whether the Protocol exposed for the integration is shaped by the application's *capability* needs (vendor-portable) or by the *external system's* native operations (vendor-bound).
 3. When (and how) a feature-local adapter should be promoted to a shared infrastructure service so that a second consumer doesn't have to copy.
-4. How the classification interacts with the existing rules for vendor SDK access (`app/clients/<vendor>/`), settings ownership (configuration-ownership.md), and import contracts (import-governance.md).
+4. How the classification interacts with the existing rules for vendor SDK access (`app/integrations/<vendor>/`), settings ownership (configuration-ownership.md), and import contracts (import-governance.md).
 
 **Constraints:**
 
-- The application has three top-level position layers (`app/clients/`, `app/infrastructure/`, `app/packages/`) per `layered-architecture.md`. This record classifies infrastructure-side integrations; it does not redefine the layer model.
-- Vendor-client purity is enforced by `client-module-placement.md`: `app/clients/<vendor>/` contains only authenticated raw SDK access, never an application service. The classification this record establishes operates at the *service* level (the composed Protocol surface that consumers see), not at the raw-client level.
+- The application has three top-level position layers (`app/integrations/`, `app/infrastructure/`, `app/packages/`) per `layered-architecture.md`. This record classifies infrastructure-side integrations; it does not redefine the layer model.
+- Vendor-client purity is enforced by `client-module-placement.md`: `app/integrations/<vendor>/` contains only authenticated raw SDK access, never an application service. The classification this record establishes operates at the *service* level (the composed Protocol surface that consumers see), not at the raw-client level.
 - Vendor credentials live in the infrastructure layer per `configuration-ownership.md`; the classification does not change that rule.
 - Feature-package layout (`feature-package-structure.md`) already names `app/packages/<feature>/adapters/<provider>.py` as the home for feature-local outbound adapters; this record formalizes when that location is the correct one.
 - Import contracts (`import-governance.md`) already enforce vendor-import boundaries; this record provides the criteria those contracts presuppose.
@@ -49,7 +49,7 @@ The problem this record addresses: **what is the canonical taxonomy for classify
 
 **Option 3 — Two-axis classification: Path × Sharing scope.** Two orthogonal axes, both binary in steady state. Path is about *purpose* (cloud-portable capability vs platform-bound integration). Sharing scope is about *consumer breadth* (multiple-feature consumers vs single-feature consumer). The combination determines physical placement, Protocol shape, and promotion rules.
 
-**Option 4 — Three-category taxonomy (A/B/C).** A category for Protocol-required shared services, a category for concrete shared utilities (raw clients), a category for feature-local. Encodes more than the two-axis matrix but adds vocabulary that overlaps with `app/clients/` (already covered by `client-module-placement.md`).
+**Option 4 — Three-category taxonomy (A/B/C).** A category for Protocol-required shared services, a category for concrete shared utilities (raw clients), a category for feature-local. Encodes more than the two-axis matrix but adds vocabulary that overlaps with `app/integrations/` (already covered by `client-module-placement.md`).
 
 ## Decision Outcome
 
@@ -96,7 +96,7 @@ A few observations about the matrix:
 
 - **Path A + Feature-local is uncommon but valid.** Most Path A integrations are introduced because the cloud-portable capability is needed by many features at once; the steady state is Path A + Shared. A single-feature Path A integration is acceptable when the Protocol is genuinely capability-shaped (e.g., a feature-only `RateLimiterStore` that is intentionally a portable abstraction even though only one feature consumes it today). It does not need to be promoted; promotion's trigger is a second consumer, not a guess at portability.
 - **Path B + Shared and Path B + Feature-local differ in placement only.** The Protocol shape is platform-bound in both — the difference is whether one feature owns it (`app/packages/<feature>/adapters/<vendor>.py`) or whether it is shared infrastructure (`app/infrastructure/<platform>/`). Slack and Teams are Path B + Shared because every chat-using feature consumes them.
-- **The four combinations cover service-shaped infrastructure**, not raw vendor SDK access (`app/clients/<vendor>/`), not cross-cutting framework concerns (logging stack, lifespan, plugin manager, configuration providers).
+- **The four combinations cover service-shaped infrastructure**, not raw vendor SDK access (`app/integrations/<vendor>/`), not cross-cutting framework concerns (logging stack, lifespan, plugin manager, configuration providers).
 
 ### Protocol design implications
 
@@ -129,7 +129,7 @@ Reclassification is not a routine operation. It is a redesign documented through
 
 ### What this classification does not cover
 
-- **Raw vendor SDK access** at `app/clients/<vendor>/`. Authenticated client construction with scalar credential injection is governed by `client-module-placement.md` and `configuration-ownership.md`; the classification in this record sits one layer above (services consume clients to build the Protocol surface).
+- **Raw vendor SDK access** at `app/integrations/<vendor>/`. Authenticated client construction with scalar credential injection is governed by `client-module-placement.md` and `configuration-ownership.md`; the classification in this record sits one layer above (services consume clients to build the Protocol surface).
 - **Cross-cutting framework concerns** — the logging stack, the lifespan, the plugin manager, the redaction pipeline, the configuration providers, the request-correlation middleware. Those are owned by their respective records and are not "outbound integrations."
 - **Feature settings and feature business logic.** Both live inside the feature; this record does not change their boundaries.
 
@@ -160,7 +160,7 @@ Reclassification is not a routine operation. It is a redesign documented through
 Compliance is verified by:
 
 - **Code review.** A PR introducing a new integration explicitly states the classification (Path A or B; shared or feature-local) and points to the matching matrix row. Reviewers verify the Protocol shape matches the path (capability-shaped for Path A; platform-shaped for Path B). PRs that add a second consumer of a feature-local adapter are paired with the promotion to `app/infrastructure/<service>/`.
-- **Repository structure.** Path A and Path B + Shared services live under `app/infrastructure/<service>/` with the per-service vertical-slice pattern. Feature-local adapters live at `app/packages/<feature>/adapters/<provider>.py`. The vendor-import contract (already enforced via `import-linter`) catches feature code reaching into `app/clients/` outside the adapter path.
+- **Repository structure.** Path A and Path B + Shared services live under `app/infrastructure/<service>/` with the per-service vertical-slice pattern. Feature-local adapters live at `app/packages/<feature>/adapters/<provider>.py`. The vendor-import contract (already enforced via `import-linter`) catches feature code reaching into `app/integrations/` outside the adapter path.
 - **Naming.** Path A Protocol names use capability terms; Path B Protocol names use platform names. PRs that name a Path A Protocol after a vendor (e.g., `S3StorageService` instead of `StorageService`) are revised; PRs that name a Path B Protocol generically (e.g., `ChatService` instead of `SlackService`) are revised.
 - **Tests.** Path A integrations have at least one Protocol-level test that exercises the capability through the Protocol, with the concrete adapter substitutable. Path B integrations have tests that exercise the platform-shaped operations.
 
@@ -198,4 +198,5 @@ Compliance is verified by:
 
 ## Change Log
 
-- 2026-05-08: Created. Establishes a two-axis classification for outbound integrations: Path (Path A — cloud-portable capability with capability-shaped Protocol; Path B — platform-bound integration with platform-shaped Protocol) × Sharing scope (Shared infrastructure consumed by multiple features; Feature-local adapter consumed by exactly one feature). Pins the four-cell placement matrix: Path A + Shared and Path B + Shared at `app/infrastructure/<service>/`; Path A + Feature-local and Path B + Feature-local at `app/packages/<feature>/adapters/<provider>.py`. The classification is decided by **purpose** (Path) and **consumer count** (Sharing scope), not by guesses or counts of vendors. Promotion from feature-local to shared is triggered by the **second consumer**, and is one-way (no demotion). Reclassification along the Path axis is rare and governance-grade. The classification does not cover raw vendor SDK access (`app/clients/<vendor>/`, governed by `client-module-placement.md`) or cross-cutting framework concerns (lifespan, plugin manager, logging stack, etc.). Formalizes the "Path A / Path B" vocabulary that several already-accepted records have been using informally; no rename of those records is required.
+- 2026-05-08: Created. Establishes a two-axis classification for outbound integrations: Path (Path A — cloud-portable capability with capability-shaped Protocol; Path B — platform-bound integration with platform-shaped Protocol) × Sharing scope (Shared infrastructure consumed by multiple features; Feature-local adapter consumed by exactly one feature). Pins the four-cell placement matrix: Path A + Shared and Path B + Shared at `app/infrastructure/<service>/`; Path A + Feature-local and Path B + Feature-local at `app/packages/<feature>/adapters/<provider>.py`. The classification is decided by **purpose** (Path) and **consumer count** (Sharing scope), not by guesses or counts of vendors. Promotion from feature-local to shared is triggered by the **second consumer**, and is one-way (no demotion). Reclassification along the Path axis is rare and governance-grade. The classification does not cover raw vendor SDK access (`app/integrations/<vendor>/`, governed by `client-module-placement.md`) or cross-cutting framework concerns (lifespan, plugin manager, logging stack, etc.). Formalizes the "Path A / Path B" vocabulary that several already-accepted records have been using informally; no rename of those records is required.
+- 2026-05-12: Updated all `app/integrations/` path references that were incorrectly written as `app/clients/`.

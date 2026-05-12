@@ -166,7 +166,7 @@ The application lifespan (per `application-lifecycle.md`) is itself testable. A 
 
 ### Coverage
 
-Coverage is measured via `pytest-cov` over a path list, not over `app/` as a whole, so accidental coverage of generated or vendor-fenced code does not skew the number. The path list mirrors the project's source positions: `app/clients`, `app/infrastructure`, `app/packages`, `app/server`. A `[tool.coverage.run]` section in `pyproject.toml` declares the source paths and the omit patterns (e.g., `__init__.py` re-export shims, generated code).
+Coverage is measured via `pytest-cov` over a path list, not over `app/` as a whole, so accidental coverage of generated or vendor-fenced code does not skew the number. The path list mirrors the project's source positions: `app/integrations`, `app/infrastructure`, `app/packages`, `app/server`. A `[tool.coverage.run]` section in `pyproject.toml` declares the source paths and the omit patterns (e.g., `__init__.py` re-export shims, generated code).
 
 Coverage targets:
 
@@ -270,3 +270,4 @@ Compliance is verified by:
 ## Change Log
 
 - 2026-05-08: Created. Establishes a three-layer test pyramid (unit, integration, smoke) with explicit cost budgets (< 50 ms / < 500 ms / unbounded-but-opt-in) and per-layer substitution rules. Pins `pytest` as the test runner with `pytest-asyncio`'s `asyncio_mode = "auto"` for async-by-default tests. Pins the directory layout: `tests/{unit,integration,smoke}/` mirroring `app/<path>/`, with shared factories in `tests/factories/` and hierarchical `conftest.py`. Pins the test-doubles preference (Protocol-conformant fake → pre-built stub → `MagicMock`), the rule that mocks substitute *collaborators* not the system under test, and the rule that the SDK is mocked at the adapter seam, never directly by feature tests. Pins integration testing on `httpx.AsyncClient` against FastAPI via `ASGITransport`. Pins coverage at a path-specific 80% steady-state target with new code at ~90%; branch coverage reported but not gated initially. Pins CI gates (unit + integration as a required check; smoke separate; soft-fail rejected). Pins per-test SLAs and the rule that flaky tests are bug reports, not retried-until-green. Pins migration discipline for legacy tests: opportunistic-when-touched plus a planned cleanup pass; new tests are not added to legacy directories.
+- 2026-05-12: Updated all `app/integrations/` path references that were incorrectly written as `app/clients/`.

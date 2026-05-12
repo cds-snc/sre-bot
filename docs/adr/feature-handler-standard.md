@@ -133,7 +133,7 @@ A note on the registration-time/runtime distinction: a feature's `__init__.py` d
 
 - Every handler in every feature on every platform reads the same way: receive, translate, call the service, render. New contributors learn one shape; reviewers spot deviations immediately.
 - Business logic stays where it can be tested in isolation. The service layer is testable without platform machinery; the handler is testable with thin shims for platform shapes.
-- The vendor-import contract is trivially satisfied because handlers do not import from `app/clients/`. The static contract catches violations automatically.
+- The vendor-import contract is trivially satisfied because handlers do not import from `app/integrations/`. The static contract catches violations automatically.
 - Errors flow through one channel: the service returns `OperationResult`, the handler renders. There are no scattered try/except blocks producing ad-hoc error responses.
 - Platform-specific timing constraints (Slack `ack`, HTTP timeouts, Teams invoke shapes) are honoured through the per-platform rendering helper, not by handler-internal heuristics.
 
@@ -154,7 +154,7 @@ A note on the registration-time/runtime distinction: a feature's `__init__.py` d
 Compliance is verified by:
 
 - **Code review.** A PR introducing a new handler is reviewed against the five-step shape and the "what does not belong inside a handler" list. PRs that include business logic, vendor-SDK construction, or direct vendor-API calls inside a handler are rejected.
-- **Static analysis.** The import contract enforces that feature code (and therefore handlers) does not import from `app/clients/`; the contract catches the most-damaging violations automatically.
+- **Static analysis.** The import contract enforces that feature code (and therefore handlers) does not import from `app/integrations/`; the contract catches the most-damaging violations automatically.
 - **Tests.** Handlers are tested by exercising their input-translation and result-rendering steps with the service layer substituted; service-layer tests cover business logic without involving handler machinery. The testing-standards record will pin the layering pattern.
 - **Handler size.** A handler whose body exceeds ~30 lines (excluding decorators, type hints, and docstrings) is flagged at review for a "what business logic snuck in?" check. The rule is a smell threshold, not a hard limit.
 
@@ -190,3 +190,4 @@ Compliance is verified by:
 - 2026-05-08: Created as placeholder under the title "Platform Interaction Handlers."
 - 2026-05-08: Renamed to `feature-handler-standard.md`. The previous filename's "Platform" prefix carried the unified-platform abstraction the corpus has rejected; "feature-handler-standard" centers the function being written and applies regardless of which platform invoked it.
 - 2026-05-08: Finalized. Establishes a single per-handler discipline that applies to every feature handler on every platform: a five-step shape (receive inputs and DI, translate to service arguments, call the service, receive `OperationResult`, render via the per-platform helper); a closed list of what does not belong inside a handler (business logic, vendor-SDK construction, direct vendor-API calls, state mutation, business-outcome try/except, cross-feature imports); async-by-default with sync as the deliberate exception; entry-time context binding for log enrichment; deferral of platform-specific runtime constraints (Slack `ack`, HTTP deferral, Teams invoke shape) to per-platform records and helpers. Pins the handler-size smell threshold at roughly 20–30 lines of body. Distinguishes the runtime handler (this record's subject) from the registration-time hookimpl (governed by the plugin-registration-discovery and feature-package-structure rules).
+- 2026-05-12: Updated all `app/integrations/` path references that were incorrectly written as `app/clients/`.

@@ -21,7 +21,7 @@ This record fills in the per-platform slots that the multi-transport pattern lea
 
 1. **SDK selection.** Which Python SDK does the application use to talk to Slack?
 2. **Delivery mode default.** HTTP Events API or Socket Mode? When does each apply?
-3. **Module placement.** Where does the raw vendor SDK access live, and where does the composed `SlackService` live, given the corpus's `app/clients/<vendor>/` and `app/infrastructure/<service>/` rules?
+3. **Module placement.** Where does the raw vendor SDK access live, and where does the composed `SlackService` live, given the corpus's `app/integrations/<vendor>/` and `app/infrastructure/<service>/` rules?
 4. **Hookspec catalogue.** What categories of Slack interactions can features register handlers for, and what does each hookspec receive?
 5. **Inbound dispatch and verification.** Where does signing-secret verification fire (HTTP mode only) and where does the inbound adapter dispatch into pluggy hookspecs?
 6. **`SlackService` Protocol surface.** What outbound operations does the infrastructure service expose for features and other infrastructure to consume?
@@ -35,7 +35,7 @@ This record fills in the per-platform slots that the multi-transport pattern lea
 - The application's FastAPI surface already exposes public endpoints when its features are enabled (HTTP API routes, webhook receivers for other integrations, etc.). The choice between Slack's two delivery modes is therefore *not* about whether the application has any public surface; it is about whether the **Slack channel specifically** requires a deployment-known public URL that Slack must be configured against. Socket Mode initiates the connection outbound from the application using an app-level token, so Slack does not need to know any deployment URL; HTTP Events mode requires Slack to be configured with a public URL per deployment and adds per-event signing-secret verification at that endpoint.
 - Feature code (under `app/packages/<feature>/`) does not import vendor SDK types per the import-governance rules. The Slack platform's runtime types (Bolt App, Web API client, Bolt request objects) are exposed through the `app/infrastructure/slack/` module's Protocol surface — feature code imports from there.
 - Vendor credentials live in `BaseSettings` in the infrastructure layer per the configuration-ownership rules; vendor clients receive scalar credentials via constructor, never the `BaseSettings` instance.
-- Top-level `app/clients/slack/` is the home for raw, authenticated vendor SDK access (per the client-module-placement decision). The composed service lives in `app/infrastructure/slack/`. The legacy nested layout (`app/infrastructure/clients/slack/`) is not used; it predates the corpus's current rules.
+- Top-level `app/integrations/slack/` is the home for raw, authenticated vendor SDK access (per the client-module-placement decision). The composed service lives in `app/infrastructure/slack/`. The legacy nested layout (`app/infrastructure/clients/slack/`) is not used; it predates the corpus's current rules.
 - The application uses Pluggy for plugin discovery and dispatch. Each platform exposes its own platform-shaped hookspec catalogue per the multi-transport pattern; this record names Slack's catalogue.
 - HTTP Events mode requires verification of every inbound POST against the signing secret per Slack's documented HMAC-SHA256 scheme with a 5-minute replay-protection window. Socket Mode does not require per-event verification — the WebSocket is pre-authenticated.
 
@@ -67,10 +67,12 @@ Slack Bolt for Python is Slack's first-party Python framework for building Slack
 
 | Concern | Path | Contents |
 | --- | --- | --- |
-| Raw vendor SDK access | `app/clients/slack/` | Authenticated factories that construct Slack SDK objects (`AsyncApp` from `slack_bolt`, `AsyncWebClient` from `slack_sdk`, `AsyncSocketModeHandler` from `slack_bolt.adapter.socket_mode.async_handler`); a small signing-secret verification utility (HMAC-SHA256 per Slack's documented scheme); no settings, no business logic, no application-state. |
-| Composed infrastructure service | `app/infrastructure/slack/` | The `SlackService` Protocol and concrete implementation; the inbound adapter (verification → correlation binding → pluggy dispatch); the connection lifecycle (Socket Mode start/stop or HTTP Events mount); the Slack-specific helpers — `parsing.py` (slash command argument parsing), `formatter.py` (`OperationResult` → Block Kit rendering), `help.py` (slash command help text), `routing.py` (handler-registration surface), `lifecycle.py` (start/stop sequence), `settings.py` (`SlackSettings`), `models.py` (Slack-shaped value types), `providers.py` (DI providers), `__init__.py` (public surface). |
+| Raw vendor SDK access | `app/integrations/slack/` | Authenticated factories that construct Slack SDK objects (`AsyncApp` from `slack_bolt`, `AsyncWebClient` from `slack_sdk`, `AsyncSocketModeHandler` from `slack_bolt.adapter.socket_mode.async_handler`); a small signing-secret verification utility (HMAC-SHA256 per Slack's documented scheme); no settings, no business logic, no application-state. |
+| Composed infrastructure service | `app/infrastructure/slack/` | The `SlackService` Protocol and concrete implementation; the inbound adapter (verification → correlation binding → pluggy dispatch); the connection lifecycle (Socket Mode start/stop or HTTP Events mount); the Slack-specific helpers — `parsing.py` (slash command argument parsing), `formatter.py` (`OperationResult` → Block Kit rendering), `help.py` (slash command help text), `lifecycle.py` (start/stop sequence), `settings.py` (`SlackSettings`), `models.py` (Slack-shaped value types), `providers.py` (DI providers), `__init__.py` (public surface; re-exports `SlackApp` type alias for `AsyncApp`). |
 
-The `app/infrastructure/slack/` package re-exports the Slack-specific Protocol surface (`SlackService`, `SlackHandlerRegistry`, `SlackInteractionContext` value types); feature code imports only from there. Feature code never imports from `app/clients/slack/` (forbidden by the import contract) or from `slack_bolt.*` / `slack_sdk.*` directly.
+The `app/infrastructure/slack/` package re-exports the Slack-specific Protocol surface (`SlackService`, `SlackApp` type alias, `SlackInteractionContext` value types); feature code imports only from there. Feature code never imports from `app/integrations/slack/` (forbidden by the import contract) or from `slack_bolt.*` / `slack_sdk.*` directly.
+
+`SlackApp` is a re-export alias for `slack_bolt.async_app.AsyncApp` declared in `app/infrastructure/slack/__init__.py`. Features receive it via the hookspec argument; they never import from `slack_bolt.*` in their own module imports. The import contract remains statically enforceable: only `app/integrations/slack/` and `app/infrastructure/slack/` may import from `slack_bolt.*`.
 
 ### Authentication and credentials
 
@@ -82,11 +84,62 @@ Three values authenticate the application against Slack. They are declared in `a
 | `app_token` | `xapp-…` | App-level token; **Socket Mode only**; used to open the WebSocket via the `apps.connections.open` Web API method. Distinct from the bot token. |
 | `signing_secret` | hex string | **HTTP Events mode only**; used to verify the HMAC-SHA256 signature on every inbound POST per Slack's verification scheme. |
 
-Per the configuration-ownership rule, the credentials live in this `BaseSettings` subclass; the `app/infrastructure/slack/providers.py` module reads them and calls factories in `app/clients/slack/` with **scalar** values. Vendor clients in `app/clients/slack/` receive primitives (the token string, the secret string) — never a `BaseSettings` instance.
+Per the configuration-ownership rule, the credentials live in this `BaseSettings` subclass; the `app/infrastructure/slack/providers.py` module reads them and calls factories in `app/integrations/slack/` with **scalar** values. Vendor clients in `app/integrations/slack/` receive primitives (the token string, the secret string) — never a `BaseSettings` instance.
 
 A fourth setting, `enabled` (boolean, default `false` for safety), gates the entire Slack platform. When `enabled=false`, the host applies `pm.set_blocked()` on every Slack-targeted feature plugin during the plugin-discovery phase per the plugin-registration-discovery rules, and the SlackService is not constructed.
 
 A fifth setting, `socket_mode` (boolean, default `true` for production), selects the delivery mode. `socket_mode=true` means the SlackService starts the Socket Mode handler in the transport phase; `socket_mode=false` means the SlackService mounts an HTTP Events endpoint into the application's FastAPI app instead.
+
+### Resilience wiring
+
+The Slack outbound boundary is resilient *by construction* — `slack_sdk`'s native retry handlers are attached to `AsyncWebClient` at the factory in `app/integrations/slack/`, against the parameters in [outbound-retry-policy.md](outbound-retry-policy.md) Shape A. No project-local retry loop wraps Slack calls; per [client-adapter-responsibilities.md](client-adapter-responsibilities.md) (2026-05-12 revision) and [outbound-retry-policy.md](outbound-retry-policy.md), hand-rolled retry above SDKs that ship native retry is forbidden.
+
+Three handlers are attached at construction:
+
+| Handler | Purpose |
+| --- | --- |
+| `AsyncConnectionErrorRetryHandler` | Retries on transport-level connection failures (DNS, TLS handshake, socket reset). Included in `AsyncWebClient`'s defaults; named explicitly here so the policy is reviewable. |
+| `AsyncRateLimitErrorRetryHandler` | Retries on `SlackApiError` with `response.data["error"] == "ratelimited"`, honoring the `Retry-After` header up to the standard 30-second cap. |
+| `AsyncServerErrorRetryHandler` | Retries on HTTP 5xx responses (500, 502, 503, 504) with jittered exponential backoff. Not in `AsyncWebClient`'s defaults; added explicitly to bring Slack into parity with the Shape A policy. |
+
+The factory in `app/integrations/slack/` constructs the client roughly as follows (illustrative — actual wiring is in code):
+
+```python
+from slack_sdk.web.async_client import AsyncWebClient
+from slack_sdk.http_retry.builtin_async_handlers import (
+    AsyncConnectionErrorRetryHandler,
+    AsyncRateLimitErrorRetryHandler,
+)
+from slack_sdk.http_retry.async_handler import AsyncRetryHandler  # base class
+from slack_sdk.http_retry.handler import RetryHandler  # for ServerError variant
+
+def build_slack_async_client(bot_token: str) -> AsyncWebClient:
+    return AsyncWebClient(
+        token=bot_token,
+        retry_handlers=[
+            AsyncConnectionErrorRetryHandler(max_retry_count=2),
+            AsyncRateLimitErrorRetryHandler(max_retry_count=2),
+            AsyncServerErrorRetryHandler(max_retry_count=2),
+        ],
+        timeout=10,  # per-attempt connect+read timeout
+    )
+```
+
+The composed `SlackService` (the `chat.postMessage`, `views.open`, etc. surface named below) consumes this pre-configured client through the shield's awaitable-wrapping executor ([client-sdk-shield-pattern.md](client-sdk-shield-pattern.md), Draft): each call goes through `slack.execute(slack.api.<method>(...))`, which awaits, applies a per-call wall-clock budget via `asyncio.wait_for`, catches `SlackApiError`, classifies the `response.data["error"]` code into the closed five-status `OperationResult` set, and returns. The executor itself does no retry — the SDK's handlers have already retried inside the awaitable before the classifier sees the outcome.
+
+Slack error-code classification (initial table; extend as new codes are encountered):
+
+| `SlackApiError.response.data["error"]` | `OperationResult.status` |
+| --- | --- |
+| `channel_not_found`, `user_not_found`, `message_not_found`, `view_not_found` | `NOT_FOUND` |
+| `not_authed`, `invalid_auth`, `account_inactive`, `token_revoked`, `token_expired`, `missing_scope` | `UNAUTHORIZED` |
+| `ratelimited` (post-retry exhaustion) | `TRANSIENT_ERROR` with `retry_after` from the SDK's `RateLimitedError` |
+| `fatal_error`, `internal_error`, `service_unavailable` (post-retry exhaustion) | `TRANSIENT_ERROR` |
+| Any other Slack-side error code | `PERMANENT_ERROR` with the Slack code in `error_code` |
+| `AsyncTimeoutError` (per-call budget exceeded) | `TRANSIENT_ERROR` |
+| Any other exception | `PERMANENT_ERROR` |
+
+The classifier table lives in `app/infrastructure/slack/service.py` (or alongside the shield, per the implementation's choice) and is the single source of truth for Slack exception → status mapping. New codes are added to this table with the change that introduces the call site that surfaces them.
 
 ### Delivery mode and inbound dispatch
 
@@ -109,25 +162,35 @@ The Protocol surface is **shaped by the operations the application actually perf
 - `push_view(trigger_id: str, view: dict) -> SlackViewReference` — `views.push`.
 - `lookup_user_by_email(email: str) -> SlackUser | None` — `users.lookupByEmail`.
 
-The concrete implementation in `app/infrastructure/slack/service.py` wraps Slack's `AsyncWebClient` from `app/clients/slack/`, translates exceptions per the client-adapter-responsibilities rules into `OperationResult` envelopes where the operation can fail recoverably, and returns plain value types (`SlackMessageReference`, `SlackViewReference`, etc.) for typed outputs.
-
-A separate Protocol — `SlackHandlerRegistry` — exposes Slack's handler-registration surface for hookspec consumers (see below).
+The concrete implementation in `app/infrastructure/slack/service.py` wraps Slack's `AsyncWebClient` from `app/integrations/slack/`, translates exceptions per the client-adapter-responsibilities rules into `OperationResult` envelopes where the operation can fail recoverably, and returns plain value types (`SlackMessageReference`, `SlackViewReference`, etc.) for typed outputs.
 
 ### Hookspec catalogue
 
-The Slack platform contributes the following hookspecs to the host's plugin namespace. Each is named after Slack's native interaction category. Each hookspec's parameter is the Slack-specific registration Protocol (`SlackHandlerRegistry`), exported from `app/infrastructure/slack/`. Feature plugins implement the hookspecs they care about; unused categories produce no hookimpl.
+The Slack platform contributes a single hookspec to the host's plugin namespace:
 
-| Hookspec | Slack category | Receiver argument |
-| --- | --- | --- |
-| `register_slack_command(registry: SlackHandlerRegistry)` | Slash commands (`/example`) | `SlackHandlerRegistry` — feature calls `registry.command("/example")` to attach a handler. |
-| `register_slack_event(registry: SlackHandlerRegistry)` | Workspace events (e.g., `app_mention`, `member_joined_channel`, `message`) | `SlackHandlerRegistry` — feature calls `registry.event("app_mention")` to attach. |
-| `register_slack_action(registry: SlackHandlerRegistry)` | Block Kit interactive component actions (button clicks, select menus, etc.) | `SlackHandlerRegistry` — feature calls `registry.action(action_id)` to attach. |
-| `register_slack_shortcut(registry: SlackHandlerRegistry)` | Global and message shortcuts | `SlackHandlerRegistry` — feature calls `registry.shortcut(callback_id)` to attach. |
-| `register_slack_view(registry: SlackHandlerRegistry)` | Modal `view_submission` and `view_closed` payloads | `SlackHandlerRegistry` — feature calls `registry.view(callback_id)` for submissions; `registry.view_closed(callback_id)` for closures. |
+```python
+@hookspec
+async def register_slack_listeners(app: SlackApp) -> None:
+    """Register all Slack listeners for this feature against the Bolt AsyncApp."""
+```
 
-`SlackHandlerRegistry` wraps the Bolt `AsyncApp`'s decorator surface. Its methods accept handler functions whose runtime parameters (`ack`, `command`, `body`, `payload`, `say`, `client`, `logger`, etc.) are Bolt's standard handler parameters; feature handlers consume them as runtime values without importing Bolt types in their module imports. `app/infrastructure/slack/__init__.py` may re-export `TYPE_CHECKING`-guarded type aliases (`SlackCommandPayload`, `SlackBlockActionPayload`, etc.) so that handlers that *want* type annotations import them from `app.infrastructure.slack`, not from `slack_bolt`.
+`SlackApp` is the `AsyncApp` re-export from `app.infrastructure.slack`. The hookspec receives the live `AsyncApp` instance; features call any of Bolt's native listener-registration methods directly against it:
 
-The hookspecs are added to the host's central hookspec module per the plugin-registration-discovery rules. Adding a new Slack hookspec (e.g., `register_slack_workflow_step`) is a deliberate change to this record's catalogue.
+```python
+# app/packages/<feature>/__init__.py
+@hookimpl
+async def register_slack_listeners(app: SlackApp) -> None:
+    app.command("/example")(commands.handle_example)
+    app.event("app_mention")(events.handle_mention)
+    app.action("approve_button")(actions.handle_approve)
+    app.view("my_modal")(views.handle_submit)
+    app.message(":wave:")(events.handle_wave)
+    app.options("priority_menu")(commands.handle_options)
+```
+
+This gives features access to the full `AsyncApp` listener surface — `command`, `event`, `message`, `action`, `block_action`, `shortcut`, `global_shortcut`, `message_shortcut`, `view`, `view_submission`, `view_closed`, `options`, `function`, `assistant`, `middleware`, `error` — without requiring a new hookspec when Bolt adds a new listener type. Feature plugins implement only this hookspec for all Slack listener registration; unused listener types produce no calls.
+
+The hookspec is added to the host's central hookspec module per the plugin-registration-discovery rules. `app/infrastructure/slack/__init__.py` may re-export `TYPE_CHECKING`-guarded type aliases (`SlackCommandPayload`, `SlackBlockActionPayload`, etc.) so that handlers that want type annotations import them from `app.infrastructure.slack`, not from `slack_bolt`.
 
 ### Slash command argument parsing
 
@@ -186,7 +249,7 @@ When `SlackSettings.enabled=false`, no Slack feature is loaded:
 - Socket Mode default removes the public-endpoint requirement; production deployments do not need a public URL or its security infrastructure.
 - The two delivery modes share one inbound-adapter phase; switching modes (e.g., for a workspace that requires HTTP Events) is a configuration change, not a code change.
 - The `SlackService` Protocol surface is shaped by the operations the application performs — small, stable, and grow-by-need. Features consume the Protocol; concrete vendor types stay out of feature code.
-- The hookspec catalogue is platform-shaped (mirrors Slack's native categories) — features that already understand Slack's interaction model find the registration surface familiar.
+- The single `register_slack_listeners` hookspec gives features direct access to Bolt's full `AsyncApp` listener surface. Adding a new interaction type (e.g., `assistant`, `function`, `options`) requires no ADR change and no new hookspec — features call whichever `AsyncApp` method they need.
 - `SLACK_ENABLED=false` produces a genuinely-absent platform: no SlackService, no listening Socket Mode handler, no Slack-targeted feature plugins. Useful for environments that don't want or have Slack credentials.
 - The slash command argument parser plus Pydantic schemas give feature authors typed, validated command arguments without each feature reimplementing tokenization or validation.
 
@@ -194,12 +257,12 @@ When `SlackSettings.enabled=false`, no Slack feature is loaded:
 
 - The application takes a hard dependency on Bolt for Python. The dependency is well-supported (Slack's first-party SDK) and the abstraction below it (Slack's Web API) is stable. A future swap to a different SDK would be a substantial migration; the cost is acceptable given Bolt's maturity.
 - Socket Mode's pre-authenticated WebSocket means the application does not see signing-secret verification on every event. The mode is intentionally trusted; the WebSocket connection itself is the verified channel. HTTP Events mode reinstates the per-event verification.
-- The `SlackHandlerRegistry` Protocol wraps Bolt's decorator surface; this is one indirection layer between feature code and Bolt. The cost is a small Protocol definition; the benefit is that feature code never imports from `slack_bolt.*` and the import contract is statically enforceable.
+- Features receive the live `AsyncApp` instance via the hookspec argument. The import contract (no `slack_bolt.*` imports in feature modules) is upheld by passing the app at runtime, not by a wrapping Protocol. The re-export of `SlackApp` from `app.infrastructure.slack` is the single allowed import point; the statically-enforceable rule is unchanged.
 - Slack-specific value types (`SlackMessageReference`, `SlackViewReference`, etc.) and the parser's argument schemas are project code that must be maintained; not all of them are exact mirrors of Slack's API shapes.
 
 **Risks:**
 
-- Slack's API or Bolt's framework changes in a way that requires SlackService surface changes. Mitigation: the Protocol surface is defined by what the application uses, not by Bolt's full API; non-breaking SDK changes are absorbed by the `app/clients/slack/` factory layer; breaking changes are deliberate updates to this record's Protocol.
+- Slack's API or Bolt's framework changes in a way that requires SlackService surface changes. Mitigation: the Protocol surface is defined by what the application uses, not by Bolt's full API; non-breaking SDK changes are absorbed by the `app/integrations/slack/` factory layer; breaking changes are deliberate updates to this record's Protocol.
 - A feature handler imports from `slack_bolt.*` directly to access a runtime type. The vendor-import contract should catch this at lint time; if it does not, code review does. Mitigation: the `app/infrastructure/slack/` re-exports cover the type-annotation cases that tempt the bypass.
 - The legacy `app/infrastructure/platforms/` and `app/integrations/slack/` code remains until the migration is complete. Mitigation: migration is a code task that follows acceptance; the new shape this record establishes is the target; the legacy code is not blessed by the corpus and is not extended.
 - Socket Mode's connection drops periodically (Slack documents a ~10-second pre-disconnect warning). The SlackService must handle reconnection. Mitigation: Bolt's `AsyncSocketModeHandler` handles reconnect by default; the lifecycle module monitors connection state and logs reconnects.
@@ -208,9 +271,9 @@ When `SlackSettings.enabled=false`, no Slack feature is loaded:
 
 Compliance is verified by:
 
-- **Repository structure.** `app/clients/slack/` exists with raw Bolt/Web-API factory code only; `app/infrastructure/slack/` exists with `service.py`, `lifecycle.py`, `routing.py`, `parsing.py`, `formatter.py`, `help.py`, `models.py`, `settings.py`, `providers.py`, and `__init__.py`. `app/infrastructure/platforms/` is being deprecated (or has been removed); `app/integrations/slack/` is being deprecated (or has been removed). The legacy `app/infrastructure/clients/slack/` nesting is not reintroduced.
-- **Import contract.** `import-linter` (or the equivalent rule) forbids feature-code imports from `slack_bolt.*`, `slack_sdk.*`, and `app.clients.slack.*`. Feature code imports the `SlackService` Protocol and `SlackHandlerRegistry` Protocol from `app.infrastructure.slack` only.
-- **Code review.** A PR adding a Slack handler in a feature is reviewed against (1) the feature-handler-standard's five-step shape, (2) the hookspec catalogue (using `register_slack_*` hookspecs registered against `SlackHandlerRegistry`), (3) the `ack()` discipline (early-ack for slow handlers; in-time-ack for fast handlers). PRs that import from `slack_bolt.*` directly are rejected.
+- **Repository structure.** `app/integrations/slack/` exists with raw Bolt/Web-API factory code only; `app/infrastructure/slack/` exists with `service.py`, `lifecycle.py`, `routing.py`, `parsing.py`, `formatter.py`, `help.py`, `models.py`, `settings.py`, `providers.py`, and `__init__.py`. `app/infrastructure/platforms/` is being deprecated (or has been removed); `app/integrations/slack/` is being deprecated (or has been removed). The legacy `app/infrastructure/clients/slack/` nesting is not reintroduced.
+- **Import contract.** `import-linter` (or the equivalent rule) forbids feature-code imports from `slack_bolt.*`, `slack_sdk.*`, and `app.clients.slack.*`. Feature code imports the `SlackService` Protocol and `SlackApp` type alias from `app.infrastructure.slack` only. Only `app/integrations/slack/` and `app/infrastructure/slack/` may import from `slack_bolt.*`.
+- **Code review.** A PR adding a Slack handler in a feature is reviewed against (1) the feature-handler-standard's five-step shape, (2) the hookspec (`register_slack_listeners` receiving `SlackApp`; listeners registered via native `AsyncApp` methods), (3) the `ack()` discipline (early-ack for slow handlers; in-time-ack for fast handlers). PRs that import from `slack_bolt.*` directly are rejected.
 - **Settings.** `SlackSettings` defines `bot_token`, `app_token`, `signing_secret`, `enabled`, `socket_mode`. The settings are loaded at boot per the configuration-ownership rules; missing values when `enabled=true` cause fail-fast at the configuration phase.
 - **Tests.** A boot test asserts the SlackService starts and stops cleanly with `enabled=true` and is absent with `enabled=false`. A handler test asserts the inbound-adapter phase opens a correlation context per delivered event. A formatter test asserts the helper renders each `OperationStatus` to a Block Kit shape per this record's mapping.
 
@@ -250,4 +313,7 @@ Compliance is verified by:
 
 - 2026-05-08: Created as placeholder.
 - 2026-05-08: Clarified the Socket-Mode-default rationale. The earlier wording implied the application has no public HTTP endpoints, which is incorrect — the application's FastAPI surface already exposes public endpoints when its features are enabled. The correct rationale: Socket Mode does not require Slack to be configured with a deployment-specific public URL (the application initiates the WebSocket outbound via the app-level token), removes per-environment Slack-app URL maintenance, and behaves identically in local development as in production. The decision is unchanged — Socket Mode default; HTTP Events supported via the `socket_mode=false` setting; mode is settings-managed.
-- 2026-05-08: Finalized. Selects Slack Bolt for Python as the SDK; pins Socket Mode as the production default with HTTP Events supported via a settings flag; pins module placement as `app/clients/slack/` (raw Bolt/Web-API factories, signing-secret utility) plus `app/infrastructure/slack/` (composed `SlackService` Protocol with a small, application-shaped surface — `post_message`, `update_message`, `open_view`, `update_view`, `push_view`, `lookup_user_by_email` — extended as features need more); names the five Slack hookspecs (`register_slack_command`, `register_slack_event`, `register_slack_action`, `register_slack_shortcut`, `register_slack_view`), each receiving a `SlackHandlerRegistry` Protocol that wraps Bolt's decorator surface so feature code never imports from `slack_bolt.*`. Pins authentication via `bot_token` (xoxb-), `app_token` (xapp-, Socket Mode only), and `signing_secret` (HTTP Events only) declared in `SlackSettings(BaseSettings)` in the infrastructure layer with scalar injection to clients per the configuration-ownership rules. Pins the slash command argument parser as Pydantic-driven, living at `app/infrastructure/slack/parsing.py`, with each feature declaring its command's argument schema as a `BaseModel`. Establishes that `SlackSettings.enabled=false` blocks every Slack-targeted feature plugin via `pm.set_blocked()` before `load_setuptools_entrypoints()` and prevents `SlackService` construction. Establishes the 3-second `ack()` discipline (early-ack for slow handlers), the `trigger_id` 3-second single-use expiry, and the rule that long-running work past the 30-minute `response_url` window must be sent via standard Web API methods. Pins outbound `OperationResult` rendering at `app/infrastructure/slack/formatter.py` as the only construction site for Block Kit JSON in response to feature operations. Slack-outbound text is localized through the I18nService Protocol per the infrastructure-i18n record; the current custom translation utilities are flagged as pending deprecation. Notes that the legacy `app/infrastructure/platforms/` and `app/integrations/slack/` code is being deprecated; the `feat/intra-slackbot-service` branch's infrastructure-side structure is a starting point but its `app/infrastructure/clients/slack/` nesting must move to top-level `app/clients/slack/` per the client-module-placement decision.
+- 2026-05-08: Finalized. Selects Slack Bolt for Python as the SDK; pins Socket Mode as the production default with HTTP Events supported via a settings flag; pins module placement as `app/integrations/slack/` (raw Bolt/Web-API factories, signing-secret utility) plus `app/infrastructure/slack/` (composed `SlackService` Protocol with a small, application-shaped surface — `post_message`, `update_message`, `open_view`, `update_view`, `push_view`, `lookup_user_by_email` — extended as features need more); names the five Slack hookspecs (`register_slack_command`, `register_slack_event`, `register_slack_action`, `register_slack_shortcut`, `register_slack_view`), each receiving a `SlackHandlerRegistry` Protocol that wraps Bolt's decorator surface so feature code never imports from `slack_bolt.*`. Pins authentication via `bot_token` (xoxb-), `app_token` (xapp-, Socket Mode only), and `signing_secret` (HTTP Events only) declared in `SlackSettings(BaseSettings)` in the infrastructure layer with scalar injection to clients per the configuration-ownership rules. Pins the slash command argument parser as Pydantic-driven, living at `app/infrastructure/slack/parsing.py`, with each feature declaring its command's argument schema as a `BaseModel`. Establishes that `SlackSettings.enabled=false` blocks every Slack-targeted feature plugin via `pm.set_blocked()` before `load_setuptools_entrypoints()` and prevents `SlackService` construction. Establishes the 3-second `ack()` discipline (early-ack for slow handlers), the `trigger_id` 3-second single-use expiry, and the rule that long-running work past the 30-minute `response_url` window must be sent via standard Web API methods. Pins outbound `OperationResult` rendering at `app/infrastructure/slack/formatter.py` as the only construction site for Block Kit JSON in response to feature operations. Slack-outbound text is localized through the I18nService Protocol per the infrastructure-i18n record; the current custom translation utilities are flagged as pending deprecation. Notes that the legacy `app/infrastructure/platforms/` and `app/integrations/slack/` code is being deprecated; the `feat/intra-slackbot-service` branch's infrastructure-side structure is a starting point but its `app/infrastructure/clients/slack/` nesting must move to top-level `app/integrations/slack/` per the client-module-placement decision.
+- 2026-05-12: Revised hookspec catalogue. Replaced the five category-specific hookspecs (`register_slack_command`, `register_slack_event`, `register_slack_action`, `register_slack_shortcut`, `register_slack_view`) and the `SlackHandlerRegistry` wrapper Protocol with a single hookspec `register_slack_listeners(app: SlackApp)` that passes the live `AsyncApp` instance directly. Features call whichever native `AsyncApp` listener methods they need (`command`, `event`, `message`, `action`, `shortcut`, `view`, `options`, `function`, `assistant`, etc.) without requiring a new hookspec or ADR change per Bolt capability. `SlackApp` is a re-export alias for `AsyncApp` declared in `app/infrastructure/slack/__init__.py`; the import contract (no `slack_bolt.*` in feature modules) is unchanged. Removed `routing.py` from the infrastructure module list; `SlackHandlerRegistry` is retired.
+- 2026-05-12: **Added Resilience wiring subsection.** Per the SDK-capability audit ([../../tmp/research-shield-pattern-sdk-capabilities.md](../../tmp/research-shield-pattern-sdk-capabilities.md)) and the 2026-05-12 revision of [client-adapter-responsibilities.md](client-adapter-responsibilities.md), Slack outbound resilience is wired *at construction* on `AsyncWebClient` via `slack_sdk`'s native retry handlers — `AsyncConnectionErrorRetryHandler`, `AsyncRateLimitErrorRetryHandler`, and `AsyncServerErrorRetryHandler` — against the parameters in [outbound-retry-policy.md](outbound-retry-policy.md) Shape A. No project-local retry loop wraps Slack calls. The composed `SlackService` consumes the pre-configured client through the awaitable-wrapping executor in [client-sdk-shield-pattern.md](client-sdk-shield-pattern.md) ; the executor classifies `SlackApiError.response.data["error"]` codes into the closed five-status `OperationResult` set per the documented mapping table (channel/user/message/view `_not_found` → `NOT_FOUND`; auth-class codes → `UNAUTHORIZED`; `ratelimited` post-retry → `TRANSIENT_ERROR` with `retry_after`; internal/service-unavailable post-retry → `TRANSIENT_ERROR`; other Slack codes → `PERMANENT_ERROR`). The `SlackService` Protocol surface, the hookspec catalogue, the delivery-mode rules, the credential model, and the `ack()` discipline are unchanged by this revision.
+- 2026-05-12: Updated all `app/integrations/` path references that were incorrectly written as `app/clients/`.
