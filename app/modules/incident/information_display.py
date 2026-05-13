@@ -47,6 +47,7 @@ def incident_information_view(incident: Incident):
 
     report_string = f"<{incident.report_url}|:memo: Incident Report>"
     meet_string = f"<{incident.meet_url}|:headphones: Google Meet>"
+    severity_string = incident.severity if incident.severity else "None"
     incident_data = incident.model_dump()
     incident_data.pop("logs")
     private_metadata = json.dumps(incident_data)
@@ -87,6 +88,19 @@ def incident_information_view(incident: Incident):
                 ],
             },
             {"type": "divider"},
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Severity*:\n" + severity_string,
+                },
+                "accessory": {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Update", "emoji": True},
+                    "value": "severity",
+                    "action_id": "update_incident_field",
+                },
+            },
             {
                 "type": "section",
                 "text": {
