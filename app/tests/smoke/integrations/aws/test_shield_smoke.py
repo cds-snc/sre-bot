@@ -34,7 +34,7 @@ if _SMOKE_ENDPOINT is None:
 def shield() -> AWSShield:
     return AWSShield(
         settings=AWSSettings(
-            AWS_REGION=os.environ.get("AWS_SMOKE_REGION", "us-east-1"),
+            AWS_REGION=os.environ.get("AWS_SMOKE_REGION", "ca-central-1"),
             AWS_ENDPOINT_URL=_SMOKE_ENDPOINT,
         )
     )
