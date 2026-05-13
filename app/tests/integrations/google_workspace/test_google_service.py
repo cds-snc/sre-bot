@@ -8,6 +8,10 @@ from google.auth.exceptions import RefreshError  # type: ignore
 from integrations.google_workspace import google_service
 
 
+@patch(
+    "integrations.google_workspace.google_service.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+    "{}",
+)
 @patch("integrations.google_workspace.google_service.build")
 @patch("integrations.google_workspace.google_service.service_account")
 def test_get_google_service_returns_build_object(mock_service_account, build_mock):
@@ -26,6 +30,10 @@ def test_get_google_service_returns_build_object(mock_service_account, build_moc
     )
 
 
+@patch(
+    "integrations.google_workspace.google_service.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+    "{}",
+)
 @patch("integrations.google_workspace.google_service.build")
 @patch("integrations.google_workspace.google_service.service_account")
 def test_get_google_service_with_delegated_user_email(
@@ -45,6 +53,10 @@ def test_get_google_service_with_delegated_user_email(
     )
 
 
+@patch(
+    "integrations.google_workspace.google_service.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+    "{}",
+)
 @patch("integrations.google_workspace.google_service.build")
 @patch("integrations.google_workspace.google_service.service_account")
 def test_get_google_service_with_scopes(mock_service_account, _build_mock):
