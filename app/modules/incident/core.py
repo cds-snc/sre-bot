@@ -509,6 +509,7 @@ def initiate_resources_creation(
         "report_url": document_link,
         "meet_url": meet_link["meetingUri"],
         "environment": environment,
+        "severity": incident_payload.severity,
     }
     incident_id = db_operations.create_incident(incident_data)
     logger.info("incident_record_created", incident_id=incident_id)
