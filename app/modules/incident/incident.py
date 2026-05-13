@@ -116,11 +116,9 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
     security_incident = view["state"]["values"]["security_incident"][
         "security_incident"
     ]["selected_option"]["value"]
-    severity = (
-        view["state"]["values"]["severity"]["severity"]["selected_option"]["value"]
-        if "severity" in view["state"]["values"]
-        else None
-    )
+    severity = view["state"]["values"]["severity"]["severity"]["selected_option"][
+        "value"
+    ]
 
     if not re.match(r"^[\w\-\s]+$", name):
         errors["name"] = (
