@@ -235,11 +235,11 @@ class TestExecuteContainsExceptions:
 
         assert not result.is_success
 
-    def test_unexpected_exception_classes_propagate(self, shield):
-        """Non-SDK exceptions (programmer errors) are not silently swallowed."""
-
+    def test_unexpected_exception_classes_return_permanent_error(self, shield):
         def raise_it():
             raise RuntimeError("logic bug")
 
-        with pytest.raises(RuntimeError):
-            shield.execute(raise_it)
+        result = shield.execute(raise_it)
+
+        assert result.status == OperationStatus.PERMANENT_ERROR
+        assert result.error_code == "unexpected_error"

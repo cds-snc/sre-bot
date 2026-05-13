@@ -1,17 +1,16 @@
 """AWS shield: resilience boundary around the boto3 SDK.
 
-Exposes `AWSShield`, a service that constructs boto3 clients with native
-retry wired in (`Config(retries={...})`) and provides `execute(thunk)`,
-the synchronous resilience boundary that classifies `ClientError` and
-`BotoCoreError` into the closed `OperationStatus` set.
+Exposes `AWSShield`, a shape γ service that constructs boto3 clients with
+native retry wired in (`Config(retries={...})`) and provides
+`execute(thunk)`, the synchronous resilience boundary that classifies
+`ClientError`, `BotoCoreError`, and any other exception into the closed
+`OperationStatus` set.
 
 Adapter call shape:
 
-    result = shield.execute(
-        lambda: shield.client("dynamodb").get_item(TableName=..., Key=...)
-    )
+    result = shield.execute(lambda: shield.dynamodb.get_item(TableName=..., Key=...))
 
-Per-service boto3 clients are constructed lazily on first request and
+Per-service boto3 clients are constructed lazily on first access and
 cached for the lifetime of the shield instance.
 """
 
@@ -68,6 +67,26 @@ class AWSShield:
         )
         self._transient_codes: frozenset[str] = frozenset(settings.TRANSIENT_CODES)
 
+    @property
+    def dynamodb(self) -> BaseClient:
+        """Cached boto3 DynamoDB client."""
+        return self.client("dynamodb")
+
+    @property
+    def s3(self) -> BaseClient:
+        """Cached boto3 S3 client."""
+        return self.client("s3")
+
+    @property
+    def organizations(self) -> BaseClient:
+        """Cached boto3 Organizations client."""
+        return self.client("organizations")
+
+    @property
+    def identity_store(self) -> BaseClient:
+        """Cached boto3 Identity Store client."""
+        return self.client("identitystore")
+
     def client(self, service_name: str) -> BaseClient:
         """Return a cached boto3 client for `service_name`, building it on first use."""
         cached = self._clients.get(service_name)
@@ -89,7 +108,7 @@ class AWSShield:
         return built
 
     def execute(self, func: Callable[[], R]) -> OperationResult[R]:
-        """Invoke `func()` and classify any boto3 exception into `OperationResult`."""
+        """Invoke `func()` and classify any exception into `OperationResult`."""
         try:
             return OperationResult.success(data=func(), provider=_PROVIDER)
         except ClientError as exc:
@@ -98,6 +117,11 @@ class AWSShield:
             return OperationResult.transient_error(
                 message=str(exc) or "botocore transport error",
                 error_code=type(exc).__name__,
+            )
+        except Exception as exc:
+            return OperationResult.permanent_error(
+                message=str(exc) or "unexpected error",
+                error_code="unexpected_error",
             )
 
     def _classify_client_error(self, exc: ClientError) -> OperationResult[Any]:
