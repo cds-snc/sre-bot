@@ -34,4 +34,4 @@ def test_get_trello_client(trello_api_mock):
     trello_api_mock.return_value = MagicMock()
     assert trello.get_trello_client() == trello_api_mock()
     trello_api_mock.assert_called_with()
-    trello_api_mock.return_value.set_token.assert_called_with('TRELLO_TOKEN')
+    trello_api_mock.return_value.set_token.assert_called_with("TRELLO_TOKEN")

@@ -25,7 +25,7 @@ def test_send_event(post_data_mock):
     event = {}
     assert sentinel.send_event(event) is True
     post_data_mock.assert_called_once_with(
-        'SENTINEL_CUSTOMER_ID', 'SENTINEL_SHARED_KEY', "{}", 'SENTINEL_LOG_TYPE'
+        "SENTINEL_CUSTOMER_ID", "SENTINEL_SHARED_KEY", "{}", "SENTINEL_LOG_TYPE"
     )
 
 
