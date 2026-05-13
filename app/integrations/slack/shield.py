@@ -72,9 +72,7 @@ class SlackShield:
             AsyncRateLimitErrorRetryHandler(
                 max_retry_count=settings.RETRY_MAX_ATTEMPTS
             ),
-            AsyncServerErrorRetryHandler(
-                max_retry_count=settings.RETRY_MAX_ATTEMPTS
-            ),
+            AsyncServerErrorRetryHandler(max_retry_count=settings.RETRY_MAX_ATTEMPTS),
         ]
         self.web: AsyncWebClient = AsyncWebClient(
             token=settings.BOT_TOKEN,

@@ -131,9 +131,7 @@ class TestExecuteSlackErrorClassification:
         "code",
         ["fatal_error", "internal_error", "service_unavailable"],
     )
-    async def test_other_transient_codes(
-        self, shield: SlackShield, code: str
-    ) -> None:
+    async def test_other_transient_codes(self, shield: SlackShield, code: str) -> None:
         async def raises():
             raise _slack_api_error(code)
 

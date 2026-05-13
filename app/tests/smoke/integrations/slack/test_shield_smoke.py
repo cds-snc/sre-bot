@@ -64,4 +64,3 @@ class TestSlackShieldAgainstSandbox:
 
         assert not result.is_success
         assert result.status == OperationStatus.NOT_FOUND
-

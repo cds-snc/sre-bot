@@ -115,7 +115,9 @@ class TestShieldedRespond:
         webhook_response.status_code = 200
         webhook_response.headers = {}
 
-        respond = ShieldedRespond(shield=shield, response_url="https://hooks.slack.com/x")
+        respond = ShieldedRespond(
+            shield=shield, response_url="https://hooks.slack.com/x"
+        )
 
         with patch.object(respond._client, "send", return_value=webhook_response):
             result = await respond(text="hello")

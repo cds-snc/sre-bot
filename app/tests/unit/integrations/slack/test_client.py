@@ -71,9 +71,7 @@ class TestSlackShieldRetryHandlers:
         types = [type(h) for h in shield.web.retry_handlers]
         assert AsyncRateLimitErrorRetryHandler in types
 
-    def test_server_error_handler_is_registered(
-        self, settings: SlackSettings
-    ) -> None:
+    def test_server_error_handler_is_registered(self, settings: SlackSettings) -> None:
         shield = SlackShield(settings=settings)
 
         types = [type(h) for h in shield.web.retry_handlers]
@@ -97,9 +95,7 @@ class TestSlackShieldRetryHandlers:
 
     def test_retry_max_attempts_override_propagates_to_handlers(self) -> None:
         shield = SlackShield(
-            settings=SlackSettings(
-                SLACK_BOT_TOKEN="xoxb-x", SLACK_RETRY_MAX_ATTEMPTS=4
-            )
+            settings=SlackSettings(SLACK_BOT_TOKEN="xoxb-x", SLACK_RETRY_MAX_ATTEMPTS=4)
         )
 
         for handler in shield.web.retry_handlers:
