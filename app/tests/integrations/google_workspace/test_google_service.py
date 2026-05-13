@@ -1,6 +1,5 @@
 """Unit Tests for the google_service module."""
 
-import os
 from unittest.mock import patch, MagicMock
 from json import JSONDecodeError
 import pytest
