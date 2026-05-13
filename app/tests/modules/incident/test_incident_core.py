@@ -165,6 +165,7 @@ _Type_ `/sre incident help` _for complete command list_"""
             "report_url": "https://docs.google.com/document/d/document_id/edit",
             "meet_url": "https://meet.google.com/aaa-bbbb-ccc",
             "environment": "prod",
+            "severity": None,
         }
     )
 

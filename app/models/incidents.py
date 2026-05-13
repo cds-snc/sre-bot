@@ -45,6 +45,7 @@ class IncidentPayload(BaseModel):
     channel_id: str
     channel_name: str
     slug: str
+    severity: Optional[str] = None
 
     class Config:  # noqa
         extra = "forbid"

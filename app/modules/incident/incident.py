@@ -15,7 +15,6 @@ from modules.incident import (
 from structlog import get_logger
 from core.config import settings
 
-
 PREFIX = settings.PREFIX
 INCIDENT_CHANNEL = settings.feat_incident.INCIDENT_CHANNEL
 SLACK_SECURITY_USER_GROUP_ID = settings.feat_incident.SLACK_SECURITY_USER_GROUP_ID
@@ -117,6 +116,9 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
     security_incident = view["state"]["values"]["security_incident"][
         "security_incident"
     ]["selected_option"]["value"]
+    severity = view["state"]["values"]["severity"]["severity"]["selected_option"][
+        "value"
+    ]
 
     if not re.match(r"^[\w\-\s]+$", name):
         errors["name"] = (
@@ -198,6 +200,7 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
         channel_id=channel_id,
         channel_name=channel_name,
         slug=slug,
+        severity=severity,
     )
     try:
         core.initiate_resources_creation(
@@ -306,6 +309,59 @@ def generate_incident_modal_view(
                     "action_id": "product",
                 },
                 "label": {"type": "plain_text", "text": "Product", "emoji": True},
+            },
+            {
+                "block_id": "severity",
+                "type": "input",
+                "element": {
+                    "type": "static_select",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": i18n.t("incident.modal.severity"),
+                    },
+                    "options": [
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": i18n.t("incident.modal.sev_none"),
+                            },
+                            "value": "none",
+                        },
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": i18n.t("incident.modal.sev_1"),
+                            },
+                            "value": "sev-1",
+                        },
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": i18n.t("incident.modal.sev_2"),
+                            },
+                            "value": "sev-2",
+                        },
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": i18n.t("incident.modal.sev_3"),
+                            },
+                            "value": "sev-3",
+                        },
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": i18n.t("incident.modal.sev_4"),
+                            },
+                            "value": "sev-4",
+                        },
+                    ],
+                    "action_id": "severity",
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": i18n.t("incident.modal.severity"),
+                },
             },
             {
                 "block_id": "security_incident",
