@@ -16,19 +16,14 @@ from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.configuration.infrastructure.platforms import PlatformsSettings
 from infrastructure.configuration.integrations.maxmind import MaxMindSettings
 from infrastructure.configuration.integrations.slack import SlackSettings
-from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
-from infrastructure.configuration.integrations.notify import NotifySettings
 from infrastructure.clients.maxmind.client import MaxMindClient
 from infrastructure.idempotency.service import DynamoDBIdempotencyService
 from infrastructure.resilience.service import ResilienceService
-from infrastructure.notifications.service import NotificationService
 from infrastructure.platforms.service import PlatformService
-from infrastructure.notifications.channels.chat import ChatChannel
 from infrastructure.services.providers import (
     get_idempotency_service,
     get_jwks_manager,
     get_maxmind_client,
-    get_notification_service,
     get_platform_service,
     get_resilience_service,
     get_slack_client,
@@ -101,27 +96,6 @@ class TestResilienceServiceNarrowSlice:
         mock_store = MagicMock()
         with pytest.raises(TypeError):
             ResilienceService(settings=mock_settings, retry_store=mock_store)
-
-
-class TestNotificationServiceNarrowSlice:
-    """NotificationService accepts pre-built channels instead of full Settings."""
-
-    def test_accepts_channels_with_dispatcher(self):
-        """NotificationService constructs with pre-built channels + injected dispatcher."""
-        mock_channel = MagicMock(spec=ChatChannel)
-        mock_dispatcher = MagicMock()
-        service = NotificationService(
-            channels={"chat": mock_channel},
-            dispatcher=mock_dispatcher,
-        )
-        assert service is not None
-
-    def test_rejects_full_settings_kwarg(self):
-        """NotificationService does not accept 'settings' kwarg."""
-        mock_settings = MagicMock()
-        mock_dispatcher = MagicMock()
-        with pytest.raises(TypeError):
-            NotificationService(settings=mock_settings, dispatcher=mock_dispatcher)
 
 
 class TestPlatformServiceNarrowSlice:
@@ -205,64 +179,6 @@ class TestProvidersDontCallGetSettings:
             mock_get_settings.assert_not_called()
             mock_retry.assert_called_once()
         get_resilience_service.cache_clear()
-
-    def test_get_notification_service_uses_narrow_slices(self):
-        """get_notification_service uses domain slices, not get_settings."""
-        get_notification_service.cache_clear()
-        with (
-            patch(
-                "infrastructure.services.providers.get_settings"
-            ) as mock_get_settings,
-            patch(
-                "infrastructure.services.providers.get_google_workspace_settings"
-            ) as mock_google_settings,
-            patch(
-                "infrastructure.services.providers.get_notify_settings"
-            ) as mock_notify_settings,
-            patch(
-                "infrastructure.services.providers.get_resilience_service"
-            ) as mock_resilience,
-            patch(
-                "infrastructure.services.providers.get_idempotency_service"
-            ) as mock_idempotency,
-            patch(
-                "infrastructure.services.providers.EmailChannel.__init__",
-                return_value=None,
-            ) as mock_email_ctor,
-            patch(
-                "infrastructure.services.providers.SMSChannel.__init__",
-                return_value=None,
-            ) as mock_sms_ctor,
-            patch(
-                "infrastructure.services.providers.ChatChannel.__init__",
-                return_value=None,
-            ),
-            patch(
-                "infrastructure.notifications.service.NotificationService.__init__",
-                return_value=None,
-            ) as mock_notification_ctor,
-        ):
-            mock_google_settings.return_value = MagicMock(spec=GoogleWorkspaceSettings)
-            mock_notify_settings.return_value = MagicMock(spec=NotifySettings)
-
-            mock_resilience_service = MagicMock()
-            mock_circuit_breaker = MagicMock()
-            mock_resilience_service.get_or_create_circuit_breaker.return_value = (
-                mock_circuit_breaker
-            )
-            mock_resilience.return_value = mock_resilience_service
-            mock_idempotency.return_value = MagicMock()
-
-            get_notification_service()
-
-            mock_get_settings.assert_not_called()
-            mock_google_settings.assert_called_once()
-            mock_notify_settings.assert_called_once()
-            assert mock_email_ctor.call_count == 1
-            assert mock_sms_ctor.call_count == 1
-            mock_notification_ctor.assert_called_once()
-
-        get_notification_service.cache_clear()
 
     def test_get_platform_service_uses_platforms_settings(self):
         """get_platform_service uses get_platforms_settings, not get_settings."""
