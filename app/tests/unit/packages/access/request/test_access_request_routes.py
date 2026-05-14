@@ -14,7 +14,7 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from infrastructure.security.models import AuthPrincipalSource, User
-from infrastructure.services import get_current_user
+from infrastructure.security import get_current_user
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.request.domain import AccessRequest, ApprovalDecision
 from packages.access.request.providers import (

@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from infrastructure.security.models import AuthPrincipalSource, User
 from infrastructure.operations import OperationResult, OperationStatus
-from infrastructure.services import get_current_user
+from infrastructure.security import get_current_user
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
     get_access_sync_settings,

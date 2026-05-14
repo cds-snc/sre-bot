@@ -5,44 +5,44 @@ Provides annotated type hints for common infrastructure dependencies.
 """
 
 from typing import Annotated
-from fastapi import Depends, Security
-from infrastructure.configuration import AppSettings, Settings
-from infrastructure.security.models import User
-from infrastructure.security.jwks import JWKSManager
-from infrastructure.security.current_user import get_current_user
+
+from fastapi import Depends
+
+from infrastructure.audit.protocol import AuditTrailService
 from infrastructure.clients.aws import AWSClients
 from infrastructure.clients.google_workspace import GoogleWorkspaceClients
 from infrastructure.clients.maxmind import MaxMindClient
+from infrastructure.configuration import AppSettings, Settings
+from infrastructure.directory.provider import DirectoryProvider
 from infrastructure.events.service import EventDispatcher
 from infrastructure.i18n.service import TranslationService
 from infrastructure.idempotency.protocol import IdempotencyService
-from infrastructure.resilience.service import ResilienceService
 from infrastructure.notifications.service import NotificationService
-from infrastructure.storage.protocol import StorageService
-from infrastructure.audit.protocol import AuditTrailService
-from infrastructure.platforms.service import PlatformService
 from infrastructure.platforms.clients.slack import SlackClientFacade
-from infrastructure.directory.provider import DirectoryProvider
-from infrastructure.slack.service import SlackBot
+from infrastructure.platforms.service import PlatformService
+from infrastructure.resilience.service import ResilienceService
+from infrastructure.security.jwks import JWKSManager
 from infrastructure.services.providers import (
     get_app_settings,
-    get_settings,
-    get_jwks_manager,
-    get_aws_clients,
-    get_google_workspace_clients,
-    get_maxmind_client,
-    get_event_dispatcher,
-    get_translation_service,
-    get_idempotency_service,
-    get_resilience_service,
-    get_notification_service,
-    get_storage_service,
     get_audit_trail_service,
+    get_aws_clients,
+    get_directory_provider,
+    get_event_dispatcher,
+    get_google_workspace_clients,
+    get_idempotency_service,
+    get_jwks_manager,
+    get_maxmind_client,
+    get_notification_service,
     get_platform_service,
+    get_resilience_service,
+    get_settings,
     get_slack_bot,
     get_slack_client,
-    get_directory_provider,
+    get_storage_service,
+    get_translation_service,
 )
+from infrastructure.slack.service import SlackBot
+from infrastructure.storage.protocol import StorageService
 
 # Settings dependency
 SettingsDep = Annotated[Settings, Depends(get_settings)]
@@ -51,15 +51,6 @@ AppSettingsDep = Annotated[AppSettings, Depends(get_app_settings)]
 # JWKS manager dependency
 JWKSManagerDep = Annotated[JWKSManager, Depends(get_jwks_manager)]
 
-# Authenticated principal dependency — requires a valid JWT Bearer token.
-# Use Security(get_current_user) for authentication-only endpoints.
-# Use Security(get_current_user, scopes=["sre-bot:<resource>"]) to enforce scopes.
-# Example:
-#   from fastapi import Security
-#   from infrastructure.services import CurrentUserDep
-#   @router.post("/sync-runs")
-#   def sync(current_user: CurrentUserDep): ...
-CurrentUserDep = Annotated[User, Security(get_current_user)]
 
 # AWS clients facade dependency - provides attribute-based access to all AWS services
 # Usage: aws.dynamodb.get_item(...), aws.identitystore.list_users(...), etc.
@@ -117,7 +108,6 @@ __all__ = [
     "SettingsDep",
     "AppSettingsDep",
     "JWKSManagerDep",
-    "CurrentUserDep",
     "AWSClientsDep",
     "GoogleWorkspaceClientsDep",
     "EventDispatcherDep",

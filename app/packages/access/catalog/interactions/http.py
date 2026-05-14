@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Security
 
 from infrastructure.security.models import User
 from infrastructure.operations import OperationResult, OperationStatus
-from infrastructure.services import get_current_user
+from infrastructure.security import get_current_user
 from packages.access.catalog.domain import EntitlementEntry, PlatformSummary
 from packages.access.catalog.providers import get_catalog_service, get_catalog_settings
 from packages.access.catalog.schemas import (
