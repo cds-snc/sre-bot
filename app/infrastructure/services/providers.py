@@ -4,57 +4,52 @@ Factory functions for dependency injection.
 Provides application-scoped singleton providers for core infrastructure services.
 """
 
-from functools import lru_cache
-from typing import Any
 import warnings
-from infrastructure.platforms.exceptions import ProviderNotFoundError
-from typing import cast
+from functools import lru_cache
+from typing import Any, cast
 
-
-from infrastructure.configuration import Settings
-from infrastructure.configuration.app import (
-    AppSettings,
-    get_app_settings as _get_app_settings,
-)
-from infrastructure.configuration.infrastructure.server import get_server_settings
-from infrastructure.configuration.infrastructure.idempotency import (
-    get_idempotency_settings,
-)
-from infrastructure.configuration.infrastructure.retry import get_retry_settings
-from infrastructure.configuration.infrastructure.platforms import get_platforms_settings
-from infrastructure.configuration.infrastructure.directory import get_directory_settings
-from infrastructure.configuration.integrations.slack import get_slack_settings
-from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
-from infrastructure.configuration.integrations.aws import get_aws_settings
-from infrastructure.configuration.integrations.notify import get_notify_settings
-from infrastructure.configuration.integrations.google import (
-    get_google_workspace_settings,
-)
-from infrastructure.security.jwks import JWKSManager
+from infrastructure.audit.protocol import AuditTrailService
+from infrastructure.audit.service import DynamoDBAuditTrailService
 from infrastructure.clients.aws import AWSClients
 from infrastructure.clients.google_workspace import GoogleWorkspaceClients
 from infrastructure.clients.maxmind import MaxMindClient
-from infrastructure.i18n.service import TranslationService
-from infrastructure.i18n.models import Locale, TranslationKey
-from infrastructure.events.service import EventDispatcher
-from infrastructure.idempotency.service import DynamoDBIdempotencyService
-from infrastructure.idempotency.protocol import IdempotencyService
-from infrastructure.idempotency.dynamodb import DynamoDBCache
-from infrastructure.resilience.service import ResilienceService
-from infrastructure.notifications.service import NotificationService
-from infrastructure.notifications.channels.chat import ChatChannel
-from infrastructure.notifications.channels.email import EmailChannel
-from infrastructure.notifications.channels.sms import SMSChannel
-from infrastructure.storage.protocol import StorageService
-from infrastructure.storage.service import DynamoDBStorageService
-from infrastructure.audit.protocol import AuditTrailService
-from infrastructure.audit.service import DynamoDBAuditTrailService
-from infrastructure.platforms import PlatformService
-from infrastructure.platforms.providers import SlackPlatformProvider
-from infrastructure.platforms.clients.slack import SlackClientFacade
+from infrastructure.configuration import Settings
+from infrastructure.configuration.app import (
+    AppSettings,
+)
+from infrastructure.configuration.app import (
+    get_app_settings as _get_app_settings,
+)
+from infrastructure.configuration.infrastructure.directory import get_directory_settings
+from infrastructure.configuration.infrastructure.idempotency import (
+    get_idempotency_settings,
+)
+from infrastructure.configuration.infrastructure.platforms import get_platforms_settings
+from infrastructure.configuration.infrastructure.retry import get_retry_settings
+from infrastructure.configuration.infrastructure.server import get_server_settings
+from infrastructure.configuration.integrations.aws import get_aws_settings
+from infrastructure.configuration.integrations.google import (
+    get_google_workspace_settings,
+)
+from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
+from infrastructure.configuration.integrations.slack import get_slack_settings
 from infrastructure.directory.factory import build_google_directory_provider
 from infrastructure.directory.provider import DirectoryProvider
+from infrastructure.events.service import EventDispatcher
+from infrastructure.i18n.models import Locale, TranslationKey
+from infrastructure.i18n.service import TranslationService
+from infrastructure.idempotency.dynamodb import DynamoDBCache
+from infrastructure.idempotency.protocol import IdempotencyService
+from infrastructure.idempotency.service import DynamoDBIdempotencyService
+from infrastructure.platforms import PlatformService
+from infrastructure.platforms.clients.slack import SlackClientFacade
+from infrastructure.platforms.exceptions import ProviderNotFoundError
+from infrastructure.platforms.providers import SlackPlatformProvider
+from infrastructure.resilience.service import ResilienceService
+from infrastructure.security.jwks import JWKSManager
 from infrastructure.slack.service import SlackBot
+from infrastructure.storage.protocol import StorageService
+from infrastructure.storage.service import DynamoDBStorageService
 
 
 @lru_cache(maxsize=1)
@@ -329,64 +324,6 @@ def get_resilience_service() -> ResilienceService:
         ResilienceService: Cached resilience service instance
     """
     return ResilienceService(retry_settings=get_retry_settings())
-
-
-@lru_cache(maxsize=1)
-def get_notification_service() -> NotificationService:
-    """Get application-scoped notification service singleton.
-
-    Returns a NotificationService instance for multi-channel notification
-    delivery with automatic fallback, idempotency, and circuit breakers.
-
-    Channel construction and circuit breaker wiring happen here (composition
-    root) so NotificationService receives pre-built channels.
-
-    Usage:
-        from infrastructure.services import NotificationServiceDep
-
-        @router.post("/notify")
-        def send_notification(
-            notification_service: NotificationServiceDep,
-            notification: Notification
-        ):
-            results = notification_service.send(notification)
-            success_count = sum(1 for r in results if r.is_success)
-            return {"sent": success_count, "total": len(results)}
-
-    Returns:
-        NotificationService: Cached notification service instance
-    """
-    email_provider_settings = get_google_workspace_settings()
-    notify_settings = get_notify_settings()
-    resilience_service = get_resilience_service()
-    idempotency_service = get_idempotency_service()
-
-    email_cb = resilience_service.get_or_create_circuit_breaker(
-        "notification_email", failure_threshold=3, timeout_seconds=60
-    )
-    sms_cb = resilience_service.get_or_create_circuit_breaker(
-        "notification_sms", failure_threshold=3, timeout_seconds=60
-    )
-    chat_cb = resilience_service.get_or_create_circuit_breaker(
-        "notification_chat", failure_threshold=3, timeout_seconds=60
-    )
-
-    channels = {
-        "chat": ChatChannel(circuit_breaker=chat_cb),
-        "email": EmailChannel(
-            email_provider_settings=email_provider_settings,
-            circuit_breaker=email_cb,
-        ),
-        "sms": SMSChannel(
-            notify_settings=notify_settings,
-            circuit_breaker=sms_cb,
-        ),
-    }
-
-    return NotificationService(
-        channels=channels,
-        idempotency_service=idempotency_service,
-    )
 
 
 @lru_cache(maxsize=1)
