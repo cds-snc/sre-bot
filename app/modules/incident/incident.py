@@ -1,6 +1,7 @@
 import re
 import i18n  # type: ignore
 from slack_sdk import WebClient
+from slack_sdk.models import views, blocks
 from slack_bolt import Ack, App
 
 from integrations.slack import users as slack_users
@@ -34,6 +35,22 @@ def register(bot: App):
     bot.action("incident_change_locale")(handle_change_locale_button)
 
 
+def _incident_modal_loading_view():
+    loading_view = views.View(
+        type="modal",
+        callback_id="incident_view",
+        title=i18n.t("incident.modal.title"),
+        blocks=[
+            blocks.SectionBlock(
+                text=blocks.MarkdownTextObject(
+                    text=f":beach-ball: {i18n.t('incident.modal.launching')}"
+                )
+            )
+        ],
+    )
+    return loading_view.to_dict()
+
+
 def open_create_incident_modal(client: WebClient, ack, command, body):
     ack()
     # private_metadata = json.dumps(
@@ -53,20 +70,7 @@ def open_create_incident_modal(client: WebClient, ack, command, body):
         user_id = body["user_id"]
     locale = slack_users.get_user_locale(client, user_id)
     i18n.set("locale", locale)
-    loading_view = {
-        "type": "modal",
-        "callback_id": "incident_view",
-        "title": {"type": "plain_text", "text": i18n.t("incident.modal.title")},
-        "blocks": [
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f":beach-ball: {i18n.t('incident.modal.launching')}",
-                },
-            },
-        ],
-    }
+    loading_view = _incident_modal_loading_view()
     view = client.views_open(trigger_id=body["trigger_id"], view=loading_view)["view"]
     folders = incident_folder.list_incident_folders()
     options = [
