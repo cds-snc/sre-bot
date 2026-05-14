@@ -9,7 +9,7 @@ Usage in route handlers:
     from fastapi import Security
     from typing import Annotated
     from infrastructure.security.models import User
-    from infrastructure.services import get_current_user
+    from infrastructure.security import get_current_user
 
     # Authentication only (valid JWT required, no scope check):
     @router.get("/me")

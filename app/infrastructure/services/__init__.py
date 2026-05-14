@@ -8,7 +8,6 @@ from infrastructure.services.dependencies import (
     AppSettingsDep,
     SettingsDep,
     JWKSManagerDep,
-    CurrentUserDep,
     AWSClientsDep,
     GoogleWorkspaceClientsDep,
     MaxMindClientDep,
@@ -44,7 +43,6 @@ from infrastructure.services.providers import (
     t,
 )
 from infrastructure.security.rate_limiter import get_limiter, setup_rate_limiter
-from infrastructure.security.current_user import get_current_user
 
 # Plugin infrastructure
 from infrastructure.services.plugins import (
@@ -60,7 +58,6 @@ __all__ = [
     "AppSettingsDep",
     "SettingsDep",
     "JWKSManagerDep",
-    "CurrentUserDep",
     "AWSClientsDep",
     "GoogleWorkspaceClientsDep",
     "MaxMindClientDep",
@@ -98,7 +95,6 @@ __all__ = [
     # Translation helper
     "t",
     # Security utilities
-    "get_current_user",
     "get_limiter",
     "setup_rate_limiter",
     # Plugin infrastructure
