@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 
 from infrastructure.security.models import AuthPrincipalSource, User
 from infrastructure.operations import OperationResult, OperationStatus
-from infrastructure.services import get_current_user
+from infrastructure.security import get_current_user
 from packages.access.catalog.providers import get_catalog_service, get_catalog_settings
 from packages.access.catalog.domain import (
     EntitlementEntry,
