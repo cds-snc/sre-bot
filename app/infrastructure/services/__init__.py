@@ -63,7 +63,6 @@ __all__ = [
     "TranslationServiceDep",
     "IdempotencyServiceDep",
     "ResilienceServiceDep",
-    "NotificationServiceDep",
     "StorageServiceDep",
     "AuditTrailServiceDep",
     "PlatformServiceDep",
