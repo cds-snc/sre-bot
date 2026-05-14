@@ -348,7 +348,7 @@ def recreate_missing_resources(
     Returns:
         dict: Summary of actions taken and any errors encountered
     """
-    results = {
+    results: dict = {
         "success": [],
         "errors": [],
         "skipped": [],
