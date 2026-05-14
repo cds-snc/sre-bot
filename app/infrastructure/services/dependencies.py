@@ -17,7 +17,6 @@ from infrastructure.directory.provider import DirectoryProvider
 from infrastructure.events.service import EventDispatcher
 from infrastructure.i18n.service import TranslationService
 from infrastructure.idempotency.protocol import IdempotencyService
-from infrastructure.notifications.service import NotificationService
 from infrastructure.platforms.clients.slack import SlackClientFacade
 from infrastructure.platforms.service import PlatformService
 from infrastructure.resilience.service import ResilienceService
@@ -32,7 +31,6 @@ from infrastructure.services.providers import (
     get_idempotency_service,
     get_jwks_manager,
     get_maxmind_client,
-    get_notification_service,
     get_platform_service,
     get_resilience_service,
     get_settings,
@@ -80,11 +78,6 @@ IdempotencyServiceDep = Annotated[IdempotencyService, Depends(get_idempotency_se
 # Resilience service dependency
 ResilienceServiceDep = Annotated[ResilienceService, Depends(get_resilience_service)]
 
-# Notification service dependency
-NotificationServiceDep = Annotated[
-    NotificationService, Depends(get_notification_service)
-]
-
 # Storage service dependency
 StorageServiceDep = Annotated[StorageService, Depends(get_storage_service)]
 
@@ -114,7 +107,6 @@ __all__ = [
     "TranslationServiceDep",
     "IdempotencyServiceDep",
     "ResilienceServiceDep",
-    "NotificationServiceDep",
     "StorageServiceDep",
     "PlatformServiceDep",
     "SlackBotDep",
