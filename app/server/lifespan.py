@@ -14,7 +14,6 @@ from infrastructure.services import (
     register_feature_integrations,
     get_directory_provider,
     get_jwks_manager,
-    # get_platform_service,
     get_settings,
     get_translation_service,
 )
