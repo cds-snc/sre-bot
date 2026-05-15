@@ -4,13 +4,17 @@ This service coexists with the legacy PlatformService-based Slack provider and
 provides a dedicated registration surface for feature hooks.
 """
 
+from functools import cache
 from typing import Any, Callable
 
 import structlog
 
-from infrastructure.configuration.integrations.slack import SlackSettings
+from infrastructure.configuration.integrations.slack import (
+    SlackSettings,
+    get_slack_settings,
+)
 from infrastructure.operations import OperationResult
-from infrastructure.platforms.clients.slack import SlackClientFacade
+from infrastructure.platforms.clients.slack import SlackClientFacade, get_slack_client
 from infrastructure.platforms.providers.slack import SlackPlatformProvider
 
 logger = structlog.get_logger()
@@ -93,3 +97,17 @@ class SlackBot:
     def socket_mode_handler(self) -> Any:
         """Expose socket mode handler managed by the underlying provider."""
         return self._provider.socket_mode_handler
+
+
+@cache
+def get_slack_bot() -> SlackBot:
+    """Get application-scoped standalone SlackBot singleton.
+
+    Returns:
+        SlackBot: Cached standalone Slack service.
+    """
+
+    return SlackBot(
+        slack_settings=get_slack_settings(),
+        slack_client=get_slack_client(),
+    )

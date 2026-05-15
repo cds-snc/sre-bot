@@ -17,8 +17,6 @@ from infrastructure.directory.provider import DirectoryProvider
 from infrastructure.events.service import EventDispatcher
 from infrastructure.i18n.service import TranslationService
 from infrastructure.idempotency.protocol import IdempotencyService
-from infrastructure.platforms.clients.slack import SlackClientFacade
-from infrastructure.platforms.service import PlatformService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.security.jwks import JWKSManager
 from infrastructure.services.providers import (
@@ -31,15 +29,11 @@ from infrastructure.services.providers import (
     get_idempotency_service,
     get_jwks_manager,
     get_maxmind_client,
-    get_platform_service,
     get_resilience_service,
     get_settings,
-    get_slack_bot,
-    get_slack_client,
     get_storage_service,
     get_translation_service,
 )
-from infrastructure.slack.service import SlackBot
 from infrastructure.storage.protocol import StorageService
 
 # Settings dependency
@@ -84,15 +78,6 @@ StorageServiceDep = Annotated[StorageService, Depends(get_storage_service)]
 # Audit trail service dependency
 AuditTrailServiceDep = Annotated[AuditTrailService, Depends(get_audit_trail_service)]
 
-# Platform service dependency
-PlatformServiceDep = Annotated[PlatformService, Depends(get_platform_service)]
-
-# Platform client facades - wrap platform SDKs with OperationResult APIs
-# Standalone Slack bot dependency
-SlackBotDep = Annotated[SlackBot, Depends(get_slack_bot)]
-
-# Slack client facade dependency
-SlackClientDep = Annotated[SlackClientFacade, Depends(get_slack_client)]
 
 # Directory provider dependency — IDP-agnostic group membership and listing
 DirectoryProviderDep = Annotated[DirectoryProvider, Depends(get_directory_provider)]
@@ -108,8 +93,5 @@ __all__ = [
     "IdempotencyServiceDep",
     "ResilienceServiceDep",
     "StorageServiceDep",
-    "PlatformServiceDep",
-    "SlackBotDep",
-    "SlackClientDep",
     "DirectoryProviderDep",
 ]

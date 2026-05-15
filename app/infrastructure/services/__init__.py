@@ -17,8 +17,6 @@ from infrastructure.services.dependencies import (
     ResilienceServiceDep,
     StorageServiceDep,
     AuditTrailServiceDep,
-    PlatformServiceDep,
-    SlackClientDep,
     DirectoryProviderDep,
 )
 from infrastructure.services.providers import (
@@ -34,10 +32,7 @@ from infrastructure.services.providers import (
     get_resilience_service,
     get_storage_service,
     get_audit_trail_service,
-    get_platform_service,
-    get_slack_client,
     get_directory_provider,
-    get_slack_provider,
     t,
 )
 from infrastructure.security.rate_limiter import get_limiter, setup_rate_limiter
@@ -65,9 +60,6 @@ __all__ = [
     "ResilienceServiceDep",
     "StorageServiceDep",
     "AuditTrailServiceDep",
-    "PlatformServiceDep",
-    # Platform client facades
-    "SlackClientDep",
     "DirectoryProviderDep",
     # Core providers
     "get_app_settings",
@@ -82,12 +74,7 @@ __all__ = [
     "get_resilience_service",
     "get_storage_service",
     "get_audit_trail_service",
-    "get_platform_service",
     "get_directory_provider",
-    # Platform client providers
-    "get_slack_client",
-    # Platform provider accessors (ergonomic improvement)
-    "get_slack_provider",
     # Translation helper
     "t",
     # Security utilities

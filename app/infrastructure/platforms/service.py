@@ -34,6 +34,7 @@ Usage:
     service.load_providers()  # Discover and register providers
 """
 
+from functools import lru_cache
 from typing import Any, Dict, List, TYPE_CHECKING
 
 import structlog
@@ -52,6 +53,7 @@ from infrastructure.platforms.providers import (
 from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
 
 from infrastructure.platforms.registry import PlatformRegistry, get_platform_registry
+from infrastructure.platforms.settings import get_platforms_settings
 
 if TYPE_CHECKING:
     from infrastructure.i18n.service import TranslationService
@@ -413,3 +415,8 @@ class PlatformService:
             PlatformRegistry instance
         """
         return self._registry
+
+
+@lru_cache(maxsize=1)
+def get_platform_service():
+    return PlatformService(platforms_settings=get_platforms_settings())
