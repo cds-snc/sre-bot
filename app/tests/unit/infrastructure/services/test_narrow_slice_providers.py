@@ -24,10 +24,10 @@ from infrastructure.services.providers import (
     get_idempotency_service,
     get_jwks_manager,
     get_maxmind_client,
-    get_platform_service,
     get_resilience_service,
-    get_slack_client,
 )
+from infrastructure.platforms.service import get_platform_service
+from infrastructure.platforms.clients.slack import get_slack_client
 
 pytestmark = pytest.mark.unit
 
@@ -185,10 +185,10 @@ class TestProvidersDontCallGetSettings:
         get_platform_service.cache_clear()
         with (
             patch(
-                "infrastructure.services.providers.get_settings"
+                "infrastructure.configuration.settings.get_settings"
             ) as mock_get_settings,
             patch(
-                "infrastructure.services.providers.get_platforms_settings"
+                "infrastructure.platforms.service.get_platforms_settings"
             ) as mock_platforms,
         ):
             mock_platforms.return_value = MagicMock(spec=PlatformsSettings)
@@ -227,9 +227,11 @@ class TestProvidersDontCallGetSettings:
         get_slack_client.cache_clear()
         with (
             patch(
-                "infrastructure.services.providers.get_settings"
+                "infrastructure.configuration.settings.get_settings"
             ) as mock_get_settings,
-            patch("infrastructure.services.providers.get_slack_settings") as mock_slack,
+            patch(
+                "infrastructure.platforms.clients.slack.get_slack_settings"
+            ) as mock_slack,
         ):
             mock_slack.return_value = MagicMock(spec=SlackSettings)
             mock_slack.return_value.SLACK_TOKEN = "xoxb-test"

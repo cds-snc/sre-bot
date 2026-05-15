@@ -4,9 +4,8 @@ Factory functions for dependency injection.
 Provides application-scoped singleton providers for core infrastructure services.
 """
 
-import warnings
 from functools import lru_cache
-from typing import Any, cast
+from typing import Any
 
 from infrastructure.audit.protocol import AuditTrailService
 from infrastructure.audit.service import DynamoDBAuditTrailService
@@ -24,7 +23,6 @@ from infrastructure.configuration.infrastructure.directory import get_directory_
 from infrastructure.configuration.infrastructure.idempotency import (
     get_idempotency_settings,
 )
-from infrastructure.configuration.infrastructure.platforms import get_platforms_settings
 from infrastructure.configuration.infrastructure.retry import get_retry_settings
 from infrastructure.configuration.infrastructure.server import get_server_settings
 from infrastructure.configuration.integrations.aws import get_aws_settings
@@ -32,7 +30,6 @@ from infrastructure.configuration.integrations.google import (
     get_google_workspace_settings,
 )
 from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
-from infrastructure.configuration.integrations.slack import get_slack_settings
 from infrastructure.directory.factory import build_google_directory_provider
 from infrastructure.directory.provider import DirectoryProvider
 from infrastructure.events.service import EventDispatcher
@@ -41,13 +38,8 @@ from infrastructure.i18n.service import TranslationService
 from infrastructure.idempotency.dynamodb import DynamoDBCache
 from infrastructure.idempotency.protocol import IdempotencyService
 from infrastructure.idempotency.service import DynamoDBIdempotencyService
-from infrastructure.platforms import PlatformService
-from infrastructure.platforms.clients.slack import SlackClientFacade
-from infrastructure.platforms.exceptions import ProviderNotFoundError
-from infrastructure.platforms.providers import SlackPlatformProvider
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.security.jwks import JWKSManager
-from infrastructure.slack.service import SlackBot
 from infrastructure.storage.protocol import StorageService
 from infrastructure.storage.service import DynamoDBStorageService
 
@@ -377,88 +369,6 @@ def get_audit_trail_service() -> AuditTrailService:
 
 
 @lru_cache(maxsize=1)
-def get_platform_service():
-    """Get application-scoped platform service singleton.
-
-    Returns a PlatformService instance for managing collaboration platform
-    providers (Slack) with unified interfaces for messaging,
-    capability detection, and provider initialization.
-
-    The service is initialized with injected dependencies from settings
-    and manages a thread-safe registry of platform providers.
-
-    Usage:
-        # FastAPI route handlers (dependency injection)
-        from infrastructure.services import PlatformServiceDep
-
-        @router.post("/platforms/send")
-        def send_message(
-            platform_service: PlatformServiceDep,
-            platform: str,
-            channel: str,
-            message: dict
-        ):
-            result = platform_service.send(platform, channel, message)
-            if result.is_success:
-                return {"sent": True}
-            return {"error": result.message}
-
-        # Application code (startup, jobs, modules)
-        from infrastructure.services import get_platform_service
-
-        def initialize_platforms():
-            platform_service = get_platform_service()  # Singleton
-            providers = platform_service.load_providers()
-            init_results = platform_service.initialize_all_providers()
-            return init_results
-
-    Returns:
-        PlatformService: Cached platform service instance
-    """
-    return PlatformService(platforms_settings=get_platforms_settings())
-
-
-@lru_cache(maxsize=1)
-def get_slack_client():
-    """Get application-scoped Slack client facade singleton.
-
-    Returns a SlackClientFacade instance that wraps the Slack SDK
-    (slack_sdk.WebClient) with OperationResult-based APIs for consistent
-    error handling across the platform.
-
-    Credentials are loaded from settings.slack.SLACK_TOKEN (bot token).
-    The facade provides methods for posting messages, updating messages,
-    listing conversations, getting user info, and opening views (modals).
-
-    Usage:
-        # FastAPI route handlers (dependency injection)
-        from infrastructure.services import SlackClientDep
-
-        @router.post("/slack/message")
-        def send_message(slack: SlackClientDep, channel: str, text: str):
-            result = slack.post_message(channel=channel, text=text)
-            if result.is_success:
-                return {"ts": result.data["ts"]}
-            return {"error": result.message}
-
-        # Application code (jobs, modules, utils)
-        from infrastructure.services import get_slack_client
-
-        def send_notification():
-            slack = get_slack_client()  # Singleton
-            result = slack.post_message(channel="C123", text="Alert!")
-            return result
-
-    Returns:
-        SlackClientFacade: Cached Slack client instance
-
-    Note:
-        For advanced use cases, access the raw WebClient via client.raw_client
-    """
-    return SlackClientFacade(token=get_slack_settings().SLACK_TOKEN)
-
-
-@lru_cache(maxsize=1)
 def get_directory_provider() -> DirectoryProvider:
     """Get application-scoped directory provider singleton.
 
@@ -502,40 +412,3 @@ def get_directory_provider() -> DirectoryProvider:
             directory_settings=directory_settings,
         )
     raise ValueError(f"Unsupported directory provider: {provider_key!r}")
-
-
-def get_slack_provider() -> SlackPlatformProvider:
-    """Get Slack platform provider from the platform service registry.
-
-    Ergonomic single-call accessor replacing the two-step
-    ``get_platform_service().get_provider('slack')`` pattern.
-
-    Returns:
-        SlackPlatformProvider instance.
-
-    Raises:
-        ProviderNotFoundError: If Slack provider has not been registered.
-    """
-    warnings.warn(
-        "get_slack_provider() is deprecated; prefer get_slack_bot() for "
-        "standalone Slack interaction registration.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    provider = get_platform_service()._registry.get_provider("slack")
-    if provider is None:
-        raise ProviderNotFoundError("No provider registered with name 'slack'")
-    return cast(SlackPlatformProvider, provider)
-
-
-@lru_cache(maxsize=1)
-def get_slack_bot() -> SlackBot:
-    """Get application-scoped standalone SlackBot singleton.
-
-    Returns:
-        SlackBot: Cached standalone Slack service.
-    """
-    return SlackBot(
-        slack_settings=get_slack_settings(),
-        slack_client=get_slack_client(),
-    )

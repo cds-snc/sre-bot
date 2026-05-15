@@ -4,12 +4,15 @@ Wraps the Slack SDK (slack_sdk.WebClient) with OperationResult-based APIs
 for consistent error handling across the platform.
 """
 
-import structlog
+from functools import cache
 from typing import Any, Dict, List, Optional
+
+import structlog
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 from infrastructure.operations import OperationResult
+from infrastructure.configuration.integrations.slack import get_slack_settings
 
 logger = structlog.get_logger()
 
@@ -347,3 +350,15 @@ class SlackClientFacade:
             Use only when facade methods are insufficient.
         """
         return self._client
+
+
+@cache
+def get_slack_client() -> SlackClientFacade:
+    """Get singleton instance of SlackClientFacade.
+
+    Returns:
+        SlackClientFacade instance initialized with token from settings
+    """
+    settings = get_slack_settings()
+    token = settings.SLACK_TOKEN
+    return SlackClientFacade(token=token)

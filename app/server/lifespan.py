@@ -14,10 +14,10 @@ from infrastructure.services import (
     register_feature_integrations,
     get_directory_provider,
     get_jwks_manager,
-    get_platform_service,
     get_settings,
     get_translation_service,
 )
+from infrastructure.platforms import get_platform_service
 from infrastructure.i18n.resources import I18nResourceSpec
 from jobs import scheduled_tasks
 from modules import (

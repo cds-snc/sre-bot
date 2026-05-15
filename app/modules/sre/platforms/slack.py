@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING, cast
 
 from slack_bolt import Ack, Respond
 from infrastructure.platforms.models import CommandPayload, CommandResponse
-from infrastructure.services import get_settings, get_slack_client
+from infrastructure.configuration.app import get_app_settings as get_settings
+from infrastructure.platforms.clients.slack import get_slack_client
 from modules.incident import incident_helper
 from modules.sre import webhook_helper
 

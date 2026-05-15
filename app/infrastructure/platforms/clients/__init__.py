@@ -8,9 +8,10 @@ Modules:
 """
 
 from infrastructure.platforms.clients.http import InternalHttpClient
-from infrastructure.platforms.clients.slack import SlackClientFacade
+from infrastructure.platforms.clients.slack import SlackClientFacade, get_slack_client
 
 __all__ = [
     "InternalHttpClient",
     "SlackClientFacade",
+    "get_slack_client",
 ]

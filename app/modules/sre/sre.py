@@ -11,7 +11,8 @@ from slack_bolt import Ack, App, Respond
 
 from infrastructure.platforms.exceptions import ProviderNotFoundError
 from infrastructure.platforms.models import CommandPayload, CommandResponse
-from infrastructure.services import get_platform_service, get_settings
+from infrastructure.platforms import get_platform_service
+from infrastructure.configuration import get_app_settings as get_settings
 
 logger = structlog.get_logger()
 
