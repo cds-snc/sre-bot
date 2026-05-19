@@ -11,7 +11,10 @@ from structlog.stdlib import BoundLogger
 from infrastructure.i18n.resources import I18nResourceSpec
 from infrastructure.logging.setup import configure_logging
 from infrastructure.platforms import get_platform_service
-from infrastructure.plugins import register_feature_integrations, collect_feature_i18n_resources
+from infrastructure.plugins import (
+    register_feature_integrations,
+    collect_feature_i18n_resources,
+)
 from infrastructure.services import (
     get_directory_provider,
     get_jwks_manager,
