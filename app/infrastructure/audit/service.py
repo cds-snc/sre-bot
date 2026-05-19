@@ -5,12 +5,15 @@ Delegates all I/O to ``StorageService`` — no direct boto3 or dynamodb_next cal
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from functools import cache
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import structlog
 
 from infrastructure.audit.models import AuditEvent
+from infrastructure.audit.protocol import AuditTrailService
 from infrastructure.operations.result import OperationResult
+from infrastructure.storage import get_storage_service
 
 if TYPE_CHECKING:
     from infrastructure.storage.protocol import StorageService
@@ -231,3 +234,14 @@ class DynamoDBAuditTrailService:
             error=result.message,
         )
         return None
+
+
+@cache
+def get_audit_trail_service() -> AuditTrailService:
+    """Get application-scoped audit trail service singleton.
+    Returns an AuditTrailService Protocol instance for writing and querying audit
+    events. The implementation uses DynamoDB, but can be swapped for alternative
+    audit backends that satisfy the Protocol.
+    """
+    storage = get_storage_service()
+    return DynamoDBAuditTrailService(storage)

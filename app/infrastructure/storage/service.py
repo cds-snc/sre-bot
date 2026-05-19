@@ -30,13 +30,16 @@ Usage (feature-level repository)::
             return None
 """
 
-from typing import Any, Dict, List, TYPE_CHECKING
+from functools import cache
+from typing import TYPE_CHECKING, Any, Dict, List
 
 import structlog
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 
+from infrastructure.clients.aws import get_aws_clients
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
+from infrastructure.storage.protocol import StorageService
 
 if TYPE_CHECKING:
     from infrastructure.clients.aws.dynamodb import DynamoDBClient
@@ -270,3 +273,14 @@ class DynamoDBStorageService:
         return OperationResult.success(
             data=[_deserialize_item(item) for item in raw_items]
         )
+
+
+@cache
+def get_storage_service() -> StorageService:
+    """Provider function for the storage service.
+
+    Returns:
+        StorageService instance.
+    """
+    dynamodb = get_aws_clients().dynamodb
+    return DynamoDBStorageService(dynamodb)

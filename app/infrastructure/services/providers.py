@@ -7,9 +7,6 @@ Provides application-scoped singleton providers for core infrastructure services
 from functools import lru_cache
 from typing import Any
 
-from infrastructure.audit.protocol import AuditTrailService
-from infrastructure.audit.service import DynamoDBAuditTrailService
-from infrastructure.clients.aws import AWSClients
 from infrastructure.clients.google_workspace import GoogleWorkspaceClients
 from infrastructure.clients.maxmind import MaxMindClient
 from infrastructure.configuration import Settings
@@ -24,7 +21,6 @@ from infrastructure.configuration.infrastructure.idempotency import (
     get_idempotency_settings,
 )
 from infrastructure.configuration.infrastructure.retry import get_retry_settings
-from infrastructure.configuration.integrations.aws import get_aws_settings
 from infrastructure.configuration.integrations.google import (
     get_google_workspace_settings,
 )
@@ -38,8 +34,6 @@ from infrastructure.idempotency.dynamodb import DynamoDBCache
 from infrastructure.idempotency.protocol import IdempotencyService
 from infrastructure.idempotency.service import DynamoDBIdempotencyService
 from infrastructure.resilience.service import ResilienceService
-from infrastructure.storage.protocol import StorageService
-from infrastructure.storage.service import DynamoDBStorageService
 
 
 @lru_cache(maxsize=1)
@@ -74,34 +68,6 @@ def get_settings() -> Settings:
 def get_app_settings() -> AppSettings:
     """Get application-scoped app settings singleton."""
     return _get_app_settings()
-
-
-@lru_cache(maxsize=1)
-def get_aws_clients() -> AWSClients:
-    """Provider for AWS clients facade with all service operations.
-
-    Returns a fully-configured AWSClients facade instance with region and endpoint
-    settings from application configuration. The facade composes per-service clients
-    (DynamoDB, IdentityStore, Organizations, SsoAdmin) with a shared SessionProvider.
-
-    Credentials (temporary creds from assume_role or default providers) are created
-    per API call, so caching this facade is safe—it doesn't hold stale credentials.
-
-    Returns:
-        AWSClients: Configured facade instance for all AWS service calls
-
-    Usage:
-        @router.post("/items")
-        def create_item(aws: AWSClientsDep):
-            result = aws.dynamodb.put_item("my_table", Item={...})
-            if result.is_success:
-                return {"item_id": result.data}
-
-            result = aws.identitystore.get_user(store_id, user_id)
-            if result.is_success:
-                return {"user": result.data}
-    """
-    return AWSClients(aws_settings=get_aws_settings())
 
 
 @lru_cache(maxsize=1)
@@ -299,56 +265,6 @@ def get_resilience_service() -> ResilienceService:
         ResilienceService: Cached resilience service instance
     """
     return ResilienceService(retry_settings=get_retry_settings())
-
-
-@lru_cache(maxsize=1)
-def get_storage_service() -> StorageService:
-    """Get application-scoped storage service singleton.
-
-    Returns a ``StorageService`` backed by ``DynamoDBClient`` from the AWS
-    clients facade.  Feature packages should define typed repository classes
-    that take ``StorageService`` as a constructor argument instead of calling
-    ``DynamoDBClient`` directly.
-
-    Usage::
-
-        from infrastructure.services import StorageServiceDep
-
-        class SyncRunRepository:
-            def __init__(self, storage: StorageServiceDep) -> None:
-                self._storage = storage
-
-    Returns:
-        StorageService: Cached storage service instance.
-    """
-    aws = get_aws_clients()
-    return DynamoDBStorageService(dynamodb=aws.dynamodb)
-
-
-@lru_cache(maxsize=1)
-def get_audit_trail_service() -> AuditTrailService:
-    """Get application-scoped audit trail service singleton.
-
-    Returns an AuditTrailService Protocol instance for writing and querying audit
-    events. The implementation uses DynamoDB, but can be swapped for alternative
-    audit backends that satisfy the Protocol.
-
-    Usage:
-        from infrastructure.services import AuditTrailServiceDep
-
-        @router.post("/audit/write")
-        def write_audit(
-            audit_trail: AuditTrailServiceDep,
-            event: AuditEvent
-        ):
-            success = audit_trail.write_audit_event(event)
-            return {"written": success}
-
-    Returns:
-        AuditTrailService: Cached audit trail service instance (implements Protocol)
-    """
-    storage = get_storage_service()
-    return DynamoDBAuditTrailService(storage=storage)
 
 
 @lru_cache(maxsize=1)
