@@ -1,6 +1,6 @@
 """Test plugin discovery and i18n hook invocation."""
 
-from infrastructure.services.plugins.manager import get_plugin_manager
+from infrastructure.plugins.manager import get_plugin_manager
 from infrastructure.i18n.resources import I18nResourceRegistry
 
 
@@ -9,7 +9,7 @@ def test_plugin_discovery_finds_geolocate() -> None:
     pm = get_plugin_manager()
 
     # Auto-discover plugins (same as in lifespan)
-    from infrastructure.services.plugins.base import auto_discover_plugins
+    from infrastructure.plugins.base import auto_discover_plugins
 
     auto_discover_plugins(pm, base_paths=["packages", "modules"])
 
@@ -29,7 +29,7 @@ def test_i18n_hook_registers_geolocate_resources() -> None:
     """Test that register_i18n_resources hook is called and geolocate registers."""
     pm = get_plugin_manager()
 
-    from infrastructure.services.plugins.base import auto_discover_plugins
+    from infrastructure.plugins.base import auto_discover_plugins
 
     auto_discover_plugins(pm, base_paths=["packages", "modules"])
 
