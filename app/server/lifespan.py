@@ -1,24 +1,26 @@
-from contextlib import asynccontextmanager
 import sys
 import threading
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncIterator, Optional, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, AsyncIterator, Optional, cast
 
 from fastapi import FastAPI
 from slack_bolt import App
 from structlog.stdlib import BoundLogger
 
+from infrastructure.i18n.resources import I18nResourceSpec
 from infrastructure.logging.setup import configure_logging
-from infrastructure.services import (
-    collect_feature_i18n_resources,
+from infrastructure.platforms import get_platform_service
+from infrastructure.plugins import (
     register_feature_integrations,
+    collect_feature_i18n_resources,
+)
+from infrastructure.services import (
     get_directory_provider,
     get_jwks_manager,
     get_settings,
     get_translation_service,
 )
-from infrastructure.platforms import get_platform_service
-from infrastructure.i18n.resources import I18nResourceSpec
 from jobs import scheduled_tasks
 from modules import (
     atip,

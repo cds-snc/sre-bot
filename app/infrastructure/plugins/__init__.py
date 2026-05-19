@@ -2,7 +2,7 @@
 
 import pluggy
 
-from infrastructure.services.plugins.manager import (
+from infrastructure.plugins.manager import (
     get_plugin_manager,
     discover_and_init_features,
     collect_feature_i18n_resources,

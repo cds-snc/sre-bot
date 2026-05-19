@@ -7,7 +7,7 @@ import pytest
 
 from infrastructure.hookspecs import features
 from infrastructure.events.service import EventDispatcher
-from infrastructure.services.plugins.manager import register_feature_integrations
+from infrastructure.plugins.manager import register_feature_integrations
 
 pytestmark = pytest.mark.unit
 
@@ -42,7 +42,7 @@ def test_hookspec_called_during_feature_integration(monkeypatch) -> None:
     fake_pm.hook.register_event_handlers = mocked_hook
 
     monkeypatch.setattr(
-        "infrastructure.services.plugins.manager.get_plugin_manager",
+        "infrastructure.plugins.manager.get_plugin_manager",
         lambda: fake_pm,
     )
 

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from infrastructure.services import hookimpl
+from infrastructure.plugins import hookimpl
 from infrastructure.i18n.resources import I18nResourceSpec
 from packages.geolocate.routes import router as geolocate_router
 from packages.geolocate.schemas import GeolocateRequest, GeolocateResponse
