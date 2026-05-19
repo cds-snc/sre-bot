@@ -8,8 +8,6 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from infrastructure.audit.protocol import AuditTrailService
-from infrastructure.clients.aws import AWSClients
 from infrastructure.clients.google_workspace import GoogleWorkspaceClients
 from infrastructure.clients.maxmind import MaxMindClient
 from infrastructure.configuration import AppSettings, Settings
@@ -20,8 +18,6 @@ from infrastructure.idempotency.protocol import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.services.providers import (
     get_app_settings,
-    get_audit_trail_service,
-    get_aws_clients,
     get_directory_provider,
     get_event_dispatcher,
     get_google_workspace_clients,
@@ -29,19 +25,12 @@ from infrastructure.services.providers import (
     get_maxmind_client,
     get_resilience_service,
     get_settings,
-    get_storage_service,
     get_translation_service,
 )
-from infrastructure.storage.protocol import StorageService
 
 # Settings dependency
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 AppSettingsDep = Annotated[AppSettings, Depends(get_app_settings)]
-
-
-# AWS clients facade dependency - provides attribute-based access to all AWS services
-# Usage: aws.dynamodb.get_item(...), aws.identitystore.list_users(...), etc.
-AWSClientsDep = Annotated[AWSClients, Depends(get_aws_clients)]
 
 # Google Workspace clients facade dependency - provides attribute-based access to all Google services
 # Usage: google.directory.list_groups(), google.drive.create_file(...), etc.
@@ -67,25 +56,16 @@ IdempotencyServiceDep = Annotated[IdempotencyService, Depends(get_idempotency_se
 # Resilience service dependency
 ResilienceServiceDep = Annotated[ResilienceService, Depends(get_resilience_service)]
 
-# Storage service dependency
-StorageServiceDep = Annotated[StorageService, Depends(get_storage_service)]
-
-# Audit trail service dependency
-AuditTrailServiceDep = Annotated[AuditTrailService, Depends(get_audit_trail_service)]
-
-
 # Directory provider dependency — IDP-agnostic group membership and listing
 DirectoryProviderDep = Annotated[DirectoryProvider, Depends(get_directory_provider)]
 
 __all__ = [
     "SettingsDep",
     "AppSettingsDep",
-    "AWSClientsDep",
     "GoogleWorkspaceClientsDep",
     "EventDispatcherDep",
     "TranslationServiceDep",
     "IdempotencyServiceDep",
     "ResilienceServiceDep",
-    "StorageServiceDep",
     "DirectoryProviderDep",
 ]

@@ -16,9 +16,7 @@ from infrastructure.operations.status import OperationStatus
 # Dependency Injection Services (THE PUBLIC API)
 from infrastructure.services import (
     SettingsDep,
-    AWSClientsDep,
     get_settings,
-    get_aws_clients,
 )
 
 __all__ = [
@@ -27,7 +25,5 @@ __all__ = [
     "OperationStatus",
     # Dependency Injection Services
     "SettingsDep",
-    "AWSClientsDep",
     "get_settings",
-    "get_aws_clients",
 ]

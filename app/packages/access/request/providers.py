@@ -12,8 +12,8 @@ from functools import lru_cache
 from infrastructure.services import (
     get_directory_provider,
     get_event_dispatcher,
-    get_storage_service,
 )
+from infrastructure.storage import get_storage_service
 from packages.access.request.service import AccessRequestService
 from packages.access.request.store import AccessRequestRepository
 from packages.access.common.providers import get_access_runtime_config

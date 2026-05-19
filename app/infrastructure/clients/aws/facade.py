@@ -7,6 +7,8 @@ Composition-based design: each service has a focused client class, composed toge
 in a lightweight facade.
 """
 
+from functools import cache
+
 import structlog
 
 from infrastructure.clients.aws.config import ConfigClient
@@ -18,7 +20,7 @@ from infrastructure.clients.aws.identity_store import IdentityStoreClient
 from infrastructure.clients.aws.organizations import OrganizationsClient
 from infrastructure.clients.aws.session_provider import SessionProvider
 from infrastructure.clients.aws.sso_admin import SsoAdminClient
-from infrastructure.configuration.integrations.aws import AwsSettings
+from infrastructure.configuration.integrations.aws import AwsSettings, get_aws_settings
 
 logger = structlog.get_logger()
 
@@ -96,3 +98,10 @@ class AWSClients:
             default_sso_instance_arn=aws_settings.INSTANCE_ARN,
         )
         self._logger = logger.bind(component="aws_clients")
+
+
+@cache
+def get_aws_clients() -> AWSClients:
+    """Factory function to create AWSClients facade instance with settings."""
+    aws_settings = get_aws_settings()
+    return AWSClients(aws_settings)

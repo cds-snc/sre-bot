@@ -24,7 +24,7 @@ as the single point of entry for dependency injection.
 from infrastructure.clients.aws.config import ConfigClient
 from infrastructure.clients.aws.cost_explorer import CostExplorerClient
 from infrastructure.clients.aws.dynamodb import DynamoDBClient
-from infrastructure.clients.aws.facade import AWSClients
+from infrastructure.clients.aws.facade import AWSClients, get_aws_clients
 from infrastructure.clients.aws.guard_duty import GuardDutyClient
 from infrastructure.clients.aws.identity_store import IdentityStoreClient
 from infrastructure.clients.aws.organizations import OrganizationsClient
@@ -41,4 +41,5 @@ __all__ = [
     "ConfigClient",
     "GuardDutyClient",
     "CostExplorerClient",
+    "get_aws_clients",
 ]
