@@ -11,7 +11,7 @@ Exports:
     get_current_user: FastAPI Security() dependency — validates JWT and returns User
 """
 
-from infrastructure.security.jwks import JWKSManager
+from infrastructure.security.jwks import JWKSManager, get_jwks_manager
 from infrastructure.security.jwt import (
     extract_user_info_from_token,
     get_issuer_from_token,
@@ -22,6 +22,7 @@ from infrastructure.security.rate_limiter import get_limiter, setup_rate_limiter
 
 __all__ = [
     "JWKSManager",
+    "get_jwks_manager",
     "get_issuer_from_token",
     "extract_user_info_from_token",
     "validate_jwt_token",

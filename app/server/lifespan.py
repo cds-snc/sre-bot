@@ -12,12 +12,16 @@ from infrastructure.i18n.resources import I18nResourceSpec
 from infrastructure.logging.setup import configure_logging
 from infrastructure.platforms import get_platform_service
 from infrastructure.plugins import (
-    register_feature_integrations,
     collect_feature_i18n_resources,
+    register_feature_integrations,
+)
+from infrastructure.security import get_jwks_manager
+from infrastructure.configuration.infrastructure.server import (
+    get_server_settings,
+    ServerSettings,
 )
 from infrastructure.services import (
     get_directory_provider,
-    get_jwks_manager,
     get_settings,
     get_translation_service,
 )
@@ -96,7 +100,7 @@ def _stop_scheduled_tasks(stop_event: Optional[threading.Event]) -> None:
 
 def _initialize_security_services(
     app: FastAPI,
-    settings: "Settings",
+    settings: "ServerSettings",
     logger: BoundLogger,
 ) -> None:
     """Pre-initialize JWT/JWKS security infrastructure at startup.
@@ -107,8 +111,8 @@ def _initialize_security_services(
     """
     log = logger.bind(phase="security")
     log.info("security_services_initialization_started")
-
-    if not settings.server.ISSUER_CONFIG:
+    issuer_config = settings.ISSUER_CONFIG
+    if not issuer_config:
         log.warning(
             "security_services_no_issuer_config",
             detail="ISSUER_CONFIG not set; authenticated endpoints will fail at runtime",
@@ -119,7 +123,7 @@ def _initialize_security_services(
     jwks_manager.warmup()
     log.info(
         "security_services_initialized",
-        issuer_count=len(settings.server.ISSUER_CONFIG),
+        issuer_count=len(issuer_config),
     )
 
 
@@ -149,6 +153,7 @@ def _initialize_directory_provider(
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
+    server_settings = get_server_settings()
     logger = _get_logger(settings)
 
     app.state.settings = settings
@@ -157,7 +162,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     logger.info("application_startup")
     _list_configs(settings, logger)
 
-    _initialize_security_services(app, settings, logger)
+    _initialize_security_services(app, server_settings, logger)
     _initialize_directory_provider(app, settings, logger)
 
     app.state.command_providers = {}

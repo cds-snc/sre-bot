@@ -18,7 +18,6 @@ from infrastructure.events.service import EventDispatcher
 from infrastructure.i18n.service import TranslationService
 from infrastructure.idempotency.protocol import IdempotencyService
 from infrastructure.resilience.service import ResilienceService
-from infrastructure.security.jwks import JWKSManager
 from infrastructure.services.providers import (
     get_app_settings,
     get_audit_trail_service,
@@ -27,7 +26,6 @@ from infrastructure.services.providers import (
     get_event_dispatcher,
     get_google_workspace_clients,
     get_idempotency_service,
-    get_jwks_manager,
     get_maxmind_client,
     get_resilience_service,
     get_settings,
@@ -39,9 +37,6 @@ from infrastructure.storage.protocol import StorageService
 # Settings dependency
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 AppSettingsDep = Annotated[AppSettings, Depends(get_app_settings)]
-
-# JWKS manager dependency
-JWKSManagerDep = Annotated[JWKSManager, Depends(get_jwks_manager)]
 
 
 # AWS clients facade dependency - provides attribute-based access to all AWS services
@@ -85,7 +80,6 @@ DirectoryProviderDep = Annotated[DirectoryProvider, Depends(get_directory_provid
 __all__ = [
     "SettingsDep",
     "AppSettingsDep",
-    "JWKSManagerDep",
     "AWSClientsDep",
     "GoogleWorkspaceClientsDep",
     "EventDispatcherDep",

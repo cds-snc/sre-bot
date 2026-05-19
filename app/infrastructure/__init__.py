@@ -1,7 +1,7 @@
 """Infrastructure layer - dependency injection and core services.
 
 Public API:
-- Dependency injection providers (get_settings, get_jwks_manager, etc.)
+- Dependency injection providers (get_settings, etc.)
 - Type aliases for FastAPI routes (SettingsDep, CurrentUserDep, etc.)
 - Base types used across application (OperationResult, OperationStatus)
 
@@ -16,10 +16,8 @@ from infrastructure.operations.status import OperationStatus
 # Dependency Injection Services (THE PUBLIC API)
 from infrastructure.services import (
     SettingsDep,
-    JWKSManagerDep,
     AWSClientsDep,
     get_settings,
-    get_jwks_manager,
     get_aws_clients,
 )
 
@@ -29,9 +27,7 @@ __all__ = [
     "OperationStatus",
     # Dependency Injection Services
     "SettingsDep",
-    "JWKSManagerDep",
     "AWSClientsDep",
     "get_settings",
-    "get_jwks_manager",
     "get_aws_clients",
 ]
