@@ -11,17 +11,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from infrastructure.clients.maxmind.client import MaxMindClient
-from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
 from infrastructure.configuration.infrastructure.platforms import PlatformsSettings
 from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.configuration.integrations.maxmind import MaxMindSettings
 from infrastructure.configuration.integrations.slack import SlackSettings
-from infrastructure.idempotency.service import DynamoDBIdempotencyService
 from infrastructure.platforms.clients.slack import get_slack_client
 from infrastructure.platforms.service import PlatformService, get_platform_service
 from infrastructure.resilience.service import ResilienceService
 from infrastructure.services.providers import (
-    get_idempotency_service,
     get_maxmind_client,
 )
 
@@ -48,30 +45,6 @@ class TestMaxMindClientNarrowSlice:
         mock_settings = MagicMock()
         with pytest.raises(TypeError):
             MaxMindClient(settings=mock_settings)
-
-
-class TestIdempotencyServiceNarrowSlice:
-    """DynamoDBIdempotencyService accepts only a pre-constructed cache (no settings)."""
-
-    def test_accepts_injected_cache(self):
-        """DynamoDBIdempotencyService constructs with a pre-built cache."""
-        mock_cache = MagicMock()
-        service = DynamoDBIdempotencyService(cache=mock_cache)
-        assert service is not None
-
-    def test_rejects_settings_kwarg(self):
-        """DynamoDBIdempotencyService does not accept 'settings' or 'idempotency_settings' kwargs."""
-        mock_cache = MagicMock()
-        with pytest.raises(TypeError):
-            DynamoDBIdempotencyService(settings=MagicMock(), cache=mock_cache)
-
-    def test_rejects_idempotency_settings_kwarg(self):
-        """DynamoDBIdempotencyService no longer accepts idempotency_settings (moved to providers)."""
-        mock_cache = MagicMock()
-        with pytest.raises(TypeError):
-            DynamoDBIdempotencyService(
-                idempotency_settings=MagicMock(), cache=mock_cache
-            )
 
 
 class TestResilienceServiceNarrowSlice:
@@ -135,27 +108,6 @@ class TestProvidersDontCallGetSettings:
             mock_get_settings.assert_not_called()
             mock_maxmind.assert_called_once()
         get_maxmind_client.cache_clear()
-
-    def test_get_idempotency_service_uses_idempotency_settings(self):
-        """get_idempotency_service uses get_idempotency_settings, not get_settings."""
-        get_idempotency_service.cache_clear()
-        with (
-            patch(
-                "infrastructure.services.providers.get_settings"
-            ) as mock_get_settings,
-            patch(
-                "infrastructure.services.providers.get_idempotency_settings"
-            ) as mock_idempotency,
-            patch(
-                "infrastructure.services.providers.DynamoDBCache"
-            ) as mock_dynamodb_cache,
-        ):
-            mock_idempotency.return_value = MagicMock(spec=IdempotencySettings)
-            mock_dynamodb_cache.return_value = MagicMock()
-            get_idempotency_service()
-            mock_get_settings.assert_not_called()
-            mock_idempotency.assert_called_once()
-        get_idempotency_service.cache_clear()
 
     def test_get_platform_service_uses_platforms_settings(self):
         """get_platform_service uses get_platforms_settings, not get_settings."""

@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, Security
 from infrastructure.security.models import User
 from infrastructure.operations import OperationResult
 from infrastructure.security import get_current_user
-from infrastructure.services import get_idempotency_service
+from infrastructure.idempotency import get_idempotency_service
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
     get_access_sync_settings,

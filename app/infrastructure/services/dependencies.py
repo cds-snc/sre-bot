@@ -12,11 +12,9 @@ from infrastructure.clients.maxmind import MaxMindClient
 from infrastructure.configuration import AppSettings, Settings
 from infrastructure.events.service import EventDispatcher
 from infrastructure.i18n.service import TranslationService
-from infrastructure.idempotency.protocol import IdempotencyService
 from infrastructure.services.providers import (
     get_app_settings,
     get_event_dispatcher,
-    get_idempotency_service,
     get_maxmind_client,
     get_settings,
     get_translation_service,
@@ -38,14 +36,10 @@ EventDispatcherDep = Annotated[EventDispatcher, Depends(get_event_dispatcher)]
 # Translation service dependency
 TranslationServiceDep = Annotated[TranslationService, Depends(get_translation_service)]
 
-# Idempotency service dependency
-IdempotencyServiceDep = Annotated[IdempotencyService, Depends(get_idempotency_service)]
-
 
 __all__ = [
     "SettingsDep",
     "AppSettingsDep",
     "EventDispatcherDep",
     "TranslationServiceDep",
-    "IdempotencyServiceDep",
 ]

@@ -15,16 +15,10 @@ from infrastructure.configuration.app import (
 from infrastructure.configuration.app import (
     get_app_settings as _get_app_settings,
 )
-from infrastructure.configuration.infrastructure.idempotency import (
-    get_idempotency_settings,
-)
 from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
 from infrastructure.events.service import EventDispatcher
 from infrastructure.i18n.models import Locale, TranslationKey
 from infrastructure.i18n.service import TranslationService
-from infrastructure.idempotency.dynamodb import DynamoDBCache
-from infrastructure.idempotency.protocol import IdempotencyService
-from infrastructure.idempotency.service import DynamoDBIdempotencyService
 
 
 @lru_cache(maxsize=1)
@@ -161,34 +155,3 @@ def t(key: str, locale: str, fallback: str = "", **variables: Any) -> str:
         )
     except Exception:
         return fallback
-
-
-@lru_cache(maxsize=1)
-def get_idempotency_service() -> IdempotencyService:
-    """Get application-scoped idempotency service singleton.
-
-    Returns an IdempotencyService instance with DynamoDB-backed cache
-    for distributed idempotency across ECS tasks.
-
-    Usage:
-        from infrastructure.services import IdempotencyServiceDep
-
-        @router.post("/action")
-        def perform_action(
-            idempotency: IdempotencyServiceDep,
-            request_id: str
-        ):
-            cached = idempotency.get(request_id)
-            if cached:
-                return cached
-
-            result = process_request()
-            idempotency.set(request_id, result, ttl_seconds=3600)
-            return result
-
-    Returns:
-        IdempotencyService: Cached idempotency service instance
-    """
-    return DynamoDBIdempotencyService(
-        cache=DynamoDBCache(idempotency_settings=get_idempotency_settings())
-    )
