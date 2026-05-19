@@ -4,8 +4,8 @@ import importlib
 
 import pytest
 
-from infrastructure.services.plugins.base import auto_discover_plugins
-from infrastructure.services.plugins.manager import get_plugin_manager
+from infrastructure.plugins.base import auto_discover_plugins
+from infrastructure.plugins.manager import get_plugin_manager
 
 
 _ACCESS_ENV_KEYS = (

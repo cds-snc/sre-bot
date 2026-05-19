@@ -11,7 +11,7 @@ import pluggy
 import structlog
 
 from infrastructure import hookspecs
-from infrastructure.services.plugins.base import auto_discover_plugins
+from infrastructure.plugins.base import auto_discover_plugins
 from infrastructure.i18n.resources import I18nResourceRegistry
 
 if TYPE_CHECKING:

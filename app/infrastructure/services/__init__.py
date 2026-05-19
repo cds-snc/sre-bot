@@ -37,15 +37,6 @@ from infrastructure.services.providers import (
 )
 from infrastructure.security.rate_limiter import get_limiter, setup_rate_limiter
 
-# Plugin infrastructure
-from infrastructure.services.plugins import (
-    hookimpl,
-    get_plugin_manager,
-    discover_and_init_features,
-    collect_feature_i18n_resources,
-    register_feature_integrations,
-)
-
 __all__ = [
     # Core dependencies
     "AppSettingsDep",
@@ -80,10 +71,4 @@ __all__ = [
     # Security utilities
     "get_limiter",
     "setup_rate_limiter",
-    # Plugin infrastructure
-    "hookimpl",
-    "get_plugin_manager",
-    "discover_and_init_features",
-    "collect_feature_i18n_resources",
-    "register_feature_integrations",
 ]
