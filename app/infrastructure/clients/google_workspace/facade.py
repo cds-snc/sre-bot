@@ -1,5 +1,6 @@
 """Google Workspace clients facade for all service operations."""
 
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 import structlog
@@ -10,6 +11,9 @@ from infrastructure.clients.google_workspace.drive import DriveClient
 from infrastructure.clients.google_workspace.gmail import GmailClient
 from infrastructure.clients.google_workspace.session_provider import SessionProvider
 from infrastructure.clients.google_workspace.sheets import SheetsClient
+from infrastructure.configuration.integrations.google import (
+    get_google_workspace_settings,
+)
 
 if TYPE_CHECKING:
     from infrastructure.configuration.integrations.google import (
@@ -81,3 +85,14 @@ class GoogleWorkspaceClients:
         )
 
         self._logger = logger.bind(component="google_workspace_clients")
+
+
+@lru_cache(maxsize=1)
+def get_google_workspace_clients() -> GoogleWorkspaceClients:
+    """Provider for Google Workspace clients facade with all service operations.
+
+    Returns a fully-configured GoogleWorkspaceClients facade instance with credentials
+    and workspace settings from application configuration. The facade composes per-service
+    clients (Directory, Drive, Docs, Sheets, Gmail) with a shared SessionProvider.
+    """
+    return GoogleWorkspaceClients(google_settings=get_google_workspace_settings())

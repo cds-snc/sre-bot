@@ -24,9 +24,13 @@ Developer Usage (Recommended):
 from infrastructure.clients.google_workspace.directory import (
     ListGroupsWithMembersRequest,
 )
-from infrastructure.clients.google_workspace.facade import GoogleWorkspaceClients
+from infrastructure.clients.google_workspace.facade import (
+    GoogleWorkspaceClients,
+    get_google_workspace_clients,
+)
 
 __all__ = [
     "GoogleWorkspaceClients",
     "ListGroupsWithMembersRequest",
+    "get_google_workspace_clients",
 ]

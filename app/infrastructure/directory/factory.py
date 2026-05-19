@@ -14,9 +14,14 @@ Adding a new backend:
     3. Add the dispatch branch in ``infrastructure.services.providers.get_directory_provider``.
 """
 
+from functools import cache
 from typing import TYPE_CHECKING
 
-from infrastructure.clients.google_workspace import GoogleWorkspaceClients
+from infrastructure.clients.google_workspace import (
+    GoogleWorkspaceClients,
+    get_google_workspace_clients,
+)
+from infrastructure.configuration.infrastructure.directory import get_directory_settings
 from infrastructure.directory.google import GoogleDirectoryProvider
 from infrastructure.directory.provider import DirectoryProvider
 
@@ -41,3 +46,17 @@ def build_google_directory_provider(
         google_clients=google_clients,
         directory_settings=directory_settings,
     )
+
+
+@cache
+def get_directory_provider() -> DirectoryProvider:
+    """Singleton accessor for the configured DirectoryProvider implementation."""
+
+    directory_settings = get_directory_settings()
+    provider_key = directory_settings.provider
+    if provider_key == "google":
+        return build_google_directory_provider(
+            google_clients=get_google_workspace_clients(),
+            directory_settings=directory_settings,
+        )
+    raise ValueError(f"Unsupported directory provider: {provider_key!r}")
