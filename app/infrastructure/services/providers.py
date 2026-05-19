@@ -7,7 +7,6 @@ Provides application-scoped singleton providers for core infrastructure services
 from functools import lru_cache
 from typing import Any
 
-from infrastructure.clients.google_workspace import GoogleWorkspaceClients
 from infrastructure.clients.maxmind import MaxMindClient
 from infrastructure.configuration import Settings
 from infrastructure.configuration.app import (
@@ -16,17 +15,11 @@ from infrastructure.configuration.app import (
 from infrastructure.configuration.app import (
     get_app_settings as _get_app_settings,
 )
-from infrastructure.configuration.infrastructure.directory import get_directory_settings
 from infrastructure.configuration.infrastructure.idempotency import (
     get_idempotency_settings,
 )
 from infrastructure.configuration.infrastructure.retry import get_retry_settings
-from infrastructure.configuration.integrations.google import (
-    get_google_workspace_settings,
-)
 from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
-from infrastructure.directory.factory import build_google_directory_provider
-from infrastructure.directory.provider import DirectoryProvider
 from infrastructure.events.service import EventDispatcher
 from infrastructure.i18n.models import Locale, TranslationKey
 from infrastructure.i18n.service import TranslationService
@@ -68,46 +61,6 @@ def get_settings() -> Settings:
 def get_app_settings() -> AppSettings:
     """Get application-scoped app settings singleton."""
     return _get_app_settings()
-
-
-@lru_cache(maxsize=1)
-def get_google_workspace_clients() -> GoogleWorkspaceClients:
-    """Provider for Google Workspace clients facade with all service operations.
-
-    Returns a fully-configured GoogleWorkspaceClients facade instance with credentials
-    and workspace settings from application configuration. The facade composes per-service
-    clients (Directory, Drive, Docs, Sheets, Gmail) with a shared SessionProvider.
-
-    Credentials are loaded from the service account key file specified in settings.
-    The facade holds a single SessionProvider instance that manages authentication
-    and delegation across all Google Workspace services.
-
-    Returns:
-        GoogleWorkspaceClients: Configured facade instance for all Google Workspace API calls.
-
-    Usage:
-        # FastAPI route handlers (dependency injection)
-        from infrastructure.services import GoogleWorkspaceClientsDep
-
-        @router.get("/groups")
-        def list_groups(google_clients: GoogleWorkspaceClientsDep):
-            result = google_clients.directory.list_groups()
-            if result.is_success:
-                return {"groups": result.data}
-
-        # Application code (jobs, modules, utils)
-        from infrastructure.services import get_google_workspace_clients
-
-        def sync_groups():
-            google_clients = get_google_workspace_clients()
-            result = google_clients.directory.list_groups()
-            return result
-
-    Note:
-        For Google Workspace types and data classes, import from:
-        infrastructure.clients.google_workspace
-    """
-    return GoogleWorkspaceClients(google_settings=get_google_workspace_settings())
 
 
 @lru_cache(maxsize=1)
@@ -265,49 +218,3 @@ def get_resilience_service() -> ResilienceService:
         ResilienceService: Cached resilience service instance
     """
     return ResilienceService(retry_settings=get_retry_settings())
-
-
-@lru_cache(maxsize=1)
-def get_directory_provider() -> DirectoryProvider:
-    """Get application-scoped directory provider singleton.
-
-    Returns a DirectoryProvider instance backed by the IDP configured in
-    settings.directory.provider.  Default is Google Workspace.
-
-    Credentials and client facades are obtained from the centralised
-    infrastructure.services singletons and injected into the provider via the
-    factory — this function is the single point that knows about both.
-
-    Returns:
-        DirectoryProvider: Cached provider instance for directory operations.
-
-    Usage:
-        # FastAPI route handlers (dependency injection)
-        from infrastructure.services import DirectoryProviderDep
-
-        @router.get("/membership")
-        def check_membership(
-            directory: DirectoryProviderDep,
-            group_key: str,
-            user_email: str,
-        ):
-            result = directory.check_membership(group_key, user_email)
-            if result.is_success:
-                return result.data
-
-        # Application code (jobs, services)
-        from infrastructure.services import get_directory_provider
-
-        def sync_access():
-            directory = get_directory_provider()
-            result = directory.get_group_members("sg-ops@example.com")
-            return result
-    """
-    directory_settings = get_directory_settings()
-    provider_key = directory_settings.provider
-    if provider_key == "google":
-        return build_google_directory_provider(
-            google_clients=get_google_workspace_clients(),
-            directory_settings=directory_settings,
-        )
-    raise ValueError(f"Unsupported directory provider: {provider_key!r}")
