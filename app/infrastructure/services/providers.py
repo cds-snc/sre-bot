@@ -24,7 +24,6 @@ from infrastructure.configuration.infrastructure.idempotency import (
     get_idempotency_settings,
 )
 from infrastructure.configuration.infrastructure.retry import get_retry_settings
-from infrastructure.configuration.infrastructure.server import get_server_settings
 from infrastructure.configuration.integrations.aws import get_aws_settings
 from infrastructure.configuration.integrations.google import (
     get_google_workspace_settings,
@@ -39,7 +38,6 @@ from infrastructure.idempotency.dynamodb import DynamoDBCache
 from infrastructure.idempotency.protocol import IdempotencyService
 from infrastructure.idempotency.service import DynamoDBIdempotencyService
 from infrastructure.resilience.service import ResilienceService
-from infrastructure.security.jwks import JWKSManager
 from infrastructure.storage.protocol import StorageService
 from infrastructure.storage.service import DynamoDBStorageService
 
@@ -76,21 +74,6 @@ def get_settings() -> Settings:
 def get_app_settings() -> AppSettings:
     """Get application-scoped app settings singleton."""
     return _get_app_settings()
-
-
-@lru_cache(maxsize=1)
-def get_jwks_manager() -> JWKSManager:
-    """
-    Get application-scoped JWKSManager singleton.
-
-    Returns:
-        JWKSManager: Cached JWKS manager configured from application settings.
-    """
-    server_settings = get_server_settings()
-    issuer_config = server_settings.ISSUER_CONFIG
-    if not issuer_config:
-        raise ValueError("ISSUER_CONFIG is not configured in settings.server")
-    return JWKSManager(issuer_config=issuer_config)
 
 
 @lru_cache(maxsize=1)

@@ -4,13 +4,31 @@ This module provides JWKS client management and JWT token validation
 with support for multiple issuers.
 """
 
+from functools import lru_cache
 from typing import Any, Dict, Optional
 
 import structlog
 from jwt import PyJWKClient, PyJWKClientError
 
+from infrastructure.configuration.infrastructure.server import (
+    get_server_settings,
+)
 
 logger = structlog.get_logger()
+
+
+def get_issuer_config() -> Dict[str, Dict[str, Any]] | None:
+    """Return the JWKS settings slice from the unified security settings."""
+    settings = get_server_settings()
+    if settings.ISSUER_CONFIG is not None:
+        return settings.ISSUER_CONFIG
+
+    log = logger.bind()
+    log.warning(
+        "issuer_config_not_set",
+        detail="ISSUER_CONFIG is not set in server settings",
+    )
+    return {}
 
 
 class JWKSManager:
@@ -23,7 +41,9 @@ class JWKSManager:
         jwks_clients: Cache of JWKS clients for each issuer
     """
 
-    def __init__(self, issuer_config: Dict[str, Dict[str, Any]]):
+    def __init__(
+        self, issuer_config: Optional[Dict[str, Dict[str, Any]]] = None
+    ) -> None:
         """Initialize JWKS manager.
 
         Args:
@@ -96,7 +116,28 @@ class JWKSManager:
         ensures the client objects are created and cached so there is no
         object-construction overhead on the first authenticated request.
         """
+        if self.issuer_config is None:
+            log = logger.bind()
+            log.warning("jwks_warmup_skipped_no_issuer_config")
+            return
         for issuer in list(self.issuer_config.keys()):
             self.get_jwks_client(issuer)
         log = logger.bind(issuer_count=len(self.issuer_config))
         log.info("jwks_clients_warmed_up")
+
+
+@lru_cache(maxsize=1)
+def get_jwks_manager() -> JWKSManager:
+    """Singleton accessor for JWKSManager.
+
+    Args:
+        issuer_config: Optional issuer configuration dictionary.
+    Returns:
+        The singleton JWKSManager instance.
+    """
+    log = logger.bind()
+    log.info("initializing_jwks_manager")
+    issuer_config = get_issuer_config()
+    if not issuer_config:
+        log.warning("jwks_manager_initialized_with_empty_issuer_config")
+    return JWKSManager(issuer_config=issuer_config)

@@ -33,20 +33,20 @@ secret verification before command handlers are invoked. The CommandPayload.user
 carries the verified Slack user identity — no JWT dependency needed in Slack handlers.
 """
 
-from typing import Any, Annotated, List, Optional
+from typing import Annotated, Any, List, Optional
 
 import structlog
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, SecurityScopes
 
-from infrastructure.security.models import AuthPrincipalSource, User
 from infrastructure.security.jwks import JWKSManager
 from infrastructure.security.jwt import validate_jwt_token
-from infrastructure.services.providers import (
-    get_app_settings,
-    get_jwks_manager,
+from infrastructure.security.models import AuthPrincipalSource, User
+from infrastructure.configuration.infrastructure.server import (
     get_server_settings,
 )
+from infrastructure.configuration import get_app_settings
+from infrastructure.security import get_jwks_manager
 
 logger = structlog.get_logger()
 

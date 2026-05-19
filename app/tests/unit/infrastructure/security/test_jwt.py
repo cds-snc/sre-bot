@@ -198,7 +198,7 @@ class TestValidateJWTToken:
             assert exc_info.value.status_code == 401
             assert "Untrusted or missing" in exc_info.value.detail
 
-    @patch("infrastructure.services.providers.get_jwks_manager")
+    @patch("infrastructure.security.get_jwks_manager")
     def test_validate_jwt_token_uses_default_manager(self, mock_get_jwks_manager):
         """Test validate_jwt_token works with provided jwks_manager."""
         from fastapi.security import HTTPAuthorizationCredentials

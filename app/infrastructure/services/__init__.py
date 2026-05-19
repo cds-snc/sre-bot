@@ -7,7 +7,6 @@ Provides type aliases and provider functions for FastAPI dependency injection.
 from infrastructure.services.dependencies import (
     AppSettingsDep,
     SettingsDep,
-    JWKSManagerDep,
     AWSClientsDep,
     GoogleWorkspaceClientsDep,
     MaxMindClientDep,
@@ -22,7 +21,6 @@ from infrastructure.services.dependencies import (
 from infrastructure.services.providers import (
     get_app_settings,
     get_settings,
-    get_jwks_manager,
     get_aws_clients,
     get_google_workspace_clients,
     get_maxmind_client,
@@ -35,13 +33,11 @@ from infrastructure.services.providers import (
     get_directory_provider,
     t,
 )
-from infrastructure.security.rate_limiter import get_limiter, setup_rate_limiter
 
 __all__ = [
     # Core dependencies
     "AppSettingsDep",
     "SettingsDep",
-    "JWKSManagerDep",
     "AWSClientsDep",
     "GoogleWorkspaceClientsDep",
     "MaxMindClientDep",
@@ -55,7 +51,6 @@ __all__ = [
     # Core providers
     "get_app_settings",
     "get_settings",
-    "get_jwks_manager",
     "get_aws_clients",
     "get_google_workspace_clients",
     "get_maxmind_client",
@@ -68,7 +63,4 @@ __all__ = [
     "get_directory_provider",
     # Translation helper
     "t",
-    # Security utilities
-    "get_limiter",
-    "setup_rate_limiter",
 ]
