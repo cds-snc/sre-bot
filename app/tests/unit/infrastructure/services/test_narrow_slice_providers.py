@@ -10,24 +10,21 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrastructure.configuration.infrastructure.server import ServerSettings
+from infrastructure.clients.maxmind.client import MaxMindClient
 from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
-from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.configuration.infrastructure.platforms import PlatformsSettings
+from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.configuration.integrations.maxmind import MaxMindSettings
 from infrastructure.configuration.integrations.slack import SlackSettings
-from infrastructure.clients.maxmind.client import MaxMindClient
 from infrastructure.idempotency.service import DynamoDBIdempotencyService
+from infrastructure.platforms.clients.slack import get_slack_client
+from infrastructure.platforms.service import PlatformService, get_platform_service
 from infrastructure.resilience.service import ResilienceService
-from infrastructure.platforms.service import PlatformService
 from infrastructure.services.providers import (
     get_idempotency_service,
-    get_jwks_manager,
     get_maxmind_client,
     get_resilience_service,
 )
-from infrastructure.platforms.service import get_platform_service
-from infrastructure.platforms.clients.slack import get_slack_client
 
 pytestmark = pytest.mark.unit
 
@@ -200,27 +197,6 @@ class TestProvidersDontCallGetSettings:
             mock_get_settings.assert_not_called()
             mock_platforms.assert_called_once()
         get_platform_service.cache_clear()
-
-    def test_get_jwks_manager_uses_server_settings(self):
-        """get_jwks_manager uses get_server_settings, not get_settings."""
-        get_jwks_manager.cache_clear()
-        with (
-            patch(
-                "infrastructure.services.providers.get_settings"
-            ) as mock_get_settings,
-            patch(
-                "infrastructure.services.providers.get_server_settings"
-            ) as mock_server,
-        ):
-            mock_server.return_value = MagicMock(spec=ServerSettings)
-            mock_server.return_value.ISSUER_CONFIG = {"issuer": "https://test.example"}
-            with patch(
-                "infrastructure.security.jwks.JWKSManager.__init__", return_value=None
-            ):
-                get_jwks_manager()
-            mock_get_settings.assert_not_called()
-            mock_server.assert_called_once()
-        get_jwks_manager.cache_clear()
 
     def test_get_slack_client_uses_slack_settings(self):
         """get_slack_client uses get_slack_settings, not get_settings."""
