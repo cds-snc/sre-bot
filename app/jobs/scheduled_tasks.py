@@ -12,7 +12,7 @@ from modules.aws import identity_center, spending
 from modules.incident.notify_stale_incident_channels import (
     notify_stale_incident_channels,
 )
-from infrastructure.services.plugins.manager import get_plugin_manager
+from infrastructure.plugins.manager import get_plugin_manager
 
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
