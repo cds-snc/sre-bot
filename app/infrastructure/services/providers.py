@@ -18,7 +18,6 @@ from infrastructure.configuration.app import (
 from infrastructure.configuration.infrastructure.idempotency import (
     get_idempotency_settings,
 )
-from infrastructure.configuration.infrastructure.retry import get_retry_settings
 from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
 from infrastructure.events.service import EventDispatcher
 from infrastructure.i18n.models import Locale, TranslationKey
@@ -26,7 +25,6 @@ from infrastructure.i18n.service import TranslationService
 from infrastructure.idempotency.dynamodb import DynamoDBCache
 from infrastructure.idempotency.protocol import IdempotencyService
 from infrastructure.idempotency.service import DynamoDBIdempotencyService
-from infrastructure.resilience.service import ResilienceService
 
 
 @lru_cache(maxsize=1)
@@ -194,27 +192,3 @@ def get_idempotency_service() -> IdempotencyService:
     return DynamoDBIdempotencyService(
         cache=DynamoDBCache(idempotency_settings=get_idempotency_settings())
     )
-
-
-@lru_cache(maxsize=1)
-def get_resilience_service() -> ResilienceService:
-    """Get application-scoped resilience service singleton.
-
-    Returns a ResilienceService instance that provides unified access to
-    circuit breakers and retry stores for fault-tolerant operations.
-
-    Usage:
-        from infrastructure.services import ResilienceServiceDep
-
-        @router.get("/external-call")
-        def make_call(resilience: ResilienceServiceDep):
-            cb = resilience.get_or_create_circuit_breaker("external_api")
-            try:
-                return cb.call(external_api_function)
-            except CircuitBreakerOpenError:
-                return {"error": "Service unavailable"}
-
-    Returns:
-        ResilienceService: Cached resilience service instance
-    """
-    return ResilienceService(retry_settings=get_retry_settings())

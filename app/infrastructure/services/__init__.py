@@ -11,7 +11,6 @@ from infrastructure.services.dependencies import (
     EventDispatcherDep,
     TranslationServiceDep,
     IdempotencyServiceDep,
-    ResilienceServiceDep,
 )
 from infrastructure.services.providers import (
     get_app_settings,
@@ -20,7 +19,6 @@ from infrastructure.services.providers import (
     get_event_dispatcher,
     get_translation_service,
     get_idempotency_service,
-    get_resilience_service,
     t,
 )
 
@@ -32,7 +30,6 @@ __all__ = [
     "EventDispatcherDep",
     "TranslationServiceDep",
     "IdempotencyServiceDep",
-    "ResilienceServiceDep",
     # Core providers
     "get_app_settings",
     "get_settings",
@@ -40,7 +37,6 @@ __all__ = [
     "get_event_dispatcher",
     "get_translation_service",
     "get_idempotency_service",
-    "get_resilience_service",
     # Translation helper
     "t",
 ]

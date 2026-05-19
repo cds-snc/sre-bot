@@ -13,13 +13,11 @@ from infrastructure.configuration import AppSettings, Settings
 from infrastructure.events.service import EventDispatcher
 from infrastructure.i18n.service import TranslationService
 from infrastructure.idempotency.protocol import IdempotencyService
-from infrastructure.resilience.service import ResilienceService
 from infrastructure.services.providers import (
     get_app_settings,
     get_event_dispatcher,
     get_idempotency_service,
     get_maxmind_client,
-    get_resilience_service,
     get_settings,
     get_translation_service,
 )
@@ -43,8 +41,6 @@ TranslationServiceDep = Annotated[TranslationService, Depends(get_translation_se
 # Idempotency service dependency
 IdempotencyServiceDep = Annotated[IdempotencyService, Depends(get_idempotency_service)]
 
-# Resilience service dependency
-ResilienceServiceDep = Annotated[ResilienceService, Depends(get_resilience_service)]
 
 __all__ = [
     "SettingsDep",
@@ -52,5 +48,4 @@ __all__ = [
     "EventDispatcherDep",
     "TranslationServiceDep",
     "IdempotencyServiceDep",
-    "ResilienceServiceDep",
 ]

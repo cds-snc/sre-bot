@@ -23,7 +23,6 @@ from infrastructure.resilience.service import ResilienceService
 from infrastructure.services.providers import (
     get_idempotency_service,
     get_maxmind_client,
-    get_resilience_service,
 )
 
 pytestmark = pytest.mark.unit
@@ -157,25 +156,6 @@ class TestProvidersDontCallGetSettings:
             mock_get_settings.assert_not_called()
             mock_idempotency.assert_called_once()
         get_idempotency_service.cache_clear()
-
-    def test_get_resilience_service_uses_retry_settings(self):
-        """get_resilience_service uses get_retry_settings, not get_settings."""
-        get_resilience_service.cache_clear()
-        with (
-            patch(
-                "infrastructure.services.providers.get_settings"
-            ) as mock_get_settings,
-            patch("infrastructure.services.providers.get_retry_settings") as mock_retry,
-        ):
-            mock_retry.return_value = MagicMock(spec=RetrySettings)
-            with patch(
-                "infrastructure.resilience.service.ResilienceService.__init__",
-                return_value=None,
-            ):
-                get_resilience_service()
-            mock_get_settings.assert_not_called()
-            mock_retry.assert_called_once()
-        get_resilience_service.cache_clear()
 
     def test_get_platform_service_uses_platforms_settings(self):
         """get_platform_service uses get_platforms_settings, not get_settings."""

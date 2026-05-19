@@ -22,7 +22,7 @@ from infrastructure.resilience.retry import (
     RetryStore,
     RetryWorker,
 )
-from infrastructure.resilience.service import ResilienceService
+from infrastructure.resilience.service import ResilienceService, get_resilience_service
 
 __all__ = [
     # Circuit Breaker
@@ -43,4 +43,5 @@ __all__ = [
     "RetryProcessor",
     # Service
     "ResilienceService",
+    "get_resilience_service",
 ]
