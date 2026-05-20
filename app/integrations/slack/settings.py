@@ -39,39 +39,6 @@ class SlackSettings(BaseSettings):
     )
     RETRY_MAX_ATTEMPTS: int = Field(default=2, alias="SLACK_RETRY_MAX_ATTEMPTS")
 
-    NOT_FOUND_CODES: list[str] = Field(
-        default=[
-            "channel_not_found",
-            "user_not_found",
-            "message_not_found",
-            "view_not_found",
-            "file_not_found",
-            "subteam_not_found",
-        ],
-        alias="SLACK_NOT_FOUND_CODES",
-    )
-    UNAUTHORIZED_CODES: list[str] = Field(
-        default=[
-            "not_authed",
-            "invalid_auth",
-            "account_inactive",
-            "token_revoked",
-            "token_expired",
-            "missing_scope",
-            "no_permission",
-        ],
-        alias="SLACK_UNAUTHORIZED_CODES",
-    )
-    TRANSIENT_CODES: list[str] = Field(
-        default=[
-            "ratelimited",
-            "fatal_error",
-            "internal_error",
-            "service_unavailable",
-        ],
-        alias="SLACK_TRANSIENT_CODES",
-    )
-
     @model_validator(mode="after")
     def _validate_transport_credentials(self) -> "SlackSettings":
         if not self.ENABLED:
