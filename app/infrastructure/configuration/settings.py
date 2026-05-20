@@ -1,6 +1,6 @@
 """SRE Bot configuration settings - main aggregator."""
 
-import warnings
+from functools import lru_cache
 from typing import Any, Callable
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -76,7 +76,7 @@ class Settings(BaseSettings):
 
     Example:
         ```python
-        from infrastructure.services import get_settings
+        from infrastructure.configuration import get_settings
 
         settings = get_settings()
 
@@ -148,13 +148,13 @@ class Settings(BaseSettings):
         Args:
             **kwargs: Optional overrides for specific settings sections.
         """
-        warnings.warn(
-            "Settings aggregator is deprecated. Use domain-specific providers "
-            "(e.g., get_slack_settings(), get_server_settings()). "
-            "See ADR-0055 Standard 4.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
+        # warnings.warn(
+        #     "Settings aggregator is deprecated. Use domain-specific providers "
+        #     "(e.g., get_slack_settings(), get_server_settings()). "
+        #     "See ADR-0055 Standard 4.",
+        #     DeprecationWarning,
+        #     stacklevel=2,
+        # )
 
         settings_map: dict[str, Callable[[], Any]] = {
             # Integrations
@@ -198,3 +198,14 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore",
     )
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Singleton provider for aggregated Settings.
+
+    Returns:
+        Settings instance with all sub-settings sourced from their respective
+        singleton providers.
+    """
+    return Settings()

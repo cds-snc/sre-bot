@@ -8,35 +8,18 @@ Feature packages MUST NOT call ``DynamoDBClient`` or ``dynamodb_next`` directly.
 Instead, define a thin repository class that takes
 ``infrastructure.storage.protocol.StorageService`` as a constructor argument and
 delegates all DynamoDB I/O here.
-
-Usage (feature-level repository)::
-
-    from infrastructure.services import StorageServiceDep
-
-    class SyncRunRepository:
-        TABLE = "sre_bot_access"
-
-        def __init__(self, storage: StorageService) -> None:
-            self._storage = storage
-
-        def save(self, record: SyncRunRecord) -> bool:
-            result = self._storage.put(self.TABLE, record.model_dump())
-            return result.is_success
-
-        def get(self, run_id: str) -> Optional[SyncRunRecord]:
-            result = self._storage.get(self.TABLE, {"pk": run_id})
-            if result.is_success:
-                return SyncRunRecord(**result.data)
-            return None
 """
 
-from typing import Any, Dict, List, TYPE_CHECKING
+from functools import cache
+from typing import TYPE_CHECKING, Any, Dict, List
 
 import structlog
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 
+from infrastructure.clients.aws import get_aws_clients
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
+from infrastructure.storage.protocol import StorageService
 
 if TYPE_CHECKING:
     from infrastructure.clients.aws.dynamodb import DynamoDBClient
@@ -270,3 +253,14 @@ class DynamoDBStorageService:
         return OperationResult.success(
             data=[_deserialize_item(item) for item in raw_items]
         )
+
+
+@cache
+def get_storage_service() -> StorageService:
+    """Provider function for the storage service.
+
+    Returns:
+        StorageService instance.
+    """
+    dynamodb = get_aws_clients().dynamodb
+    return DynamoDBStorageService(dynamodb)

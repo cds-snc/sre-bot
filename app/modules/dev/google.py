@@ -17,7 +17,7 @@ from infrastructure.platforms.parsing import (
     ArgumentType,
     CommandArgumentParser,
 )
-from infrastructure.services import get_directory_provider
+from infrastructure.directory import get_directory_provider
 
 logger: BoundLogger = structlog.get_logger()
 

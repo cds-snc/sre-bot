@@ -3,6 +3,7 @@
 Provides a class-based interface to circuit breakers and retry stores for easier DI and testing.
 """
 
+from functools import cache
 from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
 
 import structlog
@@ -12,6 +13,7 @@ from infrastructure.resilience.circuit_breaker import (
     CircuitBreaker,
     CircuitState,
 )
+from infrastructure.configuration.infrastructure.retry import get_retry_settings
 
 if TYPE_CHECKING:
     from infrastructure.resilience.retry.store import RetryStore
@@ -30,28 +32,6 @@ class ResilienceService:
     - Manages a registry of circuit breakers
     - Provides access to retry store functionality
     - Offers helper methods for common resilience patterns
-
-    Usage:
-        # Via dependency injection
-        from infrastructure.services import ResilienceServiceDep
-
-        @router.get("/external-call")
-        def make_external_call(resilience: ResilienceServiceDep):
-            cb = resilience.get_or_create_circuit_breaker(
-                "external_api",
-                failure_threshold=5
-            )
-            try:
-                result = cb.call(external_api_function)
-                return result
-            except CircuitBreakerOpenError:
-                return {"error": "Service temporarily unavailable"}
-
-        # Direct instantiation
-        from infrastructure.resilience import ResilienceService
-
-        service = ResilienceService()
-        breaker = service.create_circuit_breaker("my_service")
     """
 
     def __init__(
@@ -237,3 +217,13 @@ class ResilienceService:
             List of circuit breaker names
         """
         return list(self._circuit_breakers.keys())
+
+
+@cache
+def get_resilience_service() -> ResilienceService:
+    """Get application-scoped resilience service singleton.
+
+    Returns:
+        ResilienceService: Cached resilience service instance
+    """
+    return ResilienceService(retry_settings=get_retry_settings())

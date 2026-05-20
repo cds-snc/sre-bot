@@ -8,7 +8,7 @@ import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
-from infrastructure.services.providers import get_storage_service
+from infrastructure.storage import get_storage_service
 from infrastructure.storage.protocol import StorageService
 from infrastructure.storage.service import DynamoDBStorageService
 from tests.unit.infrastructure.storage.fake_storage import FakeStorageService

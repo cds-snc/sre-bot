@@ -220,6 +220,7 @@ def test_incident_submit_calls_succeeds(
         channel_id="channel_id",
         channel_name="channel_name",
         slug="slug",
+        severity="sev-1",
     )
     incident.submit(ack, view, say, body, client)
     ack.assert_called()
@@ -458,6 +459,14 @@ def helper_generate_view(name="name", locale="en-US"):
                         "selected_option": {
                             "text": {"text": "yes"},
                             "value": "yes",
+                        }
+                    }
+                },
+                "severity": {
+                    "severity": {
+                        "selected_option": {
+                            "text": {"text": "sev-1"},
+                            "value": "sev-1",
                         }
                     }
                 },

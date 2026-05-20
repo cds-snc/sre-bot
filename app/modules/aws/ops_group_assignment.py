@@ -1,9 +1,8 @@
 import json
 import structlog
 
-from infrastructure.services import get_settings
+from infrastructure.configuration import get_settings
 from integrations.aws import identity_store, organizations, sso_admin
-
 
 logger = structlog.get_logger()
 

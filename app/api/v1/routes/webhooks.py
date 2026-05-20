@@ -5,7 +5,7 @@ import structlog
 from fastapi import APIRouter, HTTPException, Request, Body
 from slack_sdk import WebClient
 
-from infrastructure.services import get_limiter
+from infrastructure.security import get_limiter
 from integrations.sentinel import log_to_sentinel
 from models.webhooks import WebhookPayload
 from modules.slack import webhooks

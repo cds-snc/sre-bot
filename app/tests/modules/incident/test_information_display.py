@@ -153,6 +153,19 @@ def test_incident_information_view(mock_convert_timestamp):
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
+                    "text": "*Severity*:\nNone",
+                },
+                "accessory": {
+                    "type": "button",
+                    "text": {"type": "plain_text", "text": "Update", "emoji": True},
+                    "value": "severity",
+                    "action_id": "update_incident_field",
+                },
+            },
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
                     "text": "*Status*:\nstatus",
                 },
                 "accessory": {

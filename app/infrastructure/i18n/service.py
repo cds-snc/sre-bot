@@ -6,7 +6,6 @@ Provides a class-based interface to the i18n system for easier DI and testing.
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from infrastructure.i18n.factory import create_translator
 from infrastructure.i18n.loader import YAMLTranslationLoader
 from infrastructure.i18n.models import Locale, TranslationKey
 from infrastructure.i18n.translator import Translator
@@ -31,7 +30,7 @@ class TranslationService:
 
     Usage:
         # Via dependency injection (routes)
-        from infrastructure.services import TranslationServiceDep
+        from infrastructure.i18n import TranslationServiceDep
 
         @router.get("/message")
         def get_message(translation: TranslationServiceDep):
@@ -42,8 +41,7 @@ class TranslationService:
             return {"message": msg}
 
         # Initialization (lifespan)
-        from infrastructure.services import get_translation_service
-        from infrastructure.i18n.resources import I18nResourceSpec
+        from infrastructure.i18n import get_translation_service, I18nResourceSpec
 
         translation = get_translation_service()
         resources = [
@@ -58,10 +56,9 @@ class TranslationService:
         """Initialize translation service side-effect safe.
 
         Args:
-            translator: Optional pre-configured Translator instance.
-                       If not provided, creates lazy translator via factory.
+            translator: Pre-configured Translator instance.
         """
-        self._translator = translator or create_translator(preload=False)
+        self._translator = translator
         self._is_initialized = False
 
     def initialize(

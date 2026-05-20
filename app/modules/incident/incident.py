@@ -1,6 +1,7 @@
 import re
 import i18n  # type: ignore
 from slack_sdk import WebClient
+from slack_sdk.models import views, blocks
 from slack_bolt import Ack, App
 
 from integrations.slack import users as slack_users
@@ -14,7 +15,6 @@ from modules.incident import (
 )
 from structlog import get_logger
 from core.config import settings
-
 
 PREFIX = settings.PREFIX
 INCIDENT_CHANNEL = settings.feat_incident.INCIDENT_CHANNEL
@@ -33,6 +33,22 @@ def register(bot: App):
     bot.command(f"/{PREFIX}incident")(open_create_incident_modal)
     bot.view("incident_view")(submit)
     bot.action("incident_change_locale")(handle_change_locale_button)
+
+
+def _incident_modal_loading_view():
+    loading_view = views.View(
+        type="modal",
+        callback_id="incident_view",
+        title=i18n.t("incident.modal.title"),
+        blocks=[
+            blocks.SectionBlock(
+                text=blocks.MarkdownTextObject(
+                    text=f":beach-ball: {i18n.t('incident.modal.launching')}"
+                )
+            )
+        ],
+    )
+    return loading_view.to_dict()
 
 
 def open_create_incident_modal(client: WebClient, ack, command, body):
@@ -54,20 +70,7 @@ def open_create_incident_modal(client: WebClient, ack, command, body):
         user_id = body["user_id"]
     locale = slack_users.get_user_locale(client, user_id)
     i18n.set("locale", locale)
-    loading_view = {
-        "type": "modal",
-        "callback_id": "incident_view",
-        "title": {"type": "plain_text", "text": i18n.t("incident.modal.title")},
-        "blocks": [
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": f":beach-ball: {i18n.t('incident.modal.launching')}",
-                },
-            },
-        ],
-    }
+    loading_view = _incident_modal_loading_view()
     view = client.views_open(trigger_id=body["trigger_id"], view=loading_view)["view"]
     folders = incident_folder.list_incident_folders()
     options = [
@@ -117,6 +120,9 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
     security_incident = view["state"]["values"]["security_incident"][
         "security_incident"
     ]["selected_option"]["value"]
+    severity = view["state"]["values"]["severity"]["severity"]["selected_option"][
+        "value"
+    ]
 
     if not re.match(r"^[\w\-\s]+$", name):
         errors["name"] = (
@@ -198,6 +204,7 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
         channel_id=channel_id,
         channel_name=channel_name,
         slug=slug,
+        severity=severity,
     )
     try:
         core.initiate_resources_creation(
@@ -306,6 +313,59 @@ def generate_incident_modal_view(
                     "action_id": "product",
                 },
                 "label": {"type": "plain_text", "text": "Product", "emoji": True},
+            },
+            {
+                "block_id": "severity",
+                "type": "input",
+                "element": {
+                    "type": "static_select",
+                    "placeholder": {
+                        "type": "plain_text",
+                        "text": i18n.t("incident.modal.severity"),
+                    },
+                    "options": [
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": i18n.t("incident.modal.sev_none"),
+                            },
+                            "value": "none",
+                        },
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": i18n.t("incident.modal.sev_1"),
+                            },
+                            "value": "sev-1",
+                        },
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": i18n.t("incident.modal.sev_2"),
+                            },
+                            "value": "sev-2",
+                        },
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": i18n.t("incident.modal.sev_3"),
+                            },
+                            "value": "sev-3",
+                        },
+                        {
+                            "text": {
+                                "type": "plain_text",
+                                "text": i18n.t("incident.modal.sev_4"),
+                            },
+                            "value": "sev-4",
+                        },
+                    ],
+                    "action_id": "severity",
+                },
+                "label": {
+                    "type": "plain_text",
+                    "text": i18n.t("incident.modal.severity"),
+                },
             },
             {
                 "block_id": "security_incident",

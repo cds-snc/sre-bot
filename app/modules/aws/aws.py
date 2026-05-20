@@ -23,7 +23,7 @@ from modules.aws import (
     lambdas,
     spending,
 )
-from infrastructure.services import get_settings
+from infrastructure.configuration import get_settings
 
 logger = structlog.get_logger()
 

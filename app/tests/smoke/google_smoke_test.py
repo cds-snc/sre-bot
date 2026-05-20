@@ -45,7 +45,7 @@ if "pytest" in sys.modules and not os.environ.get("RUN_SMOKE_TESTS"):
 from integrations.google_workspace import google_directory_next as gdn  # noqa: E402
 from integrations.google_workspace.schemas import User  # noqa: E402
 from infrastructure.operations import OperationResult, OperationStatus  # noqa: E402
-from infrastructure.services.providers import get_settings  # noqa: E402
+from infrastructure.configuration import get_settings  # noqa: E402
 from tests.factories.google import (
     make_google_groups,
     make_google_members,

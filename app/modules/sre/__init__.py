@@ -1,6 +1,6 @@
 """SRE module - Platform command registration."""
 
-from infrastructure.services import hookimpl
+from infrastructure.plugins import hookimpl
 from modules.sre.platforms import slack
 
 

@@ -3,7 +3,7 @@
 Provides generic Event base class and protocol for event handlers.
 """
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from typing import Any, Dict, Generic, Optional, TypeVar
 from uuid import UUID, uuid4

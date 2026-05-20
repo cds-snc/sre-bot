@@ -5,12 +5,14 @@ and OperationResult return types.
 """
 
 from dataclasses import dataclass
+from functools import cache
 from typing import TYPE_CHECKING, Optional
 
 import geoip2.database
 import structlog
 from geoip2.errors import AddressNotFoundError, GeoIP2Error
 
+from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
 from infrastructure.operations import OperationResult, OperationStatus
 
 if TYPE_CHECKING:
@@ -153,3 +155,9 @@ class MaxMindClient:
                 message=f"MaxMind healthcheck failed: {result.message}",
                 error_code="HEALTHCHECK_FAILED",
             )
+
+
+@cache
+def get_maxmind_client() -> MaxMindClient:
+    """Get singleton MaxMindClient instance."""
+    return MaxMindClient(maxmind_settings=get_maxmind_settings())

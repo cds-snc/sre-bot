@@ -5,6 +5,7 @@ from slack_sdk import WebClient
 from core.config import settings
 from structlog import get_logger
 from integrations.google_workspace import meet, google_drive
+from slack_sdk.models import blocks
 from models.incidents import IncidentPayload
 from modules.incident import (
     incident_document,
@@ -347,7 +348,7 @@ def recreate_missing_resources(
     Returns:
         dict: Summary of actions taken and any errors encountered
     """
-    results = {
+    results: dict = {
         "success": [],
         "errors": [],
         "skipped": [],
@@ -473,6 +474,20 @@ def initiate_resources_creation(
         },
     )
 
+    if isinstance(
+        incident_payload.severity, str
+    ) and incident_payload.severity.lower() in ["sev-1", "sev-2", "sev-3", "sev-4"]:
+        warning_string = f"\n:rotating_light: *SEVERITY WARNING: {incident_payload.severity.upper()}*  :rotating_light: \n\n\n_The incident was initially called with a {incident_payload.severity.upper()} severity level._"
+        message_blocks: list[blocks.SectionBlock | blocks.DividerBlock] = [
+            blocks.DividerBlock(),
+            blocks.SectionBlock(text=blocks.MarkdownTextObject(text=warning_string)),
+            blocks.DividerBlock(),
+        ]
+        client.chat_postMessage(
+            blocks=message_blocks,
+            channel=incident_payload.channel_id,
+        )
+
     text = f"A hangout has been created at: {meet_link['meetingUri']}"
     client.chat_postMessage(text=text, channel=incident_payload.channel_id)
 
@@ -509,6 +524,7 @@ def initiate_resources_creation(
         "report_url": document_link,
         "meet_url": meet_link["meetingUri"],
         "environment": environment,
+        "severity": incident_payload.severity,
     }
     incident_id = db_operations.create_incident(incident_data)
     logger.info("incident_record_created", incident_id=incident_id)

@@ -1,23 +1,23 @@
 """Unit tests for access sync route handlers and job runner."""
 
-import pytest
 from unittest.mock import MagicMock, patch
-from fastapi import FastAPI
-from fastapi import Response
+
+import pytest
+from fastapi import FastAPI, Response
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
-from infrastructure.security.models import AuthPrincipalSource, User
 from infrastructure.operations import OperationResult, OperationStatus
-from infrastructure.services import get_current_user
+from infrastructure.security import get_current_user
+from infrastructure.security.models import AuthPrincipalSource, User
+from packages.access.sync.domain import SyncOutcome
+from packages.access.sync.interactions.http import router, sync_endpoint
+from packages.access.sync.job_runner import run_user_sync_job
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
     get_access_sync_settings,
 )
-from packages.access.sync.domain import SyncOutcome
 from packages.access.sync.schemas import UserSyncRequest
-from packages.access.sync.job_runner import run_user_sync_job
-from packages.access.sync.interactions.http import router, sync_endpoint
 
 
 def _get_route(path: str, method: str) -> APIRoute:

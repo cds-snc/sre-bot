@@ -27,7 +27,7 @@ def get_access_runtime_config() -> AccessRuntimeConfig:
 
     Returns feature-level configuration (policies, per-group overrides).
     Infrastructure clients (AWS, Google Workspace, etc.) are obtained separately
-    from infrastructure.services and come pre-configured with all bootstrap
+    from infrastructure.configuration and come pre-configured with all bootstrap
     settings (e.g., AWS_SSO_INSTANCE_ID).
 
     Raises:

@@ -2,11 +2,6 @@
 
 Provides an IDP-agnostic directory abstraction for security group reads.
 Feature packages should access the service via the singleton accessor:
-
-    from infrastructure.services import get_directory_provider
-
-    provider = get_directory_provider()
-    result = provider.check_membership("sg-admin@example.com", "user@example.com")
 """
 
 from infrastructure.directory.models import (
@@ -16,6 +11,9 @@ from infrastructure.directory.models import (
     MembershipCheckResult,
 )
 from infrastructure.directory.provider import DirectoryProvider
+from infrastructure.directory.factory import (
+    get_directory_provider,
+)
 
 __all__ = [
     "DirectoryGroup",
@@ -23,4 +21,5 @@ __all__ = [
     "DirectoryUser",
     "DirectoryProvider",
     "MembershipCheckResult",
+    "get_directory_provider",
 ]

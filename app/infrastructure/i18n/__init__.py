@@ -10,6 +10,7 @@ Main components:
 - resolvers: LocaleResolver and LanguageNegotiator for locale detection
 """
 
+from infrastructure.i18n.factory import create_translator, get_translation_service, t
 from infrastructure.i18n.loader import TranslationLoader, YAMLTranslationLoader
 from infrastructure.i18n.models import (
     Locale,
@@ -18,9 +19,9 @@ from infrastructure.i18n.models import (
     TranslationKey,
 )
 from infrastructure.i18n.resolvers import LanguageNegotiator, LocaleResolver
-from infrastructure.i18n.translator import Translator
-from infrastructure.i18n.factory import create_translator
+from infrastructure.i18n.resources import I18nResourceSpec
 from infrastructure.i18n.service import TranslationService
+from infrastructure.i18n.translator import Translator
 
 __all__ = [
     "Locale",
@@ -31,7 +32,10 @@ __all__ = [
     "YAMLTranslationLoader",
     "Translator",
     "LocaleResolver",
+    "I18nResourceSpec",
     "LanguageNegotiator",
     "create_translator",
     "TranslationService",
+    "get_translation_service",
+    "t",
 ]

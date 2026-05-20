@@ -10,7 +10,7 @@ module scope — never bypass providers.
 from functools import lru_cache
 from typing import Dict
 
-from infrastructure.services import get_directory_provider
+from infrastructure.directory import get_directory_provider
 from packages.access.catalog.parsers import (
     AwsCatalogSlugParser,
     CatalogSlugParser,

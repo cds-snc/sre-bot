@@ -21,7 +21,7 @@ class DynamoDBIdempotencyService:
 
     Usage:
         # Via dependency injection
-        from infrastructure.services import IdempotencyServiceDep
+        from infrastructure.idempotency import IdempotencyServiceDep
 
         @router.post("/action")
         def perform_action(

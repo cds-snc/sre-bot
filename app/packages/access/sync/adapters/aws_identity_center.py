@@ -2,7 +2,7 @@
 
 Maps normalized Access Sync actions to AWS IdentityStore API calls.
 All external API calls are wrapped in try/except and return OperationResult.
-Clients are injected from infrastructure.services — never instantiated locally.
+Clients are injected from infrastructure.clients — never instantiated locally.
 
 Entitlement model: entitlement_type="group", entitlement_id=AWS IC GroupId (UUID).
 Group sync maps IDP security groups → AWS IC groups via group membership.
@@ -73,7 +73,7 @@ class AwsIdentityCenterAdapter:
     is needed at the feature layer—the client is ready to use.
 
     Args:
-        aws_clients: Centralized AWS clients facade from infrastructure.services.
+        aws_clients: Centralized AWS clients facade from infrastructure.clients.aws.get_aws_clients
             Must have been initialized with AWS_SSO_INSTANCE_ID bootstrap setting.
     """
 

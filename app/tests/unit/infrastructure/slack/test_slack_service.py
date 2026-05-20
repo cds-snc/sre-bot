@@ -7,8 +7,7 @@ import pytest
 from infrastructure.configuration.integrations.slack import SlackSettings
 from infrastructure.platforms.clients.slack import SlackClientFacade
 from infrastructure.platforms.service import PlatformService
-from infrastructure.services.providers import get_slack_bot
-from infrastructure.slack.service import SlackBot
+from infrastructure.slack.service import SlackBot, get_slack_bot
 
 pytestmark = pytest.mark.unit
 

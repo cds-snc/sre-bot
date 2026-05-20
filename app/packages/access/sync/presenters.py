@@ -7,7 +7,7 @@ here so HTTP routes and Slack handlers share a single source of truth.
 
 from typing import Any, Dict
 
-from infrastructure.services import t
+from infrastructure.i18n import t
 from packages.access.sync.job_models import JobStatus
 from packages.access.sync.schemas import SyncJobStatusResponse
 

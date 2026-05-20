@@ -18,6 +18,16 @@ FIELD_SCHEMA = {
     "start_impact_time": {"type": "datetime"},
     "end_impact_time": {"type": "datetime"},
     "retrospective_url": {"type": "text"},
+    "severity": {
+        "type": "dropdown",
+        "options": [
+            "none",
+            "sev-1",
+            "sev-2",
+            "sev-3",
+            "sev-4",
+        ],
+    },
     "status": {
         "type": "dropdown",
         "options": [

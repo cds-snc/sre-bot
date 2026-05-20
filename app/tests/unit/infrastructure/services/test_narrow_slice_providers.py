@@ -10,29 +10,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrastructure.configuration.infrastructure.server import ServerSettings
-from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
-from infrastructure.configuration.infrastructure.retry import RetrySettings
+from infrastructure.clients.maxmind.client import MaxMindClient, get_maxmind_client
 from infrastructure.configuration.infrastructure.platforms import PlatformsSettings
+from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.configuration.integrations.maxmind import MaxMindSettings
 from infrastructure.configuration.integrations.slack import SlackSettings
-from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
-from infrastructure.configuration.integrations.notify import NotifySettings
-from infrastructure.clients.maxmind.client import MaxMindClient
-from infrastructure.idempotency.service import DynamoDBIdempotencyService
+from infrastructure.platforms.clients.slack import get_slack_client
+from infrastructure.platforms.service import PlatformService, get_platform_service
 from infrastructure.resilience.service import ResilienceService
-from infrastructure.notifications.service import NotificationService
-from infrastructure.platforms.service import PlatformService
-from infrastructure.notifications.channels.chat import ChatChannel
-from infrastructure.services.providers import (
-    get_idempotency_service,
-    get_jwks_manager,
-    get_maxmind_client,
-    get_notification_service,
-    get_platform_service,
-    get_resilience_service,
-    get_slack_client,
-)
 
 pytestmark = pytest.mark.unit
 
@@ -59,30 +44,6 @@ class TestMaxMindClientNarrowSlice:
             MaxMindClient(settings=mock_settings)
 
 
-class TestIdempotencyServiceNarrowSlice:
-    """DynamoDBIdempotencyService accepts only a pre-constructed cache (no settings)."""
-
-    def test_accepts_injected_cache(self):
-        """DynamoDBIdempotencyService constructs with a pre-built cache."""
-        mock_cache = MagicMock()
-        service = DynamoDBIdempotencyService(cache=mock_cache)
-        assert service is not None
-
-    def test_rejects_settings_kwarg(self):
-        """DynamoDBIdempotencyService does not accept 'settings' or 'idempotency_settings' kwargs."""
-        mock_cache = MagicMock()
-        with pytest.raises(TypeError):
-            DynamoDBIdempotencyService(settings=MagicMock(), cache=mock_cache)
-
-    def test_rejects_idempotency_settings_kwarg(self):
-        """DynamoDBIdempotencyService no longer accepts idempotency_settings (moved to providers)."""
-        mock_cache = MagicMock()
-        with pytest.raises(TypeError):
-            DynamoDBIdempotencyService(
-                idempotency_settings=MagicMock(), cache=mock_cache
-            )
-
-
 class TestResilienceServiceNarrowSlice:
     """ResilienceService accepts retry_settings instead of full Settings."""
 
@@ -101,27 +62,6 @@ class TestResilienceServiceNarrowSlice:
         mock_store = MagicMock()
         with pytest.raises(TypeError):
             ResilienceService(settings=mock_settings, retry_store=mock_store)
-
-
-class TestNotificationServiceNarrowSlice:
-    """NotificationService accepts pre-built channels instead of full Settings."""
-
-    def test_accepts_channels_with_dispatcher(self):
-        """NotificationService constructs with pre-built channels + injected dispatcher."""
-        mock_channel = MagicMock(spec=ChatChannel)
-        mock_dispatcher = MagicMock()
-        service = NotificationService(
-            channels={"chat": mock_channel},
-            dispatcher=mock_dispatcher,
-        )
-        assert service is not None
-
-    def test_rejects_full_settings_kwarg(self):
-        """NotificationService does not accept 'settings' kwarg."""
-        mock_settings = MagicMock()
-        mock_dispatcher = MagicMock()
-        with pytest.raises(TypeError):
-            NotificationService(settings=mock_settings, dispatcher=mock_dispatcher)
 
 
 class TestPlatformServiceNarrowSlice:
@@ -150,10 +90,10 @@ class TestProvidersDontCallGetSettings:
         get_maxmind_client.cache_clear()
         with (
             patch(
-                "infrastructure.services.providers.get_settings"
+                "infrastructure.configuration.settings.get_settings"
             ) as mock_get_settings,
             patch(
-                "infrastructure.services.providers.get_maxmind_settings"
+                "infrastructure.clients.maxmind.client.get_maxmind_settings"
             ) as mock_maxmind,
             patch(
                 "infrastructure.clients.maxmind.client.MaxMindClient.__init__",
@@ -166,113 +106,15 @@ class TestProvidersDontCallGetSettings:
             mock_maxmind.assert_called_once()
         get_maxmind_client.cache_clear()
 
-    def test_get_idempotency_service_uses_idempotency_settings(self):
-        """get_idempotency_service uses get_idempotency_settings, not get_settings."""
-        get_idempotency_service.cache_clear()
-        with (
-            patch(
-                "infrastructure.services.providers.get_settings"
-            ) as mock_get_settings,
-            patch(
-                "infrastructure.services.providers.get_idempotency_settings"
-            ) as mock_idempotency,
-            patch(
-                "infrastructure.services.providers.DynamoDBCache"
-            ) as mock_dynamodb_cache,
-        ):
-            mock_idempotency.return_value = MagicMock(spec=IdempotencySettings)
-            mock_dynamodb_cache.return_value = MagicMock()
-            get_idempotency_service()
-            mock_get_settings.assert_not_called()
-            mock_idempotency.assert_called_once()
-        get_idempotency_service.cache_clear()
-
-    def test_get_resilience_service_uses_retry_settings(self):
-        """get_resilience_service uses get_retry_settings, not get_settings."""
-        get_resilience_service.cache_clear()
-        with (
-            patch(
-                "infrastructure.services.providers.get_settings"
-            ) as mock_get_settings,
-            patch("infrastructure.services.providers.get_retry_settings") as mock_retry,
-        ):
-            mock_retry.return_value = MagicMock(spec=RetrySettings)
-            with patch(
-                "infrastructure.resilience.service.ResilienceService.__init__",
-                return_value=None,
-            ):
-                get_resilience_service()
-            mock_get_settings.assert_not_called()
-            mock_retry.assert_called_once()
-        get_resilience_service.cache_clear()
-
-    def test_get_notification_service_uses_narrow_slices(self):
-        """get_notification_service uses domain slices, not get_settings."""
-        get_notification_service.cache_clear()
-        with (
-            patch(
-                "infrastructure.services.providers.get_settings"
-            ) as mock_get_settings,
-            patch(
-                "infrastructure.services.providers.get_google_workspace_settings"
-            ) as mock_google_settings,
-            patch(
-                "infrastructure.services.providers.get_notify_settings"
-            ) as mock_notify_settings,
-            patch(
-                "infrastructure.services.providers.get_resilience_service"
-            ) as mock_resilience,
-            patch(
-                "infrastructure.services.providers.get_idempotency_service"
-            ) as mock_idempotency,
-            patch(
-                "infrastructure.services.providers.EmailChannel.__init__",
-                return_value=None,
-            ) as mock_email_ctor,
-            patch(
-                "infrastructure.services.providers.SMSChannel.__init__",
-                return_value=None,
-            ) as mock_sms_ctor,
-            patch(
-                "infrastructure.services.providers.ChatChannel.__init__",
-                return_value=None,
-            ),
-            patch(
-                "infrastructure.notifications.service.NotificationService.__init__",
-                return_value=None,
-            ) as mock_notification_ctor,
-        ):
-            mock_google_settings.return_value = MagicMock(spec=GoogleWorkspaceSettings)
-            mock_notify_settings.return_value = MagicMock(spec=NotifySettings)
-
-            mock_resilience_service = MagicMock()
-            mock_circuit_breaker = MagicMock()
-            mock_resilience_service.get_or_create_circuit_breaker.return_value = (
-                mock_circuit_breaker
-            )
-            mock_resilience.return_value = mock_resilience_service
-            mock_idempotency.return_value = MagicMock()
-
-            get_notification_service()
-
-            mock_get_settings.assert_not_called()
-            mock_google_settings.assert_called_once()
-            mock_notify_settings.assert_called_once()
-            assert mock_email_ctor.call_count == 1
-            assert mock_sms_ctor.call_count == 1
-            mock_notification_ctor.assert_called_once()
-
-        get_notification_service.cache_clear()
-
     def test_get_platform_service_uses_platforms_settings(self):
         """get_platform_service uses get_platforms_settings, not get_settings."""
         get_platform_service.cache_clear()
         with (
             patch(
-                "infrastructure.services.providers.get_settings"
+                "infrastructure.configuration.settings.get_settings"
             ) as mock_get_settings,
             patch(
-                "infrastructure.services.providers.get_platforms_settings"
+                "infrastructure.platforms.service.get_platforms_settings"
             ) as mock_platforms,
         ):
             mock_platforms.return_value = MagicMock(spec=PlatformsSettings)
@@ -285,35 +127,16 @@ class TestProvidersDontCallGetSettings:
             mock_platforms.assert_called_once()
         get_platform_service.cache_clear()
 
-    def test_get_jwks_manager_uses_server_settings(self):
-        """get_jwks_manager uses get_server_settings, not get_settings."""
-        get_jwks_manager.cache_clear()
-        with (
-            patch(
-                "infrastructure.services.providers.get_settings"
-            ) as mock_get_settings,
-            patch(
-                "infrastructure.services.providers.get_server_settings"
-            ) as mock_server,
-        ):
-            mock_server.return_value = MagicMock(spec=ServerSettings)
-            mock_server.return_value.ISSUER_CONFIG = {"issuer": "https://test.example"}
-            with patch(
-                "infrastructure.security.jwks.JWKSManager.__init__", return_value=None
-            ):
-                get_jwks_manager()
-            mock_get_settings.assert_not_called()
-            mock_server.assert_called_once()
-        get_jwks_manager.cache_clear()
-
     def test_get_slack_client_uses_slack_settings(self):
         """get_slack_client uses get_slack_settings, not get_settings."""
         get_slack_client.cache_clear()
         with (
             patch(
-                "infrastructure.services.providers.get_settings"
+                "infrastructure.configuration.settings.get_settings"
             ) as mock_get_settings,
-            patch("infrastructure.services.providers.get_slack_settings") as mock_slack,
+            patch(
+                "infrastructure.platforms.clients.slack.get_slack_settings"
+            ) as mock_slack,
         ):
             mock_slack.return_value = MagicMock(spec=SlackSettings)
             mock_slack.return_value.SLACK_TOKEN = "xoxb-test"

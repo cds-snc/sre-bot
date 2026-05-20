@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Security
 
 from infrastructure.security.models import User
 from infrastructure.operations import OperationResult, OperationStatus
-from infrastructure.services import get_current_user
+from infrastructure.security import get_current_user
 from packages.access.request.domain import AccessRequest, ApprovalDecision
 from packages.access.request.providers import (
     get_access_request_service,
