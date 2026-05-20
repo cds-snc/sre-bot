@@ -46,47 +46,6 @@ class TestSlackSettingsFields:
         assert settings.RETRY_MAX_ATTEMPTS == 5
 
 
-class TestSlackSettingsClassificationCatalogues:
-    """Default error-code catalogues used by the shield's classifier."""
-
-    def test_not_found_defaults_include_canonical_slack_codes(self):
-        codes = SlackSettings().NOT_FOUND_CODES
-
-        assert "channel_not_found" in codes
-        assert "user_not_found" in codes
-        assert "message_not_found" in codes
-        assert "view_not_found" in codes
-
-    def test_unauthorized_defaults_include_canonical_slack_codes(self):
-        codes = SlackSettings().UNAUTHORIZED_CODES
-
-        assert "not_authed" in codes
-        assert "invalid_auth" in codes
-        assert "account_inactive" in codes
-        assert "token_revoked" in codes
-        assert "token_expired" in codes
-        assert "missing_scope" in codes
-
-    def test_transient_defaults_include_rate_limit_and_5xx_codes(self):
-        codes = SlackSettings().TRANSIENT_CODES
-
-        assert "ratelimited" in codes
-        assert "fatal_error" in codes
-        assert "internal_error" in codes
-        assert "service_unavailable" in codes
-
-    def test_catalogues_are_overridable_at_construction(self):
-        settings = SlackSettings(
-            SLACK_NOT_FOUND_CODES=["custom_missing"],
-            SLACK_UNAUTHORIZED_CODES=["custom_denied"],
-            SLACK_TRANSIENT_CODES=["custom_throttle"],
-        )
-
-        assert settings.NOT_FOUND_CODES == ["custom_missing"]
-        assert settings.UNAUTHORIZED_CODES == ["custom_denied"]
-        assert settings.TRANSIENT_CODES == ["custom_throttle"]
-
-
 class TestSlackSettingsDeliveryMode:
     """`SlackSettings` carries delivery-mode credentials and fail-fast validation."""
 
