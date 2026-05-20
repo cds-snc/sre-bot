@@ -10,10 +10,8 @@ from fastapi import Depends
 
 from infrastructure.clients.maxmind import MaxMindClient
 from infrastructure.configuration import AppSettings, Settings
-from infrastructure.events.service import EventDispatcher
 from infrastructure.services.providers import (
     get_app_settings,
-    get_event_dispatcher,
     get_maxmind_client,
     get_settings,
 )
@@ -28,13 +26,9 @@ AppSettingsDep = Annotated[AppSettings, Depends(get_app_settings)]
 # For types and data classes: from infrastructure.clients.maxmind import GeoLocationData
 MaxMindClientDep = Annotated[MaxMindClient, Depends(get_maxmind_client)]
 
-# Events dispatcher dependency
-EventDispatcherDep = Annotated[EventDispatcher, Depends(get_event_dispatcher)]
-
 
 __all__ = [
     "SettingsDep",
     "AppSettingsDep",
     "MaxMindClientDep",
-    "EventDispatcherDep",
 ]

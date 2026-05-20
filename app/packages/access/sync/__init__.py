@@ -9,9 +9,9 @@ Exports the FastAPI router for registration in the main application.
 
 from pathlib import Path
 
+from infrastructure.events import get_event_dispatcher
 from infrastructure.i18n.resources import I18nResourceSpec
 from infrastructure.plugins import hookimpl
-from infrastructure.services import get_event_dispatcher
 from packages.access.common.events import REQUEST_APPROVED
 from packages.access.common.providers import get_access_runtime_config
 from packages.access.sync.interactions import slack

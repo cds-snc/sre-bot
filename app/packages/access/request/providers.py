@@ -9,15 +9,15 @@ module scope — never bypass providers by instantiating services directly.
 
 from functools import lru_cache
 
-from infrastructure.services import (
+from infrastructure.directory import get_directory_provider
+from infrastructure.events import (
     get_event_dispatcher,
 )
-from infrastructure.directory import get_directory_provider
 from infrastructure.storage import get_storage_service
-from packages.access.request.service import AccessRequestService
-from packages.access.request.store import AccessRequestRepository
 from packages.access.common.providers import get_access_runtime_config
 from packages.access.common.settings import AccessRequestsSettings, get_access_settings
+from packages.access.request.service import AccessRequestService
+from packages.access.request.store import AccessRequestRepository
 
 
 def get_access_request_settings() -> AccessRequestsSettings:

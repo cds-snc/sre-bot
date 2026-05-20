@@ -6,7 +6,7 @@ from typing import get_args, get_origin, get_type_hints
 import pytest
 
 from infrastructure.operations import OperationResult
-from infrastructure.services import get_event_dispatcher
+from infrastructure.events import get_event_dispatcher
 from packages.access.common.events import SYNC_COMPLETED, SYNC_FAILED
 from packages.access.request.domain import AccessRequest, ApprovalDecision
 from packages.access.request.service import AccessRequestServicePort

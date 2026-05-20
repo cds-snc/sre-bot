@@ -2,10 +2,8 @@ import functools
 from typing import Dict
 
 from infrastructure.clients.aws import get_aws_clients
-from infrastructure.services import (
-    get_event_dispatcher,
-)
 from infrastructure.directory import get_directory_provider
+from infrastructure.events import get_event_dispatcher
 from infrastructure.storage import get_storage_service
 from packages.access.common.providers import get_access_runtime_config
 from packages.access.common.settings import AccessSyncSettings, get_access_settings

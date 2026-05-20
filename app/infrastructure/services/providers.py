@@ -15,7 +15,6 @@ from infrastructure.configuration.app import (
     get_app_settings as _get_app_settings,
 )
 from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
-from infrastructure.events.service import EventDispatcher
 
 
 @lru_cache(maxsize=1)
@@ -85,23 +84,3 @@ def get_maxmind_client() -> MaxMindClient:
         infrastructure.clients.maxmind
     """
     return MaxMindClient(maxmind_settings=get_maxmind_settings())
-
-
-@lru_cache(maxsize=1)
-def get_event_dispatcher() -> EventDispatcher:
-    """Get application-scoped event dispatcher singleton.
-
-    Returns an EventDispatcher instance for dependency injection and testing.
-
-    Usage:
-        from infrastructure.services import EventDispatcherDep
-
-        @router.post("/action")
-        def perform_action(dispatcher: EventDispatcherDep):
-            event = Event(event_type="action.performed")
-            dispatcher.dispatch(event)
-
-    Returns:
-        EventDispatcher: Cached event dispatcher instance
-    """
-    return EventDispatcher()
