@@ -12,6 +12,7 @@ from infrastructure.configuration.infrastructure.server import (
     ServerSettings,
     get_server_settings,
 )
+from infrastructure.configuration import get_settings
 from infrastructure.directory import get_directory_provider
 from infrastructure.i18n import I18nResourceSpec, get_translation_service
 from infrastructure.logging.setup import configure_logging
@@ -21,9 +22,7 @@ from infrastructure.plugins import (
     register_feature_integrations,
 )
 from infrastructure.security import get_jwks_manager
-from infrastructure.services import (
-    get_settings,
-)
+
 from jobs import scheduled_tasks
 from modules import (
     atip,

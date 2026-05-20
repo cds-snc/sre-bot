@@ -10,7 +10,7 @@ import structlog
 from typing import TYPE_CHECKING, Callable, Any, Dict, List
 
 from infrastructure.platforms.models import CommandPayload, CommandResponse
-from infrastructure.services import get_settings
+from infrastructure.configuration import get_settings
 from infrastructure.platforms.clients.slack import get_slack_client
 from modules.dev import (
     google,

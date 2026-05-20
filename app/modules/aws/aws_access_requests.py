@@ -3,11 +3,11 @@ import uuid
 
 import boto3  # type: ignore
 import structlog
+from slack_sdk import WebClient
 
-from infrastructure.services import get_settings
+from infrastructure.configuration import get_settings
 from integrations.aws import identity_store, organizations, sso_admin
 from modules.ops.notifications import log_ops_message
-from slack_sdk import WebClient
 
 logger = structlog.get_logger()
 

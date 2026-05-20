@@ -4,8 +4,7 @@ Verifies the domain-based organization of settings modules after Phase 1
 refactoring (split by domain pattern).
 """
 
-from infrastructure.services.providers import get_settings
-from infrastructure.configuration import RetrySettings
+from infrastructure.configuration import RetrySettings, get_settings
 from infrastructure.configuration.base import (
     IntegrationSettings,
     FeatureSettings,
