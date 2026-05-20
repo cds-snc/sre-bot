@@ -6,7 +6,6 @@ Provides application-scoped singleton providers for core infrastructure services
 
 from functools import lru_cache
 
-from infrastructure.clients.maxmind import MaxMindClient
 from infrastructure.configuration import Settings
 from infrastructure.configuration.app import (
     AppSettings,
@@ -14,7 +13,6 @@ from infrastructure.configuration.app import (
 from infrastructure.configuration.app import (
     get_app_settings as _get_app_settings,
 )
-from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
 
 
 @lru_cache(maxsize=1)
@@ -49,38 +47,3 @@ def get_settings() -> Settings:
 def get_app_settings() -> AppSettings:
     """Get application-scoped app settings singleton."""
     return _get_app_settings()
-
-
-@lru_cache(maxsize=1)
-def get_maxmind_client() -> MaxMindClient:
-    """Provider for MaxMind GeoIP2 client.
-
-    Returns a fully-configured MaxMindClient instance with database path
-    from application configuration.
-
-    Returns:
-        MaxMindClient: Configured client instance for geolocation operations
-
-    Usage:
-        # FastAPI route handlers (dependency injection)
-        from infrastructure.services import MaxMindClientDep
-
-        @router.get("/geolocate")
-        def geolocate(ip: str, maxmind: MaxMindClientDep):
-            result = maxmind.geolocate(ip_address=ip)
-            if result.is_success:
-                return result.data
-
-        # Application code (jobs, modules, utils)
-        from infrastructure.services import get_maxmind_client
-
-        def check_ip_location(ip: str):
-            maxmind = get_maxmind_client()
-            result = maxmind.geolocate(ip_address=ip)
-            return result
-
-    Note:
-        For MaxMind types and data classes, import from:
-        infrastructure.clients.maxmind
-    """
-    return MaxMindClient(maxmind_settings=get_maxmind_settings())

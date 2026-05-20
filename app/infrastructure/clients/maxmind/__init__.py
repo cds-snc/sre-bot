@@ -16,9 +16,14 @@ Developer Usage (Recommended):
             return result.data
 """
 
-from infrastructure.clients.maxmind.client import GeoLocationData, MaxMindClient
+from infrastructure.clients.maxmind.client import (
+    GeoLocationData,
+    MaxMindClient,
+    get_maxmind_client,
+)
 
 __all__ = [
     "MaxMindClient",
     "GeoLocationData",
+    "get_maxmind_client",
 ]

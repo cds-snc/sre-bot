@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrastructure.clients.maxmind.client import MaxMindClient
+from infrastructure.clients.maxmind.client import MaxMindClient, get_maxmind_client
 from infrastructure.configuration.infrastructure.platforms import PlatformsSettings
 from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.configuration.integrations.maxmind import MaxMindSettings
@@ -18,9 +18,6 @@ from infrastructure.configuration.integrations.slack import SlackSettings
 from infrastructure.platforms.clients.slack import get_slack_client
 from infrastructure.platforms.service import PlatformService, get_platform_service
 from infrastructure.resilience.service import ResilienceService
-from infrastructure.services.providers import (
-    get_maxmind_client,
-)
 
 pytestmark = pytest.mark.unit
 
@@ -93,10 +90,10 @@ class TestProvidersDontCallGetSettings:
         get_maxmind_client.cache_clear()
         with (
             patch(
-                "infrastructure.services.providers.get_settings"
+                "infrastructure.configuration.settings.get_settings"
             ) as mock_get_settings,
             patch(
-                "infrastructure.services.providers.get_maxmind_settings"
+                "infrastructure.clients.maxmind.client.get_maxmind_settings"
             ) as mock_maxmind,
             patch(
                 "infrastructure.clients.maxmind.client.MaxMindClient.__init__",
