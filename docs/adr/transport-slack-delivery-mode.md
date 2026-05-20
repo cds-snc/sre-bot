@@ -5,7 +5,7 @@ type: Standard
 tier: Tier-3
 governance_domain: [application]
 concerns: [architecture, api]
-constrained_by: [transport-slack.md, cross-channel-correlation.md, application-lifecycle.md, configuration-ownership.md]
+constrained_by: [cross-channel-correlation.md, application-lifecycle.md, configuration-ownership.md]
 date: 2026-05-13
 decision_makers:
   - SRE Team

@@ -1,11 +1,11 @@
 ---
 title: "Slack Transport — Shield Implementation"
-status: Draft
+status: Rejected
 type: Standard
 tier: Tier-3
 governance_domain: [application]
 concerns: [architecture, api]
-constrained_by: [transport-slack.md, client-sdk-shield-pattern.md, outbound-retry-policy.md, operation-result-pattern.md, configuration-ownership.md]
+constrained_by: [client-sdk-shield-pattern.md, outbound-retry-policy.md, operation-result-pattern.md, configuration-ownership.md]
 date: 2026-05-13
 decision_makers:
   - SRE Team
@@ -181,3 +181,4 @@ This is an escape hatch, not the default path. The method should be promoted to 
 ## Change Log
 
 - 2026-05-13: Created by splitting shield-implementation content out of [transport-slack.md](transport-slack.md). Covers `SlackShield` construction, `shield_listener_callables` middleware, both classification tables, and the escape hatch. The cross-cutting shield pattern remains in [client-sdk-shield-pattern.md](client-sdk-shield-pattern.md).
+- 2026-05-20: Rejected by SRE Team. The shield pattern is meant for external SDK clients; Slack is a built-in transport with native Bolt callables. The shield adds unnecessary complexity and indirection without meaningful benefits. 

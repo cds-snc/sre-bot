@@ -5,7 +5,7 @@ type: Standard
 tier: Tier-3
 governance_domain: [application]
 concerns: [architecture, api]
-constrained_by: [transport-slack.md, slack-command-parser.md, infrastructure-i18n.md, type-boundaries.md]
+constrained_by: [transport-slack-delivery-mode.md, slack-command-parser.md, infrastructure-i18n.md, type-boundaries.md]
 date: 2026-05-13
 decision_makers:
   - SRE Team
@@ -26,7 +26,7 @@ Help text generation is not a transport concern and not a parsing concern. It is
 - User-facing strings are localized via the I18nService Protocol per [infrastructure-i18n.md](infrastructure-i18n.md).
 - The help renderer must not depend on `slack_sdk`, `slack_bolt`, or any transport mechanism. It is testable without Slack credentials.
 
-**Non-goals:** OperationResult rendering (that is `formatter.py` in [transport-slack.md](transport-slack.md)); slash command routing; argument parsing (that is [slack-command-parser.md](slack-command-parser.md)).
+**Non-goals:** OperationResult rendering; slash command routing; argument parsing (that is [slack-command-parser.md](slack-command-parser.md)).
 
 ## Considered Options
 

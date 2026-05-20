@@ -5,7 +5,7 @@ type: Standard
 tier: Tier-3
 governance_domain: [application]
 concerns: [architecture, api]
-constrained_by: [transport-slack.md, type-boundaries.md, operation-result-pattern.md]
+constrained_by: [transport-slack-delivery-mode.md, type-boundaries.md, operation-result-pattern.md]
 date: 2026-05-13
 decision_makers:
   - SRE Team
@@ -26,7 +26,7 @@ This is not a transport concern. The parsing problem — tokenizing a string, ex
 - Parse failures must surface as a `PERMANENT_ERROR` `OperationResult` with a user-displayable message, not as a raised exception that the handler must catch.
 - The schema definition serves double duty: validation input and help-text source. See [slack-help-text.md](slack-help-text.md).
 
-**Non-goals:** routing of parsed commands to handlers (that is the responsibility of [transport-slack.md](transport-slack.md) and the pluggy hookspec); rendering of parse errors into Block Kit (that is [transport-slack.md](transport-slack.md) §Help text and `OperationResult` rendering); MS Teams or any other platform (command parsing for other platforms is out of scope for this record).
+**Non-goals:** routing of parsed commands to handlers (that is the responsibility of [transport-slack-delivery-mode.md](transport-slack-delivery-mode.md) and the pluggy hookspec); rendering of parse errors into Block Kit (that is [transport-slack-delivery-mode.md](transport-slack-delivery-mode.md) §Help text and `OperationResult` rendering); MS Teams or any other platform (command parsing for other platforms is out of scope for this record).
 
 ## Considered Options
 
