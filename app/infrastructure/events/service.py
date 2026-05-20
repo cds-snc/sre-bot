@@ -134,17 +134,6 @@ class EventDispatcher:
 @cache
 def get_event_dispatcher() -> EventDispatcher:
     """Get application-scoped event dispatcher singleton.
-
-    Returns an EventDispatcher instance for dependency injection and testing.
-
-    Usage:
-        from infrastructure.services import EventDispatcherDep
-
-        @router.post("/action")
-        def perform_action(dispatcher: EventDispatcherDep):
-            event = Event(event_type="action.performed")
-            dispatcher.dispatch(event)
-
     Returns:
         EventDispatcher: Cached event dispatcher instance
     """

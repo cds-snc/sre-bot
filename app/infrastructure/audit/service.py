@@ -36,7 +36,7 @@ class DynamoDBAuditTrailService:
 
     Usage::
 
-        from infrastructure.services import AuditTrailServiceDep
+        from infrastructure.audit import AuditTrailServiceDep
 
         @router.post("/audit/write")
         def write_event(audit_trail: AuditTrailServiceDep, event: AuditEvent):

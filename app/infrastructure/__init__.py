@@ -13,17 +13,8 @@ Use the services layer for all infrastructure access.
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
 
-# Dependency Injection Services (THE PUBLIC API)
-from infrastructure.services import (
-    SettingsDep,
-    get_settings,
-)
-
 __all__ = [
     # Base types
     "OperationResult",
     "OperationStatus",
-    # Dependency Injection Services
-    "SettingsDep",
-    "get_settings",
 ]

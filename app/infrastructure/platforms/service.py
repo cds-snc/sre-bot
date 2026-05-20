@@ -9,29 +9,6 @@ This service:
 - Formats responses using platform-specific formatters
 - Validates platform capabilities
 - Provides health checking for active platforms
-
-Usage:
-    # Via dependency injection
-    from infrastructure.services import PlatformServiceDep
-
-    @router.post("/send")
-    def send_message(
-        platform_service: PlatformServiceDep,
-        message: MessageRequest
-    ):
-        result = platform_service.send(
-            platform="slack",
-            channel="C123456",
-            message={"text": "Hello"}
-        )
-        return {"success": result.is_success}
-
-    # Direct instantiation
-    from infrastructure.platforms import PlatformService
-    from infrastructure.services import get_settings
-
-    service = PlatformService(settings=get_settings())
-    service.load_providers()  # Discover and register providers
 """
 
 from functools import lru_cache

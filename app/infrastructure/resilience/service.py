@@ -32,28 +32,6 @@ class ResilienceService:
     - Manages a registry of circuit breakers
     - Provides access to retry store functionality
     - Offers helper methods for common resilience patterns
-
-    Usage:
-        # Via dependency injection
-        from infrastructure.services import ResilienceServiceDep
-
-        @router.get("/external-call")
-        def make_external_call(resilience: ResilienceServiceDep):
-            cb = resilience.get_or_create_circuit_breaker(
-                "external_api",
-                failure_threshold=5
-            )
-            try:
-                result = cb.call(external_api_function)
-                return result
-            except CircuitBreakerOpenError:
-                return {"error": "Service temporarily unavailable"}
-
-        # Direct instantiation
-        from infrastructure.resilience import ResilienceService
-
-        service = ResilienceService()
-        breaker = service.create_circuit_breaker("my_service")
     """
 
     def __init__(
@@ -244,20 +222,6 @@ class ResilienceService:
 @cache
 def get_resilience_service() -> ResilienceService:
     """Get application-scoped resilience service singleton.
-
-    Returns a ResilienceService instance that provides unified access to
-    circuit breakers and retry stores for fault-tolerant operations.
-
-    Usage:
-        from infrastructure.services import ResilienceServiceDep
-
-        @router.get("/external-call")
-        def make_call(resilience: ResilienceServiceDep):
-            cb = resilience.get_or_create_circuit_breaker("external_api")
-            try:
-                return cb.call(external_api_function)
-            except CircuitBreakerOpenError:
-                return {"error": "Service unavailable"}
 
     Returns:
         ResilienceService: Cached resilience service instance

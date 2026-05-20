@@ -27,7 +27,7 @@ class SyncRunRepository:
     """DynamoDB-backed repository for sync run records.
 
     Constructed once at startup in ``providers.py`` using the centralized
-    ``StorageService`` singleton from ``infrastructure.services``.
+    ``StorageService`` singleton from ``infrastructure.storage``.
 
     Args:
         storage: Configured ``StorageService`` instance injected by provider.
