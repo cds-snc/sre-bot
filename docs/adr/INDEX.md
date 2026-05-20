@@ -1,6 +1,6 @@
 # Decision Record Index
 
-**Generated:** 2026-05-11 · **Total records:** 40
+**Generated:** 2026-05-13 · **Total records:** 44
 
 ---
 
@@ -11,7 +11,7 @@
 | Tier-0 (Governance) | — | — | 1 |
 | Tier-1 (Foundational) | 3 | 0 | 0 |
 | Tier-2 (Cross-cutting) | 29 | 2 | 5 |
-| Tier-3 (Scoped) | 0 | 0 | 0 |
+| Tier-3 (Scoped) | 4 | 0 | 0 |
 
 ---
 
@@ -47,6 +47,8 @@
   - `Standard` · `Accepted` · `architecture`
 - [client-module-placement.md](client-module-placement.md) — **Client Module Placement**
   - `Selection` · `Accepted` · `architecture`
+- [client-sdk-shield-pattern.md](client-sdk-shield-pattern.md) — **Client SDK Shield Pattern**
+  - `Standard` · `Draft` · `architecture`
 - [code-quality-tooling.md](code-quality-tooling.md) — **Code Quality Tooling**
   - `Selection` · `Accepted` · `quality-gates`
 - [configuration-ownership.md](configuration-ownership.md) — **Configuration Ownership and Settings**
@@ -99,10 +101,19 @@
   - `Selection` · `Accepted` · `security`, `api`
 - [testing-standards.md](testing-standards.md) — **Testing Standards**
   - `Standard` · `Accepted` · `testing`, `architecture`
-- [transport-slack.md](transport-slack.md) — **Slack Transport**
-  - `Standard` · `Accepted` · `api`, `architecture`, `plugins`
 - [transport-teams.md](transport-teams.md) — **Teams Transport**
   - `Standard` · `Draft` · `api`, `architecture`, `plugins`
+
+#### Tier-3: Scoped
+
+- [slack-command-parser.md](slack-command-parser.md) — **Slack Command Parser**
+  - `Standard` · `Draft` · `architecture`, `api`
+- [slack-help-text.md](slack-help-text.md) — **Slack Help Text**
+  - `Standard` · `Draft` · `architecture`, `api`
+- [transport-slack-delivery-mode.md](transport-slack-delivery-mode.md) — **Slack Transport — Delivery Mode**
+  - `Standard` · `Draft` · `architecture`, `api`
+- [transport-slack-shield.md](transport-slack-shield.md) — **Slack Transport — Shield Implementation**
+  - `Standard` · `Draft` · `architecture`, `api`
 
 ### Operations
 
@@ -141,10 +152,16 @@
   - `Standard` · `Accepted` · `api`, `architecture`
 - [operation-result-pattern.md](operation-result-pattern.md) — **Operation Result Pattern**
   - `Standard` · `Accepted` · `architecture`, `api`
+- [slack-command-parser.md](slack-command-parser.md) — **Slack Command Parser**
+  - `Standard` · `Draft` · `architecture`, `api`
+- [slack-help-text.md](slack-help-text.md) — **Slack Help Text**
+  - `Standard` · `Draft` · `architecture`, `api`
 - [technology-slowapi.md](technology-slowapi.md) — **Technology Selection: SlowAPI**
   - `Selection` · `Accepted` · `security`, `api`
-- [transport-slack.md](transport-slack.md) — **Slack Transport**
-  - `Standard` · `Accepted` · `api`, `architecture`, `plugins`
+- [transport-slack-delivery-mode.md](transport-slack-delivery-mode.md) — **Slack Transport — Delivery Mode**
+  - `Standard` · `Draft` · `architecture`, `api`
+- [transport-slack-shield.md](transport-slack-shield.md) — **Slack Transport — Shield Implementation**
+  - `Standard` · `Draft` · `architecture`, `api`
 - [transport-teams.md](transport-teams.md) — **Teams Transport**
   - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 
@@ -160,6 +177,8 @@
   - `Standard` · `Accepted` · `architecture`
 - [client-module-placement.md](client-module-placement.md) — **Client Module Placement**
   - `Selection` · `Accepted` · `architecture`
+- [client-sdk-shield-pattern.md](client-sdk-shield-pattern.md) — **Client SDK Shield Pattern**
+  - `Standard` · `Draft` · `architecture`
 - [cloud-portability.md](cloud-portability.md) — **Cloud Portability**
   - `Principle` · `Accepted` · `architecture`
 - [configuration-ownership.md](configuration-ownership.md) — **Configuration Ownership and Settings**
@@ -194,14 +213,20 @@
   - `Standard` · `Accepted` · `architecture`
 - [plugin-registration-discovery.md](plugin-registration-discovery.md) — **Plugin Registration and Discovery**
   - `Standard` · `Accepted` · `plugins`, `architecture`
+- [slack-command-parser.md](slack-command-parser.md) — **Slack Command Parser**
+  - `Standard` · `Draft` · `architecture`, `api`
+- [slack-help-text.md](slack-help-text.md) — **Slack Help Text**
+  - `Standard` · `Draft` · `architecture`, `api`
 - [technology-blinker.md](technology-blinker.md) — **Technology Selection: Blinker**
   - `Selection` · `Accepted` · `architecture`
 - [technology-pluggy.md](technology-pluggy.md) — **Technology Selection: Pluggy**
   - `Selection` · `Accepted` · `plugins`, `architecture`
 - [testing-standards.md](testing-standards.md) — **Testing Standards**
   - `Standard` · `Accepted` · `testing`, `architecture`
-- [transport-slack.md](transport-slack.md) — **Slack Transport**
-  - `Standard` · `Accepted` · `api`, `architecture`, `plugins`
+- [transport-slack-delivery-mode.md](transport-slack-delivery-mode.md) — **Slack Transport — Delivery Mode**
+  - `Standard` · `Draft` · `architecture`, `api`
+- [transport-slack-shield.md](transport-slack-shield.md) — **Slack Transport — Shield Implementation**
+  - `Standard` · `Draft` · `architecture`, `api`
 - [transport-teams.md](transport-teams.md) — **Teams Transport**
   - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 - [type-boundaries.md](type-boundaries.md) — **Type Boundaries**
@@ -265,8 +290,6 @@
   - `Standard` · `Accepted` · `plugins`, `architecture`
 - [technology-pluggy.md](technology-pluggy.md) — **Technology Selection: Pluggy**
   - `Selection` · `Accepted` · `plugins`, `architecture`
-- [transport-slack.md](transport-slack.md) — **Slack Transport**
-  - `Standard` · `Accepted` · `api`, `architecture`, `plugins`
 - [transport-teams.md](transport-teams.md) — **Teams Transport**
   - `Standard` · `Draft` · `api`, `architecture`, `plugins`
 
