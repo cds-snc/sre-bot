@@ -5,7 +5,6 @@ Provides application-scoped singleton providers for core infrastructure services
 """
 
 from functools import lru_cache
-from typing import Any
 
 from infrastructure.clients.maxmind import MaxMindClient
 from infrastructure.configuration import Settings
@@ -17,8 +16,6 @@ from infrastructure.configuration.app import (
 )
 from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
 from infrastructure.events.service import EventDispatcher
-from infrastructure.i18n.models import Locale, TranslationKey
-from infrastructure.i18n.service import TranslationService
 
 
 @lru_cache(maxsize=1)
@@ -108,50 +105,3 @@ def get_event_dispatcher() -> EventDispatcher:
         EventDispatcher: Cached event dispatcher instance
     """
     return EventDispatcher()
-
-
-@lru_cache(maxsize=1)
-def get_translation_service() -> TranslationService:
-    """Get application-scoped translation service singleton.
-
-    Returns a TranslationService instance with pre-configured Translator
-    that has all YAML catalogs loaded from the default locales directory.
-
-    Usage:
-        from infrastructure.services import TranslationServiceDep
-
-        @router.get("/message")
-        def get_message(translation: TranslationServiceDep, locale: str):
-            key = TranslationKey.from_string("groups.create.success")
-            return translation.translate(key, Locale.from_string(locale))
-
-    Returns:
-        TranslationService: Cached translation service instance
-    """
-    # TranslationService doesn't need settings - uses factory internally
-    return TranslationService()
-
-
-def t(key: str, locale: str, fallback: str = "", **variables: Any) -> str:
-    """Translate a key safely, designed for use in command handlers and feature packages.
-
-    Wraps the application-scoped translation singleton with a fallback so callers
-    never have to guard against uninitialized state or missing keys.
-
-    Args:
-        key: Dot-separated translation key (e.g. "geolocate.result.city_label").
-        locale: Locale string such as "en-US" or "fr-FR".
-        fallback: Returned as-is when the key is missing or the service is not yet ready.
-        **variables: Interpolation variables for ``{{variable}}`` placeholders.
-
-    Returns:
-        Translated and interpolated string, or *fallback* on any error.
-    """
-    try:
-        return get_translation_service().translate(
-            key=TranslationKey.from_string(key),
-            locale=Locale.from_string(locale),
-            variables=variables or None,
-        )
-    except Exception:
-        return fallback
