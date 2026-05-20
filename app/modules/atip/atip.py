@@ -8,7 +8,7 @@ from datetime import datetime
 import i18n  # type: ignore
 from structlog import get_logger
 
-from infrastructure.services import get_settings
+from infrastructure.configuration import get_settings
 from integrations.slack import users as slack_users, commands as slack_commands
 from integrations import trello
 

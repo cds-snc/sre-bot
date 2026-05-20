@@ -3,17 +3,6 @@
 Provides the singleton Limiter instance used by route handlers and wired
 into the FastAPI app in server/server.py.
 
-Route handlers import get_limiter() from infrastructure.services and use the
-returned instance as a decorator:
-
-    from infrastructure.services import get_limiter
-
-    limiter = get_limiter()
-
-    @router.get("/endpoint")
-    @limiter.limit("50/minute")
-    def my_endpoint(request: Request): ...
-
 App wiring (app.state.limiter and the RateLimitExceeded exception handler) is
 done once in server/server.py via setup_rate_limiter().
 """

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sns_message_validator import SNSMessageValidator  # type: ignore
 
 from api.router import api_router
-from infrastructure.services import get_settings
+from infrastructure.configuration import get_settings
 from infrastructure.security import setup_rate_limiter
 from server.lifespan import lifespan
 

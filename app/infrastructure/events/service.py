@@ -4,6 +4,7 @@ Provides error-isolated in-process event dispatch with a DI-friendly API.
 """
 
 from concurrent.futures import ThreadPoolExecutor
+from functools import cache
 from threading import Lock
 from typing import Any, Callable
 
@@ -128,3 +129,12 @@ class EventDispatcher:
         """Get number of handlers registered for an event type."""
         signal = self._get_signal(event_type)
         return len(list(signal.receivers_for(blinker.ANY)))
+
+
+@cache
+def get_event_dispatcher() -> EventDispatcher:
+    """Get application-scoped event dispatcher singleton.
+    Returns:
+        EventDispatcher: Cached event dispatcher instance
+    """
+    return EventDispatcher()

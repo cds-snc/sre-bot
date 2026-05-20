@@ -3,9 +3,15 @@
 from typing import Optional
 
 import structlog
+
+from infrastructure.configuration.infrastructure.idempotency import (
+    IdempotencySettings,
+    get_idempotency_settings,
+)
 from infrastructure.idempotency.cache import IdempotencyCache
 from infrastructure.idempotency.dynamodb import DynamoDBCache
-from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
+from infrastructure.idempotency.service import DynamoDBIdempotencyService
+from infrastructure.idempotency.protocol import IdempotencyService
 
 logger = structlog.get_logger().bind(component="idempotency.factory")
 
@@ -43,3 +49,14 @@ def reset_cache() -> None:
     global _cache_instance
     _cache_instance = None
     logger.debug("reset_cache_singleton")
+
+
+def get_idempotency_service() -> IdempotencyService:
+    """Get application-scoped idempotency service singleton.
+
+    Returns an IdempotencyService instance with DynamoDB-backed cache
+    for distributed idempotency across ECS tasks.
+    """
+    return DynamoDBIdempotencyService(
+        cache=DynamoDBCache(idempotency_settings=get_idempotency_settings())
+    )

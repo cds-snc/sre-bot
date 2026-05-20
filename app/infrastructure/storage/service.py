@@ -8,26 +8,6 @@ Feature packages MUST NOT call ``DynamoDBClient`` or ``dynamodb_next`` directly.
 Instead, define a thin repository class that takes
 ``infrastructure.storage.protocol.StorageService`` as a constructor argument and
 delegates all DynamoDB I/O here.
-
-Usage (feature-level repository)::
-
-    from infrastructure.services import StorageServiceDep
-
-    class SyncRunRepository:
-        TABLE = "sre_bot_access"
-
-        def __init__(self, storage: StorageService) -> None:
-            self._storage = storage
-
-        def save(self, record: SyncRunRecord) -> bool:
-            result = self._storage.put(self.TABLE, record.model_dump())
-            return result.is_success
-
-        def get(self, run_id: str) -> Optional[SyncRunRecord]:
-            result = self._storage.get(self.TABLE, {"pk": run_id})
-            if result.is_success:
-                return SyncRunRecord(**result.data)
-            return None
 """
 
 from functools import cache

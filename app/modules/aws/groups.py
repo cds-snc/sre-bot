@@ -5,7 +5,7 @@ from modules.aws import identity_center, ops_group_assignment
 from modules.permissions import handler as permissions
 from modules.provisioning import groups as provisioning_groups
 from integrations.slack import users as slack_users
-from infrastructure.services import get_settings
+from infrastructure.configuration import get_settings
 
 logger = structlog.get_logger()
 

@@ -5,7 +5,7 @@ from slack_sdk.web import WebClient
 from modules.aws import identity_center
 from modules.permissions import handler as permissions
 from integrations.slack import users as slack_users
-from infrastructure.services import get_settings
+from infrastructure.configuration import get_settings
 
 logger = structlog.get_logger()
 

@@ -10,7 +10,7 @@ Exports:
 
 Example:
     ```python
-    from infrastructure.services import get_settings
+    from infrastructure.configuration import get_settings
 
     settings = get_settings()
 
@@ -26,7 +26,13 @@ Example:
 """
 
 from infrastructure.configuration.app import AppSettings, get_app_settings
-from infrastructure.configuration.settings import Settings
+from infrastructure.configuration.settings import Settings, get_settings
 from infrastructure.configuration.infrastructure.retry import RetrySettings
 
-__all__ = ["AppSettings", "Settings", "RetrySettings", "get_app_settings"]
+__all__ = [
+    "AppSettings",
+    "Settings",
+    "RetrySettings",
+    "get_app_settings",
+    "get_settings",
+]

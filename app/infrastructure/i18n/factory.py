@@ -4,12 +4,16 @@ Provides convenience functions for initializing translators with default
 configurations suitable for the application.
 """
 
+from functools import cache
 from pathlib import Path
+from typing import Any
 
 import structlog
+
 from infrastructure.i18n.loader import YAMLTranslationLoader
+from infrastructure.i18n.models import Locale, TranslationKey
+from infrastructure.i18n.service import TranslationService
 from infrastructure.i18n.translator import Translator
-from infrastructure.i18n.models import Locale
 
 logger = structlog.get_logger().bind(component="i18n.factory")
 
@@ -72,3 +76,41 @@ def create_translator(
         log.info("translator_created_lazy")
 
     return translator
+
+
+@cache
+def get_translation_service() -> TranslationService:
+    """Get application-scoped translation service singleton.
+
+    Returns a TranslationService instance with pre-configured Translator
+    that has all YAML catalogs loaded from the default locales directory.
+    """
+    # TranslationService doesn't need settings - uses factory internally
+    translator = create_translator()
+    return TranslationService(translator=translator)
+
+
+@cache
+def t(key: str, locale: str, fallback: str = "", **variables: Any) -> str:
+    """Translate a key safely, designed for use in command handlers and feature packages.
+
+    Wraps the application-scoped translation singleton with a fallback so callers
+    never have to guard against uninitialized state or missing keys.
+
+    Args:
+        key: Dot-separated translation key (e.g. "geolocate.result.city_label").
+        locale: Locale string such as "en-US" or "fr-FR".
+        fallback: Returned as-is when the key is missing or the service is not yet ready.
+        **variables: Interpolation variables for ``{{variable}}`` placeholders.
+
+    Returns:
+        Translated and interpolated string, or *fallback* on any error.
+    """
+    try:
+        return get_translation_service().translate(
+            key=TranslationKey.from_string(key),
+            locale=Locale.from_string(locale),
+            variables=variables or None,
+        )
+    except Exception:
+        return fallback

@@ -8,7 +8,7 @@ import pytest
 
 from infrastructure.events.models import Event
 from infrastructure.events.service import EventDispatcher
-from infrastructure.services.providers import get_event_dispatcher
+from infrastructure.events import get_event_dispatcher
 
 
 @pytest.fixture(autouse=True)

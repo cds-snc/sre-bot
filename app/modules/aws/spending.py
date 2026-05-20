@@ -8,7 +8,7 @@ from pandas.core.frame import DataFrame
 
 from integrations.aws import organizations, cost_explorer
 from integrations.google_workspace import sheets
-from infrastructure.services import get_settings
+from infrastructure.configuration import get_settings
 
 logger = structlog.get_logger()
 

@@ -4,7 +4,7 @@ import importlib
 
 import pytest
 
-from infrastructure.services import get_event_dispatcher
+from infrastructure.events import get_event_dispatcher
 from packages.access.common.events import REQUEST_APPROVED
 
 

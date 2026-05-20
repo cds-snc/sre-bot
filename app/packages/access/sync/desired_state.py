@@ -32,7 +32,7 @@ class DirectoryMembershipBuilder:
 
     Injected into ``AccessSyncApplicationService`` at startup via ``providers.py``.
     Calls ``DirectoryProvider`` (the IDP abstraction from
-    ``infrastructure.services``) exclusively; it never touches platform adapters.
+    ``infrastructure.directory``) exclusively; it never touches platform adapters.
 
     All public methods return ``OperationResult`` so callers can handle IDP
     failures through the standard result contract without catching exceptions.

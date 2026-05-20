@@ -9,15 +9,15 @@ pending implementation of a ``register_slack_commands(provider)`` hookimpl
 per ADR-0059 Standard 3.
 """
 
-from infrastructure.services import get_event_dispatcher
+from infrastructure.events import get_event_dispatcher
 from infrastructure.plugins import hookimpl
 from packages.access.common.events import SYNC_COMPLETED, SYNC_FAILED
 from packages.access.common.providers import get_access_runtime_config
+from packages.access.request.interactions.http import router as access_requests_router
 from packages.access.request.providers import (
     get_access_request_service,
     get_access_request_settings,
 )
-from packages.access.request.interactions.http import router as access_requests_router
 
 
 @hookimpl

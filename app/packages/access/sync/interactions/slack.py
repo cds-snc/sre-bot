@@ -9,23 +9,24 @@ Command hierarchy under /sre:
             └── status  <job_id>
 """
 
-from typing import Any, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict
 
 import structlog
 
+from infrastructure.i18n import t
+from infrastructure.idempotency import get_idempotency_service
 from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.platforms.parsing import Argument, ArgumentType
-from infrastructure.services import get_idempotency_service, t
-from packages.access.sync.providers import (
-    get_access_sync_coordinator,
-    get_access_sync_settings,
-)
-from packages.access.sync.schemas import SyncJobStatusResponse
 from packages.access.sync.interactions.ingress import (
     enqueue_platform_sync,
     enqueue_user_sync,
 )
 from packages.access.sync.presenters import to_slack_status_message
+from packages.access.sync.providers import (
+    get_access_sync_coordinator,
+    get_access_sync_settings,
+)
+from packages.access.sync.schemas import SyncJobStatusResponse
 
 if TYPE_CHECKING:
     from infrastructure.platforms.providers.slack import SlackPlatformProvider

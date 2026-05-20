@@ -1,13 +1,13 @@
 """Slack platform implementation for geolocate package."""
 
-from typing import Any, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict
 
 import structlog
 
+from infrastructure.i18n import t
 from infrastructure.operations import OperationStatus
 from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.platforms.parsing import Argument, ArgumentType
-from infrastructure.services import t
 from packages.geolocate.schemas import GeolocateResponse
 from packages.geolocate.service import geolocate_ip
 

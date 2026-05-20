@@ -8,8 +8,7 @@ Tests cover:
 
 import pytest
 
-from infrastructure.configuration.settings import RetrySettings, Settings
-from infrastructure.services.providers import get_settings
+from infrastructure.configuration.settings import RetrySettings, Settings, get_settings
 
 
 class TestRetrySettings:

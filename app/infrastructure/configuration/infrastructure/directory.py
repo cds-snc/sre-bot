@@ -24,7 +24,7 @@ class DirectorySettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.services import get_settings
+        from infrastructure.configuration import get_settings
 
         settings = get_settings()
 
