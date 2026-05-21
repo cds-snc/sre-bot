@@ -17,6 +17,31 @@ def helper_generate_default_incident_params():
     )
 
 
+def _mock_successful_dependencies(
+    mock_incident_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call_users_from_folder,
+):
+    mock_get_on_call_users_from_folder.return_value = [
+        {
+            "id": "U12345",
+            "profile": {
+                "display_name_normalized": "test user name",
+            },
+        },
+    ]
+    mock_google_meet.create_space.return_value = {
+        "meetingUri": "https://meet.google.com/aaa-bbbb-ccc",
+    }
+    mock_incident_document.create_incident_document.return_value = "document_id"
+    mock_incident_folder.list_incident_folders.return_value = [
+        {"id": "folder", "name": "Team Name"},
+    ]
+    mock_db_operations.create_incident.return_value = "incident_id"
+
+
 @patch("modules.incident.core.INCIDENT_CHANNEL", "incident-channel")
 @patch("modules.incident.core.logger")
 @patch("modules.incident.core.on_call.get_on_call_users_from_folder")
@@ -200,6 +225,81 @@ _Type_ `/sre incident help` _for complete command list_"""
     )
     mock_logger.info.assert_any_call(
         "incident_record_created", incident_id="incident_id"
+    )
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+def test_initiate_resources_creation_adds_source_alert_link(
+    mock_incident_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call_users_from_folder,
+    _mock_logger,
+):
+    incident_payload = helper_generate_default_incident_params()
+    incident_payload.source_alert_permalink = "https://slack/source"
+    client = MagicMock()
+    _mock_successful_dependencies(
+        mock_incident_folder,
+        mock_incident_document,
+        mock_google_meet,
+        mock_db_operations,
+        mock_get_on_call_users_from_folder,
+    )
+
+    core.initiate_resources_creation(client, incident_payload)
+
+    client.bookmarks_add.assert_any_call(
+        channel_id="channel_id",
+        title="Source alert",
+        type="link",
+        link="https://slack/source",
+    )
+    client.chat_postMessage.assert_any_call(
+        text="Source alert: <https://slack/source|View original alert>",
+        channel="channel_id",
+    )
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+def test_initiate_resources_creation_skips_source_alert_link_when_missing(
+    mock_incident_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call_users_from_folder,
+    _mock_logger,
+):
+    incident_payload = helper_generate_default_incident_params()
+    client = MagicMock()
+    _mock_successful_dependencies(
+        mock_incident_folder,
+        mock_incident_document,
+        mock_google_meet,
+        mock_db_operations,
+        mock_get_on_call_users_from_folder,
+    )
+
+    core.initiate_resources_creation(client, incident_payload)
+
+    assert not any(
+        call.kwargs.get("title") == "Source alert"
+        for call in client.bookmarks_add.call_args_list
+    )
+    assert not any(
+        call.kwargs.get("text", "").startswith("Source alert:")
+        for call in client.chat_postMessage.call_args_list
     )
 
 

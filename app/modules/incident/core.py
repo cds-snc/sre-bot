@@ -540,6 +540,18 @@ def initiate_resources_creation(
     text = f":lapage: An incident report has been created at: {document_link}"
     client.chat_postMessage(text=text, channel=incident_payload.channel_id)
 
+    if incident_payload.source_alert_permalink:
+        client.bookmarks_add(
+            channel_id=incident_payload.channel_id,
+            title="Source alert",
+            type="link",
+            link=incident_payload.source_alert_permalink,
+        )
+        client.chat_postMessage(
+            text=f"Source alert: <{incident_payload.source_alert_permalink}|View original alert>",
+            channel=incident_payload.channel_id,
+        )
+
     # Gather all user IDs in a list to ensure uniqueness
     users_to_invite = []
 

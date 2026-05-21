@@ -17,6 +17,8 @@ def test_handle_incident_action_buttons_call_incident(
                 "type": "button",
             }
         ],
+        "channel": {"id": "channel_id"},
+        "message_ts": "123.456",
         "user": {"id": "user_id"},
     }
     incident_alert.handle_incident_action_buttons(
@@ -25,7 +27,54 @@ def test_handle_incident_action_buttons_call_incident(
         body,
     )
     incident_mock.open_create_incident_modal.assert_called_with(
-        client, ack, {"text": "incident_id"}, body
+        client,
+        ack,
+        {
+            "text": "incident_id",
+            "private_metadata": {
+                "source_channel_id": "channel_id",
+                "source_message_ts": "123.456",
+            },
+        },
+        body,
+    )
+    log_to_sentinel_mock.assert_called_with("call_incident_button_pressed", body)
+
+
+@patch("modules.incident.incident_alert.log_to_sentinel")
+@patch("modules.incident.incident_alert.incident")
+def test_handle_incident_action_buttons_call_incident_uses_container_fallback(
+    incident_mock, log_to_sentinel_mock
+):
+    client = MagicMock()
+    ack = MagicMock()
+    body = {
+        "actions": [
+            {
+                "name": "call-incident",
+                "value": "incident_id",
+                "type": "button",
+            }
+        ],
+        "container": {"channel_id": "container_channel", "message_ts": "987.654"},
+        "user": {"id": "user_id"},
+    }
+    incident_alert.handle_incident_action_buttons(
+        client,
+        ack,
+        body,
+    )
+    incident_mock.open_create_incident_modal.assert_called_with(
+        client,
+        ack,
+        {
+            "text": "incident_id",
+            "private_metadata": {
+                "source_channel_id": "container_channel",
+                "source_message_ts": "987.654",
+            },
+        },
+        body,
     )
     log_to_sentinel_mock.assert_called_with("call_incident_button_pressed", body)
 
