@@ -57,7 +57,7 @@ def link_ip_addresses_to_geolocate(text: str, base_url: str | None = None) -> st
         except ValueError:
             return ip_address
 
-        return _geolocate_url(ip_address, base_url)
+        return f"<{_geolocate_url(ip_address, base_url)}|{ip_address}>"
 
     return IP_ADDRESS_PATTERN.sub(replace_match, text)
 

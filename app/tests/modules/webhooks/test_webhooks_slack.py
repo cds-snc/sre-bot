@@ -81,7 +81,7 @@ def test_link_ip_addresses_to_geolocate():
 
     assert (
         result
-        == "source https://sre-bot.example.com/v1/geolocate?ip_address=8.8.8.8 hit https://sre-bot.example.com/v1/geolocate?ip_address=1.1.1.1"
+        == "source <https://sre-bot.example.com/v1/geolocate?ip_address=8.8.8.8|8.8.8.8> hit <https://sre-bot.example.com/v1/geolocate?ip_address=1.1.1.1|1.1.1.1>"
     )
 
 
@@ -111,7 +111,7 @@ def test_link_ip_addresses_to_geolocate_supports_ipv6():
 
     assert (
         result
-        == "resolver https://sre-bot.example.com/v1/geolocate?ip_address=2001%3A4860%3A4860%3A%3A8888"
+        == "resolver <https://sre-bot.example.com/v1/geolocate?ip_address=2001%3A4860%3A4860%3A%3A8888|2001:4860:4860::8888>"
     )
 
 
@@ -134,14 +134,14 @@ def test_hydrate_ip_addresses_links_text_and_block_strings():
 
     assert (
         result.text
-        == "source https://sre-bot.example.com/v1/geolocate?ip_address=8.8.8.8"
+        == "source <https://sre-bot.example.com/v1/geolocate?ip_address=8.8.8.8|8.8.8.8>"
     )
     assert result.blocks == [
         {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": "destination https://sre-bot.example.com/v1/geolocate?ip_address=1.1.1.1",
+                "text": "destination <https://sre-bot.example.com/v1/geolocate?ip_address=1.1.1.1|1.1.1.1>",
             },
         }
     ]
