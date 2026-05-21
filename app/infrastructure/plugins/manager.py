@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from infrastructure.events.service import EventDispatcher
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
-    from infrastructure.slack.service import SlackBot
+    from integrations.slack.service import SlackBot
 
 logger = structlog.get_logger()
 
