@@ -28,6 +28,7 @@ from integrations.slack.help import (
     SLACK_HELP_KEYWORDS,
     SlackHelpGenerator,
 )
+from integrations.slack import LegacySlackBootstrap
 
 logger = structlog.get_logger()
 
@@ -190,7 +191,7 @@ class SlackPlatformProvider(BasePlatformProvider):
 
         try:
             # Create Bolt App instance
-            self._app = App(token=self._settings.BOT_TOKEN)
+            self._app = LegacySlackBootstrap().create_app()
             self._client = self._app.client
             log.debug("slack_app_created")
 
