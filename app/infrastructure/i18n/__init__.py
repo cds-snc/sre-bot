@@ -19,7 +19,7 @@ from infrastructure.i18n.models import (
     TranslationKey,
 )
 from infrastructure.i18n.resolvers import LanguageNegotiator, LocaleResolver
-from infrastructure.i18n.resources import I18nResourceSpec
+from infrastructure.i18n.resources import I18nResourceSpec, I18nResourceRegistry
 from infrastructure.i18n.service import TranslationService
 from infrastructure.i18n.translator import Translator
 
@@ -33,6 +33,7 @@ __all__ = [
     "Translator",
     "LocaleResolver",
     "I18nResourceSpec",
+    "I18nResourceRegistry",
     "LanguageNegotiator",
     "create_translator",
     "TranslationService",

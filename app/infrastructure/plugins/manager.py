@@ -10,13 +10,14 @@ from typing import TYPE_CHECKING
 import pluggy
 import structlog
 
-from infrastructure import hookspecs
-from infrastructure.plugins.base import auto_discover_plugins
 from infrastructure.i18n.resources import I18nResourceRegistry
+from infrastructure.plugins.base import auto_discover_plugins
+from infrastructure.plugins.specs import FeatureLifecycleSpecs
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
     from structlog.stdlib import BoundLogger
+
     from infrastructure.events.service import EventDispatcher
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
     from infrastructure.slack.service import SlackBot
@@ -32,7 +33,7 @@ def get_plugin_manager() -> pluggy.PluginManager:
         PluginManager configured with all feature lifecycle hookspecs.
     """
     pm = pluggy.PluginManager("sre_bot")
-    pm.add_hookspecs(hookspecs.features)
+    pm.add_hookspecs(FeatureLifecycleSpecs)
 
     logger.info("plugin_manager_created")
     return pm
@@ -89,10 +90,6 @@ def register_feature_integrations(
     if slack_provider:
         pm.hook.register_slack_commands(provider=slack_provider)
         logger.info("slack_commands_registered")
-
-    if slack_bot:
-        pm.hook.register_slack_agent_interactions(provider=slack_bot)
-        logger.info("slack_agent_interactions_registered")
 
     if event_dispatcher:
         pm.hook.register_event_handlers(dispatcher=event_dispatcher)
