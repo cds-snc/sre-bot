@@ -24,7 +24,7 @@ from infrastructure.platforms.models import (
 )
 from infrastructure.platforms.parsing import CommandArgumentParser
 from infrastructure.platforms.providers.base import BasePlatformProvider
-from infrastructure.platforms.utils.slack_help import (
+from integrations.slack.help import (
     SLACK_HELP_KEYWORDS,
     SlackHelpGenerator,
 )

@@ -1,10 +1,10 @@
 """Tests for automatic help text generation."""
 
 from infrastructure.platforms.parsing import Argument, ArgumentType
-from infrastructure.platforms.utils.slack_help import (
-    generate_slack_help_text,
-    generate_usage_line,
-    get_argument_by_name,
+from integrations.slack.help import (
+    _generate_slack_help_text as generate_slack_help_text,
+    _generate_usage_line as generate_usage_line,
+    _get_argument_by_name as get_argument_by_name,
 )
 
 
