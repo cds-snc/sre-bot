@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pluggy
 import pytest
 
-from infrastructure.hookspecs import features
+from infrastructure.plugins.specs import FeatureLifecycleSpecs
 from infrastructure.events.service import EventDispatcher
 from infrastructure.plugins.manager import register_feature_integrations
 
@@ -13,12 +13,12 @@ pytestmark = pytest.mark.unit
 
 
 def test_register_event_handlers_hookspec_exists() -> None:
-    assert hasattr(features, "register_event_handlers")
+    assert hasattr(FeatureLifecycleSpecs, "register_event_handlers")
 
 
 def test_hookimpl_receives_dispatcher() -> None:
     pm = pluggy.PluginManager("sre_bot")
-    pm.add_hookspecs(features)
+    pm.add_hookspecs(FeatureLifecycleSpecs)
     observed: dict[str, object] = {}
     hookimpl = pluggy.HookimplMarker("sre_bot")
 

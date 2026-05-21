@@ -5,24 +5,30 @@ from pathlib import Path
 from typing import TYPE_CHECKING, AsyncIterator, Optional, cast
 
 from fastapi import FastAPI
+from pluggy import PluginManager
 from slack_bolt import App
 from structlog.stdlib import BoundLogger
 
+from infrastructure.configuration import get_settings
 from infrastructure.configuration.infrastructure.server import (
     ServerSettings,
     get_server_settings,
 )
-from infrastructure.configuration import get_settings
 from infrastructure.directory import get_directory_provider
-from infrastructure.i18n import I18nResourceSpec, get_translation_service
+from infrastructure.i18n import (
+    I18nResourceRegistry,
+    I18nResourceSpec,
+    TranslationService,
+    get_translation_service,
+)
 from infrastructure.logging.setup import configure_logging
 from infrastructure.platforms import get_platform_service
 from infrastructure.plugins import (
-    collect_feature_i18n_resources,
+    auto_discover_plugins,
+    get_plugin_manager,
     register_feature_integrations,
 )
 from infrastructure.security import get_jwks_manager
-
 from jobs import scheduled_tasks
 from modules import (
     atip,
@@ -148,36 +154,20 @@ def _initialize_directory_provider(
     log.info("directory_provider_initialization_completed")
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    settings = get_settings()
-    server_settings = get_server_settings()
-    logger = _get_logger(settings)
-
-    app.state.settings = settings
-    app.state.logger = logger
-
-    logger.info("application_startup")
-    _list_configs(settings, logger)
-
-    _initialize_security_services(app, server_settings, logger)
-    _initialize_directory_provider(app, settings, logger)
-
-    app.state.command_providers = {}
-
-    platform_service = get_platform_service()
-    platform_providers = platform_service.load_providers()
-    app.state.platform_service = platform_service
-    app.state.platform_providers = platform_providers
-
+def _initialize_translation_service(
+    pm: PluginManager, logger: BoundLogger
+) -> TranslationService:
+    """"""
     # Phase 1: Discover feature plugins and collect i18n resource registrations.
-    # This must happen before translation service initialization so that all
-    # feature-package locale paths are included in the loaded catalogs.
     log = logger.bind(phase="i18n_resource_collection")
-    i18n_registry = collect_feature_i18n_resources(logger=logger)
-    log.info(
-        "i18n_resources_collected",
-        i18n_resource_count=i18n_registry.get_resource_count(),
+
+    auto_discover_plugins(pm, base_paths=["packages", "modules"])
+    logger.info("feature_plugins_discovered", plugin_count=len(pm.get_plugins()))
+
+    i18n_registry = I18nResourceRegistry()
+    pm.hook.register_i18n_resources(registry=i18n_registry)
+    logger.info(
+        "i18n_resources_collected", resource_count=i18n_registry.get_resource_count()
     )
 
     # Phase 2: Initialize translation service with all registered resources.
@@ -211,7 +201,34 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         raise RuntimeError(f"i18n health check failed: {health_result.message}")
 
     log.info("i18n_initialization_completed_and_healthy")
+    return translation_service
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    server_settings = get_server_settings()
+    logger = _get_logger(settings)
+
+    app.state.settings = settings
+    app.state.logger = logger
+
+    logger.info("application_startup")
+    _list_configs(settings, logger)
+
+    _initialize_security_services(app, server_settings, logger)
+    _initialize_directory_provider(app, settings, logger)
+
+    app.state.command_providers = {}
+
+    platform_service = get_platform_service()
+    platform_providers = platform_service.load_providers()
+    app.state.platform_service = platform_service
+    app.state.platform_providers = platform_providers
+
+    pm = get_plugin_manager()
+
+    translation_service = _initialize_translation_service(pm, logger)
     # Inject translation service into all platform providers and their formatters
     # before command registration so help-text translations work at startup.
     platform_service.inject_translation_service(translation_service)

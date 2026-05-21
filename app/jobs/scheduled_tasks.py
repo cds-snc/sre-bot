@@ -1,29 +1,29 @@
 import threading
 import time
 from typing import Any, Callable
+
 import schedule
-
 from structlog import get_logger
-from integrations import maxmind, opsgenie
-from integrations.google_workspace import google_drive
 
+from infrastructure.plugins.manager import get_plugin_manager
+from integrations import maxmind, opsgenie
 from integrations.aws import identity_store
+from integrations.google_workspace import google_drive
+from jobs.models import BackgroundJobRegistry
 from modules.aws import identity_center, spending
 from modules.incident.notify_stale_incident_channels import (
     notify_stale_incident_channels,
 )
-from infrastructure.plugins.manager import get_plugin_manager
-
 from packages.access.sync.providers import (
-    get_access_sync_coordinator,
     get_access_runtime_config,
+    get_access_sync_coordinator,
 )
 
 logger = get_logger()
 schedule_lib = schedule
 
 
-class _ScheduleBackgroundJobRegistry:
+class _ScheduleBackgroundJobRegistry(BackgroundJobRegistry):
     """Adapter that binds feature jobs to the schedule library."""
 
     def register(
@@ -75,7 +75,7 @@ def init(bot):
     )
 
     registry = _ScheduleBackgroundJobRegistry()
-    get_plugin_manager().hook.register_background_job(registry=registry)
+    get_plugin_manager().hook.register_background_jobs(registry=registry)
 
 
 def scheduler_heartbeat():

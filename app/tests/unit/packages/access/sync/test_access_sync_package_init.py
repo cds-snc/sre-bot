@@ -181,7 +181,7 @@ def test_sync_register_background_job_registers_reconciliation_when_enabled(
 
     monkeypatch.setattr(sync_pkg, "get_access_sync_settings", lambda: _Settings())
 
-    sync_pkg.register_background_job(registry=_BackgroundJobRegistry())
+    sync_pkg.register_background_jobs(registry=_BackgroundJobRegistry())
 
     assert len(registrations) == 1
     assert registrations[0]["job_name"] == "access_sync_reconciliation"
@@ -217,6 +217,6 @@ def test_sync_register_background_job_skips_registration_when_disabled(
 
     monkeypatch.setattr(sync_pkg, "get_access_sync_settings", lambda: _Settings())
 
-    sync_pkg.register_background_job(registry=_BackgroundJobRegistry())
+    sync_pkg.register_background_jobs(registry=_BackgroundJobRegistry())
 
     assert registrations == []

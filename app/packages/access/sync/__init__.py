@@ -91,7 +91,7 @@ def register_routes(app):
 
 
 @hookimpl
-def register_background_job(registry) -> None:
+def register_background_jobs(registry) -> None:
     """Register reconciliation schedule through the feature job registry."""
     settings = get_access_sync_settings()
     if not settings.enabled or not settings.reconciliation_enabled:
