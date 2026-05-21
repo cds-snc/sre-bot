@@ -6,13 +6,34 @@ from structlog import get_logger
 logger = get_logger()
 
 
+def _get_source_alert_metadata(body):
+    channel_id = body.get("channel", {}).get("id")
+    message_ts = body.get("message_ts")
+
+    container = body.get("container", {})
+    if not channel_id:
+        channel_id = container.get("channel_id")
+    if not message_ts:
+        message_ts = container.get("message_ts")
+
+    return {
+        "source_channel_id": channel_id,
+        "source_message_ts": message_ts,
+    }
+
+
 def handle_incident_action_buttons(client, ack, body):
     delete_block = False
     name = body["actions"][0]["name"]
     value = body["actions"][0]["value"]
     user = body["user"]["id"]
     if name == "call-incident":
-        incident.open_create_incident_modal(client, ack, {"text": value}, body)
+        incident.open_create_incident_modal(
+            client,
+            ack,
+            {"text": value, "private_metadata": _get_source_alert_metadata(body)},
+            body,
+        )
         log_to_sentinel("call_incident_button_pressed", body)
     elif name == "ignore-incident":
         ack()

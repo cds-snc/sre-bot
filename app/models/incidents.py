@@ -46,6 +46,7 @@ class IncidentPayload(BaseModel):
     channel_name: str
     slug: str
     severity: Optional[str] = None
+    source_alert_permalink: Optional[str] = None
 
     class Config:  # noqa
         extra = "forbid"

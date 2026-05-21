@@ -1,3 +1,4 @@
+import json
 import re
 import i18n  # type: ignore
 from slack_sdk import WebClient
@@ -53,12 +54,12 @@ def _incident_modal_loading_view():
 
 def open_create_incident_modal(client: WebClient, ack, command, body):
     ack()
-    # private_metadata = json.dumps(
-    #     {
-    #         "channel_id": body["channel"]["id"],
-    #         "message_ts": body["message_ts"],
-    #     }
-    # )
+    private_metadata = command.get("private_metadata")
+    if isinstance(private_metadata, dict):
+        private_metadata = json.dumps(private_metadata)
+    elif not isinstance(private_metadata, str):
+        private_metadata = None
+
     logger.info(
         "incident_command_called",
         command=command,
@@ -80,7 +81,9 @@ def open_create_incident_modal(client: WebClient, ack, command, body):
         }
         for i in folders
     ]
-    loaded_view = generate_incident_modal_view(command, options, None, locale)
+    loaded_view = generate_incident_modal_view(
+        command, options, private_metadata, locale
+    )
     client.views_update(view_id=view["id"], view=loaded_view)
 
 
@@ -103,8 +106,40 @@ def handle_change_locale_button(ack, client, body):
     command = {"text": body["view"]["state"]["values"]["name"]["name"]["value"]}
     if command["text"] is None:
         command["text"] = ""
-    view = generate_incident_modal_view(command, options, None, locale)
+    private_metadata = body["view"].get("private_metadata")
+    view = generate_incident_modal_view(command, options, private_metadata, locale)
     client.views_update(view_id=body["view"]["id"], view=view)
+
+
+def _get_source_alert_permalink(client: WebClient, view: dict) -> str | None:
+    private_metadata = view.get("private_metadata")
+    if not private_metadata:
+        return None
+
+    try:
+        metadata = json.loads(private_metadata)
+    except (TypeError, json.JSONDecodeError) as e:
+        logger.warning("source_alert_metadata_invalid", error=str(e))
+        return None
+
+    source_channel_id = metadata.get("source_channel_id")
+    source_message_ts = metadata.get("source_message_ts")
+    if not source_channel_id or not source_message_ts:
+        return None
+
+    try:
+        return client.chat_getPermalink(
+            channel=source_channel_id,
+            message_ts=source_message_ts,
+        )["permalink"]
+    except Exception as e:
+        logger.warning(
+            "source_alert_permalink_failed",
+            source_channel_id=source_channel_id,
+            source_message_ts=source_message_ts,
+            error=str(e),
+        )
+        return None
 
 
 def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
@@ -140,10 +175,8 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
     channel_name = None
     slug = None
     user_id = body["user"]["id"]
+    source_alert_permalink = _get_source_alert_permalink(client, view)
 
-    # private_metadata = json.loads(body["view"].get("private_metadata"))
-    # source_channel_id = private_metadata.get("channel_id")
-    # source_message_ts = private_metadata.get("message_ts")
     try:
         channel_created = incident_conversation.create_incident_conversation(
             client, name
@@ -163,16 +196,6 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
             channel=body["user"]["id"],
         )
         return
-
-    # if private_metadata:
-    #     # private_metadata = json.loads(private_metadata)
-    #     logger.info("private_metadata_found", private_metadata=private_metadata)
-    #     incident_alert.update_alert_with_channel_link(
-    #         client,
-    #         source_channel_id,
-    #         source_message_ts,
-    #         incident_details={"channel_id": channel_id, "channel_name": channel_name},
-    #     )
 
     logger.info(
         "incident_channel_created",
@@ -205,6 +228,7 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
         channel_name=channel_name,
         slug=slug,
         severity=severity,
+        source_alert_permalink=source_alert_permalink,
     )
     try:
         core.initiate_resources_creation(

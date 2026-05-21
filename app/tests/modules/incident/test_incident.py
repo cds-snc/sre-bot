@@ -1,4 +1,5 @@
 import datetime
+import json
 from unittest.mock import ANY, MagicMock, patch, call
 from slack_sdk.errors import SlackApiError
 from models.incidents import IncidentPayload
@@ -45,6 +46,42 @@ def test_incident_open_modal_calls_ack(
         command, ANY, None, "en-US"
     )
     client.views_update.assert_called_once_with(view_id=ANY, view=loaded_view)
+
+
+@patch("modules.incident.incident.generate_incident_modal_view")
+@patch("modules.incident.incident.slack_users.get_user_locale")
+@patch("modules.incident.incident.incident_folder.list_incident_folders")
+def test_incident_open_modal_passes_source_private_metadata(
+    mock_list_incident_folders,
+    mock_get_user_locale,
+    mock_generate_incident_modal_view,
+):
+    mock_get_user_locale.return_value = "en-US"
+    mock_list_incident_folders.return_value = [{"id": "id", "name": "name"}]
+    client = MagicMock()
+    ack = MagicMock()
+    command = {
+        "text": "incident description",
+        "private_metadata": {
+            "source_channel_id": "channel_id",
+            "source_message_ts": "123.456",
+        },
+    }
+    body = {"trigger_id": "trigger_id", "user": {"id": "user_id"}}
+
+    incident.open_create_incident_modal(client, ack, command, body)
+
+    mock_generate_incident_modal_view.assert_called_once_with(
+        command,
+        ANY,
+        json.dumps(
+            {
+                "source_channel_id": "channel_id",
+                "source_message_ts": "123.456",
+            }
+        ),
+        "en-US",
+    )
 
 
 @patch("modules.incident.incident.generate_incident_modal_view")
@@ -163,13 +200,15 @@ def test_incident_locale_button_updates_view_modal_locale_value(
         "trigger_id": "trigger_id",
         "user_id": "user_id",
         "actions": [{"value": "fr-FR"}],
-        "view": helper_generate_view("command_name"),
+        "view": helper_generate_view(
+            "command_name", private_metadata='{"source_channel_id": "channel"}'
+        ),
     }
     incident.handle_change_locale_button(ack, client, body)
 
     ack.assert_called()
     mock_generate_incident_modal_view.assert_called_with(
-        command, options, None, "en-US"
+        command, options, '{"source_channel_id": "channel"}', "en-US"
     )
 
 
@@ -248,6 +287,135 @@ def test_incident_submit_calls_succeeds(
     mock_core.initiate_resources_creation.assert_called_once_with(
         client=client,
         incident_payload=incident_payload,
+    )
+
+
+@patch("modules.incident.incident.core")
+@patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident.logger")
+@patch("modules.incident.incident.incident_conversation")
+def test_incident_submit_adds_source_alert_permalink(
+    mock_create_incident_conversation,
+    _mock_logger,
+    _mock_log_to_sentinel,
+    mock_core,
+):
+    ack = MagicMock()
+    view = helper_generate_view(
+        private_metadata=json.dumps(
+            {
+                "source_channel_id": "source_channel",
+                "source_message_ts": "123.456",
+            }
+        )
+    )
+    say = MagicMock()
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+    client = MagicMock()
+    client.chat_getPermalink.return_value = {"permalink": "https://slack/source"}
+    mock_create_incident_conversation.create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
+    }
+
+    incident.submit(ack, view, say, body, client)
+
+    client.chat_getPermalink.assert_called_once_with(
+        channel="source_channel", message_ts="123.456"
+    )
+    mock_core.initiate_resources_creation.assert_called_once_with(
+        client=client,
+        incident_payload=IncidentPayload(
+            name="name",
+            folder="folder",
+            product="product",
+            security_incident="yes",
+            user_id="user_id",
+            channel_id="channel_id",
+            channel_name="channel_name",
+            slug="slug",
+            severity="sev-1",
+            source_alert_permalink="https://slack/source",
+        ),
+    )
+
+
+@patch("modules.incident.incident.core")
+@patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident.logger")
+@patch("modules.incident.incident.incident_conversation")
+def test_incident_submit_ignores_malformed_source_metadata(
+    mock_create_incident_conversation,
+    mock_logger,
+    _mock_log_to_sentinel,
+    mock_core,
+):
+    ack = MagicMock()
+    view = helper_generate_view(private_metadata="not-json")
+    say = MagicMock()
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+    client = MagicMock()
+    mock_create_incident_conversation.create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
+    }
+
+    incident.submit(ack, view, say, body, client)
+
+    client.chat_getPermalink.assert_not_called()
+    mock_logger.warning.assert_called_once()
+    assert (
+        mock_core.initiate_resources_creation.call_args.kwargs[
+            "incident_payload"
+        ].source_alert_permalink
+        is None
+    )
+
+
+@patch("modules.incident.incident.core")
+@patch("modules.incident.incident.log_to_sentinel")
+@patch("modules.incident.incident.logger")
+@patch("modules.incident.incident.incident_conversation")
+def test_incident_submit_continues_when_source_permalink_fails(
+    mock_create_incident_conversation,
+    mock_logger,
+    _mock_log_to_sentinel,
+    mock_core,
+):
+    ack = MagicMock()
+    view = helper_generate_view(
+        private_metadata=json.dumps(
+            {
+                "source_channel_id": "source_channel",
+                "source_message_ts": "123.456",
+            }
+        )
+    )
+    say = MagicMock()
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+    client = MagicMock()
+    client.chat_getPermalink.side_effect = Exception("slack error")
+    mock_create_incident_conversation.create_incident_conversation.return_value = {
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
+    }
+
+    incident.submit(ack, view, say, body, client)
+
+    mock_logger.warning.assert_called_once_with(
+        "source_alert_permalink_failed",
+        source_channel_id="source_channel",
+        source_message_ts="123.456",
+        error="slack error",
+    )
+    assert (
+        mock_core.initiate_resources_creation.call_args.kwargs[
+            "incident_payload"
+        ].source_alert_permalink
+        is None
     )
 
 
@@ -434,9 +602,10 @@ def helper_generate_success_modal(channel_url="channel_url", locale="en-US"):
     }
 
 
-def helper_generate_view(name="name", locale="en-US"):
+def helper_generate_view(name="name", locale="en-US", private_metadata=""):
     return {
         "id": "view_id",
+        "private_metadata": private_metadata,
         "blocks": [
             {
                 "elements": [{"value": locale}],
