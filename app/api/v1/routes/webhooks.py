@@ -10,7 +10,7 @@ from integrations.sentinel import log_to_sentinel
 from models.webhooks import WebhookPayload
 from modules.slack import webhooks
 from modules.webhooks.base import handle_webhook_payload
-from modules.webhooks.slack import map_emails_to_slack_users
+from modules.webhooks.slack import hydrate_ip_addresses, map_emails_to_slack_users
 
 
 logger = structlog.get_logger()
@@ -89,6 +89,7 @@ def handle_webhook(
     ):
         webhook_payload = webhook_result.payload
         webhook_payload = map_emails_to_slack_users(webhook_payload)
+        webhook_payload = hydrate_ip_addresses(webhook_payload)
         webhook_payload.channel = webhook["channel"]["S"]
         hook_type = webhook.get("hook_type", {}).get(
             "S", "alert"
