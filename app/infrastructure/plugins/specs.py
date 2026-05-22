@@ -13,7 +13,7 @@ from structlog.stdlib import BoundLogger
 
 from infrastructure.events import EventDispatcher
 from infrastructure.i18n import I18nResourceRegistry
-from infrastructure.platforms.providers.slack import SlackPlatformProvider
+from integrations.slack.provider import SlackPlatformProvider
 from jobs import BackgroundJobRegistry
 
 hookspec = pluggy.HookspecMarker("sre_bot")

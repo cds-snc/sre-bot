@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from infrastructure.operations import OperationResult, OperationStatus
-from infrastructure.platforms.providers.slack import SlackPlatformProvider
+from integrations.slack.provider import SlackPlatformProvider
 from integrations.slack.models import CommandPayload, CommandResponse
 from packages.geolocate.platforms.slack import (
     handle_geolocate_command,

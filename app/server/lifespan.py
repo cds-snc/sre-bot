@@ -22,13 +22,13 @@ from infrastructure.i18n import (
     get_translation_service,
 )
 from infrastructure.logging.setup import configure_logging
-from infrastructure.platforms.providers import get_slack_provider
 from infrastructure.plugins import (
     auto_discover_plugins,
     get_plugin_manager,
     register_feature_integrations,
 )
 from infrastructure.security import get_jwks_manager
+from integrations.slack.provider import get_slack_provider
 from jobs import scheduled_tasks
 from modules import (
     atip,

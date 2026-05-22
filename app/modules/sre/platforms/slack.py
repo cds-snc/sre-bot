@@ -16,7 +16,7 @@ from modules.incident import incident_helper
 from modules.sre import webhook_helper
 
 if TYPE_CHECKING:
-    from infrastructure.platforms.providers.slack import SlackPlatformProvider
+    from integrations.slack.provider import SlackPlatformProvider
 
 
 client = LegacySlackBootstrap().web

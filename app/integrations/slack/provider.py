@@ -1,4 +1,6 @@
-"""Slack platform provider implementation.
+""" Transitory file for Slack platform provider implementation during refactoring.
+
+Slack platform provider implementation.
 
 Provides integration with Slack using the Bolt SDK for Socket Mode.
 """
@@ -11,14 +13,8 @@ import structlog
 from slack_bolt import Ack, App, Respond
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
-from infrastructure.i18n import Translator
+from infrastructure.i18n import Locale, TranslationKey, Translator
 from infrastructure.operations import OperationResult
-from infrastructure.platforms.capabilities.models import (
-    CapabilityDeclaration,
-    PlatformCapability,
-    create_capability_declaration,
-)
-from infrastructure.platforms.providers.base import BasePlatformProvider
 from integrations.slack import LegacySlackBootstrap
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.help import (
@@ -26,6 +22,7 @@ from integrations.slack.help import (
     SlackHelpGenerator,
 )
 from integrations.slack.models import (
+    ArgumentParsingError,
     CommandDefinition,
     CommandPayload,
     CommandResponse,
@@ -36,7 +33,7 @@ from integrations.slack.settings import get_slack_settings
 logger = structlog.get_logger()
 
 
-class SlackPlatformProvider(BasePlatformProvider):
+class SlackPlatformProvider:
     """Slack platform provider using Bolt SDK with Socket Mode.
 
     Provides core functionality for:
@@ -47,7 +44,7 @@ class SlackPlatformProvider(BasePlatformProvider):
 
     Example:
         from infrastructure.configuration import SlackPlatformSettings
-        from infrastructure.platforms.formatters.slack import (
+        from integrations.slack.formatter import (
             SlackBlockKitFormatter
         )
 
@@ -77,6 +74,7 @@ class SlackPlatformProvider(BasePlatformProvider):
         settings,  # SlackPlatformSettings type
         formatter: Optional[SlackBlockKitFormatter] = None,
         name: str = "slack",
+        enabled: bool = True,
         version: str = "1.0.0",
         translation_service: Optional["Translator"] = None,
     ):
@@ -89,11 +87,13 @@ class SlackPlatformProvider(BasePlatformProvider):
             version: Provider version (default: "1.0.0")
             translation_service: Optional translation service for i18n support
         """
-        super().__init__(
-            name=name,
-            version=version,
-            enabled=settings.ENABLED,
-        )
+        self._name = name
+        self._version = version
+        self._enabled = enabled
+        self._logger = logger.bind(provider=name, version=version)
+        # Commands stored by full_path (e.g., "sre.dev.aws") as key
+        self._commands: Dict[str, CommandDefinition] = {}
+        self._translator: Optional["Translator"] = None
         if translation_service:
             self.set_translator(translation_service)
 
@@ -120,42 +120,20 @@ class SlackPlatformProvider(BasePlatformProvider):
         )
         self._socket_thread: Optional[threading.Thread] = None
 
-    def get_capabilities(self) -> CapabilityDeclaration:
-        """Get Slack platform capabilities.
+    @property
+    def name(self) -> str:
+        """Get the provider name."""
+        return self._name
 
-        Returns:
-            CapabilityDeclaration with supported Slack capabilities
-        """
-        return create_capability_declaration(
-            "slack",
-            PlatformCapability.COMMANDS,
-            PlatformCapability.INTERACTIVE_CARDS,
-            PlatformCapability.VIEWS_MODALS,
-            PlatformCapability.THREADS,
-            PlatformCapability.REACTIONS,
-            PlatformCapability.FILE_SHARING,
-            PlatformCapability.HIERARCHICAL_TEXT_COMMANDS,
-            metadata={
-                "socket_mode": self._settings.SOCKET_MODE,
-                "platform": "slack",
-                "connection_mode": "websocket",
-                "command_parsing": "hierarchical_text",
-            },
-        )
+    @property
+    def version(self) -> str:
+        """Get the provider version."""
+        return self._version
 
-    def get_webhook_router(self):
-        """Get webhook router for Slack.
-
-        Slack uses Socket Mode (WebSocket), so no HTTP webhooks are needed.
-
-        Returns:
-            None (WebSocket mode, not HTTP)
-        """
-        return None  # Slack uses Socket Mode (WebSocket), not HTTP webhooks
-
-    def get_help_keywords(self) -> FrozenSet[str]:
-        """Get Slack-specific help keywords for text commands."""
-        return self.SLACK_HELP_KEYWORDS
+    @property
+    def enabled(self) -> bool:
+        """Check if the provider is enabled."""
+        return self._enabled
 
     def initialize_app(self) -> OperationResult:
         """Initialize Slack Bolt app with Socket Mode handler.
@@ -226,6 +204,152 @@ class SlackPlatformProvider(BasePlatformProvider):
                 message=f"Failed to initialize Slack app: {str(e)}",
                 error_code="INITIALIZATION_ERROR",
             )
+
+    def get_webhook_router(self):
+        """Get webhook router for Slack.
+
+        Slack uses Socket Mode (WebSocket), so no HTTP webhooks are needed.
+
+        Returns:
+            None (WebSocket mode, not HTTP)
+        """
+        return None  # Slack uses Socket Mode (WebSocket), not HTTP webhooks
+
+    def set_translator(self, translator: "Translator") -> None:
+        """Set translator for i18n support in help generation.
+
+        Args:
+            translator: Translator instance for message translation
+        """
+        self._translator = translator
+
+    def _translate_or_fallback(
+        self,
+        key: Optional[str],
+        fallback: str,
+        locale: str = "en-US",
+        variables: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """Translate a key or return fallback if translation unavailable.
+
+        Args:
+            key: Translation key (e.g., "commands.geolocate.description")
+            fallback: Fallback text if key is None or translation missing
+            locale: Locale string (e.g., "en-US", "fr-FR")
+            variables: Optional interpolation variables for the message template
+
+        Returns:
+            Translated text or fallback
+        """
+        if not key:
+            return fallback
+
+        if not self._translator:
+            # No translator configured, use fallback
+            self._logger.debug(
+                "translation_skipped_no_translator",
+                key=key,
+                locale=locale,
+            )
+            return fallback
+
+        try:
+            # Create TranslationKey from dot-separated string
+            translation_key = TranslationKey.from_string(key)
+
+            # Convert locale string to Locale enum
+            locale_enum = Locale.from_string(locale)
+
+            # Attempt translation
+            result = self._translator.translate_message(
+                translation_key, locale_enum, variables=variables
+            )
+
+            # Return translation if successful, otherwise fallback
+            translated = result if result else fallback
+            self._logger.debug(
+                "translation_result",
+                key=key,
+                locale=locale,
+                found=bool(result),
+                result=translated,
+            )
+            return translated
+
+        except Exception as e:
+            self._logger.warning(
+                "translation_failed",
+                key=key,
+                locale=locale,
+                error=str(e),
+            )
+            return fallback
+
+    def _ensure_parent_chain_exists(self, parent: str) -> None:
+        """Ensure all intermediate parent nodes exist in the command tree.
+
+        Auto-generates intermediate command nodes if they don't exist.
+
+        Args:
+            parent: Parent command path in dot notation (e.g., "sre.dev" creates "sre" and "sre.dev" nodes)
+
+        Example:
+            # Registering command with parent="sre.dev" ensures:
+            # 1. "sre" node exists (auto-generated if needed)
+            # 2. "sre.dev" node exists (auto-generated if needed)
+            # 3. Then registers the actual command as child of "sre.dev"
+        """
+        if not parent:
+            return
+
+        # Split parent chain: "sre.dev" -> ["sre", "dev"]
+        parts = parent.split(".")
+
+        # Build intermediate paths: ["sre", "sre.dev"]
+        for i in range(len(parts)):
+            partial_path = ".".join(parts[: i + 1])
+
+            # Create auto-generated node if doesn't exist
+            if partial_path not in self._commands:
+                # Determine parent for this node
+                node_parent = ".".join(parts[:i]) if i > 0 else None
+                node_name = parts[i]
+                auto_cmd = CommandDefinition(
+                    name=node_name,
+                    handler=None,  # No handler for auto-generated nodes
+                    description=f"Commands for {node_name}",  # Generic description
+                    parent=node_parent,
+                    is_auto_generated=True,
+                )
+
+                self._commands[partial_path] = auto_cmd
+
+                self._logger.debug(
+                    "auto_generated_intermediate_command",
+                    path=partial_path,
+                    parent=node_parent,
+                )
+
+    def _get_child_commands(self, parent_path: str) -> List[CommandDefinition]:
+        """Get all direct children of a command node.
+
+        Args:
+            parent_path: Parent full_path (e.g., "sre.dev")
+
+        Returns:
+            List of child CommandDefinition objects
+        """
+        children = []
+        for cmd in self._commands.values():
+            # Check if this command's parent matches
+            if cmd.parent == parent_path:
+                children.append(cmd)
+
+        return sorted(children, key=lambda c: c.name)
+
+    def get_help_keywords(self) -> FrozenSet[str]:
+        """Get Slack-specific help keywords for text commands."""
+        return self.SLACK_HELP_KEYWORDS
 
     def start(self) -> OperationResult:
         """Start Slack Socket Mode if enabled."""
@@ -562,7 +686,7 @@ class SlackPlatformProvider(BasePlatformProvider):
             example_keys: List of translation keys for examples
             parent: Dot notation parent path (e.g., "sre.dev")
             legacy_mode: If True, bypass automatic help interception (for gradual migration)
-            arguments: List of Argument definitions for parsing (from infrastructure.platforms.parsing)
+            arguments: List of Argument definitions for parsing (from integrations.slack.parser)
             schema: Pydantic BaseModel schema for validation
             argument_mapper: Function to transform parsed args Dict to schema fields Dict
             fallback_handler: Optional handler called when command expects arguments but none provided
@@ -577,7 +701,7 @@ class SlackPlatformProvider(BasePlatformProvider):
             )
 
             # With argument parsing
-            from infrastructure.platforms.parsing import Argument, ArgumentType
+            from integrations.slack.parser Argument, ArgumentType
 
             provider.register_command(
                 command="list",
@@ -673,6 +797,144 @@ class SlackPlatformProvider(BasePlatformProvider):
         """
         return self._help_generator.generate(
             command_name, mode="command", locale=locale
+        )
+
+    def dispatch_command(  # noqa: C901
+        self, command_name: str, payload: CommandPayload
+    ) -> CommandResponse:
+        """Dispatch a command to its registered handler.
+
+        Args:
+            command_name: Name of the command to dispatch
+            payload: CommandPayload with command text and metadata
+
+        Returns:
+            CommandResponse from the handler, or error response if command not found
+
+        Raises:
+            None - always returns CommandResponse (no exceptions)
+        """
+        # Look up command first
+        cmd_def = self._commands.get(command_name)
+        if not cmd_def:
+            return CommandResponse(
+                message=f"Unknown command: {command_name}",
+                ephemeral=True,
+            )
+
+        # Enrich payload with user locale if not already set
+        # This ensures platform-specific locale extraction happens automatically
+        if not payload.user_locale or payload.user_locale == "en-US":
+            # Try to get actual user locale from platform API
+            try:
+                detected_locale = self.get_user_locale(payload.user_id)
+                if detected_locale and detected_locale != "en-US":
+                    payload.user_locale = detected_locale
+                    self._logger.info(
+                        "locale_enriched_from_platform",
+                        user_id=payload.user_id,
+                        locale=detected_locale,
+                    )
+            except Exception as e:
+                self._logger.warning(
+                    "locale_enrichment_failed",
+                    user_id=payload.user_id,
+                    error=str(e),
+                )
+
+        # Get user's locale for help/error messages
+        user_locale = payload.user_locale
+        self._logger.debug(
+            "dispatch_command_locale",
+            command=command_name,
+            locale=user_locale,
+        )
+
+        # If command has no handler (auto-generated parent), show help for children
+        # This handles cases like `/sre dev` where `dev` is just a grouping node.
+        # Help keyword checking is handled by route_hierarchical_command in
+        # platform-specific providers (e.g., SlackPlatformProvider) to avoid
+        # duplicate checks and keep dispatch focused on execution.
+        if cmd_def.handler is None:
+            help_text = self.generate_help(
+                locale=user_locale, root_command=command_name
+            )
+            return CommandResponse(message=help_text, ephemeral=True)
+
+        # Dispatch to handler
+        try:
+            # Parse arguments if defined
+            parsed_args = None
+            request = None
+
+            if cmd_def.arguments:
+                # If command expects arguments but none provided
+                if not payload.text or not payload.text.strip():
+                    # Use fallback handler if provided, otherwise show help
+                    if cmd_def.fallback_handler:
+                        return cmd_def.fallback_handler(payload)
+                    else:
+                        help_text = self.generate_command_help(
+                            command_name, locale=user_locale
+                        )
+                        return CommandResponse(message=help_text, ephemeral=True)
+
+                parser = CommandArgumentParser(cmd_def.arguments)
+                try:
+                    parsed_args = parser.parse(payload.text)
+
+                    # Apply argument mapper if provided
+                    if cmd_def.argument_mapper:
+                        mapped_args = cmd_def.argument_mapper(parsed_args)
+                    else:
+                        mapped_args = parsed_args
+
+                    # Validate with schema if provided
+                    if cmd_def.schema:
+                        request = cmd_def.schema(**mapped_args)
+
+                except ArgumentParsingError as e:
+                    # Show parsing errors (invalid arguments, unknown options, etc.)
+                    return CommandResponse(
+                        message=f"❌ Argument parsing error: {e.message}",
+                        ephemeral=True,
+                    )
+                except Exception as e:
+                    return CommandResponse(
+                        message=f"❌ Validation error: {str(e)}",
+                        ephemeral=True,
+                    )
+
+            # Call handler with appropriate arguments
+            if request is not None:
+                # Handler expects: payload, parsed_args, request
+                response = cmd_def.handler(payload, parsed_args, request)
+            elif parsed_args is not None:
+                # Handler expects: payload, parsed_args
+                response = cmd_def.handler(payload, parsed_args)
+            else:
+                # Handler expects: payload only
+                response = cmd_def.handler(payload)
+
+            return response
+        except Exception as e:
+            self._logger.error(
+                "command_handler_error",
+                command=command_name,
+                error=str(e),
+            )
+            return CommandResponse(
+                message=f"Error executing {command_name}: {str(e)}",
+                ephemeral=True,
+            )
+
+    def __repr__(self) -> str:
+        """String representation of the provider."""
+        return (
+            f"{self.__class__.__name__}("
+            f"name={self._name!r}, "
+            f"version={self._version!r}, "
+            f"enabled={self._enabled})"
         )
 
 

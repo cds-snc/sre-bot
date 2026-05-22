@@ -13,9 +13,9 @@ import pytest
 from infrastructure.configuration.infrastructure.platforms import (
     SlackPlatformSettings,
 )
-from infrastructure.platforms.providers.slack import SlackPlatformProvider
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.models import CommandPayload, CommandResponse
+from integrations.slack.provider import SlackPlatformProvider
 
 
 @pytest.fixture
@@ -60,9 +60,9 @@ def slack_provider(make_slack_settings, monkeypatch):
             self.app = app
             self.token = token
 
-    monkeypatch.setattr("infrastructure.platforms.providers.slack.App", FakeApp)
+    monkeypatch.setattr("integrations.slack.provider.App", FakeApp)
     monkeypatch.setattr(
-        "infrastructure.platforms.providers.slack.SocketModeHandler",
+        "integrations.slack.provider.SocketModeHandler",
         FakeSocketModeHandler,
     )
 

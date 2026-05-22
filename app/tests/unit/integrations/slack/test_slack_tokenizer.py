@@ -20,6 +20,7 @@ from integrations.slack.parser import (
 
 pytestmark = pytest.mark.unit
 
+
 class TestTokenizer:
     """Test quote-aware tokenization with full preservation."""
 

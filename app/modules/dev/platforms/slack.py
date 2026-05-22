@@ -22,7 +22,7 @@ from modules.dev import (
 )
 
 if TYPE_CHECKING:
-    from infrastructure.platforms.providers.slack import SlackPlatformProvider
+    from integrations.slack.provider import SlackPlatformProvider
 
 
 logger = structlog.get_logger()

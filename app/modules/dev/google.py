@@ -11,7 +11,7 @@ from structlog.stdlib import BoundLogger
 
 from infrastructure.directory import get_directory_provider
 from infrastructure.operations import OperationResult
-from infrastructure.platforms.parsing import (
+from integrations.slack.parser import (
     Argument,
     ArgumentParsingError,
     ArgumentType,

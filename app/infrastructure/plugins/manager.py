@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from structlog.stdlib import BoundLogger
 
     from infrastructure.events.service import EventDispatcher
-    from infrastructure.platforms.providers.slack import SlackPlatformProvider
+    from integrations.slack.provider import SlackPlatformProvider
 
 logger = structlog.get_logger()
 
