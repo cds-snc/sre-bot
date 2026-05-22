@@ -255,7 +255,7 @@ class TestInitializeApp:
         settings.SOCKET_MODE = True
         settings.APP_TOKEN = None
         settings.BOT_TOKEN = "xoxb-test"
-        
+
         provider = SlackPlatformProvider(settings=settings)
 
         result = provider.initialize_app()
