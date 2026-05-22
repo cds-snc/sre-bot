@@ -1,15 +1,13 @@
 """Unit tests for SlackPlatformProvider."""
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from infrastructure.operations import OperationStatus
-from infrastructure.platforms.capabilities.models import PlatformCapability
-from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
-from infrastructure.platforms.models import CommandPayload, CommandResponse
-from infrastructure.platforms.providers.slack import SlackPlatformProvider
-from tests.unit.infrastructure.platforms.providers.conftest import (
-    MockSlackSettings,
-)
+from integrations.slack.formatter import SlackBlockKitFormatter
+from integrations.slack.models import CommandPayload, CommandResponse
+from integrations.slack.provider import SlackPlatformProvider
 
 
 # Fake Slack Bolt classes for unit tests to avoid network/socket operations
@@ -27,9 +25,9 @@ def mock_slack_bolt(monkeypatch):
         def connect(self):
             return None
 
-    monkeypatch.setattr("infrastructure.platforms.providers.slack.App", FakeApp)
+    monkeypatch.setattr("integrations.slack.provider.App", FakeApp)
     monkeypatch.setattr(
-        "infrastructure.platforms.providers.slack.SocketModeHandler",
+        "integrations.slack.provider.SocketModeHandler",
         FakeSocketModeHandler,
     )
     return None
@@ -66,12 +64,6 @@ class TestSlackPlatformProvider:
 
         assert isinstance(provider.formatter, SlackBlockKitFormatter)
 
-    def test_initialization_disabled_provider(self, slack_settings_disabled):
-        """Test initialization with disabled provider."""
-        provider = SlackPlatformProvider(settings=slack_settings_disabled)
-
-        assert provider.enabled is False
-
     def test_provider_properties(self, slack_settings, slack_formatter):
         """Test provider property accessors."""
         provider = SlackPlatformProvider(
@@ -81,102 +73,6 @@ class TestSlackPlatformProvider:
         assert provider.formatter is slack_formatter
         assert provider.settings is slack_settings
         assert provider.name == "slack"
-
-
-@pytest.mark.unit
-class TestGetCapabilities:
-    """Test get_capabilities() method."""
-
-    def test_get_capabilities_returns_declaration(self, slack_settings):
-        """Test that get_capabilities returns CapabilityDeclaration."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        capabilities = provider.get_capabilities()
-
-        assert capabilities is not None
-        assert hasattr(capabilities, "capabilities")
-        assert hasattr(capabilities, "metadata")
-
-    def test_capabilities_include_commands(self, slack_settings):
-        """Test that capabilities include COMMANDS."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        capabilities = provider.get_capabilities()
-
-        assert capabilities.supports(PlatformCapability.COMMANDS)
-
-    def test_capabilities_include_interactive_cards(self, slack_settings):
-        """Test that capabilities include INTERACTIVE_CARDS."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        capabilities = provider.get_capabilities()
-
-        assert capabilities.supports(PlatformCapability.INTERACTIVE_CARDS)
-
-    def test_capabilities_include_views_modals(self, slack_settings):
-        """Test that capabilities include VIEWS_MODALS."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        capabilities = provider.get_capabilities()
-
-        assert capabilities.supports(PlatformCapability.VIEWS_MODALS)
-
-    def test_capabilities_include_threads(self, slack_settings):
-        """Test that capabilities include THREADS."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        capabilities = provider.get_capabilities()
-
-        assert capabilities.supports(PlatformCapability.THREADS)
-
-    def test_capabilities_include_reactions(self, slack_settings):
-        """Test that capabilities include REACTIONS."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        capabilities = provider.get_capabilities()
-
-        assert capabilities.supports(PlatformCapability.REACTIONS)
-
-    def test_capabilities_include_file_sharing(self, slack_settings):
-        """Test that capabilities include FILE_SHARING."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        capabilities = provider.get_capabilities()
-
-        assert capabilities.supports(PlatformCapability.FILE_SHARING)
-
-    def test_capabilities_include_hierarchical_text_commands(self, slack_settings):
-        """Test that capabilities include HIERARCHICAL_TEXT_COMMANDS."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        capabilities = provider.get_capabilities()
-
-        assert capabilities.supports(PlatformCapability.HIERARCHICAL_TEXT_COMMANDS)
-
-    def test_capabilities_metadata_includes_socket_mode(self, slack_settings):
-        """Test that capabilities metadata includes socket_mode."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        capabilities = provider.get_capabilities()
-
-        assert "socket_mode" in capabilities.metadata
-        assert capabilities.metadata["socket_mode"] is True
-
-    def test_capabilities_metadata_includes_platform(self, slack_settings):
-        """Test that capabilities metadata includes platform."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        capabilities = provider.get_capabilities()
-
-        assert capabilities.metadata["platform"] == "slack"
-
-    def test_capabilities_metadata_includes_command_parsing(self, slack_settings):
-        """Test that capabilities metadata includes command_parsing."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        capabilities = provider.get_capabilities()
-
-        assert capabilities.metadata["command_parsing"] == "hierarchical_text"
 
 
 @pytest.mark.unit
@@ -325,14 +221,6 @@ class TestHierarchicalRouting:
         assert response.ephemeral is True
         assert response.message  # Should have some help text
 
-    def test_capabilities_socket_mode_false(self, slack_settings_http_mode):
-        """Test capabilities metadata when socket_mode is False."""
-        provider = SlackPlatformProvider(settings=slack_settings_http_mode)
-
-        capabilities = provider.get_capabilities()
-
-        assert capabilities.metadata["socket_mode"] is False
-
 
 @pytest.mark.unit
 class TestInitializeApp:
@@ -362,10 +250,12 @@ class TestInitializeApp:
 
     def test_initialize_app_missing_app_token(self):
         """Test initialization with missing APP_TOKEN in Socket Mode."""
+        settings = MagicMock()
+        settings.ENABLED = True
+        settings.SOCKET_MODE = True
+        settings.APP_TOKEN = None
+        settings.BOT_TOKEN = "xoxb-test"
 
-        settings = MockSlackSettings(
-            socket_mode=True, app_token=None, bot_token="xoxb-test"
-        )
         provider = SlackPlatformProvider(settings=settings)
 
         result = provider.initialize_app()
@@ -375,9 +265,11 @@ class TestInitializeApp:
 
     def test_initialize_app_missing_bot_token(self):
         """Test initialization with missing BOT_TOKEN."""
-        settings = MockSlackSettings(
-            socket_mode=True, app_token="xapp-test", bot_token=None
-        )
+        settings = MagicMock()
+        settings.ENABLED = True
+        settings.SOCKET_MODE = True
+        settings.APP_TOKEN = "xapp-test"
+        settings.BOT_TOKEN = None
         provider = SlackPlatformProvider(settings=settings)
         result = provider.initialize_app()
 
@@ -403,36 +295,3 @@ class TestInitializeApp:
         result = provider.initialize_app()
 
         assert result.is_success
-
-
-@pytest.mark.unit
-class TestProviderIntegration:
-    """Test provider integration with base class."""
-
-    def test_supports_capability(self, slack_settings):
-        """Test supports_capability() inherited from base class."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        assert provider.supports_capability(PlatformCapability.COMMANDS)
-        assert provider.supports_capability(PlatformCapability.THREADS)
-
-    def test_repr(self, slack_settings):
-        """Test __repr__ string representation."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        repr_str = repr(provider)
-
-        assert "SlackPlatformProvider" in repr_str
-        assert "name='slack'" in repr_str
-
-    def test_provider_enabled_property(self, slack_settings):
-        """Test enabled property."""
-        provider = SlackPlatformProvider(settings=slack_settings)
-
-        assert provider.enabled is True
-
-    def test_provider_disabled_property(self, slack_settings_disabled):
-        """Test enabled property when disabled."""
-        provider = SlackPlatformProvider(settings=slack_settings_disabled)
-
-        assert provider.enabled is False

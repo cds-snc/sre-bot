@@ -1,10 +1,11 @@
 """Tests for Slack platform features."""
 
-import pytest
 from unittest.mock import patch
 
+import pytest
+
 from infrastructure.operations import OperationResult, OperationStatus
-from infrastructure.platforms.models import CommandPayload, CommandResponse
+from integrations.slack.models import CommandPayload, CommandResponse
 from packages.geolocate.platforms.slack import handle_geolocate_command
 
 

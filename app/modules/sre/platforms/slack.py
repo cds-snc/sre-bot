@@ -4,18 +4,19 @@ Uses decorator-based command registration via auto-discovery.
 Registers all SRE subcommands (version, incident, webhooks, groups).
 """
 
-import structlog
 from typing import TYPE_CHECKING, cast
 
+import structlog
 from slack_bolt import Ack, Respond
-from infrastructure.platforms.models import CommandPayload, CommandResponse
+
 from infrastructure.configuration.app import get_app_settings as get_settings
 from integrations.slack.bootstrap import LegacySlackBootstrap
+from integrations.slack.models import CommandPayload, CommandResponse
 from modules.incident import incident_helper
 from modules.sre import webhook_helper
 
 if TYPE_CHECKING:
-    from infrastructure.platforms.providers.slack import SlackPlatformProvider
+    from integrations.slack.provider import SlackPlatformProvider
 
 
 client = LegacySlackBootstrap().web

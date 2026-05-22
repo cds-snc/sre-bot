@@ -6,10 +6,10 @@ Argument definitions, with optional i18n support.
 
 from typing import TYPE_CHECKING, Callable, List, Optional
 
-from infrastructure.platforms.parsing import Argument
+from integrations.slack.models import Argument
 
 if TYPE_CHECKING:
-    from infrastructure.platforms.models import CommandDefinition
+    from integrations.slack.models import CommandDefinition
 
 SLACK_HELP_KEYWORDS = frozenset({"help", "aide", "--help", "-h"})
 

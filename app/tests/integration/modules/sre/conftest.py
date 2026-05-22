@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
-from infrastructure.platforms.providers.slack import SlackPlatformProvider
+from integrations.slack.provider import SlackPlatformProvider
+from integrations.slack.formatter import SlackBlockKitFormatter
 from modules.sre.platforms import slack as sre_slack
 
 
@@ -71,9 +71,9 @@ def slack_provider(slack_settings, slack_formatter, monkeypatch):
         def connect(self):
             return None
 
-    monkeypatch.setattr("infrastructure.platforms.providers.slack.App", FakeApp)
+    monkeypatch.setattr("integrations.slack.provider.App", FakeApp)
     monkeypatch.setattr(
-        "infrastructure.platforms.providers.slack.SocketModeHandler",
+        "integrations.slack.provider.SocketModeHandler",
         FakeSocketModeHandler,
     )
 

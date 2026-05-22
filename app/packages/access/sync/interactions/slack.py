@@ -15,8 +15,8 @@ import structlog
 
 from infrastructure.i18n import t
 from infrastructure.idempotency import get_idempotency_service
-from infrastructure.platforms.models import CommandPayload, CommandResponse
-from infrastructure.platforms.parsing import Argument, ArgumentType
+from integrations.slack.models import CommandPayload, CommandResponse
+from integrations.slack.parser import Argument, ArgumentType
 from packages.access.sync.interactions.ingress import (
     enqueue_platform_sync,
     enqueue_user_sync,
