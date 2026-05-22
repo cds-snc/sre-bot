@@ -6,8 +6,7 @@ following the hierarchical fixture architecture pattern.
 
 import pytest
 
-from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
-from infrastructure.platforms.formatters.teams import TeamsAdaptiveCardsFormatter
+from integrations.slack.formatter import SlackBlockKitFormatter
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MOCK SETTINGS FACTORIES
@@ -64,9 +63,3 @@ def slack_settings_http_mode():
 def slack_formatter():
     """Provide Slack BlockKit formatter."""
     return SlackBlockKitFormatter()
-
-
-@pytest.fixture
-def teams_formatter():
-    """Provide Teams Adaptive Cards formatter."""
-    return TeamsAdaptiveCardsFormatter()

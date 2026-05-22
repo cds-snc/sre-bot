@@ -4,8 +4,8 @@ import pytest
 
 from infrastructure.operations import OperationStatus
 from infrastructure.platforms.capabilities.models import PlatformCapability
-from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
 from infrastructure.platforms.providers.slack import SlackPlatformProvider
+from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.models import CommandPayload, CommandResponse
 from tests.unit.infrastructure.platforms.providers.conftest import (
     MockSlackSettings,

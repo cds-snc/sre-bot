@@ -19,12 +19,6 @@ from infrastructure.platforms.capabilities.models import (
     PlatformCapability,
     create_capability_declaration,
 )
-from infrastructure.platforms.formatters import (
-    BaseResponseFormatter,
-    DiscordEmbedFormatter,
-    SlackBlockKitFormatter,
-    TeamsAdaptiveCardsFormatter,
-)
 from infrastructure.platforms.providers import (
     BasePlatformProvider,
     SlackPlatformProvider,
@@ -38,9 +32,4 @@ __all__ = [
     "PlatformCapability",
     "CapabilityDeclaration",
     "create_capability_declaration",
-    # Formatters
-    "BaseResponseFormatter",
-    "SlackBlockKitFormatter",
-    "TeamsAdaptiveCardsFormatter",
-    "DiscordEmbedFormatter",
 ]

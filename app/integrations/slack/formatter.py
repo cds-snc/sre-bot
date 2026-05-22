@@ -5,11 +5,14 @@ See: https://api.slack.com/block-kit
 """
 
 from typing import Any, Dict, List, Optional
+from structlog import get_logger
+from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.i18n import Locale, TranslationKey, TranslationService
 
-from infrastructure.platforms.formatters.base import BaseResponseFormatter
+logger = get_logger(__name__)
 
 
-class SlackBlockKitFormatter(BaseResponseFormatter):
+class SlackBlockKitFormatter:
     """Formatter for Slack Block Kit JSON responses.
 
     Converts responses into Slack's Block Kit format with support for:
@@ -28,14 +31,20 @@ class SlackBlockKitFormatter(BaseResponseFormatter):
         # Returns Block Kit JSON with success formatting
     """
 
-    def __init__(self, translation_service=None, locale: str = "en-US"):
+    def __init__(
+        self,
+        translation_service: Optional[TranslationService] = None,
+        locale: str = "en-US",
+    ):
         """Initialize Slack Block Kit formatter.
 
         Args:
             translation_service: Optional TranslationService instance for i18n
             locale: Locale code (default: "en-US")
         """
-        super().__init__(translation_service=translation_service, locale=locale)
+        self._translation_service = translation_service
+        self._locale_str = locale
+        self._logger = logger.bind(formatter=self.__class__.__name__)
 
     def format_success(
         self,
@@ -159,6 +168,71 @@ class SlackBlockKitFormatter(BaseResponseFormatter):
 
         return {"blocks": blocks}
 
+    def format_operation_result(self, result: OperationResult) -> Dict[str, Any]:
+        """Convert an OperationResult to platform-specific format.
+
+        Routes to format_success() or format_error() based on result status.
+
+        Args:
+            result: OperationResult to format.
+
+        Returns:
+            Platform-specific message payload.
+        """
+        if result.status == OperationStatus.SUCCESS:
+            return self.format_success(
+                data=result.data or {},
+                message=result.message,
+            )
+        else:
+            return self.format_error(
+                message=result.message or "An error occurred",
+                error_code=result.error_code,
+                details=result.data,
+            )
+
+    def translate(
+        self,
+        key: str,
+        variables: Optional[Dict[str, Any]] = None,
+        fallback: Optional[str] = None,
+    ) -> str:
+        """Translate a message key to the current locale.
+
+        Uses the injected TranslationService to translate message keys.
+        If no translation service is available, returns the fallback or key.
+
+        Args:
+            key: Translation key (e.g., "platforms.slack.success")
+            variables: Optional substitution variables for the translation
+            fallback: Optional fallback string if translation not found
+
+        Returns:
+            Translated string, or fallback, or key if translation unavailable
+
+        Example:
+            >>> formatter = SlackBlockKitFormatter(translation_service=service)
+            >>> msg = formatter.translate(
+            ...     "platforms.success_message",
+            ...     variables={"action": "created"},
+            ...     fallback="Operation completed successfully"
+            ... )
+        """
+        if self._translation_service is None:
+            return fallback or key
+
+        try:
+            translation_key = TranslationKey.from_string(key)
+            locale = Locale.from_string(self._locale_str)
+            return self._translation_service.translate(
+                key=translation_key, locale=locale, variables=variables
+            )
+        except (KeyError, ValueError) as e:
+            self._logger.warning(
+                "translation_failed", key=key, locale=self._locale_str, error=str(e)
+            )
+            return fallback or key
+
     def _create_section(self, text: str) -> Dict[str, Any]:
         """Create a Slack section block with markdown text.
 
@@ -218,3 +292,33 @@ class SlackBlockKitFormatter(BaseResponseFormatter):
             lines.append(f"*{display_key}:* {display_value}")
 
         return "\n".join(lines)
+
+    def set_locale(self, locale: str) -> None:
+        """Set the default locale for formatting.
+
+        Args:
+            locale: Locale code (e.g., "en", "fr", "en-US")
+        """
+        self._locale_str = locale
+
+    @property
+    def locale(self) -> str:
+        """Get the current locale.
+
+        Returns:
+            String representing current locale
+        """
+        return self._locale_str
+
+    @property
+    def has_translation_service(self) -> bool:
+        """Check if formatter has translation service configured.
+
+        Returns:
+            True if translation service is available
+        """
+        return self._translation_service is not None
+
+    def __repr__(self) -> str:
+        """String representation of the formatter."""
+        return f"{self.__class__.__name__}(locale={self._locale_str!r})"

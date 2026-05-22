@@ -3,7 +3,7 @@
 import pytest
 
 from infrastructure.operations import OperationResult, OperationStatus
-from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
+from integrations.slack.formatter import SlackBlockKitFormatter
 
 
 class MockTranslator:
