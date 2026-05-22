@@ -1,11 +1,19 @@
 """Tests for automatic help text generation."""
 
-from infrastructure.platforms.parsing import Argument, ArgumentType
+import pytest
+
 from integrations.slack.help import (
     _generate_slack_help_text as generate_slack_help_text,
+)
+from integrations.slack.help import (
     _generate_usage_line as generate_usage_line,
+)
+from integrations.slack.help import (
     _get_argument_by_name as get_argument_by_name,
 )
+from integrations.slack.parser import Argument, ArgumentType
+
+pytestmark = pytest.mark.unit
 
 
 class TestGenerateHelpText:

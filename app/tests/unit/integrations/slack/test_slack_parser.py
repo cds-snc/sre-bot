@@ -13,12 +13,14 @@ Tests argument parsing including:
 
 import pytest
 
-from infrastructure.platforms.parsing import (
+from integrations.slack.parser import (
     Argument,
-    ArgumentType,
     ArgumentParsingError,
+    ArgumentType,
     CommandArgumentParser,
 )
+
+pytestmark = pytest.mark.unit
 
 
 class TestFlagParsing:

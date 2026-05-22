@@ -12,7 +12,7 @@ Handles:
 
 from typing import Dict, List, Any, Optional
 
-from infrastructure.platforms.parsing.models import (
+from integrations.slack.models import (
     Argument,
     ArgumentType,
     ArgumentParsingError,

@@ -10,12 +10,15 @@ Tests all quote preservation scenarios including:
 - Real-world command examples
 """
 
-from infrastructure.platforms.parsing import (
+import pytest
+
+from integrations.slack.parser import (
     Argument,
     ArgumentType,
     CommandArgumentParser,
 )
 
+pytestmark = pytest.mark.unit
 
 class TestTokenizer:
     """Test quote-aware tokenization with full preservation."""

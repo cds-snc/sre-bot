@@ -18,7 +18,6 @@ from infrastructure.platforms.capabilities.models import (
     PlatformCapability,
     create_capability_declaration,
 )
-from infrastructure.platforms.parsing import CommandArgumentParser
 from infrastructure.platforms.providers.base import BasePlatformProvider
 from integrations.slack import LegacySlackBootstrap
 from integrations.slack.formatter import SlackBlockKitFormatter
@@ -31,6 +30,7 @@ from integrations.slack.models import (
     CommandPayload,
     CommandResponse,
 )
+from integrations.slack.parser import CommandArgumentParser
 from integrations.slack.settings import get_slack_settings
 
 logger = structlog.get_logger()

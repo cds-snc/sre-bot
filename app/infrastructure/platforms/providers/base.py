@@ -11,14 +11,14 @@ import structlog
 from infrastructure.i18n.models import Locale, TranslationKey
 from infrastructure.operations import OperationResult
 from infrastructure.platforms.capabilities.models import CapabilityDeclaration
-from infrastructure.platforms.parsing import (
-    ArgumentParsingError,
-    CommandArgumentParser,
-)
 from integrations.slack.models import (
     CommandDefinition,
     CommandPayload,
     CommandResponse,
+)
+from integrations.slack.parser import (
+    ArgumentParsingError,
+    CommandArgumentParser,
 )
 
 if TYPE_CHECKING:
