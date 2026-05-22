@@ -20,14 +20,12 @@ def get_users_from_integration(integration_source, **kwargs):
         case "google_directory":
             log.info(
                 "get_users_from_integration_started",
-                integration_source=integration_source,
                 service="Google Workspace",
             )
             users = google_directory.list_users()
         case "aws_identity_center":
             log.info(
                 "get_users_from_integration_started",
-                integration_source=integration_source,
                 service="AWS Identity Center",
             )
             users = identity_store.list_users()
@@ -39,7 +37,6 @@ def get_users_from_integration(integration_source, **kwargs):
 
     logger.info(
         "get_users_from_integration_completed",
-        integration_source=integration_source,
         users_count=len(users),
     )
 

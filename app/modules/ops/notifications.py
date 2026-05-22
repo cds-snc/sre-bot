@@ -22,20 +22,17 @@ def log_ops_message(message: str):
     if not client:
         log.error(
             "slack_client_not_initialized",
-            ops_message=message,
         )
         return
     if not OPS_CHANNEL_ID:
         log.warning(
             "ops_channel_id_not_configured",
-            ops_message=message,
         )
         return
     channel_id = OPS_CHANNEL_ID
     log.info(
         "ops_message_log_attempted",
         channel_id=channel_id,
-        ops_message=message,
     )
     try:
         client.conversations_join(channel=channel_id)
@@ -43,12 +40,10 @@ def log_ops_message(message: str):
         log.info(
             "ops_message_logged",
             channel_id=channel_id,
-            ops_message=message,
         )
     except SlackApiError as e:
         log.error(
             "ops_message_failed",
             channel_id=channel_id,
-            ops_message=message,
             error=str(e),
         )

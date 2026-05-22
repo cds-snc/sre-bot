@@ -43,7 +43,6 @@ def get_groups_from_integration(
         case "google_groups":
             log.info(
                 "get_groups_from_integration_started",
-                integration_source=integration_source,
                 service="Google Groups",
                 query=query,
             )
@@ -62,7 +61,6 @@ def get_groups_from_integration(
         case "aws_identity_center":
             log.info(
                 "get_groups_from_integration_started",
-                integration_source=integration_source,
                 service="AWS Identity Center",
             )
             groups = identity_store.list_groups_with_memberships(
@@ -112,25 +110,21 @@ def log_groups(
     if not group_display_key:
         log.warning(
             "log_groups_missing_display_key",
-            integration_name=integration_name,
             missing_key="group_display_key",
         )
     if not members:
         log.warning(
             "log_groups_missing_members_key",
-            integration_name=integration_name,
             missing_key="members",
         )
     if not members_display_key:
         log.warning(
             "log_groups_missing_display_key",
-            integration_name=integration_name,
             missing_key="members_display_key",
         )
 
     log.info(
         "log_groups_summary",
-        integration_name=integration_name,
         groups_count=len(groups),
     )
 
@@ -141,7 +135,6 @@ def log_groups(
         if group.get(members):
             log.info(
                 "log_group_members",
-                integration_name=integration_name,
                 group_name=group_display_name,
                 members_count=len(group[members]),
             )
@@ -153,13 +146,11 @@ def log_groups(
                     members_display_name = "<User Name not found>"
                 log.info(
                     "log_group_member",
-                    integration_name=integration_name,
                     group_name=group_display_name,
                     member_name=members_display_name,
                 )
         else:
             log.info(
                 "log_group_no_members",
-                integration_name=integration_name,
                 group_name=group_display_name,
             )

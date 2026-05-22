@@ -25,37 +25,22 @@ def test_provision_entities_success(mock_logger, mock_log_to_sentinel):
     info_calls = [
         call(
             "provision_entities_started",
-            integration="aws",
-            entity="Entity",
-            operation="creation",
             entities_count=3,
         ),
         call(
             "provision_entity_successful",
-            integration="aws",
-            entity="Entity",
-            operation="creation",
             entity_value="user1",
         ),
         call(
             "provision_entity_successful",
-            integration="aws",
-            entity="Entity",
-            operation="creation",
             entity_value="user2",
         ),
         call(
             "provision_entity_successful",
-            integration="aws",
-            entity="Entity",
-            operation="creation",
             entity_value="user3",
         ),
         call(
             "provision_entities_completed",
-            integration="aws",
-            entity="Entity",
-            operation="creation",
             provisioned_entities_count=3,
         ),
     ]
@@ -88,30 +73,18 @@ def test_provision_entities_failure(mock_logger, mock_log_to_sentinel):
     info_calls = [
         call(
             "provision_entities_started",
-            integration="aws",
-            entity="Entity",
-            operation="creation",
             entities_count=3,
         ),
         call(
             "provision_entity_successful",
-            integration="aws",
-            entity="Entity",
-            operation="creation",
             entity_value="user1",
         ),
         call(
             "provision_entity_successful",
-            integration="aws",
-            entity="Entity",
-            operation="creation",
             entity_value="user3",
         ),
         call(
             "provision_entities_completed",
-            integration="aws",
-            entity="Entity",
-            operation="creation",
             provisioned_entities_count=2,
         ),
     ]
@@ -121,9 +94,6 @@ def test_provision_entities_failure(mock_logger, mock_log_to_sentinel):
         [
             call(
                 "provision_entity_failed",
-                integration="aws",
-                entity="Entity",
-                operation="creation",
                 entity_value="user2",
             )
         ]
@@ -152,9 +122,6 @@ def test_provision_entities_empty_list(mock_logger, mock_log_to_sentinel):
         [
             call(
                 "provision_entities_no_entities_to_process",
-                integration="aws",
-                entity="Entity",
-                operation="creation",
             )
         ]
     )
@@ -185,37 +152,22 @@ def test_provision_entities_execute_false(mock_logger, mock_log_to_sentinel):
     info_calls = [
         call(
             "provision_entities_started",
-            integration="aws",
-            entity="Entity",
-            operation="creation",
             entities_count=3,
         ),
         call(
             "provision_entity_dry_run",
-            integration="aws",
-            entity="Entity",
-            operation="creation",
             entity_value="user1",
         ),
         call(
             "provision_entity_dry_run",
-            integration="aws",
-            entity="Entity",
-            operation="creation",
             entity_value="user2",
         ),
         call(
             "provision_entity_dry_run",
-            integration="aws",
-            entity="Entity",
-            operation="creation",
             entity_value="user3",
         ),
         call(
             "provision_entities_completed",
-            integration="aws",
-            entity="Entity",
-            operation="creation",
             provisioned_entities_count=3,
         ),
     ]

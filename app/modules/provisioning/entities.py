@@ -39,17 +39,11 @@ def provision_entities(
     if not entities:
         log.info(
             "provision_entities_no_entities_to_process",
-            integration=integration_name,
-            entity=entity_name,
-            operation=operation_name,
         )
         return provisioned_entities
 
     log.info(
         "provision_entities_started",
-        integration=integration_name,
-        entity=entity_name,
-        operation=operation_name,
         entities_count=len(entities),
     )
 
@@ -69,9 +63,6 @@ def provision_entities(
             if response:
                 log.info(
                     "provision_entity_successful",
-                    integration=integration_name,
-                    entity=entity_name,
-                    operation=operation_name,
                     entity_value=entity_string,
                 )
                 event["status"] = "successful"
@@ -84,9 +75,6 @@ def provision_entities(
                 event["status"] = "failed"
                 log.error(
                     "provision_entity_failed",
-                    integration=integration_name,
-                    entity=entity_name,
-                    operation=operation_name,
                     entity_value=entity_string,
                 )
                 log_to_sentinel(
@@ -96,9 +84,6 @@ def provision_entities(
         else:
             log.info(
                 "provision_entity_dry_run",
-                integration=integration_name,
-                entity=entity_name,
-                operation=operation_name,
                 entity_value=entity_string,
             )
             log_to_sentinel(
@@ -109,9 +94,6 @@ def provision_entities(
 
     log.info(
         "provision_entities_completed",
-        integration=integration_name,
-        entity=entity_name,
-        operation=operation_name,
         provisioned_entities_count=len(provisioned_entities),
     )
 

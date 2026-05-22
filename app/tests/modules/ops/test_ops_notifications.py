@@ -24,12 +24,10 @@ def test_log_ops_message(mock_logger, mock_get_client):
     bound_logger.info.assert_any_call(
         "ops_message_log_attempted",
         channel_id="C0123456ABC",
-        ops_message=msg,
     )
     bound_logger.info.assert_any_call(
         "ops_message_logged",
         channel_id="C0123456ABC",
-        ops_message=msg,
     )
 
 
@@ -45,7 +43,6 @@ def test_log_ops_message_no_client(mock_logger, mock_get_client):
     notifications.log_ops_message(msg)
     bound_logger.error.assert_called_with(
         "slack_client_not_initialized",
-        ops_message=msg,
     )
 
 
@@ -61,7 +58,6 @@ def test_log_ops_message_no_channel(mock_logger, mock_get_client):
     notifications.log_ops_message(msg)
     bound_logger.warning.assert_called_with(
         "ops_channel_id_not_configured",
-        ops_message=msg,
     )
 
 
@@ -86,6 +82,5 @@ def test_log_ops_message_slack_api_error(mock_logger, mock_get_client):
     bound_logger.error.assert_called_with(
         "ops_message_failed",
         channel_id="C0123456ABC",
-        ops_message=msg,
         error=str(SlackApiError(error_message, mock_response)),
     )
