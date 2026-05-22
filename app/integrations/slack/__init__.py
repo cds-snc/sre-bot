@@ -7,3 +7,10 @@ This package contains the Slack integration modules. Contains:
 - commands: Module containing the command related functionality for the Slack integration.
 - blocks: Module containing Slack Block Kit utilities and validation.
 """
+
+from integrations.slack.bootstrap import LegacySlackBootstrap, SlackBootstrap
+
+__all__ = [
+    "SlackBootstrap",
+    "LegacySlackBootstrap",
+]

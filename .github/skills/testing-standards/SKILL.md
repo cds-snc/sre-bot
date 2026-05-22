@@ -3,40 +3,74 @@ name: testing-standards
 description: Apply project testing standards for app/tests layout, naming, dependency overrides, and route/service coverage.
 ---
 
-# Testing Standards
+## Test Layout & Naming
 
-Use this skill when creating or updating tests.
+Mirror `app/` under `tests/`:
+- `tests/unit/` — isolated units with Protocol fakes. Cost <50ms.
+- `tests/integration/` — feature + infrastructure with external deps stubbed. Cost <500ms.
+- `tests/smoke/` — live systems. On-demand only.
 
-## Placement and Naming
+Names: `test_<domain>_<entity>_<action>.py`. No generic names.
 
-1. Place tests under `app/tests/` only.
-2. Use feature-prefix naming (for example, `test_groups_routes.py`).
-3. Avoid ambiguous names like `test_routes.py`.
+## Unit Tests
 
-## Structure Guidance
+Test one function/class in isolation.
 
-- Unit tests: `app/tests/unit/...`
-- Integration tests: `app/tests/integration/...`
-- Fixtures and factories should remain under shared test support locations.
+```python
+async def test_item_service_fetch_success(mocker):
+    fake_adapter = mocker.Mock(spec=ItemAdapter)
+    fake_adapter.get_item.return_value = OperationResult(SUCCESS, payload=Item(...))
+    
+    service = ItemService(adapter=fake_adapter)
+    result = await service.fetch("id1")
+    
+    assert result.status == SUCCESS
+    assert result.payload.name == "expected"
+```
 
-## Route Testing
+Use Protocol-conformant fakes. Assert on OperationResult status, not provider details.
 
-For FastAPI endpoints, cover:
+## Integration Tests
 
-1. Success path with response schema assertions.
-2. Failure mapping path (status and stable error detail).
-3. Dependency variation path (auth/permission/override where relevant).
+Test feature service + infrastructure with external deps stubbed.
 
-Use dependency overrides instead of patching unrelated internals when possible.
+```python
+async def test_item_route_success(app, monkeypatch):
+    fake_adapter = FakeItemAdapter()
+    app.dependency_overrides[get_item_service] = lambda: ItemService(fake_adapter)
+    
+    client = TestClient(app)
+    response = client.get("/items/id1")
+    
+    assert response.status_code == 200
+    assert response.json()["name"] == "expected"
+    
+    app.dependency_overrides.clear()
+```
 
-## Service Testing
+Clear `dependency_overrides` in finally or use fixture autouse.
 
-- Test business rules with direct service calls.
-- Use protocol/fake implementations for external dependencies.
-- Keep tests deterministic and avoid network dependence.
+## Route Tests
+
+1. Success: status code + response schema.
+2. Failure paths: OperationResult → HTTP status + RFC 9457 body.
+3. Auth/permission branches.
+
+## Fixtures
+
+Narrow-slice settings only. Clear `@lru_cache` between tests:
+
+```python
+@pytest.fixture(autouse=True)
+def _clear_caches():
+    yield
+    from app.packages.myfeature import providers
+    providers.get_service.cache_clear()
+```
 
 ## Anti-patterns
 
-- Tests outside `app/tests`.
-- Heavy integration setup for pure unit behavior.
-- Asserting only status code without payload/behavior assertions.
+- Tests outside `app/tests/`.
+- Status-code-only assertions.
+- Missing `dependency_overrides` cleanup.
+- Full Settings objects in fixtures.

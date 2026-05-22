@@ -26,7 +26,6 @@ def test_app_state_has_all_required_attributes(app_with_lifespan):
         "settings",
         "logger",
         "bot",  # Can be None if Slack not configured, but must exist
-        "command_providers",
         "directory_provider",
         "socket_mode_handler",
         "scheduled_stop_event",
@@ -70,19 +69,6 @@ def test_app_state_logger_is_valid(app_with_lifespan):
     assert hasattr(logger, "info"), "logger missing info method"
     assert hasattr(logger, "error"), "logger missing error method"
     assert hasattr(logger, "bind"), "logger missing bind method"
-
-
-@pytest.mark.integration
-def test_app_state_command_providers_is_initialized(app_with_lifespan):
-    """Validate that command_providers dict is initialized (may be empty).
-
-    command_providers dict should exist even if no providers are loaded.
-    This prevents KeyError when command handlers check for providers.
-    """
-    command_providers = app_with_lifespan.app.state.command_providers
-
-    assert command_providers is not None, "command_providers must not be None"
-    assert isinstance(command_providers, dict), "command_providers must be a dict"
 
 
 @pytest.mark.integration

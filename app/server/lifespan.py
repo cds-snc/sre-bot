@@ -22,7 +22,7 @@ from infrastructure.i18n import (
     get_translation_service,
 )
 from infrastructure.logging.setup import configure_logging
-from infrastructure.platforms import get_platform_service
+from infrastructure.platforms.providers import get_slack_provider
 from infrastructure.plugins import (
     auto_discover_plugins,
     get_plugin_manager,
@@ -219,20 +219,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     _initialize_security_services(app, server_settings, logger)
     _initialize_directory_provider(app, settings, logger)
 
-    app.state.command_providers = {}
-
-    platform_service = get_platform_service()
-    platform_providers = platform_service.load_providers()
-    app.state.platform_service = platform_service
-    app.state.platform_providers = platform_providers
+    app.state.slack_provider = get_slack_provider()
 
     pm = get_plugin_manager()
 
     translation_service = _initialize_translation_service(pm, logger)
     # Inject translation service into all platform providers and their formatters
     # before command registration so help-text translations work at startup.
-    platform_service.inject_translation_service(translation_service)
-
+    app.state.slack_provider.set_translator(translation_service.translator)
     # Phase 3: Register feature commands, routes, and run startup warmup.
     # Providers now have the translator set, so description_key translations
     # resolve correctly at registration time.
@@ -240,40 +234,36 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     register_feature_integrations(
         app=app,
         logger=logger,
-        slack_provider=platform_providers.get("slack"),
+        slack_provider=app.state.slack_provider,
     )
     log.info("feature_integrations_registered")
 
-    init_results = platform_service.initialize_all_providers()
-    failed = [name for name, result in init_results.items() if not result.is_success]
-    if failed:
-        logger.warning(
-            "platform_providers_initialization_partial_failure",
-            failed=failed,
-        )
-
-    slack_provider = platform_providers.get("slack")
-    if slack_provider and getattr(slack_provider, "app", None):
-        slack_app = cast(App, slack_provider.app)
+    app.state.slack_provider.initialize_app()
+    if app.state.slack_provider and getattr(app.state.slack_provider, "app", None):
+        logger.info("slack_provider_app_available")
+        slack_app = cast(App, app.state.slack_provider.app)
         _register_legacy_handlers(slack_app, logger)
         app.state.bot = slack_app
-        app.state.socket_mode_handler = slack_provider.socket_mode_handler
+        app.state.socket_mode_handler = app.state.slack_provider.socket_mode_handler
         if not _is_test_environment():
             scheduled_stop_event = _start_scheduled_tasks(slack_app, settings, logger)
         else:
             scheduled_stop_event = None
     else:
+        logger.warning("slack_provider_app_unavailable", reason="initialization_failed")
         app.state.bot = None
         app.state.socket_mode_handler = None
         scheduled_stop_event = None
 
     if not _is_test_environment():
-        start_results = platform_service.start_all_providers()
-        failed_start = [
-            name for name, result in start_results.items() if not result.is_success
-        ]
-        if failed_start:
-            logger.warning("platform_providers_start_failed", failed=failed_start)
+        start_slack_result = app.state.slack_provider.start()
+        if not start_slack_result.is_success:
+            logger.warning(
+                "slack_provider_start_failed",
+                error=start_slack_result.message,
+            )
+        else:
+            logger.info("slack_provider_start_skipped", reason="test_environment")
 
     app.state.scheduled_stop_event = scheduled_stop_event
 
@@ -283,4 +273,5 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     _stop_scheduled_tasks(app.state.scheduled_stop_event)
 
-    platform_service.stop_all_providers()
+    if app.state.slack_provider:
+        app.state.slack_provider.stop()

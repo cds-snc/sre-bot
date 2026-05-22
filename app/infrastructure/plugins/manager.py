@@ -20,7 +20,6 @@ if TYPE_CHECKING:
 
     from infrastructure.events.service import EventDispatcher
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
-    from infrastructure.slack.service import SlackBot
 
 logger = structlog.get_logger()
 
@@ -70,7 +69,6 @@ def collect_feature_i18n_resources(
 def register_feature_integrations(
     app: "FastAPI",
     logger: "BoundLogger",
-    slack_bot: "SlackBot | None" = None,
     slack_provider: "SlackPlatformProvider | None" = None,
     event_dispatcher: "EventDispatcher | None" = None,
 ) -> None:
@@ -105,7 +103,6 @@ def register_feature_integrations(
 def discover_and_init_features(
     app: "FastAPI",
     logger: "BoundLogger",
-    slack_bot: "SlackBot | None" = None,
     slack_provider: "SlackPlatformProvider | None" = None,
     event_dispatcher: "EventDispatcher | None" = None,
 ) -> I18nResourceRegistry:
@@ -122,7 +119,6 @@ def discover_and_init_features(
     register_feature_integrations(
         app=app,
         logger=logger,
-        slack_bot=slack_bot,
         slack_provider=slack_provider,
         event_dispatcher=event_dispatcher,
     )

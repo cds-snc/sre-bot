@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 SLACK_HELP_KEYWORDS = frozenset({"help", "aide", "--help", "-h"})
 
 
-def build_slack_display_path(command_path: str) -> str:
+def _build_slack_display_path(command_path: str) -> str:
     """Convert dot-separated command path into space-separated display path.
 
     Args:
@@ -26,7 +26,7 @@ def build_slack_display_path(command_path: str) -> str:
     return command_path.replace(".", " ")
 
 
-def build_slack_command_signature(
+def _build_slack_command_signature(
     command_path: str,
     usage_hint: str = "",
     prefix: str = "/",
@@ -41,13 +41,13 @@ def build_slack_command_signature(
     Returns:
         Command signature (e.g., "/sre dev aws <account_id>").
     """
-    display_path = build_slack_display_path(command_path)
+    display_path = _build_slack_display_path(command_path)
     if usage_hint:
         return f"{prefix}{display_path} {usage_hint}"
     return f"{prefix}{display_path}"
 
 
-def generate_slack_help_text(
+def _generate_slack_help_text(
     arguments: List[Argument],
     include_types: bool = True,
     include_defaults: bool = True,
@@ -150,7 +150,7 @@ def generate_slack_help_text(
     return "\n".join(lines)
 
 
-def generate_usage_line(
+def _generate_usage_line(
     command_path: str,
     arguments: List[Argument],
 ) -> str:
@@ -175,7 +175,7 @@ def generate_usage_line(
         >>> print(usage)
         Usage: /sre groups add EMAIL GROUP_ID [--justification TEXT]
     """
-    display_path = build_slack_display_path(command_path)
+    display_path = _build_slack_display_path(command_path)
 
     arg_parts: List[str] = []
     for arg in arguments:
@@ -201,7 +201,7 @@ def generate_usage_line(
     return f"Usage: /{display_path}"
 
 
-def get_argument_by_name(
+def _get_argument_by_name(
     arguments: List[Argument],
     name: str,
 ) -> Optional[Argument]:
@@ -351,7 +351,7 @@ class SlackHelpGenerator:
         lines = []
 
         # Command signature
-        signature = build_slack_command_signature(command_path, cmd_def.usage_hint)
+        signature = _build_slack_command_signature(command_path, cmd_def.usage_hint)
         lines.append(f"*{signature}*")
         lines.append("")
 
@@ -369,7 +369,7 @@ class SlackHelpGenerator:
             arguments_label = self._translator(
                 "commands.labels.arguments", "Arguments:", locale
             )
-            args_help = generate_slack_help_text(
+            args_help = _generate_slack_help_text(
                 cmd_def.arguments,
                 include_types=True,
                 include_defaults=True,
@@ -423,7 +423,7 @@ class SlackHelpGenerator:
         arguments_label = self._translator(
             "commands.labels.arguments", "Arguments:", locale
         )
-        return generate_slack_help_text(
+        return _generate_slack_help_text(
             cmd_def.arguments,
             include_types=True,
             include_defaults=True,
@@ -450,7 +450,7 @@ class SlackHelpGenerator:
             locale: Locale string (e.g., "en-US", "fr-FR")
         """
         indent = "  " * indent_level
-        display_path = build_slack_display_path(cmd_def.full_path)
+        display_path = _build_slack_display_path(cmd_def.full_path)
 
         # Build bullet point with path and description
         if not cmd_def.is_auto_generated:
@@ -465,7 +465,9 @@ class SlackHelpGenerator:
             lines.append(f"{indent}• /{display_path}")
 
         # Add signature
-        signature = build_slack_command_signature(cmd_def.full_path, cmd_def.usage_hint)
+        signature = _build_slack_command_signature(
+            cmd_def.full_path, cmd_def.usage_hint
+        )
         lines.append(f"{indent}  `{signature}`")
         lines.append("")
 

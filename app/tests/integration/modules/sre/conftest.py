@@ -87,9 +87,9 @@ def slack_provider(slack_settings, slack_formatter, monkeypatch):
 @pytest.fixture
 def mock_slack_client(monkeypatch):
     """Mock SlackClientFacade for integration tests."""
-    mock_facade = MagicMock()
-    mock_facade.raw_client = MagicMock()
+    mock_slack_bootstrap = MagicMock()
+    mock_slack_bootstrap.web = MagicMock()
 
-    monkeypatch.setattr(sre_slack, "get_slack_client", lambda: mock_facade)
+    monkeypatch.setattr(sre_slack, "LegacySlackBootstrap", lambda: mock_slack_bootstrap)
 
-    return mock_facade
+    return mock_slack_bootstrap
