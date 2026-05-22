@@ -1,10 +1,11 @@
 import json
+
 from slack_sdk.web import WebClient
+from structlog import get_logger
+
 from modules.slack import webhooks
 
-from core.logging import get_module_logger
-
-logger = get_module_logger()
+logger = get_logger()
 
 MAX_BLOCK_SIZE = 16
 
@@ -198,14 +199,15 @@ def list_all_webhooks(
 
 def reveal_webhook(ack, body, client: WebClient):
     ack()
-
-    username = body["user"]["username"]
+    log = logger.bind(
+        user_name=body["user"]["username"], webhook_id=body["actions"][0]["value"]
+    )
     hook = webhooks.get_webhook(body["actions"][0]["value"])
     id = hook["id"]["S"]
     name = hook["name"]["S"]
     channel = hook["channel"]["S"]
 
-    logger.info("reveal_webhook_called", user_name=username, webhook_id=id)
+    log.info("reveal_webhook_called")
 
     blocks = {
         "type": "modal",
@@ -238,23 +240,19 @@ def reveal_webhook(ack, body, client: WebClient):
 
 def toggle_webhook(ack, body, client):
     ack()
-
     username = body["user"]["username"]
     user_id = body["user"]["id"]
     hook = webhooks.get_webhook(body["actions"][0]["value"])
     id = hook["id"]["S"]
     name = hook["name"]["S"]
     channel = hook["channel"]["S"]
+
+    log = logger.bind(user_name=username, webhook_id=id, channel=channel)
+    log.info("toggle_webhook_called")
     private_metadata = json.loads(body["view"]["private_metadata"])
 
     webhooks.toggle_webhook(id)
     message = f"Webhook {name} has been {'disabled' if hook['active']['BOOL'] else 'enabled'} by <@{username}>"
-    logger.info(
-        "toggle_webhook_called",
-        user_name=username,
-        webhook_id=id,
-        channel=channel,
-    )
     client.chat_postMessage(
         channel=channel,
         user=user_id,

@@ -1,7 +1,6 @@
+from unittest.mock import ANY, MagicMock, call, patch
+
 from modules import role
-
-from unittest.mock import ANY, MagicMock, patch, call
-
 
 ROLE_CONSTANTS = {
     "SCORING_GUIDE_TEMPLATE": "scoring_guide_template",
@@ -340,6 +339,8 @@ def test_create_new_folder_failed(
     say = MagicMock()
     body = helper_body_payload("en-US")
     client = MagicMock()
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     mock_create_new_folder.return_value = ""
     role.role_view_handler(ack, body, say, client)
     mock_create_new_folder.assert_called_once_with(
@@ -348,7 +349,7 @@ def test_create_new_folder_failed(
         "id",
         delegated_user_email="bot_email",
     )
-    mock_logger.error.assert_called_once_with(
+    bound_logger.error.assert_called_once_with(
         "talent_role_folder_creation_failed", folder_name="foo"
     )
     mock_copy_file_to_folder.assert_not_called()
@@ -367,6 +368,8 @@ def test_copy_files_to_internal_talent_folder(
     say = MagicMock()
     body = helper_body_payload("en-US")
     client = MagicMock()
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     mock_create_new_folder.return_value = {"id": "folder_id"}
     mock_copy_file_to_folder.return_value = "id"
     role.role_view_handler(ack, body, say, client)
@@ -428,7 +431,7 @@ def test_copy_files_to_internal_talent_folder(
     # 1 call for the folder creation
     # 7 calls for copying files
     # 1 call for conversation creation
-    assert mock_logger.info.call_count == 10
+    assert bound_logger.info.call_count == 10
 
 
 @patch("modules.role.role.i18n")

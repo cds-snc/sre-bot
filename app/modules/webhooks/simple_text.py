@@ -1,14 +1,15 @@
-import os
 import importlib
+import os
 import re
 from typing import Any, Callable, Dict, List, Literal, Optional, Pattern
 
-from core.logging import get_module_logger
-from models.webhooks import SimpleTextPayload, WebhookPayload, WebhookResult
 from pydantic import field_validator
 from pydantic.dataclasses import dataclass
+from structlog import get_logger
 
-logger = get_module_logger()
+from models.webhooks import SimpleTextPayload, WebhookPayload, WebhookResult
+
+logger = get_logger()
 
 
 @dataclass
@@ -230,10 +231,12 @@ def init_pattern_handlers():
                     for attr in dir(mod):
                         if attr.endswith("_HANDLER"):
                             register_pattern(getattr(mod, attr))
-                            logger.info(f"registered_pattern: {attr}")
+                            logger.info(
+                                "registered_pattern", pattern=attr, module=mod_name
+                            )
                 except Exception as e:
                     logger.warning(
-                        f"failed_to_register_pattern_module: {mod_name}", error=str(e)
+                        "register_pattern_failed", module=mod_name, error=str(e)
                     )
 
 

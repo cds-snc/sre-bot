@@ -10,7 +10,7 @@ import structlog
 from infrastructure.i18n.loader import TranslationLoader
 from infrastructure.i18n.models import Locale, TranslationCatalog, TranslationKey
 
-logger = structlog.get_logger().bind(component="i18n.translator")
+logger = structlog.get_logger()
 
 
 class Translator:

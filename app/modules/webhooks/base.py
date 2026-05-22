@@ -3,19 +3,20 @@ from typing import Any, Dict, List, Optional, Tuple, Type, cast
 from fastapi import Request
 from pydantic import BaseModel
 from slack_sdk import WebClient
-from core.logging import get_module_logger
-from utils.models import select_best_model
+from structlog import get_logger
+
 from models.webhooks import (
-    WebhookPayload,
-    AwsSnsPayload,
     AccessRequest,
+    AwsSnsPayload,
     SimpleTextPayload,
+    WebhookPayload,
     WebhookResult,
 )
 from modules.webhooks.aws_sns import process_aws_sns_payload
 from modules.webhooks.simple_text import process_simple_text_payload
+from utils.models import select_best_model
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def _get_bot_client(request: Request) -> Optional[WebClient]:
@@ -83,13 +84,6 @@ def handle_webhook_payload(
     else:
         error_message = "No matching model found for payload"
         return WebhookResult(status="error", message=error_message)
-
-    # handler_map = {
-    #     "WebhookPayload": "process_webhook_payload",
-    #     "AwsSnsPayload": "process_aws_sns_payload",
-    #     "AccessRequest": "process_access_request_payload",
-    #     "SimpleTextPayload": "process_simple_text_payload",
-    # }
 
     match payload_type.__name__:
         case "WebhookPayload":

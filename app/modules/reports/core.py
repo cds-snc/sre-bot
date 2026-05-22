@@ -1,10 +1,10 @@
 from slack_bolt import Ack, Respond
 from slack_sdk import WebClient
+from structlog import get_logger
 
-from core.logging import get_module_logger
 from modules.reports import google_groups
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 help_text = """
@@ -21,13 +21,18 @@ help_text = """
 
 def reports_command(args, ack: Ack, command, respond: Respond, client: WebClient, body):
     ack()
+    log = logger.bind(
+        command_args=args,
+        user_id=command["user_id"],
+        channel_id=command["channel_id"],
+    )
     if len(args) == 0:
         respond(help_text)
         return
-    logger.info("SRE reports command received: %s", command["text"])
+    log.info("sre_reports_command_received", command_text=command["text"])
 
     action, *args = args
-    logger.info("reports_action_received", action=action, args=args)
+    log.info("reports_action_received", action=action, args=args)
     match action:
         case "help" | "aide":
             respond(help_text)

@@ -1,18 +1,19 @@
-import os
 import importlib
 import json
+import os
 import re
 from typing import Any, Callable, Dict, List, Literal, Optional, Pattern, Union
 
-from core.logging import get_module_logger
-from integrations.slack.blocks import validate_blocks
-from models.webhooks import AwsSnsPayload
-from modules.ops.notifications import log_ops_message
 from pydantic import field_validator
 from pydantic.dataclasses import dataclass
 from slack_sdk import WebClient
+from structlog import get_logger
 
-logger = get_module_logger()
+from integrations.slack.blocks import validate_blocks
+from models.webhooks import AwsSnsPayload
+from modules.ops.notifications import log_ops_message
+
+logger = get_logger()
 
 
 @dataclass
@@ -339,6 +340,7 @@ def _register_handlers_from_module(mod, mod_name: str) -> tuple[int, int]:
     Returns:
         tuple[int, int]: (registered_count, failed_count)
     """
+    log = logger.bind(module=mod_name)
     registered_count = 0
     failed_count = 0
 
@@ -348,16 +350,14 @@ def _register_handlers_from_module(mod, mod_name: str) -> tuple[int, int]:
                 pattern = getattr(mod, attr)
                 register_notification_pattern(pattern)
                 registered_count += 1
-                logger.info(
+                log.info(
                     "registered_notification_pattern",
-                    module=mod_name,
                     pattern_name=getattr(pattern, "name", attr),
                     handler_attr=attr,
                 )
             except Exception as handler_exc:
-                logger.error(
+                log.error(
                     "failed_to_register_pattern_handler",
-                    module=mod_name,
                     handler_attr=attr,
                     error=str(handler_exc),
                     error_type=type(handler_exc).__name__,
@@ -365,7 +365,7 @@ def _register_handlers_from_module(mod, mod_name: str) -> tuple[int, int]:
                 failed_count += 1
 
     if registered_count == 0:
-        logger.info(
+        log.info(
             "no_handlers_found_in_module",
             module=mod_name,
         )
@@ -379,32 +379,27 @@ def _load_pattern_module(mod_name: str, fname: str) -> tuple[int, int]:
     Returns:
         tuple[int, int]: (registered_count, failed_count)
     """
+    log = logger.bind(module=mod_name, filename=fname)
     try:
         mod = importlib.import_module(mod_name)
         return _register_handlers_from_module(mod, mod_name)
     except ImportError as import_exc:
-        logger.error(
+        log.error(
             "failed_to_import_pattern_module",
-            module=mod_name,
-            filename=fname,
             error=str(import_exc),
             error_type="ImportError",
         )
         return 0, 1
     except SyntaxError as syntax_exc:
-        logger.error(
+        log.error(
             "syntax_error_in_pattern_module",
-            module=mod_name,
-            filename=fname,
             error=str(syntax_exc),
             error_type="SyntaxError",
         )
         return 0, 1
     except Exception as exc:
-        logger.error(
+        log.error(
             "unexpected_error_loading_pattern_module",
-            module=mod_name,
-            filename=fname,
             error=str(exc),
             error_type=type(exc).__name__,
         )
@@ -416,11 +411,12 @@ def init_notification_handlers():
     patterns_dir = os.path.join(
         os.path.dirname(__file__), "patterns", "aws_sns_notification"
     )
+    log = logger.bind(patterns_dir=patterns_dir)
 
     if not patterns_dir or not os.path.isdir(patterns_dir):
-        logger.warning(
+        log.warning(
             "patterns_directory_not_found",
-            patterns_dir=patterns_dir,
+            message="Patterns directory for AWS SNS notifications not found. No default handlers will be registered.",
         )
         return
 
@@ -434,7 +430,7 @@ def init_notification_handlers():
             total_registered += registered
             total_failed += failed
 
-    logger.info(
+    log.info(
         "notification_handlers_initialization_complete",
         registered_count=total_registered,
         failed_count=total_failed,

@@ -1,4 +1,5 @@
-from unittest.mock import patch, call
+from unittest.mock import MagicMock, call, patch
+
 from modules.provisioning import groups
 
 
@@ -190,6 +191,8 @@ def test_log_groups(
     mock_logger,
     aws_groups_w_users,
 ):
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     groups_w_members = aws_groups_w_users(3, 3)
     mock_filters.get_nested_value.side_effect = [
         "group-name1",
@@ -213,81 +216,69 @@ def test_log_groups(
         integration_name="AWS",
     )
     expected_info_messages = [
-        call("log_groups_summary", integration_name="AWS", groups_count=3),
+        call("log_groups_summary", groups_count=3),
         call(
             "log_group_members",
-            integration_name="AWS",
             group_name="group-name1",
             members_count=3,
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name1",
             member_name="user-email1@test.com",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name1",
             member_name="user-email2@test.com",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name1",
             member_name="user-email3@test.com",
         ),
         call(
             "log_group_members",
-            integration_name="AWS",
             group_name="group-name2",
             members_count=3,
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name2",
             member_name="user-email1@test.com",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name2",
             member_name="user-email2@test.com",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name2",
             member_name="user-email3@test.com",
         ),
         call(
             "log_group_members",
-            integration_name="AWS",
             group_name="group-name3",
             members_count=3,
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name3",
             member_name="user-email1@test.com",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name3",
             member_name="user-email2@test.com",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name3",
             member_name="user-email3@test.com",
         ),
     ]
-    mock_logger.info.assert_has_calls(expected_info_messages)
+    bound_logger.info.assert_has_calls(expected_info_messages)
 
 
 @patch("modules.provisioning.groups.logger")
@@ -297,6 +288,8 @@ def test_log_groups_no_groups(
     mock_logger,
     aws_groups_w_users,
 ):
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     groups_w_members = []
     groups.log_groups(
         groups_w_members,
@@ -305,10 +298,8 @@ def test_log_groups_no_groups(
         members_display_key="MemberId.UserName",
         integration_name="AWS",
     )
-    expected_info_messages = [
-        call("log_groups_summary", integration_name="AWS", groups_count=0)
-    ]
-    mock_logger.info.assert_has_calls(expected_info_messages)
+    expected_info_messages = [call("log_groups_summary", groups_count=0)]
+    bound_logger.info.assert_has_calls(expected_info_messages)
 
 
 @patch("modules.provisioning.groups.logger")
@@ -318,6 +309,8 @@ def test_log_groups_missing_members_key(
     mock_logger,
     aws_groups_w_users,
 ):
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     groups_w_members = aws_groups_w_users(3, 3)
     mock_filters.get_nested_value.side_effect = [
         "group-name1",
@@ -333,20 +326,19 @@ def test_log_groups_missing_members_key(
         integration_name="AWS",
     )
     expected_info_messages = [
-        call("log_groups_summary", integration_name="AWS", groups_count=3),
-        call("log_group_no_members", integration_name="AWS", group_name="group-name1"),
-        call("log_group_no_members", integration_name="AWS", group_name="group-name2"),
-        call("log_group_no_members", integration_name="AWS", group_name="group-name3"),
+        call("log_groups_summary", groups_count=3),
+        call("log_group_no_members", group_name="group-name1"),
+        call("log_group_no_members", group_name="group-name2"),
+        call("log_group_no_members", group_name="group-name3"),
     ]
     expected_warn_messages = [
         call(
             "log_groups_missing_members_key",
-            integration_name="AWS",
             missing_key="members",
         )
     ]
-    mock_logger.info.assert_has_calls(expected_info_messages)
-    mock_logger.warning.assert_has_calls(expected_warn_messages)
+    bound_logger.info.assert_has_calls(expected_info_messages)
+    bound_logger.warning.assert_has_calls(expected_warn_messages)
 
 
 @patch("modules.provisioning.groups.logger")
@@ -356,6 +348,8 @@ def test_log_groups_missing_group_display_key(
     mock_logger,
     aws_groups_w_users,
 ):
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     groups_w_members = aws_groups_w_users(3, 3)
     mock_filters.get_nested_value.side_effect = [
         None,
@@ -379,76 +373,64 @@ def test_log_groups_missing_group_display_key(
         integration_name="AWS",
     )
     expected_info_messages = [
-        call("log_groups_summary", integration_name="AWS", groups_count=3),
+        call("log_groups_summary", groups_count=3),
         call(
             "log_group_members",
-            integration_name="AWS",
             group_name="<Group Name not found>",
             members_count=3,
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="<Group Name not found>",
             member_name="user-email1@test.com",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="<Group Name not found>",
             member_name="user-email2@test.com",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="<Group Name not found>",
             member_name="user-email3@test.com",
         ),
         call(
             "log_group_members",
-            integration_name="AWS",
             group_name="<Group Name not found>",
             members_count=3,
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="<Group Name not found>",
             member_name="user-email1@test.com",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="<Group Name not found>",
             member_name="user-email2@test.com",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="<Group Name not found>",
             member_name="user-email3@test.com",
         ),
         call(
             "log_group_members",
-            integration_name="AWS",
             group_name="<Group Name not found>",
             members_count=3,
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="<Group Name not found>",
             member_name="user-email1@test.com",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="<Group Name not found>",
             member_name="user-email2@test.com",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="<Group Name not found>",
             member_name="user-email3@test.com",
         ),
@@ -457,13 +439,12 @@ def test_log_groups_missing_group_display_key(
     expected_warn_messages = [
         call(
             "log_groups_missing_display_key",
-            integration_name="AWS",
             missing_key="group_display_key",
         )
     ]
 
-    mock_logger.info.assert_has_calls(expected_info_messages)
-    mock_logger.warning.assert_has_calls(expected_warn_messages)
+    bound_logger.info.assert_has_calls(expected_info_messages)
+    bound_logger.warning.assert_has_calls(expected_warn_messages)
 
 
 @patch("modules.provisioning.groups.logger")
@@ -473,6 +454,8 @@ def test_log_groups_no_group_members_display_keys(
     mock_logger,
     aws_groups_w_users,
 ):
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     groups_w_members = aws_groups_w_users(3, 3)
     mock_filters.get_nested_value.side_effect = [
         "group-name1",
@@ -496,76 +479,64 @@ def test_log_groups_no_group_members_display_keys(
         integration_name="AWS",
     )
     expected_info_messages = [
-        call("log_groups_summary", integration_name="AWS", groups_count=3),
+        call("log_groups_summary", groups_count=3),
         call(
             "log_group_members",
-            integration_name="AWS",
             group_name="group-name1",
             members_count=3,
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name1",
             member_name="<User Name not found>",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name1",
             member_name="<User Name not found>",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name1",
             member_name="<User Name not found>",
         ),
         call(
             "log_group_members",
-            integration_name="AWS",
             group_name="group-name2",
             members_count=3,
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name2",
             member_name="<User Name not found>",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name2",
             member_name="<User Name not found>",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name2",
             member_name="<User Name not found>",
         ),
         call(
             "log_group_members",
-            integration_name="AWS",
             group_name="group-name3",
             members_count=3,
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name3",
             member_name="<User Name not found>",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name3",
             member_name="<User Name not found>",
         ),
         call(
             "log_group_member",
-            integration_name="AWS",
             group_name="group-name3",
             member_name="<User Name not found>",
         ),
@@ -574,10 +545,9 @@ def test_log_groups_no_group_members_display_keys(
     expected_warn_messages = [
         call(
             "log_groups_missing_display_key",
-            integration_name="AWS",
             missing_key="members_display_key",
         )
     ]
 
-    mock_logger.info.assert_has_calls(expected_info_messages)
-    mock_logger.warning.assert_has_calls(expected_warn_messages)
+    bound_logger.info.assert_has_calls(expected_info_messages)
+    bound_logger.warning.assert_has_calls(expected_warn_messages)

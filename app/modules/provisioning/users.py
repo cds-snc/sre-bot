@@ -3,27 +3,29 @@
 from integrations.google_workspace import google_directory
 from integrations.aws import identity_store
 from utils import filters
-from core.logging import get_module_logger
+from structlog import get_logger
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def get_users_from_integration(integration_source, **kwargs):
+    log = logger.bind(
+        integration=integration_source,
+        operation="get_users_from_integration",
+    )
     processing_filters = kwargs.get("processing_filters", [])
     users = []
 
     match integration_source:
         case "google_directory":
-            logger.info(
+            log.info(
                 "get_users_from_integration_started",
-                integration_source=integration_source,
                 service="Google Workspace",
             )
             users = google_directory.list_users()
         case "aws_identity_center":
-            logger.info(
+            log.info(
                 "get_users_from_integration_started",
-                integration_source=integration_source,
                 service="AWS Identity Center",
             )
             users = identity_store.list_users()
@@ -35,7 +37,6 @@ def get_users_from_integration(integration_source, **kwargs):
 
     logger.info(
         "get_users_from_integration_completed",
-        integration_source=integration_source,
         users_count=len(users),
     )
 

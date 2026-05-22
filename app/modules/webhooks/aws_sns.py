@@ -1,10 +1,5 @@
 import requests
-from core.logging import get_module_logger
-from core.config import settings
 from fastapi import HTTPException
-from models.webhooks import AwsSnsPayload, WebhookPayload, WebhookResult
-from modules.ops.notifications import log_ops_message
-from modules.webhooks.aws_sns_notification import process_aws_notification_payload
 from slack_sdk import WebClient
 from sns_message_validator import (
     InvalidCertURLException,
@@ -13,8 +8,14 @@ from sns_message_validator import (
     SignatureVerificationFailureException,
     SNSMessageValidator,
 )
+from structlog import get_logger
 
-logger = get_module_logger()
+from core.config import settings
+from models.webhooks import AwsSnsPayload, WebhookPayload, WebhookResult
+from modules.ops.notifications import log_ops_message
+from modules.webhooks.aws_sns_notification import process_aws_notification_payload
+
+logger = get_logger()
 sns_message_validator = SNSMessageValidator()
 
 

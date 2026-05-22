@@ -2,11 +2,11 @@
 Example patterns showing the different match types and configuration options.
 """
 
-from core.logging import get_module_logger
+from structlog import get_logger
+
 from modules.webhooks.simple_text import SimpleTextPattern, register_pattern
 
-
-logger = get_module_logger()
+logger = get_logger()
 
 # Example patterns using different match types
 EXAMPLE_PATTERNS = [

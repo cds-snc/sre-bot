@@ -1,9 +1,8 @@
 from utils import filters
 from integrations.sentinel import log_to_sentinel
-from core.logging import get_module_logger
+from structlog import get_logger
 
-
-logger = get_module_logger()
+logger = get_logger()
 
 
 def provision_entities(
@@ -31,21 +30,20 @@ def provision_entities(
     Returns:
         list: A list of created entities objects.
     """
-    provisioned_entities = []
+    log = logger.bind(
+        integration=integration_name,
+        operation=operation_name,
+        entity=entity_name,
+    )
+    provisioned_entities: list[dict] = []
     if not entities:
-        logger.info(
+        log.info(
             "provision_entities_no_entities_to_process",
-            integration=integration_name,
-            entity=entity_name,
-            operation=operation_name,
         )
         return provisioned_entities
 
-    logger.info(
+    log.info(
         "provision_entities_started",
-        integration=integration_name,
-        entity=entity_name,
-        operation=operation_name,
         entities_count=len(entities),
     )
 
@@ -63,11 +61,8 @@ def provision_entities(
         if execute:
             response = function(**entity, **kwargs)
             if response:
-                logger.info(
+                log.info(
                     "provision_entity_successful",
-                    integration=integration_name,
-                    entity=entity_name,
-                    operation=operation_name,
                     entity_value=entity_string,
                 )
                 event["status"] = "successful"
@@ -78,11 +73,8 @@ def provision_entities(
                 provisioned_entities.append({"entity": entity, "response": response})
             else:
                 event["status"] = "failed"
-                logger.error(
+                log.error(
                     "provision_entity_failed",
-                    integration=integration_name,
-                    entity=entity_name,
-                    operation=operation_name,
                     entity_value=entity_string,
                 )
                 log_to_sentinel(
@@ -90,11 +82,8 @@ def provision_entities(
                     {"entity": entity},
                 )
         else:
-            logger.info(
+            log.info(
                 "provision_entity_dry_run",
-                integration=integration_name,
-                entity=entity_name,
-                operation=operation_name,
                 entity_value=entity_string,
             )
             log_to_sentinel(
@@ -103,11 +92,8 @@ def provision_entities(
             )
             provisioned_entities.append({"entity": entity, "response": None})
 
-    logger.info(
+    log.info(
         "provision_entities_completed",
-        integration=integration_name,
-        entity=entity_name,
-        operation=operation_name,
         provisioned_entities_count=len(provisioned_entities),
     )
 

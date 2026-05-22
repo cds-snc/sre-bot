@@ -220,8 +220,9 @@ def test_handle_webhook_payload_with_invalid_payload_type(
     class UnknownPayload(BaseModel):
         invalid_field: str
 
-        class Config:
-            extra = "forbid"
+        model_config = {
+            "extra": "forbid",
+        }
 
     request = MagicMock()
     payload = {}

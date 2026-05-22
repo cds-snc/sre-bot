@@ -1,5 +1,6 @@
 import json
-from unittest.mock import MagicMock, call, patch, ANY
+from unittest.mock import ANY, MagicMock, call, patch
+
 from modules.slack import webhooks_list
 
 
@@ -345,6 +346,8 @@ def test_reveal_webhook(get_webhook_mock, mock_logger):
     get_webhook_mock.return_value = helper_generate_webhook("name", "channel", "id")
     ack = MagicMock()
     client = MagicMock()
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     body = {
         "actions": [{"value": "id"}],
         "user": {"username": "username"},
@@ -353,10 +356,8 @@ def test_reveal_webhook(get_webhook_mock, mock_logger):
     }
     webhooks_list.reveal_webhook(ack, body, client)
     ack.assert_called()
-    mock_logger.info.assert_called_with(
+    bound_logger.info.assert_called_with(
         "reveal_webhook_called",
-        user_name="username",
-        webhook_id="id",
     )
     client.views_push.assert_called()
 
@@ -378,6 +379,8 @@ def test_toggle_webhook(
     get_webhook_mock.return_value = helper_generate_webhook("name", "channel", "id")
     ack = MagicMock()
     client = MagicMock()
+    bound_logger = MagicMock()
+    logger_mock.bind.return_value = bound_logger
     private_metadata = {"channel": None}
     body = {
         "actions": [{"value": "id"}],
@@ -389,11 +392,8 @@ def test_toggle_webhook(
     webhooks_list.toggle_webhook(ack, body, client)
     ack.assert_called()
     toggle_webhook_mock.assert_called_with("id")
-    logger_mock.info.assert_called_with(
+    bound_logger.info.assert_called_with(
         "toggle_webhook_called",
-        user_name="username",
-        webhook_id="id",
-        channel="channel",
     )
     client.chat_postMessage.assert_called_with(
         channel="channel",
@@ -431,6 +431,8 @@ def test_toggle_webhook_with_channel(
     get_webhook_mock.return_value = helper_generate_webhook("name", "channel", "id")
     ack = MagicMock()
     client = MagicMock()
+    bound_logger = MagicMock()
+    logger_mock.bind.return_value = bound_logger
     private_metadata = {"channel": "channel_id"}
     body = {
         "actions": [{"value": "id"}],
@@ -442,11 +444,8 @@ def test_toggle_webhook_with_channel(
     webhooks_list.toggle_webhook(ack, body, client)
     ack.assert_called()
     toggle_webhook_mock.assert_called_with("id")
-    logger_mock.info.assert_called_with(
+    bound_logger.info.assert_called_with(
         "toggle_webhook_called",
-        user_name="username",
-        webhook_id="id",
-        channel="channel",
     )
     client.chat_postMessage.assert_called_with(
         channel="channel",
