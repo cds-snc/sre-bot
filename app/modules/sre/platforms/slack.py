@@ -10,13 +10,15 @@ from typing import TYPE_CHECKING, cast
 from slack_bolt import Ack, Respond
 from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.configuration.app import get_app_settings as get_settings
-from infrastructure.platforms.clients.slack import get_slack_client
+from integrations.slack.bootstrap import LegacySlackBootstrap
 from modules.incident import incident_helper
 from modules.sre import webhook_helper
 
 if TYPE_CHECKING:
     from infrastructure.platforms.providers.slack import SlackPlatformProvider
 
+
+client = LegacySlackBootstrap().web
 
 logger = structlog.get_logger()
 
@@ -51,10 +53,6 @@ def handle_incident_command(payload: CommandPayload) -> CommandResponse:
         CommandResponse formatted for Slack
     """
     logger.info("command_received", command="incident", text=payload.text)
-
-    # Get Slack client singleton
-    slack_facade = get_slack_client()
-    client = slack_facade.raw_client
 
     # Parse command text into args
     args = payload.text.split() if payload.text else []
@@ -116,10 +114,6 @@ def handle_webhooks_command(payload: CommandPayload) -> CommandResponse:
         CommandResponse formatted for Slack
     """
     logger.info("command_received", command="webhooks", text=payload.text)
-
-    # Get Slack client singleton
-    slack_facade = get_slack_client()
-    client = slack_facade.raw_client
 
     # Parse command text into args
     args = payload.text.split() if payload.text else []

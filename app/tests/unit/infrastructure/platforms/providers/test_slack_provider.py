@@ -7,6 +7,9 @@ from infrastructure.platforms.capabilities.models import PlatformCapability
 from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
 from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.platforms.providers.slack import SlackPlatformProvider
+from tests.unit.infrastructure.platforms.providers.conftest import (
+    MockSlackSettings,
+)
 
 
 # Fake Slack Bolt classes for unit tests to avoid network/socket operations
@@ -359,9 +362,6 @@ class TestInitializeApp:
 
     def test_initialize_app_missing_app_token(self):
         """Test initialization with missing APP_TOKEN in Socket Mode."""
-        from tests.unit.infrastructure.platforms.providers.conftest import (
-            MockSlackSettings,
-        )
 
         settings = MockSlackSettings(
             socket_mode=True, app_token=None, bot_token="xoxb-test"
@@ -375,15 +375,10 @@ class TestInitializeApp:
 
     def test_initialize_app_missing_bot_token(self):
         """Test initialization with missing BOT_TOKEN."""
-        from tests.unit.infrastructure.platforms.providers.conftest import (
-            MockSlackSettings,
-        )
-
         settings = MockSlackSettings(
             socket_mode=True, app_token="xapp-test", bot_token=None
         )
         provider = SlackPlatformProvider(settings=settings)
-
         result = provider.initialize_app()
 
         assert not result.is_success

@@ -4,12 +4,14 @@ Provides integration with Slack using the Bolt SDK for Socket Mode.
 """
 
 import threading
+from functools import cache
 from typing import Any, Callable, Dict, FrozenSet, List, Optional, cast
 
 import structlog
 from slack_bolt import Ack, App, Respond
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
+from infrastructure.i18n import Translator
 from infrastructure.operations import OperationResult
 from infrastructure.platforms.capabilities.models import (
     CapabilityDeclaration,
@@ -24,11 +26,12 @@ from infrastructure.platforms.models import (
 )
 from infrastructure.platforms.parsing import CommandArgumentParser
 from infrastructure.platforms.providers.base import BasePlatformProvider
+from integrations.slack import LegacySlackBootstrap
 from integrations.slack.help import (
     SLACK_HELP_KEYWORDS,
     SlackHelpGenerator,
 )
-from integrations.slack import LegacySlackBootstrap
+from integrations.slack.settings import get_slack_settings
 
 logger = structlog.get_logger()
 
@@ -75,6 +78,7 @@ class SlackPlatformProvider(BasePlatformProvider):
         formatter: Optional[SlackBlockKitFormatter] = None,
         name: str = "slack",
         version: str = "1.0.0",
+        translation_service: Optional["Translator"] = None,
     ):
         """Initialize Slack platform provider.
 
@@ -83,12 +87,15 @@ class SlackPlatformProvider(BasePlatformProvider):
             formatter: Optional SlackBlockKitFormatter for response formatting
             name: Provider name (default: "slack")
             version: Provider version (default: "1.0.0")
+            translation_service: Optional translation service for i18n support
         """
         super().__init__(
             name=name,
             version=version,
             enabled=settings.ENABLED,
         )
+        if translation_service:
+            self.set_translator(translation_service)
 
         self._settings = settings
         self._formatter = formatter or SlackBlockKitFormatter()
@@ -667,3 +674,21 @@ class SlackPlatformProvider(BasePlatformProvider):
         return self._help_generator.generate(
             command_name, mode="command", locale=locale
         )
+
+
+@cache
+def get_slack_provider() -> SlackPlatformProvider:
+    """Factory function to create and return a SlackPlatformProvider instance.
+
+    This function can be used by the platform service to instantiate the provider
+    based on configuration. It encapsulates the creation logic and allows for
+    easy extension in the future (e.g., if different Slack settings profiles are needed).
+
+    Returns:
+        An instance of SlackPlatformProvider initialized with settings from configuration.
+    """
+
+    settings = get_slack_settings()
+    formatter = SlackBlockKitFormatter()
+    provider = SlackPlatformProvider(settings=settings, formatter=formatter)
+    return provider

@@ -19,10 +19,6 @@ from infrastructure.platforms.capabilities.models import (
     PlatformCapability,
     create_capability_declaration,
 )
-from infrastructure.platforms.clients import (
-    InternalHttpClient,
-    SlackClientFacade,
-)
 from infrastructure.platforms.exceptions import (
     AuthenticationError,
     CapabilityNotSupportedError,
@@ -60,10 +56,6 @@ from infrastructure.platforms.providers import (
     BasePlatformProvider,
     SlackPlatformProvider,
 )
-from infrastructure.platforms.registry import (
-    PlatformRegistry,
-)
-from infrastructure.platforms.service import PlatformService, get_platform_service
 
 __all__ = [
     # Service
@@ -113,6 +105,4 @@ __all__ = [
     "AuthenticationError",
     "RateLimitExceededError",
     "FormatterError",
-    # Service
-    "get_platform_service",
 ]

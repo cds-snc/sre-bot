@@ -11,8 +11,8 @@ from slack_bolt import Ack, App, Respond
 
 from infrastructure.platforms.exceptions import ProviderNotFoundError
 from infrastructure.platforms.models import CommandPayload, CommandResponse
-from infrastructure.platforms import get_platform_service
 from infrastructure.configuration import get_app_settings as get_settings
+from infrastructure.platforms.providers.slack import get_slack_provider
 
 logger = structlog.get_logger()
 
@@ -62,8 +62,7 @@ def sre_command(
     )
 
     try:
-        platform_service = get_platform_service()
-        slack_provider = platform_service.get_provider("slack")
+        slack_provider = get_slack_provider()
     except ProviderNotFoundError as exc:
         logger.error("slack_provider_missing", error=str(exc))
         respond(text="Slack provider is not available.", response_type="ephemeral")
