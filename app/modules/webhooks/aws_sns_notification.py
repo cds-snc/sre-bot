@@ -416,7 +416,8 @@ def init_notification_handlers():
     if not patterns_dir or not os.path.isdir(patterns_dir):
         log.warning(
             "patterns_directory_not_found",
-            message="Patterns directory for AWS SNS notifications not found. No default handlers will be registered.",)
+            message="Patterns directory for AWS SNS notifications not found. No default handlers will be registered.",
+        )
         return
 
     total_registered = 0

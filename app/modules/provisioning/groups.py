@@ -158,7 +158,7 @@ def log_groups(
                     member_name=members_display_name,
                 )
         else:
-            log .info(
+            log.info(
                 "log_group_no_members",
                 integration_name=integration_name,
                 group_name=group_display_name,

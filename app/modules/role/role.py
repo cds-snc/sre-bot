@@ -74,9 +74,7 @@ def role_command(
     user_id = body["user_id"]
     # get the user locale from slack.
     update_locale(slack_users.get_user_locale(client, user_id))
-    log.info(
-        "slack_user_locale_detected", user_id=user_id, locale=i18n.get("locale")
-    )
+    log.info("slack_user_locale_detected", user_id=user_id, locale=i18n.get("locale"))
 
     # process the command
     if command["text"] == "":
@@ -197,6 +195,7 @@ def role_view_handler(ack, body, say, client):
     log = logger.bind(
         user_id=body["user"]["id"],
     )
+
     def log_document_created(document_name, document_id):
         """Log the creation of a document with a consistent format."""
         log.info(
