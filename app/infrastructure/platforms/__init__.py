@@ -19,18 +19,6 @@ from infrastructure.platforms.capabilities.models import (
     PlatformCapability,
     create_capability_declaration,
 )
-from infrastructure.platforms.exceptions import (
-    AuthenticationError,
-    CapabilityNotSupportedError,
-    ConnectionError,
-    FormatterError,
-    InvalidMessageFormatError,
-    PlatformError,
-    ProviderAlreadyRegisteredError,
-    ProviderInitializationError,
-    ProviderNotFoundError,
-    RateLimitExceededError,
-)
 from infrastructure.platforms.formatters import (
     BaseResponseFormatter,
     DiscordEmbedFormatter,
@@ -58,10 +46,6 @@ from infrastructure.platforms.providers import (
 )
 
 __all__ = [
-    # Service
-    "PlatformService",
-    # Registry
-    "PlatformRegistry",
     # Providers
     "BasePlatformProvider",
     "SlackPlatformProvider",
@@ -74,9 +58,6 @@ __all__ = [
     "SlackBlockKitFormatter",
     "TeamsAdaptiveCardsFormatter",
     "DiscordEmbedFormatter",
-    # Clients
-    "InternalHttpClient",
-    "SlackClientFacade",
     # Models - Command
     "CommandPayload",
     "CommandResponse",
@@ -94,15 +75,4 @@ __all__ = [
     # Models - HTTP
     "HttpEndpointRequest",
     "HttpEndpointResponse",
-    # Exceptions
-    "PlatformError",
-    "ProviderNotFoundError",
-    "ProviderAlreadyRegisteredError",
-    "CapabilityNotSupportedError",
-    "ProviderInitializationError",
-    "InvalidMessageFormatError",
-    "ConnectionError",
-    "AuthenticationError",
-    "RateLimitExceededError",
-    "FormatterError",
 ]

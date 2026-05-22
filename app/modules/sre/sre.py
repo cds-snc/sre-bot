@@ -9,7 +9,6 @@ from typing import Any, Dict
 import structlog
 from slack_bolt import Ack, App, Respond
 
-from infrastructure.platforms.exceptions import ProviderNotFoundError
 from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.configuration import get_app_settings as get_settings
 from infrastructure.platforms.providers.slack import get_slack_provider
@@ -63,7 +62,7 @@ def sre_command(
 
     try:
         slack_provider = get_slack_provider()
-    except ProviderNotFoundError as exc:
+    except Exception as exc:
         logger.error("slack_provider_missing", error=str(exc))
         respond(text="Slack provider is not available.", response_type="ephemeral")
         return
