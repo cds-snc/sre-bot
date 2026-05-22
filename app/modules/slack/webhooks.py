@@ -1,23 +1,23 @@
 import json
+import uuid
+from datetime import datetime
 from decimal import Decimal
 from typing import List, Type
 
-import uuid
-from datetime import datetime
-from pydantic import BaseModel
 from boto3.dynamodb.types import TypeDeserializer
+from pydantic import BaseModel
+from structlog import get_logger
 
-from utils import models as model_utils
-from models.webhooks import (
-    WebhookPayload,
-    AwsSnsPayload,
-    AccessRequest,
-    SimpleTextPayload,
-)
 from integrations.aws import dynamodb
-from core.logging import get_module_logger
+from models.webhooks import (
+    AccessRequest,
+    AwsSnsPayload,
+    SimpleTextPayload,
+    WebhookPayload,
+)
+from utils import models as model_utils
 
-logger = get_module_logger()
+logger = get_logger()
 
 table = "webhooks"
 

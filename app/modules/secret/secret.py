@@ -7,8 +7,9 @@ import time
 
 import i18n  # type: ignore
 import requests  # type: ignore
+from structlog import get_logger
+
 from core.config import settings
-from core.logging import get_module_logger
 from integrations.slack import users as slack_users
 
 PREFIX = settings.PREFIX
@@ -17,7 +18,7 @@ i18n.load_path.append("./locales/")
 i18n.set("locale", "en-US")
 i18n.set("fallback", "en-US")
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def register(bot):
@@ -28,13 +29,17 @@ def register(bot):
 
 def secret_command(client, ack, command, body):
     ack()
-    logger.info(
-        "secret_command_received",
-        command=command["text"],
+    ###### WARNING #####
+    # Never log the command text as it may contain secrets.
+    # Only log the command metadata and the fact that the command was received.
+    log = logger.bind(
         user_id=command["user_id"],
         user_name=command["user_name"],
         channel_id=command["channel_id"],
         channel_name=command["channel_name"],
+    )
+    log.info(
+        "secret_command_received",
     )
     if "user" in body:
         user_id = body["user"]["id"]

@@ -22,10 +22,11 @@ Dependencies:
 import logging
 import sys
 from pathlib import Path
-import structlog
-from structlog.stdlib import BoundLogger
-from structlog.processors import CallsiteParameter
 from typing import TYPE_CHECKING, Any
+
+import structlog
+from structlog.processors import CallsiteParameter
+from structlog.stdlib import BoundLogger
 
 if TYPE_CHECKING:
     from infrastructure.configuration import Settings
@@ -212,60 +213,3 @@ def configure_logging(
     )
 
     return structlog.stdlib.get_logger()
-
-
-# =============================================================================
-# DEPRECATED FUNCTIONS - For backward compatibility only
-# =============================================================================
-
-
-def get_module_logger() -> BoundLogger:
-    """Get a logger for the calling module with context.
-
-    .. deprecated::
-        This function is deprecated. Use `structlog.get_logger()` instead
-        with explicit `.bind()` for context. This follows structlog best practices.
-
-        Migration example:
-            # OLD
-            from infrastructure.logging import get_module_logger
-            logger = get_module_logger()
-
-            # NEW (best practice)
-            import structlog
-            logger = structlog.get_logger()
-            log = logger.bind(component="my_module")  # explicit context
-
-    Returns:
-        Configured logger instance with module context
-    """
-    import warnings
-    import inspect
-
-    warnings.warn(
-        "get_module_logger() is deprecated. Use structlog.get_logger() with "
-        "explicit .bind() for context instead. See structlog best practices.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-
-    # Auto-detect calling module for backward compatibility
-    current_frame = inspect.currentframe()
-    if current_frame is None:
-        return structlog.get_logger()
-
-    frame = current_frame.f_back
-    if frame is None:
-        return structlog.get_logger()
-
-    module = inspect.getmodule(frame)
-    if module:
-        module_name = module.__name__
-        parts = module_name.split(".")
-        context = {
-            "component": parts[-1],
-            "module_path": module_name,
-        }
-        return structlog.get_logger().bind(**context)
-
-    return structlog.get_logger().bind(component="unknown")

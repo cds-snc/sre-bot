@@ -19,8 +19,9 @@ class WebhookPayload(BaseModel):
     username: str | None = None
     parse: str | None = None
 
-    class Config:
-        extra = "forbid"
+    model_config = {
+        "extra": "forbid",
+    }
 
 
 class AwsSnsPayload(BaseModel):
@@ -37,8 +38,9 @@ class AwsSnsPayload(BaseModel):
     Subject: str | None = None
     UnsubscribeURL: str | None = None
 
-    class Config:
-        extra = "forbid"
+    model_config = {
+        "extra": "forbid",
+    }
 
 
 class AccessRequest(BaseModel):
@@ -68,5 +70,6 @@ class WebhookResult(BaseModel):
     payload: WebhookPayload | None = None
     message: str | None = None
 
-    class Config:
-        extra = "forbid"
+    model_config = {
+        "extra": "forbid",
+    }

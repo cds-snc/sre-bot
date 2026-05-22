@@ -16,10 +16,6 @@ Public API:
     - set_correlation_id(): Set correlation ID in context
     - clear_request_context(): Clear all request context
 
-Deprecated (backward compatibility only):
-    - get_module_logger(): DEPRECATED - Use structlog.get_logger() instead
-    - logger: DEPRECATED - Use structlog.get_logger() instead
-
 Formatters:
     - add_app_info(): Processor to add app name/version
     - mask_sensitive_data(): Processor to redact sensitive fields
@@ -51,8 +47,6 @@ Example (Best Practice):
 # Core logging setup
 from infrastructure.logging.setup import (
     configure_logging,
-    # Deprecated - kept for backward compatibility
-    get_module_logger,
 )
 
 # Request context binding
@@ -75,8 +69,6 @@ from infrastructure.logging.formatters import (
 __all__ = [
     # Setup
     "configure_logging",
-    # Deprecated - backward compatibility only
-    "get_module_logger",
     # Context
     "bind_request_context",
     "get_correlation_id",

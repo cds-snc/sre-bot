@@ -3,9 +3,9 @@
 import re
 from functools import reduce
 
-from core.logging import get_module_logger
+from structlog import get_logger
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def filter_by_condition(item_list, condition):
@@ -35,12 +35,13 @@ def get_nested_value(dictionary, key):
     Returns:
         The value of the nested key in the dictionary, or None if the key is not found.
     """
+    log = logger.bind(key=key)
     if key in dictionary:
         return dictionary[key]
     try:
         return reduce(dict.get, key.split("."), dictionary)
     except TypeError:
-        logger.exception("error_getting_nested_value", key=key, dictionary=dictionary)
+        log.exception("error_getting_nested_value", dictionary=dictionary)
         return None
 
 

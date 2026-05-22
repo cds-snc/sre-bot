@@ -15,7 +15,7 @@ from infrastructure.i18n.models import Locale, TranslationKey
 from infrastructure.i18n.service import TranslationService
 from infrastructure.i18n.translator import Translator
 
-logger = structlog.get_logger().bind(component="i18n.factory")
+logger = structlog.get_logger()
 
 
 def create_translator(

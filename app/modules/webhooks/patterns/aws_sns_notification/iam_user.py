@@ -1,12 +1,10 @@
 import re
 from typing import Dict, List, Union
 
-from core.logging import get_module_logger
-from models.webhooks import AwsSnsPayload
-from modules.webhooks.aws_sns_notification import AwsNotificationPattern
 from slack_sdk import WebClient
 
-logger = get_module_logger()
+from models.webhooks import AwsSnsPayload
+from modules.webhooks.aws_sns_notification import AwsNotificationPattern
 
 
 def handle_iam_user_notification(

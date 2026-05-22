@@ -1,4 +1,4 @@
-from unittest.mock import ANY, patch
+from unittest.mock import ANY, MagicMock, patch
 
 from modules.slack import webhooks
 
@@ -337,17 +337,24 @@ def test_validate_string_payload_same_params_in_multiple_models_returns_first_fo
     assert model_utils_mock.has_parameters_in_model.call_count == 4
 
 
-def test_validate_string_payload_type_error_loading_json(caplog):
-    with caplog.at_level("WARNING"):
-        assert webhooks.validate_string_payload_type("{") == (None, None)
-    assert "Invalid JSON payload" in caplog.text
+@patch("modules.slack.webhooks.logger")
+def test_validate_string_payload_type_error_loading_json(logger_mock):
+    assert webhooks.validate_string_payload_type("{") == (None, None)
+    logger_mock.warning.assert_called_with(
+        "string_payload_validation_error",
+        error="Invalid JSON payload",
+    )
 
 
-def test_validate_string_payload_type_unknown_payload_type(caplog):
-    with caplog.at_level("WARNING"):
-        assert webhooks.validate_string_payload_type('{"type": "unknown"}') == (
-            None,
-            None,
-        )
+@patch("modules.slack.webhooks.logger")
+def test_validate_string_payload_type_unknown_payload_type(logger_mock):
+    assert webhooks.validate_string_payload_type('{"type": "unknown"}') == (
+        None,
+        None,
+    )
     warning_message = "Unknown payload type"
-    assert warning_message in caplog.text
+    logger_mock.warning.assert_called_with(
+        "string_payload_validation_error",
+        error=warning_message,
+        payload='{"type": "unknown"}',
+    )

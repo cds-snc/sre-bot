@@ -1,9 +1,11 @@
-from typing import Any, Dict, List, Optional, Type, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Type
+
 from pydantic import BaseModel, ValidationError
-from core.logging import get_module_logger
+from structlog import get_logger
+
 from modules.ops.notifications import log_ops_message
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def get_parameters_from_model(model: Type[BaseModel]) -> List[str]:

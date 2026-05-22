@@ -2,20 +2,17 @@
 
 Tests cover:
 - configure_logging function
-- get_module_logger function (deprecated)
 - Test logging suppression in test environment
 """
 
 import logging
-import warnings
 
 import pytest
 import structlog
 
 from infrastructure.logging.setup import (
-    configure_logging,
-    get_module_logger,
     _is_test_environment,
+    configure_logging,
 )
 
 
@@ -91,49 +88,6 @@ class TestConfigureLogging:
         root_logger = logging.getLogger()
         # Level should be CRITICAL + 1 (51) to suppress all output
         assert root_logger.level >= logging.CRITICAL
-
-
-@pytest.mark.unit
-class TestGetModuleLogger:
-    """Test suite for get_module_logger function (deprecated)."""
-
-    def test_get_module_logger_returns_bound_logger(self, mock_settings):
-        """get_module_logger returns a BoundLogger with expected methods."""
-        configure_logging(settings=mock_settings)
-
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            logger = get_module_logger()
-
-            # Should emit deprecation warning
-            assert len(w) == 1
-            assert issubclass(w[0].category, DeprecationWarning)
-            assert "deprecated" in str(w[0].message).lower()
-
-        assert logger is not None
-        assert hasattr(logger, "info")
-        assert hasattr(logger, "bind")
-
-    def test_get_module_logger_emits_deprecation_warning(self, mock_settings):
-        """get_module_logger emits DeprecationWarning."""
-        configure_logging(settings=mock_settings)
-
-        with pytest.warns(DeprecationWarning, match="deprecated"):
-            get_module_logger()
-
-    def test_get_module_logger_still_works(self, mock_settings):
-        """get_module_logger still returns functional logger for backward compat."""
-        configure_logging(settings=mock_settings)
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            logger = get_module_logger()
-
-        # Should be able to call logging methods
-        assert hasattr(logger, "info")
-        assert hasattr(logger, "debug")
-        assert hasattr(logger, "warning")
-        assert hasattr(logger, "error")
 
 
 @pytest.mark.unit

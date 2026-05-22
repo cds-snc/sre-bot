@@ -52,6 +52,8 @@ def test_create_webhook_with_existing_webhook(create_webhook_mock, logger_mock):
     body = {"user": {"id": "user"}}
     client = MagicMock()
     say = MagicMock()
+    bound_logger = MagicMock()
+    logger_mock.bind.return_value = bound_logger
     webhooks_create.handle_create_webhook_action(
         ack,
         view,
@@ -65,7 +67,7 @@ def test_create_webhook_with_existing_webhook(create_webhook_mock, logger_mock):
         "foo",
         "alert",
     )
-    logger_mock.info.assert_called_with(
+    bound_logger.info.assert_called_with(
         "webhook_creation_success",
         webhook_id="id",
         webhook_url="https://sre-bot.cdssandbox.xyz/hook/id",
@@ -96,6 +98,8 @@ def test_create_webhook_with_creation_error(create_webhook_mock, logger_mock):
     body = {"user": {"id": "user"}}
     client = MagicMock()
     say = MagicMock()
+    bound_logger = MagicMock()
+    logger_mock.bind.return_value = bound_logger
     webhooks_create.handle_create_webhook_action(
         ack,
         view,
@@ -109,7 +113,7 @@ def test_create_webhook_with_creation_error(create_webhook_mock, logger_mock):
         "foo",
         "alert",
     )
-    logger_mock.error.assert_called_with(
+    bound_logger.error.assert_called_with(
         "webhook_creation_failure", channel="channel", user="user", name="foo"
     )
 

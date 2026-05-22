@@ -1,10 +1,13 @@
 from unittest.mock import MagicMock, call, patch
+
 from modules.provisioning import entities
 
 
 @patch("modules.provisioning.entities.log_to_sentinel")
 @patch("modules.provisioning.entities.logger")
 def test_provision_entities_success(mock_logger, mock_log_to_sentinel):
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     users_list = [{"name": "user1"}, {"name": "user2"}, {"name": "user3"}]
     mock_function = MagicMock()
     mock_function.return_value = True
@@ -57,8 +60,8 @@ def test_provision_entities_success(mock_logger, mock_log_to_sentinel):
         ),
     ]
 
-    mock_logger.info.assert_has_calls(info_calls)
-    mock_logger.error.assert_not_called()
+    bound_logger.info.assert_has_calls(info_calls)
+    bound_logger.error.assert_not_called()
     mock_log_to_sentinel.assert_called()
 
 
@@ -66,6 +69,8 @@ def test_provision_entities_success(mock_logger, mock_log_to_sentinel):
 @patch("modules.provisioning.entities.logger")
 def test_provision_entities_failure(mock_logger, mock_log_to_sentinel):
     mock_function = MagicMock()
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     users_list = [{"name": "user1"}, {"name": "user2"}, {"name": "user3"}]
     mock_function.side_effect = [True, False, True]
 
@@ -111,8 +116,8 @@ def test_provision_entities_failure(mock_logger, mock_log_to_sentinel):
         ),
     ]
 
-    mock_logger.info.assert_has_calls(info_calls)
-    mock_logger.error.assert_has_calls(
+    bound_logger.info.assert_has_calls(info_calls)
+    bound_logger.error.assert_has_calls(
         [
             call(
                 "provision_entity_failed",
@@ -129,6 +134,8 @@ def test_provision_entities_failure(mock_logger, mock_log_to_sentinel):
 @patch("modules.provisioning.entities.log_to_sentinel")
 @patch("modules.provisioning.entities.logger")
 def test_provision_entities_empty_list(mock_logger, mock_log_to_sentinel):
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     users_list = []
     mock_function = MagicMock()
     result = entities.provision_entities(
@@ -141,7 +148,7 @@ def test_provision_entities_empty_list(mock_logger, mock_log_to_sentinel):
 
     assert len(result) == 0
     assert mock_function.call_count == 0
-    mock_logger.info.assert_has_calls(
+    bound_logger.info.assert_has_calls(
         [
             call(
                 "provision_entities_no_entities_to_process",
@@ -151,7 +158,7 @@ def test_provision_entities_empty_list(mock_logger, mock_log_to_sentinel):
             )
         ]
     )
-    mock_logger.error.assert_not_called()
+    bound_logger.error.assert_not_called()
     mock_log_to_sentinel.assert_not_called()
 
 
@@ -161,7 +168,8 @@ def test_provision_entities_execute_false(mock_logger, mock_log_to_sentinel):
     mock_function = MagicMock()
     users_list = [{"name": "user1"}, {"name": "user2"}, {"name": "user3"}]
     mock_function.side_effect = [True, True, True]
-
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     result = entities.provision_entities(
         mock_function,
         users_list,
@@ -212,5 +220,5 @@ def test_provision_entities_execute_false(mock_logger, mock_log_to_sentinel):
         ),
     ]
 
-    mock_logger.info.assert_has_calls(info_calls)
+    bound_logger.info.assert_has_calls(info_calls)
     mock_log_to_sentinel.assert_called()

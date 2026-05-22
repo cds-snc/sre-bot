@@ -1,4 +1,5 @@
-from unittest.mock import patch, call
+from unittest.mock import MagicMock, call, patch
+
 from modules.provisioning import groups
 
 
@@ -190,6 +191,8 @@ def test_log_groups(
     mock_logger,
     aws_groups_w_users,
 ):
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     groups_w_members = aws_groups_w_users(3, 3)
     mock_filters.get_nested_value.side_effect = [
         "group-name1",
@@ -287,7 +290,7 @@ def test_log_groups(
             member_name="user-email3@test.com",
         ),
     ]
-    mock_logger.info.assert_has_calls(expected_info_messages)
+    bound_logger.info.assert_has_calls(expected_info_messages)
 
 
 @patch("modules.provisioning.groups.logger")
@@ -297,6 +300,8 @@ def test_log_groups_no_groups(
     mock_logger,
     aws_groups_w_users,
 ):
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     groups_w_members = []
     groups.log_groups(
         groups_w_members,
@@ -308,7 +313,7 @@ def test_log_groups_no_groups(
     expected_info_messages = [
         call("log_groups_summary", integration_name="AWS", groups_count=0)
     ]
-    mock_logger.info.assert_has_calls(expected_info_messages)
+    bound_logger.info.assert_has_calls(expected_info_messages)
 
 
 @patch("modules.provisioning.groups.logger")
@@ -318,6 +323,8 @@ def test_log_groups_missing_members_key(
     mock_logger,
     aws_groups_w_users,
 ):
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     groups_w_members = aws_groups_w_users(3, 3)
     mock_filters.get_nested_value.side_effect = [
         "group-name1",
@@ -345,8 +352,8 @@ def test_log_groups_missing_members_key(
             missing_key="members",
         )
     ]
-    mock_logger.info.assert_has_calls(expected_info_messages)
-    mock_logger.warning.assert_has_calls(expected_warn_messages)
+    bound_logger.info.assert_has_calls(expected_info_messages)
+    bound_logger.warning.assert_has_calls(expected_warn_messages)
 
 
 @patch("modules.provisioning.groups.logger")
@@ -356,6 +363,8 @@ def test_log_groups_missing_group_display_key(
     mock_logger,
     aws_groups_w_users,
 ):
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     groups_w_members = aws_groups_w_users(3, 3)
     mock_filters.get_nested_value.side_effect = [
         None,
@@ -462,8 +471,8 @@ def test_log_groups_missing_group_display_key(
         )
     ]
 
-    mock_logger.info.assert_has_calls(expected_info_messages)
-    mock_logger.warning.assert_has_calls(expected_warn_messages)
+    bound_logger.info.assert_has_calls(expected_info_messages)
+    bound_logger.warning.assert_has_calls(expected_warn_messages)
 
 
 @patch("modules.provisioning.groups.logger")
@@ -473,6 +482,8 @@ def test_log_groups_no_group_members_display_keys(
     mock_logger,
     aws_groups_w_users,
 ):
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     groups_w_members = aws_groups_w_users(3, 3)
     mock_filters.get_nested_value.side_effect = [
         "group-name1",
@@ -579,5 +590,5 @@ def test_log_groups_no_group_members_display_keys(
         )
     ]
 
-    mock_logger.info.assert_has_calls(expected_info_messages)
-    mock_logger.warning.assert_has_calls(expected_warn_messages)
+    bound_logger.info.assert_has_calls(expected_info_messages)
+    bound_logger.warning.assert_has_calls(expected_warn_messages)

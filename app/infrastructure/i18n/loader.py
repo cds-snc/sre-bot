@@ -12,8 +12,7 @@ import yaml
 import structlog
 from infrastructure.i18n.models import Locale, TranslationCatalog
 
-logger = structlog.get_logger().bind(component="i18n.loader")
-
+logger = structlog.get_logger()
 
 class TranslationLoader(ABC):
     """Abstract base for translation loaders.
@@ -79,9 +78,8 @@ class YAMLTranslationLoader(TranslationLoader):
                 f"Translations directory not found: {self.translations_dir}"
             )
 
-        self.log = logger.bind(translations_dir=str(self.translations_dir))
-        log = self.log.bind(use_cache=use_cache)
-        log.info("initialized_yaml_loader")
+        self.log = logger.bind(translations_dir=str(self.translations_dir), use_cache=use_cache)
+        self.log.info("initialized_yaml_loader")
 
     def load(self, locale: Locale) -> TranslationCatalog:
         """Load translations for a locale from YAML files.

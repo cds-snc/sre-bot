@@ -1,13 +1,12 @@
 import i18n  # type: ignore
-
 from slack_bolt import Ack, App, Respond
 from slack_sdk import WebClient
-from integrations.google_workspace import google_drive
-from integrations.slack import users as slack_users, commands as slack_commands
+from structlog import get_logger
 
 from core.config import settings
-from core.logging import get_module_logger
-
+from integrations.google_workspace import google_drive
+from integrations.slack import commands as slack_commands
+from integrations.slack import users as slack_users
 
 PREFIX = settings.PREFIX
 BOT_EMAIL = settings.google_workspace.SRE_BOT_EMAIL
@@ -38,7 +37,7 @@ i18n.set("locale", "en-US")
 i18n.set("fallback", "en-CA")
 
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def register(bot: App):
@@ -60,20 +59,22 @@ def role_command(
 
     # acknowledge to slack that the command was received
     ack()
-
-    logger.info(
-        "talent_role_command_received",
+    log = logger.bind(
         command=command["text"],
         user_id=command["user_id"],
         user_name=command["user_name"],
         channel_id=command["channel_id"],
         channel_name=command["channel_name"],
     )
+
+    log.info(
+        "talent_role_command_received",
+    )
     # get the user id and set the locale for the user
     user_id = body["user_id"]
     # get the user locale from slack.
     update_locale(slack_users.get_user_locale(client, user_id))
-    logger.info(
+    log.info(
         "slack_user_locale_detected", user_id=user_id, locale=i18n.get("locale")
     )
 
@@ -193,9 +194,12 @@ def role_modal_view(locale):
 def role_view_handler(ack, body, say, client):
     ack()
 
+    log = logger.bind(
+        user_id=body["user"]["id"],
+    )
     def log_document_created(document_name, document_id):
         """Log the creation of a document with a consistent format."""
-        logger.info(
+        log.info(
             "talent_role_document_created",
             document_name=document_name,
             document_id=document_id,
@@ -205,7 +209,7 @@ def role_view_handler(ack, body, say, client):
     private_channel_name = body["view"]["state"]["values"]["channel_name"][
         "channel_name"
     ]["value"]
-    logger.info(
+    log.info(
         "talent_role_view_handler_called",
         role_name=role_name,
         private_channel_name=private_channel_name,
@@ -227,13 +231,13 @@ def role_view_handler(ack, body, say, client):
     if isinstance(folder, dict):
         folder_id = folder.get("id", None)
     else:
-        logger.error(
+        log.error(
             "talent_role_folder_creation_failed",
             folder_name=role_name,
         )
         return
 
-    logger.info(
+    log.info(
         "talent_role_folder_created",
         folder_name=role_name,
         folder_id=folder_id,
@@ -312,7 +316,7 @@ def role_view_handler(ack, body, say, client):
 
     channel_name = response["channel"]["name"]
     channel_id = response["channel"]["id"]
-    logger.info(
+    log.info(
         "talent_role_channel_created",
         channel_name=channel_name,
         channel_id=channel_id,

@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 from slack_sdk.errors import SlackApiError
+
 from modules.ops import notifications
 
 
@@ -10,12 +11,26 @@ from modules.ops import notifications
 def test_log_ops_message(mock_logger, mock_get_client):
     client = MagicMock()
     mock_get_client.return_value = client
+
+    # Patch logger.bind() to return a mock with .info/.error/.warning
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
+
     msg = "foo bar baz"
     notifications.log_ops_message(msg)
     client.chat_postMessage.assert_called_with(
         channel="C0123456ABC", text=msg, as_user=True
     )
-    mock_logger.info.assert_called_with("ops_message_logged", message=msg)
+    bound_logger.info.assert_any_call(
+        "ops_message_log_attempted",
+        channel_id="C0123456ABC",
+        ops_message=msg,
+    )
+    bound_logger.info.assert_any_call(
+        "ops_message_logged",
+        channel_id="C0123456ABC",
+        ops_message=msg,
+    )
 
 
 @patch("modules.ops.notifications.OPS_CHANNEL_ID", "C0123456ABC")
@@ -24,8 +39,14 @@ def test_log_ops_message(mock_logger, mock_get_client):
 def test_log_ops_message_no_client(mock_logger, mock_get_client):
     msg = "foo bar baz"
     mock_get_client.return_value = None
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
+
     notifications.log_ops_message(msg)
-    mock_logger.error.assert_called_with("slack_client_not_initialized")
+    bound_logger.error.assert_called_with(
+        "slack_client_not_initialized",
+        ops_message=msg,
+    )
 
 
 @patch("modules.ops.notifications.OPS_CHANNEL_ID", "")
@@ -34,8 +55,14 @@ def test_log_ops_message_no_client(mock_logger, mock_get_client):
 def test_log_ops_message_no_channel(mock_logger, mock_get_client):
     msg = "foo bar baz"
     mock_get_client.return_value = MagicMock()
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
+
     notifications.log_ops_message(msg)
-    mock_logger.warning.assert_called_with("ops_channel_id_not_configured")
+    bound_logger.warning.assert_called_with(
+        "ops_channel_id_not_configured",
+        ops_message=msg,
+    )
 
 
 @patch("modules.ops.notifications.OPS_CHANNEL_ID", "C0123456ABC")
@@ -44,6 +71,8 @@ def test_log_ops_message_no_channel(mock_logger, mock_get_client):
 def test_log_ops_message_slack_api_error(mock_logger, mock_get_client):
     client = MagicMock()
     mock_get_client.return_value = client
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
     msg = "foo bar baz"
     error_message = "Some Slack API error"
     mock_response = MagicMock()
@@ -54,8 +83,9 @@ def test_log_ops_message_slack_api_error(mock_logger, mock_get_client):
     client.chat_postMessage.assert_called_with(
         channel="C0123456ABC", text=msg, as_user=True
     )
-    mock_logger.error.assert_called_with(
+    bound_logger.error.assert_called_with(
         "ops_message_failed",
-        message=msg,
-        error=f"{error_message}\nThe server responded with: {mock_response}",
+        channel_id="C0123456ABC",
+        ops_message=msg,
+        error=str(SlackApiError(error_message, mock_response)),
     )

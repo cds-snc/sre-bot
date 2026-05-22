@@ -1,10 +1,10 @@
-from integrations.google_workspace import google_directory
+from structlog import get_logger
+
 from integrations.aws import identity_store
+from integrations.google_workspace import google_directory
 from utils import filters
-from core.logging import get_module_logger
 
-
-logger = get_module_logger()
+logger = get_logger()
 
 
 def get_groups_from_integration(
@@ -29,6 +29,10 @@ def get_groups_from_integration(
     Returns:
         list: A list of groups with members, empty list if no groups are found.
     """
+    log = logger.bind(
+        integration=integration_source,
+        operation="get_groups_from_integration",
+    )
     groups = []
     group_display_key = None
     members = None
@@ -37,7 +41,7 @@ def get_groups_from_integration(
     groups_dataframe = None
     match integration_source:
         case "google_groups":
-            logger.info(
+            log.info(
                 "get_groups_from_integration_started",
                 integration_source=integration_source,
                 service="Google Groups",
@@ -56,7 +60,7 @@ def get_groups_from_integration(
             members = "members"
             members_display_key = "primaryEmail"
         case "aws_identity_center":
-            logger.info(
+            log.info(
                 "get_groups_from_integration_started",
                 integration_source=integration_source,
                 service="AWS Identity Center",
@@ -101,26 +105,30 @@ def log_groups(
         groups (list): The list of groups to log.
         group_display_key (str, optional): The key to display in the logs. Defaults to None.
     """
+    log = logger.bind(
+        integration=integration_name,
+        operation="log_groups",
+    )
     if not group_display_key:
-        logger.warning(
+        log.warning(
             "log_groups_missing_display_key",
             integration_name=integration_name,
             missing_key="group_display_key",
         )
     if not members:
-        logger.warning(
+        log.warning(
             "log_groups_missing_members_key",
             integration_name=integration_name,
             missing_key="members",
         )
     if not members_display_key:
-        logger.warning(
+        log.warning(
             "log_groups_missing_display_key",
             integration_name=integration_name,
             missing_key="members_display_key",
         )
 
-    logger.info(
+    log.info(
         "log_groups_summary",
         integration_name=integration_name,
         groups_count=len(groups),
@@ -131,7 +139,7 @@ def log_groups(
         if not group_display_name:
             group_display_name = "<Group Name not found>"
         if group.get(members):
-            logger.info(
+            log.info(
                 "log_group_members",
                 integration_name=integration_name,
                 group_name=group_display_name,
@@ -143,14 +151,14 @@ def log_groups(
                 )
                 if not members_display_name:
                     members_display_name = "<User Name not found>"
-                logger.info(
+                log.info(
                     "log_group_member",
                     integration_name=integration_name,
                     group_name=group_display_name,
                     member_name=members_display_name,
                 )
         else:
-            logger.info(
+            log .info(
                 "log_group_no_members",
                 integration_name=integration_name,
                 group_name=group_display_name,

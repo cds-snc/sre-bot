@@ -1,18 +1,22 @@
 """Slack utilities for creating webhooks."""
 
 import re
-from modules.slack import webhooks
+
+from structlog import get_logger
+
 from core.config import settings
-from core.logging import get_module_logger
+from modules.slack import webhooks
 
 PREFIX = settings.PREFIX
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def handle_create_webhook_action(ack, view, body, client, say):
     ack()
-
+    log = logger.bind(
+        user_id=body["user"]["id"],
+    )
     errors = {}
 
     name = view["state"]["values"]["name"]["name"]["value"]
@@ -37,7 +41,7 @@ def handle_create_webhook_action(ack, view, body, client, say):
     if id:
         webhook_url = f"https://sre-bot.cdssandbox.xyz/hook/{id}"
         message = f"Webhook created with url: https://sre-bot.cdssandbox.xyz/hook/{id}"
-        logger.info(
+        log.info(
             "webhook_creation_success",
             webhook_id=id,
             webhook_url=webhook_url,
@@ -49,7 +53,7 @@ def handle_create_webhook_action(ack, view, body, client, say):
         say(channel=channel, text=f"<@{user}> created a new SRE-Bot webhook: {name}")
     else:
         message = "Something went wrong creating the webhook"
-        logger.error(
+        log.error(
             "webhook_creation_failure",
             channel=channel,
             user=user,

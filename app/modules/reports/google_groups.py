@@ -1,17 +1,18 @@
 import time
 from datetime import datetime
 
+from structlog import get_logger
+
 from core.config import settings
-from core.logging import get_module_logger
 from integrations.google_workspace import (
     google_directory,
-    sheets,
     google_drive,
+    sheets,
 )
 
 FOLDER_REPORTS_GOOGLE_GROUPS = settings.google_resources.google_groups_reports_folder_id
 
-logger = get_module_logger()
+logger = get_logger()
 
 
 def generate_report(args, respond):
@@ -20,28 +21,31 @@ def generate_report(args, respond):
 
 def generate_group_members_report(args, respond):
     """Generate a report of Google Groups members."""
+    log = logger.bind(
+        operation="generate_group_members_report",
+    )
     if not FOLDER_REPORTS_GOOGLE_GROUPS:
         respond("Google Drive folder for reports not set.")
         return
     exclude_groups = ["AWS-"]
-    logger.info(
+    log.info(
         "group_members_report_started",
         group="Google Groups",
     )
     filename = f"groups_report_{datetime.now().strftime('%Y-%m-%d')}"
-    logger.info("getting_group_file", filename=filename)
+    log.info("getting_group_file", filename=filename)
     files = google_drive.find_files_by_name(filename, FOLDER_REPORTS_GOOGLE_GROUPS)
 
     if len(files) == 0:
-        logger.info("file_not_found_creating_new_file", filename=filename)
+        log.info("file_not_found_creating_new_file", filename=filename)
         file = google_drive.create_file(
             filename, FOLDER_REPORTS_GOOGLE_GROUPS, "spreadsheet"
         )
     else:
         file = files[0]
-        logger.info("file_found", filename=filename, file=file)
+        log.info("file_found", filename=filename, file=file)
 
-    logger.info("getting_google_groups")
+    log.info("getting_google_groups")
     groups = google_directory.list_groups()
     groups = [
         group
@@ -53,10 +57,10 @@ def generate_group_members_report(args, respond):
         respond("No groups found.")
         return
 
-    logger.info("groups_found", count=len(groups))
+    log.info("groups_found", count=len(groups))
     groups_with_members = []
     for _index, group in enumerate(groups):
-        logger.info(
+        log.info(
             "processing_group",
             group_email=group["email"],
         )
@@ -66,7 +70,7 @@ def generate_group_members_report(args, respond):
 
     for group in groups_with_members:
         group_sheet_name = f"{group['name']}"
-        logger.info("processing_group_sheet", group=group_sheet_name)
+        log.info("processing_group_sheet", group=group_sheet_name)
         if len(group_sheet_name) > 50:
             group_sheet_name = group_sheet_name[:50]
 
@@ -75,7 +79,7 @@ def generate_group_members_report(args, respond):
         except Exception:
             sheet = None
         if sheet:
-            logger.info("sheet_found", sheet=sheet)
+            log.info("sheet_found", sheet=sheet)
         else:
             try:
                 request = {
@@ -91,9 +95,9 @@ def generate_group_members_report(args, respond):
                 }
                 sheet = sheets.batch_update(file["id"], request)
                 if sheet:
-                    logger.info("sheet_created", sheet=group_sheet_name)
+                    log.info("sheet_created", sheet=group_sheet_name)
             except Exception as e:
-                logger.error("sheet_creation_failed", error=str(e))
+                log.error("sheet_creation_failed", error=str(e))
 
         values = [["Group Name", group_sheet_name], ["Email", "Role"]]
         group_sheet_name = f"{group_sheet_name}!A1"
@@ -105,7 +109,7 @@ def generate_group_members_report(args, respond):
             values,
         )
         if updated_sheet:
-            logger.info("sheet_updated", sheet=group_sheet_name)
+            log.info("sheet_updated", sheet=group_sheet_name)
 
         time.sleep(1.1)
 

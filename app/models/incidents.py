@@ -30,8 +30,9 @@ class Incident(BaseModel):
     retrospective_url: Optional[str] = None
     incident_updates: Optional[List[str | dict]] = []
 
-    class Config:  # noqa
-        extra = "forbid"
+    model_config = {
+        "extra": "forbid",
+    }
 
 
 class IncidentPayload(BaseModel):
@@ -48,5 +49,6 @@ class IncidentPayload(BaseModel):
     severity: Optional[str] = None
     source_alert_permalink: Optional[str] = None
 
-    class Config:  # noqa
-        extra = "forbid"
+    model_config = {
+        "extra": "forbid",
+    }
