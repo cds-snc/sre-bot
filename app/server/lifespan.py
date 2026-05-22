@@ -14,6 +14,7 @@ from infrastructure.configuration.infrastructure.server import (
     ServerSettings,
     get_server_settings,
 )
+from infrastructure.configuration.features.sre_ops import get_sre_ops_settings
 from infrastructure.directory import get_directory_provider
 from infrastructure.i18n import (
     I18nResourceRegistry,
@@ -208,6 +209,7 @@ def _initialize_translation_service(
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     server_settings = get_server_settings()
+    sre_ops_settings = get_sre_ops_settings()
     logger = _get_logger(settings)
 
     app.state.settings = settings
@@ -245,10 +247,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         _register_legacy_handlers(slack_app, logger)
         app.state.bot = slack_app
         app.state.socket_mode_handler = app.state.slack_provider.socket_mode_handler
+        if sre_ops_settings.SRE_OPS_CHANNEL_ID:
+            app.state.bot.client.chat_postMessage(
+                channel=sre_ops_settings.SRE_OPS_CHANNEL_ID,
+                text="SRE Bot has started up and is ready to receive commands.",
+            )
         if not _is_test_environment():
             scheduled_stop_event = _start_scheduled_tasks(slack_app, settings, logger)
         else:
             scheduled_stop_event = None
+
     else:
         logger.warning("slack_provider_app_unavailable", reason="initialization_failed")
         app.state.bot = None
