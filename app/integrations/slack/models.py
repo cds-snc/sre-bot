@@ -35,11 +35,6 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Type
 
-# try:
-#     from pydantic import BaseModel
-# except ImportError:
-#     BaseModel = None  # type: ignore
-
 
 class ArgumentType(str, Enum):
     """Supported argument types for parsing and validation."""
