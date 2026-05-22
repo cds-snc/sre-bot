@@ -25,21 +25,6 @@ from infrastructure.platforms.formatters import (
     SlackBlockKitFormatter,
     TeamsAdaptiveCardsFormatter,
 )
-from infrastructure.platforms.models import (
-    CardAction,
-    CardActionStyle,
-    CardDefinition,
-    CardElementType,
-    CardSection,
-    CommandPayload,
-    CommandResponse,
-    CommandDefinition,
-    HttpEndpointRequest,
-    HttpEndpointResponse,
-    ViewDefinition,
-    ViewField,
-    ViewSubmission,
-)
 from infrastructure.platforms.providers import (
     BasePlatformProvider,
     SlackPlatformProvider,
@@ -58,21 +43,4 @@ __all__ = [
     "SlackBlockKitFormatter",
     "TeamsAdaptiveCardsFormatter",
     "DiscordEmbedFormatter",
-    # Models - Command
-    "CommandPayload",
-    "CommandResponse",
-    "CommandDefinition",
-    # Models - View/Modal
-    "ViewField",
-    "ViewDefinition",
-    "ViewSubmission",
-    # Models - Interactive Cards
-    "CardElementType",
-    "CardActionStyle",
-    "CardAction",
-    "CardSection",
-    "CardDefinition",
-    # Models - HTTP
-    "HttpEndpointRequest",
-    "HttpEndpointResponse",
 ]

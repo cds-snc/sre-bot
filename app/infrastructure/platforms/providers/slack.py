@@ -19,17 +19,17 @@ from infrastructure.platforms.capabilities.models import (
     create_capability_declaration,
 )
 from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
-from infrastructure.platforms.models import (
-    CommandDefinition,
-    CommandPayload,
-    CommandResponse,
-)
 from infrastructure.platforms.parsing import CommandArgumentParser
 from infrastructure.platforms.providers.base import BasePlatformProvider
 from integrations.slack import LegacySlackBootstrap
 from integrations.slack.help import (
     SLACK_HELP_KEYWORDS,
     SlackHelpGenerator,
+)
+from integrations.slack.models import (
+    CommandDefinition,
+    CommandPayload,
+    CommandResponse,
 )
 from integrations.slack.settings import get_slack_settings
 

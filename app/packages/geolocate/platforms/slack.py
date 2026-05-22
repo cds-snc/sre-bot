@@ -6,8 +6,8 @@ import structlog
 
 from infrastructure.i18n import t
 from infrastructure.operations import OperationStatus
-from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.platforms.parsing import Argument, ArgumentType
+from integrations.slack.models import CommandPayload, CommandResponse
 from packages.geolocate.schemas import GeolocateResponse
 from packages.geolocate.service import geolocate_ip
 

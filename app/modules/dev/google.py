@@ -9,15 +9,15 @@ from typing import Any
 import structlog
 from structlog.stdlib import BoundLogger
 
+from infrastructure.directory import get_directory_provider
 from infrastructure.operations import OperationResult
-from infrastructure.platforms.models import CommandPayload
 from infrastructure.platforms.parsing import (
     Argument,
     ArgumentParsingError,
     ArgumentType,
     CommandArgumentParser,
 )
-from infrastructure.directory import get_directory_provider
+from integrations.slack.models import CommandPayload
 
 logger: BoundLogger = structlog.get_logger()
 

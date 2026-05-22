@@ -9,9 +9,9 @@ from typing import Any, Dict
 import structlog
 from slack_bolt import Ack, App, Respond
 
-from infrastructure.platforms.models import CommandPayload, CommandResponse
 from infrastructure.configuration import get_app_settings as get_settings
 from infrastructure.platforms.providers.slack import get_slack_provider
+from integrations.slack.models import CommandPayload, CommandResponse
 
 logger = structlog.get_logger()
 

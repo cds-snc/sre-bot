@@ -6,15 +6,18 @@ Registers all /sre dev subcommands (google, slack, stale, incident, load-inciden
 Only available in development environment (PREFIX=dev-).
 """
 
-import structlog
-from typing import TYPE_CHECKING, Callable, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Callable, Dict, List
 
-from infrastructure.platforms.models import CommandPayload, CommandResponse
+import structlog
+
 from infrastructure.configuration import get_settings
-from infrastructure.platforms.clients.slack import get_slack_client
+from integrations.slack import LegacySlackBootstrap
+from integrations.slack.models import CommandPayload, CommandResponse
 from modules.dev import (
     google,
     incident,
+)
+from modules.dev import (
     slack as slack_dev,
 )
 
@@ -23,6 +26,7 @@ if TYPE_CHECKING:
 
 
 logger = structlog.get_logger()
+client = LegacySlackBootstrap().create_app().client
 
 
 def _require_dev_environment(payload: CommandPayload) -> CommandResponse | None:
@@ -66,10 +70,6 @@ def _call_legacy_handler(
     def capture_respond(text: str | None = None, **kwargs):
         if text:
             captured_responses.append(text)
-
-    # Get Slack client
-    slack_facade = get_slack_client()
-    client = slack_facade.raw_client
 
     # Build legacy body dict from payload
     body = {
@@ -135,9 +135,6 @@ def handle_stale_dev_command(payload: CommandPayload) -> CommandResponse:
 
     if error := _require_dev_environment(payload):
         return error
-
-    slack_facade = get_slack_client()
-    client = slack_facade.raw_client
 
     text = """👋  Hi! There have been no updates in this incident channel for 14 days! Consider scheduling a retro or archiving it.
 Bonjour! Il n'y a pas eu de mise à jour dans ce canal d'incident depuis 14 jours. Pensez à planifier une rétro ou à l'archiver."""

@@ -15,7 +15,7 @@ from infrastructure.configuration.infrastructure.platforms import (
 )
 from infrastructure.platforms.formatters.slack import SlackBlockKitFormatter
 from infrastructure.platforms.providers.slack import SlackPlatformProvider
-from infrastructure.platforms.models import CommandPayload, CommandResponse
+from integrations.slack.models import CommandPayload, CommandResponse
 
 
 @pytest.fixture
