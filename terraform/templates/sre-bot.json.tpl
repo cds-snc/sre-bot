@@ -39,7 +39,12 @@
       }
     ],
     "cpu": 0,
-    "environment": [],
+    "environment": [
+      {
+        "name": "BACKEND_URL",
+        "value": "${backend_url}"
+      }
+    ],
     "essential": true,
     "mountPoints": [],
     "systemControls": [],

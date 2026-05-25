@@ -15,6 +15,7 @@ data "template_file" "sre-bot" {
     awslogs-region                   = "ca-central-1"
     awslogs-stream-prefix            = "ecs-sre-bot"
     image                            = "${aws_ecr_repository.sre-bot.repository_url}:latest"
+    backend_url                      = "https://${aws_route53_zone.sre_bot.name}"
     fargate_cpu                      = var.fargate_cpu
     fargate_memory                   = var.fargate_memory
     aws_region                       = "ca-central-1"
