@@ -28,6 +28,32 @@ def test_get_geolocate_success(client):
         data = response.json()
         assert data["ip_address"] == "8.8.8.8"
         assert data["city"] == "Mountain View"
+        assert data["map_links"] == {
+            "openstreetmap": "https://www.openstreetmap.org/?mlat=37.386&mlon=-122.0838#map=12/37.386/-122.0838",
+            "opentopomap": "https://opentopomap.org/#map=12/37.386/-122.0838",
+        }
+
+
+@pytest.mark.integration
+def test_get_geolocate_success_without_coordinates_has_no_map_links(client):
+    """Test successful geolocation without coordinates omits map links."""
+    mock_result = OperationResult.success(
+        data={
+            "city": "Mountain View",
+            "country": "United States",
+            "country_code": "US",
+            "latitude": None,
+            "longitude": -122.0838,
+        }
+    )
+
+    with patch("packages.geolocate.routes.geolocate_ip") as mock_geolocate:
+        mock_geolocate.return_value = mock_result
+
+        response = client.get("/v1/geolocate?ip_address=8.8.8.8")
+
+        assert response.status_code == 200
+        assert response.json()["map_links"] is None
 
 
 @pytest.mark.integration
