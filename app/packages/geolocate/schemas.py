@@ -33,7 +33,9 @@ class OpenSourceMapLinks(BaseModel):
     opentopomap: str = Field(..., description="OpenTopoMap URL for the coordinates")
 
 
-def build_open_source_map_links(latitude: float, longitude: float) -> OpenSourceMapLinks:
+def build_open_source_map_links(
+    latitude: float, longitude: float
+) -> OpenSourceMapLinks:
     """Build links to open-source mapping sites for a coordinate pair."""
     return OpenSourceMapLinks(
         openstreetmap=f"https://www.openstreetmap.org/?mlat={latitude}&mlon={longitude}#map=12/{latitude}/{longitude}",
@@ -79,7 +81,11 @@ class GeolocateResponse(BaseModel):
     @model_validator(mode="after")
     def populate_map_links(self) -> "GeolocateResponse":
         """Populate map links when both coordinates are present."""
-        if self.latitude is not None and self.longitude is not None and self.map_links is None:
+        if (
+            self.latitude is not None
+            and self.longitude is not None
+            and self.map_links is None
+        ):
             self.map_links = build_open_source_map_links(
                 latitude=self.latitude,
                 longitude=self.longitude,
