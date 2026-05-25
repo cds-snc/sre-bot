@@ -8,15 +8,19 @@ test_app = create_test_app(geolocate.router)
 
 @patch("api.v1.routes.geolocate.maxmind.geolocate")
 def test_geolocate_success(mock_geolocate):
-    mock_geolocate.return_value = "country", "city", "latitude", "longitude"
+    mock_geolocate.return_value = "country", "city", 0, 0
     with TestClient(test_app) as client:
         response = client.get("/geolocate/111.111.111.111")
         assert response.status_code == 200
         assert response.json() == {
             "country": "country",
             "city": "city",
-            "latitude": "latitude",
-            "longitude": "longitude",
+            "latitude": 0,
+            "longitude": 0,
+            "map_links": {
+                "openstreetmap": "https://www.openstreetmap.org/?mlat=0&mlon=0#map=12/0/0",
+                "opentopomap": "https://opentopomap.org/#map=12/0/0",
+            },
         }
 
 

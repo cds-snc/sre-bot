@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from integrations import maxmind
 from infrastructure.security import get_limiter
+from packages.geolocate.schemas import build_open_source_map_links
 
 router = APIRouter(tags=["Geolocation"])
 limiter = get_limiter()
@@ -19,4 +20,8 @@ def geolocate(ip):
             "city": city,
             "latitude": latitude,
             "longitude": longitude,
+            "map_links": build_open_source_map_links(
+                latitude=latitude,
+                longitude=longitude,
+            ).model_dump(),
         }

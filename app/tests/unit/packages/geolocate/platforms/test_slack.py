@@ -36,6 +36,10 @@ def test_handle_geolocate_command_success():
         assert isinstance(result, CommandResponse)
         assert result.ephemeral is False
         assert result.blocks is not None
+        assert (
+            "<https://www.openstreetmap.org/?mlat=37.386&mlon=-122.0838#map=12/37.386/-122.0838|OpenStreetMap>"
+            in result.blocks[1]["fields"][2]["text"]
+        )
         mock_service.assert_called_once_with(ip_address="8.8.8.8")
 
 

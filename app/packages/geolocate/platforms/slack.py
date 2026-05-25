@@ -121,12 +121,17 @@ def _format_success_blocks(
     if data.postal_code:
         label = t("geolocate.result.postal_code_label", locale, "Postal Code")
         fields.append({"type": "mrkdwn", "text": f"*{label}:*\n{data.postal_code}"})
-    if data.latitude and data.longitude:
+    if data.latitude is not None and data.longitude is not None:
         label = t("geolocate.result.coordinates_label", locale, "Coordinates")
+        coordinates_text = f"{data.latitude}, {data.longitude}"
+        if data.map_links:
+            coordinates_text = (
+                f"{coordinates_text}\n<{data.map_links.openstreetmap}|OpenStreetMap>"
+            )
         fields.append(
             {
                 "type": "mrkdwn",
-                "text": f"*{label}:*\n{data.latitude}, {data.longitude}",
+                "text": f"*{label}:*\n{coordinates_text}",
             }
         )
     if data.time_zone:

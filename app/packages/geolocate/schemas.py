@@ -3,7 +3,7 @@
 import ipaddress
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class GeolocateRequest(BaseModel):
@@ -26,6 +26,21 @@ class GeolocateRequest(BaseModel):
             raise ValueError(f"Invalid IP address format: {v}")
 
 
+class OpenSourceMapLinks(BaseModel):
+    """Open-source map links for a coordinate pair."""
+
+    openstreetmap: str = Field(..., description="OpenStreetMap URL for the coordinates")
+    opentopomap: str = Field(..., description="OpenTopoMap URL for the coordinates")
+
+
+def build_open_source_map_links(latitude: float, longitude: float) -> OpenSourceMapLinks:
+    """Build links to open-source mapping sites for a coordinate pair."""
+    return OpenSourceMapLinks(
+        openstreetmap=f"https://www.openstreetmap.org/?mlat={latitude}&mlon={longitude}#map=12/{latitude}/{longitude}",
+        opentopomap=f"https://opentopomap.org/#map=12/{latitude}/{longitude}",
+    )
+
+
 class GeolocateResponse(BaseModel):
     """Response from IP geolocation."""
 
@@ -38,6 +53,10 @@ class GeolocateResponse(BaseModel):
                 "country_code": "US",
                 "latitude": 37.386,
                 "longitude": -122.0838,
+                "map_links": {
+                    "openstreetmap": "https://www.openstreetmap.org/?mlat=37.386&mlon=-122.0838#map=12/37.386/-122.0838",
+                    "opentopomap": "https://opentopomap.org/#map=12/37.386/-122.0838",
+                },
                 "postal_code": "94035",
                 "time_zone": "America/Los_Angeles",
             }
@@ -50,5 +69,19 @@ class GeolocateResponse(BaseModel):
     country_code: Optional[str] = Field(None, description="ISO country code")
     latitude: Optional[float] = Field(None, description="Latitude")
     longitude: Optional[float] = Field(None, description="Longitude")
+    map_links: Optional[OpenSourceMapLinks] = Field(
+        None,
+        description="Links to open-source mapping sites for the coordinates",
+    )
     postal_code: Optional[str] = Field(None, description="Postal/ZIP code")
     time_zone: Optional[str] = Field(None, description="IANA time zone")
+
+    @model_validator(mode="after")
+    def populate_map_links(self) -> "GeolocateResponse":
+        """Populate map links when both coordinates are present."""
+        if self.latitude is not None and self.longitude is not None and self.map_links is None:
+            self.map_links = build_open_source_map_links(
+                latitude=self.latitude,
+                longitude=self.longitude,
+            )
+        return self
