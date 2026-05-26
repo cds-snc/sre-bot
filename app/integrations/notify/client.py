@@ -7,12 +7,13 @@ import time
 import jwt
 import requests
 import structlog
-from core.config import settings
+
+from infrastructure.configuration.app import get_app_settings
+from infrastructure.configuration.integrations.notify import get_notify_settings
 
 logger = structlog.get_logger()
-NOTIFY_SRE_USER_NAME = settings.notify.NOTIFY_SRE_USER_NAME
-NOTIFY_SRE_CLIENT_SECRET = settings.notify.NOTIFY_SRE_CLIENT_SECRET
-NOTIFY_API_URL = settings.notify.NOTIFY_API_URL
+settings = get_app_settings()
+notify_settings = get_notify_settings()
 
 
 # generate the epoch seconds for the jwt token
@@ -61,8 +62,8 @@ def create_jwt_token(secret, client_id):
 def create_authorization_header():
     """Function to create the authorization header for the Notify API"""
     # get the client_id and secret from the environment variables
-    client_id = NOTIFY_SRE_USER_NAME
-    secret = NOTIFY_SRE_CLIENT_SECRET
+    client_id = notify_settings.NOTIFY_SRE_USER_NAME
+    secret = notify_settings.NOTIFY_SRE_CLIENT_SECRET
 
     # If the client_id or secret is missing, raise an error
     if not client_id:
@@ -115,7 +116,7 @@ def revoke_api_key(api_key: str, api_type: str, github_repo: str, source: str) -
     if not settings.is_production:
         log.info("revoke_api_key_skipped", api_key=api_key)
         return "error"
-    url = NOTIFY_API_URL
+    url = notify_settings.NOTIFY_API_URL
 
     if url is None:
         log.error("revoke_api_key_error", error="NOTIFY_API_URL is missing")
