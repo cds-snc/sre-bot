@@ -252,6 +252,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 channel=sre_ops_settings.SRE_OPS_CHANNEL_ID,
                 text="SRE Bot has started up and is ready to receive commands.",
             )
+        if server_settings.SRE_TEST_CHANNEL_ID:
+            app.state.bot.client.chat_postMessage(
+                channel=server_settings.SRE_TEST_CHANNEL_ID,
+                text="SRE Bot has started up in test mode.",
+            )
         if not _is_test_environment():
             scheduled_stop_event = _start_scheduled_tasks(slack_app, settings, logger)
         else:
