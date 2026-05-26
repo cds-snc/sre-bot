@@ -3,14 +3,14 @@ from datetime import datetime
 
 from structlog import get_logger
 
-from core.config import settings
+from infrastructure.configuration.integrations.google import get_google_resources_config
 from integrations.google_workspace import (
     google_directory,
     google_drive,
     sheets,
 )
 
-FOLDER_REPORTS_GOOGLE_GROUPS = settings.google_resources.google_groups_reports_folder_id
+FOLDER_REPORTS_GOOGLE_GROUPS = get_google_resources_config().google_groups_reports_folder_id
 
 logger = get_logger()
 
