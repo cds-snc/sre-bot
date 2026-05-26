@@ -4,25 +4,30 @@ from typing import Dict, List, Union
 from slack_sdk import WebClient
 from structlog import get_logger
 
-from core.config import settings
+from infrastructure.configuration.app import get_app_settings
+from infrastructure.configuration.infrastructure.server import get_server_settings
 from integrations import notify
 from models.webhooks import AwsSnsPayload
 from modules.webhooks.aws_sns_notification import AwsNotificationPattern
 
 logger = get_logger()
-NOTIFY_OPS_CHANNEL_ID = settings.server.NOTIFY_OPS_CHANNEL_ID
+app_settings = get_app_settings()
+server_settings = get_server_settings()
 
 
 def send_message_to_notify_channel(client: WebClient, blocks: List[Dict]):
     """Send message to the notification ops channel."""
-    # Raise an exception if the NOTIFY_OPS_CHANNEL_ID is not set
-    assert NOTIFY_OPS_CHANNEL_ID, "NOTIFY_OPS_CHANNEL_ID is not set in the environment"
-
-    if not settings.is_production:
-        client.chat_postMessage(channel="C033L7RGCT0", blocks=blocks)
+    if not app_settings.is_production:
+        client.chat_postMessage(
+            channel=server_settings.SRE_TEST_CHANNEL_ID, blocks=blocks
+        )
     else:
+        if not server_settings.NOTIFY_OPS_CHANNEL_ID:
+            raise ValueError("NOTIFY_OPS_CHANNEL_ID is not set in server settings")
         # post the message to the notification channel
-        client.chat_postMessage(channel=NOTIFY_OPS_CHANNEL_ID, blocks=blocks)
+        client.chat_postMessage(
+            channel=server_settings.NOTIFY_OPS_CHANNEL_ID, blocks=blocks
+        )
 
 
 def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> List[Dict]:
