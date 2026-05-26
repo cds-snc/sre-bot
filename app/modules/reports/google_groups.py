@@ -10,7 +10,9 @@ from integrations.google_workspace import (
     sheets,
 )
 
-FOLDER_REPORTS_GOOGLE_GROUPS = get_google_resources_config().google_groups_reports_folder_id
+FOLDER_REPORTS_GOOGLE_GROUPS = (
+    get_google_resources_config().google_groups_reports_folder_id
+)
 
 logger = get_logger()
 
