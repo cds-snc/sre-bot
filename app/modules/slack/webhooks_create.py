@@ -4,10 +4,7 @@ import re
 
 from structlog import get_logger
 
-from core.config import settings
 from modules.slack import webhooks
-
-PREFIX = settings.PREFIX
 
 logger = get_logger()
 
