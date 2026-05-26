@@ -217,14 +217,14 @@ def mock_sns_signature_validation_disabled(monkeypatch):
     This ensures test payloads with fake signatures work.
 
     Since is_production is a read-only property, we monkeypatch the
-    entire settings object in the aws_sns module.
+    entire app_settings object in the aws_sns module.
     """
     mock_settings = MagicMock()
     # Make is_production return False so signature validation is skipped
     type(mock_settings).is_production = PropertyMock(return_value=False)
 
     monkeypatch.setattr(
-        "modules.webhooks.aws_sns.settings",
+        "modules.webhooks.aws_sns.app_settings",
         mock_settings,
     )
 
