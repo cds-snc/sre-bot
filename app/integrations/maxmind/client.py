@@ -3,10 +3,10 @@
 import geoip2.database
 import structlog
 from geoip2.errors import AddressNotFoundError, GeoIP2Error
-from core.config import settings
+from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
 
 logger = structlog.get_logger()
-MAXMIND_DB_PATH = settings.maxmind.MAXMIND_DB_PATH
+MAXMIND_DB_PATH = get_maxmind_settings().MAXMIND_DB_PATH
 
 
 def geolocate(ip) -> tuple | str:
