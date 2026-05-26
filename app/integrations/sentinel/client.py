@@ -1,20 +1,21 @@
 import base64
-from datetime import date, datetime, time, timezone
 import hashlib
 import hmac
 import json
+from datetime import date, datetime, time, timezone
 from typing import Any
 
 import requests
 import structlog
 
-from core.config import settings
+from infrastructure.configuration.integrations.sentinel import get_sentinel_settings
 from infrastructure.audit.models import AuditEvent
 
 logger = structlog.get_logger()
-SENTINEL_CUSTOMER_ID = settings.sentinel.SENTINEL_CUSTOMER_ID
-SENTINEL_LOG_TYPE = settings.sentinel.SENTINEL_LOG_TYPE
-SENTINEL_SHARED_KEY = settings.sentinel.SENTINEL_SHARED_KEY
+sentinel_settings = get_sentinel_settings()
+SENTINEL_CUSTOMER_ID = sentinel_settings.SENTINEL_CUSTOMER_ID
+SENTINEL_LOG_TYPE = sentinel_settings.SENTINEL_LOG_TYPE
+SENTINEL_SHARED_KEY = sentinel_settings.SENTINEL_SHARED_KEY
 
 
 def _json_default(value: Any) -> Any:
@@ -63,22 +64,10 @@ def build_signature(
     resource: str,
 ) -> str:
     x_headers = "x-ms-date:" + date
-    string_to_hash = (
-        method
-        + "\n"
-        + str(content_length)
-        + "\n"
-        + content_type
-        + "\n"
-        + x_headers
-        + "\n"
-        + resource
-    )
+    string_to_hash = method + "\n" + str(content_length) + "\n" + content_type + "\n" + x_headers + "\n" + resource
     bytes_to_hash = bytes(string_to_hash, encoding="utf-8")
     decoded_key = base64.b64decode(shared_key)
-    encoded_hash = base64.b64encode(
-        hmac.new(decoded_key, bytes_to_hash, digestmod=hashlib.sha256).digest()
-    ).decode()
+    encoded_hash = base64.b64encode(hmac.new(decoded_key, bytes_to_hash, digestmod=hashlib.sha256).digest()).decode()
     authorization = "SharedKey {}:{}".format(customer_id, encoded_hash)
     return authorization
 
@@ -102,13 +91,7 @@ def post_data(customer_id: str, shared_key: str, body: str, log_type: str) -> bo
         content_type,
         resource,
     )
-    uri = (
-        "https://"
-        + customer_id
-        + ".ods.opinsights.azure.com"
-        + resource
-        + "?api-version=2016-04-01"
-    )
+    uri = "https://" + customer_id + ".ods.opinsights.azure.com" + resource + "?api-version=2016-04-01"
 
     headers = {
         "content-type": content_type,
