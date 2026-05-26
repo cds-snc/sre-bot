@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Request
-from core.config import settings
+
+from infrastructure.configuration.app import get_app_settings
 from infrastructure.security import get_limiter
 
 router = APIRouter(tags=["System"])
 limiter = get_limiter()
+settings = get_app_settings()
 
 
 # Route53 uses this as a healthcheck every 30 seconds and the alb uses this as a checkpoint every 10 seconds.
