@@ -36,6 +36,7 @@ class ServerSettings(InfrastructureSettings):
 
     BACKEND_URL: str = Field(default="http://127.0.0.1:8000", alias="BACKEND_URL")
     NOTIFY_OPS_CHANNEL_ID: str = Field(default="", alias="NOTIFY_OPS_CHANNEL_ID")
+    SRE_TEST_CHANNEL_ID: str = Field(default="", alias="SRE_TEST_CHANNEL_ID")
     GOOGLE_CLIENT_ID: str | None = Field(default=None, alias="GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET: str | None = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
     SECRET_KEY: str | None = Field(default=None, alias="SESSION_SECRET_KEY")
