@@ -9,10 +9,10 @@ import i18n  # type: ignore
 import requests  # type: ignore
 from structlog import get_logger
 
-from core.config import settings
+from infrastructure.configuration.app import get_app_settings
 from integrations.slack import users as slack_users
 
-PREFIX = settings.PREFIX
+PREFIX = get_app_settings().PREFIX
 
 i18n.load_path.append("./locales/")
 i18n.set("locale", "en-US")

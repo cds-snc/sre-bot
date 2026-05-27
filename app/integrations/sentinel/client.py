@@ -1,20 +1,21 @@
 import base64
-from datetime import date, datetime, time, timezone
 import hashlib
 import hmac
 import json
+from datetime import date, datetime, time, timezone
 from typing import Any
 
 import requests
 import structlog
 
-from core.config import settings
+from infrastructure.configuration.integrations.sentinel import get_sentinel_settings
 from infrastructure.audit.models import AuditEvent
 
 logger = structlog.get_logger()
-SENTINEL_CUSTOMER_ID = settings.sentinel.SENTINEL_CUSTOMER_ID
-SENTINEL_LOG_TYPE = settings.sentinel.SENTINEL_LOG_TYPE
-SENTINEL_SHARED_KEY = settings.sentinel.SENTINEL_SHARED_KEY
+sentinel_settings = get_sentinel_settings()
+SENTINEL_CUSTOMER_ID = sentinel_settings.SENTINEL_CUSTOMER_ID
+SENTINEL_LOG_TYPE = sentinel_settings.SENTINEL_LOG_TYPE
+SENTINEL_SHARED_KEY = sentinel_settings.SENTINEL_SHARED_KEY
 
 
 def _json_default(value: Any) -> Any:

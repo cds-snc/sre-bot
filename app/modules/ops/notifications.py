@@ -1,10 +1,8 @@
 from slack_sdk.errors import SlackApiError
 from structlog import get_logger
 
-from core.config import settings
+from infrastructure.configuration.features.sre_ops import get_sre_ops_settings
 from integrations.slack.client import SlackClientManager
-
-OPS_CHANNEL_ID = settings.sre_ops.SRE_OPS_CHANNEL_ID
 
 logger = get_logger()
 
@@ -18,18 +16,19 @@ def log_ops_message(message: str):
         message (str): The message to be logged to the operations channel.
     """
     log = logger.bind(ops_message=message)
+    ops_channel_id = get_sre_ops_settings().SRE_OPS_CHANNEL_ID
     client = SlackClientManager.get_client()
     if not client:
         log.error(
             "slack_client_not_initialized",
         )
         return
-    if not OPS_CHANNEL_ID:
+    if not ops_channel_id:
         log.warning(
             "ops_channel_id_not_configured",
         )
         return
-    channel_id = OPS_CHANNEL_ID
+    channel_id = ops_channel_id
     log.info(
         "ops_message_log_attempted",
         channel_id=channel_id,

@@ -1,9 +1,24 @@
 import json
+from unittest.mock import MagicMock, patch
+
 import jwt
 import pytest
-from integrations.notify import client as notify
-from unittest.mock import patch, MagicMock
 from freezegun import freeze_time
+
+from integrations.notify import client as notify
+
+
+@pytest.fixture(autouse=True)
+def setup_notify_settings():
+    with patch(
+        "integrations.notify.client.get_notify_settings"
+    ) as mock_get_notify_settings:
+        mock_get_notify_settings.return_value = MagicMock(
+            NOTIFY_SRE_USER_NAME="test-client-id",
+            NOTIFY_SRE_CLIENT_SECRET="test-secret",
+            NOTIFY_API_URL="https://notify.example.com",
+        )
+        yield
 
 
 # helper function to decode the token for testing
@@ -55,7 +70,7 @@ def test_create_jwt_token_contains_correct_claims_headers():
     assert "pay" not in decoded_token
 
 
-@patch("jwt.encode")
+@patch("integrations.notify.client.jwt.encode")
 def test_create_jwt_token_with_bytes_return(mock_jwt_encode):
     mock_jwt_encode.return_value = b"encoded_token_as_bytes"
 
@@ -80,11 +95,14 @@ def test_token_contains_correct_iat():
 
 
 # Test that an assertion error is raised if the NOTIFY_SRE_USER_NAME is missing
-@patch.object(notify, "NOTIFY_SRE_USER_NAME", "")
-@patch.object(notify, "NOTIFY_SRE_CLIENT_SECRET", "foo")
+@patch("integrations.notify.client.notify_settings", new_callable=MagicMock)
 @patch("integrations.notify.client.logger")
 @patch("integrations.notify.client.create_jwt_token")
-def test_authorization_header_missing_client_id(jwt_token_mock, mock_logger):
+def test_authorization_header_missing_client_id(
+    mock_jwt_token, mock_logger, mock_notify_settings
+):
+    mock_notify_settings.NOTIFY_SRE_USER_NAME = ""
+    mock_notify_settings.NOTIFY_SRE_CLIENT_SECRET = "foo"
     with pytest.raises(ValueError) as err:
         notify.create_authorization_header()
     assert str(err.value) == "NOTIFY_SRE_USER_NAME is missing"
@@ -92,15 +110,18 @@ def test_authorization_header_missing_client_id(jwt_token_mock, mock_logger):
         "authorization_header_creation_failed",
         error="NOTIFY_SRE_USER_NAME is missing",
     )
-    jwt_token_mock.assert_not_called()
+    mock_jwt_token.assert_not_called()
 
 
 # Test that an assertion error is raised if the NOTIFY_SRE_CLIENT_SECRET is missing
-@patch.object(notify, "NOTIFY_SRE_USER_NAME", "foo")
-@patch.object(notify, "NOTIFY_SRE_CLIENT_SECRET", "")
+@patch("integrations.notify.client.notify_settings", new_callable=MagicMock)
 @patch("integrations.notify.client.logger")
 @patch("integrations.notify.client.create_jwt_token")
-def test_authorization_header_missing_secret(jwt_token_mock, mock_logger):
+def test_authorization_header_missing_secret(
+    mock_jwt_token, mock_logger, mock_notify_settings
+):
+    mock_notify_settings.NOTIFY_SRE_USER_NAME = "foo"
+    mock_notify_settings.NOTIFY_SRE_CLIENT_SECRET = ""
     with pytest.raises(ValueError) as err:
         notify.create_authorization_header()
     assert str(err.value) == "NOTIFY_SRE_CLIENT_SECRET is missing"
@@ -108,7 +129,7 @@ def test_authorization_header_missing_secret(jwt_token_mock, mock_logger):
         "authorization_header_creation_failed",
         error="NOTIFY_SRE_CLIENT_SECRET is missing",
     )
-    jwt_token_mock.assert_not_called()
+    mock_jwt_token.assert_not_called()
 
 
 # Test that the authorization header is created correctly and the correct header is generated
@@ -123,13 +144,15 @@ def test_successful_creation_of_header(mock_jwt_token, mock_logger):
     assert header_value == "Bearer mocked_jwt_token"
 
 
+@patch("integrations.notify.client.notify_settings", new_callable=MagicMock)
 @patch("integrations.notify.client.requests.post")
 @patch("integrations.notify.client.create_authorization_header")
-def test_post_event(mock_auth_header, mock_post):
+def test_post_event(mock_auth_header, mock_post, mock_notify_settings):
     # Set up mock return values
     mock_auth_header.return_value = ("Auth-Header", "auth-value")
     mock_response = mock_post.return_value
 
+    mock_notify_settings.NOTIFY_API_URL = "https://notify.example.com"
     # Test data
     test_url = "https://api.notify.example.com/endpoint"
     test_payload = {"key1": "value1", "key2": "value2"}
@@ -153,9 +176,10 @@ def test_post_event(mock_auth_header, mock_post):
 
 
 # Test the revoke_api_key function when NOTIFY_API_URL is None
-@patch.object(notify, "NOTIFY_API_URL", None)
+@patch("integrations.notify.client.notify_settings", new_callable=MagicMock)
 @patch("integrations.notify.client.logger")
-def test_revoke_api_key_missing_url(mock_logger):
+def test_revoke_api_key_missing_url(mock_logger, mock_notify_settings):
+    mock_notify_settings.NOTIFY_API_URL = None
     bound_logger_mock = mock_logger.bind.return_value
     result = notify.revoke_api_key("api-key-123", "api-type", "github.com/repo", "test")
 
@@ -166,15 +190,16 @@ def test_revoke_api_key_missing_url(mock_logger):
 
 
 # Test successful API key revocation (status code 201)
-@patch.object(notify, "NOTIFY_API_URL", "https://notify.example.com")
+@patch("integrations.notify.client.notify_settings", new_callable=MagicMock)
 @patch("integrations.notify.client.post_event")
 @patch("integrations.notify.client.logger")
-def test_revoke_api_key_success(mock_logger, mock_post_event):
+def test_revoke_api_key_success(mock_logger, mock_post_event, mock_notify_settings):
     # Mock successful response
     mock_response = MagicMock()
     mock_response.status_code = 201
     mock_post_event.return_value = mock_response
 
+    mock_notify_settings.NOTIFY_API_URL = "https://notify.example.com"
     # Test data
     api_key = "test-api-key-123"
     api_type = "test-type"
@@ -205,7 +230,6 @@ def test_revoke_api_key_success(mock_logger, mock_post_event):
 
 
 # Test failed API key revocation (non-201 status code)
-@patch.object(notify, "NOTIFY_API_URL", "https://notify.example.com")
 @patch("integrations.notify.client.post_event")
 @patch("integrations.notify.client.logger")
 def test_revoke_api_key_failure(mock_logger, mock_post_event):
@@ -235,10 +259,11 @@ def test_revoke_api_key_failure(mock_logger, mock_post_event):
 
 
 # Test API key not found response (status code 200)
-@patch.object(notify, "NOTIFY_API_URL", "https://notify.example.com")
+@patch("integrations.notify.client.notify_settings", new_callable=MagicMock)
 @patch("integrations.notify.client.post_event")
 @patch("integrations.notify.client.logger")
-def test_revoke_api_key_not_found(mock_logger, mock_post_event):
+def test_revoke_api_key_not_found(mock_logger, mock_post_event, mock_notify_settings):
+    mock_notify_settings.NOTIFY_API_URL = "https://notify.example.com"
     mock_response = MagicMock()
     mock_response.status_code = 200
     mock_post_event.return_value = mock_response

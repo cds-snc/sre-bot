@@ -1,10 +1,12 @@
 import json
-import structlog
 from urllib.request import Request, urlopen
-from core.config import settings
+
+import structlog
+
+from infrastructure.configuration.integrations.opsgenie import get_opsgenie_settings
 
 # Use the integrations API Key as the Opsgenie API Key
-OPSGENIE_KEY = settings.opsgenie.OPSGENIE_INTEGRATIONS_KEY
+OPSGENIE_KEY = get_opsgenie_settings().OPSGENIE_INTEGRATIONS_KEY
 logger = structlog.get_logger()
 
 

@@ -10,11 +10,12 @@ from sns_message_validator import (
 )
 from structlog import get_logger
 
-from core.config import settings
+from infrastructure.configuration.app import get_app_settings
 from models.webhooks import AwsSnsPayload, WebhookPayload, WebhookResult
 from modules.ops.notifications import log_ops_message
 from modules.webhooks.aws_sns_notification import process_aws_notification_payload
 
+app_settings = get_app_settings()
 logger = get_logger()
 sns_message_validator = SNSMessageValidator()
 
@@ -80,8 +81,7 @@ def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
     Returns:
         AwsSnsPayload: The validated AWS SNS payload.
     """
-
-    if not settings.is_production:
+    if not app_settings.is_production:
         return awsSnsPayload
     try:
         valid_payload = AwsSnsPayload.model_validate(awsSnsPayload)
