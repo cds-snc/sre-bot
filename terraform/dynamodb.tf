@@ -201,19 +201,22 @@ resource "aws_dynamodb_table" "sre_bot_retry_records" {
 
 # Define a KMS key to encrypt the backup.
 resource "aws_kms_key" "sre_bot_backup_vault_key" {
+  provider            = aws.core_services
   description         = "KMS key for DynamoDB backup"
   enable_key_rotation = true
 }
 
 # Create the backup vault.
 resource "aws_backup_vault" "sre_bot_backup_vault" {
+  provider    = aws.core_services
   name        = "sre-bot-dynamodb-backup-vault"
   kms_key_arn = aws_kms_key.sre_bot_backup_vault_key.arn
 }
 
 # Define a backup plan to back up the data. Backups will be performed daily at 1:00 AM Eastern Time, which is 6:00am UTC.
 resource "aws_backup_plan" "sre_bot_backup_plan" {
-  name = "sre-bot-dynamodb-backup-plan"
+  provider = aws.core_services
+  name     = "sre-bot-dynamodb-backup-plan"
   rule {
     rule_name         = "sre-bot-dynamodb-backup-rule"
     target_vault_name = aws_backup_vault.sre_bot_backup_vault.name
@@ -229,6 +232,7 @@ resource "aws_backup_plan" "sre_bot_backup_plan" {
 
 # Assign/Associate the backup plan to the DynamoDB table.
 resource "aws_backup_selection" "sre_bot_backup_selection" {
+  provider     = aws.core_services
   iam_role_arn = aws_iam_role.sre_bot_backup_role.arn
   name         = "sre-bot-dynamodb-backup-selection"
   plan_id      = aws_backup_plan.sre_bot_backup_plan.id
@@ -247,7 +251,8 @@ resource "aws_backup_selection" "sre_bot_backup_selection" {
 
 # Create an IAM role to allow AWS Backup to perform backups.
 resource "aws_iam_role" "sre_bot_backup_role" {
-  name = "sre-bot-dynamodb-backup-role"
+  provider = aws.core_services
+  name     = "sre-bot-dynamodb-backup-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -266,6 +271,7 @@ resource "aws_iam_role" "sre_bot_backup_role" {
 # Attach the default AWS Backup policy to the IAM Role 
 resource "aws_iam_policy_attachment" "sre_bot_backup_role_policy" {
   name       = "sre-bot-dynamodb-backup-role-policy"
+  provider   = aws.core_services
   roles      = [aws_iam_role.sre_bot_backup_role.name]
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup"
 }

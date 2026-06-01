@@ -1,5 +1,6 @@
 resource "aws_security_group" "sre_bot_load_balancer" {
   name        = "SRE Bot load balancer"
+  provider    = aws.core_services
   description = "Ingress - SRE Bot Load Balancer"
   vpc_id      = module.vpc.vpc_id
 
@@ -25,6 +26,7 @@ resource "aws_security_group" "sre_bot_load_balancer" {
 
 resource "aws_security_group" "ecs_tasks" {
   name        = "sre-bot-security-group"
+  provider    = aws.core_services
   description = "Allow inbound and outbout traffic for SRE Bot"
   vpc_id      = module.vpc.vpc_id
 

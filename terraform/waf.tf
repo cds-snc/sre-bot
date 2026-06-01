@@ -1,5 +1,6 @@
 resource "aws_wafv2_web_acl" "sre-bot" {
   name        = "sre-bot"
+  provider    = aws.core_services
   scope       = "REGIONAL"
   description = "WAF Web ACL for SRE Bot"
   default_action {
@@ -216,6 +217,7 @@ resource "aws_wafv2_web_acl" "sre-bot" {
 
 resource "aws_wafv2_ip_set" "blocked_ips" {
   name        = "sre-bot-blocked-ips"
+  provider    = aws.core_services
   description = "List of IP addresses for the SRE bot that are blocked due to attacks"
   scope       = "REGIONAL"
 
@@ -233,12 +235,15 @@ resource "aws_wafv2_ip_set" "blocked_ips" {
 resource "aws_wafv2_web_acl_association" "sre-bot" {
   resource_arn = aws_lb.sre_bot.arn
   web_acl_arn  = aws_wafv2_web_acl.sre-bot.arn
+  provider     = aws.core_services
 }
 resource "aws_cloudwatch_log_group" "sre_bot_waf_log_group" {
   name              = "aws-waf-logs-sre-bot"
+  provider          = aws.core_services
   retention_in_days = 30
 }
 resource "aws_wafv2_web_acl_logging_configuration" "sre-bot" {
   resource_arn            = aws_wafv2_web_acl.sre-bot.arn
   log_destination_configs = [aws_cloudwatch_log_group.sre_bot_waf_log_group.arn]
+  provider                = aws.core_services
 }

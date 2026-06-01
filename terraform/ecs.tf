@@ -74,6 +74,7 @@ resource "aws_ecs_service" "main" {
 
 resource "aws_cloudwatch_log_group" "sre-bot_group" {
   name              = "/ecs/sre-bot-app"
+  provider          = aws.core_services
   retention_in_days = 30
 
   tags = {
@@ -83,5 +84,6 @@ resource "aws_cloudwatch_log_group" "sre-bot_group" {
 
 resource "aws_cloudwatch_log_stream" "sre-bot_stream" {
   name           = "sre-bot-log-stream"
+  provider       = aws.core_services
   log_group_name = aws_cloudwatch_log_group.sre-bot_group.name
 }

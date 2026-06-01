@@ -1,4 +1,5 @@
 resource "aws_cloudwatch_log_metric_filter" "sre_bot_error" {
+  provider       = aws.core_services
   name           = local.error_logged
   pattern        = "?ERROR ?Exception"
   log_group_name = local.api_cloudwatch_log_group
@@ -11,6 +12,7 @@ resource "aws_cloudwatch_log_metric_filter" "sre_bot_error" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "sre_bot_error" {
+  provider            = aws.core_services
   alarm_name          = "SRE Bot Errors"
   alarm_description   = "Errors logged by the SRE Bot"
   comparison_operator = "GreaterThanOrEqualToThreshold"
@@ -28,6 +30,7 @@ resource "aws_cloudwatch_metric_alarm" "sre_bot_error" {
 }
 
 resource "aws_cloudwatch_log_metric_filter" "sre_bot_warning" {
+  provider       = aws.core_services
   name           = local.warning_logged
   pattern        = "WARNING"
   log_group_name = local.api_cloudwatch_log_group
@@ -40,6 +43,7 @@ resource "aws_cloudwatch_log_metric_filter" "sre_bot_warning" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "sre_bot_warning" {
+  provider            = aws.core_services
   alarm_name          = "SRE Bot Warnings"
   alarm_description   = "Warnings logged by the SRE Bot"
   comparison_operator = "GreaterThanOrEqualToThreshold"
@@ -57,6 +61,7 @@ resource "aws_cloudwatch_metric_alarm" "sre_bot_warning" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "sre_bot_high_cpu" {
+  provider            = aws.core_services
   alarm_name          = "SRE Bot ECS High CPU Utilization"
   alarm_description   = "ECS High CPU Utilization has been detected"
   comparison_operator = "GreaterThanOrEqualToThreshold"
@@ -79,6 +84,7 @@ resource "aws_cloudwatch_metric_alarm" "sre_bot_high_cpu" {
 }
 
 resource "aws_cloudwatch_metric_alarm" "sre_bot_high_memory" {
+  provider            = aws.core_services
   alarm_name          = "SRE Bot ECS High Memory Utilization"
   alarm_description   = "ECS High Memory Utilization has been detected"
   comparison_operator = "GreaterThanOrEqualToThreshold"
