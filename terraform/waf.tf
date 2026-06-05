@@ -51,6 +51,23 @@ resource "aws_wafv2_web_acl" "sre-bot" {
       managed_rule_group_statement {
         vendor_name = "AWS"
         name        = "AWSManagedRulesCommonRuleSet"
+        scope_down_statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string = "/hook/"
+                field_to_match {
+                  uri_path {}
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+                positional_constraint = "STARTS_WITH"
+              }
+            }
+          }
+        }
       }
     }
 
@@ -114,6 +131,24 @@ resource "aws_wafv2_web_acl" "sre-bot" {
       managed_rule_group_statement {
         vendor_name = "AWS"
         name        = "AWSManagedRulesAmazonIpReputationList"
+
+        scope_down_statement {
+          not_statement {
+            statement {
+              byte_match_statement {
+                search_string = "/hook/"
+                field_to_match {
+                  uri_path {}
+                }
+                text_transformation {
+                  priority = 0
+                  type     = "NONE"
+                }
+                positional_constraint = "STARTS_WITH"
+              }
+            }
+          }
+        }
       }
     }
 
