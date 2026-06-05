@@ -1,4 +1,5 @@
 resource "aws_lb_target_group" "sre_bot" {
+  provider             = aws.core_services
   name                 = "sre-bot"
   port                 = 8000
   protocol             = "HTTP"
@@ -21,6 +22,7 @@ resource "aws_lb_target_group" "sre_bot" {
 }
 
 resource "aws_lb_listener" "sre_bot_listener" {
+  provider = aws.core_services
   depends_on = [
     aws_acm_certificate.sre_bot,
     aws_route53_record.sre_bot_certificate_validation,
@@ -40,8 +42,8 @@ resource "aws_lb_listener" "sre_bot_listener" {
 }
 
 resource "aws_lb" "sre_bot" {
-
   name                       = "sre-bot"
+  provider                   = aws.core_services
   internal                   = false #tfsec:ignore:AWS005
   load_balancer_type         = "application"
   enable_deletion_protection = true
@@ -59,6 +61,7 @@ resource "aws_lb" "sre_bot" {
 
 # Serve security.txt as a fixed response from the ALB
 resource "aws_alb_listener_rule" "security_txt" {
+  provider     = aws.core_services
   listener_arn = aws_lb_listener.sre_bot_listener.arn
   priority     = 1
 

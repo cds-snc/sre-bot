@@ -62,14 +62,15 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
 }
 
 resource "aws_iam_policy" "sre-bot_secrets_manager" {
-  name   = "sre-botSecretsManagerKeyRetrieval"
-  path   = "/"
-  policy = data.aws_iam_policy_document.sre-bot_secrets_manager.json
+  name     = "sre-botSecretsManagerKeyRetrieval"
+  provider = aws.core_services
+  path     = "/"
+  policy   = data.aws_iam_policy_document.sre-bot_secrets_manager.json
 }
 
 resource "aws_iam_role" "sre-bot" {
-  name = "sre-bot-ecs-role"
-
+  name               = "sre-bot-ecs-role"
+  provider           = aws.core_services
   assume_role_policy = data.aws_iam_policy_document.sre-bot.json
 
   tags = {
@@ -79,16 +80,19 @@ resource "aws_iam_role" "sre-bot" {
 
 resource "aws_iam_role_policy_attachment" "ecs_task_execution" {
   role       = aws_iam_role.sre-bot.name
+  provider   = aws.core_services
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
 resource "aws_iam_role_policy_attachment" "secrets_manager" {
   role       = aws_iam_role.sre-bot.name
+  provider   = aws.core_services
   policy_arn = aws_iam_policy.sre-bot_secrets_manager.arn
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_read_only" {
   role       = aws_iam_role.sre-bot.name
+  provider   = aws.core_services
   policy_arn = "arn:aws:iam::aws:policy/AWSLambda_ReadOnlyAccess"
 }
 
@@ -110,19 +114,21 @@ data "aws_iam_policy_document" "sre_bot_bucket" {
 
 resource "aws_iam_policy" "sre_bot_bucket" {
   name        = "sre_bot_bucket"
+  provider    = aws.core_services
   description = "Allows access to the sre-bot-bucket"
   policy      = data.aws_iam_policy_document.sre_bot_bucket.json
 }
 
 resource "aws_iam_role_policy_attachment" "sre_bot_bucket" {
   role       = aws_iam_role.sre-bot.name
+  provider   = aws.core_services
   policy_arn = aws_iam_policy.sre_bot_bucket.arn
 }
 
 # Create an IAM role and policy to allow the SRE Bot to access the SQS queue
 resource "aws_iam_role" "sre_bot_sqs_access_role" {
-  name = "sre_bot_sqs_access_role"
-
+  name     = "sre_bot_sqs_access_role"
+  provider = aws.core_services
   assume_role_policy = jsonencode({
     Version = "2012-10-17",
     Statement = [
@@ -139,8 +145,9 @@ resource "aws_iam_role" "sre_bot_sqs_access_role" {
 
 # Create an IAM policy to allow the SRE Bot to access the SQS queue via the role
 resource "aws_iam_role_policy" "sre_bot_sqs_access_policy" {
-  name = "sre_bot_sqs_access_policy"
-  role = aws_iam_role.sre_bot_sqs_access_role.id
+  name     = "sre_bot_sqs_access_policy"
+  provider = aws.core_services
+  role     = aws_iam_role.sre_bot_sqs_access_role.id
 
   policy = jsonencode({
     Version = "2012-10-17",

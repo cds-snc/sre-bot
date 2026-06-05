@@ -1,6 +1,6 @@
 resource "aws_cloudwatch_query_definition" "api_errors" {
-  name = "SRE Bot Errors"
-
+  name     = "SRE Bot Errors"
+  provider = aws.core_services
   log_group_names = [
     local.api_cloudwatch_log_group
   ]
@@ -14,8 +14,8 @@ resource "aws_cloudwatch_query_definition" "api_errors" {
 }
 
 resource "aws_cloudwatch_query_definition" "api_warnings" {
-  name = "SRE Bot Warnings"
-
+  name     = "SRE Bot Warnings"
+  provider = aws.core_services
   log_group_names = [
     local.api_cloudwatch_log_group
   ]

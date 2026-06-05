@@ -3,7 +3,7 @@ locals {
 }
 
 module "gh_oidc_roles" {
-  source   = "github.com/cds-snc/terraform-modules//gh_oidc_role?ref=v7.4.3"
+  source   = "github.com/cds-snc/terraform-modules//gh_oidc_role?ref=v11.3.2"
   org_name = "cds-snc"
   roles = [
     {
@@ -38,11 +38,13 @@ data "aws_iam_policy_document" "publish_techdocs" {
 
 resource "aws_iam_policy" "geodb_refresh_policy" {
   name        = "geodb_refresh_policy"
+  provider    = aws.core_services
   description = "Policy to allow the Geodb Refresh role to publish to the target bucket"
   policy      = data.aws_iam_policy_document.publish_techdocs.json
 }
 
 resource "aws_iam_role_policy_attachment" "geodb_refresh_attachment" {
+  provider   = aws.core_services
   role       = local.geodb_name
   policy_arn = aws_iam_policy.geodb_refresh_policy.arn
 }

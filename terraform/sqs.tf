@@ -1,6 +1,7 @@
 # Create a FIFO SQS queue for the SRE Bot
 resource "aws_sqs_queue" "sre_bot_fifo_queue" {
   name                        = "sre-bot-fifo-queue.fifo"
+  provider                    = aws.core_services
   fifo_queue                  = true # Make sure that it is FIFO queue
   content_based_deduplication = true # Enable content-based deduplication
   delay_seconds               = 0    # Specify delay time for messages
@@ -18,5 +19,6 @@ resource "aws_sqs_queue" "sre_bot_fifo_queue" {
 # Dead-letter queue resource, which is used to store messages that cannot be processed 
 resource "aws_sqs_queue" "sre_bot_dead_letter_queue" {
   name       = "sre-bot-dead-letter-queue.fifo"
+  provider   = aws.core_services
   fifo_queue = true
 }

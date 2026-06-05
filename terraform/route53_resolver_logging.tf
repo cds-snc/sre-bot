@@ -1,5 +1,6 @@
 resource "aws_cloudwatch_log_group" "sre_bot_dns" {
   name              = "/aws/route53/${module.vpc.vpc_id}"
+  provider          = aws.core_services
   retention_in_days = 30
 }
 
@@ -21,6 +22,7 @@ data "aws_iam_policy_document" "route53_resolver_logging_policy" {
 }
 
 resource "aws_cloudwatch_log_resource_policy" "route53_resolver_logging_policy" {
+  provider        = aws.core_services
   policy_document = data.aws_iam_policy_document.route53_resolver_logging_policy.json
   policy_name     = "route53_resolver_logging_policy"
 }
