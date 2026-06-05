@@ -38,6 +38,7 @@ The following pattern handlers have been implemented:
 | ---------------------- | -------- | --------------------------- | --------------------------------------------- |
 | API Key Detected       | 60       | `api_key_detected.py`       | Handles compromised API key notifications     |
 | Step Functions         | 55       | `step_functions.py`         | Handles Step Functions execution notifications |
+| DynamoDB Access        | 55       | `dynamodb_access.py`        | Handles unexpected DynamoDB access alerts     |
 | CloudWatch Alarm       | 50       | `cloudwatch_alarm.py`       | Handles CloudWatch alarm notifications        |
 | Abuse Notification     | 45       | `abuse_notification.py`     | Handles AWS abuse reports                     |
 | Budget Notification    | 40       | `budget_notification.py`    | Handles budget threshold alerts               |
