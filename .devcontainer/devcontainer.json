@@ -47,8 +47,8 @@
 			"moby": true
 		},
 		"ghcr.io/devcontainers/features/terraform:1": {
-			"version": "1.14.9",
-			"terragrunt": "0.69.13"
+			"version": "1.5.3",
+			"terragrunt": "0.48.0"
 		},
 		"ghcr.io/devcontainers/features/node:1": {
 			"version": "20"

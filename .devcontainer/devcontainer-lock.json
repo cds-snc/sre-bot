@@ -6,9 +6,9 @@
       "integrity": "sha256:1f93c8315b7a6d76982ebb2269f8b0d50413fc0f965c032edf4aee0caceb73ef"
     },
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
-      "version": "2.16.1",
-      "resolved": "ghcr.io/devcontainers/features/docker-in-docker@sha256:ce078b7bf7d9ef3bcb9813b32103795d8d72172446890b64772cbe1dec6baafd",
-      "integrity": "sha256:ce078b7bf7d9ef3bcb9813b32103795d8d72172446890b64772cbe1dec6baafd"
+      "version": "2.17.0",
+      "resolved": "ghcr.io/devcontainers/features/docker-in-docker@sha256:25b9f05705ffba7dbe503230ac76081419306f8c8bc88e0ce78c4ecd99a0c78c",
+      "integrity": "sha256:25b9f05705ffba7dbe503230ac76081419306f8c8bc88e0ce78c4ecd99a0c78c"
     },
     "ghcr.io/devcontainers/features/node:1": {
       "version": "1.7.1",
@@ -16,9 +16,9 @@
       "integrity": "sha256:8c0de46939b61958041700ee89e3493f3b2e4131a06dc46b4d9423427d06e5f6"
     },
     "ghcr.io/devcontainers/features/terraform:1": {
-      "version": "1.4.2",
-      "resolved": "ghcr.io/devcontainers/features/terraform@sha256:250d08e39c99d9e959e091e74527c22c04eeae728b424da99f002423c7902f82",
-      "integrity": "sha256:250d08e39c99d9e959e091e74527c22c04eeae728b424da99f002423c7902f82"
+      "version": "1.4.3",
+      "resolved": "ghcr.io/devcontainers/features/terraform@sha256:503d0888b3a43a32335e08cd4477f8c4629404ad83f6a36f0e0fee7f567c06c7",
+      "integrity": "sha256:503d0888b3a43a32335e08cd4477f8c4629404ad83f6a36f0e0fee7f567c06c7"
     }
   }
 }
