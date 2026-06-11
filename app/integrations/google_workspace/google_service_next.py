@@ -33,27 +33,29 @@ Key Functions:
 
 import json
 import time
-
 from functools import wraps
 from json import JSONDecodeError
 from typing import Any, Callable, List, Optional, Tuple, Union, cast
 
 import structlog
-from core.config import settings
 from google.oauth2 import service_account
 from googleapiclient.discovery import Resource, build
 from googleapiclient.errors import HttpError
+
+from infrastructure.configuration.integrations.google import (
+    get_google_workspace_settings,
+)
 
 # OperationResult and status for standardized response modeling
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
 
 # Define the default arguments
-GOOGLE_WORKSPACE_CUSTOMER_ID = settings.google_workspace.GOOGLE_WORKSPACE_CUSTOMER_ID
-GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = (
-    settings.google_workspace.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
-)
-SRE_BOT_EMAIL = settings.google_workspace.SRE_BOT_EMAIL
+settings = get_google_workspace_settings()
+GOOGLE_WORKSPACE_CUSTOMER_ID = settings.GOOGLE_WORKSPACE_CUSTOMER_ID
+GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = settings.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
+SRE_BOT_EMAIL = settings.SRE_BOT_EMAIL
+
 
 logger = structlog.get_logger()
 

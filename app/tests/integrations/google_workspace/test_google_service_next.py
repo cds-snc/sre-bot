@@ -8,7 +8,9 @@ from tests.fixtures.google_clients import FakeGoogleService
 
 # --- Fixtures ---
 @pytest.fixture
-@patch("integrations.google_workspace.google_service_next.settings")
+@patch(
+    "integrations.google_workspace.google_service_next.get_google_workspace_settings"
+)
 def fake_settings(settings_mock):
     class FakeGoogleWorkspace:
         GOOGLE_WORKSPACE_CUSTOMER_ID = "fake_customer_id"

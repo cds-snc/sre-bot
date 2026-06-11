@@ -8,12 +8,13 @@ from google.auth.exceptions import RefreshError  # type: ignore
 from integrations.google_workspace import google_service
 
 
-@patch(
-    "integrations.google_workspace.google_service.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
-    "{}",
-)
 @patch("integrations.google_workspace.google_service.build")
 @patch("integrations.google_workspace.google_service.service_account")
+@patch.object(
+    google_service.settings,
+    "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+    new="{}",
+)
 def test_get_google_service_returns_build_object(mock_service_account, build_mock):
     """
     Test case to verify that the function returns a build object.
@@ -30,12 +31,13 @@ def test_get_google_service_returns_build_object(mock_service_account, build_moc
     )
 
 
-@patch(
-    "integrations.google_workspace.google_service.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
-    "{}",
-)
 @patch("integrations.google_workspace.google_service.build")
 @patch("integrations.google_workspace.google_service.service_account")
+@patch.object(
+    google_service.settings,
+    "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+    new="{}",
+)
 def test_get_google_service_with_delegated_user_email(
     mock_service_account, _build_mock
 ):
@@ -53,12 +55,13 @@ def test_get_google_service_with_delegated_user_email(
     )
 
 
-@patch(
-    "integrations.google_workspace.google_service.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
-    "{}",
-)
 @patch("integrations.google_workspace.google_service.build")
 @patch("integrations.google_workspace.google_service.service_account")
+@patch.object(
+    google_service.settings,
+    "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+    new="{}",
+)
 def test_get_google_service_with_scopes(mock_service_account, _build_mock):
     """
     Test case to verify that the function works correctly with scopes.
@@ -73,7 +76,7 @@ def test_get_google_service_with_scopes(mock_service_account, _build_mock):
 
 
 @patch.object(
-    google_service,
+    google_service.settings,
     "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
     new="",
 )
@@ -88,25 +91,18 @@ def test_get_google_service_raises_exception_if_credentials_json_not_set():
 
 
 @patch.object(
-    google_service,
+    google_service.settings,
     "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
     new="invalid",
 )
 @patch("integrations.google_workspace.google_service.logger")
-@patch("integrations.google_workspace.google_service.service_account")
-@patch("integrations.google_workspace.google_service.build")
 def test_get_google_service_raises_exception_if_credentials_json_is_invalid(
-    _build_mock,
-    mocked_service_account,
     mocked_logger,
 ):
     """
     Test case to verify that the function raises an exception if:
      - GCP_SRE_SERVICE_ACCOUNT_KEY_FILE is invalid.
     """
-    mocked_service_account.Credentials.from_service_account_info.side_effect = (
-        JSONDecodeError("Invalid credentials JSON", "", 0)
-    )
     with pytest.raises(JSONDecodeError) as e:
         google_service.get_google_service("drive", "v3")
     assert "Invalid credentials JSON" in str(e.value)
@@ -258,13 +254,16 @@ def test_handle_google_api_errors_processes_unsupported_params(
 
     assert result == "test"
     mock_func.assert_called_once()
-    mocked_logger.warningassert_called_once_with(
-        "Unknown parameters in 'mock_module:mock_func' were detected: unsupported"
+    mocked_logger.warning.assert_called_once_with(
+        "unsupported_parameters_warning",
+        function="mock_func",
+        module="mock_module",
+        unsupported_params="unsupported",
     )
 
 
-@patch("integrations.google_workspace.google_service.SRE_BOT_EMAIL", "sre_bot_email")
 @patch("integrations.google_workspace.google_service.get_google_service")
+@patch.object(google_service.settings, "SRE_BOT_EMAIL", new="sre_bot_email")
 def test_execute_google_api_call_calls_get_google_service(mock_get_google_service):
     google_service.execute_google_api_call(
         "service_name", "version", "resource", "method"
@@ -274,8 +273,8 @@ def test_execute_google_api_call_calls_get_google_service(mock_get_google_servic
     )
 
 
-@patch("integrations.google_workspace.google_service.SRE_BOT_EMAIL", "sre_bot_email")
 @patch("integrations.google_workspace.google_service.get_google_service")
+@patch.object(google_service.settings, "SRE_BOT_EMAIL", new="sre_bot_email")
 def test_execute_google_api_call_calls_get_google_service_with_delegated_user_email(
     mock_get_google_service,
 ):
