@@ -1,5 +1,4 @@
 from slack_sdk import WebClient
-from core.config import settings
 from infrastructure.configuration.integrations.slack import SlackSettings
 
 
