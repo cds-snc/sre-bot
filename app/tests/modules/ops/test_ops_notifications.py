@@ -6,11 +6,11 @@ from modules.ops import notifications
 
 
 @patch("modules.ops.notifications.get_sre_ops_settings")
-@patch("modules.ops.notifications.SlackClientManager.get_client")
+@patch("modules.ops.notifications.LegacySlackBootstrap.create_app")
 @patch("modules.ops.notifications.logger")
-def test_log_ops_message(mock_logger, mock_get_client, mock_get_sre_ops_settings):
+def test_log_ops_message(mock_logger, mock_slack_app, mock_get_sre_ops_settings):
     client = MagicMock()
-    mock_get_client.return_value = client
+    mock_slack_app.return_value.client = client
     mock_get_sre_ops_settings.return_value.SRE_OPS_CHANNEL_ID = "C0123456ABC"
 
     # Patch logger.bind() to return a mock with .info/.error/.warning
@@ -33,13 +33,13 @@ def test_log_ops_message(mock_logger, mock_get_client, mock_get_sre_ops_settings
 
 
 @patch("modules.ops.notifications.get_sre_ops_settings")
-@patch("modules.ops.notifications.SlackClientManager.get_client")
+@patch("modules.ops.notifications.LegacySlackBootstrap.create_app")
 @patch("modules.ops.notifications.logger")
 def test_log_ops_message_no_client(
-    mock_logger, mock_get_client, mock_get_sre_ops_settings
+    mock_logger, mock_slack_app, mock_get_sre_ops_settings
 ):
     msg = "foo bar baz"
-    mock_get_client.return_value = None
+    mock_slack_app.return_value.client = None
     mock_get_sre_ops_settings.return_value.SRE_OPS_CHANNEL_ID = "C0123456ABC"
     bound_logger = MagicMock()
     mock_logger.bind.return_value = bound_logger
@@ -51,14 +51,14 @@ def test_log_ops_message_no_client(
 
 
 @patch("modules.ops.notifications.get_sre_ops_settings")
-@patch("modules.ops.notifications.SlackClientManager.get_client")
+@patch("modules.ops.notifications.LegacySlackBootstrap.create_app")
 @patch("modules.ops.notifications.logger")
 def test_log_ops_message_no_channel(
-    mock_logger, mock_get_client, mock_get_sre_ops_settings
+    mock_logger, mock_slack_app, mock_get_sre_ops_settings
 ):
     msg = "foo bar baz"
     mock_get_sre_ops_settings.return_value.SRE_OPS_CHANNEL_ID = None
-    mock_get_client.return_value = MagicMock()
+    mock_slack_app.return_value.client = MagicMock()
     bound_logger = MagicMock()
     mock_logger.bind.return_value = bound_logger
 
@@ -69,13 +69,13 @@ def test_log_ops_message_no_channel(
 
 
 @patch("modules.ops.notifications.get_sre_ops_settings")
-@patch("modules.ops.notifications.SlackClientManager.get_client")
+@patch("modules.ops.notifications.LegacySlackBootstrap.create_app")
 @patch("modules.ops.notifications.logger")
 def test_log_ops_message_slack_api_error(
-    mock_logger, mock_get_client, mock_get_sre_ops_settings
+    mock_logger, mock_slack_app, mock_get_sre_ops_settings
 ):
     client = MagicMock()
-    mock_get_client.return_value = client
+    mock_slack_app.return_value.client = client
     mock_get_sre_ops_settings.return_value.SRE_OPS_CHANNEL_ID = "C0123456ABC"
     bound_logger = MagicMock()
     mock_logger.bind.return_value = bound_logger
