@@ -1,5 +1,5 @@
 from slack_sdk import WebClient
-from core.config import settings
+from infrastructure.configuration.integrations.slack import SlackSettings
 
 
 class SlackClientManager:
@@ -11,5 +11,6 @@ class SlackClientManager:
     def get_client(cls) -> WebClient:
         """Returns a singleton instance of the Slack WebClient."""
         if cls._client is None:
-            cls._client = WebClient(token=settings.slack.SLACK_TOKEN)
+            slack_settings = SlackSettings()
+            cls._client = WebClient(token=slack_settings.SLACK_TOKEN)
         return cls._client
