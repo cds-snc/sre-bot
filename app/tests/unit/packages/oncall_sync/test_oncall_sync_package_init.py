@@ -30,21 +30,10 @@ class _Logger:
         self.events.append(("warning", {"event": event, **kw}))
 
 
-class _Settings:
-    def __init__(self, *, enabled: bool, interval: int = 300) -> None:
-        self.ENABLED = enabled
-        self.SYNC_INTERVAL_SECONDS = interval
-
-
 @pytest.mark.unit
-def test_register_background_jobs_when_enabled_with_rotations(monkeypatch) -> None:
+def test_register_background_jobs_with_rotations(monkeypatch) -> None:
     pkg = _reload_pkg()
     settings_mod = importlib.import_module("packages.oncall_sync.settings")
-    monkeypatch.setattr(
-        settings_mod,
-        "get_oncall_sync_settings",
-        lambda: _Settings(enabled=True, interval=120),
-    )
     monkeypatch.setattr(settings_mod, "get_oncall_rotations", lambda: [object()])
 
     registry = _Registry()
@@ -52,36 +41,14 @@ def test_register_background_jobs_when_enabled_with_rotations(monkeypatch) -> No
 
     assert len(registry.calls) == 1
     assert registry.calls[0]["job_name"] == "oncall_sync"
-    assert registry.calls[0]["every"] == timedelta(seconds=120)
+    assert registry.calls[0]["every"] == timedelta(minutes=5)
     assert callable(registry.calls[0]["job"])
-
-
-@pytest.mark.unit
-def test_register_background_jobs_noop_when_disabled(monkeypatch) -> None:
-    pkg = _reload_pkg()
-    settings_mod = importlib.import_module("packages.oncall_sync.settings")
-    monkeypatch.setattr(
-        settings_mod,
-        "get_oncall_sync_settings",
-        lambda: _Settings(enabled=False),
-    )
-    monkeypatch.setattr(settings_mod, "get_oncall_rotations", lambda: [object()])
-
-    registry = _Registry()
-    pkg.register_background_jobs(registry=registry)
-
-    assert registry.calls == []
 
 
 @pytest.mark.unit
 def test_register_background_jobs_noop_when_no_rotations(monkeypatch) -> None:
     pkg = _reload_pkg()
     settings_mod = importlib.import_module("packages.oncall_sync.settings")
-    monkeypatch.setattr(
-        settings_mod,
-        "get_oncall_sync_settings",
-        lambda: _Settings(enabled=True),
-    )
     monkeypatch.setattr(settings_mod, "get_oncall_rotations", lambda: [])
 
     registry = _Registry()
@@ -91,14 +58,9 @@ def test_register_background_jobs_noop_when_no_rotations(monkeypatch) -> None:
 
 
 @pytest.mark.unit
-def test_startup_warmup_logs_loaded_settings(monkeypatch) -> None:
+def test_startup_warmup_logs_rotation_count(monkeypatch) -> None:
     pkg = _reload_pkg()
     settings_mod = importlib.import_module("packages.oncall_sync.settings")
-    monkeypatch.setattr(
-        settings_mod,
-        "get_oncall_sync_settings",
-        lambda: _Settings(enabled=True, interval=60),
-    )
     monkeypatch.setattr(
         settings_mod, "get_oncall_rotations", lambda: [object(), object()]
     )
@@ -106,33 +68,25 @@ def test_startup_warmup_logs_loaded_settings(monkeypatch) -> None:
     logger = _Logger()
     pkg.startup_warmup(logger=logger)
 
-    levels = [lvl for lvl, _ in logger.events]
-    assert "info" in levels
     loaded = next(
         evt
         for lvl, evt in logger.events
         if evt["event"] == "oncall_sync_settings_loaded"
     )
-    assert loaded["enabled"] is True
     assert loaded["rotation_count"] == 2
-    assert loaded["sync_interval_seconds"] == 60
+    assert loaded["sync_interval_seconds"] == 300
 
 
 @pytest.mark.unit
-def test_startup_warmup_warns_when_disabled(monkeypatch) -> None:
+def test_startup_warmup_warns_when_no_rotations(monkeypatch) -> None:
     pkg = _reload_pkg()
     settings_mod = importlib.import_module("packages.oncall_sync.settings")
-    monkeypatch.setattr(
-        settings_mod,
-        "get_oncall_sync_settings",
-        lambda: _Settings(enabled=False),
-    )
     monkeypatch.setattr(settings_mod, "get_oncall_rotations", lambda: [])
 
     logger = _Logger()
     pkg.startup_warmup(logger=logger)
 
     assert any(
-        lvl == "warning" and evt["event"] == "oncall_sync_disabled"
+        lvl == "warning" and evt["event"] == "oncall_sync_no_rotations"
         for lvl, evt in logger.events
     )

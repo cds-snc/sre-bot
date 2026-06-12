@@ -8,7 +8,6 @@ import pytest
 from packages.oncall_sync import settings as settings_module
 from packages.oncall_sync.settings import (
     OnCallRotation,
-    OnCallSyncSettings,
     load_rotations,
 )
 
@@ -18,28 +17,6 @@ _VALID_ROTATION = {
     "slack_handle": "oncall-x",
     "slack_name": "On-call X",
 }
-
-
-@pytest.mark.unit
-def test_settings_defaults_when_no_env(monkeypatch) -> None:
-    monkeypatch.delenv("ONCALL_SYNC_ENABLED", raising=False)
-    monkeypatch.delenv("ONCALL_SYNC_INTERVAL_SECONDS", raising=False)
-
-    s = OnCallSyncSettings(_env_file=None)
-
-    assert s.ENABLED is False
-    assert s.SYNC_INTERVAL_SECONDS == 300
-
-
-@pytest.mark.unit
-def test_settings_read_from_env(monkeypatch) -> None:
-    monkeypatch.setenv("ONCALL_SYNC_ENABLED", "true")
-    monkeypatch.setenv("ONCALL_SYNC_INTERVAL_SECONDS", "60")
-
-    s = OnCallSyncSettings(_env_file=None)
-
-    assert s.ENABLED is True
-    assert s.SYNC_INTERVAL_SECONDS == 60
 
 
 @pytest.mark.unit
