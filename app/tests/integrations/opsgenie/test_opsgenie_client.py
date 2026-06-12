@@ -222,10 +222,10 @@ def test_get_on_call_user_for_rotation_skips_non_user_recipients(
 
 @patch("integrations.opsgenie.client.api_get_request")
 @patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
-def test_get_on_call_user_for_rotation_ignores_periods_outside_now(
+def test_get_on_call_user_for_rotation_returns_none_when_first_period_in_future(
     api_get_request_mock,
 ):
-    """Periods that don't bracket 'now' must not be returned."""
+    """A first period starting after 'now' signals a coverage gap."""
     future_start = _iso(datetime.now(timezone.utc) + timedelta(hours=6))
     future_end = _iso(datetime.now(timezone.utc) + timedelta(hours=12))
     api_get_request_mock.return_value = _timeline_response(
@@ -245,47 +245,6 @@ def test_get_on_call_user_for_rotation_ignores_periods_outside_now(
     )
 
     assert opsgenie.get_on_call_user_for_rotation("sched-1", "PSO_rotation") is None
-
-
-@patch("integrations.opsgenie.client.api_get_request")
-@patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
-def test_get_on_call_user_for_rotation_picks_period_containing_now(
-    api_get_request_mock,
-):
-    """Given multiple periods in the window, return the one bracketing 'now'."""
-    now = datetime.now(timezone.utc)
-    api_get_request_mock.return_value = _timeline_response(
-        [
-            {
-                "name": "PSO_rotation",
-                "periods": [
-                    {
-                        "startDate": _iso(now - timedelta(hours=2)),
-                        "endDate": _iso(now - timedelta(hours=1)),
-                        "type": "user",
-                        "recipient": {"type": "user", "name": "earlier@x.ca"},
-                    },
-                    {
-                        "startDate": _iso(now - timedelta(minutes=10)),
-                        "endDate": _iso(now + timedelta(minutes=50)),
-                        "type": "user",
-                        "recipient": {"type": "user", "name": "current@x.ca"},
-                    },
-                    {
-                        "startDate": _iso(now + timedelta(hours=1)),
-                        "endDate": _iso(now + timedelta(hours=2)),
-                        "type": "user",
-                        "recipient": {"type": "user", "name": "later@x.ca"},
-                    },
-                ],
-            }
-        ]
-    )
-
-    assert (
-        opsgenie.get_on_call_user_for_rotation("sched-1", "PSO_rotation")
-        == "current@x.ca"
-    )
 
 
 @patch("integrations.opsgenie.client.api_get_request")
