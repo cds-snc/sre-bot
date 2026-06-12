@@ -16,6 +16,8 @@ from datetime import timedelta
 
 from infrastructure.plugins import hookimpl
 
+from packages.oncall_sync.settings import get_oncall_rotations
+
 SYNC_INTERVAL = timedelta(minutes=5)
 
 
@@ -29,7 +31,6 @@ def _run_oncall_sync() -> None:
 @hookimpl
 def register_background_jobs(registry) -> None:
     """Register the recurring on-call sync job."""
-    from packages.oncall_sync.settings import get_oncall_rotations
 
     if not get_oncall_rotations():
         return
@@ -44,7 +45,6 @@ def register_background_jobs(registry) -> None:
 @hookimpl
 def startup_warmup(logger) -> None:
     """Log effective configuration at startup."""
-    from packages.oncall_sync.settings import get_oncall_rotations
 
     rotations = get_oncall_rotations()
     logger.info(
