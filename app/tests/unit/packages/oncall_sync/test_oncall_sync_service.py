@@ -23,7 +23,7 @@ class _FakeOnCall:
         self,
         *,
         emails: dict[str, str | None] | None = None,
-        raise_for: set[str] | None = None
+        raise_for: set[str] | None = None,
     ) -> None:
         self._emails = emails or {}
         self._raise_for = raise_for or set()
