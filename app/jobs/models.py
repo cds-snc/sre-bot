@@ -6,8 +6,6 @@ class BackgroundJobRegistry(Protocol):
     """Scheduler-agnostic registry boundary for feature background jobs.
 
     This protocol defines the exact contract feature packages must interact with.
-    Producers pick the cadence kind by choosing a method; the parameter type
-    enforces the payload shape.
     """
 
     def register_daily(

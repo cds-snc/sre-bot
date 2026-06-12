@@ -36,14 +36,23 @@ def get_on_call_users(schedule):
 def get_on_call_user_for_rotation(schedule_id: str, rotation_name: str) -> str | None:
     """Return the email of the user currently on-call for ``rotation_name``.
 
-    Returns ``None`` when the rotation has no current on-call participant
-    (gap in coverage, or the rotation doesn't exist on this schedule).
-    Raises :class:`OpsGenieAPIError` on transport or response-parsing failures.
+    Selects the timeline period whose ``[startDate, endDate)`` window contains
+    the current UTC moment, then returns the user email if that period's
+    recipient is a user. Returns ``None`` when no period covers "now" (gap in
+    coverage), the active recipient is not a user (team/escalation/none), or
+    the rotation does not exist on this schedule. Raises
+    :class:`OpsGenieAPIError` on transport or response-parsing failures.
+
+    The OpsGenie ``/timeline`` endpoint only supports ``intervalUnit`` of
+    ``days``/``weeks``/``months``, so the response is a window of upcoming
+    periods rather than a single point-in-time answer. We explicitly select
+    the period containing ``now`` instead of relying on ordering.
     """
-    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = datetime.now(timezone.utc)
     url = (
         f"https://api.opsgenie.com/v2/schedules/{schedule_id}/timeline"
-        f"?identifierType=id&interval=1&intervalUnit=days&date={now}"
+        f"?identifierType=id&interval=1&intervalUnit=days"
+        f"&date={now.strftime('%Y-%m-%dT%H:%M:%SZ')}"
     )
     try:
         content = api_get_request(url, {"name": "GenieKey", "token": OPSGENIE_KEY})
@@ -58,11 +67,28 @@ def get_on_call_user_for_rotation(schedule_id: str, rotation_name: str) -> str |
         if rot.get("name") != rotation_name:
             continue
         for period in rot.get("periods", []) or []:
+            if not _period_covers(period, now):
+                continue
             recipient = period.get("recipient") or {}
             if recipient.get("type") == "user":
                 return recipient.get("name")
+            return None
         return None
     return None
+
+
+def _period_covers(period: dict, instant: datetime) -> bool:
+    """Return True when ``instant`` falls within ``period``'s [start, end)."""
+    start_raw = period.get("startDate")
+    end_raw = period.get("endDate")
+    if not start_raw or not end_raw:
+        return False
+    try:
+        start = datetime.fromisoformat(start_raw)
+        end = datetime.fromisoformat(end_raw)
+    except ValueError:
+        return False
+    return start <= instant < end
 
 
 # Create an Opsgenie alert. This is used to notify the on-call users
