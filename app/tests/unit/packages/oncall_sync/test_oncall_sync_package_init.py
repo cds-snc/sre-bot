@@ -33,8 +33,7 @@ class _Logger:
 @pytest.mark.unit
 def test_register_background_jobs_with_rotations(monkeypatch) -> None:
     pkg = _reload_pkg()
-    settings_mod = importlib.import_module("packages.oncall_sync.settings")
-    monkeypatch.setattr(settings_mod, "get_oncall_rotations", lambda: [object()])
+    monkeypatch.setattr(pkg, "get_oncall_rotations", lambda: [object()])
 
     registry = _Registry()
     pkg.register_background_jobs(registry=registry)
@@ -48,8 +47,7 @@ def test_register_background_jobs_with_rotations(monkeypatch) -> None:
 @pytest.mark.unit
 def test_register_background_jobs_noop_when_no_rotations(monkeypatch) -> None:
     pkg = _reload_pkg()
-    settings_mod = importlib.import_module("packages.oncall_sync.settings")
-    monkeypatch.setattr(settings_mod, "get_oncall_rotations", lambda: [])
+    monkeypatch.setattr(pkg, "get_oncall_rotations", lambda: [])
 
     registry = _Registry()
     pkg.register_background_jobs(registry=registry)
@@ -60,10 +58,7 @@ def test_register_background_jobs_noop_when_no_rotations(monkeypatch) -> None:
 @pytest.mark.unit
 def test_startup_warmup_logs_rotation_count(monkeypatch) -> None:
     pkg = _reload_pkg()
-    settings_mod = importlib.import_module("packages.oncall_sync.settings")
-    monkeypatch.setattr(
-        settings_mod, "get_oncall_rotations", lambda: [object(), object()]
-    )
+    monkeypatch.setattr(pkg, "get_oncall_rotations", lambda: [object(), object()])
 
     logger = _Logger()
     pkg.startup_warmup(logger=logger)
@@ -80,8 +75,7 @@ def test_startup_warmup_logs_rotation_count(monkeypatch) -> None:
 @pytest.mark.unit
 def test_startup_warmup_warns_when_no_rotations(monkeypatch) -> None:
     pkg = _reload_pkg()
-    settings_mod = importlib.import_module("packages.oncall_sync.settings")
-    monkeypatch.setattr(settings_mod, "get_oncall_rotations", lambda: [])
+    monkeypatch.setattr(pkg, "get_oncall_rotations", lambda: [])
 
     logger = _Logger()
     pkg.startup_warmup(logger=logger)
