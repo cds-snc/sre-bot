@@ -1,9 +1,11 @@
 import structlog
-from core.config import settings
+
+from infrastructure.configuration.integrations.aws import get_aws_settings
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 
 logger = structlog.get_logger()
-LOGGING_ROLE_ARN = settings.aws.LOGGING_ROLE_ARN
+settings = get_aws_settings()
+LOGGING_ROLE_ARN = settings.LOGGING_ROLE_ARN
 
 
 @handle_aws_api_errors
