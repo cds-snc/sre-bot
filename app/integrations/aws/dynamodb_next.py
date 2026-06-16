@@ -21,13 +21,14 @@ Usage:
 from typing import Any, Dict
 
 import structlog
-from core.config import settings
-from integrations.aws.client_next import execute_aws_api_call
+
+from infrastructure.configuration.integrations.aws import get_aws_settings
 from infrastructure.operations.result import OperationResult
+from integrations.aws.client_next import execute_aws_api_call
 
 logger = structlog.get_logger()
-
-AWS_REGION = settings.aws.AWS_REGION
+settings = get_aws_settings()
+AWS_REGION = settings.AWS_REGION
 
 
 def get_item(
