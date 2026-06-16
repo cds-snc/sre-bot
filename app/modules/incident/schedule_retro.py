@@ -1,20 +1,22 @@
+import json
 from datetime import datetime, timedelta
 
-import json
-
 from slack_sdk import WebClient
-from integrations.slack import channels as slack_channels
-from integrations.google_workspace.google_calendar import (
-    get_freebusy,
-    insert_event,
-    find_first_available_slot,
-    identify_unavailable_users,
-)
-from modules.incident import incident_conversation
 from structlog import get_logger
-from core.config import settings
 
-CALENDAR_ID = settings.google_resources.sre_calendar_id
+from infrastructure.configuration.integrations.google import get_google_resources_config
+from integrations.google_workspace.google_calendar import (
+    find_first_available_slot,
+    get_freebusy,
+    identify_unavailable_users,
+    insert_event,
+)
+from integrations.slack import channels as slack_channels
+from modules.incident import incident_conversation
+
+google_resources = get_google_resources_config()
+
+CALENDAR_ID = google_resources.sre_calendar_id
 
 logger = get_logger()
 
