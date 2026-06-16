@@ -4,21 +4,23 @@ Includes functions to manage the folders, the metadata, and the list of incident
 """
 
 import datetime
-import pytz
-
 import re
 import time
-from slack_sdk.web import WebClient
-from slack_sdk.errors import SlackApiError
+
+import pytz
 from slack_bolt import Ack
-from integrations.google_workspace import google_drive, sheets
-from integrations.aws import dynamodb
-from modules.incident import db_operations
-from core.config import settings
+from slack_sdk.errors import SlackApiError
+from slack_sdk.web import WebClient
 from structlog import get_logger
 
-SRE_INCIDENT_FOLDER = settings.google_resources.incident_folder_id
-INCIDENT_LIST = settings.google_resources.incident_list_id
+from infrastructure.configuration.integrations.google import get_google_resources_config
+from integrations.aws import dynamodb
+from integrations.google_workspace import google_drive, sheets
+from modules.incident import db_operations
+
+google_resources = get_google_resources_config()
+SRE_INCIDENT_FOLDER = google_resources.incident_folder_id
+INCIDENT_LIST = google_resources.incident_list_id
 
 logger = get_logger()
 

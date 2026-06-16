@@ -1,22 +1,25 @@
 """Core module to handle Incident creation"""
 
 from slack_sdk import WebClient
-
-from core.config import settings
-from structlog import get_logger
-from integrations.google_workspace import meet, google_drive
 from slack_sdk.models import blocks
+from structlog import get_logger
+
+from infrastructure.configuration.app import get_app_settings
+from infrastructure.configuration.features.incident import get_incident_settings
+from integrations.google_workspace import google_drive, meet
 from models.incidents import IncidentPayload
 from modules.incident import (
+    db_operations,
     incident_document,
     incident_folder,
-    db_operations,
     on_call,
 )
 
-PREFIX = settings.PREFIX
-INCIDENT_CHANNEL = settings.feat_incident.INCIDENT_CHANNEL
-SLACK_SECURITY_USER_GROUP_ID = settings.feat_incident.SLACK_SECURITY_USER_GROUP_ID
+app_settings = get_app_settings()
+incident_settings = get_incident_settings()
+PREFIX = app_settings.PREFIX
+INCIDENT_CHANNEL = incident_settings.INCIDENT_CHANNEL
+SLACK_SECURITY_USER_GROUP_ID = incident_settings.SLACK_SECURITY_USER_GROUP_ID
 
 logger = get_logger()
 

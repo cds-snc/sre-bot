@@ -1,33 +1,40 @@
-from datetime import datetime
-from typing import Callable
 import json
 import re
+from datetime import datetime
+from typing import Callable
+
+from slack_bolt import Ack, App, Respond
 from slack_sdk import WebClient
-from slack_bolt import Ack, Respond, App
-from integrations.google_workspace import google_drive
-from integrations.slack import (
-    channels as slack_channels,
-    users as slack_users,
-    commands as slack_commands,
-)
-from integrations.sentinel import log_to_sentinel
-from modules.incident import (
-    incident_status,
-    incident_alert,
-    incident_folder,
-    incident_roles,
-    incident_conversation,
-    schedule_retro,
-    db_operations,
-    information_display,
-    information_update,
-    core,
-)
-from core.config import settings
 from structlog import get_logger
 
+from infrastructure.configuration.integrations.google import get_google_resources_config
+from integrations.google_workspace import google_drive
+from integrations.sentinel import log_to_sentinel
+from integrations.slack import (
+    channels as slack_channels,
+)
+from integrations.slack import (
+    commands as slack_commands,
+)
+from integrations.slack import (
+    users as slack_users,
+)
+from modules.incident import (
+    core,
+    db_operations,
+    incident_alert,
+    incident_conversation,
+    incident_folder,
+    incident_roles,
+    incident_status,
+    information_display,
+    information_update,
+    schedule_retro,
+)
+
+google_resources = get_google_resources_config()
+SRE_INCIDENT_FOLDER = google_resources.incident_folder_id
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
-SRE_INCIDENT_FOLDER = settings.google_resources.incident_folder_id
 VALID_STATUS = [
     "In Progress",
     "Open",

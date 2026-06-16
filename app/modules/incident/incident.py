@@ -1,26 +1,31 @@
 import json
 import re
+
 import i18n  # type: ignore
-from slack_sdk import WebClient
-from slack_sdk.models import views, blocks
 from slack_bolt import Ack, App
+from slack_sdk import WebClient
+from slack_sdk.models import blocks, views
+from structlog import get_logger
 
-from integrations.slack import users as slack_users
+from infrastructure.configuration.app import get_app_settings
+from infrastructure.configuration.features.incident import get_incident_settings
+from infrastructure.configuration.integrations.google import get_google_resources_config
 from integrations.sentinel import log_to_sentinel
+from integrations.slack import users as slack_users
 from models.incidents import IncidentPayload
-
 from modules.incident import (
+    core,
     incident_conversation,
     incident_folder,
-    core,
 )
-from structlog import get_logger
-from core.config import settings
 
-PREFIX = settings.PREFIX
-INCIDENT_CHANNEL = settings.feat_incident.INCIDENT_CHANNEL
-SLACK_SECURITY_USER_GROUP_ID = settings.feat_incident.SLACK_SECURITY_USER_GROUP_ID
-INCIDENT_HANDBOOK_ID = settings.google_resources.incident_handbook_id
+app_settings = get_app_settings()
+incident_settings = get_incident_settings()
+google_resource = get_google_resources_config()
+PREFIX = app_settings.PREFIX
+INCIDENT_CHANNEL = incident_settings.INCIDENT_CHANNEL
+SLACK_SECURITY_USER_GROUP_ID = incident_settings.SLACK_SECURITY_USER_GROUP_ID
+INCIDENT_HANDBOOK_ID = google_resource.incident_handbook_id
 
 logger = get_logger()
 

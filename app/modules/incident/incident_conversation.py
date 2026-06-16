@@ -1,22 +1,23 @@
 import re
 from datetime import datetime
+
 import pytz  # type: ignore
 from slack_sdk import WebClient  # type: ignore
 from slack_sdk.errors import SlackApiError  # type: ignore
 from slack_sdk.web import SlackResponse  # type: ignore
-from integrations.google_workspace import google_docs
-from integrations.slack import users as slack_users
-from integrations.sentinel import log_to_sentinel
+from structlog import get_logger
 
+from infrastructure.configuration.app import get_app_settings
+from integrations.google_workspace import google_docs
+from integrations.sentinel import log_to_sentinel
+from integrations.slack import users as slack_users
+from modules.incident import incident_helper, schedule_retro
 from modules.incident.incident_document import (
     get_timeline_section,
     replace_text_between_headings,
 )
-from modules.incident import incident_helper, schedule_retro
-from structlog import get_logger
-from core.config import settings
 
-
+settings = get_app_settings()
 PREFIX = settings.PREFIX
 
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
