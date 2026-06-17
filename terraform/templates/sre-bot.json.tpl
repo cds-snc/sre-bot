@@ -29,6 +29,10 @@
       {
         "name": "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
         "valueFrom": "${GCP_SRE_SERVICE_ACCOUNT_KEY_FILE}"
+      },
+      {
+        "name": "SLACK_NOTIFY_MGMT_USER_GROUP_ID",
+        "valueFrom": "${SLACK_NOTIFY_MGMT_USER_GROUP_ID}"
       }
     ],
     "ulimits": [

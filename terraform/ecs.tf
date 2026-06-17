@@ -19,7 +19,8 @@ data "template_file" "sre-bot" {
     fargate_cpu                      = var.fargate_cpu
     fargate_memory                   = var.fargate_memory
     aws_region                       = "ca-central-1"
-    GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = aws_ssm_parameter.gcp_sre_service_account_key.arn
+    GCP_SRE_SERVICE_ACCOUNT_KEY_FILE    = aws_ssm_parameter.gcp_sre_service_account_key.arn
+    SLACK_NOTIFY_MGMT_USER_GROUP_ID     = aws_ssm_parameter.slack_notify_mgmt_user_group_id.arn
   }
 }
 

@@ -381,6 +381,9 @@ class IncidentFeatureSettings(BaseSettings):
     SLACK_SECURITY_USER_GROUP_ID: str | None = Field(
         default=None, alias="SLACK_SECURITY_USER_GROUP_ID"
     )
+    SLACK_NOTIFY_MGMT_USER_GROUP_ID: str | None = Field(
+        default=None, alias="SLACK_NOTIFY_MGMT_USER_GROUP_ID"
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",

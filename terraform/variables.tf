@@ -37,6 +37,12 @@ variable "slack_webhook_url" {
   sensitive   = true
 }
 
+variable "slack_notify_mgmt_user_group_id" {
+  description = "(Required) The Slack user group ID for the Notify management team"
+  type        = string
+  sensitive   = true
+}
+
 variable "authorized_endpoints_with_constraints" {
   description = "List of authorized endpoints with their positional constraints"
   type = list(object({

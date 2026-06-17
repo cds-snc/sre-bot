@@ -15,6 +15,7 @@ env:
   TF_VAR_google_oauth_pickle_string: "${{ secrets.GOOGLE_PICKLE_STRING }}"
   TF_VAR_slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
   TF_VAR_gcp_sre_service_account_key: ${{ secrets.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE }}
+  TF_VAR_slack_notify_mgmt_user_group_id: ${{ secrets.SLACK_NOTIFY_MGMT_USER_GROUP_ID }}
 
 
   

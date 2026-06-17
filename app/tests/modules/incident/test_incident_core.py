@@ -550,3 +550,120 @@ def test_initiate_resources_creation_boilerplate_update_fails(
         core.initiate_resources_creation(client, incident_payload)
     except Exception as e:
         assert str(e) == "boilerplate error"
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
+def test_initiate_resources_creation_notify_group_added(
+    _mock_create_incident_conversation,
+    _mock_incident_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call_users_from_folder,
+    _mock_logger,
+):
+    incident_payload = helper_generate_default_incident_params()
+    incident_payload.product = "Notify"
+    incident_payload.security_incident = "no"
+    mock_get_on_call_users_from_folder.return_value = []
+    mock_google_meet.create_space.return_value = {"meetingUri": "meet_url"}
+    mock_incident_document.create_incident_document.return_value = "doc_id"
+    mock_db_operations.create_incident.return_value = "incident_id"
+    client = MagicMock()
+
+    client.usergroups_users_list.return_value = {
+        "ok": True,
+        "users": ["notify_user_1", "notify_user_2"],
+    }
+    with patch("modules.incident.core.PREFIX", ""):
+        core.initiate_resources_creation(client, incident_payload)
+
+    client.usergroups_users_list.assert_called_once_with(
+        usergroup=None  # SLACK_NOTIFY_MGMT_USER_GROUP_ID default in test env
+    )
+    client.conversations_invite.assert_called_once_with(
+        channel="channel_id", users=["notify_user_1", "notify_user_2"]
+    )
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
+def test_initiate_resources_creation_notify_group_not_added_for_other_products(
+    _mock_create_incident_conversation,
+    _mock_incident_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call_users_from_folder,
+    _mock_logger,
+):
+    incident_payload = helper_generate_default_incident_params()
+    incident_payload.product = "SomeOtherProduct"
+    incident_payload.security_incident = "no"
+    mock_get_on_call_users_from_folder.return_value = []
+    mock_google_meet.create_space.return_value = {"meetingUri": "meet_url"}
+    mock_incident_document.create_incident_document.return_value = "doc_id"
+    mock_db_operations.create_incident.return_value = "incident_id"
+    client = MagicMock()
+
+    with patch("modules.incident.core.PREFIX", ""):
+        core.initiate_resources_creation(client, incident_payload)
+
+    client.usergroups_users_list.assert_not_called()
+    client.conversations_invite.assert_not_called()
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
+def test_initiate_resources_creation_notify_group_fails(
+    mock_create_incident_conversation,
+    mock_incident_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call_users_from_folder,
+    mock_logger,
+):
+    incident_payload = helper_generate_default_incident_params()
+    incident_payload.product = "Notify"
+    incident_payload.security_incident = "no"
+    mock_get_on_call_users_from_folder.return_value = []
+    mock_google_meet.create_space.return_value = {"meetingUri": "meet_url"}
+    mock_incident_document.create_incident_document.return_value = "doc_id"
+    mock_db_operations.create_incident.return_value = "incident_id"
+    client = MagicMock()
+
+    client.usergroups_users_list.side_effect = Exception("notify group error")
+    with patch("modules.incident.core.PREFIX", ""):
+        try:
+            core.initiate_resources_creation(client, incident_payload)
+        except Exception as e:
+            assert str(e) == "notify group error"
+
+    mock_create_incident_conversation.assert_not_called()
+    mock_google_meet.create_space.assert_called_once()
+    mock_incident_document.create_incident_document.assert_called_once_with(
+        "slug", "folder"
+    )
+    mock_incident_folder.add_new_incident_to_list.assert_called_once()
+    mock_db_operations.create_incident.assert_called_once()
+    mock_logger.info.assert_any_call("incident_document_created", document_id="doc_id")
+    mock_logger.info.assert_any_call(
+        "incident_record_created", incident_id="incident_id"
+    )
