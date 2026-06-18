@@ -9,9 +9,9 @@ import pytest
 from server import lifespan as lifespan_module
 from server.lifespan import (
     _initialize_directory_provider,
-    _get_logger,
+    _get_logger_from_app,
     _is_test_environment,
-    _list_configs,
+    _list_configs_from_sections,
     _register_legacy_handlers,
     _start_scheduled_tasks,
     _stop_scheduled_tasks,
@@ -57,7 +57,7 @@ def test_lifespan_get_logger_returns_logger(mock_settings):
     # Arrange
 
     # Act
-    logger = _get_logger(mock_settings)
+    logger = _get_logger_from_app(mock_settings)
 
     # Assert
     assert logger is not None
@@ -68,9 +68,18 @@ def test_lifespan_list_configs_logs_settings(mock_settings):
     """Test that _list_configs logs configuration settings."""
     # Arrange
     mock_logger = MagicMock()
+    mock_server_settings = MagicMock()
+    mock_server_settings.model_dump.return_value = {"PORT": 8080}
+    mock_directory_settings = MagicMock()
+    mock_directory_settings.model_dump.return_value = {"require_startup_warmup": True}
 
     # Act
-    _list_configs(mock_settings, mock_logger)
+    _list_configs_from_sections(
+        mock_settings,
+        mock_server_settings,
+        mock_directory_settings,
+        mock_logger,
+    )
 
     # Assert
     mock_logger.info.assert_called()
@@ -87,7 +96,7 @@ def test_lifespan_get_logger_configures_logging(mock_configure_logging, mock_set
     mock_configure_logging.return_value = mock_logger
 
     # Act
-    logger = _get_logger(mock_settings)
+    logger = _get_logger_from_app(mock_settings)
 
     # Assert
     mock_configure_logging.assert_called_once_with(settings=mock_settings)
@@ -206,7 +215,7 @@ def test_initialize_directory_provider_stores_provider_on_app_state(monkeypatch)
     app.state = MagicMock()
     mock_logger = MagicMock()
     mock_settings = MagicMock()
-    mock_settings.directory.require_startup_warmup = True
+    mock_settings.require_startup_warmup = True
     mock_provider = MagicMock()
     mock_provider.warmup.return_value = MagicMock(is_success=True, message="ok")
 
@@ -228,7 +237,7 @@ def test_initialize_directory_provider_raises_when_required_warmup_fails(monkeyp
     app.state = MagicMock()
     mock_logger = MagicMock()
     mock_settings = MagicMock()
-    mock_settings.directory.require_startup_warmup = True
+    mock_settings.require_startup_warmup = True
     mock_provider = MagicMock()
     mock_provider.warmup.return_value = MagicMock(
         is_success=False,
@@ -250,7 +259,7 @@ def test_initialize_directory_provider_allows_failed_optional_warmup(monkeypatch
     app.state = MagicMock()
     mock_logger = MagicMock()
     mock_settings = MagicMock()
-    mock_settings.directory.require_startup_warmup = False
+    mock_settings.require_startup_warmup = False
     mock_provider = MagicMock()
 
     monkeypatch.setattr("server.lifespan.get_directory_provider", lambda: mock_provider)
