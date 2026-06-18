@@ -3,13 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from sns_message_validator import SNSMessageValidator  # type: ignore
 
 from api.router import api_router
-from infrastructure.configuration import get_settings
+from infrastructure.configuration.app import get_app_settings
 from infrastructure.security import setup_rate_limiter
 from server.lifespan import lifespan
 
 sns_message_validator = SNSMessageValidator()
-settings = get_settings()
-
+app_settings = get_app_settings()
 
 handler = FastAPI(lifespan=lifespan)
 setup_rate_limiter(handler)
@@ -21,7 +20,7 @@ class ConfigurationError(Exception):
 
 allow_origins = (
     ["*"]
-    if settings.is_production
+    if app_settings.is_production
     else [
         "http://localhost:8000",
         "http://127.0.0.1:8000",
