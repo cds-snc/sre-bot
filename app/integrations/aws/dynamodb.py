@@ -1,19 +1,23 @@
 """AWS DynamoDB API client"""
 
 import structlog
-from core.config import settings
+
+from infrastructure.configuration.app import get_app_settings
+from infrastructure.configuration.integrations.aws import get_aws_settings
 from integrations.aws.client import (
     execute_aws_api_call,
     handle_aws_api_errors,
 )
 
 logger = structlog.get_logger()
+settings = get_aws_settings()
+app_settings = get_app_settings()
 
 client_config = dict(
-    region_name=settings.aws.AWS_REGION,
+    region_name=settings.AWS_REGION,
 )
 
-if settings.PREFIX:
+if app_settings.PREFIX:
     client_config["endpoint_url"] = "http://dynamodb-local:8000"
 
 

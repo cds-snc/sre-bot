@@ -15,19 +15,20 @@ not through this module.
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Optional, Mapping
+from typing import Any, Dict, List, Mapping, Optional
 
 import structlog
-from core.config import settings
-from integrations.aws.client_next import execute_aws_api_call
+
+from infrastructure.configuration.integrations.aws import get_aws_settings
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
-
-# Configuration from settings
-AWS_IDENTITY_STORE_ID = settings.aws.INSTANCE_ID
-ROLE_ARN = settings.aws.ORG_ROLE_ARN
+from integrations.aws.client_next import execute_aws_api_call
 
 logger = structlog.get_logger()
+# Configuration from settings
+settings = get_aws_settings()
+AWS_IDENTITY_STORE_ID = settings.INSTANCE_ID
+ROLE_ARN = settings.ORG_ROLE_ARN
 
 
 # User Management Functions

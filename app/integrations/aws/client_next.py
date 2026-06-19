@@ -29,21 +29,23 @@ Notes:
 """
 
 import time
-from typing import Any, List, Optional, Callable, cast
+from typing import Any, Callable, List, Optional, cast
 
-import structlog
 import boto3  # type: ignore
+import structlog
 from botocore.client import BaseClient  # type: ignore
 from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
-from core.config import settings
+
+from infrastructure.configuration.integrations.aws import get_aws_settings
 
 from infrastructure.operations.result import OperationResult
 
 logger = structlog.get_logger()
+settings = get_aws_settings()
 
-AWS_REGION = settings.aws.AWS_REGION
-THROTTLING_ERRS = settings.aws.THROTTLING_ERRS
-RESOURCE_NOT_FOUND_ERRS = settings.aws.RESOURCE_NOT_FOUND_ERRS
+AWS_REGION = settings.AWS_REGION
+THROTTLING_ERRS = settings.THROTTLING_ERRS
+RESOURCE_NOT_FOUND_ERRS = settings.RESOURCE_NOT_FOUND_ERRS
 
 ERROR_CONFIG = {
     "non_critical_errors": {

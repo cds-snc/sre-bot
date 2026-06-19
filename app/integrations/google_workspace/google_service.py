@@ -21,17 +21,20 @@ import structlog
 from google.oauth2 import service_account  # type: ignore
 from googleapiclient.discovery import Resource, build  # type: ignore
 from googleapiclient.errors import HttpError  # type: ignore
-from integrations.utils.api import convert_kwargs_to_camel_case
-from core.config import settings
 
-# Define the default arguments
-GOOGLE_WORKSPACE_CUSTOMER_ID = settings.google_workspace.GOOGLE_WORKSPACE_CUSTOMER_ID
-GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = (
-    settings.google_workspace.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
+from infrastructure.configuration.integrations.google import (
+    get_google_resources_config,
+    get_google_workspace_settings,
 )
-SRE_BOT_EMAIL = settings.google_workspace.SRE_BOT_EMAIL
-INCIDENT_TEMPLATE = settings.google_resources.incident_template_id
+from integrations.utils.api import convert_kwargs_to_camel_case
 
+# Define the default arguments - do not delete currently used in sibling modules
+settings = get_google_workspace_settings()
+resources = get_google_resources_config()
+GOOGLE_WORKSPACE_CUSTOMER_ID = settings.GOOGLE_WORKSPACE_CUSTOMER_ID
+GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = settings.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
+SRE_BOT_EMAIL = settings.SRE_BOT_EMAIL
+INCIDENT_TEMPLATE = resources.incident_template_id
 logger = structlog.get_logger()
 
 
@@ -54,7 +57,7 @@ def get_google_service(
         Resource: The authenticated Google service resource.
     """
 
-    creds_json = GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
+    creds_json = settings.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
 
     if not creds_json:
         logger.error("credentials_json_missing")
@@ -192,7 +195,7 @@ def execute_google_api_call(
         Any: The result of the API call. If paginate is True, returns a list of all results.
     """
     if delegated_user_email is None:
-        delegated_user_email = SRE_BOT_EMAIL
+        delegated_user_email = settings.SRE_BOT_EMAIL
     service = get_google_service(
         service_name,
         version,

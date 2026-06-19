@@ -3,30 +3,32 @@ from slack_bolt import Ack, App, Respond
 from slack_sdk import WebClient
 from structlog import get_logger
 
-from core.config import settings
+from infrastructure.configuration.app import get_app_settings
+from infrastructure.configuration.integrations.google import (
+    get_google_resources_config,
+    get_google_workspace_settings,
+)
 from integrations.google_workspace import google_drive
 from integrations.slack import commands as slack_commands
 from integrations.slack import users as slack_users
 
-PREFIX = settings.PREFIX
-BOT_EMAIL = settings.google_workspace.SRE_BOT_EMAIL
+app_settings = get_app_settings()
+google_settings = get_google_workspace_settings()
+google_resources = get_google_resources_config()
 
-SCORING_GUIDE_TEMPLATE = settings.google_resources.scoring_guide_template_id
-CORE_VALUES_INTERVIEW_NOTES_TEMPLATE = (
-    settings.google_resources.core_values_interview_notes_id
-)
-TECHNICAL_INTERVIEW_NOTES_TEMPLATE = (
-    settings.google_resources.technical_interview_notes_id
-)
-INTAKE_FORM_TEMPLATE = settings.google_resources.intake_form_template_id
-PHONE_SCREEN_TEMPLATE = settings.google_resources.phone_screen_template_id
-RECRUITMENT_FEEDBACK_TEMPLATE = (
-    settings.google_resources.recruitment_feedback_template_id
-)
-PANELIST_GUIDEBOOK_TEMPLATE = settings.google_resources.panelist_guidebook_template_id
+PREFIX = app_settings.PREFIX
+BOT_EMAIL = google_settings.SRE_BOT_EMAIL
 
-TEMPLATES_FOLDER = settings.google_resources.templates_folder_id
-INTERNAL_TALENT_FOLDER = settings.google_resources.internal_talent_folder_id
+SCORING_GUIDE_TEMPLATE = google_resources.scoring_guide_template_id
+CORE_VALUES_INTERVIEW_NOTES_TEMPLATE = google_resources.core_values_interview_notes_id
+TECHNICAL_INTERVIEW_NOTES_TEMPLATE = google_resources.technical_interview_notes_id
+INTAKE_FORM_TEMPLATE = google_resources.intake_form_template_id
+PHONE_SCREEN_TEMPLATE = google_resources.phone_screen_template_id
+RECRUITMENT_FEEDBACK_TEMPLATE = google_resources.recruitment_feedback_template_id
+PANELIST_GUIDEBOOK_TEMPLATE = google_resources.panelist_guidebook_template_id
+
+TEMPLATES_FOLDER = google_resources.templates_folder_id
+INTERNAL_TALENT_FOLDER = google_resources.internal_talent_folder_id
 
 ROLE_SCOPES = ["https://www.googleapis.com/auth/drive"]
 

@@ -22,19 +22,18 @@ Dependencies:
 import logging
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from collections.abc import Callable, Mapping, MutableMapping
+from typing import Any
 
 import structlog
 from structlog.processors import CallsiteParameter
 from structlog.stdlib import BoundLogger
-
-if TYPE_CHECKING:
-    from infrastructure.configuration import Settings
+from infrastructure.configuration.app import AppSettings
 
 
 def _apply_otel_code_conventions(
-    logger: Any, method_name: str, event_dict: dict[str, Any]
-) -> dict[str, Any]:
+    logger: Any, method_name: str, event_dict: MutableMapping[str, Any]
+) -> Mapping[str, Any] | str | bytes | bytearray | tuple[Any, ...]:
     """Apply OpenTelemetry semantic conventions for code attributes.
 
     Converts structlog callsite parameters to OTel standard fields:
@@ -102,7 +101,7 @@ def _is_test_environment() -> bool:
 
 
 def configure_logging(
-    settings: "Settings",
+    settings: AppSettings,
     log_level: str | None = None,
     is_production: bool | None = None,
 ) -> BoundLogger:
@@ -115,7 +114,7 @@ def configure_logging(
     - Test environment detection for log suppression
 
     Args:
-        settings: Settings instance (REQUIRED). Must be passed explicitly.
+        settings: AppSettings instance (REQUIRED). Must be passed explicitly.
         log_level: Optional override for log level (DEBUG, INFO, WARNING, etc).
             Defaults to settings.LOG_LEVEL if not provided.
         is_production: Optional override for production mode. Defaults to
@@ -165,7 +164,12 @@ def configure_logging(
 
     # Build processor pipeline per structlog best practices
     # Order matters: context vars first, then enrichment, then formatting
-    processors = [
+    processors: list[
+        Callable[
+            [Any, str, MutableMapping[str, Any]],
+            Mapping[str, Any] | str | bytes | bytearray | tuple[Any, ...],
+        ]
+    ] = [
         # 1. Context propagation (must be first)
         structlog.contextvars.merge_contextvars,
         # 2. Add metadata

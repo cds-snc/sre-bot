@@ -2,14 +2,19 @@ import sys
 import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, AsyncIterator, Optional, cast
+from typing import AsyncIterator, Optional, cast
 
 from fastapi import FastAPI
 from pluggy import PluginManager
 from slack_bolt import App
 from structlog.stdlib import BoundLogger
 
-from infrastructure.configuration import get_settings
+from infrastructure.configuration.app import AppSettings, get_app_settings
+from infrastructure.configuration.settings import Settings
+from infrastructure.configuration.infrastructure.directory import (
+    DirectorySettings,
+    get_directory_settings,
+)
 from infrastructure.configuration.infrastructure.server import (
     ServerSettings,
     get_server_settings,
@@ -42,27 +47,33 @@ from modules import (
     webhook_helper,
 )
 
-if TYPE_CHECKING:
-    from infrastructure.configuration import Settings
-
 
 def _is_test_environment() -> bool:
     """Detect if running in a test environment."""
     return "pytest" in sys.modules
 
 
-def _get_logger(settings: "Settings") -> BoundLogger:
-    return configure_logging(settings=settings)
+def _get_logger_from_app(app_settings: AppSettings) -> BoundLogger:
+    return configure_logging(settings=app_settings)
 
 
-def _list_configs(settings: "Settings", logger: BoundLogger) -> None:
-    config_settings: dict[str, list[object]] = {"settings": []}
+def _list_configs_from_sections(
+    app_settings: AppSettings,
+    server_settings: ServerSettings,
+    directory_settings: DirectorySettings,
+    logger: BoundLogger,
+) -> None:
+    config_settings: dict[str, tuple[object, ...]] = {
+        "settings": (
+            {"PREFIX": app_settings.PREFIX},
+            {"LOG_LEVEL": app_settings.LOG_LEVEL},
+            {"GIT_SHA": app_settings.GIT_SHA},
+        )
+    }
 
-    for key, value in settings.model_dump().items():
-        if isinstance(value, dict):
-            config_settings[key] = list(value.keys())
-        else:
-            config_settings["settings"].append({key: value})
+    config_settings["app"] = tuple(app_settings.model_dump().keys())
+    config_settings["server"] = tuple(server_settings.model_dump().keys())
+    config_settings["directory"] = tuple(directory_settings.model_dump().keys())
 
     logger.info("configuration_initialized", base_settings=config_settings["settings"])
     for key, value in config_settings.items():
@@ -84,10 +95,10 @@ def _register_legacy_handlers(bot: App, logger: BoundLogger) -> None:
 
 def _start_scheduled_tasks(
     bot: App,
-    settings: "Settings",
+    app_settings: AppSettings,
     logger: BoundLogger,
 ) -> Optional[threading.Event]:
-    if settings.PREFIX != "":
+    if app_settings.PREFIX != "":
         logger.info("scheduled_tasks_skipped", reason="prefix_not_empty")
         return None
 
@@ -134,7 +145,7 @@ def _initialize_security_services(
 
 def _initialize_directory_provider(
     app: FastAPI,
-    settings: "Settings",
+    directory_settings: DirectorySettings,
     logger: BoundLogger,
 ) -> None:
     """Build, warm up, and store the directory provider on app.state."""
@@ -143,7 +154,7 @@ def _initialize_directory_provider(
 
     directory_provider = get_directory_provider()
 
-    if settings.directory.require_startup_warmup:
+    if directory_settings.require_startup_warmup:
         warmup = directory_provider.warmup()
         if not warmup.is_success:
             log.error("directory_provider_initialization_failed", error=warmup.message)
@@ -207,19 +218,26 @@ def _initialize_translation_service(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    settings = get_settings()
+    settings = Settings()
+    app_settings = get_app_settings()
     server_settings = get_server_settings()
+    directory_settings = get_directory_settings()
     sre_ops_settings = get_sre_ops_settings()
-    logger = _get_logger(settings)
+    logger = _get_logger_from_app(app_settings)
 
     app.state.settings = settings
     app.state.logger = logger
 
     logger.info("application_startup")
-    _list_configs(settings, logger)
+    _list_configs_from_sections(
+        app_settings,
+        server_settings,
+        directory_settings,
+        logger,
+    )
 
     _initialize_security_services(app, server_settings, logger)
-    _initialize_directory_provider(app, settings, logger)
+    _initialize_directory_provider(app, directory_settings, logger)
 
     app.state.slack_provider = get_slack_provider()
 
@@ -258,7 +276,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 text="SRE Bot has started up in test mode.",
             )
         if not _is_test_environment():
-            scheduled_stop_event = _start_scheduled_tasks(slack_app, settings, logger)
+            scheduled_stop_event = _start_scheduled_tasks(
+                slack_app,
+                app_settings,
+                logger,
+            )
         else:
             scheduled_stop_event = None
 

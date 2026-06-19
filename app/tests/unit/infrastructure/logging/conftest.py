@@ -3,13 +3,13 @@
 import pytest
 from unittest.mock import Mock
 
-from infrastructure.configuration import Settings
+from infrastructure.configuration.app import AppSettings
 
 
 @pytest.fixture
 def mock_settings():
-    """Mock Settings instance for testing."""
-    settings = Mock(spec=Settings)
+    """Mock AppSettings instance for testing."""
+    settings = Mock(spec=AppSettings)
     settings.LOG_LEVEL = "INFO"
     settings.is_production = False
     return settings
