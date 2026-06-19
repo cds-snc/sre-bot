@@ -9,4 +9,3 @@ resource "aws_ssm_parameter" "gcp_sre_service_account_key" {
     Terraform  = true
   }
 }
-

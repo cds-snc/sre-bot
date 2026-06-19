@@ -37,7 +37,6 @@ variable "slack_webhook_url" {
   sensitive   = true
 }
 
-
 variable "authorized_endpoints_with_constraints" {
   description = "List of authorized endpoints with their positional constraints"
   type = list(object({
