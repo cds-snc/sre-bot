@@ -44,7 +44,9 @@
 		},
 		"ghcr.io/devcontainers/features/docker-in-docker:2": {
 			"version": "latest",
-			"moby": true
+			"moby": true,
+			"dockerBuildxVersion": "0.14.1",
+			"installDockerBuildx": false
 		},
 		"ghcr.io/devcontainers/features/terraform:1": {
 			"version": "1.5.3",
