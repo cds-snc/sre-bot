@@ -136,6 +136,7 @@ class TestSlackSettingsScope:
         [
             "INCIDENT_CHANNEL",
             "SLACK_SECURITY_USER_GROUP_ID",
+            "SLACK_NOTIFY_MGMT_USER_GROUP_ID",
         ],
     )
     def test_domain_fields_are_absent(self, field):

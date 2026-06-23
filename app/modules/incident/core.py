@@ -20,6 +20,7 @@ incident_settings = get_incident_settings()
 PREFIX = app_settings.PREFIX
 INCIDENT_CHANNEL = incident_settings.INCIDENT_CHANNEL
 SLACK_SECURITY_USER_GROUP_ID = incident_settings.SLACK_SECURITY_USER_GROUP_ID
+SLACK_NOTIFY_MGMT_USER_GROUP_ID = incident_settings.SLACK_NOTIFY_MGMT_USER_GROUP_ID
 
 logger = get_logger()
 
@@ -574,6 +575,24 @@ def initiate_resources_creation(
             for security_user in response["users"]:
                 if security_user != incident_payload.user_id:
                     users_to_invite.append(security_user)
+
+    # Get users from the @notify-management group
+    if incident_payload.product == "Notify" and SLACK_NOTIFY_MGMT_USER_GROUP_ID:
+        # If this is a Notify product incident, get users from the Notify management user group
+        # and add them to the list of users to invite
+        response = client.usergroups_users_list(
+            usergroup=SLACK_NOTIFY_MGMT_USER_GROUP_ID
+        )
+        if response.get("ok"):
+            for notify_user in response["users"]:
+                if notify_user != incident_payload.user_id:
+                    users_to_invite.append(notify_user)
+        else:
+            logger.warning(
+                "notify_mgmt_group_fetch_failed",
+                error=response.get("error"),
+                usergroup=SLACK_NOTIFY_MGMT_USER_GROUP_ID,
+            )
 
     # Invite all collected users to the channel in a single API call
     if users_to_invite:

@@ -550,3 +550,290 @@ def test_initiate_resources_creation_boilerplate_update_fails(
         core.initiate_resources_creation(client, incident_payload)
     except Exception as e:
         assert str(e) == "boilerplate error"
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
+def test_initiate_resources_creation_notify_group_added(
+    _mock_create_incident_conversation,
+    _mock_incident_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call_users_from_folder,
+    _mock_logger,
+):
+    incident_payload = helper_generate_default_incident_params()
+    incident_payload.product = "Notify"
+    incident_payload.security_incident = "no"
+    mock_get_on_call_users_from_folder.return_value = []
+    mock_google_meet.create_space.return_value = {"meetingUri": "meet_url"}
+    mock_incident_document.create_incident_document.return_value = "doc_id"
+    mock_db_operations.create_incident.return_value = "incident_id"
+    client = MagicMock()
+
+    client.usergroups_users_list.return_value = {
+        "ok": True,
+        "users": ["notify_user_1", "notify_user_2"],
+    }
+    with patch(
+        "modules.incident.core.SLACK_NOTIFY_MGMT_USER_GROUP_ID", "NOTIFY_GROUP_ID"
+    ):
+        core.initiate_resources_creation(client, incident_payload)
+
+    client.usergroups_users_list.assert_called_once_with(usergroup="NOTIFY_GROUP_ID")
+    assert client.conversations_invite.call_count == 2
+    client.conversations_invite.assert_any_call(
+        channel="channel_id", users=["notify_user_1", "notify_user_2"]
+    )
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
+def test_initiate_resources_creation_notify_group_not_added_for_other_products(
+    _mock_create_incident_conversation,
+    _mock_incident_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call_users_from_folder,
+    _mock_logger,
+):
+    incident_payload = helper_generate_default_incident_params()
+    incident_payload.product = "SomeOtherProduct"
+    incident_payload.security_incident = "no"
+    mock_get_on_call_users_from_folder.return_value = []
+    mock_google_meet.create_space.return_value = {"meetingUri": "meet_url"}
+    mock_incident_document.create_incident_document.return_value = "doc_id"
+    mock_db_operations.create_incident.return_value = "incident_id"
+    client = MagicMock()
+
+    core.initiate_resources_creation(client, incident_payload)
+
+    client.usergroups_users_list.assert_not_called()
+    # conversations_invite is still called once to add the incident creator
+    client.conversations_invite.assert_called_once_with(
+        channel="channel_id", users="user_id"
+    )
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
+def test_initiate_resources_creation_notify_group_fails(
+    mock_create_incident_conversation,
+    mock_incident_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call_users_from_folder,
+    mock_logger,
+):
+    incident_payload = helper_generate_default_incident_params()
+    incident_payload.product = "Notify"
+    incident_payload.security_incident = "no"
+    mock_get_on_call_users_from_folder.return_value = []
+    mock_google_meet.create_space.return_value = {"meetingUri": "meet_url"}
+    mock_incident_document.create_incident_document.return_value = "doc_id"
+    mock_db_operations.create_incident.return_value = "incident_id"
+    client = MagicMock()
+
+    client.usergroups_users_list.side_effect = Exception("notify group error")
+    with patch(
+        "modules.incident.core.SLACK_NOTIFY_MGMT_USER_GROUP_ID", "NOTIFY_GROUP_ID"
+    ):
+        try:
+            core.initiate_resources_creation(client, incident_payload)
+        except Exception as e:
+            assert str(e) == "notify group error"
+
+    mock_create_incident_conversation.assert_not_called()
+    mock_google_meet.create_space.assert_called_once()
+    mock_incident_document.create_incident_document.assert_called_once_with(
+        "slug", "folder"
+    )
+    mock_incident_folder.add_new_incident_to_list.assert_called_once()
+    mock_db_operations.create_incident.assert_called_once()
+    mock_logger.info.assert_any_call("incident_document_created", document_id="doc_id")
+    mock_logger.info.assert_any_call(
+        "incident_record_created", incident_id="incident_id"
+    )
+
+
+# --- SLACK_NOTIFY_MGMT_USER_GROUP_ID-specific tests ---
+
+
+def _notify_incident_payload():
+    payload = helper_generate_default_incident_params()
+    payload.product = "Notify"
+    payload.security_incident = "no"
+    return payload
+
+
+def _setup_notify_mocks(
+    mock_incident_document, mock_google_meet, mock_db_operations, mock_get_on_call
+):
+    mock_get_on_call.return_value = []
+    mock_google_meet.create_space.return_value = {"meetingUri": "meet_url"}
+    mock_incident_document.create_incident_document.return_value = "doc_id"
+    mock_db_operations.create_incident.return_value = "incident_id"
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
+def test_notify_incident_group_id_not_set_skips_usergroups_call(
+    _mock_conversation,
+    _mock_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call,
+    _mock_logger,
+):
+    """When SLACK_NOTIFY_MGMT_USER_GROUP_ID is None, usergroups_users_list is never called."""
+    incident_payload = _notify_incident_payload()
+    _setup_notify_mocks(
+        mock_incident_document, mock_google_meet, mock_db_operations, mock_get_on_call
+    )
+    client = MagicMock()
+
+    with patch("modules.incident.core.SLACK_NOTIFY_MGMT_USER_GROUP_ID", None):
+        core.initiate_resources_creation(client, incident_payload)
+
+    client.usergroups_users_list.assert_not_called()
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
+def test_notify_incident_slack_api_returns_ok_false_does_not_invite(
+    _mock_conversation,
+    _mock_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call,
+    mock_logger,
+):
+    """When Slack returns ok=False, no notify users are invited and a warning is logged."""
+    incident_payload = _notify_incident_payload()
+    _setup_notify_mocks(
+        mock_incident_document, mock_google_meet, mock_db_operations, mock_get_on_call
+    )
+    client = MagicMock()
+    client.usergroups_users_list.return_value = {
+        "ok": False,
+        "error": "no_such_subteam",
+    }
+
+    with patch(
+        "modules.incident.core.SLACK_NOTIFY_MGMT_USER_GROUP_ID", "NOTIFY_GROUP_ID"
+    ):
+        core.initiate_resources_creation(client, incident_payload)
+
+    # Only the creator invite should happen, no batch notify invite
+    client.conversations_invite.assert_called_once_with(
+        channel="channel_id", users="user_id"
+    )
+    mock_logger.warning.assert_called_once_with(
+        "notify_mgmt_group_fetch_failed",
+        error="no_such_subteam",
+        usergroup="NOTIFY_GROUP_ID",
+    )
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
+def test_notify_incident_creator_excluded_from_notify_group_invite(
+    _mock_conversation,
+    _mock_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call,
+    _mock_logger,
+):
+    """The incident creator (user_id) is not duplicated in the notify group invite."""
+    incident_payload = _notify_incident_payload()
+    _setup_notify_mocks(
+        mock_incident_document, mock_google_meet, mock_db_operations, mock_get_on_call
+    )
+    client = MagicMock()
+    # Slack returns user_id as a member of the notify group
+    client.usergroups_users_list.return_value = {
+        "ok": True,
+        "users": ["user_id", "notify_user_1"],
+    }
+
+    with patch(
+        "modules.incident.core.SLACK_NOTIFY_MGMT_USER_GROUP_ID", "NOTIFY_GROUP_ID"
+    ):
+        core.initiate_resources_creation(client, incident_payload)
+
+    # Only notify_user_1 should be in the batch invite (user_id excluded)
+    client.conversations_invite.assert_any_call(
+        channel="channel_id", users=["notify_user_1"]
+    )
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
+def test_notify_incident_empty_group_does_not_batch_invite(
+    _mock_conversation,
+    _mock_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call,
+    _mock_logger,
+):
+    """When the notify group has no users, no batch invite is made."""
+    incident_payload = _notify_incident_payload()
+    _setup_notify_mocks(
+        mock_incident_document, mock_google_meet, mock_db_operations, mock_get_on_call
+    )
+    client = MagicMock()
+    client.usergroups_users_list.return_value = {"ok": True, "users": []}
+
+    with patch(
+        "modules.incident.core.SLACK_NOTIFY_MGMT_USER_GROUP_ID", "NOTIFY_GROUP_ID"
+    ):
+        core.initiate_resources_creation(client, incident_payload)
+
+    # Only the creator invite should happen, no second batch invite
+    client.conversations_invite.assert_called_once_with(
+        channel="channel_id", users="user_id"
+    )

@@ -13,6 +13,7 @@ class IncidentFeatureSettings(FeatureSettings):
     Environment Variables:
         INCIDENT_CHANNEL: Slack channel ID for incident notifications
         SLACK_SECURITY_USER_GROUP_ID: Security team user group ID for mentions
+        SLACK_NOTIFY_MGMT_USER_GROUP_ID: Notify management team user group ID for Notify product incidents
 
     Example:
         ```python
@@ -28,6 +29,9 @@ class IncidentFeatureSettings(FeatureSettings):
     INCIDENT_CHANNEL: str | None = Field(default=None, alias="INCIDENT_CHANNEL")
     SLACK_SECURITY_USER_GROUP_ID: str | None = Field(
         default=None, alias="SLACK_SECURITY_USER_GROUP_ID"
+    )
+    SLACK_NOTIFY_MGMT_USER_GROUP_ID: str | None = Field(
+        default=None, alias="SLACK_NOTIFY_MGMT_USER_GROUP_ID"
     )
 
 
