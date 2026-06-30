@@ -72,12 +72,15 @@ def test_lifespan_list_configs_logs_settings(mock_settings):
     mock_server_settings.model_dump.return_value = {"PORT": 8080}
     mock_directory_settings = MagicMock()
     mock_directory_settings.model_dump.return_value = {"require_startup_warmup": True}
+    mock_sre_ops_settings = MagicMock()
+    mock_sre_ops_settings.model_dump.return_value = {"SRE_OPS_CHANNEL_ID": ""}
 
     # Act
     _list_configs_from_sections(
         mock_settings,
         mock_server_settings,
         mock_directory_settings,
+        mock_sre_ops_settings,
         mock_logger,
     )
 
