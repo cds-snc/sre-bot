@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 logger = structlog.get_logger()
-client = LegacySlackBootstrap().create_app().client
+client = LegacySlackBootstrap().web
 
 
 def _require_dev_environment(
@@ -225,7 +225,7 @@ def handle_stale_dev_command(payload: CommandPayload) -> CommandResponse:
         )
         return CommandResponse(
             message=(
-                "Stale channel notification sent (check channel for the " "message)"
+                "Stale channel notification sent " "(check channel for the message)"
             ),
             ephemeral=True,
         )

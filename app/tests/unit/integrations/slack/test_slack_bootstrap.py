@@ -10,6 +10,8 @@ into the shield.
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 from slack_sdk.http_retry.builtin_async_handlers import (
     AsyncConnectionErrorRetryHandler,
@@ -19,7 +21,7 @@ from slack_sdk.http_retry.builtin_async_handlers import (
 from slack_sdk.web.async_client import AsyncWebClient
 
 from integrations.slack.settings import SlackSettings
-from integrations.slack.bootstrap import SlackBootstrap
+from integrations.slack.bootstrap import LegacySlackBootstrap, SlackBootstrap
 
 pytestmark = pytest.mark.unit
 
@@ -88,3 +90,53 @@ class TestSlackBootstrapRetryHandlers:
                 ),
             ):
                 assert handler.max_retry_count == 2
+
+
+class TestSlackBootstrapAppCreation:
+    """Bolt app factories should set request verification by transport mode."""
+
+    def test_legacy_create_app_disables_request_verification_in_socket_mode(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setenv("SLACK_SOCKET_MODE", "true")
+
+        with patch("integrations.slack.bootstrap.App") as app_cls:
+            app_cls.return_value = MagicMock()
+
+            bootstrap = LegacySlackBootstrap()
+            bootstrap.create_app()
+
+        app_cls.assert_called_once()
+        assert app_cls.call_args.kwargs["request_verification_enabled"] is False
+
+    def test_legacy_create_app_enables_request_verification_in_http_mode(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setenv("SLACK_SOCKET_MODE", "false")
+        monkeypatch.setenv("SLACK_SIGNING_SECRET", "test-secret")
+
+        with patch("integrations.slack.bootstrap.App") as app_cls:
+            app_cls.return_value = MagicMock()
+
+            bootstrap = LegacySlackBootstrap()
+            bootstrap.create_app()
+
+        app_cls.assert_called_once()
+        assert app_cls.call_args.kwargs["request_verification_enabled"] is True
+
+    def test_async_create_app_disables_request_verification_in_socket_mode(
+        self,
+        monkeypatch,
+    ) -> None:
+        monkeypatch.setenv("SLACK_SOCKET_MODE", "true")
+
+        with patch("integrations.slack.bootstrap.AsyncApp") as app_cls:
+            app_cls.return_value = MagicMock()
+
+            bootstrap = SlackBootstrap()
+            bootstrap.create_app()
+
+        app_cls.assert_called_once()
+        assert app_cls.call_args.kwargs["request_verification_enabled"] is False

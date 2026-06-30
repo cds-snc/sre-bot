@@ -1,6 +1,7 @@
-"""Slack Bot Bootstrap module.
+"""Slack Bot bootstrap module.
 
-This module contains the bootstrap code for the Slack integration, including the Bolt app factory and any necessary setup for the integration.
+Contains Slack integration bootstrap code, including Bolt app factories
+and setup helpers.
 """
 
 from slack_bolt import App
@@ -48,11 +49,13 @@ class SlackBootstrap:
         )
 
     def create_app(self) -> AsyncApp:
-        """Create and return a Bolt AsyncApp instance configured with the Slack settings."""
+        """Create a Bolt AsyncApp configured from Slack settings."""
         self.settings
+        request_verification_enabled = not self.settings.SOCKET_MODE
         app = AsyncApp(
             token=self.settings.BOT_TOKEN,
             client=self.web,
+            request_verification_enabled=request_verification_enabled,
         )
         return app
 
@@ -80,10 +83,12 @@ class LegacySlackBootstrap:
         )
 
     def create_app(self) -> App:
-        """Create and return a Bolt App instance configured with the Slack settings."""
+        """Create a Bolt App configured from Slack settings."""
         self.settings
+        request_verification_enabled = not self.settings.SOCKET_MODE
         app = App(
             token=self.settings.BOT_TOKEN,
             client=self.web,
+            request_verification_enabled=request_verification_enabled,
         )
         return app
