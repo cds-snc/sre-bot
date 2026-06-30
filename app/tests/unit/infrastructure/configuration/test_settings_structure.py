@@ -4,11 +4,20 @@ Verifies the domain-based organization of settings modules after Phase 1
 refactoring (split by domain pattern).
 """
 
-from infrastructure.configuration import RetrySettings, get_settings
+from infrastructure.configuration.app import get_app_settings
 from infrastructure.configuration.base import (
-    IntegrationSettings,
     FeatureSettings,
+    IntegrationSettings,
     InfrastructureSettings,
+)
+from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
+from infrastructure.configuration.infrastructure.retry import (
+    RetrySettings,
+    get_retry_settings,
+)
+from infrastructure.configuration.infrastructure.server import get_server_settings
+from infrastructure.configuration.integrations.google import (
+    get_google_workspace_settings,
 )
 from infrastructure.configuration.integrations import (
     SlackSettings,
@@ -38,48 +47,42 @@ class TestSettingsStructure:
     """Test the new domain-based settings structure."""
 
     def test_settings_loads_all_integration_sections(self):
-        """Verify all integration settings sections load correctly."""
-        settings = get_settings()
-        # Integration settings
-        assert hasattr(settings, "slack")
-        assert hasattr(settings, "aws")
-        assert hasattr(settings, "google_workspace")
-        assert hasattr(settings, "google_resources")
-        assert hasattr(settings, "maxmind")
-        assert hasattr(settings, "notify")
-        assert hasattr(settings, "opsgenie")
-        assert hasattr(settings, "sentinel")
-        assert hasattr(settings, "trello")
+        """Verify integration settings provider loads correctly."""
+        google_workspace_settings = get_google_workspace_settings()
+
+        assert isinstance(google_workspace_settings, GoogleWorkspaceSettings)
+        assert hasattr(google_workspace_settings, "SRE_BOT_EMAIL")
 
     def test_settings_loads_all_feature_sections(self):
-        """Verify all feature settings sections load correctly."""
-        settings = get_settings()
-        # Feature settings
-        assert hasattr(settings, "feat_incident")
-        assert hasattr(settings, "aws_feature")
-        assert hasattr(settings, "atip")
-        assert hasattr(settings, "sre_ops")
+        """Verify feature settings provider loads correctly."""
+        aws_feature_settings = get_aws_feature_settings()
+
+        assert isinstance(aws_feature_settings, AWSFeatureSettings)
+        assert hasattr(aws_feature_settings, "AWS_ADMIN_GROUPS")
 
     def test_settings_loads_all_infrastructure_sections(self):
-        """Verify all infrastructure settings sections load correctly."""
-        settings = get_settings()
-        # Infrastructure settings
-        assert hasattr(settings, "retry")
-        assert hasattr(settings, "idempotency")
-        assert hasattr(settings, "server")
-        assert hasattr(settings, "dev")
+        """Verify infrastructure settings providers load correctly."""
+        server_settings = get_server_settings()
+        retry_settings = get_retry_settings()
+
+        assert isinstance(server_settings, ServerSettings)
+        assert isinstance(retry_settings, RetrySettings)
 
     def test_settings_preserves_field_access(self):
-        """Verify settings values are accessible at same paths as before."""
-        settings = get_settings()
-        assert hasattr(settings.slack, "SLACK_TOKEN")
-        assert hasattr(settings.aws, "AWS_REGION")
-        assert hasattr(settings.google_workspace, "GOOGLE_DELEGATED_ADMIN_EMAIL")
+        """Verify settings values are accessible from narrow providers."""
+        aws_feature_settings = get_aws_feature_settings()
+        server_settings = get_server_settings()
+        google_workspace_settings = get_google_workspace_settings()
+        retry_settings = get_retry_settings()
 
-        # Infrastructure fields
-        assert hasattr(settings.retry, "enabled")
-        assert hasattr(settings.retry, "backend")
-        assert hasattr(settings.idempotency, "IDEMPOTENCY_TTL_SECONDS")
+        assert hasattr(aws_feature_settings, "AWS_ADMIN_GROUPS")
+        assert hasattr(server_settings, "BACKEND_URL")
+        assert hasattr(
+            google_workspace_settings,
+            "GOOGLE_DELEGATED_ADMIN_EMAIL",
+        )
+        assert hasattr(retry_settings, "enabled")
+        assert hasattr(retry_settings, "backend")
 
     def test_retry_settings_can_be_imported_separately(self):
         """Verify RetrySettings can be imported separately for testing."""
@@ -92,7 +95,7 @@ class TestSettingsStructure:
 
     def test_settings_is_production_property(self):
         """Verify is_production property works correctly."""
-        settings = get_settings()
+        settings = get_app_settings()
         # Production is when PREFIX is empty
         assert hasattr(settings, "is_production")
         assert isinstance(settings.is_production, bool)
@@ -104,11 +107,20 @@ class TestSettingsStructure:
         assert issubclass(RetrySettings, InfrastructureSettings)
 
     def test_settings_singleton_still_works(self):
-        """Verify settings singleton behavior is preserved."""
-        # Settings should be a single instance from get_settings
-        settings1 = get_settings()
-        settings2 = get_settings()
-        assert settings1 is settings2
+        """Verify provider singleton behavior is preserved."""
+        retry_settings1 = get_retry_settings()
+        retry_settings2 = get_retry_settings()
+        server_settings1 = get_server_settings()
+        server_settings2 = get_server_settings()
+        google_settings1 = get_google_workspace_settings()
+        google_settings2 = get_google_workspace_settings()
+        aws_feature_settings1 = get_aws_feature_settings()
+        aws_feature_settings2 = get_aws_feature_settings()
+
+        assert retry_settings1 is retry_settings2
+        assert server_settings1 is server_settings2
+        assert google_settings1 is google_settings2
+        assert aws_feature_settings1 is aws_feature_settings2
 
     def test_all_integration_settings_classes_instantiable(self):
         """Verify all integration settings classes can be instantiated."""
@@ -130,10 +142,10 @@ class TestSettingsStructure:
             assert isinstance(instance, IntegrationSettings)
 
     def test_google_workspace_settings_defaults_customer_id(self, monkeypatch):
-        """Verify Google Workspace customer ID defaults to the stable customer alias."""
+        """Verify Google Workspace customer ID defaults to the stable alias."""
         monkeypatch.delenv("GOOGLE_WORKSPACE_CUSTOMER_ID", raising=False)
 
-        settings = GoogleWorkspaceSettings(_env_file=None)
+        settings = GoogleWorkspaceSettings.model_validate({})
 
         assert settings.GOOGLE_WORKSPACE_CUSTOMER_ID == "my_customer"
 

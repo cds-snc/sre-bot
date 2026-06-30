@@ -5,7 +5,7 @@ import boto3  # type: ignore
 import structlog
 from slack_sdk import WebClient
 
-from infrastructure.configuration import get_settings
+from infrastructure.configuration.app import get_app_settings
 from integrations.aws import identity_store, organizations, sso_admin
 from modules.ops.notifications import log_ops_message
 
@@ -13,10 +13,12 @@ logger = structlog.get_logger()
 
 
 def _get_dynamodb_client():
-    settings = get_settings()
+    app_settings = get_app_settings()
     return boto3.client(
         "dynamodb",
-        endpoint_url=("http://dynamodb-local:8000" if settings.PREFIX != "" else None),
+        endpoint_url=(
+            "http://dynamodb-local:8000" if app_settings.PREFIX != "" else None
+        ),
         region_name="ca-central-1",
     )
 
@@ -29,7 +31,9 @@ table = "aws_access_requests"
 def already_has_access(account_id, user_id, access_type):
     response = dynamodb_client.query(
         TableName=table,
-        KeyConditionExpression="account_id = :account_id and created_at > :created_at",
+        KeyConditionExpression=(
+            "account_id = :account_id and created_at > :created_at"
+        ),
         ExpressionAttributeValues={
             ":account_id": {"S": account_id},
             ":created_at": {
@@ -126,8 +130,8 @@ def get_active_requests():
     """
     Retrieves active requests from the DynamoDB table.
 
-    This function fetches records where the current time is less than the 'end_date_time' attribute,
-    indicating active requests.
+    This function fetches records where the current time is less than the
+    'end_date_time' attribute, indicating active requests.
 
     Returns:
         list: A list of active items from the DynamoDB table, or an empty list if none are found.
@@ -148,8 +152,8 @@ def get_past_requests():
     """
     Retrieves past requests from the DynamoDB table.
 
-    This function fetches records where the current time is greater than the 'end_date_time' attribute,
-    indicating past requests.
+    This function fetches records where the current time is greater than the
+    'end_date_time' attribute, indicating past requests.
 
     Returns:
         list: A list of past items from the DynamoDB table, or an empty list if none are found.
@@ -196,7 +200,11 @@ def access_view_handler(ack, body, request_logger, client: WebClient):
         "selected_option"
     ]["value"]
 
-    msg = f"<@{user_id}> ({email}) requested access to {account_name} ({account}) with {access_type} priviliges.\n\nRationale: {rationale}"
+    msg = (
+        f"<@{user_id}> ({email}) requested access to {account_name} "
+        f"({account}) with {access_type} priviliges.\n\n"
+        f"Rationale: {rationale}"
+    )
 
     log = logger.bind(
         user_id=user_id,
@@ -213,15 +221,41 @@ def access_view_handler(ack, body, request_logger, client: WebClient):
     aws_user_id = identity_store.get_user_id(email)
 
     if aws_user_id is None:
-        msg = f"<@{user_id}> ({email}) is not registered with AWS SSO. Please contact your administrator.\n<@{user_id}> ({email}) n'est pas enregistré avec AWS SSO. SVP contactez votre administrateur."
+        msg = (
+            f"<@{user_id}> ({email}) is not registered with AWS SSO. "
+            "Please contact your administrator.\n"
+            f"<@{user_id}> ({email}) n'est pas enregistré avec AWS SSO. "
+            "SVP contactez votre administrateur."
+        )
     elif expires := already_has_access(account, user_id, access_type):
-        msg = f"You already have access to {account_name} ({account}) with access type {access_type}. Your access will expire in {expires} minutes."
+        msg = (
+            f"You already have access to {account_name} ({account}) with "
+            f"access type {access_type}. Your access will expire in "
+            f"{expires} minutes."
+        )
     elif create_aws_access_request(
         account, account_name, user_id, email, access_type, rationale
     ) and sso_admin.create_account_assignment(aws_user_id, account, access_type):
-        msg = f"Provisioning {access_type} access request for {account_name} ({account}). This can take a minute or two. Visit <https://cds-snc.awsapps.com/start#/|https://cds-snc.awsapps.com/start#/> to gain access.\nTraitement de la requête d'accès {access_type} pour le compte {account_name} ({account}) en cours. Cela peut prendre quelques minutes. Visitez <https://cds-snc.awsapps.com/start#/|https://cds-snc.awsapps.com/start#/> pour y accéder"
+        msg = (
+            f"Provisioning {access_type} access request for {account_name} "
+            f"({account}). This can take a minute or two. Visit "
+            "<https://cds-snc.awsapps.com/start#/|"
+            "https://cds-snc.awsapps.com/start#/> to gain access.\n"
+            f"Traitement de la requête d'accès {access_type} pour le compte "
+            f"{account_name} ({account}) en cours. Cela peut prendre "
+            "quelques minutes. Visitez "
+            "<https://cds-snc.awsapps.com/start#/|"
+            "https://cds-snc.awsapps.com/start#/> pour y accéder"
+        )
     else:
-        msg = f"Failed to provision {access_type} access request for {account_name} ({account}). Please drop a note in the <#sre-and-tech-ops> channel.\nLa requête d'accès {access_type} pour {account_name} ({account}) a échouée. Envoyez une note sur le canal <#sre-and-tech-ops>"
+        msg = (
+            f"Failed to provision {access_type} access request for "
+            f"{account_name} ({account}). Please drop a note in the "
+            "<#sre-and-tech-ops> channel.\n"
+            f"La requête d'accès {access_type} pour {account_name} "
+            f"({account}) a échouée. Envoyez une note sur le canal "
+            "<#sre-and-tech-ops>"
+        )
 
     client.chat_postEphemeral(
         channel=user_id,
@@ -259,7 +293,10 @@ def request_access_modal(client: WebClient, body):
                         "type": "static_select",
                         "placeholder": {
                             "type": "plain_text",
-                            "text": "Select an account to access | Choisissez un compte à accéder",
+                            "text": (
+                                "Select an account to access | "
+                                "Choisissez un compte à accéder"
+                            ),
                         },
                         "options": options,
                         "action_id": "account",
@@ -271,7 +308,11 @@ def request_access_modal(client: WebClient, body):
                     "type": "input",
                     "label": {
                         "type": "plain_text",
-                        "text": "What type of access do you want? :this-is-fine-fire: | Quel type d'accès désirez-vous? :this-is-fine-fire:",
+                        "text": (
+                            "What type of access do you want? "
+                            ":this-is-fine-fire: | Quel type d'accès "
+                            "désirez-vous? :this-is-fine-fire:"
+                        ),
                         "emoji": True,
                     },
                     "element": {
@@ -280,7 +321,11 @@ def request_access_modal(client: WebClient, body):
                             {
                                 "text": {
                                     "type": "plain_text",
-                                    "text": "Read access - just need to check something \n Lecture seule - je dois juste regarder quelque chose",
+                                    "text": (
+                                        "Read access - just need to check "
+                                        "something \n Lecture seule - je dois "
+                                        "juste regarder quelque chose"
+                                    ),
                                     "emoji": True,
                                 },
                                 "value": "read",
@@ -288,7 +333,11 @@ def request_access_modal(client: WebClient, body):
                             {
                                 "text": {
                                     "type": "plain_text",
-                                    "text": "Write access - need to modify something \n Écriture - je dois modifier quelque chose",
+                                    "text": (
+                                        "Write access - need to modify "
+                                        "something \n Écriture - je dois "
+                                        "modifier quelque chose"
+                                    ),
                                     "emoji": True,
                                 },
                                 "value": "write",
@@ -307,7 +356,9 @@ def request_access_modal(client: WebClient, body):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": "What do you plan on doing? | Que planifiez-vous faire?",
+                        "text": (
+                            "What do you plan on doing? | " "Que planifiez-vous faire?"
+                        ),
                         "emoji": True,
                     },
                 },

@@ -99,7 +99,7 @@ def test_should_delegate_to_ops_handler_when_ops_command_given(
 
 
 @pytest.mark.unit
-@patch("modules.aws.groups.get_settings")
+@patch("modules.aws.groups.get_aws_feature_settings")
 @patch("modules.aws.groups.identity_center")
 @patch("modules.aws.groups.permissions")
 @patch("modules.aws.groups.slack_users")
@@ -109,18 +109,18 @@ def test_should_synchronize_groups_when_user_has_permission(
     mock_slack_users,
     mock_permissions,
     mock_identity_center,
-    mock_get_settings,
+    mock_get_aws_feature_settings,
 ):
     """Test successful group synchronization when user has permission."""
     # Arrange
     client = MagicMock()
     body = MagicMock()
     respond = MagicMock()
-    args = []
+    args: list[str] = []
 
-    mock_settings = MagicMock()
-    mock_settings.aws_feature.AWS_ADMIN_GROUPS = ["admin@test.com"]
-    mock_get_settings.return_value = mock_settings
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_ADMIN_GROUPS = ["admin@test.com"]
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
 
     mock_slack_users.get_user_email_from_body.return_value = "admin.user@test.com"
     mock_permissions.is_user_member_of_groups.return_value = True
@@ -141,22 +141,22 @@ def test_should_synchronize_groups_when_user_has_permission(
 
 
 @pytest.mark.unit
-@patch("modules.aws.groups.get_settings")
+@patch("modules.aws.groups.get_aws_feature_settings")
 @patch("modules.aws.groups.permissions")
 @patch("modules.aws.groups.slack_users")
 def test_should_deny_sync_when_user_lacks_permission(
-    mock_slack_users, mock_permissions, mock_get_settings
+    mock_slack_users, mock_permissions, mock_get_aws_feature_settings
 ):
     """Test sync denial when user lacks permission."""
     # Arrange
     client = MagicMock()
     body = MagicMock()
     respond = MagicMock()
-    args = []
+    args: list[str] = []
 
-    mock_settings = MagicMock()
-    mock_settings.aws_feature.AWS_ADMIN_GROUPS = ["admin@test.com"]
-    mock_get_settings.return_value = mock_settings
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_ADMIN_GROUPS = ["admin@test.com"]
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
 
     mock_slack_users.get_user_email_from_body.return_value = "user@test.com"
     mock_permissions.is_user_member_of_groups.return_value = False
@@ -171,23 +171,26 @@ def test_should_deny_sync_when_user_lacks_permission(
 
 
 @pytest.mark.unit
-@patch("modules.aws.groups.get_settings")
+@patch("modules.aws.groups.get_aws_feature_settings")
 @patch("modules.aws.groups.provisioning_groups")
 @patch("modules.aws.groups.permissions")
 @patch("modules.aws.groups.slack_users")
 def test_should_list_groups_when_user_has_permission(
-    mock_slack_users, mock_permissions, mock_provisioning_groups, mock_get_settings
+    mock_slack_users,
+    mock_permissions,
+    mock_provisioning_groups,
+    mock_get_aws_feature_settings,
 ):
     """Test successful group listing when user has permission."""
     # Arrange
     client = MagicMock()
     body = MagicMock()
     respond = MagicMock()
-    args = []
+    args: list[str] = []
 
-    mock_settings = MagicMock()
-    mock_settings.aws_feature.AWS_ADMIN_GROUPS = ["admin@test.com"]
-    mock_get_settings.return_value = mock_settings
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_ADMIN_GROUPS = ["admin@test.com"]
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
 
     mock_slack_users.get_user_email_from_body.return_value = "admin.user@test.com"
     mock_permissions.is_user_member_of_groups.return_value = True
@@ -214,22 +217,22 @@ def test_should_list_groups_when_user_has_permission(
 
 
 @pytest.mark.unit
-@patch("modules.aws.groups.get_settings")
+@patch("modules.aws.groups.get_aws_feature_settings")
 @patch("modules.aws.groups.permissions")
 @patch("modules.aws.groups.slack_users")
 def test_should_deny_list_when_user_lacks_permission(
-    mock_slack_users, mock_permissions, mock_get_settings
+    mock_slack_users, mock_permissions, mock_get_aws_feature_settings
 ):
     """Test list denial when user lacks permission."""
     # Arrange
     client = MagicMock()
     body = MagicMock()
     respond = MagicMock()
-    args = []
+    args: list[str] = []
 
-    mock_settings = MagicMock()
-    mock_settings.aws_feature.AWS_ADMIN_GROUPS = ["admin@test.com"]
-    mock_get_settings.return_value = mock_settings
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_ADMIN_GROUPS = ["admin@test.com"]
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
 
     mock_slack_users.get_user_email_from_body.return_value = "user@test.com"
     mock_permissions.is_user_member_of_groups.return_value = False

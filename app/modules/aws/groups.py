@@ -5,7 +5,7 @@ from modules.aws import identity_center, ops_group_assignment
 from modules.permissions import handler as permissions
 from modules.provisioning import groups as provisioning_groups
 from integrations.slack import users as slack_users
-from infrastructure.configuration import get_settings
+from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
 
 logger = structlog.get_logger()
 
@@ -51,12 +51,12 @@ def request_groups_sync(client, body, respond, args):
         respond (function): The function to respond to the request.
         args (list[str]): The list of arguments.
     """
-    settings = get_settings()
+    aws_feature_settings = get_aws_feature_settings()
     requestor_email = slack_users.get_user_email_from_body(client, body)
     log = logger.bind(requestor_email=requestor_email)
     log.info("aws_groups_sync_request_received")
     if permissions.is_user_member_of_groups(
-        requestor_email, settings.aws_feature.AWS_ADMIN_GROUPS
+        requestor_email, aws_feature_settings.AWS_ADMIN_GROUPS
     ):
         pre_processing_filters = (
             [
@@ -89,7 +89,7 @@ def request_groups_sync(client, body, respond, args):
     else:
         log.warning(
             "aws_groups_sync_request_denied",
-            aws_admin_groups=settings.aws_feature.AWS_ADMIN_GROUPS,
+            aws_admin_groups=aws_feature_settings.AWS_ADMIN_GROUPS,
         )
         respond("You do not have permission to sync groups.")
         return
@@ -97,14 +97,14 @@ def request_groups_sync(client, body, respond, args):
 
 def request_groups_list(client, body, respond, args):
     """List all groups from AWS Identity Center."""
-    settings = get_settings()
+    aws_feature_settings = get_aws_feature_settings()
     requestor_email = slack_users.get_user_email_from_body(client, body)
     log = logger.bind(requestor_email=requestor_email)
     log.info(
         "aws_groups_list_request_received",
     )
     if permissions.is_user_member_of_groups(
-        requestor_email, settings.aws_feature.AWS_ADMIN_GROUPS
+        requestor_email, aws_feature_settings.AWS_ADMIN_GROUPS
     ):
         respond("AWS Groups List request received.")
         log.info(
@@ -124,7 +124,7 @@ def request_groups_list(client, body, respond, args):
     else:
         log.warning(
             "aws_groups_list_request_denied",
-            aws_admin_groups=settings.aws_feature.AWS_ADMIN_GROUPS,
+            aws_admin_groups=aws_feature_settings.AWS_ADMIN_GROUPS,
         )
         respond("You do not have permission to list groups.")
         return
@@ -132,14 +132,14 @@ def request_groups_list(client, body, respond, args):
 
 def request_groups_ops(client, body, respond, args):
     """Assign Ops group to all AWS accounts."""
-    settings = get_settings()
+    aws_feature_settings = get_aws_feature_settings()
     requestor_email = slack_users.get_user_email_from_body(client, body)
     log = logger.bind(requestor_email=requestor_email)
     log.info(
         "aws_ops_group_assignment_received",
     )
     if permissions.is_user_member_of_groups(
-        requestor_email, settings.aws_feature.AWS_ADMIN_GROUPS
+        requestor_email, aws_feature_settings.AWS_ADMIN_GROUPS
     ):
         respond("AWS Ops Group Assignment request received.")
         log.info(
@@ -160,7 +160,7 @@ def request_groups_ops(client, body, respond, args):
     else:
         log.warning(
             "aws_ops_group_assignment_request_denied",
-            aws_admin_groups=settings.aws_feature.AWS_ADMIN_GROUPS,
+            aws_admin_groups=aws_feature_settings.AWS_ADMIN_GROUPS,
         )
         respond("You do not have permission to assign Ops group.")
         return

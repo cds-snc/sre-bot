@@ -7,13 +7,13 @@ from modules.aws import ops_group_assignment
 
 
 @pytest.mark.unit
-@patch("modules.aws.ops_group_assignment.get_settings")
-def test_should_return_none_when_feature_disabled(mock_get_settings):
+@patch("modules.aws.ops_group_assignment.get_aws_feature_settings")
+def test_should_return_none_when_feature_disabled(mock_get_aws_feature_settings):
     """Test execute returns None when feature is disabled."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.aws_feature.AWS_OPS_GROUP_NAME = None
-    mock_get_settings.return_value = mock_settings
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_OPS_GROUP_NAME = None
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
 
     # Act
     result = ops_group_assignment.execute()
@@ -23,16 +23,16 @@ def test_should_return_none_when_feature_disabled(mock_get_settings):
 
 
 @pytest.mark.unit
-@patch("modules.aws.ops_group_assignment.get_settings")
+@patch("modules.aws.ops_group_assignment.get_aws_feature_settings")
 @patch("modules.aws.ops_group_assignment.identity_store")
 def test_should_return_failed_when_group_not_found(
-    mock_identity_store, mock_get_settings
+    mock_identity_store, mock_get_aws_feature_settings
 ):
     """Test execute returns failed status when ops group not found."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.aws_feature.AWS_OPS_GROUP_NAME = "OpsGroup"
-    mock_get_settings.return_value = mock_settings
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_OPS_GROUP_NAME = "OpsGroup"
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
     mock_identity_store.get_group_id.return_value = None
 
     # Act
@@ -45,18 +45,21 @@ def test_should_return_failed_when_group_not_found(
 
 
 @pytest.mark.unit
-@patch("modules.aws.ops_group_assignment.get_settings")
+@patch("modules.aws.ops_group_assignment.get_aws_feature_settings")
 @patch("modules.aws.ops_group_assignment.identity_store")
 @patch("modules.aws.ops_group_assignment.organizations")
 @patch("modules.aws.ops_group_assignment.sso_admin")
 def test_should_assign_group_to_unassigned_accounts(
-    mock_sso_admin, mock_organizations, mock_identity_store, mock_get_settings
+    mock_sso_admin,
+    mock_organizations,
+    mock_identity_store,
+    mock_get_aws_feature_settings,
 ):
     """Test execute assigns ops group to unassigned accounts."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.aws_feature.AWS_OPS_GROUP_NAME = "OpsGroup"
-    mock_get_settings.return_value = mock_settings
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_OPS_GROUP_NAME = "OpsGroup"
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
     mock_identity_store.get_group_id.return_value = "group-123"
     mock_organizations.list_organization_accounts.return_value = [
         {"Id": "111111111111", "Name": "Account1", "Status": "ACTIVE"},
@@ -75,18 +78,21 @@ def test_should_assign_group_to_unassigned_accounts(
 
 
 @pytest.mark.unit
-@patch("modules.aws.ops_group_assignment.get_settings")
+@patch("modules.aws.ops_group_assignment.get_aws_feature_settings")
 @patch("modules.aws.ops_group_assignment.identity_store")
 @patch("modules.aws.ops_group_assignment.organizations")
 @patch("modules.aws.ops_group_assignment.sso_admin")
 def test_should_return_ok_when_all_accounts_assigned(
-    mock_sso_admin, mock_organizations, mock_identity_store, mock_get_settings
+    mock_sso_admin,
+    mock_organizations,
+    mock_identity_store,
+    mock_get_aws_feature_settings,
 ):
     """Test execute returns ok when all accounts already assigned."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.aws_feature.AWS_OPS_GROUP_NAME = "OpsGroup"
-    mock_get_settings.return_value = mock_settings
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_OPS_GROUP_NAME = "OpsGroup"
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
     mock_identity_store.get_group_id.return_value = "group-123"
     mock_organizations.list_organization_accounts.return_value = [
         {"Id": "111111111111", "Name": "Account1", "Status": "ACTIVE"},
@@ -104,18 +110,21 @@ def test_should_return_ok_when_all_accounts_assigned(
 
 
 @pytest.mark.unit
-@patch("modules.aws.ops_group_assignment.get_settings")
+@patch("modules.aws.ops_group_assignment.get_aws_feature_settings")
 @patch("modules.aws.ops_group_assignment.identity_store")
 @patch("modules.aws.ops_group_assignment.organizations")
 @patch("modules.aws.ops_group_assignment.sso_admin")
 def test_should_skip_suspended_accounts(
-    mock_sso_admin, mock_organizations, mock_identity_store, mock_get_settings
+    mock_sso_admin,
+    mock_organizations,
+    mock_identity_store,
+    mock_get_aws_feature_settings,
 ):
     """Test execute skips suspended accounts."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.aws_feature.AWS_OPS_GROUP_NAME = "OpsGroup"
-    mock_get_settings.return_value = mock_settings
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_OPS_GROUP_NAME = "OpsGroup"
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
     mock_identity_store.get_group_id.return_value = "group-123"
     mock_organizations.list_organization_accounts.return_value = [
         {"Id": "111111111111", "Name": "Account1", "Status": "SUSPENDED"},
@@ -134,18 +143,21 @@ def test_should_skip_suspended_accounts(
 
 
 @pytest.mark.unit
-@patch("modules.aws.ops_group_assignment.get_settings")
+@patch("modules.aws.ops_group_assignment.get_aws_feature_settings")
 @patch("modules.aws.ops_group_assignment.identity_store")
 @patch("modules.aws.ops_group_assignment.organizations")
 @patch("modules.aws.ops_group_assignment.sso_admin")
 def test_should_handle_account_missing_id(
-    mock_sso_admin, mock_organizations, mock_identity_store, mock_get_settings
+    mock_sso_admin,
+    mock_organizations,
+    mock_identity_store,
+    mock_get_aws_feature_settings,
 ):
     """Test execute handles accounts missing ID gracefully."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.aws_feature.AWS_OPS_GROUP_NAME = "OpsGroup"
-    mock_get_settings.return_value = mock_settings
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_OPS_GROUP_NAME = "OpsGroup"
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
     mock_identity_store.get_group_id.return_value = "group-123"
     mock_organizations.list_organization_accounts.return_value = [
         {"Name": "NoIdAccount", "Status": "ACTIVE"},
@@ -164,18 +176,21 @@ def test_should_handle_account_missing_id(
 
 
 @pytest.mark.unit
-@patch("modules.aws.ops_group_assignment.get_settings")
+@patch("modules.aws.ops_group_assignment.get_aws_feature_settings")
 @patch("modules.aws.ops_group_assignment.identity_store")
 @patch("modules.aws.ops_group_assignment.organizations")
 @patch("modules.aws.ops_group_assignment.sso_admin")
 def test_should_return_failed_when_assignment_fails(
-    mock_sso_admin, mock_organizations, mock_identity_store, mock_get_settings
+    mock_sso_admin,
+    mock_organizations,
+    mock_identity_store,
+    mock_get_aws_feature_settings,
 ):
     """Test execute returns failed status when assignment fails."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.aws_feature.AWS_OPS_GROUP_NAME = "OpsGroup"
-    mock_get_settings.return_value = mock_settings
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_OPS_GROUP_NAME = "OpsGroup"
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
     mock_identity_store.get_group_id.return_value = "group-123"
     mock_organizations.list_organization_accounts.return_value = [
         {"Id": "111111111111", "Name": "Account1", "Status": "ACTIVE"},
@@ -192,18 +207,21 @@ def test_should_return_failed_when_assignment_fails(
 
 
 @pytest.mark.unit
-@patch("modules.aws.ops_group_assignment.get_settings")
+@patch("modules.aws.ops_group_assignment.get_aws_feature_settings")
 @patch("modules.aws.ops_group_assignment.identity_store")
 @patch("modules.aws.ops_group_assignment.organizations")
 @patch("modules.aws.ops_group_assignment.sso_admin")
 def test_should_use_correct_permission_set(
-    mock_sso_admin, mock_organizations, mock_identity_store, mock_get_settings
+    mock_sso_admin,
+    mock_organizations,
+    mock_identity_store,
+    mock_get_aws_feature_settings,
 ):
     """Test execute uses correct permission set when assigning."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.aws_feature.AWS_OPS_GROUP_NAME = "OpsGroup"
-    mock_get_settings.return_value = mock_settings
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_OPS_GROUP_NAME = "OpsGroup"
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
     mock_identity_store.get_group_id.return_value = "group-123"
     mock_organizations.list_organization_accounts.return_value = [
         {"Id": "111111111111", "Name": "Account1", "Status": "ACTIVE"},
@@ -221,18 +239,21 @@ def test_should_use_correct_permission_set(
 
 
 @pytest.mark.unit
-@patch("modules.aws.ops_group_assignment.get_settings")
+@patch("modules.aws.ops_group_assignment.get_aws_feature_settings")
 @patch("modules.aws.ops_group_assignment.identity_store")
 @patch("modules.aws.ops_group_assignment.organizations")
 @patch("modules.aws.ops_group_assignment.sso_admin")
 def test_should_handle_multiple_accounts_with_mixed_status(
-    mock_sso_admin, mock_organizations, mock_identity_store, mock_get_settings
+    mock_sso_admin,
+    mock_organizations,
+    mock_identity_store,
+    mock_get_aws_feature_settings,
 ):
     """Test execute handles mixed account statuses correctly."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.aws_feature.AWS_OPS_GROUP_NAME = "OpsGroup"
-    mock_get_settings.return_value = mock_settings
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_OPS_GROUP_NAME = "OpsGroup"
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
     mock_identity_store.get_group_id.return_value = "group-123"
     mock_organizations.list_organization_accounts.return_value = [
         {"Id": "111111111111", "Name": "Account1", "Status": "ACTIVE"},
