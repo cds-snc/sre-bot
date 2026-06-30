@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Audit DNS requests
-      uses: cds-snc/dns-proxy-action@main
+      uses: cds-snc/dns-proxy-action@ecf81b342b408970a7082a45da0c05e35d411422 # main
       env:
         DNS_PROXY_FORWARDTOSENTINEL: "true"
         DNS_PROXY_LOGANALYTICSWORKSPACEID: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
