@@ -17,12 +17,12 @@ class IncidentFeatureSettings(FeatureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.features.incident import get_incident_settings
 
-        settings = get_settings()
+        settings = get_incident_settings()
 
-        incident_channel = settings.feat_incident.INCIDENT_CHANNEL
-        security_group = settings.feat_incident.SLACK_SECURITY_USER_GROUP_ID
+        incident_channel = settings.INCIDENT_CHANNEL
+        security_group = settings.SLACK_SECURITY_USER_GROUP_ID
         ```
     """
 

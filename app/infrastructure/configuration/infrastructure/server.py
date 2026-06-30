@@ -24,13 +24,13 @@ class ServerSettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.infrastructure.server import get_server_settings
 
-        settings = get_settings()
+        settings = get_server_settings()
 
-        backend_url = settings.server.BACKEND_URL
-        client_id = settings.server.GOOGLE_CLIENT_ID
-        token_expire = settings.server.ACCESS_TOKEN_EXPIRE_MINUTES
+        backend_url = settings.BACKEND_URL
+        client_id = settings.GOOGLE_CLIENT_ID
+        token_expire = settings.ACCESS_TOKEN_EXPIRE_MINUTES
         ```
     """
 
@@ -68,11 +68,11 @@ class DevSettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.infrastructure.server import get_dev_settings
 
-        settings = get_settings()
+        settings = get_dev_settings()
 
-        dev_channel = settings.dev.SLACK_DEV_MSG_CHANNEL
+        dev_channel = settings.SLACK_DEV_MSG_CHANNEL
         ```
     """
 

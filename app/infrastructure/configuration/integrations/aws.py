@@ -23,12 +23,12 @@ class AwsSettings(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.integrations.aws import get_aws_settings
 
-        settings = get_settings()
+        settings = get_aws_settings()
 
-        region = settings.aws.AWS_REGION
-        instance_arn = settings.aws.INSTANCE_ARN
+        region = settings.AWS_REGION
+        instance_arn = settings.INSTANCE_ARN
         ```
     """
 

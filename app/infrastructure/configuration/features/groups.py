@@ -62,16 +62,16 @@ class GroupsFeatureSettings(FeatureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.features.groups import get_groups_settings
 
-        settings = get_settings()
+        settings = get_groups_settings()
 
-        if settings.groups.circuit_breaker_enabled:
-            threshold = settings.groups.circuit_breaker_failure_threshold
+        if settings.circuit_breaker_enabled:
+            threshold = settings.circuit_breaker_failure_threshold
             # Configure circuit breaker...
 
         primary_provider = next(
-            (name for name, cfg in settings.groups.providers.items()
+            (name for name, cfg in settings.providers.items()
              if cfg.get("primary")),
             None
         )
