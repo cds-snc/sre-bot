@@ -10,36 +10,40 @@ from infrastructure.configuration.base import (
     IntegrationSettings,
     InfrastructureSettings,
 )
-from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
+from infrastructure.configuration.features.aws_ops import (
+    get_aws_feature_settings,
+)
 from infrastructure.configuration.infrastructure.retry import (
     RetrySettings,
     get_retry_settings,
 )
-from infrastructure.configuration.infrastructure.server import get_server_settings
+from infrastructure.configuration.infrastructure.server import (
+    get_server_settings,
+)
 from infrastructure.configuration.integrations.google import (
     get_google_workspace_settings,
 )
 from infrastructure.configuration.integrations import (
-    SlackSettings,
     AwsSettings,
     GoogleWorkspaceSettings,
     GoogleResourcesConfig,
     MaxMindSettings,
     NotifySettings,
+    SlackSettings,
     OpsGenieSettings,
     SentinelSettings,
     TrelloSettings,
 )
 from infrastructure.configuration.features import (
-    IncidentFeatureSettings,
     AWSFeatureSettings,
     AtipSettings,
+    IncidentFeatureSettings,
     SreOpsSettings,
 )
 from infrastructure.configuration.infrastructure import (
+    DevSettings,
     IdempotencySettings,
     ServerSettings,
-    DevSettings,
 )
 
 

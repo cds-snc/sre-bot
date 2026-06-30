@@ -8,7 +8,7 @@ from datetime import datetime
 import i18n  # type: ignore
 from structlog import get_logger
 
-from infrastructure.configuration import get_settings
+from infrastructure.configuration.app import get_app_settings
 from integrations.slack import users as slack_users, commands as slack_commands
 from integrations import trello
 
@@ -33,8 +33,8 @@ def register(bot):
         atip.register(bot)
     ```
     """
-    settings = get_settings()
-    prefix = settings.PREFIX if settings.PREFIX else ""
+    app_settings = get_app_settings()
+    prefix = app_settings.PREFIX if app_settings.PREFIX else ""
     bot.command(f"/{prefix}atip")(atip_command)
     bot.command(f"/{prefix}aiprp")(atip_command)
     bot.action("ati_search_width")(atip_width_action)
@@ -380,7 +380,7 @@ def atip_width_action(ack):
 
 def atip_view_handler(ack, body, say, client):
     ack()
-    settings = get_settings()
+    app_settings = get_app_settings()
 
     ati_locale = body["view"]["blocks"][0]["elements"][0]["value"]
     ati_id = body["view"]["state"]["values"]["ati_id"]["ati_id"]["value"]
@@ -425,7 +425,7 @@ def atip_view_handler(ack, body, say, client):
     slug = f"tmp atip {ati_id}".replace(" ", "-").lower()
 
     # Create channel
-    prefix = settings.PREFIX if settings.PREFIX else ""
+    prefix = app_settings.PREFIX if app_settings.PREFIX else ""
     if prefix:
         slug = f"{prefix}-{slug}"
     response = client.conversations_create(name=f"{slug}")
