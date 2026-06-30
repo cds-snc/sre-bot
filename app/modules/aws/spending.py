@@ -8,14 +8,16 @@ from pandas.core.frame import DataFrame
 
 from integrations.aws import organizations, cost_explorer
 from integrations.google_workspace import sheets
-from infrastructure.configuration import get_settings
+from infrastructure.configuration.integrations.google import (
+    get_google_resources_config,
+)
 
 logger = structlog.get_logger()
 
 
 def _get_spending_sheet_id():
-    settings = get_settings()
-    return settings.google_resources.spending_sheet_id
+    google_resources = get_google_resources_config()
+    return google_resources.spending_sheet_id
 
 
 SPENDING_SHEET_ID = _get_spending_sheet_id()
@@ -122,7 +124,7 @@ def format_account_details(account):
 
 
 def spending_to_df(spending: list):
-    """Converts the spending data to a pandas DataFrame with flattened structure"""
+    """Converts the spending data to a pandas DataFrame with flattened structure."""
     log = logger.bind()
     if not spending:
         log.warning("spending_to_df", error="No spending data provided")

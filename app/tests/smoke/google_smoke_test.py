@@ -45,14 +45,16 @@ if "pytest" in sys.modules and not os.environ.get("RUN_SMOKE_TESTS"):
 from integrations.google_workspace import google_directory_next as gdn  # noqa: E402
 from integrations.google_workspace.schemas import User  # noqa: E402
 from infrastructure.operations import OperationResult, OperationStatus  # noqa: E402
-from infrastructure.configuration import get_settings  # noqa: E402
+from infrastructure.configuration.integrations.google import (
+    get_google_workspace_settings,
+)  # noqa: E402
 from tests.factories.google import (
     make_google_groups,
     make_google_members,
     make_google_users,
 )  # noqa: E402
 
-settings = get_settings()
+google_settings = get_google_workspace_settings()
 
 
 def _validate_integration_response(resp, expected_model=None):
@@ -83,9 +85,7 @@ def test_get_user(domain: str):
         resp = gdn.get_user(users[0]["primaryEmail"])
     else:
         # In live mode, query a known admin/test user instead of the synthetic svc- user
-        live_user = os.environ.get("TEST_GOOGLE_USER") or getattr(
-            getattr(settings, "google_workspace", {}), "SRE_BOT_EMAIL", None
-        )
+        live_user = os.environ.get("TEST_GOOGLE_USER") or google_settings.SRE_BOT_EMAIL
         if not live_user:
             print(
                 "ERROR: No TEST_GOOGLE_USER env var or settings.google_workspace.SRE_BOT_EMAIL configured for live get_user.",

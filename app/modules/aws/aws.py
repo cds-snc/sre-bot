@@ -23,7 +23,7 @@ from modules.aws import (
     lambdas,
     spending,
 )
-from infrastructure.configuration import get_settings
+from infrastructure.configuration.app import get_app_settings
 
 logger = structlog.get_logger()
 
@@ -56,10 +56,11 @@ def register(bot: App) -> None:
     """AWS module registration.
 
     Args:
-        bot (SlackBot): The SlackBot instance to which the module will be registered.
+        bot (SlackBot): The SlackBot instance to which the module
+            will be registered.
     """
-    settings = get_settings()
-    bot.command(f"/{settings.PREFIX}aws")(aws_command)
+    app_settings = get_app_settings()
+    bot.command(f"/{app_settings.PREFIX}aws")(aws_command)
     bot.view("aws_access_view")(aws_access_requests.access_view_handler)
     bot.view("aws_health_view")(aws_account_health.health_view_handler)
 
@@ -67,7 +68,8 @@ def register(bot: App) -> None:
 def aws_command(ack: Ack, command, respond: Respond, client: WebClient, body) -> None:
     """AWS command handler.
 
-    This function handles the `/aws` command by parsing the command text and executing the appropriate action.
+    This function handles the `/aws` command by parsing the command text
+    and executing the appropriate action.
 
     Args:
         ack (function): The function to acknowledge the command.
@@ -137,22 +139,28 @@ def request_aws_account_access(
     """
     Request AWS account access for a user.
 
-    This function initiates a request for access to an AWS account for a specified user.
+    This function initiates a request for access to an AWS account for
+    a specified user.
     It performs the following steps:
     1. Retrieves the account ID associated with the given account name.
     2. Retrieves the user ID associated with the given user email.
     3. Creates an AWS access request with the provided details.
 
     Args:
-        account_name (str): The name of the AWS account to which access is requested.
+        account_name (str): The name of the AWS account to which access
+            is requested.
         rationale (str): The reason for requesting access to the AWS account.
-        start_date (datetime): The start date and time for the requested access period.
-        end_date (datetime): The end date and time for the requested access period.
+        start_date (datetime): The start date and time for the requested
+            access period.
+        end_date (datetime): The end date and time for the requested
+            access period.
         user_email (str): The email address of the user requesting access.
-        access_type (str): The type of access requested (e.g., 'read', 'write').
+        access_type (str): The type of access requested
+            (e.g., 'read', 'write').
 
     Returns:
-        bool: True if the access request was successfully created, False otherwise.
+        bool: True if the access request was successfully created,
+            False otherwise.
     """
     account_id = get_account_id_by_name(account_name)
     user_id = identity_store.get_user_id(user_email)

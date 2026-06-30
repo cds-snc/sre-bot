@@ -1,7 +1,7 @@
 import json
 import structlog
 
-from infrastructure.configuration import get_settings
+from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
 from integrations.aws import identity_store, organizations, sso_admin
 
 logger = structlog.get_logger()
@@ -9,25 +9,25 @@ logger = structlog.get_logger()
 
 def execute():
     """Assign the AWS Ops group to member accounts."""
-    settings = get_settings()
+    aws_feature_settings = get_aws_feature_settings()
     log = logger.bind()
 
     # if the feature is not enabled, exit
-    if not settings.aws_feature.AWS_OPS_GROUP_NAME:
+    if not aws_feature_settings.AWS_OPS_GROUP_NAME:
         return
 
     aws_ops_group_id = identity_store.get_group_id(
-        settings.aws_feature.AWS_OPS_GROUP_NAME
+        aws_feature_settings.AWS_OPS_GROUP_NAME
     )
     if not aws_ops_group_id:
         status = {
             "status": "failed",
             "message": (
-                f"Ops group '{settings.aws_feature.AWS_OPS_GROUP_NAME}' not found in AWS Identity Center."
+                f"Ops group '{aws_feature_settings.AWS_OPS_GROUP_NAME}' not found in AWS Identity Center."
             ),
         }
         log.error(
-            "ops_group_not_found", group_name=settings.aws_feature.AWS_OPS_GROUP_NAME
+            "ops_group_not_found", group_name=aws_feature_settings.AWS_OPS_GROUP_NAME
         )
         return status
 
@@ -51,12 +51,12 @@ def execute():
         status = {
             "status": "ok",
             "message": (
-                f"Ops group '{settings.aws_feature.AWS_OPS_GROUP_NAME}' is already assigned to all active accounts."
+                f"Ops group '{aws_feature_settings.AWS_OPS_GROUP_NAME}' is already assigned to all active accounts."
             ),
         }
         log.info(
             "all_accounts_already_assigned",
-            group_name=settings.aws_feature.AWS_OPS_GROUP_NAME,
+            group_name=aws_feature_settings.AWS_OPS_GROUP_NAME,
             total_accounts=len(organizations_accounts),
         )
         return status
@@ -85,22 +85,22 @@ def execute():
             status = {
                 "status": "success",
                 "message": (
-                    f"Ops group '{settings.aws_feature.AWS_OPS_GROUP_NAME}' assigned to account '{account.get('Name')}'."
+                    f"Ops group '{aws_feature_settings.AWS_OPS_GROUP_NAME}' assigned to account '{account.get('Name')}'."
                 ),
             }
             account_log.info(
                 "ops_group_assigned_to_account",
-                group_name=settings.aws_feature.AWS_OPS_GROUP_NAME,
+                group_name=aws_feature_settings.AWS_OPS_GROUP_NAME,
             )
         else:
             status = {
                 "status": "failed",
                 "message": (
-                    f"Failed to assign Ops group '{settings.aws_feature.AWS_OPS_GROUP_NAME}' to account '{account.get('Name')}'."
+                    f"Failed to assign Ops group '{aws_feature_settings.AWS_OPS_GROUP_NAME}' to account '{account.get('Name')}'."
                 ),
             }
             account_log.error(
                 "failed_to_assign_ops_group_to_account",
-                group_name=settings.aws_feature.AWS_OPS_GROUP_NAME,
+                group_name=aws_feature_settings.AWS_OPS_GROUP_NAME,
             )
     return status

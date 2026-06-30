@@ -5,7 +5,7 @@ from slack_sdk.web import WebClient
 from modules.aws import identity_center
 from modules.permissions import handler as permissions
 from integrations.slack import users as slack_users
-from infrastructure.configuration import get_settings
+from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
 
 logger = structlog.get_logger()
 
@@ -16,7 +16,7 @@ help_text = """
 """
 
 
-def command_handler(client: WebClient, body, respond, args: str):
+def command_handler(client: WebClient, body, respond, args: list[str]):
     """Handle the command.
 
     Args:
@@ -25,7 +25,7 @@ def command_handler(client: WebClient, body, respond, args: str):
         respond (function): The function to respond to the request.
         args (list[str]): The list of arguments.
     """
-    action: list[str] = args.pop(0) if args else ""
+    action: str = args.pop(0) if args else ""
     match action:
         case "help" | "aide":
             respond(help_text)
@@ -48,12 +48,12 @@ def request_user_provisioning(client: WebClient, body, respond, args):
         respond (function): The function to respond to the request.
         args (list): The list of arguments passed with the command.
     """
-    settings = get_settings()
+    aws_feature_settings = get_aws_feature_settings()
     requestor_email = slack_users.get_user_email_from_body(client, body)
     log = logger.bind(requestor_email=requestor_email)
     log.info("aws_users_provisioning_request_received")
     if permissions.is_user_member_of_groups(
-        requestor_email, settings.aws_feature.AWS_ADMIN_GROUPS
+        requestor_email, aws_feature_settings.AWS_ADMIN_GROUPS
     ):
         operation = args[0]
         users_emails = args[1:]

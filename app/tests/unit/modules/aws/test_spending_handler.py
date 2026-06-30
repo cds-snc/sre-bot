@@ -1,24 +1,17 @@
 """Unit tests for AWS spending data handler."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 import pandas as pd
 
 from modules.aws import spending
 
 
 @pytest.mark.unit
-@patch("modules.aws.spending.get_settings")
 @patch("modules.aws.spending.organizations")
-def test_should_generate_spending_data_successfully(
-    mock_organizations, mock_get_settings
-):
+def test_should_generate_spending_data_successfully(mock_organizations):
     """Test successful spending data generation."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.google_resources.spending_sheet_id = "test_sheet_id"
-    mock_get_settings.return_value = mock_settings
-
     mock_organizations.list_organization_accounts.return_value = [
         {"Id": "123456789012", "Name": "TestAccount"}
     ]
@@ -64,7 +57,7 @@ def test_should_generate_spending_data_successfully(
 def test_should_return_empty_dataframe_when_no_spending_data_provided():
     """Test handling of empty spending data."""
     # Arrange
-    spending_data = []
+    spending_data: list[dict[str, object]] = []
 
     # Act
     result = spending.spending_to_df(spending_data)
@@ -109,14 +102,9 @@ def test_should_flatten_spending_data_correctly():
 
 @pytest.mark.unit
 @patch("modules.aws.spending.sheets")
-@patch("modules.aws.spending.get_settings")
-def test_should_update_spending_data_in_sheet(mock_get_settings, mock_sheets):
+def test_should_update_spending_data_in_sheet(mock_sheets):
     """Test updating spending data in Google Sheets."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.google_resources.spending_sheet_id = "test_sheet_id"
-    mock_get_settings.return_value = mock_settings
-
     data = {"Account": ["123456789012"], "Cost": [100.00]}
     df = pd.DataFrame(data)
 
@@ -147,18 +135,13 @@ def test_should_skip_update_when_spreadsheet_id_not_set(mock_sheets):
 
 
 @pytest.mark.unit
-@patch("modules.aws.spending.get_settings")
 @patch("modules.aws.spending.generate_spending_data")
 @patch("modules.aws.spending.update_spending_data")
 def test_should_execute_and_update_spending_job_successfully(
-    mock_update, mock_generate, mock_get_settings
+    mock_update, mock_generate
 ):
     """Test successful execution of spending data update job."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.google_resources.spending_sheet_id = "test_sheet_id"
-    mock_get_settings.return_value = mock_settings
-
     mock_spending_data = pd.DataFrame({"Account": ["123456789012"], "Cost": [100.00]})
     mock_generate.return_value = mock_spending_data
 
@@ -171,18 +154,11 @@ def test_should_execute_and_update_spending_job_successfully(
 
 
 @pytest.mark.unit
-@patch("modules.aws.spending.get_settings")
 @patch("modules.aws.spending.generate_spending_data")
 @patch("modules.aws.spending.update_spending_data")
-def test_should_skip_update_when_spending_data_empty(
-    mock_update, mock_generate, mock_get_settings
-):
+def test_should_skip_update_when_spending_data_empty(mock_update, mock_generate):
     """Test that update is skipped when spending data is empty."""
     # Arrange
-    mock_settings = MagicMock()
-    mock_settings.google_resources.spending_sheet_id = "test_sheet_id"
-    mock_get_settings.return_value = mock_settings
-
     mock_spending_data = pd.DataFrame()
     mock_generate.return_value = mock_spending_data
 
