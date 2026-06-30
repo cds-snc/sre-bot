@@ -16,12 +16,12 @@ class AWSFeatureSettings(FeatureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
 
-        settings = get_settings()
+        settings = get_aws_feature_settings()
 
-        admin_groups = settings.aws_feature.AWS_ADMIN_GROUPS
-        ops_group = settings.aws_feature.AWS_OPS_GROUP_NAME
+        admin_groups = settings.AWS_ADMIN_GROUPS
+        ops_group = settings.AWS_OPS_GROUP_NAME
         ```
     """
 

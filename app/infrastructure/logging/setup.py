@@ -125,8 +125,9 @@ def configure_logging(
 
     Example:
         # At application startup
-        from infrastructure.configuration import get_settings
-        settings = get_settings()
+        from infrastructure.configuration.app import get_app_settings
+
+        settings = get_app_settings()
         logger = configure_logging(settings=settings)
 
         # With overrides for testing

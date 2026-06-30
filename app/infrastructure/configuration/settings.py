@@ -76,25 +76,19 @@ class Settings(BaseSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.app import get_app_settings
+        from infrastructure.configuration.infrastructure.retry import get_retry_settings
 
-        settings = get_settings()
-
-        # Access integration settings
-        slack_token = settings.slack.SLACK_TOKEN
-        aws_region = settings.aws.AWS_REGION
-
-        # Access feature settings
-        if settings.groups.circuit_breaker_enabled:
-            # Configure circuit breaker...
+        app_settings = get_app_settings()
+        retry_settings = get_retry_settings()
 
         # Access infrastructure settings
-        if settings.retry.enabled:
-            backend = settings.retry.backend
+        if retry_settings.enabled:
+            backend = retry_settings.backend
             # Configure retry system...
 
         # Check environment
-        if settings.is_production:
+        if app_settings.is_production:
             # Production-specific logic...
         ```
     """

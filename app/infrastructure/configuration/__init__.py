@@ -4,29 +4,29 @@ This module provides centralized configuration management for the SRE Bot
 application using Pydantic BaseSettings with domain-based organization.
 
 Exports:
-    settings: Singleton Settings instance (main configuration object)
+    AppSettings: App-level settings slice
     Settings: Main settings class (for testing/overrides)
     RetrySettings: Retry system settings class (for testing)
 
 Example:
     ```python
-    from infrastructure.configuration import get_settings
+    from infrastructure.configuration.app import get_app_settings
+    from infrastructure.configuration.infrastructure.retry import get_retry_settings
 
-    settings = get_settings()
+    app_settings = get_app_settings()
+    retry_settings = get_retry_settings()
 
-    # Access settings
-    slack_token = settings.slack.SLACK_TOKEN
-    aws_region = settings.aws.AWS_REGION
-    retry_enabled = settings.retry.enabled
+    # Access narrow settings slices
+    retry_enabled = retry_settings.enabled
 
     # Check environment
-    if settings.is_production:
+    if app_settings.is_production:
         # Production-specific logic...
     ```
 """
 
 from infrastructure.configuration.app import AppSettings, get_app_settings
-from infrastructure.configuration.settings import Settings, get_settings
+from infrastructure.configuration.settings import Settings
 from infrastructure.configuration.infrastructure.retry import RetrySettings
 
 __all__ = [
@@ -34,5 +34,4 @@ __all__ = [
     "Settings",
     "RetrySettings",
     "get_app_settings",
-    "get_settings",
 ]

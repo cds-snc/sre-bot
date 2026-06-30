@@ -15,11 +15,11 @@ class SreOpsSettings(FeatureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.features.sre_ops import get_sre_ops_settings
 
-        settings = get_settings()
+        settings = get_sre_ops_settings()
 
-        ops_channel = settings.sre_ops.SRE_OPS_CHANNEL_ID
+        ops_channel = settings.SRE_OPS_CHANNEL_ID
         ```
     """
 
