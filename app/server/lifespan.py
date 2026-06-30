@@ -10,7 +10,6 @@ from slack_bolt import App
 from structlog.stdlib import BoundLogger
 
 from infrastructure.configuration.app import AppSettings, get_app_settings
-from infrastructure.configuration.settings import Settings
 from infrastructure.configuration.infrastructure.directory import (
     DirectorySettings,
     get_directory_settings,
@@ -19,7 +18,10 @@ from infrastructure.configuration.infrastructure.server import (
     ServerSettings,
     get_server_settings,
 )
-from infrastructure.configuration.features.sre_ops import get_sre_ops_settings
+from infrastructure.configuration.features.sre_ops import (
+    SreOpsSettings,
+    get_sre_ops_settings,
+)
 from infrastructure.directory import get_directory_provider
 from infrastructure.i18n import (
     I18nResourceRegistry,
@@ -61,6 +63,7 @@ def _list_configs_from_sections(
     app_settings: AppSettings,
     server_settings: ServerSettings,
     directory_settings: DirectorySettings,
+    sre_ops_settings: SreOpsSettings,
     logger: BoundLogger,
 ) -> None:
     config_settings: dict[str, tuple[object, ...]] = {
@@ -74,6 +77,7 @@ def _list_configs_from_sections(
     config_settings["app"] = tuple(app_settings.model_dump().keys())
     config_settings["server"] = tuple(server_settings.model_dump().keys())
     config_settings["directory"] = tuple(directory_settings.model_dump().keys())
+    config_settings["sre_ops"] = tuple(sre_ops_settings.model_dump().keys())
 
     logger.info("configuration_initialized", base_settings=config_settings["settings"])
     for key, value in config_settings.items():
@@ -218,14 +222,13 @@ def _initialize_translation_service(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    settings = Settings()
     app_settings = get_app_settings()
     server_settings = get_server_settings()
     directory_settings = get_directory_settings()
     sre_ops_settings = get_sre_ops_settings()
     logger = _get_logger_from_app(app_settings)
 
-    app.state.settings = settings
+    app.state.settings = app_settings
     app.state.logger = logger
 
     logger.info("application_startup")
@@ -233,6 +236,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app_settings,
         server_settings,
         directory_settings,
+        sre_ops_settings,
         logger,
     )
 

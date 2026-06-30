@@ -20,7 +20,7 @@ class ConfigurationError(Exception):
 
 allow_origins = (
     ["*"]
-    if app_settings.is_production
+    if not bool(app_settings.PREFIX)
     else [
         "http://localhost:8000",
         "http://127.0.0.1:8000",
