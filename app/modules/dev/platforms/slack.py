@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 logger = structlog.get_logger()
-client = LegacySlackBootstrap().create_app().client
+client = LegacySlackBootstrap().web
 
 
 def _require_dev_environment(
