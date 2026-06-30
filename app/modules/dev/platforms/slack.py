@@ -1,8 +1,7 @@
-"""Slack platform implementation for the dev module.
+"""Slack platform implementation for dev module.
 
 Uses decorator-based command registration via auto-discovery.
-Registers the /sre dev subcommands for google, slack, stale, incident,
-load-incidents, add-incident, and aws.
+Registers all /sre dev subcommands (google, slack, stale, incident, load-incidents, add-incident, aws).
 
 Only available in development environment (PREFIX=dev-).
 """
@@ -11,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List
 
 import structlog
 
-from infrastructure.configuration.app import get_app_settings
+from infrastructure.configuration import get_settings
 from integrations.slack import LegacySlackBootstrap
 from integrations.slack.models import CommandPayload, CommandResponse
 from modules.dev import (
@@ -30,20 +29,16 @@ logger = structlog.get_logger()
 client = LegacySlackBootstrap().create_app().client
 
 
-def _require_dev_environment(
-    payload: CommandPayload,
-) -> CommandResponse | None:
+def _require_dev_environment(payload: CommandPayload) -> CommandResponse | None:
     """Check if running in development environment.
 
     Returns:
         CommandResponse with error if not in dev environment, None otherwise
     """
-    app_settings = get_app_settings()
-    if app_settings.PREFIX != "dev-":
+    settings = get_settings()
+    if settings.PREFIX != "dev-":
         return CommandResponse(
-            message=(
-                "This command is only available in the " "development " "environment."
-            ),
+            message="This command is only available in the development environment.",
             ephemeral=True,
         )
     return None
@@ -67,15 +62,9 @@ def _call_legacy_handler(
         CommandResponse with captured output
     """
     log = logger.bind(
-        command=payload.text,
-        user_id=payload.user_id,
-        channel_id=payload.channel_id,
+        command=payload.text, user_id=payload.user_id, channel_id=payload.channel_id
     )
-    log.info(
-        "calling_legacy_handler",
-        handler=handler.__name__,
-        parsed_payload=payload,
-    )
+    log.info("calling_legacy_handler", handler=handler.__name__, parsed_payload=payload)
     captured_responses: List[str] = []
 
     def capture_respond(text: str | None = None, **kwargs):
@@ -108,11 +97,7 @@ def _call_legacy_handler(
 
 def handle_google_dev_command(payload: CommandPayload) -> CommandResponse:
     """Handle /sre dev google - test Google Workspace Directory API."""
-    logger.info(
-        "command_received",
-        command="google",
-        text=payload.text,
-    )
+    logger.info("command_received", command="google", text=payload.text)
 
     if error := _require_dev_environment(payload):
         return error
@@ -130,11 +115,7 @@ def handle_google_dev_command(payload: CommandPayload) -> CommandResponse:
 
 def handle_slack_dev_command(payload: CommandPayload) -> CommandResponse:
     """Handle /sre dev slack - test Slack API operations."""
-    logger.info(
-        "command_received",
-        command="slack",
-        text=payload.text,
-    )
+    logger.info("command_received", command="slack", text=payload.text)
 
     if error := _require_dev_environment(payload):
         return error
@@ -144,44 +125,24 @@ def handle_slack_dev_command(payload: CommandPayload) -> CommandResponse:
 
     args = payload.text.split() if payload.text else []
     return _call_legacy_handler(
-        payload,
-        slack_dev.slack_command,
-        noop_ack,
-        logger=logger,
-        args=args,
+        payload, slack_dev.slack_command, noop_ack, logger=logger, args=args
     )
 
 
 def handle_stale_dev_command(payload: CommandPayload) -> CommandResponse:
     """Handle /sre dev stale - send test stale channel notification."""
-    logger.info(
-        "command_received",
-        command="stale",
-        channel_id=payload.channel_id,
-    )
+    logger.info("command_received", command="stale", channel_id=payload.channel_id)
 
     if error := _require_dev_environment(payload):
         return error
 
-    text = (
-        "👋  Hi! There have been no updates in this incident channel for "
-        "14 days! "
-        "Consider scheduling a retro or archiving it.\n"
-        "Bonjour! Il n'y a pas eu de mise à jour dans ce canal d'incident "
-        "depuis 14 jours. Pensez à planifier une rétro ou à l'archiver."
-    )
+    text = """👋  Hi! There have been no updates in this incident channel for 14 days! Consider scheduling a retro or archiving it.
+Bonjour! Il n'y a pas eu de mise à jour dans ce canal d'incident depuis 14 jours. Pensez à planifier une rétro ou à l'archiver."""
 
     attachments: List[Dict[str, Any]] = [
         {
-            "text": (
-                "Would you like to archive the channel now or schedule a "
-                "retro? | Souhaitez-vous archiver le canal maintenant ou "
-                "planifier une rétro?"
-            ),
-            "fallback": (
-                "You are unable to archive the channel | Vous ne pouvez pas "
-                "archiver ce canal"
-            ),
+            "text": "Would you like to archive the channel now or schedule a retro? | Souhaitez-vous archiver le canal maintenant ou planifier une rétro?",
+            "fallback": "You are unable to archive the channel | Vous ne pouvez pas archiver ce canal",
             "callback_id": "archive_channel",
             "color": "#3AA3E3",
             "attachment_type": "default",
@@ -211,30 +172,17 @@ def handle_stale_dev_command(payload: CommandPayload) -> CommandResponse:
     ]
 
     try:
-        channel_id = payload.channel_id
-        if channel_id is None:
-            logger.error("missing_channel_id_for_stale_notification")
-            return CommandResponse(
-                message="Missing channel ID for stale notification.",
-                ephemeral=True,
-            )
         client.chat_postMessage(
-            channel=channel_id,
+            channel=payload.channel_id,
             text=text,
             attachments=attachments,
         )
         return CommandResponse(
-            message=(
-                "Stale channel notification sent (check channel for the " "message)"
-            ),
+            message="Stale channel notification sent (check channel for the message)",
             ephemeral=True,
         )
     except Exception as e:
-        logger.error(
-            "failed_to_send_stale_notification",
-            error=str(e),
-            exc_info=True,
-        )
+        logger.error("failed_to_send_stale_notification", error=str(e), exc_info=True)
         return CommandResponse(
             message=f"Failed to send stale notification: {str(e)}",
             ephemeral=True,
@@ -243,11 +191,7 @@ def handle_stale_dev_command(payload: CommandPayload) -> CommandResponse:
 
 def handle_incident_dev_command(payload: CommandPayload) -> CommandResponse:
     """Handle /sre dev incident - list incidents from DynamoDB."""
-    logger.info(
-        "command_received",
-        command="incident",
-        channel_id=payload.channel_id,
-    )
+    logger.info("command_received", command="incident", channel_id=payload.channel_id)
 
     if error := _require_dev_environment(payload):
         return error
@@ -262,10 +206,7 @@ def handle_incident_dev_command(payload: CommandPayload) -> CommandResponse:
 
 def handle_load_incidents_command(payload: CommandPayload) -> CommandResponse:
     """Handle /sre dev load-incidents - load incidents from Google Sheet."""
-    logger.info(
-        "command_received",
-        command="load-incidents",
-    )
+    logger.info("command_received", command="load-incidents")
 
     if error := _require_dev_environment(payload):
         return error
@@ -281,9 +222,7 @@ def handle_load_incidents_command(payload: CommandPayload) -> CommandResponse:
 def handle_add_incident_command(payload: CommandPayload) -> CommandResponse:
     """Handle /sre dev add-incident - add incident from current channel."""
     logger.info(
-        "command_received",
-        command="add-incident",
-        channel_id=payload.channel_id,
+        "command_received", command="add-incident", channel_id=payload.channel_id
     )
 
     if error := _require_dev_environment(payload):
@@ -292,12 +231,7 @@ def handle_add_incident_command(payload: CommandPayload) -> CommandResponse:
     def noop_ack():
         pass
 
-    return _call_legacy_handler(
-        payload,
-        incident.add_incident,
-        noop_ack,
-        logger=logger,
-    )
+    return _call_legacy_handler(payload, incident.add_incident, noop_ack, logger=logger)
 
 
 # def handle_aws_dev_command(payload: CommandPayload) -> CommandResponse:
@@ -342,8 +276,7 @@ def handle_add_incident_command(payload: CommandPayload) -> CommandResponse:
 #         )
 
 #     message = (
-#         "\n".join(captured_responses) if captured_responses else "AWS"
-#         " command executed"
+#         "\n".join(captured_responses) if captured_responses else "AWS command executed"
 #     )
 #     return CommandResponse(message=message, ephemeral=True)
 
@@ -354,7 +287,7 @@ def register_commands(provider: "SlackPlatformProvider") -> None:
     Args:
         provider: Slack platform provider instance
     """
-    # Register parent dev command (handler=None means auto-generate help).
+    # Register parent dev command (handler=None means auto-generate help for children)
     provider.register_command(
         command="dev",
         handler=None,
@@ -367,7 +300,7 @@ def register_commands(provider: "SlackPlatformProvider") -> None:
         command="google",
         handler=handle_google_dev_command,
         parent="sre.dev",
-        description="Google Workspace dev commands",
+        description="Google Workspace development commands",
         description_key="dev.subcommands.google.description",
     )
 
@@ -375,7 +308,7 @@ def register_commands(provider: "SlackPlatformProvider") -> None:
         command="slack",
         handler=handle_slack_dev_command,
         parent="sre.dev",
-        description="Slack dev commands",
+        description="Slack development commands",
         description_key="dev.subcommands.slack.description",
     )
 
@@ -415,6 +348,6 @@ def register_commands(provider: "SlackPlatformProvider") -> None:
     #     command="aws",
     #     handler=handle_aws_dev_command,
     #     parent="sre.dev",
-    #     description="Test AWS client integrations",
+    #     description="Test AWS client integrations (identitystore, organizations, sso, health)",
     #     description_key="dev.subcommands.aws.description",
     # )

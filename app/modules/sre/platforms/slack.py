@@ -1,7 +1,7 @@
-"""Slack platform implementation for the SRE module.
+"""Slack platform implementation for SRE module.
 
 Uses decorator-based command registration via auto-discovery.
-Registers the SRE subcommands (version, incident, webhooks, groups).
+Registers all SRE subcommands (version, incident, webhooks, groups).
 """
 
 from typing import TYPE_CHECKING, cast
@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, cast
 import structlog
 from slack_bolt import Ack, Respond
 
-from infrastructure.configuration.app import get_app_settings
+from infrastructure.configuration.app import get_app_settings as get_settings
 from integrations.slack.bootstrap import LegacySlackBootstrap
 from integrations.slack.models import CommandPayload, CommandResponse
 from modules.incident import incident_helper
@@ -33,14 +33,11 @@ def handle_version_command(payload: CommandPayload) -> CommandResponse:
     Returns:
         CommandResponse formatted for Slack
     """
-    logger.info(
-        "command_received",
-        command="version",
-    )
+    logger.info("command_received", command="version")
 
-    app_settings = get_app_settings()
+    settings = get_settings()
     return CommandResponse(
-        message=f"🤖 SRE Bot version: {app_settings.GIT_SHA}",
+        message=f"🤖 SRE Bot version: {settings.GIT_SHA}",
         ephemeral=True,
     )
 
@@ -48,7 +45,7 @@ def handle_version_command(payload: CommandPayload) -> CommandResponse:
 def handle_incident_command(payload: CommandPayload) -> CommandResponse:
     """Handle /sre incident Slack command.
 
-    Bridges the platform provider payload to the legacy incident helper.
+    Bridges the new platform provider CommandPayload to the legacy incident_helper interface.
 
     Args:
         payload: Command payload from Slack platform provider
@@ -56,11 +53,7 @@ def handle_incident_command(payload: CommandPayload) -> CommandResponse:
     Returns:
         CommandResponse formatted for Slack
     """
-    logger.info(
-        "command_received",
-        command="incident",
-        text=payload.text,
-    )
+    logger.info("command_received", command="incident", text=payload.text)
 
     # Parse command text into args
     args = payload.text.split() if payload.text else []
@@ -71,8 +64,8 @@ def handle_incident_command(payload: CommandPayload) -> CommandResponse:
         "channel_id": payload.channel_id,
     }
 
-    # Merge Slack command fields from platform metadata.
-    # This keeps legacy handlers compatible with Slack-specific fields.
+    # Merge all Slack command fields from platform_metadata
+    # This ensures legacy handlers have access to all Slack-specific fields
     if payload.platform_metadata:
         body.update(payload.platform_metadata)
 
@@ -90,7 +83,7 @@ def handle_incident_command(payload: CommandPayload) -> CommandResponse:
         """No-op ack - already handled by platform provider."""
         pass
 
-    # Call the legacy incident helper.
+    # Call legacy incident helper
     incident_helper.handle_incident_command(
         args=args,
         client=client,
@@ -99,18 +92,13 @@ def handle_incident_command(payload: CommandPayload) -> CommandResponse:
         ack=cast(Ack, noop_ack),
     )
 
-    # Return the captured response.
+    # Return captured response
     if captured_response["blocks"]:
         return CommandResponse(
-            message="",
-            blocks=captured_response["blocks"],
-            ephemeral=True,
+            message="", blocks=captured_response["blocks"], ephemeral=True
         )
     elif captured_response["message"]:
-        return CommandResponse(
-            message=captured_response["message"],
-            ephemeral=True,
-        )
+        return CommandResponse(message=captured_response["message"], ephemeral=True)
     else:
         return CommandResponse(message="Incident command executed", ephemeral=True)
 
@@ -118,7 +106,7 @@ def handle_incident_command(payload: CommandPayload) -> CommandResponse:
 def handle_webhooks_command(payload: CommandPayload) -> CommandResponse:
     """Handle /sre webhooks Slack command.
 
-    Bridges the platform provider payload to the legacy webhook helper.
+    Bridges the new platform provider CommandPayload to the legacy webhook_helper interface.
 
     Args:
         payload: Command payload from Slack platform provider
@@ -126,11 +114,7 @@ def handle_webhooks_command(payload: CommandPayload) -> CommandResponse:
     Returns:
         CommandResponse formatted for Slack
     """
-    logger.info(
-        "command_received",
-        command="webhooks",
-        text=payload.text,
-    )
+    logger.info("command_received", command="webhooks", text=payload.text)
 
     # Parse command text into args
     args = payload.text.split() if payload.text else []
@@ -141,8 +125,8 @@ def handle_webhooks_command(payload: CommandPayload) -> CommandResponse:
         "channel_id": payload.channel_id,
     }
 
-    # Merge Slack command fields from platform metadata.
-    # This keeps legacy handlers compatible with Slack-specific fields.
+    # Merge all Slack command fields from platform_metadata
+    # This ensures legacy handlers have access to all Slack-specific fields
     if payload.platform_metadata:
         body.update(payload.platform_metadata)
 
@@ -160,7 +144,7 @@ def handle_webhooks_command(payload: CommandPayload) -> CommandResponse:
         """No-op ack - already handled by platform provider."""
         pass
 
-    # Call the legacy webhook helper.
+    # Call legacy webhook helper (note: function name is handle_webhook_command, not handle_webhooks_command)
     webhook_helper.handle_webhook_command(
         args=args,
         client=client,
@@ -176,10 +160,7 @@ def handle_webhooks_command(payload: CommandPayload) -> CommandResponse:
     elif captured_response["message"]:
         return CommandResponse(message=captured_response["message"], ephemeral=True)
     else:
-        return CommandResponse(
-            message="Webhooks command executed",
-            ephemeral=True,
-        )
+        return CommandResponse(message="Webhooks command executed", ephemeral=True)
 
 
 def register_commands(provider: "SlackPlatformProvider") -> None:
@@ -188,7 +169,7 @@ def register_commands(provider: "SlackPlatformProvider") -> None:
     Note: No need to register explicit "help" handlers - the platform provider
     automatically generates help when:
     - User types `/sre` (parent command with no handler)
-    - User types `/sre help` (explicit help request with legacy_mode=False).
+    - User types `/sre help` (explicit help request with legacy_mode=False)
     - User types `/sre <subcommand> help` (subcommand help)
 
     Args:
