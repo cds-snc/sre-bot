@@ -42,9 +42,7 @@ def _require_dev_environment(
     if app_settings.PREFIX != "dev-":
         return CommandResponse(
             message=(
-                "This command is only available in the "
-                "development "
-                "environment."
+                "This command is only available in the " "development " "environment."
             ),
             ephemeral=True,
         )
@@ -103,9 +101,7 @@ def _call_legacy_handler(
 
     # Return captured response
     message = (
-        "\n".join(captured_responses)
-        if captured_responses
-        else "Command completed"
+        "\n".join(captured_responses) if captured_responses else "Command completed"
     )
     return CommandResponse(message=message, ephemeral=True)
 
@@ -229,8 +225,7 @@ def handle_stale_dev_command(payload: CommandPayload) -> CommandResponse:
         )
         return CommandResponse(
             message=(
-                "Stale channel notification sent (check channel for the "
-                "message)"
+                "Stale channel notification sent (check channel for the " "message)"
             ),
             ephemeral=True,
         )
