@@ -8,7 +8,11 @@ Tests cover:
 
 import pytest
 
-from infrastructure.configuration.settings import RetrySettings, Settings, get_settings
+from infrastructure.configuration.infrastructure.retry import (
+    RetrySettings,
+    get_retry_settings,
+)
+from infrastructure.configuration.settings import Settings
 
 
 class TestRetrySettings:
@@ -125,13 +129,10 @@ class TestSettingsIntegration:
         assert retry.backend == "dynamodb"
         assert retry.max_attempts == 10
 
-    def test_settings_singleton_behavior(self):
-        """Test settings from get_settings returns singleton instance."""
+    def test_settings_reuses_retry_singleton(self):
+        """Test Settings delegates retry config to the retry singleton."""
 
-        settings1 = get_settings()
-        settings2 = get_settings()
+        settings = Settings()
+        retry_settings = get_retry_settings()
 
-        assert settings1 is not None
-        assert isinstance(settings1, Settings)
-        assert isinstance(settings2, Settings)
-        assert settings1 is settings2  # Same instance (singleton)
+        assert settings.retry is retry_settings

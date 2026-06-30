@@ -40,20 +40,17 @@ def test_app_state_has_all_required_attributes(app_with_lifespan):
 
 @pytest.mark.integration
 def test_app_state_settings_is_valid(app_with_lifespan):
-    """Validate that settings object is properly initialized.
+    """Validate that app-level settings object is properly initialized.
 
-    Settings should be a valid Settings instance with all required
-    configuration loaded from environment.
+    The lifespan should store the narrow app settings slice on app.state.
     """
     settings = app_with_lifespan.app.state.settings
 
     assert settings is not None, "settings must not be None"
-    # Verify it's a Settings instance by checking it has expected attributes
-    assert hasattr(settings, "is_production"), "settings missing is_production"
-    assert hasattr(settings, "slack"), "settings missing slack"
-    assert hasattr(settings, "aws"), "settings missing aws"
+    assert hasattr(settings, "PREFIX"), "settings missing PREFIX"
     assert hasattr(settings, "LOG_LEVEL"), "settings missing LOG_LEVEL"
-    # Verify is_production is a boolean
+    assert hasattr(settings, "GIT_SHA"), "settings missing GIT_SHA"
+    assert hasattr(settings, "is_production"), "settings missing is_production"
     assert isinstance(settings.is_production, bool), "is_production must be a boolean"
 
 
