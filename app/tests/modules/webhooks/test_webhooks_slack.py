@@ -126,10 +126,8 @@ def test_hydrate_ip_addresses_links_text_and_block_strings():
         ],
     )
 
-    with patch("modules.webhooks.slack.get_settings") as mock_get_settings:
-        mock_get_settings.return_value.server.BACKEND_URL = (
-            "https://sre-bot.example.com"
-        )
+    with patch("modules.webhooks.slack.get_server_settings") as mock_get_settings:
+        mock_get_settings.return_value.BACKEND_URL = "https://sre-bot.example.com"
         result = hydrate_ip_addresses(payload)
 
     assert (
