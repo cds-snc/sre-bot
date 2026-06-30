@@ -225,7 +225,7 @@ def handle_stale_dev_command(payload: CommandPayload) -> CommandResponse:
         )
         return CommandResponse(
             message=(
-                "Stale channel notification sent " "(check channel for the message)"
+                "Stale channel notification sent (check channel for the " "message)"
             ),
             ephemeral=True,
         )
