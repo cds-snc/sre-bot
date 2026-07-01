@@ -97,7 +97,7 @@ def register_background_jobs(registry) -> None:
     if not settings.enabled or not settings.reconciliation_enabled:
         return
 
-    registry.register(
+    registry.register_daily(
         job_name="access_sync_reconciliation",
         schedule=settings.reconciliation_schedule,
         job=_run_reconciliation_job,

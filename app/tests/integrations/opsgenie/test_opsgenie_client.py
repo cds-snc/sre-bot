@@ -1,6 +1,12 @@
 from integrations import opsgenie
 
+import json
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
+
+import pytest
+
+from integrations.opsgenie import OpsGenieAPIError
 
 
 @patch("integrations.opsgenie.client.api_get_request")
@@ -104,3 +110,147 @@ def test_healthcheck_unhealthy(api_get_request_mock):
 def test_healthcheck_unhealthy_error(api_get_request_mock):
     api_get_request_mock.return_value = "{]"
     assert opsgenie.healthcheck() is False
+
+
+def _timeline_response(rotations):
+    return json.dumps({"data": {"finalTimeline": {"rotations": rotations}}})
+
+
+def _iso(dt: datetime) -> str:
+    """Render an aware UTC datetime in OpsGenie's response format."""
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _window_around_now(
+    *,
+    before: timedelta = timedelta(minutes=30),
+    after: timedelta = timedelta(minutes=30),
+) -> tuple[str, str]:
+    now = datetime.now(timezone.utc)
+    return _iso(now - before), _iso(now + after)
+
+
+@patch("integrations.opsgenie.client.api_get_request")
+@patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
+def test_get_on_call_user_for_rotation_returns_email(api_get_request_mock):
+    start, end = _window_around_now()
+    api_get_request_mock.return_value = _timeline_response(
+        [
+            {
+                "name": "PSO_rotation",
+                "periods": [
+                    {
+                        "startDate": start,
+                        "endDate": end,
+                        "type": "user",
+                        "recipient": {"type": "user", "name": "a@x.ca"},
+                    }
+                ],
+            }
+        ]
+    )
+
+    result = opsgenie.get_on_call_user_for_rotation("sched-1", "PSO_rotation")
+
+    assert result == "a@x.ca"
+    called_url = api_get_request_mock.call_args[0][0]
+    assert "/v2/schedules/sched-1/timeline" in called_url
+    assert "intervalUnit=days" in called_url
+
+
+@patch("integrations.opsgenie.client.api_get_request")
+@patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
+def test_get_on_call_user_for_rotation_returns_none_when_rotation_absent(
+    api_get_request_mock,
+):
+    start, end = _window_around_now()
+    api_get_request_mock.return_value = _timeline_response(
+        [
+            {
+                "name": "OtherRotation",
+                "periods": [
+                    {
+                        "startDate": start,
+                        "endDate": end,
+                        "type": "user",
+                        "recipient": {"type": "user", "name": "b@x.ca"},
+                    }
+                ],
+            }
+        ]
+    )
+
+    assert opsgenie.get_on_call_user_for_rotation("sched-1", "PSO_rotation") is None
+
+
+@patch("integrations.opsgenie.client.api_get_request")
+@patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
+def test_get_on_call_user_for_rotation_returns_none_when_no_user_period(
+    api_get_request_mock,
+):
+    api_get_request_mock.return_value = _timeline_response(
+        [{"name": "PSO_rotation", "periods": []}]
+    )
+
+    assert opsgenie.get_on_call_user_for_rotation("sched-1", "PSO_rotation") is None
+
+
+@patch("integrations.opsgenie.client.api_get_request")
+@patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
+def test_get_on_call_user_for_rotation_skips_non_user_recipients(
+    api_get_request_mock,
+):
+    start, end = _window_around_now()
+    api_get_request_mock.return_value = _timeline_response(
+        [
+            {
+                "name": "PSO_rotation",
+                "periods": [
+                    {
+                        "startDate": start,
+                        "endDate": end,
+                        "type": "team",
+                        "recipient": {"type": "team", "name": "platform"},
+                    }
+                ],
+            }
+        ]
+    )
+
+    assert opsgenie.get_on_call_user_for_rotation("sched-1", "PSO_rotation") is None
+
+
+@patch("integrations.opsgenie.client.api_get_request")
+@patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
+def test_get_on_call_user_for_rotation_returns_none_when_first_period_in_future(
+    api_get_request_mock,
+):
+    """A first period starting after 'now' signals a coverage gap."""
+    future_start = _iso(datetime.now(timezone.utc) + timedelta(hours=6))
+    future_end = _iso(datetime.now(timezone.utc) + timedelta(hours=12))
+    api_get_request_mock.return_value = _timeline_response(
+        [
+            {
+                "name": "PSO_rotation",
+                "periods": [
+                    {
+                        "startDate": future_start,
+                        "endDate": future_end,
+                        "type": "user",
+                        "recipient": {"type": "user", "name": "later@x.ca"},
+                    }
+                ],
+            }
+        ]
+    )
+
+    assert opsgenie.get_on_call_user_for_rotation("sched-1", "PSO_rotation") is None
+
+
+@patch("integrations.opsgenie.client.api_get_request")
+@patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
+def test_get_on_call_user_for_rotation_raises_on_api_failure(api_get_request_mock):
+    api_get_request_mock.return_value = "{not json"
+
+    with pytest.raises(OpsGenieAPIError):
+        opsgenie.get_on_call_user_for_rotation("sched-1", "PSO_rotation")

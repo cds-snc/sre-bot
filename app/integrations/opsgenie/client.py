@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from urllib.request import Request, urlopen
 
 import structlog
@@ -8,6 +9,10 @@ from infrastructure.configuration.integrations.opsgenie import get_opsgenie_sett
 # Use the integrations API Key as the Opsgenie API Key
 OPSGENIE_KEY = get_opsgenie_settings().OPSGENIE_INTEGRATIONS_KEY
 logger = structlog.get_logger()
+
+
+class OpsGenieAPIError(Exception):
+    """Raised when an OpsGenie API call fails or returns an unparseable response."""
 
 
 def get_on_call_users(schedule):
@@ -26,6 +31,42 @@ def get_on_call_users(schedule):
             error=str(e),
         )
         return []
+
+
+def get_on_call_user_for_rotation(schedule_id: str, rotation_name: str) -> str | None:
+    """Return the email of the user currently on-call for ``rotation_name``.
+
+    Returns ``None`` when the rotation does not exist on the schedule, has no
+    current coverage (gap), or the active recipient is not a user
+    (team/escalation). Raises :class:`OpsGenieAPIError` on transport or
+    response-parsing failures.
+    """
+    # With no `date` param, OpsGenie anchors `finalTimeline` at "now", so the
+    # first period of the matching rotation is the active one — unless its
+    # startDate is in the future, which indicates a coverage gap.
+    url = (
+        f"https://api.opsgenie.com/v2/schedules/{schedule_id}/timeline"
+        "?identifierType=id&interval=1&intervalUnit=days"
+    )
+    try:
+        content = api_get_request(url, {"name": "GenieKey", "token": OPSGENIE_KEY})
+        rotations = json.loads(content)["data"]["finalTimeline"]["rotations"]
+    except Exception as exc:
+        raise OpsGenieAPIError(
+            f"OpsGenie timeline request failed for schedule {schedule_id!r}"
+        ) from exc
+
+    rotation = next((r for r in rotations if r.get("name") == rotation_name), None)
+    if not rotation:
+        return None
+    periods = rotation.get("periods") or []
+    if not periods:
+        return None
+    period = periods[0]
+    if datetime.fromisoformat(period["startDate"]) > datetime.now(timezone.utc):
+        return None
+    recipient = period.get("recipient") or {}
+    return recipient.get("name") if recipient.get("type") == "user" else None
 
 
 # Create an Opsgenie alert. This is used to notify the on-call users
