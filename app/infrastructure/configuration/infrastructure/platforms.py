@@ -24,12 +24,12 @@ class SlackPlatformSettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.infrastructure.platforms import get_platforms_settings
 
-        settings = get_settings()
+        settings = get_platforms_settings()
 
-        if settings.platforms.slack.ENABLED:
-            bot_token = settings.platforms.slack.BOT_TOKEN
+        if settings.slack.ENABLED:
+            bot_token = settings.slack.BOT_TOKEN
         ```
     """
 
@@ -119,12 +119,12 @@ class PlatformsSettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.infrastructure.platforms import get_platforms_settings
 
-        settings = get_settings()
+        settings = get_platforms_settings()
 
         # Check which platforms are enabled
-        if settings.platforms.slack.ENABLED:
+        if settings.slack.ENABLED:
             # Initialize Slack provider
 
         ```

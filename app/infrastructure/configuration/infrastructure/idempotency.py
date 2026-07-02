@@ -15,11 +15,11 @@ class IdempotencySettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.infrastructure.idempotency import get_idempotency_settings
 
-        settings = get_settings()
+        settings = get_idempotency_settings()
 
-        ttl = settings.idempotency.IDEMPOTENCY_TTL_SECONDS
+        ttl = settings.IDEMPOTENCY_TTL_SECONDS
         # Configure idempotency cache with TTL...
         ```
     """

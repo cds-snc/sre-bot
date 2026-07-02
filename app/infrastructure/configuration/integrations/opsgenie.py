@@ -15,11 +15,11 @@ class OpsGenieSettings(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.integrations.opsgenie import get_opsgenie_settings
 
-        settings = get_settings()
+        settings = get_opsgenie_settings()
 
-        api_key = settings.opsgenie.OPSGENIE_INTEGRATIONS_KEY
+        api_key = settings.OPSGENIE_INTEGRATIONS_KEY
         ```
     """
 

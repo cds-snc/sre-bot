@@ -17,13 +17,13 @@ class SlackSettings(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.integrations.slack import get_slack_settings
 
-        settings = get_settings()
+        settings = get_slack_settings()
 
-        if settings.slack.ENABLED:
-            slack_token = settings.slack.SLACK_TOKEN
-            incident_channel = settings.slack.INCIDENT_CHANNEL
+        if settings.ENABLED:
+            slack_token = settings.SLACK_TOKEN
+            incident_channel = settings.INCIDENT_CHANNEL
         ```
     """
 
