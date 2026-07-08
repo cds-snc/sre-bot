@@ -4,6 +4,7 @@ title: Build the smoke-test harness for the legacy Slack command and webhook sur
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:58'
 labels:
   - migration
   - phase-5
@@ -12,6 +13,7 @@ milestone: m-5
 dependencies: []
 references:
   - decisions/migration.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1290'
 priority: high
 ordinal: 36000
 ---

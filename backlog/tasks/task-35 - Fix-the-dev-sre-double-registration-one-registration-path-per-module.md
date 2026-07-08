@@ -4,6 +4,7 @@ title: Fix the dev/sre double registration (one registration path per module)
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:58'
 labels:
   - migration
   - phase-5
@@ -12,6 +13,7 @@ dependencies: []
 references:
   - decisions/migration.md
   - decisions/plugins.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1289'
 priority: high
 ordinal: 35000
 ---

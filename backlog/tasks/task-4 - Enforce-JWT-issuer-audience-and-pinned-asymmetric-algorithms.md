@@ -4,6 +4,7 @@ title: 'Enforce JWT issuer, audience, and pinned asymmetric algorithms'
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:56'
 labels:
   - security
   - phase-0
@@ -11,6 +12,7 @@ milestone: m-0
 dependencies: []
 references:
   - decisions/security.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1258'
 priority: high
 ordinal: 4000
 ---

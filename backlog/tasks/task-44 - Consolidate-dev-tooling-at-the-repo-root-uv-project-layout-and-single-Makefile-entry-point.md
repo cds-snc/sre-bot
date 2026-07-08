@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-08 15:04'
-updated_date: '2026-07-08 16:27'
+updated_date: '2026-07-08 16:58'
 labels:
   - toolchain
 milestone: m-1
@@ -15,6 +15,7 @@ references:
   - Makefile
   - app/Makefile
   - app/pyproject.toml
+  - 'https://github.com/cds-snc/sre-bot/issues/1298'
 priority: medium
 ordinal: 44000
 ---

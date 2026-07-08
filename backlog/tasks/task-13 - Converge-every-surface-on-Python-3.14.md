@@ -4,6 +4,7 @@ title: Converge every surface on Python 3.14
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:57'
 labels:
   - toolchain
   - phase-2
@@ -11,6 +12,7 @@ milestone: m-2
 dependencies: []
 references:
   - decisions/toolchain.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1267'
 priority: high
 ordinal: 13000
 ---

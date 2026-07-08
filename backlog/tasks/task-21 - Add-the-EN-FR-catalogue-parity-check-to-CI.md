@@ -4,6 +4,7 @@ title: Add the EN/FR catalogue parity check to CI
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:57'
 labels:
   - toolchain
   - phase-2
@@ -12,6 +13,7 @@ milestone: m-2
 dependencies: []
 references:
   - decisions/i18n.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1275'
 priority: medium
 ordinal: 21000
 ---

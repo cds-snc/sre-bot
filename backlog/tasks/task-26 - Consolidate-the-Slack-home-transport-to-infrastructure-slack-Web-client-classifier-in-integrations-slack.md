@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:57'
 labels:
   - slack
   - phase-3
@@ -16,6 +17,7 @@ dependencies:
 references:
   - decisions/transport-slack.md
   - decisions/platform-transports.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1280'
 priority: high
 ordinal: 26000
 ---

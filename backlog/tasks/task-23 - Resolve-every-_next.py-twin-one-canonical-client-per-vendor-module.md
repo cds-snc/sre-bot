@@ -4,6 +4,7 @@ title: 'Resolve every _next.py twin: one canonical client per vendor module'
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:57'
 labels:
   - clients
   - phase-3
@@ -12,6 +13,7 @@ dependencies:
   - TASK-22
 references:
   - decisions/outbound-clients.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1277'
 priority: high
 ordinal: 23000
 ---

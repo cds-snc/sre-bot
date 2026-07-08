@@ -4,6 +4,7 @@ title: Reconcile planning documents against the new corpus
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:57'
 labels:
   - governance
   - phase-1
@@ -12,6 +13,7 @@ dependencies:
   - TASK-10
 references:
   - ADR-REVIEW-AND-MIGRATION-PLAN.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1265'
 priority: medium
 ordinal: 11000
 ---

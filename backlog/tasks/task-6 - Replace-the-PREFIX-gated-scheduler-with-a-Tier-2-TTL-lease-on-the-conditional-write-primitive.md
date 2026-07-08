@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:56'
 labels:
   - reliability
   - phase-0
@@ -16,6 +17,7 @@ dependencies:
 references:
   - decisions/reliability.md
   - claude-research-outcome.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1260'
 priority: medium
 ordinal: 6000
 ---

@@ -4,6 +4,7 @@ title: 'Enforce test gates: strict markers, coverage ratchet, single test tree'
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:57'
 labels:
   - toolchain
   - phase-2
@@ -13,6 +14,7 @@ dependencies:
   - TASK-18
 references:
   - decisions/testing.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1274'
 priority: medium
 ordinal: 20000
 ---

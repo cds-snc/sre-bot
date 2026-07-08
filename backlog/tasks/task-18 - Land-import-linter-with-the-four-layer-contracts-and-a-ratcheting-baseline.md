@@ -4,6 +4,7 @@ title: Land import-linter with the four layer contracts and a ratcheting baselin
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:57'
 labels:
   - toolchain
   - phase-2
@@ -14,6 +15,7 @@ references:
   - decisions/toolchain.md
   - decisions/layers.md
   - decisions/feature-packages.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1272'
 priority: high
 ordinal: 18000
 ---

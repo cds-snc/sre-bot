@@ -4,6 +4,7 @@ title: 'Strangler completion: delete modules/, the legacy list, and python-i18n'
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:58'
 labels:
   - migration
   - phase-5
@@ -13,6 +14,7 @@ dependencies:
   - TASK-40
 references:
   - decisions/migration.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1295'
 priority: medium
 ordinal: 41000
 ---

@@ -4,6 +4,7 @@ title: 'Fix production CORS: explicit origin allow-list with boot-time validator
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:56'
 labels:
   - security
   - phase-0
@@ -12,6 +13,7 @@ dependencies:
   - TASK-1
 references:
   - decisions/security.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1256'
 priority: high
 ordinal: 2000
 ---

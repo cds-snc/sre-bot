@@ -4,6 +4,7 @@ title: Provider registry with eager lifespan warmup and test clear-all fixture
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:58'
 labels:
   - infrastructure
   - phase-4
@@ -13,6 +14,7 @@ dependencies: []
 references:
   - decisions/dependency-injection.md
   - decisions/testing.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1283'
 priority: medium
 ordinal: 29000
 ---
