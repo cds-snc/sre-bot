@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 15:03'
 labels:
   - security
   - phase-0
@@ -14,6 +15,7 @@ dependencies: []
 references:
   - decisions/configuration.md
   - decisions/security.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1254'
 priority: high
 ordinal: 1000
 ---

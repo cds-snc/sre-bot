@@ -85,8 +85,8 @@ fmt-ci:
 audit-client-usage-matrix:
 	bash bin/generate_client_usage_matrix.sh
 
-backlog-board: # Backlog.md web UI (Kanban board) at http://localhost:6420
-	cd .. && backlog browser
+backlog-board: # Backlog.md web UI (Kanban board) at http://localhost:6421
+	cd .. && backlog browser --no-open --port 6421
 
 run:
 	uv run uvicorn main:server_app
