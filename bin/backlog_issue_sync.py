@@ -48,15 +48,8 @@ BACKLOG_DIR = REPO_ROOT / "backlog"
 MARKER_RE = re.compile(r"<!-- backlog-sync: (task-[\w.-]+) -->")
 FRONTMATTER_RE = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n?(.*)\Z", re.S)
 
-SYNC_LABEL = "backlog"
-LABEL_COLORS = {
-    SYNC_LABEL: "5319e7",
-    "priority: high": "d93f0b",
-    "priority: medium": "fbca04",
-    "priority: low": "c2e0c6",
-    "status: in-progress": "1d76db",
-}
-DEFAULT_LABEL_COLOR = "ededed"
+# GitHub issues stay deliberately plain: title + body + open/closed state.
+# Rich metadata (labels, priority, milestone) lives only in the backlog.
 
 
 @dataclass
@@ -154,33 +147,9 @@ def load_tasks() -> dict[str, Task]:
     return tasks
 
 
-def load_milestone_titles() -> dict[str, str]:
-    titles: dict[str, str] = {}
-    directory = BACKLOG_DIR / "milestones"
-    if not directory.is_dir():
-        return titles
-    for path in directory.glob("*.md"):
-        match = FRONTMATTER_RE.match(path.read_text(encoding="utf-8"))
-        if not match:
-            continue
-        meta = yaml.safe_load(match.group(1)) or {}
-        if meta.get("id") and meta.get("title"):
-            titles[str(meta["id"]).lower()] = str(meta["title"]).strip()
-    return titles
-
-
 def task_sort_key(task_id: str):
     match = re.search(r"(\d+)", task_id)
     return (int(match.group(1)) if match else 0, task_id)
-
-
-def desired_labels(task: Task) -> set[str]:
-    labels = set(task.labels) | {SYNC_LABEL}
-    if task.priority:
-        labels.add(f"priority: {task.priority}")
-    if task.status.strip().lower() == "in progress":
-        labels.add("status: in-progress")
-    return labels
 
 
 def render_body(task: Task, issue_by_task: dict[str, int], nwo: str) -> str:
@@ -225,31 +194,6 @@ def normalize(text: str) -> str:
     return text.replace("\r\n", "\n").strip()
 
 
-def ensure_labels(needed: set[str], apply: bool) -> list[str]:
-    existing = {label["name"] for label in gh_json("label", "list", "--limit", "300", "--json", "name")}
-    missing = sorted(needed - existing)
-    for name in missing:
-        if apply:
-            gh(
-                "label", "create", name,
-                "--color", LABEL_COLORS.get(name, DEFAULT_LABEL_COLOR),
-                "--description", "Managed by backlog issue sync",
-            )
-    return missing
-
-
-def ensure_milestones(needed: set[str], apply: bool) -> list[str]:
-    existing = {
-        milestone["title"]
-        for milestone in gh_json("api", "repos/{owner}/{repo}/milestones?state=all&per_page=100")
-    }
-    missing = sorted(needed - existing)
-    for title in missing:
-        if apply:
-            gh("api", "-X", "POST", "repos/{owner}/{repo}/milestones", "-f", f"title={title}")
-    return missing
-
-
 def write_back_reference(task: Task, issue_url: str) -> None:
     """Append the issue URL to the task's references via the backlog CLI.
 
@@ -280,7 +224,6 @@ def main() -> int:
 
     nwo = gh_json("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
     all_tasks = load_tasks()
-    milestone_titles = load_milestone_titles()
 
     if args.task:
         wanted = {t.lower() for t in args.task}
@@ -292,7 +235,7 @@ def main() -> int:
         selected = all_tasks
 
     issues = gh_json("issue", "list", "--state", "all", "--limit", "1000",
-                     "--json", "number,title,body,state,labels,milestone")
+                     "--json", "number,title,body,state")
     issue_for_task: dict[str, dict] = {}
     unmanaged_open = 0
     for issue in issues:
@@ -309,17 +252,6 @@ def main() -> int:
 
     to_process = [selected[tid] for tid in sorted(selected, key=task_sort_key)]
 
-    needed_labels = set().union(*(desired_labels(task) for task in to_process)) if to_process else set()
-    needed_milestones = {
-        milestone_titles[task.milestone]
-        for task in to_process
-        if task.milestone and task.milestone in milestone_titles
-    }
-    for name in ensure_labels(needed_labels, args.apply):
-        print(f"LABEL     create '{name}'")
-    for title in ensure_milestones(needed_milestones, args.apply):
-        print(f"MILESTONE create '{title}'")
-
     def throttle():
         if args.apply:
             time.sleep(args.throttle)
@@ -332,31 +264,19 @@ def main() -> int:
         if task.id in issue_number_by_task or task.desired_closed:
             continue
         body = render_body(task, issue_number_by_task, nwo)
-        milestone_title = milestone_titles.get(task.milestone, "")
         print(f"CREATE    {task.id}: {task.title[:70]}")
         counts["create"] += 1
         if not args.apply:
             continue
-        create_args = ["issue", "create", "--title", task.title, "--body-file", "-"]
-        for label in sorted(desired_labels(task)):
-            create_args += ["--label", label]
-        if milestone_title:
-            create_args += ["--milestone", milestone_title]
-        url = gh(*create_args, input_text=body)
+        url = gh("issue", "create", "--title", task.title, "--body-file", "-", input_text=body)
         number = int(url.rstrip("/").rsplit("/", 1)[1])
         issue_number_by_task[task.id] = number
         issue_for_task[task.id] = {
             "number": number, "title": task.title, "body": body, "state": "OPEN",
-            "labels": [{"name": label} for label in desired_labels(task)],
-            "milestone": {"title": milestone_title} if milestone_title else None,
         }
         print(f"          -> {url}")
         write_back_reference(task, url)
         throttle()
-
-    # Labels this sync owns and may remove when no longer desired: anything a
-    # backlog task declares, plus the sync's own namespaces.
-    managed_labels = set().union(*(desired_labels(task) for task in all_tasks.values())) if all_tasks else set()
 
     # Pass 2: converge existing issues (including ones just created, whose
     # dependency links may have resolved later in pass 1).
@@ -369,33 +289,17 @@ def main() -> int:
             continue
         number = issue["number"]
         desired_body = render_body(task, issue_number_by_task, nwo)
-        desired = desired_labels(task)
-        current_labels = {label["name"] for label in issue.get("labels") or []}
-        current_milestone = (issue.get("milestone") or {}).get("title") or ""
-        wanted_milestone = milestone_titles.get(task.milestone, "")
-        add_labels = sorted(desired - current_labels)
-        remove_labels = sorted((current_labels & managed_labels) - desired)
         content_differs = (
             normalize(issue.get("body") or "") != normalize(desired_body)
             or issue.get("title", "") != task.title
-            or add_labels or remove_labels
-            or current_milestone != wanted_milestone
         )
 
         if content_differs:
             print(f"UPDATE    #{number} {task.id}")
             counts["update"] += 1
             if args.apply:
-                edit_args = ["issue", "edit", str(number), "--title", task.title, "--body-file", "-"]
-                for label in add_labels:
-                    edit_args += ["--add-label", label]
-                for label in remove_labels:
-                    edit_args += ["--remove-label", label]
-                if wanted_milestone and wanted_milestone != current_milestone:
-                    edit_args += ["--milestone", wanted_milestone]
-                elif current_milestone and not wanted_milestone:
-                    edit_args += ["--remove-milestone"]
-                gh(*edit_args, input_text=desired_body)
+                gh("issue", "edit", str(number), "--title", task.title,
+                   "--body-file", "-", input_text=desired_body)
                 throttle()
 
         is_closed = issue["state"] == "CLOSED"
