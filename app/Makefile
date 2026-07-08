@@ -1,4 +1,4 @@
-.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit
+.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit backlog-board
 
 dev:
 	PREFIX="dev-" uv run uvicorn main:server_app --reload
@@ -81,6 +81,12 @@ lint-ci:
 
 fmt-ci:
 	uv run black --check . --target-version py311
+
+audit-client-usage-matrix:
+	bash bin/generate_client_usage_matrix.sh
+
+backlog-board: # Backlog.md web UI (Kanban board) at http://localhost:6420
+	cd .. && backlog browser
 
 run:
 	uv run uvicorn main:server_app
