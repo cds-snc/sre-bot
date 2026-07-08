@@ -1,26 +1,14 @@
 ---
 name: feature-architecture
-description: Produce a feature-scoped architecture packet with complexity classification, ingress/egress contracts, and a TDD test matrix.
+description: Produce a feature-scoped architecture packet with complexity classification, ingress/egress contracts, a TDD test matrix, and right-sized backlog tasks.
 agent: feature-architecture
 model: GPT-5.3-Codex (copilot)
 ---
 
-Produce a feature architecture packet from the request.
+Produce a feature architecture packet from the request, following the agent's full workflow and output contract.
 
-Required output:
-1. Feature scope and assumptions.
-2. Applicable decision records and constraints.
-3. Complexity classification (Level 1/2/3) with rationale.
-4. Ingress and egress model definitions.
-5. Interaction flow across layers/channels.
-6. Error taxonomy and mapping.
-7. For Level 3 features, overarching principles mapped to existing decision records or proposed record updates.
-8. Acceptance criteria.
-9. TDD test specification matrix for tests-creation.
-10. Implementation handoff checklist.
+Invocation notes:
 
-Rules:
-- Keep design feature-scoped and executable.
-- Enforce type boundary rules and package/infrastructure boundaries.
-- Full compliance with decision records unless explicit deviation proposal is required.
-- For rich workflow (Level 3), do not define persistent architecture policy only in the feature packet; link policy to decision records.
+- Classify complexity (Level 1/2/3) honestly; if the user says "rich", "rich workflow", or "Level 3", treat the feature as Level 3 and include orchestration boundaries, channel parity rules, and the policy/config model.
+- Apply the single-PR size gate when sizing delivery; Level 2/3 features usually become multiple backlog tasks.
+- Prefer the task-planner handoff so the packet is persisted into backlog tasks rather than remaining chat-only.

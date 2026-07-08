@@ -39,7 +39,7 @@ Produce production-grade Python/FastAPI backend changes with architecture-first 
 
 - Package discovery/registration/loading/initialization must be startup-driven via lifespan.
 - Use pluggy-based registration for package capabilities.
-- Use startup-driven filesystem discovery (`auto_discover_plugins`) as the canonical way to register packages.
+- Register packages via `pyproject.toml` entry-points loaded at startup (`pm.load_setuptools_entrypoints`), per `decisions/plugins.md` — declarative, reviewed registration, not implicit filesystem discovery.
 - Never perform plugin registration at import time (no side-effecting code in `__init__.py` bodies).
 - Design all new packages to be plugin-registerable from day one.
 

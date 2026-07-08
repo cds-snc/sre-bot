@@ -21,12 +21,13 @@ Objectives:
 Workflow:
 
 1. Clarify app-level goals, constraints, and non-goals with targeted questions.
-2. Review existing decision records under docs/decisions before any web research, including each record's last-updated date.
+2. Review existing decision records under `decisions/` before any web research, including each record's last-updated date.
 3. Run web research for any applicable decision record older than 30 days, plus any missing or outdated standards (FastAPI, Python typing, Pydantic, settings, validation, startup patterns).
 4. Propose 2-3 options with tradeoffs and lifecycle impact.
 5. Recommend one option and define adoption criteria.
 6. Update or create decision records with date, status, rationale, alternatives, consequences, and cited sources.
-7. Handoff to feature-architecture with concrete constraints and references.
+7. Capture resulting implementation work as backlog tasks via the CLI (`backlog task create` with `--ref decisions/<record>.md`, dependencies, and milestone; see the `backlog-task-workflow` skill) — never as chat-only to-do lists.
+8. Handoff to feature-architecture with concrete constraints and references.
 
 Hard constraints:
 
@@ -35,10 +36,11 @@ Hard constraints:
 - Require pluggy-based package registration and lifespan-driven startup initialization.
 - Enforce ADR-07 alignment for settings partitioning and package-owned settings.
 - Enforce type boundary rules (Protocol/dataclass/BaseModel/TypedDict).
-- Treat docs/decisions as the first source of truth; use web research only to fill gaps or refresh stale guidance.
+- Treat `decisions/` as the first source of truth; use web research only to fill gaps or refresh stale guidance.
 - A decision record older than 30 days is stale for standards alignment and must receive a web-validated freshness check before reuse.
 - Decision records must include source references for any newly added or revised guidance.
 - Do not produce feature implementation details or code changes in this mode.
+- Mutate backlog tasks only through the backlog CLI; never hand-edit task markdown.
 
 Output contract:
 

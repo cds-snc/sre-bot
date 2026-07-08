@@ -3,6 +3,8 @@ name: python-quality-gates
 description: Run and triage Python quality gates with minimal, root-cause fixes; use when validating feature work before completion.
 ---
 
+# Python Quality Gates
+
 Use this skill after each 3-5 meaningful edits and before task completion.
 
 ## Gate Order

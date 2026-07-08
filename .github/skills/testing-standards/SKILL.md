@@ -3,12 +3,14 @@ name: testing-standards
 description: Apply project testing standards for app/tests layout, naming, dependency overrides, and route/service coverage.
 ---
 
+# Testing Standards
+
 ## Test Layout & Naming
 
-Mirror `app/` under `tests/`:
-- `tests/unit/` — isolated units with Protocol fakes. Cost <50ms.
-- `tests/integration/` — feature + infrastructure with external deps stubbed. Cost <500ms.
-- `tests/smoke/` — live systems. On-demand only.
+Mirror `app/` under `app/tests/`:
+- `app/tests/unit/` — isolated units with Protocol fakes. Cost <50ms.
+- `app/tests/integration/` — feature + infrastructure with external deps stubbed. Cost <500ms.
+- `app/tests/smoke/` — live systems. On-demand only.
 
 Names: `test_<domain>_<entity>_<action>.py`. No generic names.
 

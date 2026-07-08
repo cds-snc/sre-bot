@@ -1,25 +1,14 @@
 ---
 name: architecture-review
-description: Produce app-level architecture options and source-cited decision-record updates, including mandatory web refresh for records older than 30 days.
+description: Run app-level architecture mode on a request, producing options, source-cited decision-record updates, and backlog tasks for resulting work.
 agent: architecture
 model: Claude Sonnet 4.6 (copilot)
 ---
 
-Review the request in app-level architecture mode.
+Review the request in app-level architecture mode and follow the agent's full workflow and output contract.
 
-Required output:
-1. App-level context, constraints, and non-goals.
-2. Existing decision records reviewed and relevance status (include age in days).
-3. Freshness audit for records older than 30 days with web validation outcomes.
-4. Options considered (2-3) with tradeoffs.
-5. Recommended approach and why.
-6. Risks and mitigations.
-7. Decision-record updates required (create/update list with sources).
-8. Handoff packet for feature-level architecture.
+Invocation notes:
 
-Rules:
-- Ignore legacy app/modules patterns for architecture decisions.
-- Align with app/infrastructure shared services and app/packages business domains.
-- Prioritize docs/decisions first; run web research for any relevant decision older than 30 days and for gaps/stale guidance.
-- Include source references for every new or revised decision statement.
-- Validate settings, typing, and startup/plugin registration constraints.
+- Treat the user's input as the app-level question or change under review.
+- Decision records live in `decisions/`; run the mandatory freshness audit (web-validate records older than 30 days).
+- End with the decision-record update plan, backlog tasks created for resulting work, and the feature-architecture handoff packet.
