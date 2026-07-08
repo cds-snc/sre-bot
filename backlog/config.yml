@@ -1,4 +1,4 @@
-project_name: "sentinel"
+project_name: "SRE Bot"
 default_status: "To Do"
 statuses: ["To Do", "In Progress", "Done"]
 labels: []
