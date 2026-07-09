@@ -1,5 +1,6 @@
 import threading
 import time
+from datetime import timedelta
 from typing import Any, Callable
 
 import schedule
@@ -26,7 +27,7 @@ schedule_lib = schedule
 class _ScheduleBackgroundJobRegistry(BackgroundJobRegistry):
     """Adapter that binds feature jobs to the schedule library."""
 
-    def register(
+    def register_daily(
         self,
         *,
         job_name: str,
@@ -37,7 +38,24 @@ class _ScheduleBackgroundJobRegistry(BackgroundJobRegistry):
         logger.info(
             "feature_background_job_scheduled",
             job_name=job_name,
+            cadence="daily",
             schedule=schedule,
+        )
+
+    def register_interval(
+        self,
+        *,
+        job_name: str,
+        every: timedelta,
+        job: Callable[[], None],
+    ) -> None:
+        seconds = int(every.total_seconds())
+        schedule_lib.every(seconds).seconds.do(safe_run(job))
+        logger.info(
+            "feature_background_job_scheduled",
+            job_name=job_name,
+            cadence="interval",
+            every_seconds=seconds,
         )
 
 

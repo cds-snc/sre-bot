@@ -6,7 +6,12 @@ executing the actual scheduled work.
 
 import pytest
 from unittest.mock import MagicMock, patch
-from jobs.scheduled_tasks import safe_run, scheduler_heartbeat, reconcile_access_sync
+from jobs.scheduled_tasks import (
+    _ScheduleBackgroundJobRegistry,
+    safe_run,
+    scheduler_heartbeat,
+    reconcile_access_sync,
+)
 
 
 class TestSafeRun:
@@ -191,3 +196,49 @@ class TestReconcileAccessSync:
         mock_logger.info.assert_called_once_with(
             "reconcile_access_sync_started", module="scheduled_tasks"
         )
+
+
+class TestScheduleBackgroundJobRegistry:
+    """Tests for the typed background-job registry methods."""
+
+    @pytest.mark.unit
+    @patch("jobs.scheduled_tasks.schedule_lib")
+    def test_register_daily_binds_hh_mm(self, mock_schedule_lib) -> None:
+        registry = _ScheduleBackgroundJobRegistry()
+        job = MagicMock()
+
+        registry.register_daily(job_name="daily_job", schedule="03:30", job=job)
+
+        mock_schedule_lib.every.assert_called_once_with()
+        mock_schedule_lib.every.return_value.day.at.assert_called_once_with("03:30")
+        mock_schedule_lib.every.return_value.day.at.return_value.do.assert_called_once()
+
+    @pytest.mark.unit
+    @patch("jobs.scheduled_tasks.schedule_lib")
+    def test_register_interval_with_minutes(self, mock_schedule_lib) -> None:
+        from datetime import timedelta
+
+        registry = _ScheduleBackgroundJobRegistry()
+        job = MagicMock()
+
+        registry.register_interval(
+            job_name="minute_job", every=timedelta(minutes=5), job=job
+        )
+
+        mock_schedule_lib.every.assert_called_once_with(300)
+        mock_schedule_lib.every.return_value.seconds.do.assert_called_once()
+
+    @pytest.mark.unit
+    @patch("jobs.scheduled_tasks.schedule_lib")
+    def test_register_interval_with_hours(self, mock_schedule_lib) -> None:
+        from datetime import timedelta
+
+        registry = _ScheduleBackgroundJobRegistry()
+        job = MagicMock()
+
+        registry.register_interval(
+            job_name="hourly_job", every=timedelta(hours=2), job=job
+        )
+
+        mock_schedule_lib.every.assert_called_once_with(7200)
+        mock_schedule_lib.every.return_value.seconds.do.assert_called_once()

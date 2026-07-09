@@ -174,7 +174,7 @@ def test_sync_register_background_job_registers_reconciliation_when_enabled(
     registrations: list[dict[str, object]] = []
 
     class _BackgroundJobRegistry:
-        def register(self, *, job_name: str, schedule: str, job) -> None:
+        def register_daily(self, *, job_name: str, schedule: str, job) -> None:
             registrations.append(
                 {"job_name": job_name, "schedule": schedule, "job": job}
             )
@@ -210,7 +210,7 @@ def test_sync_register_background_job_skips_registration_when_disabled(
     registrations: list[dict[str, object]] = []
 
     class _BackgroundJobRegistry:
-        def register(self, *, job_name: str, schedule: str, job) -> None:
+        def register_daily(self, *, job_name: str, schedule: str, job) -> None:
             registrations.append(
                 {"job_name": job_name, "schedule": schedule, "job": job}
             )
