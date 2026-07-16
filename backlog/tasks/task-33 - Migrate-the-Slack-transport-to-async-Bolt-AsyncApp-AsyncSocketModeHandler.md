@@ -4,6 +4,7 @@ title: Migrate the Slack transport to async Bolt (AsyncApp + AsyncSocketModeHand
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:58'
 labels:
   - slack
   - phase-4
@@ -12,6 +13,7 @@ dependencies:
   - TASK-26
 references:
   - decisions/transport-slack.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1287'
 priority: medium
 ordinal: 33000
 ---

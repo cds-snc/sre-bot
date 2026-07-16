@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:57'
 labels:
   - clients
   - phase-3
@@ -15,6 +16,7 @@ dependencies:
 references:
   - decisions/layers.md
   - decisions/outbound-clients.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1276'
 priority: high
 ordinal: 22000
 ---

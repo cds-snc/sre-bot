@@ -3,6 +3,8 @@ name: fastapi-api-patterns
 description: Apply typed FastAPI route patterns with clean dependency boundaries, stable error mapping, and test coverage for success/failure paths.
 ---
 
+# FastAPI API Patterns
+
 Use this skill when implementing or reviewing API endpoints.
 
 ## Core Rules

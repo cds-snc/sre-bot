@@ -4,6 +4,7 @@ title: Adopt decisions/ as sole source of truth; archive docs/adr/ and its machi
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:57'
 labels:
   - governance
   - phase-1
@@ -12,6 +13,7 @@ dependencies: []
 references:
   - decisions/governance.md
   - decisions/README.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1264'
 priority: high
 ordinal: 10000
 ---

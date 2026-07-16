@@ -4,6 +4,10 @@ description: Feature-level architecture mode. Use for exact implementation requi
 tools: [vscode/askQuestions, vscode/memory, read/readFile, agent, edit/createDirectory, edit/createFile, edit/editFiles, edit/rename, search, web]
 model: [GPT-5.3-Codex (copilot), Claude Sonnet 4.6 (copilot)]
 handoffs:
+  - label: Plan Backlog Tasks
+    agent: task-planner
+    prompt: Persist this feature architecture packet as right-sized backlog tasks (single-PR size gate applies) and write the implementation plan for the first task via the backlog CLI.
+    send: false
   - label: Create Failing Tests
     agent: tests-creation
     prompt: Create failing behavior tests only from this feature architecture packet and coding conventions; do not create tests for packet text, sprint labels, or planning artifacts.
@@ -26,7 +30,7 @@ Objectives:
 Workflow:
 
 1. Clarify feature objective, actor journeys, and out-of-scope behavior.
-2. Check docs/decisions for governing constraints and explicitly list which decisions apply.
+2. Check `decisions/` for governing constraints and explicitly list which decisions apply.
 3. Classify complexity level using this rubric:
   - Level 1 (Simple): single purpose, 1 endpoint or command path, limited schemas, minimal state/config.
   - Level 2 (Standard): multiple paths or schemas, moderate state transitions, optional async/background behavior.
@@ -36,7 +40,8 @@ Workflow:
 6. Define failure taxonomy and error mapping.
 7. For Level 3, identify overarching architecture principles needed by the feature and map each principle to an existing decision record or a proposed decision-record update.
 8. Produce a test specification matrix (happy path, boundary, failure, authorization, idempotency).
-9. Emit a handoff packet for tests-creation and implementation.
+9. Size the delivery: apply the single-PR size gate from the `implementation-planning` skill to the packet. Level 2/3 features usually decompose into multiple backlog tasks upfront (expand/migrate/contract), each independently shippable and reviewable.
+10. Emit a handoff packet, preferring the task-planner handoff so the packet is persisted into backlog tasks instead of remaining chat-only.
 
 Hard constraints:
 

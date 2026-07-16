@@ -4,6 +4,7 @@ title: 'Resolve the empty infrastructure services: persistence/ and notification
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:58'
 labels:
   - infrastructure
   - phase-4
@@ -11,6 +12,7 @@ milestone: m-4
 dependencies: []
 references:
   - decisions/layers.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1286'
 priority: low
 ordinal: 32000
 ---

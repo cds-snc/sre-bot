@@ -4,6 +4,7 @@ title: Adopt ruff as sole formatter and linter; remove black and standalone band
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:57'
 labels:
   - toolchain
   - phase-2
@@ -12,6 +13,7 @@ dependencies:
   - TASK-13
 references:
   - decisions/toolchain.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1269'
 priority: medium
 ordinal: 15000
 ---

@@ -4,6 +4,7 @@ title: Migrate modules/incident to a feature package
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:58'
 labels:
   - migration
   - phase-5
@@ -14,6 +15,7 @@ dependencies:
 references:
   - decisions/migration.md
   - decisions/feature-packages.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1292'
 priority: medium
 ordinal: 38000
 ---

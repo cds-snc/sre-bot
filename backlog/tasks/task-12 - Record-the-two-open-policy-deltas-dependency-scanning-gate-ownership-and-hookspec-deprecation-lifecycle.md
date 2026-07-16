@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:57'
 labels:
   - governance
   - phase-1
@@ -15,6 +16,7 @@ dependencies:
 references:
   - decisions/governance.md
   - decisions/plugins.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1266'
 priority: low
 ordinal: 12000
 ---

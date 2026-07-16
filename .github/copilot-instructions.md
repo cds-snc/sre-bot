@@ -39,7 +39,7 @@ Produce production-grade Python/FastAPI backend changes with architecture-first 
 
 - Package discovery/registration/loading/initialization must be startup-driven via lifespan.
 - Use pluggy-based registration for package capabilities.
-- Use startup-driven filesystem discovery (`auto_discover_plugins`) as the canonical way to register packages.
+- Register packages via `pyproject.toml` entry-points loaded at startup (`pm.load_setuptools_entrypoints`), per `decisions/plugins.md` — declarative, reviewed registration, not implicit filesystem discovery.
 - Never perform plugin registration at import time (no side-effecting code in `__init__.py` bodies).
 - Design all new packages to be plugin-registerable from day one.
 
@@ -68,6 +68,15 @@ Required behavior:
 - Maintain strict typing and predictable async behavior.
 - Run validations after every 3-5 meaningful changes and before completion.
 - Prefer reusable prompt files for recurring workflows under `.github/prompts/*.prompt.md`.
+
+## Task Workflow (Backlog.md)
+
+Work items live as Backlog.md tasks under `backlog/tasks/` and are the source of truth for scope, plans, and acceptance criteria.
+
+- Operate tasks only through the backlog CLI (`backlog task view/edit/create`); never hand-edit task markdown files. See the `backlog-task-workflow` skill and `backlog instructions overview`.
+- Before implementing a backlog task, it must have a human-approved implementation plan written into the task (`backlog task edit <id> --plan`). Use the `task-planner` agent (`/plan-task <id>`) to produce it.
+- Single-PR size gate: if a task's change is too large for one reviewable PR (~400 production LOC / ~10 files / multiple subsystems / mixed refactor+behavior), it must be decomposed into smaller, safer, incremental subtasks (`backlog task create ... --dep --parent`) before implementation. See the `implementation-planning` skill. This is mandatory so the dev team can properly review every change.
+- One task per session, one branch, one PR. Agents check acceptance criteria one by one as verified and stop at In Progress with notes; humans move tasks to Done.
 
 ## Testing Placement and Naming
 

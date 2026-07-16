@@ -4,6 +4,7 @@ title: Write the transport-teams decision record (M365 Agents SDK evaluation)
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:58'
 labels:
   - teams
   - phase-6
@@ -11,6 +12,7 @@ milestone: m-6
 dependencies: []
 references:
   - decisions/platform-transports.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1296'
 priority: low
 ordinal: 42000
 ---

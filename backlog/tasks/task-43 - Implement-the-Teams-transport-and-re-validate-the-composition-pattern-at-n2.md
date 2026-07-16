@@ -4,6 +4,7 @@ title: Implement the Teams transport and re-validate the composition pattern at 
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
+updated_date: '2026-07-08 16:58'
 labels:
   - teams
   - phase-6
@@ -12,6 +13,7 @@ dependencies:
   - TASK-42
 references:
   - decisions/platform-transports.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1297'
 priority: low
 ordinal: 43000
 ---
