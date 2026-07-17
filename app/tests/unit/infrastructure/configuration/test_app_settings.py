@@ -17,15 +17,15 @@ class TestAppSettings:
         assert settings.LOG_LEVEL == "INFO"
         assert settings.GIT_SHA == "Unknown"
 
-    def test_app_settings_is_production_when_prefix_empty(self):
-        """is_production should be True when PREFIX is empty."""
-        settings = AppSettings(PREFIX="")
+    def test_app_settings_is_production_when_environment_production(self):
+        """is_production should be True when ENVIRONMENT is production."""
+        settings = AppSettings(ENVIRONMENT="production")
 
         assert settings.is_production is True
 
-    def test_app_settings_is_not_production_when_prefix_set(self):
-        """is_production should be False when PREFIX is set."""
-        settings = AppSettings(PREFIX="dev")
+    def test_app_settings_is_not_production_when_environment_non_production(self):
+        """is_production should be False when ENVIRONMENT is non-production."""
+        settings = AppSettings(ENVIRONMENT="dev")
 
         assert settings.is_production is False
 
@@ -58,8 +58,10 @@ class TestAppSettings:
 class TestAppSettingsEnvironment:
     """Behavior tests for ENVIRONMENT and DEV_BYPASS_ENABLED settings."""
 
-    def test_environment_default_is_local(self):
+    def test_environment_default_is_local(self, monkeypatch):
         """Default environment should be local."""
+        monkeypatch.delenv("ENVIRONMENT", raising=False)
+
         settings = AppSettings()
 
         assert settings.ENVIRONMENT == "local"

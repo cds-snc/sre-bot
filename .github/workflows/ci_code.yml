@@ -47,6 +47,7 @@ jobs:
         working-directory: ./app
         run: make test
         env:
+          ENVIRONMENT: ci
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           SESSION_SECRET_KEY: ${{ secrets.SESSION_SECRET_KEY }}
