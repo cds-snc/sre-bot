@@ -3,11 +3,11 @@ id: TASK-1.1
 title: >-
   Add ENVIRONMENT and DEV_BYPASS_ENABLED to AppSettings; set in all deployment
   configs
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-17 16:14'
-updated_date: '2026-07-17 18:20'
+updated_date: '2026-07-17 18:58'
 labels:
   - phase-0
 milestone: m-0
