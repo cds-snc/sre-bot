@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 15:03'
+updated_date: '2026-07-17 16:15'
 labels:
   - security
   - phase-0
@@ -39,6 +39,34 @@ Steps:
 - [ ] #3 Dev-bypass requires the two independent guards (non-production ENVIRONMENT and DEV_BYPASS_ENABLED=true) and logs each use
 - [ ] #4 Unit tests cover: valid values accepted, invalid value rejected at boot, dev-bypass denied when either guard is off
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+This task is decomposed into two subtasks due to the single-PR size gate (3 subsystems crossed: app Python code + terraform + CI; additive change mixed with behavior change).
+
+Subtask execution order (enforced by dependency wiring):
+1. TASK-1.1 — Add ENVIRONMENT + DEV_BYPASS_ENABLED to AppSettings; update all deployment configs (purely additive, no behavior change)
+2. TASK-1.2 — Migrate all environment checks from PREFIX/is_production to ENVIRONMENT; enforce dual dev-bypass guard; remove is_production shim
+
+TASK-1 ACs are satisfied when both subtasks are done:
+- AC #1 → TASK-1.1 (field added, validation enforced)
+- AC #2 → TASK-1.2 (all PREFIX env-derivation replaced)
+- AC #3 → TASK-1.2 (dual guard enforced in current_user.py)
+- AC #4 → TASK-1.1 + TASK-1.2 (unit tests in both slices)
+- DoD #2 → TASK-1.1 (manifests updated)
+- DoD #3 → TASK-1.2 PR description must reference SEC-10 and decisions/configuration.md
+<!-- SECTION:PLAN:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @planner
+created: 2026-07-17 16:15
+---
+AC #2 grep scope is narrower than the actual call-site surface. Current grep target (PREFIX ==) misses: PREFIX !=, bool(PREFIX), if app_settings.PREFIX: (truthy check). TASK-1.2 will target all four forms. Suggest widening AC #2 to: grep -rn 'PREFIX' app/ --include='*.py' and manually excluding URL-prefix uses, OR replacing with: grep -rn 'is_production' app/ --include='*.py' returns no hits (TASK-1.2 AC #1 already covers this). Human approval needed before AC #2 wording is changed.
+---
+<!-- COMMENTS:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
