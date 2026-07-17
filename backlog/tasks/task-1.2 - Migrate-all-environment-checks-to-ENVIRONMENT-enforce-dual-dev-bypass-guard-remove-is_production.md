@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-17 16:14'
-updated_date: '2026-07-17 16:22'
+updated_date: '2026-07-17 19:43'
 labels:
   - phase-0
 milestone: m-0
@@ -35,3 +35,23 @@ Migrate + contract phase for TASK-1. Replace every is_production and PREFIX-deri
 - [ ] #5 All existing tests plus new dual-guard tests pass
 - [ ] #6 aws_sns.py validate_sns_payload skips validation when ENVIRONMENT != 'production' (local/dev/ci never receive real SNS payloads from the internet); validation is always enforced when ENVIRONMENT == 'production'
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+TASK-1.2 is further decomposed into three right-sized slices (single-PR gate re-triggered: 16 production files, 3 subsystem layers, mechanical + behavioral mixed).
+
+SNS deviation: AC #6 reflects an approved operational deviation from decisions/security.md. Local/dev/ci instances are not internet-reachable and never receive real SNS payloads; production-only enforcement is the confirmed design. This deviation is explicit and recorded here.
+
+Subtask execution order:
+1. TASK-1.2.1 — Security/Auth + Transport: current_user.py dual-guard, aws_sns.py env-check, api_key_detected.py, notify/client.py
+2. TASK-1.2.2 — Runtime Infra Gates: DynamoDB local endpoint, scheduled-tasks gate, CORS gate
+3. TASK-1.2.3 — Legacy env branches + is_production contract removal: dev/platforms/slack.py, incident/core.py, incident_conversation.py, shim deletion from app.py/settings.py/logging/setup.py
+
+TASK-1.2 ACs satisfied when all subtasks done:
+- AC #1 (is_production gone) and AC #2 (PREFIX env-derivation gone) verified after TASK-1.2.3
+- AC #3 (dual bypass guard) verified after TASK-1.2.1
+- AC #4 (DynamoDB env matrix) verified after TASK-1.2.2
+- AC #5 (tests pass) verified per slice
+- AC #6 (SNS deviation) verified after TASK-1.2.1
+<!-- SECTION:PLAN:END -->
