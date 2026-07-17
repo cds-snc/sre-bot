@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-17 16:14'
-updated_date: '2026-07-17 17:47'
+updated_date: '2026-07-17 18:20'
 labels:
   - phase-0
 milestone: m-0
@@ -28,12 +28,12 @@ Expand phase for TASK-1. Purely additive: add ENVIRONMENT: Literal["local","ci",
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 AppSettings.ENVIRONMENT is Literal["local","ci","dev","staging","production"] with default "local"; AppSettings(ENVIRONMENT="uat") raises pydantic ValidationError at construction
-- [ ] #2 AppSettings.DEV_BYPASS_ENABLED: bool = False by default
-- [ ] #3 is_production property kept as forwarding shim: return self.ENVIRONMENT == "production"
-- [ ] #4 terraform/templates/sre-bot.json.tpl has ENVIRONMENT=production entry in environment array
-- [ ] #5 .github/workflows/ci_code.yml has ENVIRONMENT: ci in the test step env block
-- [ ] #6 All existing tests pass; new unit tests cover valid enum values accepted, invalid value rejected at boot, DEV_BYPASS_ENABLED default, shim correctness
+- [x] #1 AppSettings.ENVIRONMENT is Literal["local","ci","dev","staging","production"] with default "local"; AppSettings(ENVIRONMENT="uat") raises pydantic ValidationError at construction
+- [x] #2 AppSettings.DEV_BYPASS_ENABLED: bool = False by default
+- [x] #3 is_production property kept as forwarding shim: return self.ENVIRONMENT == "production"
+- [x] #4 terraform/templates/sre-bot.json.tpl has ENVIRONMENT=production entry in environment array
+- [x] #5 .github/workflows/ci_code.yml has ENVIRONMENT: ci in the test step env block
+- [x] #6 All existing tests pass; new unit tests cover valid enum values accepted, invalid value rejected at boot, DEV_BYPASS_ENABLED default, shim correctness
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -100,3 +100,9 @@ Blast radius and rollback:
   - Single git revert of this PR fully restores previous state; TASK-1.2 cannot compile without TASK-1.1 (ENVIRONMENT and DEV_BYPASS_ENABLED fields would be missing)
   - No routing or security logic changes; any revert is clean
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented TASK-1.1 expand slice:\n- Added typed AppSettings.ENVIRONMENT Literal[local, ci, dev, staging, production] with default local.\n- Added AppSettings.DEV_BYPASS_ENABLED default False.\n- Updated AppSettings.is_production shim to return ENVIRONMENT == production.\n- Added ENVIRONMENT=production to terraform/templates/sre-bot.json.tpl task environment.\n- Added ENVIRONMENT: ci to .github/workflows/ci_code.yml test job env.\n- Added/updated AppSettings behavior tests and stabilized existing environment-sensitive tests to make behavior explicit under typed ENVIRONMENT.\n\nTest evidence:\n- uv run pytest tests/unit/infrastructure/configuration/test_app_settings.py -q -> 18 passed\n- uv run pytest tests --ignore=tests/smoke -q -> 2856 passed, 37 skipped\n- uv run black --check . -> pass\n\nQuality gates status:\n- mypy . -> fails with pre-existing baseline errors outside this task's changes (modules/incident, modules/webhooks, infrastructure/security/rate_limiter, packages/access/sync, etc.)\n- flake8 -> fails with pre-existing E501 baseline across many existing test files\n\nDoD items left for human verification:\n- Confirm CI workflow change and terraform template change satisfy deployment expectations.\n- Ensure PR description references SEC-10 and decisions/configuration.md.
+<!-- SECTION:NOTES:END -->

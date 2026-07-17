@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from infrastructure.configuration.app import AppSettings
 from models.webhooks import AwsSnsPayload, WebhookPayload
 from modules.webhooks import aws_sns
 from fastapi import HTTPException
@@ -12,10 +13,18 @@ from sns_message_validator import (
 )
 
 
+@pytest.fixture
+def force_production_app_settings(monkeypatch):
+    monkeypatch.setattr(
+        "modules.webhooks.aws_sns.app_settings",
+        AppSettings(ENVIRONMENT="production"),
+    )
+
+
 @patch("modules.webhooks.aws_sns.log_ops_message")
 @patch("modules.webhooks.aws_sns.SNSMessageValidator.validate_message")
 def test_validate_sns_payload_validates_model(
-    validate_message_mock, log_ops_message_mock
+    validate_message_mock, log_ops_message_mock, force_production_app_settings
 ):
     client = MagicMock()
     payload = AwsSnsPayload(
@@ -37,7 +46,10 @@ def test_validate_sns_payload_validates_model(
 @patch("modules.webhooks.aws_sns.log_ops_message")
 @patch("modules.webhooks.aws_sns.SNSMessageValidator.validate_message")
 def test_validate_sns_payload_invalid_message_type(
-    validate_message_mock, log_ops_message_mock, logger_mock
+    validate_message_mock,
+    log_ops_message_mock,
+    logger_mock,
+    force_production_app_settings,
 ):
     client = MagicMock()
     payload = AwsSnsPayload(
@@ -62,7 +74,10 @@ def test_validate_sns_payload_invalid_message_type(
 @patch("modules.webhooks.aws_sns.log_ops_message")
 @patch("modules.webhooks.aws_sns.SNSMessageValidator.validate_message")
 def test_validate_sns_payload_invalid_signature_version(
-    validate_message_mock, log_ops_message_mock, logger_mock
+    validate_message_mock,
+    log_ops_message_mock,
+    logger_mock,
+    force_production_app_settings,
 ):
     client = MagicMock()
     payload = AwsSnsPayload(
@@ -87,7 +102,10 @@ def test_validate_sns_payload_invalid_signature_version(
 @patch("modules.webhooks.aws_sns.log_ops_message")
 @patch("modules.webhooks.aws_sns.SNSMessageValidator.validate_message")
 def test_validate_sns_payload_invalid_signature_url(
-    validate_message_mock, log_ops_message_mock, logger_mock
+    validate_message_mock,
+    log_ops_message_mock,
+    logger_mock,
+    force_production_app_settings,
 ):
     client = MagicMock()
     payload = AwsSnsPayload(
@@ -112,7 +130,10 @@ def test_validate_sns_payload_invalid_signature_url(
 @patch("modules.webhooks.aws_sns.log_ops_message")
 @patch("modules.webhooks.aws_sns.SNSMessageValidator.validate_message")
 def test_validate_sns_payload_signature_verification_failure(
-    validate_message_mock, log_ops_message_mock, logger_mock
+    validate_message_mock,
+    log_ops_message_mock,
+    logger_mock,
+    force_production_app_settings,
 ):
     client = MagicMock()
     payload = AwsSnsPayload(
@@ -137,7 +158,10 @@ def test_validate_sns_payload_signature_verification_failure(
 @patch("modules.webhooks.aws_sns.log_ops_message")
 @patch("modules.webhooks.aws_sns.SNSMessageValidator.validate_message")
 def test_validate_sns_payload_unexpected_exception(
-    validate_message_mock, log_ops_message_mock, logger_mock
+    validate_message_mock,
+    log_ops_message_mock,
+    logger_mock,
+    force_production_app_settings,
 ):
     client = MagicMock()
     payload = AwsSnsPayload(
