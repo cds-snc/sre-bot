@@ -43,6 +43,10 @@
       {
         "name": "BACKEND_URL",
         "value": "${backend_url}"
+      },
+      {
+        "name": "ENVIRONMENT",
+        "value": "production"
       }
     ],
     "essential": true,

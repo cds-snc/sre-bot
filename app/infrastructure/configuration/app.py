@@ -1,6 +1,7 @@
 """Application-level settings and singleton provider."""
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -11,13 +12,15 @@ class AppSettings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     PREFIX: str = ""
+    ENVIRONMENT: Literal["local", "ci", "dev", "staging", "production"] = "local"
+    DEV_BYPASS_ENABLED: bool = False
     LOG_LEVEL: str = "INFO"
     GIT_SHA: str = "Unknown"
 
     @property
     def is_production(self) -> bool:
-        """True when PREFIX is empty (production deployment)."""
-        return not bool(self.PREFIX)
+        """True when ENVIRONMENT is production."""
+        return self.ENVIRONMENT == "production"
 
 
 @lru_cache(maxsize=1)

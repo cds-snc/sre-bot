@@ -156,7 +156,9 @@ class TestSettingsAppFieldDelegation:
     def test_git_sha_matches_app_settings(self):
         assert Settings().GIT_SHA == get_app_settings().GIT_SHA
 
-    def test_is_production_matches_app_settings(self):
+    def test_is_production_matches_app_settings(self, monkeypatch):
+        monkeypatch.setenv("ENVIRONMENT", "production")
+        get_app_settings.cache_clear()
         assert Settings().is_production == get_app_settings().is_production
 
     def test_prefix_override_via_env(self, monkeypatch):
