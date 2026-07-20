@@ -113,7 +113,7 @@ def revoke_api_key(api_key: str, api_type: str, github_repo: str, source: str) -
     )
     # get the url and jwt_token
 
-    if not settings.is_production:
+    if settings.ENVIRONMENT != "production":
         log.info("revoke_api_key_skipped", api_key=api_key)
         return "error"
     url = notify_settings.NOTIFY_API_URL

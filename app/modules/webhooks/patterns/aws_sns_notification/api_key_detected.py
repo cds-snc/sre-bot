@@ -17,7 +17,7 @@ server_settings = get_server_settings()
 
 def send_message_to_notify_channel(client: WebClient, blocks: List[Dict]):
     """Send message to the notification ops channel."""
-    if not app_settings.is_production:
+    if app_settings.ENVIRONMENT != "production":
         client.chat_postMessage(
             channel=server_settings.SRE_TEST_CHANNEL_ID, blocks=blocks
         )
