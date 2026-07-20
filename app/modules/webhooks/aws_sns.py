@@ -81,7 +81,9 @@ def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
     Returns:
         AwsSnsPayload: The validated AWS SNS payload.
     """
-    if not app_settings.is_production:
+    # Approved deviation: local/dev/ci instances are not internet-reachable
+    # and never receive real SNS payloads; validation skipped for operational reasons.
+    if app_settings.ENVIRONMENT != "production":
         return awsSnsPayload
     try:
         valid_payload = AwsSnsPayload.model_validate(awsSnsPayload)

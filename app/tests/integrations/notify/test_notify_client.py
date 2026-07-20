@@ -180,7 +180,7 @@ def test_post_event(mock_auth_header, mock_post, mock_notify_settings):
 @patch("integrations.notify.client.settings", new_callable=MagicMock)
 @patch("integrations.notify.client.logger")
 def test_revoke_api_key_missing_url(mock_logger, mock_settings, mock_notify_settings):
-    mock_settings.is_production = True
+    mock_settings.ENVIRONMENT = "production"
     mock_notify_settings.NOTIFY_API_URL = None
     bound_logger_mock = mock_logger.bind.return_value
     result = notify.revoke_api_key("api-key-123", "api-type", "github.com/repo", "test")
@@ -199,7 +199,7 @@ def test_revoke_api_key_missing_url(mock_logger, mock_settings, mock_notify_sett
 def test_revoke_api_key_success(
     mock_logger, mock_settings, mock_post_event, mock_notify_settings
 ):
-    mock_settings.is_production = True
+    mock_settings.ENVIRONMENT = "production"
     # Mock successful response
     mock_response = MagicMock()
     mock_response.status_code = 201
@@ -243,7 +243,7 @@ def test_revoke_api_key_success(
 def test_revoke_api_key_failure(
     mock_logger, mock_settings, mock_post_event, mock_notify_settings
 ):
-    mock_settings.is_production = True
+    mock_settings.ENVIRONMENT = "production"
     mock_notify_settings.NOTIFY_API_URL = "https://notify.example.com"
     # Mock failed response
     mock_response = MagicMock()
@@ -278,7 +278,7 @@ def test_revoke_api_key_failure(
 def test_revoke_api_key_not_found(
     mock_logger, mock_settings, mock_post_event, mock_notify_settings
 ):
-    mock_settings.is_production = True
+    mock_settings.ENVIRONMENT = "production"
     mock_notify_settings.NOTIFY_API_URL = "https://notify.example.com"
     mock_response = MagicMock()
     mock_response.status_code = 200

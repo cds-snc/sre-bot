@@ -26,7 +26,8 @@ Usage in route handlers:
 Development bypass:
     Set DEV_BYPASS_TOKEN=<random-string> in your .env (non-production only).
     Pass that value as the Bearer token to skip JWKS validation entirely.
-    A synthetic User is returned. Blocked when PREFIX="" (production).
+    A synthetic User is returned. Blocked when ENVIRONMENT == "production"
+    or DEV_BYPASS_ENABLED is False.
 
 Slack transport: authentication is handled at the platform layer via Slack signing
 secret verification before command handlers are invoked. The CommandPayload.user_id
@@ -65,10 +66,10 @@ def get_current_user(
     It performs token validation, scope enforcement, and identity resolution
     in a single, composable step.
 
-    In non-production environments, if DEV_BYPASS_TOKEN is set in ServerSettings
-    and the incoming bearer token matches it exactly, JWKS validation is skipped
-    and a synthetic developer User is returned. This bypass is inert in production
-    (PREFIX="" disables it).
+    In non-production environments, if DEV_BYPASS_ENABLED is true, and
+    DEV_BYPASS_TOKEN is set in ServerSettings, and the incoming bearer token
+    matches it exactly, JWKS validation is skipped and a synthetic developer User
+    is returned. This bypass is inert in production.
 
     JWT scope claims are read from either:
     - ``scope`` (space-separated string, RFC 6749 / OAuth 2.0 style)
@@ -102,7 +103,11 @@ def get_current_user(
     # Non-production static bypass — allows local smoke testing without Backstage.
     server_settings = get_server_settings()
     app_settings = get_app_settings()
-    if not app_settings.is_production and server_settings.DEV_BYPASS_TOKEN:
+    if (
+        app_settings.ENVIRONMENT != "production"
+        and app_settings.DEV_BYPASS_ENABLED
+        and server_settings.DEV_BYPASS_TOKEN
+    ):
         if credentials.credentials == server_settings.DEV_BYPASS_TOKEN:
             log = logger.bind(bypass="dev_token")
             log.warning("dev_bypass_token_used")
