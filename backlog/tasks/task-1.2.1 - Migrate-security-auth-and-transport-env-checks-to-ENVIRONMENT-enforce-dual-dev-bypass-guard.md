@@ -3,10 +3,11 @@ id: TASK-1.2.1
 title: >-
   Migrate security/auth and transport env checks to ENVIRONMENT; enforce dual
   dev-bypass guard
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-17 19:44'
-updated_date: '2026-07-20 18:38'
+updated_date: '2026-07-20 18:49'
 labels:
   - phase-0
 milestone: m-0
