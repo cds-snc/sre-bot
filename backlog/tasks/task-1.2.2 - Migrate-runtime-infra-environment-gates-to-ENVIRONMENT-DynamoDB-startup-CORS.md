@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-17 19:44'
-updated_date: '2026-07-20 20:37'
+updated_date: '2026-07-20 21:33'
 labels:
   - phase-0
 milestone: m-0
@@ -33,7 +33,7 @@ Slice 2 of TASK-1.2. Replace PREFIX-based environment derivation in AWS DynamoDB
 - [x] #3 modules/aws/aws_access_requests.py _get_dynamodb_client uses ENVIRONMENT in (local, dev, ci) for local endpoint; no PREFIX reference remains for environment decisions
 - [x] #4 server/server.py CORS allow_origins computed from ENVIRONMENT == production not from bool(PREFIX); wildcard is returned for non-production, explicit list for production
 - [x] #5 Unit tests cover DynamoDB endpoint matrix: local/dev/ci get local URL; staging/production get None
-- [ ] #6 Full non-smoke test suite passes
+- [x] #6 Full non-smoke test suite passes
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -164,4 +164,6 @@ Blast radius and rollback:
 
 <!-- SECTION:NOTES:BEGIN -->
 Scope adjusted per follow-up decision: removed lifespan-related AC items from this task. Implemented and verified code updates for DynamoDB ENVIRONMENT gating across three call sites and CORS ENVIRONMENT production guard; DynamoDB endpoint matrix tests are present in app/tests/unit/integrations/aws/test_dynamodb_local_endpoint.py. Remaining AC is full non-smoke suite pass, currently blocked in this environment by missing dependency (ModuleNotFoundError: pydantic) when loading tests/conftest.py.
+
+Validation complete: uv run pytest tests --ignore=tests/smoke passed (2875 passed, 37 skipped). AC #6 satisfied. Lifespan behavior remains aligned with current branch tests; task scope remains limited to DynamoDB ENVIRONMENT gates and CORS ENVIRONMENT guard as agreed.
 <!-- SECTION:NOTES:END -->
