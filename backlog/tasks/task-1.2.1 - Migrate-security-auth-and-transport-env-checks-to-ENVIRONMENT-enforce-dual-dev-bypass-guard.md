@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-17 19:44'
-updated_date: '2026-07-20 18:49'
+updated_date: '2026-07-20 19:03'
 labels:
   - phase-0
 milestone: m-0
@@ -29,13 +29,13 @@ Slice 1 of TASK-1.2. Replace is_production with explicit ENVIRONMENT reads in th
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 current_user.py dev-bypass guard is ENVIRONMENT != production AND DEV_BYPASS_ENABLED=true AND token matches; either guard alone blocks bypass; each granted bypass logs dev_bypass_token_used
-- [ ] #2 aws_sns.py validate_sns_payload uses app_settings.ENVIRONMENT != production for the non-production skip (approved deviation: local/dev/ci are not internet-reachable); no is_production reference remains in the file
-- [ ] #3 api_key_detected.py routes to test vs ops channel using ENVIRONMENT != production; no is_production reference remains in the file
-- [ ] #4 integrations/notify/client.py revoke_api_key gate uses settings.ENVIRONMENT != production; no is_production reference remains in the file
-- [ ] #5 integration/webhooks/conftest.py mock_sns_signature_validation_disabled fixture monkeypatches AppSettings(ENVIRONMENT=local) instead of PropertyMock on is_production
-- [ ] #6 New unit tests cover all 4 dev-bypass scenarios: production+enabled+match denied; non-prod+disabled+match denied; non-prod+enabled+mismatch denied; non-prod+enabled+match allowed and logged
-- [ ] #7 Full non-smoke test suite passes
+- [x] #1 current_user.py dev-bypass guard is ENVIRONMENT != production AND DEV_BYPASS_ENABLED=true AND token matches; either guard alone blocks bypass; each granted bypass logs dev_bypass_token_used
+- [x] #2 aws_sns.py validate_sns_payload uses app_settings.ENVIRONMENT != production for the non-production skip (approved deviation: local/dev/ci are not internet-reachable); no is_production reference remains in the file
+- [x] #3 api_key_detected.py routes to test vs ops channel using ENVIRONMENT != production; no is_production reference remains in the file
+- [x] #4 integrations/notify/client.py revoke_api_key gate uses settings.ENVIRONMENT != production; no is_production reference remains in the file
+- [x] #5 integration/webhooks/conftest.py mock_sns_signature_validation_disabled fixture monkeypatches AppSettings(ENVIRONMENT=local) instead of PropertyMock on is_production
+- [x] #6 New unit tests cover all 4 dev-bypass scenarios: production+enabled+match denied; non-prod+disabled+match denied; non-prod+enabled+mismatch denied; non-prod+enabled+match allowed and logged
+- [x] #7 Full non-smoke test suite passes
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -154,3 +154,56 @@ Blast radius and rollback:
   - is_production shim is NOT removed; TASK-1.2.2 and TASK-1.2.3 both depend on it still being present after this PR merges.
   - Full non-smoke suite must be green before merging.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented TASK-1.2.1 slice changes and aligned tests.
+
+What changed:
+- app/infrastructure/security/current_user.py
+  - Dev bypass guard now requires:
+    ENVIRONMENT != \"production\" AND DEV_BYPASS_ENABLED AND DEV_BYPASS_TOKEN present AND token match.
+  - Updated module/function docstrings to reflect ENVIRONMENT/DEV_BYPASS_ENABLED semantics.
+- app/modules/webhooks/aws_sns.py
+  - validate_sns_payload now skips validation when app_settings.ENVIRONMENT != \"production\".
+  - Added approved-deviation comment for local/dev/ci non-internet-reachable environments.
+- app/modules/webhooks/patterns/aws_sns_notification/api_key_detected.py
+  - notify-channel routing now uses app_settings.ENVIRONMENT != \"production\".
+- app/integrations/notify/client.py
+  - revoke_api_key gate now uses settings.ENVIRONMENT != \"production\".
+- app/tests/integration/webhooks/conftest.py
+  - mock_sns_signature_validation_disabled fixture now monkeypatches AppSettings(ENVIRONMENT=\"local\").
+  - Removed PropertyMock usage and import.
+- app/tests/integrations/notify/test_notify_client.py
+  - Updated 4 tests to set mock_settings.ENVIRONMENT = \"production\".
+- app/tests/unit/infrastructure/security/test_current_user_bypass.py (new)
+  - Added 4 behavior tests covering production/disabled/mismatch/match+logged scenarios.
+
+Validation evidence:
+- Targeted tests:
+  - uv run --extra dev pytest tests/unit/infrastructure/security/test_current_user_bypass.py -q
+    -> 4 passed
+  - uv run --extra dev pytest tests/modules/webhooks/test_webhooks_aws_sns.py -q
+    -> 10 passed
+  - uv run --extra dev pytest tests/modules/webhooks/patterns/aws_sns_notifications/test_api_key_detected.py -q
+    -> 5 passed
+  - uv run --extra dev pytest tests/integrations/notify/test_notify_client.py -q
+    -> 14 passed
+  - uv run --extra dev pytest tests/integration/webhooks/test_webhook_e2e.py -q
+    -> 15 passed
+- Full non-smoke suite:
+  - uv run --extra dev pytest tests --ignore=tests/smoke
+    -> 2860 passed, 37 skipped, 46 warnings
+- Static/format/lint gates:
+  - uv run --extra dev mypy .
+    -> fails due pre-existing repository-wide errors outside this slice (no slice-specific mypy errors introduced; targeted check on infrastructure/security/current_user.py passes)
+  - uv run --extra dev flake8
+    -> fails due existing repository-wide E501/E203 baseline unrelated to this slice
+  - uv run --extra dev black --check .
+    -> passes (647 files would be left unchanged)
+
+DoD items left for human verification:
+- CI run confirmation for branch pipeline status.
+- PR review of behavior tightening impact: local/dev bypass now also requires DEV_BYPASS_ENABLED=true in addition to token.
+<!-- SECTION:NOTES:END -->
