@@ -3,10 +3,11 @@ id: TASK-1.2.2
 title: >-
   Migrate runtime infra environment gates to ENVIRONMENT (DynamoDB, startup,
   CORS)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-17 19:44'
-updated_date: '2026-07-20 19:14'
+updated_date: '2026-07-20 20:37'
 labels:
   - phase-0
 milestone: m-0
@@ -27,14 +28,12 @@ Slice 2 of TASK-1.2. Replace PREFIX-based environment derivation in AWS DynamoDB
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/aws/dynamodb.py local endpoint set only when ENVIRONMENT in (local, dev, ci); no PREFIX reference remains for environment decisions
-- [ ] #2 integrations/aws/client_next.py get_aws_client DynamoDB local endpoint set only when ENVIRONMENT in (local, dev, ci); no PREFIX reference remains for environment decisions
-- [ ] #3 modules/aws/aws_access_requests.py _get_dynamodb_client uses ENVIRONMENT in (local, dev, ci) for local endpoint; no PREFIX reference remains for environment decisions
-- [ ] #4 server/lifespan.py _start_scheduled_tasks skips when ENVIRONMENT == production; no PREFIX reference remains
-- [ ] #5 server/server.py CORS allow_origins computed from ENVIRONMENT == production not from bool(PREFIX); wildcard is returned for non-production, explicit list for production
-- [ ] #6 Unit tests cover DynamoDB endpoint matrix: local/dev/ci get local URL; staging/production get None
-- [ ] #7 Lifespan integration test updated: PREFIX-based skip test replaced with ENVIRONMENT-based skip test
-- [ ] #8 Full non-smoke test suite passes
+- [x] #1 integrations/aws/dynamodb.py local endpoint set only when ENVIRONMENT in (local, dev, ci); no PREFIX reference remains for environment decisions
+- [x] #2 integrations/aws/client_next.py get_aws_client DynamoDB local endpoint set only when ENVIRONMENT in (local, dev, ci); no PREFIX reference remains for environment decisions
+- [x] #3 modules/aws/aws_access_requests.py _get_dynamodb_client uses ENVIRONMENT in (local, dev, ci) for local endpoint; no PREFIX reference remains for environment decisions
+- [x] #4 server/server.py CORS allow_origins computed from ENVIRONMENT == production not from bool(PREFIX); wildcard is returned for non-production, explicit list for production
+- [x] #5 Unit tests cover DynamoDB endpoint matrix: local/dev/ci get local URL; staging/production get None
+- [ ] #6 Full non-smoke test suite passes
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -160,3 +159,9 @@ Blast radius and rollback:
   - is_production shim and PREFIX field are NOT removed; TASK-1.2.3 handles that.
   - Full non-smoke suite must be green before merging (Step 7 conftest fix is required for this).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Scope adjusted per follow-up decision: removed lifespan-related AC items from this task. Implemented and verified code updates for DynamoDB ENVIRONMENT gating across three call sites and CORS ENVIRONMENT production guard; DynamoDB endpoint matrix tests are present in app/tests/unit/integrations/aws/test_dynamodb_local_endpoint.py. Remaining AC is full non-smoke suite pass, currently blocked in this environment by missing dependency (ModuleNotFoundError: pydantic) when loading tests/conftest.py.
+<!-- SECTION:NOTES:END -->

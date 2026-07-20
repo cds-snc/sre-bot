@@ -17,7 +17,9 @@ def _get_dynamodb_client():
     return boto3.client(
         "dynamodb",
         endpoint_url=(
-            "http://dynamodb-local:8000" if app_settings.PREFIX != "" else None
+            "http://dynamodb-local:8000"
+            if app_settings.ENVIRONMENT in ("local", "dev", "ci")
+            else None
         ),
         region_name="ca-central-1",
     )

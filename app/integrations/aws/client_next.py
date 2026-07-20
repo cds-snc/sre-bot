@@ -36,12 +36,14 @@ import structlog
 from botocore.client import BaseClient  # type: ignore
 from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 
+from infrastructure.configuration.app import get_app_settings
 from infrastructure.configuration.integrations.aws import get_aws_settings
 
 from infrastructure.operations.result import OperationResult
 
 logger = structlog.get_logger()
 settings = get_aws_settings()
+app_settings = get_app_settings()
 
 AWS_REGION = settings.AWS_REGION
 THROTTLING_ERRS = settings.THROTTLING_ERRS
@@ -194,7 +196,7 @@ def get_aws_client(
     client_config = client_config or {"region_name": AWS_REGION}
 
     # Add DynamoDB Local endpoint for dev environments
-    if service_name == "dynamodb" and settings.PREFIX:
+    if service_name == "dynamodb" and app_settings.ENVIRONMENT in ("local", "dev", "ci"):
         client_config["endpoint_url"] = "http://dynamodb-local:8000"
 
     if role_arn:
