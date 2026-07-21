@@ -196,7 +196,11 @@ def get_aws_client(
     client_config = client_config or {"region_name": AWS_REGION}
 
     # Add DynamoDB Local endpoint for dev environments
-    if service_name == "dynamodb" and app_settings.ENVIRONMENT in ("local", "dev", "ci"):
+    if service_name == "dynamodb" and app_settings.ENVIRONMENT in (
+        "local",
+        "dev",
+        "ci",
+    ):
         client_config["endpoint_url"] = "http://dynamodb-local:8000"
 
     if role_arn:

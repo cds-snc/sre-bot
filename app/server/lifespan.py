@@ -103,9 +103,7 @@ def _start_scheduled_tasks(
     logger: BoundLogger,
 ) -> Optional[threading.Event]:
     if app_settings.ENVIRONMENT != "production":
-        logger.info(
-            "scheduled_tasks_skipped", reason="environment_is_not_production"
-        )
+        logger.info("scheduled_tasks_skipped", reason="environment_is_not_production")
         return None
 
     scheduled_tasks.init(bot)
