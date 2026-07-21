@@ -2,7 +2,7 @@
 name: task-planner
 description: Backlog task planning mode. Use to research a backlog task, write its implementation plan into the task via the backlog CLI, and enforce the single-PR size gate by decomposing oversized tasks into safe incremental subtasks before any code is written.
 tools: [vscode/askQuestions, vscode/memory, read/readFile, agent, search, execute/runInTerminal, execute/getTerminalOutput, web]
-model: [Claude Sonnet 4.6 (copilot), GPT-5.3-Codex (copilot)]
+model: [Claude Sonnet 5 (copilot), GPT-5.3-Codex (copilot)]
 handoffs:
   - label: Create Failing Tests
     agent: tests-creation

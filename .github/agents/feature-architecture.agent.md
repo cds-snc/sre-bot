@@ -2,7 +2,7 @@
 name: feature-architecture
 description: Feature-level architecture mode. Use for exact implementation requirements, ingress/egress contracts, interaction flow, complexity classification (simple to rich workflow), and TDD handoff packets aligned to decision records.
 tools: [vscode/askQuestions, vscode/memory, read/readFile, agent, edit/createDirectory, edit/createFile, edit/editFiles, edit/rename, search, web]
-model: [GPT-5.3-Codex (copilot), Claude Sonnet 4.6 (copilot)]
+model: [GPT-5.3-Codex (copilot), Claude Sonnet 5 (copilot)]
 handoffs:
   - label: Plan Backlog Tasks
     agent: task-planner

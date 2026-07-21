@@ -2,7 +2,7 @@
 name: architecture-review
 description: Run app-level architecture mode on a request, producing options, source-cited decision-record updates, and backlog tasks for resulting work.
 agent: architecture
-model: Claude Sonnet 4.6 (copilot)
+model: Claude Sonnet 5 (copilot)
 ---
 
 Review the request in app-level architecture mode and follow the agent's full workflow and output contract.
