@@ -58,7 +58,10 @@ def test_initiate_resources_creation_succeeds(
     mock_db_operations,
     mock_get_on_call_users_from_folder,
     mock_logger,
+    set_environment,
 ):
+    set_environment(core.app_settings, "production")
+
     incident_payload = helper_generate_default_incident_params()
     mock_get_on_call_users_from_folder.return_value = [
         {
@@ -854,7 +857,7 @@ def test_contract_security_group_invite_uses_environment_not_prefix(
     mock_db_operations,
     mock_get_on_call_users_from_folder,
     _mock_logger,
-    monkeypatch,
+    set_environment,
 ):
     """Security users must not be invited when ENVIRONMENT is not production."""
     incident_payload = helper_generate_default_incident_params()
@@ -872,8 +875,7 @@ def test_contract_security_group_invite_uses_environment_not_prefix(
         "users": ["security_user_1", "security_user_2"],
     }
 
-    monkeypatch.setattr(core, "PREFIX", "")
-    monkeypatch.setattr(core.app_settings, "ENVIRONMENT", "local", raising=False)
+    set_environment(core.app_settings, "local")
 
     core.initiate_resources_creation(client, incident_payload)
 

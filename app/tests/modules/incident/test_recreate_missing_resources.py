@@ -37,12 +37,13 @@ def basic_params():
     }
 
 
-def test_contract_create_database_record_uses_environment_not_prefix(monkeypatch):
+def test_contract_create_database_record_uses_environment_not_prefix(
+    set_environment,
+):
     """Database environment value must come from app_settings.ENVIRONMENT."""
     results = {"success": [], "errors": [], "skipped": []}
 
-    monkeypatch.setattr(core, "PREFIX", "")
-    monkeypatch.setattr(core.app_settings, "ENVIRONMENT", "dev", raising=False)
+    set_environment(core.app_settings, "dev")
 
     with patch("modules.incident.core.db_operations.create_incident") as mock_create:
         mock_create.return_value = "incident-id"

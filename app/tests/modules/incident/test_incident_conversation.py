@@ -65,32 +65,25 @@ def test_create_incident_conversation_raises_on_channel_data_not_dict():
         incident_conversation.create_incident_conversation(client, "Test Incident")
 
 
-def test_contract_create_incident_conversation_prefix_from_environment(monkeypatch):
-    """Channel prefix should be incident-dev- in dev and incident- in production."""
+def test_contract_create_incident_conversation_prefix_from_environment(
+    set_environment,
+):
+    """Channel prefix should be incident-dev- for non-production and incident- in production."""
     client = MagicMock()
     client.conversations_create.return_value = {
         "ok": True,
         "channel": {"id": "C123456"},
     }
 
-    # In development, prefix must include incident-dev-, independent of PREFIX.
-    monkeypatch.setattr(incident_conversation, "PREFIX", "")
-    monkeypatch.setattr(
-        incident_conversation.settings, "ENVIRONMENT", "dev", raising=False
-    )
-    dev_result = incident_conversation.create_incident_conversation(
+    # In non-production, prefix must include incident-dev-.
+    set_environment(incident_conversation.settings, "local")
+    non_prod_result = incident_conversation.create_incident_conversation(
         client, "Test Incident"
     )
-    assert dev_result["channel_name"].startswith("incident-dev-")
+    assert non_prod_result["channel_name"].startswith("incident-dev-")
 
-    # In production, prefix must be incident-, independent of PREFIX.
-    monkeypatch.setattr(incident_conversation, "PREFIX", "dev-")
-    monkeypatch.setattr(
-        incident_conversation.settings,
-        "ENVIRONMENT",
-        "production",
-        raising=False,
-    )
+    # In production, prefix must be incident-.
+    set_environment(incident_conversation.settings, "production")
     prod_result = incident_conversation.create_incident_conversation(
         client, "Test Incident"
     )
