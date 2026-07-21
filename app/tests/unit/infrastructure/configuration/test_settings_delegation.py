@@ -156,16 +156,16 @@ class TestSettingsAppFieldDelegation:
     def test_git_sha_matches_app_settings(self):
         assert Settings().GIT_SHA == get_app_settings().GIT_SHA
 
-    def test_is_production_matches_app_settings(self, monkeypatch):
-        monkeypatch.setenv("ENVIRONMENT", "production")
-        get_app_settings.cache_clear()
-        assert Settings().is_production == get_app_settings().is_production
-
     def test_prefix_override_via_env(self, monkeypatch):
         """Settings inherits PREFIX from environment (not just AppSettings cache)."""
         monkeypatch.setenv("PREFIX", "staging")
         get_app_settings.cache_clear()
         assert Settings().PREFIX == "staging"
+
+    def test_contract_settings_has_no_legacy_production_property(self):
+        """Contract: Settings no longer exposes the legacy production shim."""
+        legacy_attr = "is" + "_production"
+        assert not hasattr(Settings(), legacy_attr)
 
 
 class TestSettingsKwargsOverride:

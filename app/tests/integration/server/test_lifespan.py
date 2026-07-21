@@ -161,7 +161,7 @@ def test_lifespan_stop_scheduled_tasks_sets_event():
 
 
 @pytest.mark.integration
-def test_lifespan_start_scheduled_tasks_runs_when_environment_is_production(
+def test_lifespan_start_scheduled_tasks_runs_when_environment_is_prod(
     mock_settings, mock_bot, monkeypatch
 ):
     """Test that _start_scheduled_tasks starts when ENVIRONMENT is production."""

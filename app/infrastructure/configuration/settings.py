@@ -88,7 +88,7 @@ class Settings(BaseSettings):
             # Configure retry system...
 
         # Check environment
-        if app_settings.is_production:
+        if app_settings.ENVIRONMENT == "production":
             # Production-specific logic...
         ```
     """
@@ -122,15 +122,6 @@ class Settings(BaseSettings):
     retry: RetrySettings
     platforms: PlatformsSettings
     directory: DirectorySettings
-
-    @property
-    def is_production(self) -> bool:
-        """Check if the application is running in production.
-
-        Returns:
-            True if PREFIX is empty (production), False otherwise.
-        """
-        return not bool(self.PREFIX)
 
     def __init__(self, **kwargs):
         """Initialize Settings by delegating to domain singleton providers.

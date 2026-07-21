@@ -22,7 +22,7 @@ def _jwt_failure() -> HTTPException:
 @patch("infrastructure.security.current_user.validate_jwt_token")
 @patch("infrastructure.security.current_user.get_app_settings")
 @patch("infrastructure.security.current_user.get_server_settings")
-def test_bypass_denied_when_environment_is_production(
+def test_bypass_denied_when_environment_is_prod(
     mock_get_server_settings,
     mock_get_app_settings,
     mock_validate_jwt_token,

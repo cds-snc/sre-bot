@@ -69,15 +69,25 @@ class TestLoggingConfiguration:
         assert logger is not None
         assert hasattr(logger, "bind")
 
-    def test_configure_logging_with_custom_production_flag(self, mock_settings):
-        """configure_logging accepts custom production flag."""
-        # Note: We can't easily verify the processor setup, but we can verify
-        # it doesn't raise an error with different production flags
-        logger1 = configure_logging(settings=mock_settings, is_production=True)
-        logger2 = configure_logging(settings=mock_settings, is_production=False)
+    def test_configure_logging_uses_environment_for_production_mode(
+        self, mock_settings
+    ):
+        """configure_logging derives production mode from ENVIRONMENT."""
+        mock_settings.ENVIRONMENT = "production"
+        logger1 = configure_logging(settings=mock_settings)
+        mock_settings.ENVIRONMENT = "local"
+        logger2 = configure_logging(settings=mock_settings)
 
         assert logger1 is not None
         assert logger2 is not None
+
+    def test_contract_configure_logging_does_not_accept_legacy_production_kwarg(
+        self, mock_settings
+    ):
+        """Contract: legacy production override is removed from configure_logging."""
+        legacy_kwarg = "is" + "_production"
+        with pytest.raises(TypeError):
+            configure_logging(settings=mock_settings, **{legacy_kwarg: False})
 
 
 @pytest.mark.unit

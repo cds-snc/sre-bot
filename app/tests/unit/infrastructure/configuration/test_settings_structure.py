@@ -97,12 +97,12 @@ class TestSettingsStructure:
         assert retry.base_delay_seconds >= 1
         assert retry.max_delay_seconds >= retry.base_delay_seconds
 
-    def test_settings_is_production_property(self):
-        """Verify is_production property works correctly."""
+    def test_app_settings_environment_field(self):
+        """Verify AppSettings exposes ENVIRONMENT with an allowed value."""
         settings = get_app_settings()
-        # Production is when PREFIX is empty
-        assert hasattr(settings, "is_production")
-        assert isinstance(settings.is_production, bool)
+
+        assert hasattr(settings, "ENVIRONMENT")
+        assert settings.ENVIRONMENT in {"local", "ci", "dev", "staging", "production"}
 
     def test_settings_classes_have_proper_base_classes(self):
         """Verify settings classes inherit from appropriate base classes."""

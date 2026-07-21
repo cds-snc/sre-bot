@@ -3,11 +3,11 @@ id: TASK-1.2.2
 title: >-
   Migrate runtime infra environment gates to ENVIRONMENT (DynamoDB, startup,
   CORS)
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-17 19:44'
-updated_date: '2026-07-20 21:33'
+updated_date: '2026-07-21 14:55'
 labels:
   - phase-0
 milestone: m-0

@@ -17,7 +17,6 @@ from modules.incident import (
 
 app_settings = get_app_settings()
 incident_settings = get_incident_settings()
-PREFIX = app_settings.PREFIX
 INCIDENT_CHANNEL = incident_settings.INCIDENT_CHANNEL
 SLACK_SECURITY_USER_GROUP_ID = incident_settings.SLACK_SECURITY_USER_GROUP_ID
 SLACK_NOTIFY_MGMT_USER_GROUP_ID = incident_settings.SLACK_NOTIFY_MGMT_USER_GROUP_ID
@@ -298,7 +297,7 @@ def _create_database_record(
 ) -> None:
     """Create database record for incident if it doesn't exist."""
     try:
-        environment = "dev" if PREFIX == "dev-" else "prod"
+        environment = "prod" if app_settings.ENVIRONMENT == "production" else "dev"
 
         incident_data = {
             "channel_id": channel_id,
@@ -428,7 +427,7 @@ def initiate_resources_creation(
     """Create an incident and its related resources. If incident Slack channel provided, skips that resource creation"""
 
     # Create channel
-    environment = "dev" if PREFIX == "dev-" else "prod"
+    environment = "dev" if app_settings.ENVIRONMENT == "dev" else "prod"
 
     oncall = on_call.get_on_call_users_from_folder(client, incident_payload.folder)
 
@@ -570,8 +569,8 @@ def initiate_resources_creation(
         # and add them to the list of users to invite
         response = client.usergroups_users_list(usergroup=SLACK_SECURITY_USER_GROUP_ID)
 
-        # if we are testing, ie PREFIX is "dev" then don't add the security group users since we don't want to spam them
-        if response.get("ok") and PREFIX == "":
+        # Avoid inviting security group users outside production to prevent spam.
+        if response.get("ok") and app_settings.ENVIRONMENT == "production":
             for security_user in response["users"]:
                 if security_user != incident_payload.user_id:
                     users_to_invite.append(security_user)

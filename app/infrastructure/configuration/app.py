@@ -17,11 +17,6 @@ class AppSettings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     GIT_SHA: str = "Unknown"
 
-    @property
-    def is_production(self) -> bool:
-        """True when ENVIRONMENT is production."""
-        return self.ENVIRONMENT == "production"
-
 
 @lru_cache(maxsize=1)
 def get_app_settings() -> AppSettings:

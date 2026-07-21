@@ -11,5 +11,5 @@ def mock_settings():
     """Mock AppSettings instance for testing."""
     settings = Mock(spec=AppSettings)
     settings.LOG_LEVEL = "INFO"
-    settings.is_production = False
+    settings.ENVIRONMENT = "local"
     return settings

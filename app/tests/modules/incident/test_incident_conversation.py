@@ -65,6 +65,32 @@ def test_create_incident_conversation_raises_on_channel_data_not_dict():
         incident_conversation.create_incident_conversation(client, "Test Incident")
 
 
+def test_contract_create_incident_conversation_prefix_from_environment(
+    set_environment,
+):
+    """Channel prefix should be incident-dev- for non-production and incident- in production."""
+    client = MagicMock()
+    client.conversations_create.return_value = {
+        "ok": True,
+        "channel": {"id": "C123456"},
+    }
+
+    # In non-production, prefix must include incident-dev-.
+    set_environment(incident_conversation.settings, "local")
+    non_prod_result = incident_conversation.create_incident_conversation(
+        client, "Test Incident"
+    )
+    assert non_prod_result["channel_name"].startswith("incident-dev-")
+
+    # In production, prefix must be incident-.
+    set_environment(incident_conversation.settings, "production")
+    prod_result = incident_conversation.create_incident_conversation(
+        client, "Test Incident"
+    )
+    assert prod_result["channel_name"].startswith("incident-")
+    assert not prod_result["channel_name"].startswith("incident-dev-")
+
+
 def test_is_floppy_disk_true():
     # Test case where the reaction is 'floppy_disk'
     event = {"reaction": "floppy_disk"}
