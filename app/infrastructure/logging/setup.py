@@ -103,7 +103,6 @@ def _is_test_environment() -> bool:
 def configure_logging(
     settings: AppSettings,
     log_level: str | None = None,
-    is_production: bool | None = None,
 ) -> BoundLogger:
     """Configure structured logging with OpenTelemetry semantic conventions.
 
@@ -117,8 +116,6 @@ def configure_logging(
         settings: AppSettings instance (REQUIRED). Must be passed explicitly.
         log_level: Optional override for log level (DEBUG, INFO, WARNING, etc).
             Defaults to settings.LOG_LEVEL if not provided.
-        is_production: Optional override for production mode. Defaults to
-            settings.is_production if not provided. Controls JSON vs console output.
 
     Returns:
         Configured logger instance
@@ -131,7 +128,7 @@ def configure_logging(
         logger = configure_logging(settings=settings)
 
         # With overrides for testing
-        logger = configure_logging(settings=settings, log_level="DEBUG", is_production=False)
+        logger = configure_logging(settings=settings, log_level="DEBUG")
     """
 
     # Suppress all logging during tests
@@ -161,7 +158,7 @@ def configure_logging(
         return structlog.stdlib.get_logger()
 
     # Determine production mode
-    prod_mode = is_production if is_production is not None else settings.is_production
+    prod_mode = settings.ENVIRONMENT == "production"
 
     # Build processor pipeline per structlog best practices
     # Order matters: context vars first, then enrichment, then formatting

@@ -4,7 +4,7 @@ Uses decorator-based command registration via auto-discovery.
 Registers the /sre dev subcommands for google, slack, stale, incident,
 load-incidents, add-incident, and aws.
 
-Only available in development environment (PREFIX=dev-).
+Only available in development environment (ENVIRONMENT=dev).
 """
 
 from typing import TYPE_CHECKING, Any, Callable, Dict, List
@@ -39,7 +39,7 @@ def _require_dev_environment(
         CommandResponse with error if not in dev environment, None otherwise
     """
     app_settings = get_app_settings()
-    if app_settings.PREFIX != "dev-":
+    if app_settings.ENVIRONMENT not in ["dev", "local"]:
         return CommandResponse(
             message=(
                 "This command is only available in the " "development " "environment."
