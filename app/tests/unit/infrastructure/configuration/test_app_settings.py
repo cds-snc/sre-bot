@@ -110,3 +110,9 @@ class TestAppSettingsEnvironment:
         settings = AppSettings(ENVIRONMENT="ci")
 
         assert settings.is_production is False
+
+    def test_contract_app_settings_has_no_is_production_property(self):
+        """Contract: AppSettings no longer exposes an is_production shim."""
+        settings = AppSettings(ENVIRONMENT="production")
+
+        assert not hasattr(settings, "is_production")

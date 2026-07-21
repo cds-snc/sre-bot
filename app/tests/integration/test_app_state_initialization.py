@@ -55,6 +55,15 @@ def test_app_state_settings_is_valid(app_with_lifespan):
 
 
 @pytest.mark.integration
+def test_contract_app_state_settings_has_no_is_production(app_with_lifespan):
+    """Contract: app.state.settings should not expose the is_production shim."""
+    settings = app_with_lifespan.app.state.settings
+
+    assert hasattr(settings, "ENVIRONMENT"), "settings missing ENVIRONMENT"
+    assert not hasattr(settings, "is_production")
+
+
+@pytest.mark.integration
 def test_app_state_logger_is_valid(app_with_lifespan):
     """Validate that logger is properly initialized.
 

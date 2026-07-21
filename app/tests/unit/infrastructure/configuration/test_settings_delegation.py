@@ -167,6 +167,10 @@ class TestSettingsAppFieldDelegation:
         get_app_settings.cache_clear()
         assert Settings().PREFIX == "staging"
 
+    def test_contract_settings_has_no_is_production_property(self):
+        """Contract: Settings no longer exposes is_production."""
+        assert not hasattr(Settings(), "is_production")
+
 
 class TestSettingsKwargsOverride:
     """Settings kwargs override singletons (test isolation pattern)."""

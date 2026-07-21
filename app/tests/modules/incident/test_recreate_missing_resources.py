@@ -37,6 +37,32 @@ def basic_params():
     }
 
 
+def test_contract_create_database_record_uses_environment_not_prefix(monkeypatch):
+    """Database environment value must come from app_settings.ENVIRONMENT."""
+    results = {"success": [], "errors": [], "skipped": []}
+
+    monkeypatch.setattr(core, "PREFIX", "")
+    monkeypatch.setattr(core.app_settings, "ENVIRONMENT", "dev", raising=False)
+
+    with patch("modules.incident.core.db_operations.create_incident") as mock_create:
+        mock_create.return_value = "incident-id"
+
+        core._create_database_record(
+            channel_id="C123",
+            channel_name="incident-123",
+            incident_name="Incident Name",
+            product="Product",
+            user_id="U123",
+            document_link="https://docs.google.com/document/d/test/edit",
+            meet_url="https://meet.google.com/aaa-bbbb-ccc",
+            results=results,
+        )
+
+    assert mock_create.call_count == 1
+    incident_data = mock_create.call_args.args[0]
+    assert incident_data["environment"] == "dev"
+
+
 @patch("modules.incident.core.db_operations")
 @patch("modules.incident.core.incident_folder")
 @patch("modules.incident.core.incident_document")

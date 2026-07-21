@@ -837,3 +837,46 @@ def test_notify_incident_empty_group_does_not_batch_invite(
     client.conversations_invite.assert_called_once_with(
         channel="channel_id", users="user_id"
     )
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
+def test_contract_security_group_invite_uses_environment_not_prefix(
+    _mock_create_incident_conversation,
+    _mock_incident_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call_users_from_folder,
+    _mock_logger,
+    monkeypatch,
+):
+    """Security users must not be invited when ENVIRONMENT is not production."""
+    incident_payload = helper_generate_default_incident_params()
+    incident_payload.security_incident = "yes"
+    incident_payload.product = "SomeOtherProduct"
+
+    mock_get_on_call_users_from_folder.return_value = []
+    mock_google_meet.create_space.return_value = {"meetingUri": "meet_url"}
+    mock_incident_document.create_incident_document.return_value = "doc_id"
+    mock_db_operations.create_incident.return_value = "incident_id"
+
+    client = MagicMock()
+    client.usergroups_users_list.return_value = {
+        "ok": True,
+        "users": ["security_user_1", "security_user_2"],
+    }
+
+    monkeypatch.setattr(core, "PREFIX", "")
+    monkeypatch.setattr(core.app_settings, "ENVIRONMENT", "local", raising=False)
+
+    core.initiate_resources_creation(client, incident_payload)
+
+    client.conversations_invite.assert_called_once_with(
+        channel="channel_id", users="user_id"
+    )

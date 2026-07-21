@@ -79,6 +79,13 @@ class TestLoggingConfiguration:
         assert logger1 is not None
         assert logger2 is not None
 
+    def test_contract_configure_logging_does_not_accept_is_production(
+        self, mock_settings
+    ):
+        """Contract: is_production override is removed from configure_logging."""
+        with pytest.raises(TypeError):
+            configure_logging(settings=mock_settings, is_production=False)
+
 
 @pytest.mark.unit
 class TestGetModuleLoggerBackwardCompat:
