@@ -18,7 +18,7 @@ Use this skill when writing the implementation plan for a backlog task (checkpoi
 1. **Ordered steps** — each step names exact files and what changes in them.
 2. **AC traceability** — every acceptance criterion maps to at least one step and one named test; every step maps back to an AC or is justified as enabling work.
 3. **Test matrix** — happy path, boundary, failure, and (where relevant) authorization/idempotency cases, with intended test file names per `testing-standards`.
-4. **Assumptions and doubts** — everything the plan takes on faith, each with how to verify it (for example: "assumes nothing outside `app/` derives environment from PREFIX — verify with repo-wide grep including terraform/ and scripts/").
+4. **Assumptions and doubts** — everything the plan takes on faith, each with how to verify it (for example: "assumes all environment branching reads the typed `ENVIRONMENT` and that `PREFIX` is read only by frozen `app/modules/` command registration — verify with repo-wide grep including terraform/ and scripts/").
 5. **Blast radius and rollback** — what breaks if this ships wrong, whether a single `git revert` restores service, and any ordering constraints (for example: env vars must exist in manifests before code requiring them merges).
 
 ## Single-PR Size Gate (MANDATORY)
