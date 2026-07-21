@@ -1,0 +1,15 @@
+# Baseline of allowed AppSettings.PREFIX readers (frozen Slack command-namespace uses).
+# This baseline only ratchets DOWN as TASK-45 per-module cutovers migrate each reader to COMMAND_PREFIX.
+# When a module cuts over, remove its entry from this file.
+# Empty baseline = PREFIX is deleted (TASK-45.6).
+# See TASK-1.3 and TASK-45 for context.
+infrastructure/configuration/app.py
+infrastructure/configuration/settings.py
+server/lifespan.py
+modules/atip/atip.py
+modules/aws/aws.py
+modules/incident/incident.py
+modules/role/role.py
+modules/secret/secret.py
+modules/sre/sre.py
+
