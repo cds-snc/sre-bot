@@ -161,39 +161,15 @@ def test_lifespan_stop_scheduled_tasks_sets_event():
 
 
 @pytest.mark.integration
-def test_lifespan_start_scheduled_tasks_skips_when_prefix_not_empty(
+def test_lifespan_start_scheduled_tasks_runs_when_environment_is_production(
     mock_settings, mock_bot, monkeypatch
 ):
-    """Test that _start_scheduled_tasks skips when PREFIX is not empty."""
+    """Test that _start_scheduled_tasks starts when ENVIRONMENT is production."""
     # Arrange
     mock_logger = MagicMock()
-    mock_settings.PREFIX = "dev"
-    init_mock = MagicMock()
-    run_mock = MagicMock()
-    monkeypatch.setattr("server.lifespan.scheduled_tasks.init", init_mock)
-    monkeypatch.setattr("server.lifespan.scheduled_tasks.run_continuously", run_mock)
-
-    # Act
-    stop_event = _start_scheduled_tasks(mock_bot, mock_settings, mock_logger)
-
-    # Assert
-    assert stop_event is None
-    init_mock.assert_not_called()
-    run_mock.assert_not_called()
-    mock_logger.info.assert_called_with(
-        "scheduled_tasks_skipped",
-        reason="prefix_not_empty",
-    )
-
-
-@pytest.mark.integration
-def test_lifespan_start_scheduled_tasks_runs_when_prefix_empty(
-    mock_settings, mock_bot, monkeypatch
-):
-    """Test that _start_scheduled_tasks starts when PREFIX is empty."""
-    # Arrange
-    mock_logger = MagicMock()
-    mock_settings.PREFIX = ""
+    mock_settings.ENVIRONMENT = "production"
+    # Explicitly conflict with legacy PREFIX logic to ensure ENVIRONMENT is authoritative.
+    mock_settings.PREFIX = "non-empty-prefix"
     init_mock = MagicMock()
     stop_event = threading.Event()
     run_mock = MagicMock(return_value=stop_event)
@@ -208,6 +184,34 @@ def test_lifespan_start_scheduled_tasks_runs_when_prefix_empty(
     init_mock.assert_called_once_with(mock_bot)
     run_mock.assert_called_once()
     mock_logger.info.assert_called_with("scheduled_tasks_started")
+
+
+@pytest.mark.integration
+def test_lifespan_start_scheduled_tasks_skips_when_environment_is_not_production(
+    mock_settings, mock_bot, monkeypatch
+):
+    """Test that _start_scheduled_tasks skips when ENVIRONMENT is non-production."""
+    # Arrange
+    mock_logger = MagicMock()
+    mock_settings.ENVIRONMENT = "local"
+    # Explicitly conflict with legacy PREFIX logic to ensure ENVIRONMENT is authoritative.
+    mock_settings.PREFIX = ""
+    init_mock = MagicMock()
+    run_mock = MagicMock()
+    monkeypatch.setattr("server.lifespan.scheduled_tasks.init", init_mock)
+    monkeypatch.setattr("server.lifespan.scheduled_tasks.run_continuously", run_mock)
+
+    # Act
+    result = _start_scheduled_tasks(mock_bot, mock_settings, mock_logger)
+
+    # Assert
+    assert result is None
+    init_mock.assert_not_called()
+    run_mock.assert_not_called()
+    mock_logger.info.assert_called_with(
+        "scheduled_tasks_skipped",
+        reason="environment_is_not_production",
+    )
 
 
 @pytest.mark.integration

@@ -17,7 +17,7 @@ client_config = dict(
     region_name=settings.AWS_REGION,
 )
 
-if app_settings.PREFIX:
+if app_settings.ENVIRONMENT in ("local", "dev", "ci"):
     client_config["endpoint_url"] = "http://dynamodb-local:8000"
 
 

@@ -28,7 +28,7 @@ def mock_settings():
     settings.slack = MagicMock()
     settings.slack.SLACK_TOKEN = "xoxb-test-token"
     settings.slack.APP_TOKEN = "xapp-test-token"
-    settings.PREFIX = ""
+    settings.ENVIRONMENT = "local"
     return settings
 
 
