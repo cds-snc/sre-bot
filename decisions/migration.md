@@ -15,7 +15,7 @@ scope: The strangler-fig plan for legacy app/modules/ and the coexistence rules 
 
 **Coexistence rules (in force now):**
 
-1. **Freeze:** no new features and no new capabilities in `app/modules/`. Bug fixes are allowed; anything more starts as a feature package.
+1. **Freeze:** no new features and no new capabilities in `app/modules/`. Bug fixes are allowed; anything more starts as a feature package. **One bounded carve-out:** retiring the overloaded `AppSettings.PREFIX` command-namespace *is* permitted inside frozen modules — the overload blocks the settings-home consolidation ([configuration.md](configuration.md)) and forces the environment-derivation guardrail to carry a growing whitelist, so it is treated as a foundational cleanup rather than a feature change. It runs per-module, one PR each, behind pre/post command-name smoke tests (the same external-contract protection the freeze exists to enforce), swapping only each module's read of `AppSettings.PREFIX` for the transport's `COMMAND_PREFIX` ([transport-slack.md](transport-slack.md)); no other behavior in a frozen module changes under this carve-out.
 2. **No new dependents:** `packages/` and `infrastructure/` never import from `modules/`. Modules may keep importing `integrations/` and `infrastructure/` (they already do — that's the strangler working).
 3. **Baselines only ratchet down:** the deprecated-import allowlist and import-linter baselines never gain entries.
 4. Modules register via the legacy hard-coded list *or* hookimpls, never both (the current double-registration of `dev`/`sre` is fixed first — it's a live bug risk).

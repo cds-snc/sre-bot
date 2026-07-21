@@ -34,6 +34,8 @@ Use this skill when implementing or reviewing API endpoints.
 - Returning raw `OperationResult` objects from HTTP handlers.
 - Accessing `request.app.state` inside handlers when a dependency can be injected.
 - Broad exception catches that collapse distinct error classes.
+- Environment-derived CORS/security middleware configuration (e.g. toggling `allow_origins` on `ENVIRONMENT`/`PREFIX`) - use an explicit, settings-driven allow-list instead.
+- `CORSMiddleware` with any of `allow_origins`, `allow_methods`, or `allow_headers` set to `["*"]` while `allow_credentials=True` - browsers and Starlette both reject/forbid this combination; all three must be explicit lists when credentials are enabled.
 
 ## Test Matrix (Minimum)
 

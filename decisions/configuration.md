@@ -1,6 +1,6 @@
 ---
 status: Accepted
-date: 2026-07-06
+date: 2026-07-21
 applies: target
 scope: Settings ownership, environment identity, and secrets.
 ---
@@ -23,6 +23,8 @@ Settings are split across ~47 classes with two homes per vendor (`integrations/<
 
 **Environment identity:** one typed field, `ENVIRONMENT: Literal["local","ci","dev","staging","production"]`, on the app settings. All environment-conditional behavior reads it; deriving environment from `PREFIX`, hostname, or `sys.modules` is prohibited. Security-relevant toggles (dev-bypass) additionally require their own explicit boolean that defaults off — two independent guards.
 
+**Environment identity is orthogonal to platform-presentation config.** `ENVIRONMENT` answers "which deployment am I?" and is a portable, cross-cutting signal any layer may read for *legitimate* environment-conditional behavior (dev-only commands, local DynamoDB endpoint, prod-only side effects, SNS-validation posture). It does **not** answer "what is this command *named* so a dev and prod bot coexist in one Slack workspace" — that is a transport-owned setting (`COMMAND_PREFIX`, [transport-slack.md](transport-slack.md)), explicit and **never** derived from `ENVIRONMENT`. A transport-agnostic feature therefore reads `ENVIRONMENT` when it genuinely must branch on deployment, but never reaches into platform settings; the transport applies command naming centrally at registration. `AppSettings.PREFIX` carries **no** environment meaning after TASK-1.2.3 — it survives only as the legacy Slack command-namespace string, and is being **actively retired** per-module, replaced by the transport's `COMMAND_PREFIX` (TASK-45; [transport-slack.md](transport-slack.md)), deleted when the last legacy module cuts over — no longer gated on full `app/modules/` deletion ([migration.md](migration.md) carve-out).
+
 **Fail fast:** settings validate at import of their provider during lifespan phase 2; a missing required credential fails boot with a message naming the variable.
 
 **Secrets:** secret material resolves through the `SecretsService` port ([cloud-portability.md](cloud-portability.md)) or is platform-injected at deploy time (ECS task-definition `secrets:` → Secrets Manager); plain env-var secrets are a **tolerated divergence, not the target** — OWASP's Secrets Management guidance recommends against env vars where a managed alternative exists. Secrets never appear in defaults, logs ([observability.md](observability.md)), or repr. Rotation contract: JWKS refreshes at runtime; static secrets rotate by redeploy.
@@ -38,9 +40,9 @@ Settings are split across ~47 classes with two homes per vendor (`integrations/<
 ## Checks
 
 - CI script: each env var referenced by exactly one `BaseSettings` class.
-- grep: no `PREFIX ==`/`is_production` environment derivation; no `os.environ` reads outside settings classes.
+- grep/CI guardrail (TASK-1.3): no `PREFIX ==`/`is_production` environment derivation anywhere; `AppSettings.PREFIX` is read only by the **shrinking** set of not-yet-migrated `app/modules/` command registrations — a ratcheting whitelist that only loses entries — and by nothing else; no `os.environ` reads outside settings classes.
 - Boot test: missing required credential → clean failure naming the variable.
 
 ## Migration
 
-Ticket: settings consolidation. Tolerated until closed: dual vendor settings homes; security config still carried on a shared server-settings object rather than its own `SecuritySettings` slice.
+Ticket: settings consolidation. Tolerated until closed: dual vendor settings homes; security config still carried on a shared server-settings object rather than its own `SecuritySettings` slice; `AppSettings.PREFIX` retained as the legacy Slack command-namespace (no environment meaning) only until its per-module retirement completes (TASK-45; [transport-slack.md](transport-slack.md) owns its replacement, `COMMAND_PREFIX`), deleted when the last legacy module cuts over.
