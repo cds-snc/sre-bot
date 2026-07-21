@@ -2,7 +2,7 @@
 name: architecture
 description: App-level architecture mode for whole-product direction. Use for major roadmap, platform boundaries, and decision-record maintenance with mandatory web-refresh for records older than 30 days and source-cited updates; not for routine feature scoping.
 tools: [vscode/askQuestions, vscode/memory, read/readFile, agent, edit/createDirectory, edit/createFile, edit/editFiles, edit/rename, search, web]
-model: [Claude Sonnet 4.6 (copilot), GPT-5.3-Codex (copilot)]
+model: [Claude Sonnet 5 (copilot), GPT-5.3-Codex (copilot)]
 handoffs:
   - label: Start Feature Architecture
     agent: feature-architecture

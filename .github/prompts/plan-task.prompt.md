@@ -2,7 +2,7 @@
 name: plan-task
 description: Research a backlog task and write its implementation plan into the task via the backlog CLI, decomposing it first if too large for a single reviewable PR.
 agent: task-planner
-model: Claude Sonnet 4.6 (copilot)
+model: Claude Sonnet 5 (copilot)
 ---
 
 Plan the backlog task given as input (task id, for example `TASK-1`). If no id was provided, ask for one.
