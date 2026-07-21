@@ -3,10 +3,11 @@ id: TASK-1.2.3
 title: >-
   Migrate legacy env branches to ENVIRONMENT; remove is_production shim
   (contract)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-17 19:47'
-updated_date: '2026-07-21 15:11'
+updated_date: '2026-07-21 15:39'
 labels:
   - phase-0
 milestone: m-0
