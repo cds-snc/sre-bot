@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-17 16:15'
+updated_date: '2026-07-21 18:57'
 labels:
   - security
   - phase-0
@@ -38,6 +38,7 @@ Steps:
 - [ ] #2 grep -rn "PREFIX ==" app/ --include=*.py returns no environment-derivation hits (PREFIX may still exist for URL prefixing only)
 - [ ] #3 Dev-bypass requires the two independent guards (non-production ENVIRONMENT and DEV_BYPASS_ENABLED=true) and logs each use
 - [ ] #4 Unit tests cover: valid values accepted, invalid value rejected at boot, dev-bypass denied when either guard is off
+- [ ] #5 CI guardrail enforces that AppSettings.PREFIX is read only by its definition and the explicitly whitelisted legacy readers (app/modules/** command registration plus documented pre-existing exceptions), with a committed regression test (TASK-1.3)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -65,6 +66,12 @@ author: @planner
 created: 2026-07-17 16:15
 ---
 AC #2 grep scope is narrower than the actual call-site surface. Current grep target (PREFIX ==) misses: PREFIX !=, bool(PREFIX), if app_settings.PREFIX: (truthy check). TASK-1.2 will target all four forms. Suggest widening AC #2 to: grep -rn 'PREFIX' app/ --include='*.py' and manually excluding URL-prefix uses, OR replacing with: grep -rn 'is_production' app/ --include='*.py' returns no hits (TASK-1.2 AC #1 already covers this). Human approval needed before AC #2 wording is changed.
+---
+
+author: @planner
+created: 2026-07-21 18:57
+---
+Residual gap found while closing out TASK-1: after TASK-1.2.3, AppSettings.PREFIX carries no environment meaning but is unbounded/undocumented and unverifiable in CI, so AC #2 could not close cleanly (a grep-based one-off check isn't regression-proof). Verified via grep -rn PREFIX app/ --include=*.py and grep -rn is_production app/ --include=*.py: is_production is fully gone; PREFIX now only read by app/infrastructure/configuration/app.py (definition), its pre-existing mirror in app/infrastructure/configuration/settings.py, a diagnostic log in app/server/lifespan.py, and the 6 frozen Slack command-namespace readers in app/modules/{atip,aws,incident,role,secret,sre} (plus a stale docstring in app/modules/dev/__init__.py). Created TASK-1.3 (parent TASK-1, depends on TASK-1.2) to: annotate PREFIX's field description, add a committed CI/grep guardrail script enforcing this whitelist, and add a regression test. Added TASK-1 AC #5 below to track closure. Plan written to TASK-1.3 via --plan; awaiting human review before implementation. Out of scope for TASK-1.3 (deferred to the follow-up Slack COMMAND_PREFIX task per decisions/transport-slack.md): COMMAND_PREFIX, app/infrastructure/slack/settings.py, retiring platforms.py.
 ---
 <!-- COMMENTS:END -->
 
