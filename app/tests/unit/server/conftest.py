@@ -20,7 +20,6 @@ def mock_fastapi_app():
 def mock_settings():
     """Create a mock settings object."""
     settings = MagicMock()
-    settings.is_production = False
     settings.server = MagicMock()
     settings.server.SECRET_KEY = "test_secret_key"
     settings.server.ACCESS_TOKEN_EXPIRE_MINUTES = 30

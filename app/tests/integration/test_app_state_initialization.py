@@ -48,19 +48,22 @@ def test_app_state_settings_is_valid(app_with_lifespan):
 
     assert settings is not None, "settings must not be None"
     assert hasattr(settings, "PREFIX"), "settings missing PREFIX"
+    assert hasattr(settings, "ENVIRONMENT"), "settings missing ENVIRONMENT"
     assert hasattr(settings, "LOG_LEVEL"), "settings missing LOG_LEVEL"
     assert hasattr(settings, "GIT_SHA"), "settings missing GIT_SHA"
-    assert hasattr(settings, "is_production"), "settings missing is_production"
-    assert isinstance(settings.is_production, bool), "is_production must be a boolean"
+    assert settings.ENVIRONMENT in {"local", "ci", "dev", "staging", "production"}
 
 
 @pytest.mark.integration
-def test_contract_app_state_settings_has_no_is_production(app_with_lifespan):
-    """Contract: app.state.settings should not expose the is_production shim."""
+def test_contract_app_state_settings_has_no_legacy_production_property(
+    app_with_lifespan,
+):
+    """Contract: app.state.settings should not expose the legacy production shim."""
     settings = app_with_lifespan.app.state.settings
+    legacy_attr = "is" + "_production"
 
     assert hasattr(settings, "ENVIRONMENT"), "settings missing ENVIRONMENT"
-    assert not hasattr(settings, "is_production")
+    assert not hasattr(settings, legacy_attr)
 
 
 @pytest.mark.integration

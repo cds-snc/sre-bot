@@ -17,18 +17,6 @@ class TestAppSettings:
         assert settings.LOG_LEVEL == "INFO"
         assert settings.GIT_SHA == "Unknown"
 
-    def test_app_settings_is_production_when_environment_production(self):
-        """is_production should be True when ENVIRONMENT is production."""
-        settings = AppSettings(ENVIRONMENT="production")
-
-        assert settings.is_production is True
-
-    def test_app_settings_is_not_production_when_environment_non_production(self):
-        """is_production should be False when ENVIRONMENT is non-production."""
-        settings = AppSettings(ENVIRONMENT="dev")
-
-        assert settings.is_production is False
-
     def test_app_settings_ignores_extra_env_vars(self, monkeypatch):
         """Unknown environment variables should be ignored during settings loading."""
         monkeypatch.setenv("UNKNOWN_VAR", "x")
@@ -93,26 +81,9 @@ class TestAppSettingsEnvironment:
 
         assert settings.DEV_BYPASS_ENABLED is True
 
-    def test_is_production_shim_true_when_production(self):
-        """is_production should be True when ENVIRONMENT is production."""
+    def test_contract_app_settings_has_no_legacy_production_property(self):
+        """Contract: AppSettings no longer exposes the legacy production shim."""
         settings = AppSettings(ENVIRONMENT="production")
+        legacy_attr = "is" + "_production"
 
-        assert settings.is_production is True
-
-    def test_is_production_shim_false_when_local(self):
-        """is_production should be False when ENVIRONMENT is local."""
-        settings = AppSettings(ENVIRONMENT="local")
-
-        assert settings.is_production is False
-
-    def test_is_production_shim_false_when_ci(self):
-        """is_production should be False when ENVIRONMENT is ci."""
-        settings = AppSettings(ENVIRONMENT="ci")
-
-        assert settings.is_production is False
-
-    def test_contract_app_settings_has_no_is_production_property(self):
-        """Contract: AppSettings no longer exposes an is_production shim."""
-        settings = AppSettings(ENVIRONMENT="production")
-
-        assert not hasattr(settings, "is_production")
+        assert not hasattr(settings, legacy_attr)

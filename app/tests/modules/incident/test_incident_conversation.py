@@ -75,8 +75,12 @@ def test_contract_create_incident_conversation_prefix_from_environment(monkeypat
 
     # In development, prefix must include incident-dev-, independent of PREFIX.
     monkeypatch.setattr(incident_conversation, "PREFIX", "")
-    monkeypatch.setattr(incident_conversation.settings, "ENVIRONMENT", "dev", raising=False)
-    dev_result = incident_conversation.create_incident_conversation(client, "Test Incident")
+    monkeypatch.setattr(
+        incident_conversation.settings, "ENVIRONMENT", "dev", raising=False
+    )
+    dev_result = incident_conversation.create_incident_conversation(
+        client, "Test Incident"
+    )
     assert dev_result["channel_name"].startswith("incident-dev-")
 
     # In production, prefix must be incident-, independent of PREFIX.
@@ -87,7 +91,9 @@ def test_contract_create_incident_conversation_prefix_from_environment(monkeypat
         "production",
         raising=False,
     )
-    prod_result = incident_conversation.create_incident_conversation(client, "Test Incident")
+    prod_result = incident_conversation.create_incident_conversation(
+        client, "Test Incident"
+    )
     assert prod_result["channel_name"].startswith("incident-")
     assert not prod_result["channel_name"].startswith("incident-dev-")
 

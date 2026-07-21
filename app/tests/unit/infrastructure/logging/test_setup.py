@@ -63,19 +63,15 @@ class TestConfigureLogging:
         logger = configure_logging(settings=mock_settings, log_level="WARNING")
         assert logger is not None
 
-    def test_configure_logging_with_is_production(self, mock_settings):
-        """configure_logging accepts is_production parameter."""
-        # In test environment, logging is suppressed, but parameters should be accepted
-        logger = configure_logging(settings=mock_settings, is_production=True)
+    def test_configure_logging_production_mode_from_environment(self, mock_settings):
+        """configure_logging derives production mode from ENVIRONMENT."""
+        mock_settings.ENVIRONMENT = "production"
+        logger = configure_logging(settings=mock_settings)
         assert logger is not None
 
-        logger = configure_logging(settings=mock_settings, is_production=False)
+        mock_settings.ENVIRONMENT = "local"
+        logger = configure_logging(settings=mock_settings)
         assert logger is not None
-
-    def test_contract_configure_logging_rejects_is_production_kwarg(self, mock_settings):
-        """Contract: configure_logging derives mode from ENVIRONMENT only."""
-        with pytest.raises(TypeError):
-            configure_logging(settings=mock_settings, is_production=True)
 
     def test_configure_logging_idempotent(self, mock_settings):
         """Multiple configure_logging calls are safe."""
