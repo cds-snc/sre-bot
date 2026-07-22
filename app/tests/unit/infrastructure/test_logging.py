@@ -8,14 +8,16 @@ Tests cover:
 - Backward compatibility with get_module_logger (deprecated)
 """
 
-import pytest
 import logging
 import sys
 from unittest.mock import patch
+
+import pytest
 import structlog
+
 from infrastructure.logging.setup import (
-    configure_logging,
     _is_test_environment,
+    configure_logging,
 )
 
 
@@ -30,23 +32,24 @@ class TestLoggingConfiguration:
 
     def test_is_test_environment_without_pytest(self):
         """_is_test_environment returns False when pytest is not loaded."""
-        with patch.dict(sys.modules, {"pytest": None}):
-            # Save original state
-            had_pytest = "pytest" in sys.modules
+        had_pytest = "pytest" in sys.modules
+        original_pytest = sys.modules.get("pytest")
+        pytest_module = pytest
 
+        with patch.dict(sys.modules, {}, clear=False):
             # Remove pytest temporarily
             if "pytest" in sys.modules:
                 del sys.modules["pytest"]
 
-            try:
-                # Now pytest should not be in sys.modules
-                result = _is_test_environment()
-                assert result is False
-            finally:
-                # Restore pytest if it was there
-                if had_pytest:
-                    # Re-import pytest since we removed it
-                    import pytest as _  # noqa: F401
+            # Now pytest should not be in sys.modules
+            result = _is_test_environment()
+            assert result is False
+
+        # Restore pytest if it was there before the test
+        if had_pytest:
+            sys.modules["pytest"] = (
+                original_pytest if original_pytest is not None else pytest_module
+            )
 
     def test_configure_logging_returns_bound_logger(self, mock_settings):
         """configure_logging returns a logger instance."""
@@ -113,7 +116,6 @@ class TestLoggingBestPractices:
 
     def test_structlog_get_logger_pattern(self):
         """Standard structlog.get_logger() pattern works."""
-        import structlog
 
         logger = structlog.get_logger()
         # Should return a logger instance
@@ -123,7 +125,6 @@ class TestLoggingBestPractices:
 
     def test_logger_bind_for_context(self):
         """Logger.bind() adds context for structured logging."""
-        import structlog
 
         logger = structlog.get_logger()
         bound_logger = logger.bind(user_id="123", request_id="req-abc")

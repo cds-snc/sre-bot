@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
@@ -168,7 +168,6 @@ def test_sync_endpoint_user_sync_returns_existing_job_when_lock_held():
 @pytest.mark.unit
 def test_sync_endpoint_returns_503_when_disabled():
     """Sync endpoint should return 503 when the feature flag is disabled."""
-    from fastapi import HTTPException
 
     fake_idempotency = MagicMock()
     with (

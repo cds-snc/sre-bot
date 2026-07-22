@@ -3,9 +3,9 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from infrastructure.i18n.service import TranslationService
+from infrastructure.i18n.models import Locale, TranslationKey
 from infrastructure.i18n.resources import I18nResourceSpec
-from infrastructure.i18n.models import Locale
+from infrastructure.i18n.service import TranslationService
 
 
 class TestTranslationServiceInitialization:
@@ -186,7 +186,6 @@ class TestTranslationServiceLifecycle:
 
         # translate() should still work even if _is_initialized is False
         # because it just delegates to the underlying translator
-        from infrastructure.i18n.models import TranslationKey
 
         result = service.translate(
             key=TranslationKey.from_string("test.key"),

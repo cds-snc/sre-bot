@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock
 
+from googleapiclient.errors import HttpError
 
 from infrastructure.clients.google_workspace.docs import DocsClient
 
@@ -217,7 +218,6 @@ class TestErrorHandling:
         mock_service = mock_session_provider.get_service.return_value
 
         # Simulate API error by having execute() raise an exception
-        from googleapiclient.errors import HttpError
 
         mock_service.documents().get().execute.side_effect = HttpError(
             resp=MagicMock(status=404), content=b"Not found"

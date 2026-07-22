@@ -4,6 +4,8 @@ Uses in-memory stubs for repository, directory, and dispatcher.
 Tests cover the main orchestration paths and error branches.
 """
 
+from dataclasses import replace
+from datetime import datetime, timezone
 from typing import List, Optional
 from unittest.mock import MagicMock
 
@@ -17,9 +19,9 @@ from infrastructure.directory.models import (
 from infrastructure.events import Event
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig, PlatformPolicy
+from packages.access.common.events import SYNC_COMPLETED, SYNC_FAILED
 from packages.access.request.domain import AccessRequest, ApprovalDecision
 from packages.access.request.service import AccessRequestService
-
 
 # ---------------------------------------------------------------------------
 # Stubs / factories
@@ -121,7 +123,6 @@ def make_service(
     fallback_approver_slug: str = "sg-org-admins",
     min_approver_count: int = 1,
 ) -> tuple[AccessRequestService, FakeRepository, FakeDispatcher]:
-    from infrastructure.directory.models import DirectoryMember
 
     repo = repo or FakeRepository()
     dispatcher = dispatcher or FakeDispatcher()
@@ -394,7 +395,6 @@ def test_approve_request_should_reject_self_approval():
     )
     assert submit.data is not None
     # Force actor into resolved_approvers for this test
-    from dataclasses import replace
 
     req = repo._store[submit.data.request_id]
     repo._store[submit.data.request_id] = replace(
@@ -643,7 +643,6 @@ def test_cancel_request_should_reject_non_actor():
 
 @pytest.mark.unit
 def test_advance_from_sync_result_transitions_to_completed():
-    from packages.access.common.events import SYNC_COMPLETED
 
     service, repo, dispatcher = make_service()
 
@@ -677,7 +676,6 @@ def test_advance_from_sync_result_transitions_to_completed():
 
 @pytest.mark.unit
 def test_advance_from_sync_result_transitions_to_failed():
-    from packages.access.common.events import SYNC_FAILED
 
     service, repo, dispatcher = make_service()
 
@@ -708,7 +706,6 @@ def test_advance_from_sync_result_transitions_to_failed():
 
 @pytest.mark.unit
 def test_advance_from_sync_result_is_noop_when_no_request_id():
-    from packages.access.common.events import SYNC_COMPLETED
 
     service, repo, _ = make_service()
 
@@ -723,7 +720,6 @@ def test_advance_from_sync_result_is_noop_when_no_request_id():
 
 @pytest.mark.unit
 def test_advance_from_sync_result_is_idempotent_for_completed_request():
-    from packages.access.common.events import SYNC_COMPLETED
 
     service, repo, dispatcher = make_service()
 
@@ -761,8 +757,6 @@ def test_advance_from_sync_result_is_idempotent_for_completed_request():
 
 def _make_failed_request(repo: FakeRepository) -> str:
     """Seed a failed request into repo and return its request_id."""
-    from datetime import datetime, timezone
-    from packages.access.request.domain import AccessRequest
 
     request_id = "retry-req-001"
     req = AccessRequest(
@@ -867,7 +861,6 @@ def test_retry_request_should_return_not_found_for_missing_request():
 
 @pytest.mark.unit
 def test_retry_request_should_keep_failed_state_when_idp_write_fails_again():
-    from unittest.mock import MagicMock
 
     directory = MagicMock()
     directory.get_group.return_value = OperationResult.success(

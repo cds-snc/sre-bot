@@ -4,9 +4,11 @@ This module provides a production-ready retry store implementation using
 AWS DynamoDB for shared state across multiple application instances.
 """
 
-from datetime import datetime, timezone
-from typing import List, Dict, Any
+import json
 import time
+from datetime import datetime, timezone
+from typing import Any, Dict, List
+
 import structlog
 
 from infrastructure.resilience.retry.config import RetryConfig
@@ -542,7 +544,6 @@ class DynamoDBRetryStore:
 
         # Parse payload (stored as string)
         try:
-            import json
 
             payload = json.loads(payload_str) if payload_str else {}
         except (json.JSONDecodeError, TypeError):

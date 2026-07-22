@@ -2,12 +2,13 @@
 
 import pytest
 
+from server import server
+
 
 @pytest.fixture
 def integration_server_app():
     """Create a server app for integration testing."""
     # Import here to avoid issues with module-level initialization
-    from server import server
 
     return server.handler
 
@@ -35,7 +36,6 @@ def test_server_has_cors_middleware_configured(integration_server_app):
 def test_server_exports_handler_in_server_module():
     """Test that server module exports handler correctly."""
     # Arrange & Act
-    from server import server
 
     # Assert
     assert hasattr(server, "handler")

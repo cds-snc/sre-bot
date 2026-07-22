@@ -3,6 +3,10 @@
 import pytest
 
 from infrastructure.clients.google_workspace.sheets import (
+    INSERT_DATA_OPTION_INSERT_ROWS,
+    INSERT_DATA_OPTION_OVERWRITE,
+    VALUE_INPUT_OPTION_RAW,
+    VALUE_INPUT_OPTION_USER_ENTERED,
     SheetsClient,
 )
 from infrastructure.operations.result import OperationResult
@@ -331,20 +335,12 @@ class TestConstants:
 
     def test_value_input_options(self):
         """Test value input option constants."""
-        from infrastructure.clients.google_workspace.sheets import (
-            VALUE_INPUT_OPTION_RAW,
-            VALUE_INPUT_OPTION_USER_ENTERED,
-        )
 
         assert VALUE_INPUT_OPTION_RAW == "RAW"
         assert VALUE_INPUT_OPTION_USER_ENTERED == "USER_ENTERED"
 
     def test_insert_data_options(self):
         """Test insert data option constants."""
-        from infrastructure.clients.google_workspace.sheets import (
-            INSERT_DATA_OPTION_OVERWRITE,
-            INSERT_DATA_OPTION_INSERT_ROWS,
-        )
 
         assert INSERT_DATA_OPTION_OVERWRITE == "OVERWRITE"
         assert INSERT_DATA_OPTION_INSERT_ROWS == "INSERT_ROWS"

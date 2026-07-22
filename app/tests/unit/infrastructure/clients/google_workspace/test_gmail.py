@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock
 
+from googleapiclient.errors import HttpError
 
 from infrastructure.clients.google_workspace.gmail import GmailClient
 
@@ -382,8 +383,6 @@ class TestErrorHandling:
         mock_service = mock_session_provider.get_service.return_value
 
         # Simulate API error
-        from googleapiclient.errors import HttpError
-
         mock_service.users().messages().get().execute.side_effect = HttpError(
             resp=MagicMock(status=404), content=b"Not found"
         )

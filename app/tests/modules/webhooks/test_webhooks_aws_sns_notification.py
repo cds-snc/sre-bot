@@ -2,12 +2,15 @@
 import re
 import types
 from unittest.mock import MagicMock
+
 import pytest
 from pydantic import ValidationError
+
+from integrations.slack.blocks import validate_blocks as validate_slack_blocks
 from models.webhooks import AwsSnsPayload
 from modules.webhooks.aws_sns_notification import (
-    AwsNotificationPattern,
     NOTIFICATION_HANDLERS,
+    AwsNotificationPattern,
     find_matching_handler,
     handle_generic_notification,
     process_aws_notification_payload,
@@ -368,7 +371,6 @@ def test_aws_notification_pattern_get_compiled_pattern_callable(monkeypatch):
 
 
 def test_validate_slack_blocks():
-    from integrations.slack.blocks import validate_blocks as validate_slack_blocks
 
     # Valid blocks
     valid_blocks = [
@@ -449,11 +451,6 @@ def test_get_match_text_all_targets():
 
 
 def test_find_matching_handler_exception_handling(monkeypatch):
-    from modules.webhooks.aws_sns_notification import (
-        NOTIFICATION_HANDLERS,
-        find_matching_handler,
-        register_notification_pattern,
-    )
 
     NOTIFICATION_HANDLERS.clear()
 
@@ -476,11 +473,6 @@ def test_find_matching_handler_exception_handling(monkeypatch):
 
 
 def test_find_matching_handler_message_structure():
-    from modules.webhooks.aws_sns_notification import (
-        NOTIFICATION_HANDLERS,
-        find_matching_handler,
-        register_notification_pattern,
-    )
 
     NOTIFICATION_HANDLERS.clear()
 
@@ -508,11 +500,6 @@ def test_find_matching_handler_message_structure():
 
 
 def test_process_aws_notification_payload_handler_exception(monkeypatch):
-    from modules.webhooks.aws_sns_notification import (
-        NOTIFICATION_HANDLERS,
-        process_aws_notification_payload,
-        register_notification_pattern,
-    )
 
     NOTIFICATION_HANDLERS.clear()
 
@@ -541,11 +528,6 @@ def test_process_aws_notification_payload_handler_exception(monkeypatch):
 
 
 def test_process_aws_notification_payload_invalid_blocks(monkeypatch):
-    from modules.webhooks.aws_sns_notification import (
-        NOTIFICATION_HANDLERS,
-        process_aws_notification_payload,
-        register_notification_pattern,
-    )
 
     NOTIFICATION_HANDLERS.clear()
 
@@ -576,11 +558,6 @@ def test_process_aws_notification_payload_invalid_blocks(monkeypatch):
 
 
 def test_process_aws_notification_payload_import_error(monkeypatch):
-    from modules.webhooks.aws_sns_notification import (
-        NOTIFICATION_HANDLERS,
-        process_aws_notification_payload,
-        register_notification_pattern,
-    )
 
     NOTIFICATION_HANDLERS.clear()
 

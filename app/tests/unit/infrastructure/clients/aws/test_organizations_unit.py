@@ -1,3 +1,5 @@
+import importlib
+
 import pytest
 
 from infrastructure.operations.result import OperationResult, OperationStatus
@@ -18,8 +20,6 @@ class TestOrganizations:
             return OperationResult.success(
                 data={"Accounts": [{"Id": "111", "Name": "alpha"}]}
             )
-
-        import importlib
 
         orgs_mod = importlib.import_module("infrastructure.clients.aws.organizations")
         monkeypatch.setattr(orgs_mod, "execute_aws_api_call", fake_execute)

@@ -4,13 +4,14 @@ All functions are pure — no mocks required for entitlement-mode and
 approval-count tests.  DirectoryProvider tests use simple in-memory stubs.
 """
 
+from datetime import datetime, timezone
 from typing import List
 from unittest.mock import MagicMock
 
 import pytest
 
 from infrastructure.directory.models import DirectoryGroup, DirectoryMember
-from infrastructure.operations import OperationResult
+from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig, PlatformPolicy
 from packages.access.request.domain import AccessRequest, ApprovalDecision
 from packages.access.request.policies import (
@@ -20,9 +21,6 @@ from packages.access.request.policies import (
     meets_minimum_approver_count,
     resolve_approver_candidates,
 )
-
-from datetime import datetime, timezone
-
 
 # ---------------------------------------------------------------------------
 # Helpers / factories
@@ -200,7 +198,6 @@ def test_resolve_approver_candidates_returns_empty_when_all_fail():
 
 @pytest.mark.unit
 def test_resolve_approver_candidates_returns_empty_on_directory_error():
-    from infrastructure.operations import OperationStatus
 
     directory = MagicMock()
     directory.get_group_members.return_value = OperationResult.error(
