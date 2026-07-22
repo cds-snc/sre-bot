@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-21 19:13'
+updated_date: '2026-07-22 14:39'
 labels:
   - phase-0
   - security
@@ -41,3 +42,13 @@ Contract slice — runs only after all module cutovers land. Delete AppSettings.
 <!-- DOD:BEGIN -->
 - [ ] #1 PR references decisions/configuration.md and decisions/transport-slack.md
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @task-planner
+created: 2026-07-22 14:39
+---
+Architecture alignment (2026-07-22): per decisions/configuration.md, the god-settings aggregator (app/infrastructure/configuration/settings.py's Settings/get_settings()/settings_map) is being removed by a separate, open PR — not a target this task should assume is stable. Before executing this teardown: (1) check whether app/infrastructure/configuration/settings.py still exists / still contains the PREFIX field and kwargs.setdefault('PREFIX', app.PREFIX) at the cited lines (97, 175) — line numbers may have shifted or the file may already be gone; (2) if the aggregator has already been removed by the other PR, AC #1's 'aggregator mirror... deleted' clause is trivially satisfied — re-verify by grep rather than assuming the cited lines still apply; (3) TASK-1.3's guardrail/baseline check (AC #2) and the app.py PREFIX field deletion are unaffected either way. No change to ACs made here; flagging for whoever picks up this task's plan.
+---
+<!-- COMMENTS:END -->

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-21 19:12'
-updated_date: '2026-07-21 19:15'
+updated_date: '2026-07-22 14:39'
 labels:
   - phase-0
   - security
@@ -51,5 +51,11 @@ author: @planner
 created: 2026-07-21 19:15
 ---
 Governance: this initiative reverses the earlier 'PREFIX retirement out of scope / no legacy file touched' stance. Per governance.md cascade rule, decisions/migration.md, decisions/transport-slack.md, and decisions/configuration.md were amended in the same change to record the bounded freeze carve-out (PREFIX command-namespace retirement is permitted inside frozen modules, per-module, behind pre/post command-name smoke tests). Sequencing: TASK-45.1 (foundational, no module edits) -> TASK-45.2/.3/.4/.5 (per-module cutovers, parallelizable after .1) -> TASK-45.6 (teardown). Ratchet tracker is TASK-1.3's app/bin/baselines/prefix_readers.txt; each cutover deletes its entry. First slice (TASK-45.1) is planned in detail; per-module slices are scoped and will be planned when picked up. platforms.py deletion stays with TASK-24.
+---
+
+author: @task-planner
+created: 2026-07-22 14:39
+---
+Architecture alignment (2026-07-22): decisions/configuration.md now explicitly states the god-settings aggregator (app/infrastructure/configuration/settings.py Settings/get_settings()/settings_map) is being removed by an open PR, not grown — no new/open task may wire a settings slice into it. Two follow-ups for this task when next reviewed: (1) AC #1's 'local compose/env examples' wording is inaccurate — there is no .env.example or compose PREFIX setting in this repo; the real local coexistence anchor is app/Makefile's dev/debug targets (PREFIX="dev-"), as corrected in TASK-45.1's plan. (2) AC #4 assumes app/infrastructure/configuration/settings.py (the aggregator mirror of PREFIX) still exists at teardown time (TASK-45.6) — since a separate PR may delete that whole file first, TASK-45.6 must verify the file's existence before editing specific lines/fields.
 ---
 <!-- COMMENTS:END -->
