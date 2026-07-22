@@ -3,10 +3,10 @@ id: TASK-1
 title: >-
   Introduce typed ENVIRONMENT setting and remove PREFIX-derived environment
   logic
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-21 18:57'
+updated_date: '2026-07-22 16:43'
 labels:
   - security
   - phase-0

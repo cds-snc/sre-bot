@@ -3,11 +3,11 @@ id: TASK-45.1
 title: >-
   Stand up app/infrastructure/slack transport settings home with COMMAND_PREFIX
   and central prefix application
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-21 19:13'
-updated_date: '2026-07-22 15:12'
+updated_date: '2026-07-22 16:43'
 labels:
   - phase-0
   - slack
@@ -125,5 +125,5 @@ Alignment review (2026-07-22): direction confirmed against decisions/transport-s
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 PR references decisions/transport-slack.md and decisions/configuration.md
+- [x] #1 PR references decisions/transport-slack.md and decisions/configuration.md
 <!-- DOD:END -->

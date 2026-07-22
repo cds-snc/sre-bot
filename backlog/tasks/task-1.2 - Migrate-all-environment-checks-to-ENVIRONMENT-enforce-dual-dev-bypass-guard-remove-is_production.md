@@ -3,10 +3,10 @@ id: TASK-1.2
 title: >-
   Migrate all environment checks to ENVIRONMENT; enforce dual dev-bypass guard;
   remove is_production
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-17 16:14'
-updated_date: '2026-07-21 17:09'
+updated_date: '2026-07-22 16:46'
 labels:
   - phase-0
 milestone: m-0
@@ -29,13 +29,25 @@ Migrate + contract phase for TASK-1. Replace every is_production and PREFIX-deri
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 grep -rn "is_production" app/ --include="*.py" returns no hits outside test files that assert the property is gone
-- [ ] #2 grep -rn "PREFIX\s*[!<>=]\|bool(PREFIX)\|if.*PREFIX\b" app/ --include="*.py" returns no environment-derivation hits (PREFIX may remain for URL-prefix use only)
-- [ ] #3 current_user.py dev-bypass requires ENVIRONMENT != production AND DEV_BYPASS_ENABLED=true; either guard alone blocks bypass; each use is logged
-- [ ] #4 dynamodb local endpoint activates only for ENVIRONMENT in (local, dev, ci); staging and production use real AWS
-- [ ] #5 All existing tests plus new dual-guard tests pass
-- [ ] #6 aws_sns.py validate_sns_payload skips validation when ENVIRONMENT != 'production' (local/dev/ci never receive real SNS payloads from the internet); validation is always enforced when ENVIRONMENT == 'production'
+- [x] #1 grep -rn "is_production" app/ --include="*.py" returns no hits outside test files that assert the property is gone
+- [x] #2 grep -rn "PREFIX\s*[!<>=]\|bool(PREFIX)\|if.*PREFIX\b" app/ --include="*.py" returns no environment-derivation hits (PREFIX may remain for URL-prefix use only)
+- [x] #3 current_user.py dev-bypass requires ENVIRONMENT != production AND DEV_BYPASS_ENABLED=true; either guard alone blocks bypass; each use is logged
+- [x] #4 dynamodb local endpoint activates only for ENVIRONMENT in (local, dev, ci); staging and production use real AWS
+- [x] #5 All existing tests plus new dual-guard tests pass
+- [x] #6 aws_sns.py validate_sns_payload skips validation when ENVIRONMENT != 'production' (local/dev/ci never receive real SNS payloads from the internet); validation is always enforced when ENVIRONMENT == 'production'
 <!-- AC:END -->
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Implementation Plan
 
