@@ -4,7 +4,10 @@ from unittest.mock import Mock
 
 from googleapiclient.errors import HttpError
 
-from infrastructure.clients.google_workspace.directory import DirectoryClient
+from infrastructure.clients.google_workspace.directory import (
+    DirectoryClient,
+    ListGroupsWithMembersRequest,
+)
 from infrastructure.operations.status import OperationStatus
 
 
@@ -550,7 +553,6 @@ class TestDirectoryClientErrorHandling:
 
     def test_list_users_permission_denied(self, mock_session_provider: Mock):
         """Test permission denied error handling."""
-        from googleapiclient.errors import HttpError
 
         mock_service = Mock()
         mock_request = Mock()
@@ -805,9 +807,6 @@ class TestDirectoryClientAdvancedFeatures:
 
     def test_list_groups_with_members_basic(self, mock_session_provider: Mock):
         """Test basic list_groups_with_members operation."""
-        from infrastructure.clients.google_workspace.directory import (
-            ListGroupsWithMembersRequest,
-        )
 
         # Setup mocks for list_groups
         mock_service = Mock()
@@ -869,9 +868,6 @@ class TestDirectoryClientAdvancedFeatures:
         self, mock_session_provider: Mock
     ):
         """Test list_groups_with_members with group filters."""
-        from infrastructure.clients.google_workspace.directory import (
-            ListGroupsWithMembersRequest,
-        )
 
         mock_service = Mock()
         mock_groups_request = Mock()
@@ -932,9 +928,6 @@ class TestDirectoryClientAdvancedFeatures:
         self, mock_session_provider: Mock
     ):
         """Test list_groups_with_members with member filters."""
-        from infrastructure.clients.google_workspace.directory import (
-            ListGroupsWithMembersRequest,
-        )
 
         mock_service = Mock()
         mock_groups_request = Mock()
@@ -998,9 +991,6 @@ class TestDirectoryClientAdvancedFeatures:
 
     def test_list_groups_with_members_exclude_empty(self, mock_session_provider: Mock):
         """Test list_groups_with_members with exclude_empty_groups option."""
-        from infrastructure.clients.google_workspace.directory import (
-            ListGroupsWithMembersRequest,
-        )
 
         mock_service = Mock()
         mock_groups_request = Mock()
@@ -1055,9 +1045,6 @@ class TestDirectoryClientAdvancedFeatures:
         self, mock_session_provider: Mock
     ):
         """Test list_groups_with_members with user details enrichment."""
-        from infrastructure.clients.google_workspace.directory import (
-            ListGroupsWithMembersRequest,
-        )
 
         mock_service = Mock()
 
@@ -1146,9 +1133,6 @@ class TestDirectoryClientAdvancedFeatures:
         self, mock_session_provider: Mock
     ):
         """Test list_groups_with_members when filters return no groups."""
-        from infrastructure.clients.google_workspace.directory import (
-            ListGroupsWithMembersRequest,
-        )
 
         mock_service = Mock()
         mock_groups_request = Mock()
@@ -1180,9 +1164,6 @@ class TestDirectoryClientAdvancedFeatures:
 
     def test_list_groups_with_members_batch_failure(self, mock_session_provider: Mock):
         """Test list_groups_with_members handles batch operation failure gracefully."""
-        from infrastructure.clients.google_workspace.directory import (
-            ListGroupsWithMembersRequest,
-        )
 
         mock_service = Mock()
 

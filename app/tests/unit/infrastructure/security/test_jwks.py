@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from jwt import PyJWKClientError
 
 from infrastructure.security import JWKSManager
 
@@ -71,7 +72,6 @@ class TestJWKSManager:
         self, mock_pyjwk_client, mock_issuer_config
     ):
         """Test get_jwks_client returns None on initialization error."""
-        from jwt import PyJWKClientError
 
         mock_pyjwk_client.side_effect = PyJWKClientError("Connection failed")
 

@@ -5,6 +5,11 @@ from types import SimpleNamespace
 
 import pytest
 
+from infrastructure.configuration.app import AppSettings
+from integrations.aws import client_next
+from integrations.aws import dynamodb as dynamodb_module
+from modules.aws import aws_access_requests
+
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
@@ -23,8 +28,6 @@ def test_integrations_aws_dynamodb_endpoint_matrix(
     expected_url: str | None,
 ) -> None:
     """integrations.aws.dynamodb should gate local endpoint by ENVIRONMENT."""
-    from infrastructure.configuration.app import AppSettings
-    from integrations.aws import dynamodb as dynamodb_module
 
     monkeypatch.setattr(
         "infrastructure.configuration.app.get_app_settings",
@@ -57,7 +60,6 @@ def test_integrations_aws_client_next_dynamodb_endpoint_matrix(
     expected_url: str | None,
 ) -> None:
     """integrations.aws.client_next.get_aws_client should gate by ENVIRONMENT."""
-    from integrations.aws import client_next
 
     captured: dict[str, object] = {}
 
@@ -106,7 +108,6 @@ def test_modules_aws_access_requests_dynamodb_endpoint_matrix(
     expected_url: str | None,
 ) -> None:
     """modules.aws.aws_access_requests._get_dynamodb_client should gate by ENVIRONMENT."""
-    from modules.aws import aws_access_requests
 
     captured: dict[str, object] = {}
 

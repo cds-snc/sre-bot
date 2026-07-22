@@ -10,7 +10,14 @@ from unittest.mock import MagicMock
 import pytest
 
 from infrastructure.clients.aws import AWSClients
+from infrastructure.clients.aws.config import ConfigClient
+from infrastructure.clients.aws.cost_explorer import CostExplorerClient
+from infrastructure.clients.aws.dynamodb import DynamoDBClient
+from infrastructure.clients.aws.guard_duty import GuardDutyClient
+from infrastructure.clients.aws.identity_store import IdentityStoreClient
+from infrastructure.clients.aws.organizations import OrganizationsClient
 from infrastructure.clients.aws.session_provider import SessionProvider
+from infrastructure.clients.aws.sso_admin import SsoAdminClient
 from infrastructure.configuration.integrations.aws import AwsSettings
 
 
@@ -171,7 +178,6 @@ def mock_aws_settings():
 @pytest.fixture
 def dynamodb_client():
     """Fixture for DynamoDBClient with mocked SessionProvider."""
-    from infrastructure.clients.aws.dynamodb import DynamoDBClient
 
     session_provider = SessionProvider(region="us-east-1")
     return DynamoDBClient(
@@ -183,7 +189,6 @@ def dynamodb_client():
 @pytest.fixture
 def identity_store_client():
     """Fixture for IdentityStoreClient with mocked SessionProvider."""
-    from infrastructure.clients.aws.identity_store import IdentityStoreClient
 
     session_provider = SessionProvider(region="us-east-1")
     return IdentityStoreClient(
@@ -195,7 +200,6 @@ def identity_store_client():
 @pytest.fixture
 def organizations_client():
     """Fixture for OrganizationsClient with mocked SessionProvider."""
-    from infrastructure.clients.aws.organizations import OrganizationsClient
 
     session_provider = SessionProvider(region="us-east-1")
     return OrganizationsClient(
@@ -207,7 +211,6 @@ def organizations_client():
 @pytest.fixture
 def sso_admin_client():
     """Fixture for SsoAdminClient with mocked SessionProvider."""
-    from infrastructure.clients.aws.sso_admin import SsoAdminClient
 
     session_provider = SessionProvider(region="us-east-1")
     return SsoAdminClient(
@@ -219,7 +222,6 @@ def sso_admin_client():
 @pytest.fixture
 def config_client():
     """Fixture for ConfigClient with mocked SessionProvider."""
-    from infrastructure.clients.aws.config import ConfigClient
 
     session_provider = SessionProvider(region="us-east-1")
     return ConfigClient(
@@ -231,7 +233,6 @@ def config_client():
 @pytest.fixture
 def guard_duty_client():
     """Fixture for GuardDutyClient with mocked SessionProvider."""
-    from infrastructure.clients.aws.guard_duty import GuardDutyClient
 
     session_provider = SessionProvider(region="us-east-1")
     return GuardDutyClient(
@@ -243,7 +244,6 @@ def guard_duty_client():
 @pytest.fixture
 def cost_explorer_client():
     """Fixture for CostExplorerClient with mocked SessionProvider."""
-    from infrastructure.clients.aws.cost_explorer import CostExplorerClient
 
     session_provider = SessionProvider(region="us-east-1")
     return CostExplorerClient(

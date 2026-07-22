@@ -1,11 +1,12 @@
 import logging
-import pytest
+import time as _time
 from types import SimpleNamespace
 
+import pytest
 from botocore.exceptions import ClientError
 
-from integrations.aws import client_next
 from infrastructure.operations import OperationResult
+from integrations.aws import client_next
 from tests.fixtures.aws_clients import FakeClient
 
 
@@ -158,8 +159,6 @@ def test_execute_api_call_retries_on_retryable_error(monkeypatch, caplog):
 
     sleeps: list[float] = []
 
-    import time as _time
-
     def fake_sleep(seconds: float) -> None:
         sleeps.append(float(seconds))
 
@@ -283,8 +282,6 @@ def test_default_max_retries_honored(monkeypatch):
             attempts["count"] += 1
             raise client_next.ClientError({"Error": {"Code": "Throttling"}}, "Op")
         return {"ok": True}
-
-    import time as _time
 
     def fake_sleep(s):
         sleeps.append(s)

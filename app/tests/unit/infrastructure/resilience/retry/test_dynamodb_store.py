@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timezone
 
 from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
 
 
 class TestDynamoDBRetryStoreInitialization:
@@ -23,8 +24,6 @@ class TestDynamoDBRetryStoreInitialization:
             "infrastructure.resilience.retry.dynamodb_store.dynamodb_next",
             mock_dynamodb_next,
         )
-
-        from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
 
         config = retry_config_factory()
         store = DynamoDBRetryStore(

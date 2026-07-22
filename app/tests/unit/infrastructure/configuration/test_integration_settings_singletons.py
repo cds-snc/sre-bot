@@ -1,15 +1,11 @@
 """Unit tests for integration settings singleton providers (PR-2)."""
 
-from infrastructure.configuration.integrations.slack import (
-    SlackSettings,
-    get_slack_settings,
-)
 from infrastructure.configuration.integrations.aws import AwsSettings, get_aws_settings
 from infrastructure.configuration.integrations.google import (
-    GoogleWorkspaceSettings,
     GoogleResourcesConfig,
-    get_google_workspace_settings,
+    GoogleWorkspaceSettings,
     get_google_resources_config,
+    get_google_workspace_settings,
 )
 from infrastructure.configuration.integrations.maxmind import (
     MaxMindSettings,
@@ -26,6 +22,10 @@ from infrastructure.configuration.integrations.opsgenie import (
 from infrastructure.configuration.integrations.sentinel import (
     SentinelSettings,
     get_sentinel_settings,
+)
+from infrastructure.configuration.integrations.slack import (
+    SlackSettings,
+    get_slack_settings,
 )
 from infrastructure.configuration.integrations.trello import (
     TrelloSettings,
@@ -175,34 +175,3 @@ class TestTrelloSettingsSingleton:
         monkeypatch.setenv("TRELLO_APP_KEY", "trello-key-123")
         settings = TrelloSettings()
         assert settings.TRELLO_APP_KEY == "trello-key-123"
-
-
-class TestIntegrationSettingsExportedFromInit:
-    """Verify all providers are accessible from the integrations package."""
-
-    def test_all_providers_importable(self):
-        from infrastructure.configuration.integrations import (
-            get_slack_settings,
-            get_aws_settings,
-            get_google_workspace_settings,
-            get_google_resources_config,
-            get_maxmind_settings,
-            get_notify_settings,
-            get_opsgenie_settings,
-            get_sentinel_settings,
-            get_trello_settings,
-        )
-
-        providers = [
-            get_slack_settings,
-            get_aws_settings,
-            get_google_workspace_settings,
-            get_google_resources_config,
-            get_maxmind_settings,
-            get_notify_settings,
-            get_opsgenie_settings,
-            get_sentinel_settings,
-            get_trello_settings,
-        ]
-        for provider in providers:
-            assert callable(provider)

@@ -1,8 +1,11 @@
 """Tests for the landing page route."""
 
 import json
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
+
 from main import server_app
 
 
@@ -16,7 +19,6 @@ def test_app():
 @pytest.fixture
 def landing_content():
     """Load the landing content JSON."""
-    from pathlib import Path
 
     content_path = (
         Path(__file__).parent.parent.parent / "api" / "routes" / "landing_content.json"

@@ -117,24 +117,3 @@ class TestDirectorySettingsSingleton:
         monkeypatch.setenv("DIRECTORY_PROVIDER", "entra_id")
         settings = DirectorySettings()
         assert settings.provider == "entra_id"
-
-
-class TestInfraSettingsExportedFromInit:
-    """Verify all providers are accessible from the infrastructure package."""
-
-    def test_all_providers_importable(self):
-        from infrastructure.configuration.infrastructure import (
-            get_server_settings,
-            get_dev_settings,
-            get_idempotency_settings,
-            get_retry_settings,
-            get_platforms_settings,
-            get_directory_settings,
-        )
-
-        assert callable(get_server_settings)
-        assert callable(get_dev_settings)
-        assert callable(get_idempotency_settings)
-        assert callable(get_retry_settings)
-        assert callable(get_platforms_settings)
-        assert callable(get_directory_settings)

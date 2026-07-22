@@ -1,7 +1,9 @@
-from infrastructure.operations import OperationResult
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 from googleapiclient.errors import HttpError
+
+from infrastructure.operations import OperationResult
 from integrations.google_workspace import google_service_next as gs
 from tests.fixtures.google_clients import FakeGoogleService
 
@@ -814,7 +816,6 @@ def test_execute_batch_request_callback_never_called():
 
 
 def test_execute_google_api_call_invalid_resource_path():
-    from tests.fixtures.google_clients import FakeGoogleService
 
     # Simulate invalid resource path (attribute error)
     class BrokenFakeGoogleService(FakeGoogleService):
@@ -838,7 +839,6 @@ def test_execute_google_api_call_invalid_resource_path():
 
 
 def test_execute_google_api_call_unsupported_method():
-    from tests.fixtures.google_clients import FakeGoogleService
 
     # Simulate unsupported method (attribute error)
     class BrokenFakeGoogleService(FakeGoogleService):

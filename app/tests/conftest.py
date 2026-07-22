@@ -1,23 +1,26 @@
-import sys
 import logging
+import sys
+from unittest.mock import MagicMock
+
 import pytest
+import slack_bolt
 
 # Ensure project root is on path BEFORE importing test factories.
 project_root = "/workspace/app"
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from tests.factories.google import (  # noqa: E402
-    make_google_groups,
-    make_google_members,
-    make_google_users,
-)
 from tests.factories.aws import (  # noqa: E402
-    make_aws_users,
     make_aws_groups,
     make_aws_groups_memberships,
     make_aws_groups_w_users,
     make_aws_groups_w_users_with_legacy,
+    make_aws_users,
+)
+from tests.factories.google import (  # noqa: E402
+    make_google_groups,
+    make_google_members,
+    make_google_users,
 )
 
 # Ensure the application package root is on sys.path so importing application
@@ -34,7 +37,6 @@ def pytest_configure(config):
     auth errors during test collection when main.py is imported and tries to
     instantiate the Slack App at module load time.
     """
-    from unittest.mock import MagicMock
 
     # Create a mock that allows all attribute access and method calls
     def mock_app_init(self, *args, **kwargs):
@@ -54,7 +56,6 @@ def pytest_configure(config):
         self.add_event_handler = MagicMock()
 
     # Patch before any imports
-    import slack_bolt
 
     slack_bolt.App.__init__ = mock_app_init
 
@@ -390,7 +391,6 @@ def make_mock_settings():
     Returns:
         Callable: Factory function that accepts **overrides kwargs
     """
-    from unittest.mock import MagicMock
 
     def _factory(**overrides):
         """Create mock settings with provided overrides."""

@@ -6,11 +6,12 @@ Provides:
 - Mock database lookups for webhook validation
 """
 
-import pytest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
-from infrastructure.configuration.app import AppSettings
+import pytest
 
+from infrastructure.configuration.app import AppSettings
 
 # ============================================================================
 # Test Payloads
@@ -118,7 +119,6 @@ def upptime_status_payload():
 @pytest.fixture
 def access_request_payload():
     """AWS access request payload."""
-    from datetime import datetime, timezone, timedelta
 
     now = datetime.now(timezone.utc)
     return {

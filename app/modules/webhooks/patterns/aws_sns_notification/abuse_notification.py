@@ -1,3 +1,4 @@
+import json
 import re
 from typing import Dict, List, Union
 
@@ -32,8 +33,6 @@ def handle_abuse_notification(payload: AwsSnsPayload, client: WebClient) -> List
         List of Slack blocks formatted for the abuse notification
     """
     try:
-        import json
-
         message = payload.Message
         if message is None:
             return []

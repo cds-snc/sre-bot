@@ -15,6 +15,7 @@ and exits 0 if clean, 1 if violations are found.
 
 import ast
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -173,7 +174,6 @@ def find_violations(root: Path, baseline: set[str]) -> list[Violation]:
 
 def _run_self_tests() -> bool:
     """Run internal verification of detection rules. Returns True if all pass."""
-    import tempfile
 
     print("Running self-tests...")
     tests_passed = 0

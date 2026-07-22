@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 from jwt import PyJWTError
 
 from infrastructure.security import (
@@ -156,7 +157,6 @@ class TestValidateJWTToken:
 
     def test_validate_jwt_token_missing_token_credentials(self, mock_issuer_config):
         """Test validate_jwt_token raises 401 for empty token."""
-        from fastapi.security import HTTPAuthorizationCredentials
 
         manager = JWKSManager(issuer_config=mock_issuer_config)
         credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="")
@@ -201,7 +201,6 @@ class TestValidateJWTToken:
     @patch("infrastructure.security.get_jwks_manager")
     def test_validate_jwt_token_uses_default_manager(self, mock_get_jwks_manager):
         """Test validate_jwt_token works with provided jwks_manager."""
-        from fastapi.security import HTTPAuthorizationCredentials
 
         mock_manager_instance = MagicMock()
         mock_manager_instance.issuer_config = None
