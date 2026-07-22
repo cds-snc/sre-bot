@@ -47,6 +47,10 @@
       {
         "name": "ENVIRONMENT",
         "value": "production"
+      },
+      {
+        "name": "SLACK__COMMAND_PREFIX",
+        "value": ""
       }
     ],
     "essential": true,

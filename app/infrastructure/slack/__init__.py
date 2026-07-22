@@ -1,0 +1,1 @@
+"""Slack transport infrastructure package."""

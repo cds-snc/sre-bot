@@ -15,6 +15,7 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 from infrastructure.i18n import Locale, TranslationKey, Translator
 from infrastructure.operations import OperationResult
+from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.slack import LegacySlackBootstrap
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.help import (
@@ -73,6 +74,7 @@ class SlackPlatformProvider:
         self,
         settings,  # SlackPlatformSettings type
         formatter: Optional[SlackBlockKitFormatter] = None,
+        command_prefix: str = "",
         name: str = "slack",
         enabled: bool = True,
         version: str = "1.0.0",
@@ -99,6 +101,7 @@ class SlackPlatformProvider:
 
         self._settings = settings
         self._formatter = formatter or SlackBlockKitFormatter()
+        self._command_prefix = command_prefix
 
         # Will be initialized when app is started
         self._app: Optional[App] = None
@@ -421,7 +424,7 @@ class SlackPlatformProvider:
         # Register each root command with Slack Bolt
         for root_command in sorted(root_commands):
             # Build slash command (e.g., /sre, /geolocate)
-            slash_command = f"/{root_command}"
+            slash_command = f"/{self._command_prefix}{root_command}"
 
             # Create handler closure that captures root_command
             def create_handler(captured_root: str):
@@ -951,6 +954,11 @@ def get_slack_provider() -> SlackPlatformProvider:
     """
 
     settings = get_slack_settings()
+    transport_settings = get_slack_transport_settings()
     formatter = SlackBlockKitFormatter()
-    provider = SlackPlatformProvider(settings=settings, formatter=formatter)
+    provider = SlackPlatformProvider(
+        settings=settings,
+        formatter=formatter,
+        command_prefix=transport_settings.COMMAND_PREFIX,
+    )
     return provider
