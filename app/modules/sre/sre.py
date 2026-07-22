@@ -10,7 +10,7 @@ from typing import Any, Dict
 import structlog
 from slack_bolt import Ack, App, Respond
 
-from infrastructure.configuration.app import get_app_settings
+from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.slack.provider import get_slack_provider
 from integrations.slack.models import CommandPayload, CommandResponse
 
@@ -19,8 +19,8 @@ logger = structlog.get_logger()
 
 def register(bot: App) -> None:
     """Register /sre Slack command handler."""
-    app_settings = get_app_settings()
-    bot.command(f"/{app_settings.PREFIX}sre")(sre_command)
+    transport_settings = get_slack_transport_settings()
+    bot.command(f"/{transport_settings.COMMAND_PREFIX}sre")(sre_command)
 
 
 def _send_response(response: CommandResponse, respond: Respond) -> None:

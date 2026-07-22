@@ -23,7 +23,7 @@ from modules.aws import (
     lambdas,
     spending,
 )
-from infrastructure.configuration.app import get_app_settings
+from infrastructure.slack.settings import get_slack_transport_settings
 
 logger = structlog.get_logger()
 
@@ -59,8 +59,8 @@ def register(bot: App) -> None:
         bot (SlackBot): The SlackBot instance to which the module
             will be registered.
     """
-    app_settings = get_app_settings()
-    bot.command(f"/{app_settings.PREFIX}aws")(aws_command)
+    transport_settings = get_slack_transport_settings()
+    bot.command(f"/{transport_settings.COMMAND_PREFIX}aws")(aws_command)
     bot.view("aws_access_view")(aws_access_requests.access_view_handler)
     bot.view("aws_health_view")(aws_account_health.health_view_handler)
 
