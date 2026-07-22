@@ -26,7 +26,7 @@ jobs:
       - name: Setup python
         uses: actions/setup-python@b64ffcaf5b410884ad320a9cfac8866006a109aa # v4.8.0
         with:
-          python-version: "3.11"
+          python-version: "3.14"
 
       - name: Install uv
         run: pipx install uv

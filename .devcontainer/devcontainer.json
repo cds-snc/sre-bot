@@ -53,13 +53,14 @@
 			"terragrunt": "0.48.0"
 		},
 		"ghcr.io/devcontainers/features/node:1": {
-			"version": "20"
+			"version": "22"
 		},
-		"ghcr.io/devcontainers/features/github-cli:1.1.0": {}
+		"ghcr.io/devcontainers/features/github-cli:1.1.0": {},
+		"ghcr.io/cds-snc/devcontainer-features/uv:1": {}
 	},
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "sudo chown vscode app/.venv && .devcontainer/uv-install.sh",
+	"postCreateCommand": "sudo chown vscode app/.venv",
 	"remoteUser": "vscode"
 }
