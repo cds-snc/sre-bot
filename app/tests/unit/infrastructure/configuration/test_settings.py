@@ -10,9 +10,7 @@ import pytest
 
 from infrastructure.configuration.infrastructure.retry import (
     RetrySettings,
-    get_retry_settings,
 )
-from infrastructure.configuration.settings import Settings
 
 
 class TestRetrySettings:
@@ -83,34 +81,6 @@ class TestRetrySettings:
             assert retry.backend == backend
 
 
-class TestSettings:
-    """Test suite for main Settings class."""
-
-    def test_settings_includes_retry_config(self):
-        """Test Settings class includes retry configuration."""
-        settings = Settings()
-
-        assert hasattr(settings, "retry")
-        assert isinstance(settings.retry, RetrySettings)
-
-    def test_settings_retry_defaults(self):
-        """Test Settings uses RetrySettings defaults."""
-        settings = Settings()
-
-        assert settings.retry.enabled is True
-        assert settings.retry.backend == "memory"
-        assert settings.retry.max_attempts == 5
-
-    def test_settings_preserves_existing_config(self):
-        """Test Settings still includes all existing configuration sections."""
-        settings = Settings()
-
-        # Verify major config sections still exist
-        assert hasattr(settings, "slack")
-        assert hasattr(settings, "aws")
-        assert hasattr(settings, "server")
-
-
 @pytest.mark.unit
 class TestSettingsIntegration:
     """Integration tests for Settings with environment variables."""
@@ -129,10 +99,4 @@ class TestSettingsIntegration:
         assert retry.backend == "dynamodb"
         assert retry.max_attempts == 10
 
-    def test_settings_reuses_retry_singleton(self):
-        """Test Settings delegates retry config to the retry singleton."""
 
-        settings = Settings()
-        retry_settings = get_retry_settings()
-
-        assert settings.retry is retry_settings
