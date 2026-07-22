@@ -3,10 +3,10 @@ id: TASK-45
 title: >-
   Retire AppSettings.PREFIX: introduce SLACK__COMMAND_PREFIX transport setting
   and migrate legacy command namespacing
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-07-21 19:12'
-updated_date: '2026-07-22 14:58'
+updated_date: '2026-07-22 16:43'
 labels:
   - phase-0
   - security
