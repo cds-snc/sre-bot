@@ -5,6 +5,4 @@
 # See TASK-1.3 and TASK-45 for context.
 infrastructure/configuration/app.py
 server/lifespan.py
-modules/atip/atip.py
-modules/incident/incident.py
 

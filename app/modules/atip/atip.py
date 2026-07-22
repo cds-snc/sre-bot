@@ -9,9 +9,10 @@ import i18n  # type: ignore
 from structlog import get_logger
 
 from infrastructure.configuration.app import get_app_settings
-from integrations.slack import users as slack_users, commands as slack_commands
+from infrastructure.slack.settings import get_slack_transport_settings
 from integrations import trello
-
+from integrations.slack import commands as slack_commands
+from integrations.slack import users as slack_users
 
 logger = get_logger()
 
@@ -33,8 +34,8 @@ def register(bot):
         atip.register(bot)
     ```
     """
-    app_settings = get_app_settings()
-    prefix = app_settings.PREFIX if app_settings.PREFIX else ""
+    transport_settings = get_slack_transport_settings()
+    prefix = transport_settings.COMMAND_PREFIX
     bot.command(f"/{prefix}atip")(atip_command)
     bot.command(f"/{prefix}aiprp")(atip_command)
     bot.action("ati_search_width")(atip_width_action)
@@ -425,7 +426,7 @@ def atip_view_handler(ack, body, say, client):
     slug = f"tmp atip {ati_id}".replace(" ", "-").lower()
 
     # Create channel
-    prefix = app_settings.PREFIX if app_settings.PREFIX else ""
+    prefix = "dev-" if app_settings.ENVIRONMENT != "production" else ""
     if prefix:
         slug = f"{prefix}-{slug}"
     response = client.conversations_create(name=f"{slug}")
