@@ -3,12 +3,9 @@
 import pytest
 
 from infrastructure.configuration.infrastructure.platforms import (
-    SlackPlatformSettings,
     PlatformsSettings,
+    SlackPlatformSettings,
 )
-
-# from infrastructure.configuration.settings import Settings, get_settings
-from infrastructure.configuration.infrastructure import get_platforms_settings
 
 
 @pytest.mark.unit
