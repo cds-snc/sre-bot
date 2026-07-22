@@ -5,6 +5,7 @@ without external dependencies.
 """
 
 from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
 
 import pytest
 
@@ -470,6 +471,48 @@ def test_should_successfully_create_atip_channel(
     client.conversations_create.assert_called_once()
     client.conversations_setTopic.assert_called_once()
     assert say.call_count >= 2  # At least two say calls (announcement and channel)
+    assert mock_trello.call_count == 1
+
+
+@pytest.mark.unit
+@patch("integrations.trello.add_atip_card_to_trello")
+@pytest.mark.parametrize(
+    "environment,legacy_prefix,expected_channel_name",
+    [
+        ("production", "dev-", "tmp-atip-number"),
+        ("dev", "", "dev--tmp-atip-number"),
+    ],
+    ids=[
+        "production-channel-name-is-unprefixed",
+        "dev-channel-name-uses-dev-prefix",
+    ],
+)
+def test_should_derive_channel_name_prefix_from_environment(
+    mock_trello,
+    make_view_submission_payload,
+    monkeypatch,
+    environment,
+    legacy_prefix,
+    expected_channel_name,
+):
+    """Channel names should depend on ENVIRONMENT instead of legacy PREFIX."""
+    monkeypatch.setattr(
+        atip,
+        "get_app_settings",
+        lambda: SimpleNamespace(ENVIRONMENT=environment, PREFIX=legacy_prefix),
+    )
+
+    ack = MagicMock()
+    body = make_view_submission_payload(locale="en-US")
+    say = MagicMock()
+    client = MagicMock()
+    client.conversations_create.return_value = {
+        "channel": {"id": "C123", "name": expected_channel_name}
+    }
+
+    atip.atip_view_handler(ack, body, say, client)
+
+    client.conversations_create.assert_called_once_with(name=expected_channel_name)
     assert mock_trello.call_count == 1
 
 
