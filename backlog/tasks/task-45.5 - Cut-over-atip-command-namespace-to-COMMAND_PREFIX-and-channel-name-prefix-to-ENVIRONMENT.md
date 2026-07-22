@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-21 19:13'
-updated_date: '2026-07-22 21:13'
+updated_date: '2026-07-22 21:25'
 labels:
   - phase-0
   - slack
@@ -32,10 +32,10 @@ Per-module cutover (freeze carve-out) — atip has TWO PREFIX uses that split to
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 atip slash commands (/atip, /aiprp) build from COMMAND_PREFIX, not AppSettings.PREFIX
-- [ ] #2 atip channel-name prefixing (atip.py:428) derives from ENVIRONMENT or an atip feature setting, not AppSettings.PREFIX; a test proves the created channel name is unchanged for dev vs prod
-- [ ] #3 Pre/post command-name regression tests assert /atip and /aiprp register with the identical command string for COMMAND_PREFIX='' and 'dev-'
-- [ ] #4 atip baseline entry is removed from prefix_readers.txt and the TASK-1.3 guardrail still passes
+- [x] #1 atip slash commands (/atip, /aiprp) build from COMMAND_PREFIX, not AppSettings.PREFIX
+- [x] #2 atip channel-name prefixing (atip.py:428) derives from ENVIRONMENT or an atip feature setting, not AppSettings.PREFIX; a test proves the created channel name is unchanged for dev vs prod
+- [x] #3 Pre/post command-name regression tests assert /atip and /aiprp register with the identical command string for COMMAND_PREFIX='' and 'dev-'
+- [x] #4 atip baseline entry is removed from prefix_readers.txt and the TASK-1.3 guardrail still passes
 <!-- AC:END -->
 
 ## Definition of Done
@@ -90,6 +90,12 @@ Rollback: revert the PR; behavior reverts to reading AppSettings.PREFIX for both
 
 Size gate verdict: fits comfortably in a single PR, no decomposition needed - same scope class as the already-merged sibling per-module cutovers (TASK-45.2, TASK-45.4).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented TASK-45.5 cutover.\n\nCode changes:\n- app/modules/atip/atip.py: register() now reads command namespace from infrastructure.slack.settings.get_slack_transport_settings().COMMAND_PREFIX for both /atip and /aiprp.\n- app/modules/atip/atip.py: channel-name prefixing in atip_view_handler now derives from ENVIRONMENT ("dev-" when ENVIRONMENT != "production", else "") instead of AppSettings.PREFIX; preserved existing join behavior, including the pre-existing double-dash artifact for dev (dev--tmp-atip-...).\n- app/bin/baselines/prefix_readers.txt: removed modules/atip/atip.py reader entry; additionally removed stale modules/incident/incident.py entry that was already migrated and was causing guardrail failure.\n\nTest changes:\n- Added app/tests/unit/modules/atip/test_atip_command_registration.py with COMMAND_PREFIX regression coverage for /atip and /aiprp ("" and "dev-").\n- Extended app/tests/unit/modules/atip/test_atip.py with ENVIRONMENT-based channel-name prefix regression coverage for production vs dev.\n\nValidation evidence:\n- Targeted regression tests: cd /workspace/app && uv run pytest tests/unit/modules/atip/test_atip_command_registration.py tests/unit/modules/atip/test_atip.py -q -> 22 passed.\n- Guardrail: cd /workspace/app && make check-prefix-guardrail -> clean tree.\n- Ruff: cd /workspace/app && uv run ruff check . -> pass.\n- Black check: cd /workspace/app && uv run black --check . -> pass.\n- Full pytest (excluding smoke): cd /workspace/app && uv run pytest tests --ignore=tests/smoke -> 2865 passed, 37 skipped.\n- Mypy: cd /workspace/app && uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> fails with pre-existing repository-wide errors outside this task scope (google_workspace/aws/incident/security modules), no new atip-specific typing regression observed.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
