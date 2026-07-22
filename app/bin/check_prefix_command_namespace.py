@@ -17,7 +17,6 @@ import ast
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 
 @dataclass(frozen=True)
@@ -75,7 +74,7 @@ def _find_violations_in_ast(
                             Violation(
                                 file=file_rel,
                                 line=node.lineno,
-                                reason=f"PREFIX == derivation form found (not a legitimate namespace read)",
+                                reason="PREFIX == derivation form found (not a legitimate namespace read)",
                             )
                         )
                     elif isinstance(op, ast.NotEq):
@@ -83,7 +82,7 @@ def _find_violations_in_ast(
                             Violation(
                                 file=file_rel,
                                 line=node.lineno,
-                                reason=f"PREFIX != derivation form found (not a legitimate namespace read)",
+                                reason="PREFIX != derivation form found (not a legitimate namespace read)",
                             )
                         )
 
@@ -103,7 +102,7 @@ def _find_violations_in_ast(
             Violation(
                 file=file_rel,
                 line=first_read_line,
-                reason=f"Net-new PREFIX reader not in baseline",
+                reason="Net-new PREFIX reader not in baseline",
             )
         )
 
@@ -135,7 +134,7 @@ def find_violations(root: Path, baseline: set[str]) -> list[Violation]:
             code = py_file.read_text()
             tree = ast.parse(code, filename=rel)
             violations.extend(_find_violations_in_ast(tree, rel, baseline))
-        except (SyntaxError, OSError) as e:
+        except (SyntaxError, OSError):
             # Log but don't fail on parse errors
             pass
 
