@@ -1,10 +1,11 @@
 ---
 id: TASK-45.3
 title: Cut over /secret and /talent-role command namespacing to COMMAND_PREFIX
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-21 19:13'
-updated_date: '2026-07-22 17:35'
+updated_date: '2026-07-22 18:04'
 labels:
   - phase-0
   - slack
@@ -28,9 +29,9 @@ Per-module cutover (freeze carve-out). Swap the command-namespace source in app/
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/modules/secret/secret.py and app/modules/role/role.py build their slash-command name from COMMAND_PREFIX, not AppSettings.PREFIX; no other behavior changes
-- [ ] #2 Pre/post command-name regression tests assert /secret and /talent-role register with the identical command string for COMMAND_PREFIX='' and 'dev-'
-- [ ] #3 secret and role baseline entries are removed from prefix_readers.txt and the TASK-1.3 guardrail still passes
+- [x] #1 app/modules/secret/secret.py and app/modules/role/role.py build their slash-command name from COMMAND_PREFIX, not AppSettings.PREFIX; no other behavior changes
+- [x] #2 Pre/post command-name regression tests assert /secret and /talent-role register with the identical command string for COMMAND_PREFIX='' and 'dev-'
+- [x] #3 secret and role baseline entries are removed from prefix_readers.txt and the TASK-1.3 guardrail still passes
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -87,6 +88,12 @@ Rollback: revert the single PR (2 module edits + 1 baseline edit + 2 new test fi
 
 Size verdict: fits one PR. 3 production files touched (~10-12 LOC changed total), 2 new small test files (~35-40 LOC each) + 2 empty __init__.py — well under the ~400 LOC / ~10 files / single-subsystem gate; directly mirrors TASK-45.2's already-merged PR of the same shape (2 modules + baseline + 2 tests). No decomposition needed.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented: replaced get_app_settings().PREFIX with get_slack_transport_settings().COMMAND_PREFIX in both modules. Relocated PREFIX read from module-level to inside register() in both files (same mechanical relocation as the sre/aws cutover in PR #1315). Removed modules/role/role.py and modules/secret/secret.py from prefix_readers.txt. All 4 new registration tests pass; 26 existing role/secret handler tests stay green; PREFIX guardrail exits 0. Pre-existing mypy error at role.py:351 (Value of type 'Any | None' is not indexable) confirmed unchanged — present in original file before this PR. DoD item #1 (PR references decisions/transport-slack.md) left for human verification at PR creation.
+<!-- SECTION:NOTES:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
