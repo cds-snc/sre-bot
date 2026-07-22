@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-21 19:12'
-updated_date: '2026-07-22 14:39'
+updated_date: '2026-07-22 14:58'
 labels:
   - phase-0
   - security
@@ -57,5 +57,11 @@ author: @task-planner
 created: 2026-07-22 14:39
 ---
 Architecture alignment (2026-07-22): decisions/configuration.md now explicitly states the god-settings aggregator (app/infrastructure/configuration/settings.py Settings/get_settings()/settings_map) is being removed by an open PR, not grown — no new/open task may wire a settings slice into it. Two follow-ups for this task when next reviewed: (1) AC #1's 'local compose/env examples' wording is inaccurate — there is no .env.example or compose PREFIX setting in this repo; the real local coexistence anchor is app/Makefile's dev/debug targets (PREFIX="dev-"), as corrected in TASK-45.1's plan. (2) AC #4 assumes app/infrastructure/configuration/settings.py (the aggregator mirror of PREFIX) still exists at teardown time (TASK-45.6) — since a separate PR may delete that whole file first, TASK-45.6 must verify the file's existence before editing specific lines/fields.
+---
+
+author: @copilot
+created: 2026-07-22 14:58
+---
+Alignment guidance (2026-07-22) for all subtasks — captured here since each subtask runs in a fresh session. (1) Settings source: the slash-command prefix comes from the transport settings home infrastructure.slack.settings.get_slack_transport_settings().COMMAND_PREFIX (created in TASK-45.1), NOT AppSettings.PREFIX and NOT the provider. (2) Test hygiene: new/updated tests must NOT import infrastructure.configuration.infrastructure.platforms.SlackPlatformSettings — it is the dead third settings duplicate slated for deletion (TASK-24). Use integrations.slack.settings.SlackSettings (target home) or a lightweight attribute stub (SimpleNamespace / the MockSlackSettings pattern in app/tests/unit/integrations/slack/conftest.py). (3) Layer note: SlackPlatformProvider still lives in the mislocated app/integrations/slack/provider.py; the transport move to app/infrastructure/slack/ is TASK-26 — do not relocate the transport in a 45.* cutover. Verified against decisions/transport-slack.md + platform-transports.md.
 ---
 <!-- COMMENTS:END -->

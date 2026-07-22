@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-21 19:13'
-updated_date: '2026-07-22 14:39'
+updated_date: '2026-07-22 14:58'
 labels:
   - phase-0
   - security
@@ -50,5 +50,11 @@ author: @task-planner
 created: 2026-07-22 14:39
 ---
 Architecture alignment (2026-07-22): per decisions/configuration.md, the god-settings aggregator (app/infrastructure/configuration/settings.py's Settings/get_settings()/settings_map) is being removed by a separate, open PR — not a target this task should assume is stable. Before executing this teardown: (1) check whether app/infrastructure/configuration/settings.py still exists / still contains the PREFIX field and kwargs.setdefault('PREFIX', app.PREFIX) at the cited lines (97, 175) — line numbers may have shifted or the file may already be gone; (2) if the aggregator has already been removed by the other PR, AC #1's 'aggregator mirror... deleted' clause is trivially satisfied — re-verify by grep rather than assuming the cited lines still apply; (3) TASK-1.3's guardrail/baseline check (AC #2) and the app.py PREFIX field deletion are unaffected either way. No change to ACs made here; flagging for whoever picks up this task's plan.
+---
+
+author: @copilot
+created: 2026-07-22 14:58
+---
+Alignment (2026-07-22): teardown must not reintroduce or re-reference the dead infrastructure.configuration.infrastructure.platforms.SlackPlatformSettings duplicate (deletion tracked by TASK-24); when updating tests that referenced AppSettings.PREFIX, use integrations.slack.settings.SlackSettings or a lightweight attribute stub (SimpleNamespace / MockSlackSettings pattern). COMMAND_PREFIX continues to live in infrastructure.slack.settings (TASK-45.1). Transport provider relocation is TASK-26, out of scope here.
 ---
 <!-- COMMENTS:END -->

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-21 19:13'
+updated_date: '2026-07-22 14:58'
 labels:
   - phase-0
   - slack
@@ -37,3 +38,13 @@ Per-module cutover (freeze carve-out). Swap the command-namespace source in app/
 <!-- DOD:BEGIN -->
 - [ ] #1 PR references decisions/transport-slack.md
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @copilot
+created: 2026-07-22 14:58
+---
+Alignment (2026-07-22): read prefix from infrastructure.slack.settings.get_slack_transport_settings().COMMAND_PREFIX (TASK-45.1 home), replacing get_app_settings().PREFIX in app/modules/sre/sre.py + app/modules/aws/aws.py. Pre/post command-name smoke tests must NOT import infrastructure.configuration.infrastructure.platforms.SlackPlatformSettings (dead duplicate, deletion tracked by TASK-24); use integrations.slack.settings.SlackSettings or a lightweight attribute stub (SimpleNamespace / MockSlackSettings pattern). Do not move the transport provider here — that's TASK-26.
+---
+<!-- COMMENTS:END -->

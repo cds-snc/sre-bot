@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-21 19:13'
-updated_date: '2026-07-22 14:33'
+updated_date: '2026-07-22 14:56'
 labels:
   - phase-0
   - slack
@@ -91,6 +91,12 @@ author: @task-planner
 created: 2026-07-22 14:32
 ---
 Architecture note (2026-07-22): an open, unmerged PR removes the global settings aggregator (app/infrastructure/configuration/settings.py Settings/get_settings() + its settings_map). Per that direction and the settings-singleton skill ('avoid growing root settings aggregators for new package-owned concerns'), this task and all other open/future tasks must NOT wire new settings into that aggregator. Plan's Step 2 (aggregator wiring) is dropped; get_slack_transport_settings() is consumed directly by get_slack_provider() only.
+---
+
+author: @copilot
+created: 2026-07-22 14:56
+---
+Alignment review (2026-07-22): direction confirmed against decisions/transport-slack.md + platform-transports.md. Two notes for reviewers: (1) The new settings home app/infrastructure/slack/settings.py is target-correct. But Step 2 adds transport logic (command_prefix param, _auto_register_root_commands prefixing, get_slack_provider() importing infrastructure.slack.settings) into app/integrations/slack/provider.py, which is the transport runtime still awaiting relocation under TASK-26. This upward integrations->infrastructure.slack import is a deliberate, tolerated interim coupling (provider already imports infrastructure.i18n/operations/configuration); TASK-26 now carries a cross-ref to move this logic+tests. (2) Test hygiene: new/edited tests must NOT import infrastructure.configuration.infrastructure.platforms.SlackPlatformSettings (the third dead settings duplicate slated for deletion per transport-slack.md/TASK-24). Fixed test_slack_auto_registration.py's make_slack_settings factory to use a lightweight attribute stub (SimpleNamespace), matching the sibling MockSlackSettings pattern.
 ---
 <!-- COMMENTS:END -->
 
