@@ -76,3 +76,4 @@ def _clear_caches():
 - Status-code-only assertions.
 - Missing `dependency_overrides` cleanup.
 - Full Settings objects in fixtures.
+- Docstrings that reference external documents, task/ticket identifiers, sprint labels, plan step numbers, implementation phases, or transitory states (e.g. "before implementation", "AC#2 of TASK-X", "Step 1 of the plan"). Docstrings must describe behavior, stub strategy, and assertion rationale — nothing that becomes inaccurate as the project evolves.
