@@ -3,7 +3,7 @@ from slack_bolt import Ack, App, Respond
 from slack_sdk import WebClient
 from structlog import get_logger
 
-from infrastructure.configuration.app import get_app_settings
+from infrastructure.slack.settings import get_slack_transport_settings
 from infrastructure.configuration.integrations.google import (
     get_google_resources_config,
     get_google_workspace_settings,
@@ -12,11 +12,9 @@ from integrations.google_workspace import google_drive
 from integrations.slack import commands as slack_commands
 from integrations.slack import users as slack_users
 
-app_settings = get_app_settings()
 google_settings = get_google_workspace_settings()
 google_resources = get_google_resources_config()
 
-PREFIX = app_settings.PREFIX
 BOT_EMAIL = google_settings.SRE_BOT_EMAIL
 
 SCORING_GUIDE_TEMPLATE = google_resources.scoring_guide_template_id
@@ -43,7 +41,8 @@ logger = get_logger()
 
 
 def register(bot: App):
-    bot.command(f"/{PREFIX}talent-role")(role_command)
+    transport_settings = get_slack_transport_settings()
+    bot.command(f"/{transport_settings.COMMAND_PREFIX}talent-role")(role_command)
     bot.view("role_view")(role_view_handler)
     bot.action("role_change_locale")(update_modal_locale)
 

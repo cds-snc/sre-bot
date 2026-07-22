@@ -9,10 +9,8 @@ import i18n  # type: ignore
 import requests  # type: ignore
 from structlog import get_logger
 
-from infrastructure.configuration.app import get_app_settings
+from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.slack import users as slack_users
-
-PREFIX = get_app_settings().PREFIX
 
 i18n.load_path.append("./locales/")
 i18n.set("locale", "en-US")
@@ -22,7 +20,8 @@ logger = get_logger()
 
 
 def register(bot):
-    bot.command(f"/{PREFIX}secret")(secret_command)
+    transport_settings = get_slack_transport_settings()
+    bot.command(f"/{transport_settings.COMMAND_PREFIX}secret")(secret_command)
     bot.action("secret_change_locale")(handle_change_locale_button)
     bot.view("secret_view")(secret_view_handler)
 
