@@ -98,5 +98,3 @@ class TestSettingsIntegration:
         assert retry.enabled is False
         assert retry.backend == "dynamodb"
         assert retry.max_attempts == 10
-
-
