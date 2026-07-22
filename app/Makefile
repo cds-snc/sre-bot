@@ -1,4 +1,4 @@
-.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit backlog-board
+.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit backlog-board check-prefix-guardrail audit-client-usage-matrix
 
 dev:
 	PREFIX="dev-" uv run uvicorn main:server_app --reload
@@ -81,6 +81,9 @@ lint-ci:
 
 fmt-ci:
 	uv run black --check . --target-version py311
+
+check-prefix-guardrail:
+	python bin/check_prefix_command_namespace.py
 
 audit-client-usage-matrix:
 	bash bin/generate_client_usage_matrix.sh
