@@ -3,10 +3,11 @@ id: TASK-45.2
 title: >-
   Cut over /sre and /aws command namespacing from AppSettings.PREFIX to
   COMMAND_PREFIX
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-21 19:13'
-updated_date: '2026-07-22 16:50'
+updated_date: '2026-07-22 17:06'
 labels:
   - phase-0
   - slack
