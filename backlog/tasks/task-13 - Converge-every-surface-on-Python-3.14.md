@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-22 19:03'
+updated_date: '2026-07-22 19:08'
 labels:
   - toolchain
   - phase-2
@@ -33,13 +33,11 @@ Steps:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 grep across .python-version, workflows, and Dockerfile shows exactly one Python version: 3.14
+- [x] #1 grep across .python-version, workflows, and Dockerfile shows exactly one Python version: 3.14
 - [ ] #2 CI runs green on 3.14
-- [ ] #3 ruff and mypy target versions match
-- [ ] #4 grep across .devcontainer/docker-compose.yml shows VARIANT: "3.14" (matches .devcontainer/Dockerfile's ARG default, no more silent 3.12 override)
+- [x] #3 ruff and mypy target versions match
+- [x] #4 grep across .devcontainer/docker-compose.yml shows VARIANT: "3.14" (matches .devcontainer/Dockerfile's ARG default, no more silent 3.12 override)
 <!-- AC:END -->
-
-
 
 ## Implementation Plan
 
@@ -86,6 +84,37 @@ Blast radius / rollback:
 - Rollback is a straight revert of the single PR; no data migrations, no runtime schema/API changes, no deployed-service behavior change (production Docker image was already 3.14 before this task).
 - Residual risk: CI runners' `actions/setup-python@v4.8.0` must have a 3.14 build available in its cache/index; if not, bump the action version pin (currently a 2023-era v4.8.0) — check during implementation if the workflow fails to resolve the interpreter.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented toolchain convergence changes for Python 3.14 surfaces.
+
+Changed files:
+- .gitignore: added !app/.python-version so app-level pin is tracked.
+- app/.python-version: added 3.14.
+- .github/workflows/ci_code.yml: setup-python version -> 3.14.
+- .devcontainer/docker-compose.yml: VARIANT -> 3.14.
+- app/pyproject.toml: requires-python >=3.13, ruff target-version py314, mypy python_version 3.14.
+- app/uv.lock: regenerated via uv lock under Python 3.14 policy.
+
+Local validation evidence (Python 3.14.5):
+- uv run python --version -> Python 3.14.5
+- uv run ruff check . -> pass
+- uv run black --check . -> pass (656 files unchanged)
+- uv run pytest tests --ignore=tests/smoke -q -> 2855 passed, 37 skipped
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> fails with pre-existing baseline (126 errors in 44 files), not introduced by this task and currently non-blocking in CI lint target.
+
+AC verification performed:
+- AC#1 checked: grep on app/.python-version, .github/workflows/ci_code.yml, Dockerfile all show 3.14 only.
+- AC#3 checked: app/pyproject.toml shows ruff py314 and mypy 3.14.
+- AC#4 checked: .devcontainer/docker-compose.yml VARIANT=3.14 and .devcontainer/Dockerfile ARG VARIANT=3.14.
+- AC#2 left unchecked pending GitHub CI run confirmation.
+
+DoD items pending human verification:
+- DoD#1 CI-side full suite pass confirmation.
+- DoD#2 PR references decisions/toolchain.md.
+<!-- SECTION:NOTES:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
