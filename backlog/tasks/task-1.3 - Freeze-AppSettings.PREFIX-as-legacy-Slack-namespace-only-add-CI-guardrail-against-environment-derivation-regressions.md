@@ -3,7 +3,7 @@ id: TASK-1.3
 title: >-
   Freeze AppSettings.PREFIX as legacy Slack namespace only; add local guardrail
   against environment-derivation regressions
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-07-21 18:56'
 updated_date: '2026-07-22 13:43'
