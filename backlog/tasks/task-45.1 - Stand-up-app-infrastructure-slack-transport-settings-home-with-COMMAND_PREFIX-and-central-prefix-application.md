@@ -3,10 +3,11 @@ id: TASK-45.1
 title: >-
   Stand up app/infrastructure/slack transport settings home with COMMAND_PREFIX
   and central prefix application
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-21 19:13'
-updated_date: '2026-07-22 14:56'
+updated_date: '2026-07-22 15:12'
 labels:
   - phase-0
   - slack
@@ -30,10 +31,10 @@ Foundational slice (no frozen-module edits yet). Create the Slack transport sett
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/infrastructure/slack/settings.py defines SlackTransportSettings with COMMAND_PREFIX (env SLACK__COMMAND_PREFIX, default '') and a cached get_slack_transport_settings() provider; invalid config fails boot with a pydantic error
-- [ ] #2 The transport applies COMMAND_PREFIX once, centrally, to hookspec-registered Slack commands at registration; a unit test asserts a base command name 'sre' registers as '<COMMAND_PREFIX>sre'
-- [ ] #3 SLACK__COMMAND_PREFIX is set in terraform/ task definition, .github/workflows/ci_code.yml, and local compose/.env examples, matching PREFIX per environment
-- [ ] #4 No file under app/modules/ is modified in this slice; AppSettings.PREFIX still exists and is untouched
+- [x] #1 app/infrastructure/slack/settings.py defines SlackTransportSettings with COMMAND_PREFIX (env SLACK__COMMAND_PREFIX, default '') and a cached get_slack_transport_settings() provider; invalid config fails boot with a pydantic error
+- [x] #2 The transport applies COMMAND_PREFIX once, centrally, to hookspec-registered Slack commands at registration; a unit test asserts a base command name 'sre' registers as '<COMMAND_PREFIX>sre'
+- [x] #3 SLACK__COMMAND_PREFIX is set in terraform/ task definition, .github/workflows/ci_code.yml, and local compose/.env examples, matching PREFIX per environment
+- [x] #4 No file under app/modules/ is modified in this slice; AppSettings.PREFIX still exists and is untouched
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -77,6 +78,28 @@ Assumptions/doubts (decided on plan review 2026-07-22, see task comments for ful
 
 Blast radius: two new files (app/infrastructure/slack/__init__.py, settings.py, ~30-40 LOC), one provider.py edit (constructor param + one f-string + factory injection, ~10-15 LOC), three manifest edits (terraform template, ci_code.yml, app/Makefile, ~6 LOC total), plus new/extended unit tests. No edit to app/infrastructure/configuration/settings.py at all (dropped). Single subsystem (Slack transport settings + central registration), no frozen-module edit, no PREFIX deletion, no cross-cutting refactor, no dependency on the legacy aggregator — fits comfortably within the single-PR size gate (well under ~400 production LOC / ~10 files / one subsystem; smaller than the original draft now that aggregator wiring is dropped). Rollback: revert the PR; COMMAND_PREFIX defaults to "" everywhere it isn't explicitly set to "dev-" (app/Makefile only), so behavior is byte-identical to today until a module actually cuts over to reading COMMAND_PREFIX (later TASK-45.x slices).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented TASK-45.1 Slack transport command-prefix slice.
+
+What changed:
+- Added app/infrastructure/slack/__init__.py and app/infrastructure/slack/settings.py with SlackTransportSettings and cached get_slack_transport_settings(); COMMAND_PREFIX is owned by env alias SLACK__COMMAND_PREFIX with default ''.
+- Updated app/integrations/slack/provider.py to accept command_prefix in SlackPlatformProvider constructor, apply prefix centrally in _auto_register_root_commands(), and inject transport settings from get_slack_transport_settings() in get_slack_provider().
+- Added SLACK__COMMAND_PREFIX in terraform/templates/sre-bot.json.tpl, .github/workflows/ci_code.yml, and app/Makefile dev/debug targets (matching PREFIX behavior per environment).
+- No app/modules/** files were edited; AppSettings.PREFIX remains untouched.
+
+Verification evidence:
+- Targeted behavior tests: uv run pytest tests/unit/infrastructure/slack/test_slack_transport_settings.py tests/unit/integrations/slack/test_slack_auto_registration.py tests/unit/integrations/slack/test_slack_provider.py -q -> 33 passed.
+- Prefix guardrail: cd app && make check-prefix-guardrail -> clean tree.
+- Manifest presence: grep confirms SLACK__COMMAND_PREFIX in CI workflow, terraform task template, and Makefile dev/debug targets.
+- Formatting: cd app && uv run black --check . -> pass.
+- Fast lint on changed files: cd app && uv run ruff check <changed files> -> pass.
+
+DoD left for human verification:
+- PR description references decisions/transport-slack.md and decisions/configuration.md.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
