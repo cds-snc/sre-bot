@@ -18,8 +18,6 @@ services:
       dockerfile: .devcontainer/Dockerfile
       args:
         VARIANT: "3.14"
-        INSTALL_NODE: "true"
-        NODE_VERSION: "lts/*"
         LICENSE_KEY: '${MAXMIND_KEY}'
     volumes:
       - ..:/workspace:cached
