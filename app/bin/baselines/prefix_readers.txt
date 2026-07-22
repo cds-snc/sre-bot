@@ -6,7 +6,6 @@
 infrastructure/configuration/app.py
 server/lifespan.py
 modules/atip/atip.py
-modules/incident/incident.py
 modules/role/role.py
 modules/secret/secret.py
 

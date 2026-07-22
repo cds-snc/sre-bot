@@ -7,9 +7,9 @@ from slack_sdk import WebClient
 from slack_sdk.models import blocks, views
 from structlog import get_logger
 
-from infrastructure.configuration.app import get_app_settings
 from infrastructure.configuration.features.incident import get_incident_settings
 from infrastructure.configuration.integrations.google import get_google_resources_config
+from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import users as slack_users
 from models.incidents import IncidentPayload
@@ -19,10 +19,8 @@ from modules.incident import (
     incident_folder,
 )
 
-app_settings = get_app_settings()
 incident_settings = get_incident_settings()
 google_resource = get_google_resources_config()
-PREFIX = app_settings.PREFIX
 INCIDENT_CHANNEL = incident_settings.INCIDENT_CHANNEL
 SLACK_SECURITY_USER_GROUP_ID = incident_settings.SLACK_SECURITY_USER_GROUP_ID
 INCIDENT_HANDBOOK_ID = google_resource.incident_handbook_id
@@ -36,7 +34,10 @@ i18n.set("fallback", "en-US")
 
 
 def register(bot: App):
-    bot.command(f"/{PREFIX}incident")(open_create_incident_modal)
+    transport_settings = get_slack_transport_settings()
+    bot.command(f"/{transport_settings.COMMAND_PREFIX}incident")(
+        open_create_incident_modal
+    )
     bot.view("incident_view")(submit)
     bot.action("incident_change_locale")(handle_change_locale_button)
 
