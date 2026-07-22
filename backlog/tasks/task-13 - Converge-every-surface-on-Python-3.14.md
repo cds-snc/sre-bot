@@ -1,11 +1,11 @@
 ---
 id: TASK-13
 title: Converge every surface on Python 3.14
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-22 19:08'
+updated_date: '2026-07-22 20:59'
 labels:
   - toolchain
   - phase-2
@@ -34,10 +34,16 @@ Steps:
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 grep across .python-version, workflows, and Dockerfile shows exactly one Python version: 3.14
-- [ ] #2 CI runs green on 3.14
+- [x] #2 CI runs green on 3.14
 - [x] #3 ruff and mypy target versions match
 - [x] #4 grep across .devcontainer/docker-compose.yml shows VARIANT: "3.14" (matches .devcontainer/Dockerfile's ARG default, no more silent 3.12 override)
 <!-- AC:END -->
+
+## Definition of Done
+<!-- DOD:BEGIN -->
+- [x] #1 Full test suite passes on 3.14 locally and in CI
+- [x] #2 PR references decisions/toolchain.md
+<!-- DOD:END -->
 
 ## Implementation Plan
 
@@ -115,9 +121,3 @@ DoD items pending human verification:
 - DoD#1 CI-side full suite pass confirmation.
 - DoD#2 PR references decisions/toolchain.md.
 <!-- SECTION:NOTES:END -->
-
-## Definition of Done
-<!-- DOD:BEGIN -->
-- [ ] #1 Full test suite passes on 3.14 locally and in CI
-- [ ] #2 PR references decisions/toolchain.md
-<!-- DOD:END -->
