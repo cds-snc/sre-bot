@@ -11,12 +11,13 @@ Use this skill after each 3-5 meaningful edits and before task completion.
 
 Run checks in this order for fastest signal:
 
-1. `mypy`
-2. `flake8`
-3. `black --check .`
-4. `pytest app/tests --ignore=app/tests/smoke`
+1. `cd app && uv run mypy . --exclude '(?:^|/)\\.venv(?:/|$)'`
+2. `cd app && uv run ruff check .`
+3. `cd app && uv run black --check .`
+4. `cd app && uv run pytest tests --ignore=tests/smoke`
 
 By default, do not run `app/tests/smoke/*`. Run smoke tests only when explicitly requested and env vars are confirmed.
+Always run from `app/` and keep checks scoped to project code only (exclude virtualenv and non-project paths).
 
 ## Triage Rules
 
@@ -29,7 +30,7 @@ By default, do not run `app/tests/smoke/*`. Run smoke tests only when explicitly
 ## Targeted Re-run Examples
 
 - Type changes only: run `mypy` first, then full sequence.
-- Lint-only changes: run `flake8` and `black --check .`, then full sequence.
+- Lint-only changes: run `ruff check` and `black --check .`, then full sequence.
 - Behavioral changes or tests touched: run focused `pytest` target, then full sequence.
 - When a targeted run includes smoke tests, skip unless the task explicitly requests smoke execution with env configured.
 

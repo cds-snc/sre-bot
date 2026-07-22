@@ -30,10 +30,10 @@ Workflow:
 
 Quality gates:
 
-- mypy
-- flake8
-- black --check .
-- pytest app/tests --ignore=app/tests/smoke
+- cd app && uv run mypy . --exclude '(?:^|/)\\.venv(?:/|$)'
+- cd app && uv run ruff check .
+- cd app && uv run black --check .
+- cd app && uv run pytest tests --ignore=tests/smoke
 
 Hard constraints:
 
