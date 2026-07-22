@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-07-21 19:12'
-updated_date: '2026-07-22 16:43'
+updated_date: '2026-07-22 17:13'
 labels:
   - phase-0
   - security
@@ -19,6 +19,7 @@ references:
   - decisions/configuration.md
   - decisions/migration.md
   - decisions/platform-transports.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1316'
 priority: high
 ordinal: 51000
 ---
