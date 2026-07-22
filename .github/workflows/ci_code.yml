@@ -48,6 +48,7 @@ jobs:
         run: make test
         env:
           ENVIRONMENT: ci
+          SLACK__COMMAND_PREFIX: ""
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           SESSION_SECRET_KEY: ${{ secrets.SESSION_SECRET_KEY }}

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-21 19:13'
+updated_date: '2026-07-22 14:58'
 labels:
   - phase-0
   - slack
@@ -39,3 +40,13 @@ Per-module cutover (freeze carve-out) — atip has TWO PREFIX uses that split to
 <!-- DOD:BEGIN -->
 - [ ] #1 PR references decisions/transport-slack.md and decisions/configuration.md
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @copilot
+created: 2026-07-22 14:58
+---
+Alignment (2026-07-22): command-namespace read moves to infrastructure.slack.settings.get_slack_transport_settings().COMMAND_PREFIX (TASK-45.1 home); atip's SECOND PREFIX use (channel-name prefixing) moves to ENVIRONMENT/atip feature setting, NOT COMMAND_PREFIX. Smoke/new tests must NOT import infrastructure.configuration.infrastructure.platforms.SlackPlatformSettings (dead duplicate, TASK-24); use integrations.slack.settings.SlackSettings or a lightweight attribute stub (SimpleNamespace / MockSlackSettings pattern). Transport move stays with TASK-26.
+---
+<!-- COMMENTS:END -->

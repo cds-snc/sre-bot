@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 16:57'
+updated_date: '2026-07-22 14:56'
 labels:
   - slack
   - phase-3
@@ -48,3 +48,13 @@ Steps:
 - [ ] #1 modules/ untouched and still functional
 - [ ] #2 PR references decisions/transport-slack.md and decisions/platform-transports.md
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @copilot
+created: 2026-07-22 14:56
+---
+Cross-ref TASK-45.1 (Slack transport settings home / COMMAND_PREFIX): that slice, executed before this move, adds NEW transport logic into the still-mislocated app/integrations/slack/provider.py — (1) a command_prefix param on SlackPlatformProvider.__init__, (2) central prefix application in _auto_register_root_commands (slash_command = f'/{self._command_prefix}{root_command}'), and (3) get_slack_provider() reading get_slack_transport_settings() from infrastructure.slack.settings (a deliberate, tolerated upward import until this consolidation lands). When moving the transport runtime to app/infrastructure/slack/ per decisions/transport-slack.md + platform-transports.md, this move MUST carry all three, and relocate their tests (app/tests/unit/integrations/slack/test_slack_provider.py::TestSlackProviderFactory and test_slack_auto_registration.py prefix cases) to app/tests/unit/infrastructure/slack/. The upward integrations->infrastructure.slack import is resolved by that relocation.
+---
+<!-- COMMENTS:END -->

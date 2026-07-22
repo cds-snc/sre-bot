@@ -229,6 +229,46 @@ class TestRootCommandAutoRegistration:
         assert slack_provider.app is not None
         assert len(slack_provider._commands) == 0
 
+    def test_should_accept_transport_command_prefix_at_provider_construction(
+        self, make_slack_settings
+    ):
+        """Provider should accept command_prefix from transport settings."""
+        settings = make_slack_settings()
+        formatter = SlackBlockKitFormatter()
+
+        provider = SlackPlatformProvider(
+            settings=settings,
+            formatter=formatter,
+            command_prefix="dev-",
+        )
+
+        assert provider is not None
+
+    def test_should_apply_command_prefix_to_auto_registered_root_commands(
+        self, slack_provider
+    ):
+        """Auto-registration should build slash command with prefix once."""
+
+        class CapturingApp:
+            def __init__(self):
+                self.registered_commands = []
+
+            def command(self, command_name):
+                self.registered_commands.append(command_name)
+
+                def decorator(func):
+                    return func
+
+                return decorator
+
+        slack_provider._app = CapturingApp()
+        slack_provider._command_prefix = "dev-"
+        slack_provider._commands["sre.incident"] = Mock()
+
+        slack_provider._auto_register_root_commands()
+
+        assert "/dev-sre" in slack_provider._app.registered_commands
+
 
 @pytest.mark.unit
 class TestCommandResponseSending:

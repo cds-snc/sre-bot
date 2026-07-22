@@ -1,6 +1,6 @@
 ---
 status: Accepted
-date: 2026-07-21
+date: 2026-07-22
 applies: target
 scope: Settings ownership, environment identity, and secrets.
 ---
@@ -31,6 +31,8 @@ Settings are split across ~47 classes with two homes per vendor (`integrations/<
 
 **Consumers receive slices,** not a god-settings object: a service constructor takes its own `BaseSettings` class, nothing wider.
 
+**The god-settings aggregator is being removed, not grown.** `app/infrastructure/configuration/settings.py`'s `Settings` class (`settings_map`, `get_settings()`) is a legacy facade over the per-domain providers, not a home for new config; an open PR deletes it outright. New settings slices are never added to its `settings_map` or fields, and no new or open task may take a dependency on it, whether or not that removal has merged yet — this holds even where an older task description mentions wiring a slice into it.
+
 ## Consequences
 
 - "Where is this configured?" has one answer per domain; deleting a feature deletes its config.
@@ -45,4 +47,4 @@ Settings are split across ~47 classes with two homes per vendor (`integrations/<
 
 ## Migration
 
-Ticket: settings consolidation. Tolerated until closed: dual vendor settings homes; security config still carried on a shared server-settings object rather than its own `SecuritySettings` slice; `AppSettings.PREFIX` retained as the legacy Slack command-namespace (no environment meaning) only until its per-module retirement completes (TASK-45; [transport-slack.md](transport-slack.md) owns its replacement, `COMMAND_PREFIX`), deleted when the last legacy module cuts over.
+Ticket: settings consolidation. Tolerated until closed: dual vendor settings homes; security config still carried on a shared server-settings object rather than its own `SecuritySettings` slice; `AppSettings.PREFIX` retained as the legacy Slack command-namespace (no environment meaning) only until its per-module retirement completes (TASK-45; [transport-slack.md](transport-slack.md) owns its replacement, `COMMAND_PREFIX`), deleted when the last legacy module cuts over. The aggregator itself (`Settings`/`get_settings()`/`settings_map`) is being deleted in the same consolidation effort (separate open PR); TASK-45.6's teardown of the `PREFIX` aggregator mirror must first verify whether that file still exists before editing specific lines.

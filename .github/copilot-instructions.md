@@ -122,10 +122,12 @@ Work items live as Backlog.md tasks under `backlog/tasks/` and are the source of
 
 Run these checks regularly (after each 3-5 edits and before completion):
 
-- `mypy`
-- `flake8`
-- `black --check .`
-- `pytest app/tests --ignore=app/tests/smoke`
+- `cd app && uv run mypy . --exclude '(?:^|/)\\.venv(?:/|$)'`
+- `cd app && uv run ruff check .`
+- `cd app && uv run black --check .`
+- `cd app && uv run pytest tests --ignore=tests/smoke`
+
+Always run validation from `app/` and scope checks to project code only. Do not run quality gates against repository-external paths or virtual environment contents.
 
 Do not run `app/tests/smoke/*` unless explicitly requested and required environment variables are configured.
 
