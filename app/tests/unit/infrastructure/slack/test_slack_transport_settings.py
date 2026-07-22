@@ -32,7 +32,7 @@ def _load_transport_settings_module():
     """Load transport settings module with a clear failure message."""
     try:
         return importlib.import_module("infrastructure.slack.settings")
-    except ModuleNotFoundError as exc:
+    except ModuleNotFoundError:
         pytest.fail(
             "Expected infrastructure.slack.settings to exist for TASK-45.1",
             pytrace=False,
