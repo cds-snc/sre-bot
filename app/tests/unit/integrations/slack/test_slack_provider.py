@@ -7,6 +7,7 @@ import pytest
 from infrastructure.operations import OperationStatus
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.models import CommandPayload, CommandResponse
+import integrations.slack.provider as provider_module
 from integrations.slack.provider import SlackPlatformProvider
 
 
@@ -302,8 +303,6 @@ class TestSlackProviderFactory:
 
     def test_should_read_command_prefix_from_transport_settings(self, monkeypatch):
         """Factory should pass transport COMMAND_PREFIX into provider construction."""
-        import integrations.slack.provider as provider_module
-
         captured: dict[str, object] = {}
 
         class FakeConstructedProvider:
@@ -316,28 +315,31 @@ class TestSlackProviderFactory:
             COMMAND_PREFIX = "dev-"
 
         provider_module.get_slack_provider.cache_clear()
-        monkeypatch.setattr(
-            provider_module,
-            "SlackPlatformProvider",
-            FakeConstructedProvider,
-        )
-        monkeypatch.setattr(
-            provider_module,
-            "get_slack_settings",
-            lambda: object(),
-        )
-        monkeypatch.setattr(
-            provider_module,
-            "get_slack_transport_settings",
-            lambda: FakeTransportSettings(),
-            raising=False,
-        )
-        monkeypatch.setattr(
-            provider_module,
-            "SlackBlockKitFormatter",
-            lambda: object(),
-        )
+        try:
+            monkeypatch.setattr(
+                provider_module,
+                "SlackPlatformProvider",
+                FakeConstructedProvider,
+            )
+            monkeypatch.setattr(
+                provider_module,
+                "get_slack_settings",
+                lambda: object(),
+            )
+            monkeypatch.setattr(
+                provider_module,
+                "get_slack_transport_settings",
+                lambda: FakeTransportSettings(),
+                raising=False,
+            )
+            monkeypatch.setattr(
+                provider_module,
+                "SlackBlockKitFormatter",
+                lambda: object(),
+            )
 
-        provider_module.get_slack_provider()
+            provider_module.get_slack_provider()
+        finally:
+            provider_module.get_slack_provider.cache_clear()
 
         assert captured["command_prefix"] == "dev-"
