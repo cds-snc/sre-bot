@@ -3,10 +3,11 @@ id: TASK-45.5
 title: >-
   Cut over atip: command namespace to COMMAND_PREFIX and channel-name prefix to
   ENVIRONMENT
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-21 19:13'
-updated_date: '2026-07-22 21:09'
+updated_date: '2026-07-22 21:13'
 labels:
   - phase-0
   - slack
