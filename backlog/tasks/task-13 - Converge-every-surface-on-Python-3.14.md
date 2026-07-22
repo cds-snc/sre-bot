@@ -1,10 +1,11 @@
 ---
 id: TASK-13
 title: Converge every surface on Python 3.14
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-22 19:01'
+updated_date: '2026-07-22 19:03'
 labels:
   - toolchain
   - phase-2
