@@ -61,6 +61,6 @@
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "sudo chown vscode app/.venv && .devcontainer/uv-install.sh",
+	"postCreateCommand": "sudo chown vscode app/.venv",
 	"remoteUser": "vscode"
 }
