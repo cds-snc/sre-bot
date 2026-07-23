@@ -165,14 +165,8 @@ class TestTranslationCatalog:
 
         catalog1.merge(catalog2)
 
-        assert (
-            catalog1.get_message(make_translation_key("incident", "created"))
-            == "New message"
-        )
-        assert (
-            catalog1.get_message(make_translation_key("incident", "resolved"))
-            == "Resolved"
-        )
+        assert catalog1.get_message(make_translation_key("incident", "created")) == "New message"
+        assert catalog1.get_message(make_translation_key("incident", "resolved")) == "Resolved"
 
 
 class TestLocaleResolutionContext:

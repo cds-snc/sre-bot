@@ -27,12 +27,8 @@ class IncidentFeatureSettings(FeatureSettings):
     """
 
     INCIDENT_CHANNEL: str | None = Field(default=None, alias="INCIDENT_CHANNEL")
-    SLACK_SECURITY_USER_GROUP_ID: str | None = Field(
-        default=None, alias="SLACK_SECURITY_USER_GROUP_ID"
-    )
-    SLACK_NOTIFY_MGMT_USER_GROUP_ID: str | None = Field(
-        default=None, alias="SLACK_NOTIFY_MGMT_USER_GROUP_ID"
-    )
+    SLACK_SECURITY_USER_GROUP_ID: str | None = Field(default=None, alias="SLACK_SECURITY_USER_GROUP_ID")
+    SLACK_NOTIFY_MGMT_USER_GROUP_ID: str | None = Field(default=None, alias="SLACK_NOTIFY_MGMT_USER_GROUP_ID")
 
 
 @lru_cache(maxsize=1)

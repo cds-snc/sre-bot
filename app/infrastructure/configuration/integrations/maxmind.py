@@ -23,9 +23,7 @@ class MaxMindSettings(IntegrationSettings):
         ```
     """
 
-    MAXMIND_DB_PATH: str = Field(
-        default="./geodb/GeoLite2-City.mmdb", alias="MAXMIND_DB_PATH"
-    )
+    MAXMIND_DB_PATH: str = Field(default="./geodb/GeoLite2-City.mmdb", alias="MAXMIND_DB_PATH")
 
 
 @lru_cache(maxsize=1)

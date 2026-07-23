@@ -4,7 +4,7 @@ This module provides JWT token validation with issuer verification
 and user information extraction from token claims.
 """
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import structlog
 from fastapi import HTTPException
@@ -16,7 +16,7 @@ from infrastructure.security.jwks import JWKSManager
 logger = structlog.get_logger()
 
 
-def get_issuer_from_token(token: str) -> Optional[str]:
+def get_issuer_from_token(token: str) -> str | None:
     """Extract issuer from JWT token without verifying signature.
 
     Args:
@@ -34,7 +34,7 @@ def get_issuer_from_token(token: str) -> Optional[str]:
         return None
 
 
-def extract_user_info_from_token(token: str) -> Tuple[Optional[str], Optional[str]]:
+def extract_user_info_from_token(token: str) -> tuple[str | None, str | None]:
     """Extract user ID and email from JWT token without verifying signature.
 
     Args:
@@ -67,7 +67,7 @@ def extract_user_info_from_token(token: str) -> Tuple[Optional[str], Optional[st
 def validate_jwt_token(
     jwks_manager: JWKSManager,
     credentials: HTTPAuthorizationCredentials,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Validate JWT token and extract payload.
 
     Args:
@@ -84,11 +84,7 @@ def validate_jwt_token(
         raise HTTPException(status_code=500, detail="JWKS manager not configured")
 
     # Validate credentials structure
-    if (
-        credentials is None
-        or not credentials.scheme == "Bearer"
-        or not credentials.credentials
-    ):
+    if credentials is None or not credentials.scheme == "Bearer" or not credentials.credentials:
         raise HTTPException(status_code=401, detail="Missing or invalid token")
 
     token = credentials.credentials

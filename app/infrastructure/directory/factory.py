@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 def build_google_directory_provider(
     google_clients: GoogleWorkspaceClients,
-    directory_settings: "DirectorySettings",
+    directory_settings: DirectorySettings,
 ) -> DirectoryProvider:
     """Build a GoogleDirectoryProvider with injected clients.
 

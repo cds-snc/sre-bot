@@ -27,9 +27,7 @@ class TestGetIssuerFromToken:
             result = get_issuer_from_token("token_string")
 
             assert result == "test_issuer"
-            mock_decode.assert_called_once_with(
-                "token_string", options={"verify_signature": False}
-            )
+            mock_decode.assert_called_once_with("token_string", options={"verify_signature": False})
 
     def test_get_issuer_from_token_missing_issuer(self):
         """Test get_issuer_from_token returns None when issuer missing."""
@@ -143,9 +141,7 @@ class TestValidateJWTToken:
         assert exc_info.value.status_code == 401
         assert "Missing or invalid token" in exc_info.value.detail
 
-    def test_validate_jwt_token_invalid_scheme(
-        self, mock_http_credentials, mock_issuer_config
-    ):
+    def test_validate_jwt_token_invalid_scheme(self, mock_http_credentials, mock_issuer_config):
         """Test validate_jwt_token raises 401 for invalid auth scheme."""
         manager = JWKSManager(issuer_config=mock_issuer_config)
         credentials = mock_http_credentials(scheme="Basic")
@@ -166,9 +162,7 @@ class TestValidateJWTToken:
 
         assert exc_info.value.status_code == 401
 
-    def test_validate_jwt_token_missing_issuer_in_token(
-        self, mock_http_credentials, mock_issuer_config
-    ):
+    def test_validate_jwt_token_missing_issuer_in_token(self, mock_http_credentials, mock_issuer_config):
         """Test validate_jwt_token raises 401 when issuer missing from token."""
         manager = JWKSManager(issuer_config=mock_issuer_config)
         credentials = mock_http_credentials()
@@ -182,9 +176,7 @@ class TestValidateJWTToken:
             assert exc_info.value.status_code == 401
             assert "Issuer not found" in exc_info.value.detail
 
-    def test_validate_jwt_token_untrusted_issuer(
-        self, mock_http_credentials, mock_issuer_config
-    ):
+    def test_validate_jwt_token_untrusted_issuer(self, mock_http_credentials, mock_issuer_config):
         """Test validate_jwt_token raises 401 for untrusted issuer."""
         manager = JWKSManager(issuer_config=mock_issuer_config)
         credentials = mock_http_credentials()
@@ -213,14 +205,10 @@ class TestValidateJWTToken:
 
             with pytest.raises(HTTPException):
                 # validate_jwt_token requires jwks_manager argument
-                validate_jwt_token(
-                    jwks_manager=mock_manager_instance, credentials=credentials
-                )
+                validate_jwt_token(jwks_manager=mock_manager_instance, credentials=credentials)
 
     @patch("infrastructure.security.jwt.decode")
-    def test_validate_jwt_token_successful_validation(
-        self, mock_decode, mock_http_credentials, mock_issuer_config
-    ):
+    def test_validate_jwt_token_successful_validation(self, mock_decode, mock_http_credentials, mock_issuer_config):
         """Test validate_jwt_token successfully validates and returns payload."""
         manager = JWKSManager(issuer_config=mock_issuer_config)
         credentials = mock_http_credentials()
@@ -242,18 +230,12 @@ class TestValidateJWTToken:
             mock_get.return_value = "test_issuer"
 
             # Patch the JWKS client retrieval
-            with patch.object(
-                manager, "get_jwks_client", return_value=mock_jwks_client
-            ):
-                result = validate_jwt_token(
-                    credentials=credentials, jwks_manager=manager
-                )
+            with patch.object(manager, "get_jwks_client", return_value=mock_jwks_client):
+                result = validate_jwt_token(credentials=credentials, jwks_manager=manager)
 
                 assert result == expected_payload
 
-    def test_validate_jwt_token_pyjwt_error(
-        self, mock_http_credentials, mock_issuer_config
-    ):
+    def test_validate_jwt_token_pyjwt_error(self, mock_http_credentials, mock_issuer_config):
         """Test validate_jwt_token raises 401 on PyJWTError."""
         manager = JWKSManager(issuer_config=mock_issuer_config)
         credentials = mock_http_credentials()
@@ -269,20 +251,14 @@ class TestValidateJWTToken:
             with patch("infrastructure.security.jwt.decode") as mock_decode:
                 mock_decode.side_effect = PyJWTError("Token expired")
 
-                with patch.object(
-                    manager, "get_jwks_client", return_value=mock_jwks_client
-                ):
+                with patch.object(manager, "get_jwks_client", return_value=mock_jwks_client):
                     with pytest.raises(HTTPException) as exc_info:
-                        validate_jwt_token(
-                            credentials=credentials, jwks_manager=manager
-                        )
+                        validate_jwt_token(credentials=credentials, jwks_manager=manager)
 
                     assert exc_info.value.status_code == 401
                     assert "Invalid token" in exc_info.value.detail
 
-    def test_validate_jwt_token_uses_issuer_config(
-        self, mock_http_credentials, mock_issuer_config
-    ):
+    def test_validate_jwt_token_uses_issuer_config(self, mock_http_credentials, mock_issuer_config):
         """Test validate_jwt_token uses correct issuer config."""
         manager = JWKSManager(issuer_config=mock_issuer_config)
         credentials = mock_http_credentials()
@@ -298,12 +274,8 @@ class TestValidateJWTToken:
             with patch("infrastructure.security.jwt.decode") as mock_decode:
                 mock_decode.return_value = {"iss": "test_issuer"}
 
-                with patch.object(
-                    manager, "get_jwks_client", return_value=mock_jwks_client
-                ):
-                    result = validate_jwt_token(
-                        credentials=credentials, jwks_manager=manager
-                    )
+                with patch.object(manager, "get_jwks_client", return_value=mock_jwks_client):
+                    result = validate_jwt_token(credentials=credentials, jwks_manager=manager)
                     assert result == {"iss": "test_issuer"}
 
                     # Verify decode was called with config from issuer

@@ -62,7 +62,7 @@ class TestAppSettingsEnvironment:
         """All accepted environment values should construct successfully."""
         settings = AppSettings(ENVIRONMENT=value)
 
-        assert settings.ENVIRONMENT == value
+        assert value == settings.ENVIRONMENT
 
     def test_environment_invalid_value_raises_validation_error(self):
         """Unknown environment values should fail validation at settings construction."""

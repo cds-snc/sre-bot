@@ -2,13 +2,13 @@
 
 import inspect
 from pathlib import Path
-from typing import Any, Type
+from typing import Any
 
 from pydantic_settings import BaseSettings
 
 
 def generate_settings_docs(
-    settings_class: Type[BaseSettings],
+    settings_class: type[BaseSettings],
     output_file: Path,
     title: str = "Configuration Reference",
 ) -> None:
@@ -29,7 +29,7 @@ def generate_settings_docs(
     # Get all settings sections
     settings_instance = settings_class()
 
-    for field_name, field_info in settings_class.model_fields.items():
+    for field_name, _field_info in settings_class.model_fields.items():
         field_value = getattr(settings_instance, field_name, None)
 
         # Skip primitive fields (handled separately)
@@ -48,7 +48,7 @@ def generate_settings_docs(
 
 def _generate_section_docs(
     section_name: str,
-    settings_class: Type[BaseSettings],
+    settings_class: type[BaseSettings],
 ) -> list[str]:
     """Generate documentation for a single settings section.
 
@@ -83,9 +83,7 @@ def _generate_section_docs(
         env_var = field_info.alias or field_name.upper()
         description = field_info.description or "_No description_"
 
-        lines.append(
-            f"| `{field_name}` | `{field_type}` | `{default_value}` | `{env_var}` | {description} |"
-        )
+        lines.append(f"| `{field_name}` | `{field_type}` | `{default_value}` | `{env_var}` | {description} |")
 
     lines.append("")  # Blank line between sections
     return lines
