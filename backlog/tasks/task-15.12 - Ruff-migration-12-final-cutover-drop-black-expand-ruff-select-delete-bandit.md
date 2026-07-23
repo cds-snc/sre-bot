@@ -3,9 +3,11 @@ id: TASK-15.12
 title: >-
   Ruff migration 12: final cutover -- drop black, expand ruff select, delete
   bandit
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-23 14:19'
+updated_date: '2026-07-23 21:28'
 labels: []
 dependencies:
   - TASK-15.11
