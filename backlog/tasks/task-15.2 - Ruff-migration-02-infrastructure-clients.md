@@ -44,5 +44,5 @@ Expected size: ~49 files. No hand-edits to migrated source -- content must equal
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 make test passes; PR references decisions/toolchain.md and TASK-15
+- [ ] #1 make test passes (prompt user to perform the tests); PR references decisions/toolchain.md and TASK-15
 <!-- DOD:END -->
