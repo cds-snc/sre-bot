@@ -6,8 +6,8 @@ AWS DynamoDB for shared state across multiple application instances.
 
 import json
 import time
-from datetime import datetime, timezone
-from typing import Any, Dict, List
+from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 
@@ -77,7 +77,7 @@ class DynamoDBRetryStore:
             record.id = f"retry-{int(time.time())}-{self._record_counter}"
 
         # Initialize timestamps
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if not record.created_at:
             record.created_at = now
         if not record.updated_at:
@@ -142,7 +142,7 @@ class DynamoDBRetryStore:
             )
             raise RuntimeError(f"Failed to save retry record: {result.message}")
 
-    def fetch_due(self, limit: int = 10) -> List[RetryRecord]:
+    def fetch_due(self, limit: int = 10) -> list[RetryRecord]:
         """Fetch retry records that are due for processing.
 
         Uses GSI to efficiently query ACTIVE records where next_retry_at <= now
@@ -276,16 +276,14 @@ class DynamoDBRetryStore:
             )
             raise RuntimeError(f"Failed to mark success: {result.message}")
 
-    def mark_permanent_failure(
-        self, record_id: str, last_error: str | None = None
-    ) -> None:
+    def mark_permanent_failure(self, record_id: str, last_error: str | None = None) -> None:
         """Mark a record as permanently failed (move to DLQ).
 
         Args:
             record_id: ID of record to move to DLQ
             last_error: Optional error message
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         update_expr = "SET #status = :dlq, updated_at = :now, dlq_timestamp = :now"
         expr_values = {
             ":dlq": "DLQ",
@@ -344,29 +342,17 @@ class DynamoDBRetryStore:
             Key={"record_id": {"S": record_id}},
         )
 
-        if (
-            not get_result.is_success
-            or not get_result.data
-            or "Item" not in get_result.data
-        ):
+        if not get_result.is_success or not get_result.data or "Item" not in get_result.data:
             self.log.warning(
                 "retry_record_not_found_for_increment",
                 record_id=record_id,
-                error=(
-                    get_result.message
-                    if not get_result.is_success
-                    else "Item not found"
-                ),
+                error=(get_result.message if not get_result.is_success else "Item not found"),
             )
             return
 
         item = get_result.data["Item"]
         current_attempts_attr = item.get("attempts", {})
-        current_attempts = (
-            int(current_attempts_attr.get("N", 0))
-            if isinstance(current_attempts_attr, dict)
-            else 0
-        )
+        current_attempts = int(current_attempts_attr.get("N", 0)) if isinstance(current_attempts_attr, dict) else 0
         new_attempts = current_attempts + 1
 
         # Check if max attempts reached
@@ -382,12 +368,10 @@ class DynamoDBRetryStore:
         # Calculate next retry time with exponential backoff
         delay_seconds = self._calculate_retry_delay(current_attempts)
         next_retry_at = int(time.time()) + delay_seconds
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Update record
-        update_expr = (
-            "SET attempts = :attempts, updated_at = :now, next_retry_at = :next_retry"
-        )
+        update_expr = "SET attempts = :attempts, updated_at = :now, next_retry_at = :next_retry"
         update_expr += " REMOVE claim_worker, claim_expires_at"  # Release claim
         expr_values = {
             ":attempts": {"N": str(new_attempts)},
@@ -422,7 +406,7 @@ class DynamoDBRetryStore:
             )
             raise RuntimeError(f"Failed to increment attempt: {result.message}")
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         """Get current retry queue statistics.
 
         Returns:
@@ -461,9 +445,7 @@ class DynamoDBRetryStore:
         if not active_result.is_success or not dlq_result.is_success:
             self.log.error(
                 "dynamodb_get_stats_failed",
-                active_error=(
-                    active_result.message if not active_result.is_success else None
-                ),
+                active_error=(active_result.message if not active_result.is_success else None),
                 dlq_error=dlq_result.message if not dlq_result.is_success else None,
             )
 
@@ -473,7 +455,7 @@ class DynamoDBRetryStore:
             "dlq_records": dlq_count,
         }
 
-    def get_dlq_entries(self, limit: int = 100) -> List[RetryRecord]:
+    def get_dlq_entries(self, limit: int = 100) -> list[RetryRecord]:
         """Get entries from the dead letter queue.
 
         Args:
@@ -514,7 +496,7 @@ class DynamoDBRetryStore:
         delay = self.config.base_delay_seconds * (2**attempts)
         return min(delay, self.config.max_delay_seconds)
 
-    def _item_to_record(self, item: Dict[str, Any]) -> RetryRecord:
+    def _item_to_record(self, item: dict[str, Any]) -> RetryRecord:
         """Convert DynamoDB item to RetryRecord.
 
         Args:
@@ -544,9 +526,8 @@ class DynamoDBRetryStore:
 
         # Parse payload (stored as string)
         try:
-
             payload = json.loads(payload_str) if payload_str else {}
-        except (json.JSONDecodeError, TypeError):
+        except json.JSONDecodeError, TypeError:
             payload = {}
 
         return RetryRecord(
@@ -555,15 +536,7 @@ class DynamoDBRetryStore:
             payload=payload,
             attempts=attempts,
             last_error=last_error,
-            created_at=(
-                datetime.fromisoformat(created_at_str)
-                if created_at_str
-                else datetime.now(timezone.utc)
-            ),
-            updated_at=(
-                datetime.fromisoformat(updated_at_str)
-                if updated_at_str
-                else datetime.now(timezone.utc)
-            ),
-            next_retry_at=datetime.fromtimestamp(next_retry_at_ts, tz=timezone.utc),
+            created_at=(datetime.fromisoformat(created_at_str) if created_at_str else datetime.now(UTC)),
+            updated_at=(datetime.fromisoformat(updated_at_str) if updated_at_str else datetime.now(UTC)),
+            next_retry_at=datetime.fromtimestamp(next_retry_at_ts, tz=UTC),
         )

@@ -1,12 +1,13 @@
 """Tests for PR-11: IdempotencyService and DynamoDBCache narrow-slice dissolution."""
 
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
+
+from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
 from infrastructure.idempotency.cache import IdempotencyCache
 from infrastructure.idempotency.dynamodb import DynamoDBCache
 from infrastructure.idempotency.service import DynamoDBIdempotencyService
-from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
 
 pytestmark = pytest.mark.unit
 
@@ -63,6 +64,4 @@ class TestIdempotencyServiceReceivesConstructedCache:
         """DynamoDBIdempotencyService no longer accepts idempotency_settings (moved to providers)."""
         mock_cache = MagicMock(spec=IdempotencyCache)
         with pytest.raises(TypeError):
-            DynamoDBIdempotencyService(
-                idempotency_settings=MagicMock(), cache=mock_cache
-            )
+            DynamoDBIdempotencyService(idempotency_settings=MagicMock(), cache=mock_cache)

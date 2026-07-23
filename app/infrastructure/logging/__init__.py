@@ -45,25 +45,24 @@ Example (Best Practice):
 """
 
 # Core logging setup
-from infrastructure.logging.setup import (
-    configure_logging,
-)
-
 # Request context binding
 from infrastructure.logging.context import (
     bind_request_context,
+    clear_request_context,
     get_correlation_id,
     set_correlation_id,
-    clear_request_context,
 )
 
 # Log formatters/processors
 from infrastructure.logging.formatters import (
+    SENSITIVE_PATTERNS,
     add_app_info,
+    add_environment_info,
     mask_sensitive_data,
     truncate_large_values,
-    add_environment_info,
-    SENSITIVE_PATTERNS,
+)
+from infrastructure.logging.setup import (
+    configure_logging,
 )
 
 __all__ = [

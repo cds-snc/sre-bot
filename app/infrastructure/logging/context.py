@@ -17,20 +17,22 @@ Dependencies:
 """
 
 import uuid
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Optional, Any, Generator
+from typing import Any
+
 import structlog
 
 
 @contextmanager
 def bind_request_context(
-    correlation_id: Optional[str] = None,
-    user_email: Optional[str] = None,
-    user_id: Optional[str] = None,
-    request_path: Optional[str] = None,
-    request_method: Optional[str] = None,
+    correlation_id: str | None = None,
+    user_email: str | None = None,
+    user_id: str | None = None,
+    request_path: str | None = None,
+    request_method: str | None = None,
     **extra_context: Any,
-) -> Generator[None, None, None]:
+) -> Generator[None]:
     """Bind request-scoped context to all logs within the context manager.
 
     Creates a context that automatically adds metadata to all log entries
@@ -97,7 +99,7 @@ def bind_request_context(
         structlog.contextvars.reset_contextvars(**tokens)
 
 
-def get_correlation_id() -> Optional[str]:
+def get_correlation_id() -> str | None:
     """Get the current correlation ID from the logging context.
 
     Returns:

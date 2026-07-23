@@ -1,6 +1,7 @@
 """Unit tests for idempotency cache factory."""
 
 import pytest
+
 from infrastructure.idempotency import get_cache, reset_cache
 from infrastructure.idempotency.dynamodb import DynamoDBCache
 

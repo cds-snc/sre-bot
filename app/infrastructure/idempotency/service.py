@@ -5,7 +5,7 @@ This is the DynamoDB-backed concrete implementation. The Protocol contract is de
 in infrastructure.idempotency.protocol.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from infrastructure.idempotency.cache import IdempotencyCache
 
@@ -53,7 +53,7 @@ class DynamoDBIdempotencyService:
         """
         self._cache = cache
 
-    def get(self, key: str) -> Optional[Dict[str, Any]]:
+    def get(self, key: str) -> dict[str, Any] | None:
         """Get cached response for idempotency key.
 
         Args:
@@ -64,7 +64,7 @@ class DynamoDBIdempotencyService:
         """
         return self._cache.get(key)
 
-    def set(self, key: str, response: Dict[str, Any], ttl_seconds: int) -> None:
+    def set(self, key: str, response: dict[str, Any], ttl_seconds: int) -> None:
         """Cache a response for the given idempotency key.
 
         Args:
@@ -82,7 +82,7 @@ class DynamoDBIdempotencyService:
         """
         self._cache.clear()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

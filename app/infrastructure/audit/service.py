@@ -4,9 +4,9 @@ Wraps the DynamoDB audit storage operations with a service interface.
 Delegates all I/O to ``StorageService`` — no direct boto3 or dynamodb_next calls.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from functools import cache
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -24,7 +24,7 @@ TABLE_NAME = "sre_bot_audit_trail"
 
 
 def _compute_ttl_timestamp(retention_days: int) -> int:
-    expiry = datetime.now(timezone.utc) + timedelta(days=retention_days)
+    expiry = datetime.now(UTC) + timedelta(days=retention_days)
     return int(expiry.timestamp())
 
 
@@ -45,7 +45,7 @@ class DynamoDBAuditTrailService:
 
     """
 
-    def __init__(self, storage: "StorageService") -> None:
+    def __init__(self, storage: StorageService) -> None:
         self._storage = storage
         logger.info("initialized_audit_trail_service")
 
@@ -72,7 +72,7 @@ class DynamoDBAuditTrailService:
         resource_id = audit_event.resource_id or "unknown"
         sort_key = f"{audit_event.timestamp}#{audit_event.correlation_id}"
 
-        item: Dict[str, Any] = {
+        item: dict[str, Any] = {
             "resource_id": resource_id,
             "timestamp_correlation_id": sort_key,
             "timestamp": audit_event.timestamp,
@@ -126,10 +126,10 @@ class DynamoDBAuditTrailService:
     def get_audit_trail(
         self,
         resource_id: str,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get audit trail for a resource.
 
         Args:
@@ -142,7 +142,7 @@ class DynamoDBAuditTrailService:
             List of deserialized event dicts, newest first.
         """
         key_condition = "resource_id = :rid"
-        expression_values: Dict[str, Any] = {":rid": resource_id}
+        expression_values: dict[str, Any] = {":rid": resource_id}
 
         if start_time:
             key_condition += " AND timestamp_correlation_id < :ts"
@@ -167,10 +167,10 @@ class DynamoDBAuditTrailService:
     def get_user_audit_trail(
         self,
         user_email: str,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get audit trail for a user via GSI1 (user_email-timestamp-index).
 
         Args:
@@ -183,7 +183,7 @@ class DynamoDBAuditTrailService:
             List of deserialized event dicts, newest first.
         """
         key_condition = "user_email = :ue"
-        expression_values: Dict[str, Any] = {":ue": user_email}
+        expression_values: dict[str, Any] = {":ue": user_email}
 
         if start_time:
             key_condition += " AND timestamp < :ts"
@@ -209,7 +209,7 @@ class DynamoDBAuditTrailService:
     def get_by_correlation_id(
         self,
         correlation_id: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Lookup one audit event by correlation ID via GSI2 (correlation_id-index).
 
         Args:

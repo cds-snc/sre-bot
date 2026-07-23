@@ -8,9 +8,11 @@ Tests cover:
 - Field validation
 """
 
-import pytest
 from datetime import datetime
+
+import pytest
 from pydantic import ValidationError
+
 from infrastructure.audit.models import AuditEvent
 
 
@@ -76,9 +78,7 @@ class TestAuditEventCreation:
 
         # Should be ISO format (RFC 3339)
         assert "T" in event.timestamp
-        assert (
-            "+" in event.timestamp or "Z" in event.timestamp or "-" in event.timestamp
-        )
+        assert "+" in event.timestamp or "Z" in event.timestamp or "-" in event.timestamp
 
         # Should parse back to datetime
         parsed = datetime.fromisoformat(event.timestamp)

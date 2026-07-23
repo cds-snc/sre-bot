@@ -1,9 +1,10 @@
 """Unit tests for DynamoDB idempotency cache."""
 
-import pytest
 import json
 import time
 from unittest.mock import patch
+
+import pytest
 
 from infrastructure.idempotency.dynamodb import DynamoDBCache
 from infrastructure.operations.result import OperationResult, OperationStatus
@@ -21,9 +22,7 @@ class TestDynamoDBCacheInitialization:
 
     def test_cache_initializes_with_custom_table(self, mock_settings):
         """DynamoDBCache initializes with custom table name."""
-        cache = DynamoDBCache(
-            idempotency_settings=mock_settings, table_name="custom_table"
-        )
+        cache = DynamoDBCache(idempotency_settings=mock_settings, table_name="custom_table")
         assert cache.table_name == "custom_table"
 
     def test_cache_loads_ttl_from_settings(self, mock_settings):
@@ -52,9 +51,7 @@ class TestDynamoDBCacheGet:
         assert result is None
 
     @patch("infrastructure.idempotency.dynamodb.get_item")
-    def test_cache_get_returns_response_on_cache_hit(
-        self, mock_get_item, mock_settings
-    ):
+    def test_cache_get_returns_response_on_cache_hit(self, mock_get_item, mock_settings):
         """Cache get returns cached response on hit."""
         response = {"success": True, "data": {"id": "123"}}
         mock_get_item.return_value = OperationResult(
@@ -118,9 +115,7 @@ class TestDynamoDBCacheSet:
         assert "ttl" in call_args[1]["Item"]
 
     @patch("infrastructure.idempotency.dynamodb.put_item")
-    def test_cache_set_uses_default_ttl_if_not_specified(
-        self, mock_put_item, mock_settings
-    ):
+    def test_cache_set_uses_default_ttl_if_not_specified(self, mock_put_item, mock_settings):
         """Cache set uses default TTL when not specified."""
         mock_put_item.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
@@ -212,9 +207,7 @@ class TestDynamoDBCacheStats:
 
     def test_cache_stats_returns_backend_info(self, mock_settings):
         """Cache stats returns backend information."""
-        cache = DynamoDBCache(
-            idempotency_settings=mock_settings, table_name="test_table"
-        )
+        cache = DynamoDBCache(idempotency_settings=mock_settings, table_name="test_table")
         stats = cache.get_stats()
 
         assert stats["backend"] == "dynamodb"

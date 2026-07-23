@@ -29,9 +29,7 @@ def add_app_info(app_name: str, app_version: str = "unknown"):
         )
     """
 
-    def processor(
-        logger: Any, method_name: str, event_dict: dict[str, Any]
-    ) -> dict[str, Any]:
+    def processor(logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
         event_dict["app_name"] = app_name
         event_dict["app_version"] = app_version
         return event_dict
@@ -86,9 +84,7 @@ def mask_sensitive_data(
     if additional_patterns:
         patterns = patterns | additional_patterns
 
-    def processor(
-        logger: Any, method_name: str, event_dict: dict[str, Any]
-    ) -> dict[str, Any]:
+    def processor(logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
         masked_dict = {}
         for key, value in event_dict.items():
             key_lower = key.lower()
@@ -120,14 +116,10 @@ def truncate_large_values(max_length: int = 500):
         )
     """
 
-    def processor(
-        logger: Any, method_name: str, event_dict: dict[str, Any]
-    ) -> dict[str, Any]:
+    def processor(logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
         for key, value in event_dict.items():
             if isinstance(value, str) and len(value) > max_length:
-                event_dict[key] = (
-                    value[:max_length] + f"...[truncated, {len(value)} chars total]"
-                )
+                event_dict[key] = value[:max_length] + f"...[truncated, {len(value)} chars total]"
         return event_dict
 
     return processor
@@ -148,9 +140,7 @@ def add_environment_info(environment: str):
         )
     """
 
-    def processor(
-        logger: Any, method_name: str, event_dict: dict[str, Any]
-    ) -> dict[str, Any]:
+    def processor(logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
         event_dict["environment"] = environment
         return event_dict
 

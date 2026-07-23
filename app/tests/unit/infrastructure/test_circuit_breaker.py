@@ -3,8 +3,10 @@
 Moved from tests/unit/modules/groups/test_circuit_breaker.py.
 """
 
-import pytest
 import time
+
+import pytest
+
 from infrastructure.resilience.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerOpenError,

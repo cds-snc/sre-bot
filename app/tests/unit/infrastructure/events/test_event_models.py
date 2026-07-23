@@ -52,11 +52,7 @@ def test_event_hash() -> None:
     correlation_id = uuid4()
     timestamp = datetime.now()
 
-    first = Event(
-        event_type="first", correlation_id=correlation_id, timestamp=timestamp
-    )
-    second = Event(
-        event_type="second", correlation_id=correlation_id, timestamp=timestamp
-    )
+    first = Event(event_type="first", correlation_id=correlation_id, timestamp=timestamp)
+    second = Event(event_type="second", correlation_id=correlation_id, timestamp=timestamp)
 
     assert hash(first) == hash(second)

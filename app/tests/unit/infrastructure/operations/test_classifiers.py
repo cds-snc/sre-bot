@@ -188,9 +188,7 @@ class TestClassifyAwsError:
         """Test ThrottlingException as TRANSIENT_ERROR with retry_after."""
 
         exc = Mock(spec=ClientError)
-        exc.response = {
-            "Error": {"Code": "ThrottlingException", "Message": "Rate exceeded"}
-        }
+        exc.response = {"Error": {"Code": "ThrottlingException", "Message": "Rate exceeded"}}
 
         result = classify_aws_error(exc)
 
@@ -203,9 +201,7 @@ class TestClassifyAwsError:
         """Test AccessDeniedException as PERMANENT_ERROR."""
 
         exc = Mock(spec=ClientError)
-        exc.response = {
-            "Error": {"Code": "AccessDeniedException", "Message": "Access denied"}
-        }
+        exc.response = {"Error": {"Code": "AccessDeniedException", "Message": "Access denied"}}
 
         result = classify_aws_error(exc)
 
@@ -217,9 +213,7 @@ class TestClassifyAwsError:
         """Test ResourceNotFoundException as NOT_FOUND."""
 
         exc = Mock(spec=ClientError)
-        exc.response = {
-            "Error": {"Code": "ResourceNotFoundException", "Message": "Not found"}
-        }
+        exc.response = {"Error": {"Code": "ResourceNotFoundException", "Message": "Not found"}}
 
         result = classify_aws_error(exc)
 
@@ -231,9 +225,7 @@ class TestClassifyAwsError:
         """Test ValidationException as PERMANENT_ERROR."""
 
         exc = Mock(spec=ClientError)
-        exc.response = {
-            "Error": {"Code": "ValidationException", "Message": "Invalid input"}
-        }
+        exc.response = {"Error": {"Code": "ValidationException", "Message": "Invalid input"}}
 
         result = classify_aws_error(exc)
 
@@ -244,9 +236,7 @@ class TestClassifyAwsError:
         """Test InvalidParameterException as PERMANENT_ERROR."""
 
         exc = Mock(spec=ClientError)
-        exc.response = {
-            "Error": {"Code": "InvalidParameterException", "Message": "Bad param"}
-        }
+        exc.response = {"Error": {"Code": "InvalidParameterException", "Message": "Bad param"}}
 
         result = classify_aws_error(exc)
 
@@ -257,9 +247,7 @@ class TestClassifyAwsError:
         """Test BadRequestException as PERMANENT_ERROR."""
 
         exc = Mock(spec=ClientError)
-        exc.response = {
-            "Error": {"Code": "BadRequestException", "Message": "Bad request"}
-        }
+        exc.response = {"Error": {"Code": "BadRequestException", "Message": "Bad request"}}
 
         result = classify_aws_error(exc)
 
@@ -270,9 +258,7 @@ class TestClassifyAwsError:
         """Test unknown ClientError codes as TRANSIENT_ERROR."""
 
         exc = Mock(spec=ClientError)
-        exc.response = {
-            "Error": {"Code": "SomeUnknownError", "Message": "Unknown error"}
-        }
+        exc.response = {"Error": {"Code": "SomeUnknownError", "Message": "Unknown error"}}
 
         result = classify_aws_error(exc)
 
