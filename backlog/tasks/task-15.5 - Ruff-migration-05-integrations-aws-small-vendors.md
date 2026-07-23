@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-23 14:17'
-updated_date: '2026-07-23 18:02'
+updated_date: '2026-07-23 18:21'
 labels: []
 dependencies:
   - TASK-15.4
@@ -113,3 +113,16 @@ Implemented per plan (mirrors TASK-15.1/15.2/15.3/15.4 recipe):
 5. DoD#1: user ran `make test` (full suite, from app/) directly and confirmed it is all green (exit 0) -- the narrower-scope failure above does not reproduce in the full make test run. DoD#1 verified.
 PR should reference decisions/toolchain.md and TASK-15.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-07-23 18:21
+---
+Follow-up during this slice: the standalone Bandit CI workflow (cytopia/bandit:latest) failed to parse several already-migrated files (infrastructure/logging/setup.py, infrastructure/resilience/retry/dynamodb_store.py, infrastructure/events/models.py, infrastructure/operations/result.py, integrations/aws/client_next.py) because its bundled Python predates PEP 758 (3.14, unparenthesized except) and PEP 695 (3.12, class Foo[T]) syntax already valid under this project's actual Python 3.14 target (decisions/toolchain.md). Confirmed these are not code defects: ast.parse succeeds on Python 3.14, fails on 3.11.
+
+Fix applied: .github/workflows/scripts/run_bandit_scan.sh now excludes every path already in app/Makefile's RUFF_SCOPE via a new RUFF_MIGRATED_PATHS list -- those paths already get ruff's S (bandit-equivalent) coverage, so this removes the false failures with zero security-coverage gap. Full early deletion of the workflow was intentionally avoided (TASK-15.1 explicitly defers that to TASK-15.12, to not leave not-yet-migrated paths unscanned).
+
+Updated TASK-15.1's SHARED RECIPE (step 3c + Notes) so every remaining slice (TASK-15.6..15.11) keeps RUFF_MIGRATED_PATHS in sync with RUFF_SCOPE going forward.
+---
+<!-- COMMENTS:END -->
