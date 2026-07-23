@@ -21,9 +21,7 @@ class TestGuardDutyClient:
             session_provider=session_provider,
             default_role_arn="arn:aws:iam::123456789012:role/GuardDutyRole",
         )
-        assert (
-            client._default_role_arn == "arn:aws:iam::123456789012:role/GuardDutyRole"
-        )
+        assert client._default_role_arn == "arn:aws:iam::123456789012:role/GuardDutyRole"
         assert client.service_name == "guardduty"
 
     def test_init_without_default_role_arn(self):
@@ -41,13 +39,9 @@ class TestGuardDutyClient:
             default_role_arn="arn:aws:iam::123456789012:role/DefaultRole",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             assert role_arn == "arn:aws:iam::123456789012:role/DefaultRole"
-            return make_fake_client(
-                api_responses={"list_detectors": {"DetectorIds": ["detector-123"]}}
-            )
+            return make_fake_client(api_responses={"list_detectors": {"DetectorIds": ["detector-123"]}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
@@ -63,15 +57,9 @@ class TestGuardDutyClient:
             default_role_arn="arn:aws:iam::123456789012:role/DefaultRole",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             assert role_arn == "arn:aws:iam::123456789012:role/DefaultRole"
-            return make_fake_client(
-                api_responses={
-                    "list_detectors": {"DetectorIds": ["detector-1", "detector-2"]}
-                }
-            )
+            return make_fake_client(api_responses={"list_detectors": {"DetectorIds": ["detector-1", "detector-2"]}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
@@ -84,12 +72,8 @@ class TestGuardDutyClient:
         session_provider = SessionProvider(region="us-east-1")
         client = GuardDutyClient(session_provider=session_provider)
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
-            return make_fake_client(
-                api_responses={"list_detectors": {"DetectorIds": []}}
-            )
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
+            return make_fake_client(api_responses={"list_detectors": {"DetectorIds": []}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 

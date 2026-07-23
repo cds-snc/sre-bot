@@ -39,17 +39,9 @@ class TestOrganizationsClient:
             default_role_arn="arn:aws:iam::123456789012:role/DefaultRole",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             assert role_arn == "arn:aws:iam::123456789012:role/DefaultRole"
-            return make_fake_client(
-                api_responses={
-                    "list_accounts": {
-                        "Accounts": [{"Id": "123456789012", "Name": "Production"}]
-                    }
-                }
-            )
+            return make_fake_client(api_responses={"list_accounts": {"Accounts": [{"Id": "123456789012", "Name": "Production"}]}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
@@ -65,9 +57,7 @@ class TestOrganizationsClient:
             default_role_arn="arn:aws:iam::123456789012:role/DefaultRole",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             assert role_arn == "arn:aws:iam::123456789012:role/DefaultRole"
             return make_fake_client(
                 api_responses={
@@ -91,16 +81,8 @@ class TestOrganizationsClient:
         session_provider = SessionProvider(region="us-east-1")
         client = OrganizationsClient(session_provider=session_provider)
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
-            return make_fake_client(
-                api_responses={
-                    "describe_account": {
-                        "Account": {"Id": "123456789012", "Name": "Production"}
-                    }
-                }
-            )
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
+            return make_fake_client(api_responses={"describe_account": {"Account": {"Id": "123456789012", "Name": "Production"}}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
@@ -113,9 +95,7 @@ class TestOrganizationsClient:
         session_provider = SessionProvider(region="us-east-1")
         client = OrganizationsClient(session_provider=session_provider)
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             return make_fake_client(
                 api_responses={
                     "list_accounts": {
@@ -139,16 +119,8 @@ class TestOrganizationsClient:
         session_provider = SessionProvider(region="us-east-1")
         client = OrganizationsClient(session_provider=session_provider)
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
-            return make_fake_client(
-                api_responses={
-                    "list_accounts": {
-                        "Accounts": [{"Id": "123456789012", "Name": "Production"}]
-                    }
-                }
-            )
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
+            return make_fake_client(api_responses={"list_accounts": {"Accounts": [{"Id": "123456789012", "Name": "Production"}]}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
@@ -162,9 +134,7 @@ class TestOrganizationsClient:
         session_provider = SessionProvider(region="us-east-1")
         client = OrganizationsClient(session_provider=session_provider)
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             return make_fake_client(api_responses={"list_accounts": {"Accounts": []}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)

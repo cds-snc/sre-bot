@@ -30,17 +30,13 @@ class TestConfigClient:
         client = ConfigClient(session_provider=session_provider)
         assert client._default_role_arn is None
 
-    def test_describe_aggregate_compliance_by_config_rules_success(
-        self, monkeypatch, make_fake_client
-    ):
+    def test_describe_aggregate_compliance_by_config_rules_success(self, monkeypatch, make_fake_client):
         """Test describe_aggregate_compliance_by_config_rules returns compliance data."""
 
         session_provider = SessionProvider(region="us-east-1")
         client = ConfigClient(session_provider=session_provider)
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             return make_fake_client(
                 api_responses={
                     "describe_aggregate_compliance_by_config_rules": {
@@ -56,14 +52,10 @@ class TestConfigClient:
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
-        result = client.describe_aggregate_compliance_by_config_rules(
-            config_aggregator_name="org-aggregator"
-        )
+        result = client.describe_aggregate_compliance_by_config_rules(config_aggregator_name="org-aggregator")
         assert result.is_success
 
-    def test_describe_aggregate_compliance_by_config_rules_with_filters(
-        self, monkeypatch, make_fake_client
-    ):
+    def test_describe_aggregate_compliance_by_config_rules_with_filters(self, monkeypatch, make_fake_client):
         """Test describe_aggregate_compliance_by_config_rules with filters."""
 
         session_provider = SessionProvider(region="us-east-1")
@@ -72,16 +64,10 @@ class TestConfigClient:
             default_role_arn="arn:aws:iam::123456789012:role/DefaultRole",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             assert role_arn == "arn:aws:iam::123456789012:role/DefaultRole"
             return make_fake_client(
-                api_responses={
-                    "describe_aggregate_compliance_by_config_rules": {
-                        "AggregateComplianceByConfigRules": []
-                    }
-                }
+                api_responses={"describe_aggregate_compliance_by_config_rules": {"AggregateComplianceByConfigRules": []}}
             )
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
@@ -92,9 +78,7 @@ class TestConfigClient:
         )
         assert result.is_success
 
-    def test_describe_aggregate_compliance_by_config_rules_uses_default_role(
-        self, monkeypatch, make_fake_client
-    ):
+    def test_describe_aggregate_compliance_by_config_rules_uses_default_role(self, monkeypatch, make_fake_client):
         """Test describe_aggregate_compliance_by_config_rules uses default_role_arn."""
 
         session_provider = SessionProvider(region="us-east-1")
@@ -103,21 +87,13 @@ class TestConfigClient:
             default_role_arn="arn:aws:iam::123456789012:role/DefaultRole",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             assert role_arn == "arn:aws:iam::123456789012:role/DefaultRole"
             return make_fake_client(
-                api_responses={
-                    "describe_aggregate_compliance_by_config_rules": {
-                        "AggregateComplianceByConfigRules": []
-                    }
-                }
+                api_responses={"describe_aggregate_compliance_by_config_rules": {"AggregateComplianceByConfigRules": []}}
             )
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
-        result = client.describe_aggregate_compliance_by_config_rules(
-            config_aggregator_name="org-aggregator"
-        )
+        result = client.describe_aggregate_compliance_by_config_rules(config_aggregator_name="org-aggregator")
         assert result.is_success

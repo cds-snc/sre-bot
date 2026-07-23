@@ -6,7 +6,7 @@ and OperationResult return types.
 
 from dataclasses import dataclass
 from functools import cache
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import geoip2.database
 import structlog
@@ -25,12 +25,12 @@ logger = structlog.get_logger()
 class GeoLocationData:
     """Geolocation data for an IP address."""
 
-    country_code: Optional[str] = None
-    city: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    postal_code: Optional[str] = None
-    time_zone: Optional[str] = None
+    country_code: str | None = None
+    city: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    postal_code: str | None = None
+    time_zone: str | None = None
 
     def to_dict(self) -> dict:
         """Convert to dictionary format."""
@@ -53,7 +53,7 @@ class MaxMindClient:
         settings: Settings instance with maxmind.MAXMIND_DB_PATH
     """
 
-    def __init__(self, maxmind_settings: "MaxMindSettings") -> None:
+    def __init__(self, maxmind_settings: MaxMindSettings) -> None:
         self._db_path = maxmind_settings.MAXMIND_DB_PATH
         self._logger = logger.bind(component="maxmind_client")
 
@@ -88,9 +88,7 @@ class MaxMindClient:
                     country=location.country_code,
                     city=location.city,
                 )
-                return OperationResult.success(
-                    data=location.to_dict(), message="IP geolocated successfully"
-                )
+                return OperationResult.success(data=location.to_dict(), message="IP geolocated successfully")
 
             except AddressNotFoundError:
                 log.warning("ip_not_found")
@@ -117,7 +115,7 @@ class MaxMindClient:
             finally:
                 reader.close()
 
-        except (FileNotFoundError, IOError) as e:
+        except (OSError, FileNotFoundError) as e:
             log.error("database_file_error", error=str(e), db_path=self._db_path)
             return OperationResult.transient_error(
                 message=f"MaxMind database file error: {str(e)}",

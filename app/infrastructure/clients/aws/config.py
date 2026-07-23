@@ -3,7 +3,7 @@
 Provides operations to interact with AWS Config service, enabling retrieval of configuration compliance and resource details, with consistent error handling via OperationResult.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from infrastructure.clients.aws.executor import execute_aws_api_call
 from infrastructure.clients.aws.session_provider import SessionProvider
@@ -20,7 +20,7 @@ class ConfigClient:
     def __init__(
         self,
         session_provider: SessionProvider,
-        default_role_arn: Optional[str] = None,
+        default_role_arn: str | None = None,
     ) -> None:
         self._session_provider = session_provider
         self._default_role_arn = default_role_arn
@@ -28,14 +28,14 @@ class ConfigClient:
 
     # TODO: Add support for role_arn parameters to override default_role_arn
     def describe_aggregate_compliance_by_config_rules(
-        self, config_aggregator_name: str, filters: Optional[Dict[str, Any]] = None
+        self, config_aggregator_name: str, filters: dict[str, Any] | None = None
     ) -> OperationResult:
         """Describe aggregate compliance by config rules.
 
         Returns an OperationResult whose `data` is a list of compliance objects
         when successful.
         """
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "ConfigurationAggregatorName": config_aggregator_name,
             "Filters": filters,
         }

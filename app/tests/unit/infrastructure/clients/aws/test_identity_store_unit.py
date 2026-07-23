@@ -1,4 +1,5 @@
 import importlib
+
 import pytest
 
 from infrastructure.operations.result import OperationResult
@@ -16,9 +17,7 @@ class TestIdentityStore:
             captured.update(kwargs)
             return OperationResult.success(data={})
 
-        identity_mod = importlib.import_module(
-            "infrastructure.clients.aws.identity_store"
-        )
+        identity_mod = importlib.import_module("infrastructure.clients.aws.identity_store")
         monkeypatch.setattr(identity_mod, "execute_aws_api_call", fake_execute)
 
         # list_users - uses facade's configured identity_store_id
@@ -39,9 +38,7 @@ class TestIdentityStore:
 
         # create_user - uses facade's configured identity_store_id
         captured.clear()
-        res = aws_factory.identitystore.create_user(
-            UserName="jsmith", DisplayName="J Smith"
-        )
+        res = aws_factory.identitystore.create_user(UserName="jsmith", DisplayName="J Smith")
         assert res.is_success
         assert captured["service"] == "identitystore"
         assert captured["method"] == "create_user"

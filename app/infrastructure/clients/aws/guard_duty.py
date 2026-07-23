@@ -3,8 +3,6 @@
 Provides operations to interact with AWS GuardDuty service, enabling retrieval of detectors and findings statistics with consistent error handling via OperationResult.
 """
 
-from typing import Optional
-
 import structlog
 
 from infrastructure.clients.aws.executor import execute_aws_api_call
@@ -24,7 +22,7 @@ class GuardDutyClient:
     def __init__(
         self,
         session_provider: SessionProvider,
-        default_role_arn: Optional[str] = None,
+        default_role_arn: str | None = None,
     ) -> None:
         self._session_provider = session_provider
         self._default_role_arn = default_role_arn

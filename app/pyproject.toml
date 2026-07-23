@@ -80,6 +80,8 @@ force-exclude = '''
 /(
     api
   | tests/api
+  | infrastructure/clients
+  | tests/unit/infrastructure/clients
 )/
 '''
 

@@ -60,9 +60,7 @@ class AWSClients:
 
         self.dynamodb: DynamoDBClient = DynamoDBClient(
             self._session_provider,
-            default_role_arn=self._session_provider.get_role_arn_for_service(
-                "dynamodb"
-            ),
+            default_role_arn=self._session_provider.get_role_arn_for_service("dynamodb"),
         )
         self.identitystore: IdentityStoreClient = IdentityStoreClient(
             self._session_provider,
@@ -70,9 +68,7 @@ class AWSClients:
         )
         self.organizations: OrganizationsClient = OrganizationsClient(
             self._session_provider,
-            default_role_arn=self._session_provider.get_role_arn_for_service(
-                "organizations"
-            ),
+            default_role_arn=self._session_provider.get_role_arn_for_service("organizations"),
         )
         self.sso_admin: SsoAdminClient = SsoAdminClient(
             self._session_provider,
@@ -84,9 +80,7 @@ class AWSClients:
         )
         self.guardduty: GuardDutyClient = GuardDutyClient(
             self._session_provider,
-            default_role_arn=self._session_provider.get_role_arn_for_service(
-                "guardduty"
-            ),
+            default_role_arn=self._session_provider.get_role_arn_for_service("guardduty"),
         )
         self.cost_explorer: CostExplorerClient = CostExplorerClient(
             self._session_provider,

@@ -3,13 +3,13 @@
 Validates AWS Identity Store operations with default identity_store_id fallback.
 """
 
-from botocore.exceptions import ClientError
 import pytest
+from botocore.exceptions import ClientError
 
 from infrastructure.clients.aws import executor as aws_client
 from infrastructure.clients.aws.identity_store import IdentityStoreClient
-from infrastructure.operations import OperationStatus
 from infrastructure.clients.aws.session_provider import SessionProvider
+from infrastructure.operations import OperationStatus
 
 
 @pytest.mark.unit
@@ -40,16 +40,8 @@ class TestIdentityStoreClient:
             default_identity_store_id="store-1234567890",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
-            return make_fake_client(
-                api_responses={
-                    "list_users": {
-                        "Users": [{"UserId": "user-123", "UserName": "testuser"}]
-                    }
-                }
-            )
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
+            return make_fake_client(api_responses={"list_users": {"Users": [{"UserId": "user-123", "UserName": "testuser"}]}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
@@ -74,12 +66,8 @@ class TestIdentityStoreClient:
             default_identity_store_id="store-1234567890",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
-            return make_fake_client(
-                api_responses={"create_user": {"UserId": "user-new-123"}}
-            )
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
+            return make_fake_client(api_responses={"create_user": {"UserId": "user-new-123"}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
@@ -98,9 +86,7 @@ class TestIdentityStoreClient:
             default_identity_store_id="store-1234567890",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             return make_fake_client(
                 api_responses={
                     "describe_user": {
@@ -125,9 +111,7 @@ class TestIdentityStoreClient:
             default_identity_store_id="store-1234567890",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             return make_fake_client(api_responses={"delete_user": {}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
@@ -135,9 +119,7 @@ class TestIdentityStoreClient:
         result = client.delete_user(user_id="user-123")
         assert result.is_success
 
-    def test_get_group_membership_id_maps_resource_not_found_to_not_found(
-        self, monkeypatch
-    ):
+    def test_get_group_membership_id_maps_resource_not_found_to_not_found(self, monkeypatch):
         """Membership lookup misses should normalize to NOT_FOUND for adapter idempotency."""
 
         session_provider = SessionProvider(region="us-east-1")
@@ -146,9 +128,7 @@ class TestIdentityStoreClient:
             default_identity_store_id="store-1234567890",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             class FakeClient:
                 def get_group_membership_id(self, **kwargs):
                     raise ClientError(
