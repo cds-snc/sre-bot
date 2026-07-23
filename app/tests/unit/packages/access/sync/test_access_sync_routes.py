@@ -22,11 +22,7 @@ from packages.access.sync.schemas import UserSyncRequest
 
 def _get_route(path: str, method: str) -> APIRoute:
     for route in router.routes:
-        if (
-            isinstance(route, APIRoute)
-            and route.path == path
-            and method in route.methods
-        ):
+        if isinstance(route, APIRoute) and route.path == path and method in route.methods:
             return route
     raise AssertionError(f"Route {method} {path} not found")
 
@@ -175,15 +171,15 @@ def test_sync_endpoint_returns_503_when_disabled():
             "packages.access.sync.interactions.http.get_idempotency_service",
             return_value=fake_idempotency,
         ),
+        pytest.raises(HTTPException) as exc_info,
     ):
-        with pytest.raises(HTTPException) as exc_info:
-            sync_endpoint(
-                _make_request(),
-                response=Response(),
-                coordinator=_FakeCoordinator(OperationResult.success()),
-                settings=_Settings(enabled=False),
-                current_user=_make_user(),
-            )
+        sync_endpoint(
+            _make_request(),
+            response=Response(),
+            coordinator=_FakeCoordinator(OperationResult.success()),
+            settings=_Settings(enabled=False),
+            current_user=_make_user(),
+        )
 
     assert exc_info.value.status_code == 503
 
@@ -200,9 +196,7 @@ def test_sync_endpoint_returns_503_without_coordinator_dependency_assembly():
         coordinator_provider_called = True
         raise AssertionError("coordinator dependency should not be assembled")
 
-    app.dependency_overrides[get_access_sync_settings] = lambda: _Settings(
-        enabled=False
-    )
+    app.dependency_overrides[get_access_sync_settings] = lambda: _Settings(enabled=False)
     app.dependency_overrides[get_access_sync_coordinator] = _coordinator_provider
     app.dependency_overrides[get_current_user] = _make_user
 

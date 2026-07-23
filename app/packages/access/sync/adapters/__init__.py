@@ -7,7 +7,7 @@ All methods are idempotent and return OperationResult.
 Adapters must never raise exceptions across this boundary.
 """
 
-from typing import Protocol, TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from infrastructure.operations import OperationResult
 
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class AccessSyncAdapter(Protocol):
     """Contract for all platform sync adapters."""
 
-    def capabilities(self) -> "AdapterCapabilities":
+    def capabilities(self) -> AdapterCapabilities:
         """Return the execution capabilities declared by this adapter."""
         ...
 
@@ -56,8 +56,8 @@ class AccessSyncAdapter(Protocol):
     def reconcile_user(
         self,
         user_email: str,
-        desired_state: "DesiredUserState",
-        context: "PlanningContext",
+        desired_state: DesiredUserState,
+        context: PlanningContext,
         dry_run: bool = False,
     ) -> OperationResult:
         """Assess current platform state, plan delta, execute changes for one user.
@@ -74,8 +74,8 @@ class AccessSyncAdapter(Protocol):
 
     def reconcile_platform(
         self,
-        desired_state: "DesiredPlatformState",
-        context: "PlanningContext",
+        desired_state: DesiredPlatformState,
+        context: PlanningContext,
         dry_run: bool = False,
     ) -> OperationResult:
         """Batch reconcile a full platform using entitlement-shaped desired state.

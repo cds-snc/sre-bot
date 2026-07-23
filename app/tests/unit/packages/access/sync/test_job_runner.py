@@ -1,7 +1,8 @@
 """Unit tests for access sync transport job_runner module."""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.sync.domain import ReconciliationOutcome, SyncOutcome
@@ -10,7 +11,6 @@ from packages.access.sync.job_runner import (
     run_platform_sync_job,
     run_user_sync_job,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -207,9 +207,7 @@ def test_run_platform_sync_job_writes_in_progress_sentinel_then_completed():
     assert final["unchanged_user_count"] == 6
     assert final["action_counts"]["apply_entitlement"] == 2
     assert final["lifecycle_actions"]["remove_user"] == ["carol@example.com"]
-    assert final["entitlements_by_action"]["apply_entitlement"]["sg-aws-admin"] == [
-        "alice@example.com"
-    ]
+    assert final["entitlements_by_action"]["apply_entitlement"]["sg-aws-admin"] == ["alice@example.com"]
 
 
 @pytest.mark.unit

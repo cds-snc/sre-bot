@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict, Protocol
+from typing import Any, Protocol
 
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -28,7 +28,6 @@ from packages.access.common.config.settings import (
     EntitlementMode,
     PlatformPolicy,
 )
-
 
 # ---------------------------------------------------------------------------
 # Key Normalization
@@ -65,10 +64,10 @@ class AccessConfigLoader(Protocol):
 class PlatformPolicyConfigModel(BaseModel):
     """Typed schema for one platform policy in runtime config JSON."""
 
-    authn_token: str = "authn"
+    authn_token: str = "authn"  # noqa: S105 -- default group-slug token, not a credential
     authn_removal_mode: str = "delete"
     adapter_type: str = "fake"
-    mode_overrides: Dict[str, EntitlementMode] = Field(default_factory=dict)
+    mode_overrides: dict[str, EntitlementMode] = Field(default_factory=dict)
 
 
 class CatalogParserConfigModel(BaseModel):
@@ -80,8 +79,8 @@ class CatalogParserConfigModel(BaseModel):
 class CatalogExtensionsConfigModel(BaseModel):
     """Typed schema for catalog extensions block in runtime config."""
 
-    parsers: Dict[str, CatalogParserConfigModel] = Field(default_factory=dict)
-    platform_display_names: Dict[str, str] = Field(default_factory=dict)
+    parsers: dict[str, CatalogParserConfigModel] = Field(default_factory=dict)
+    platform_display_names: dict[str, str] = Field(default_factory=dict)
 
 
 class RuntimeConfigJsonModel(BaseModel):
@@ -112,8 +111,8 @@ class RuntimeConfigJsonModel(BaseModel):
 
     dir_prefix: str
     dir_separator: str = "-"
-    platforms: Dict[str, PlatformPolicyConfigModel] = Field(default_factory=dict)
-    extensions: Dict[str, Any] = Field(default_factory=dict)
+    platforms: dict[str, PlatformPolicyConfigModel] = Field(default_factory=dict)
+    extensions: dict[str, Any] = Field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
@@ -124,11 +123,11 @@ class RuntimeConfigJsonModel(BaseModel):
 def _build_runtime_config(
     dir_prefix: str,
     dir_separator: str,
-    platforms_model: Dict[str, PlatformPolicyConfigModel],
-    extensions: Dict[str, Any] | None = None,
+    platforms_model: dict[str, PlatformPolicyConfigModel],
+    extensions: dict[str, Any] | None = None,
 ) -> AccessRuntimeConfig:
     """Convert validated JSON platform models into ``AccessRuntimeConfig``."""
-    platforms: Dict[str, PlatformPolicy] = {}
+    platforms: dict[str, PlatformPolicy] = {}
     for key, raw_policy in platforms_model.items():
         platforms[normalize_target_key(key)] = PlatformPolicy(
             authn_token=raw_policy.authn_token,
@@ -142,9 +141,7 @@ def _build_runtime_config(
         cat_model = CatalogExtensionsConfigModel.model_validate(extensions["catalog"])
         parsers = {}
         for platform_key, parser_cfg in cat_model.parsers.items():
-            parsers[platform_key] = CatalogParserConfig(
-                known_envs=list(parser_cfg.known_envs)
-            )
+            parsers[platform_key] = CatalogParserConfig(known_envs=list(parser_cfg.known_envs))
         catalog_ext = CatalogExtensions(
             parsers=parsers,
             platform_display_names=dict(cat_model.platform_display_names),
@@ -241,9 +238,7 @@ class EnvConfigLoader:
     class _EnvModel(BaseSettings):
         dir_prefix: str = Field(default="", alias="ACCESS_CONFIG_ENV_DIR_PREFIX")
         dir_separator: str = Field(default="-", alias="ACCESS_CONFIG_ENV_DIR_SEPARATOR")
-        platforms_json: str = Field(
-            default="{}", alias="ACCESS_CONFIG_ENV_PLATFORMS_JSON"
-        )
+        platforms_json: str = Field(default="{}", alias="ACCESS_CONFIG_ENV_PLATFORMS_JSON")
 
         model_config = SettingsConfigDict(
             env_file=".env",
@@ -316,10 +311,7 @@ class FileJsonConfigLoader:
             return result
         return OperationResult.success(
             data=result.data,
-            message=(
-                f"file_json_config_loaded path={path} "
-                f"platforms={len(result.data.platforms) if result.data else 0}"
-            ),
+            message=(f"file_json_config_loaded path={path} platforms={len(result.data.platforms) if result.data else 0}"),
         )
 
 
@@ -348,7 +340,4 @@ def get_access_config_loader(source: str) -> AccessConfigLoader:
         return FileJsonConfigLoader()
     if source == "env":
         return EnvConfigLoader()
-    raise ValueError(
-        f"Unsupported ACCESS_CONFIG_SOURCE '{source}'. "
-        "Use bundle, inline_json, file_json, or env."
-    )
+    raise ValueError(f"Unsupported ACCESS_CONFIG_SOURCE '{source}'. Use bundle, inline_json, file_json, or env.")

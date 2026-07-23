@@ -9,7 +9,7 @@ All I/O is read-only: runtime config reads and directory membership checks.
 No state is modified here.
 """
 
-from typing import Dict, List, Optional, Protocol, TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 import structlog
 
@@ -30,13 +30,13 @@ logger = structlog.get_logger()
 class CatalogServicePort(Protocol):
     """Structural contract for the catalog service consumed by route handlers."""
 
-    def list_platforms(self) -> OperationResult[List[PlatformSummary]]: ...
+    def list_platforms(self) -> OperationResult[list[PlatformSummary]]: ...
 
     def list_entitlements(
         self,
         platform: str,
         user_email: str,
-    ) -> OperationResult[List[EntitlementEntry]]: ...
+    ) -> OperationResult[list[EntitlementEntry]]: ...
 
 
 class CatalogService:
@@ -55,10 +55,10 @@ class CatalogService:
 
     def __init__(
         self,
-        runtime_config: "AccessRuntimeConfig",
-        directory: "DirectoryProvider",
-        parsers: Dict[str, CatalogSlugParser],
-        display_names: Optional[Dict[str, str]] = None,
+        runtime_config: AccessRuntimeConfig,
+        directory: DirectoryProvider,
+        parsers: dict[str, CatalogSlugParser],
+        display_names: dict[str, str] | None = None,
     ) -> None:
         self._config = runtime_config
         self._directory = directory
@@ -71,7 +71,7 @@ class CatalogService:
     # Public API
     # ------------------------------------------------------------------
 
-    def list_platforms(self) -> OperationResult[List[PlatformSummary]]:
+    def list_platforms(self) -> OperationResult[list[PlatformSummary]]:
         """Return a summary for every configured platform.
 
         No IDP calls are made — this is a pure config read.
@@ -82,7 +82,7 @@ class CatalogService:
         log = self.logger.bind(operation="list_platforms")
         log.info("catalog_list_platforms_started")
 
-        summaries: List[PlatformSummary] = []
+        summaries: list[PlatformSummary] = []
         for key in sorted(self._config.platforms.keys()):
             authn_slug = self._config.authn_group_slug(key)
             display_name = self._display_names.get(key, key)
@@ -101,7 +101,7 @@ class CatalogService:
         self,
         platform: str,
         user_email: str,
-    ) -> OperationResult[List[EntitlementEntry]]:
+    ) -> OperationResult[list[EntitlementEntry]]:
         """Enumerate all entitlements for a platform with membership annotation.
 
         Steps:
@@ -156,7 +156,7 @@ class CatalogService:
         groups = discovery_result.data  # List[DirectoryGroup]
         authn_slug = self._config.authn_group_slug(normalized)
 
-        entries: List[EntitlementEntry] = []
+        entries: list[EntitlementEntry] = []
         requestable_count = 0
         provisioned_count = 0
 
@@ -176,11 +176,7 @@ class CatalogService:
 
             # Resolve effective mode from config-time overrides.
             raw_mode = policy.mode_overrides.get(token, "sync_managed")
-            mode: str = (
-                raw_mode
-                if raw_mode in ("sync_managed", "ephemeral", "deactivated")
-                else "sync_managed"
-            )
+            mode: str = raw_mode if raw_mode in ("sync_managed", "ephemeral", "deactivated") else "sync_managed"
             requestable = mode == "sync_managed"
 
             parsed_token = parser.parse(token)
@@ -226,11 +222,11 @@ class CatalogService:
         user_email: str,
         log: object,
         token: str,
-    ) -> Optional[bool]:
+    ) -> bool | None:
         """Return membership status; None on IDP error (non-fatal)."""
         result = self._directory.check_membership(group_email, user_email)
         if not result.is_success:
-            getattr(log, "warning")(
+            log.warning(
                 "catalog_membership_check_failed",
                 token=token,
                 group_email=group_email,

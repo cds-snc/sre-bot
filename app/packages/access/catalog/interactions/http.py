@@ -9,14 +9,14 @@ Handlers validate, delegate to the service, and map OperationResult to HTTP.
 No business logic lives here.
 """
 
-from typing import Annotated, List, Protocol
+from typing import Annotated, Protocol
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Security
 
-from infrastructure.security.models import User
 from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.security import get_current_user
+from infrastructure.security.models import User
 from packages.access.catalog.domain import EntitlementEntry, PlatformSummary
 from packages.access.catalog.providers import get_catalog_service, get_catalog_settings
 from packages.access.catalog.schemas import (
@@ -40,13 +40,13 @@ class _CatalogSettingsPort(Protocol):
 class _CatalogServicePort(Protocol):
     """Structural contract for catalog service consumed by route handlers."""
 
-    def list_platforms(self) -> OperationResult[List[PlatformSummary]]: ...
+    def list_platforms(self) -> OperationResult[list[PlatformSummary]]: ...
 
     def list_entitlements(
         self,
         platform: str,
         user_email: str,
-    ) -> OperationResult[List[EntitlementEntry]]: ...
+    ) -> OperationResult[list[EntitlementEntry]]: ...
 
 
 def _map_status(status: OperationStatus) -> int:
@@ -86,12 +86,8 @@ def _noop_catalog_service() -> _CatalogServicePort | None:
 )
 def list_platforms(
     settings: Annotated[_CatalogSettingsPort, Depends(get_catalog_settings)],
-    current_user: Annotated[
-        User, Security(get_current_user, scopes=["sre-bot:access-catalog"])
-    ],
-    service: Annotated[
-        _CatalogServicePort | None, Depends(_noop_catalog_service)
-    ] = None,
+    current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-catalog"])],
+    service: Annotated[_CatalogServicePort | None, Depends(_noop_catalog_service)] = None,
 ) -> PlatformListResponse:
     """List all configured platforms."""
     log = logger.bind(
@@ -113,9 +109,7 @@ def list_platforms(
     if result.data is None:
         raise HTTPException(status_code=500, detail="Failed to retrieve platforms")
 
-    return PlatformListResponse(
-        platforms=[_platform_to_response(p) for p in result.data]
-    )
+    return PlatformListResponse(platforms=[_platform_to_response(p) for p in result.data])
 
 
 @router.get(
@@ -123,8 +117,7 @@ def list_platforms(
     response_model=EntitlementListResponse,
     summary="List entitlements for a platform",
     description=(
-        "Return all entitlements available on the platform, annotated with "
-        "the authenticated user's current membership status."
+        "Return all entitlements available on the platform, annotated with the authenticated user's current membership status."
     ),
     status_code=200,
     responses={
@@ -135,12 +128,8 @@ def list_platforms(
 def list_entitlements(
     platform: str,
     settings: Annotated[_CatalogSettingsPort, Depends(get_catalog_settings)],
-    current_user: Annotated[
-        User, Security(get_current_user, scopes=["sre-bot:access-catalog"])
-    ],
-    service: Annotated[
-        _CatalogServicePort | None, Depends(_noop_catalog_service)
-    ] = None,
+    current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-catalog"])],
+    service: Annotated[_CatalogServicePort | None, Depends(_noop_catalog_service)] = None,
 ) -> EntitlementListResponse:
     """List entitlements for a platform with membership annotation."""
     log = logger.bind(
@@ -165,7 +154,7 @@ def list_entitlements(
             detail=result.message or "Failed to retrieve entitlements",
         )
 
-    entries: List[EntitlementEntry] = result.data or []
+    entries: list[EntitlementEntry] = result.data or []
     return EntitlementListResponse(
         platform=platform.strip().lower(),
         entitlements=[_entry_to_response(e) for e in entries],

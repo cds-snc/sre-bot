@@ -18,19 +18,13 @@ exact same locking, job record shape, and error sanitization semantics.
 """
 
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 
 from infrastructure.idempotency import IdempotencyService
 from packages.access.sync.application import AccessSyncApplicationServicePort
 from packages.access.sync.domain import ReconciliationOutcome, SyncOutcome
-from packages.access.sync.platform_lock import (
-    acquire_lock,
-    platform_lock_key,
-    release_lock,
-    user_lock_key,
-)
 from packages.access.sync.job_models import (
     CompletedPlatformRecord,
     CompletedUserRecord,
@@ -40,6 +34,12 @@ from packages.access.sync.job_models import (
     PlatformRunningRecord,
     SyncJobError,
     UserRunningRecord,
+)
+from packages.access.sync.platform_lock import (
+    acquire_lock,
+    platform_lock_key,
+    release_lock,
+    user_lock_key,
 )
 
 logger = structlog.get_logger()
@@ -68,9 +68,7 @@ def run_user_sync_job(
     external error payload always uses ``SyncJobError.SYNC_FAILED`` so
     implementation details do not leak through the job store.
     """
-    log = logger.bind(
-        job_id=job_id, user_email=user_email, platform=platform, dry_run=dry_run
-    )
+    log = logger.bind(job_id=job_id, user_email=user_email, platform=platform, dry_run=dry_run)
     log.info("user_sync_job_started", correlation_id=request_id)
     record: FailedUserRecord | CompletedUserRecord
     try:
@@ -80,10 +78,8 @@ def run_user_sync_job(
             dry_run=dry_run,
             request_id=request_id,
         )
-        log.info(
-            "user_sync_job_finished", success=result.is_success, error=result.message
-        )
-        completed_at = datetime.now(timezone.utc).isoformat()
+        log.info("user_sync_job_finished", success=result.is_success, error=result.message)
+        completed_at = datetime.now(UTC).isoformat()
         if result.is_success and result.data is not None:
             outcome: SyncOutcome = result.data
             record = CompletedUserRecord(
@@ -118,7 +114,7 @@ def run_user_sync_job(
                 error_code=result.error_code,
             )
     except Exception as exc:
-        completed_at = datetime.now(timezone.utc).isoformat()
+        completed_at = datetime.now(UTC).isoformat()
         record = FailedUserRecord(
             job_id=job_id,
             user_email=user_email,
@@ -132,9 +128,7 @@ def run_user_sync_job(
 
     payload = record.to_dict()
     idempotency.set(job_id, payload, ttl_seconds=job_ttl_seconds)
-    release_lock(
-        user_lock_key(platform, user_email), payload, idempotency, job_ttl_seconds
-    )
+    release_lock(user_lock_key(platform, user_email), payload, idempotency, job_ttl_seconds)
 
 
 def run_platform_sync_job(
@@ -176,7 +170,7 @@ def run_platform_sync_job(
             dry_run=dry_run,
             request_id=request_id,
         )
-        completed_at = datetime.now(timezone.utc).isoformat()
+        completed_at = datetime.now(UTC).isoformat()
         if result.is_success and result.data is not None:
             recon: ReconciliationOutcome = result.data
             record = CompletedPlatformRecord(
@@ -192,10 +186,7 @@ def run_platform_sync_job(
                 changed_user_count=recon.changed_user_count,
                 unchanged_user_count=recon.unchanged_user_count,
                 action_counts=dict(recon.action_counts),
-                lifecycle_actions={
-                    action: list(users)
-                    for action, users in recon.lifecycle_actions.items()
-                },
+                lifecycle_actions={action: list(users) for action, users in recon.lifecycle_actions.items()},
                 entitlements_by_action={
                     action: {slug: list(users) for slug, users in by_slug.items()}
                     for action, by_slug in recon.entitlements_by_action.items()
@@ -224,7 +215,7 @@ def run_platform_sync_job(
                 error_code=result.error_code,
             )
     except Exception as exc:
-        completed_at = datetime.now(timezone.utc).isoformat()
+        completed_at = datetime.now(UTC).isoformat()
         record = FailedPlatformRecord(
             job_id=job_id,
             platform=platform,

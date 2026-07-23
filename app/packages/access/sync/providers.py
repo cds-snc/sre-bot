@@ -1,5 +1,4 @@
 import functools
-from typing import Dict
 
 from infrastructure.clients.aws import get_aws_clients
 from infrastructure.directory import get_directory_provider
@@ -21,10 +20,10 @@ def get_access_sync_settings() -> AccessSyncSettings:
 
 
 @functools.lru_cache(maxsize=1)
-def get_access_sync_adapters() -> Dict[str, AccessSyncAdapter]:
+def get_access_sync_adapters() -> dict[str, AccessSyncAdapter]:
     """Provide a map of available platform adapters."""
     config = get_access_runtime_config()
-    adapters: Dict[str, AccessSyncAdapter] = {}
+    adapters: dict[str, AccessSyncAdapter] = {}
 
     for platform_name, policy in config.platforms.items():
         if policy.adapter_type == "aws_identity_center":
@@ -32,9 +31,7 @@ def get_access_sync_adapters() -> Dict[str, AccessSyncAdapter]:
         elif policy.adapter_type == "fake":
             adapters[platform_name] = FakePlatformAdapter()
         else:
-            raise ValueError(
-                f"unknown adapter_type '{policy.adapter_type}' for platform '{platform_name}'"
-            )
+            raise ValueError(f"unknown adapter_type '{policy.adapter_type}' for platform '{platform_name}'")
 
     return adapters
 
@@ -51,9 +48,7 @@ def get_access_sync_coordinator() -> AccessSyncApplicationService:
     return AccessSyncApplicationService(
         adapters=get_access_sync_adapters(),
         config=get_access_runtime_config(),
-        membership_builder=DirectoryMembershipBuilder(
-            directory=get_directory_provider()
-        ),
+        membership_builder=DirectoryMembershipBuilder(directory=get_directory_provider()),
         repository=get_sync_run_repository(),
         dispatcher=get_event_dispatcher(),
     )

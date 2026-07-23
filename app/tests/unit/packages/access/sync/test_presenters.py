@@ -1,6 +1,6 @@
 """Unit tests for access sync transport presenters."""
 
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
@@ -10,7 +10,6 @@ from packages.access.sync.presenters import (
     to_slack_status_message,
 )
 from packages.access.sync.schemas import SyncJobStatusResponse
-
 
 # ---------------------------------------------------------------------------
 # to_http_status_response
@@ -89,7 +88,7 @@ def test_to_http_status_response_maps_failed_record():
 @pytest.mark.unit
 def test_to_slack_status_message_in_progress_contains_job_id():
     """In-progress status message must include the job ID."""
-    record: Dict[str, Any] = {
+    record: dict[str, Any] = {
         "job_id": "j-4",
         "platform": "aws",
         "dry_run": False,
@@ -108,7 +107,7 @@ def test_to_slack_status_message_in_progress_contains_job_id():
 @pytest.mark.unit
 def test_to_slack_status_message_completed_platform_contains_metrics():
     """Completed platform status message must include reconciliation metrics."""
-    record: Dict[str, Any] = {
+    record: dict[str, Any] = {
         "job_id": "j-5",
         "platform": "aws",
         "sync_type": "platform",
@@ -158,7 +157,7 @@ def test_to_slack_status_message_completed_platform_contains_metrics():
 @pytest.mark.unit
 def test_to_slack_status_message_completed_user_contains_email():
     """Completed user status message must include the user email."""
-    record: Dict[str, Any] = {
+    record: dict[str, Any] = {
         "job_id": "j-6",
         "platform": "aws",
         "sync_type": "user",
@@ -186,7 +185,7 @@ def test_to_slack_status_message_completed_user_contains_email():
 @pytest.mark.unit
 def test_to_slack_status_message_failed_contains_error():
     """Failed status message must include the error string."""
-    record: Dict[str, Any] = {
+    record: dict[str, Any] = {
         "job_id": "j-7",
         "platform": "aws",
         "dry_run": False,
@@ -206,7 +205,7 @@ def test_to_slack_status_message_failed_contains_error():
 @pytest.mark.unit
 def test_to_slack_status_message_unknown_status_does_not_raise():
     """Unknown status must not raise — it should return a fallback message."""
-    record: Dict[str, Any] = {
+    record: dict[str, Any] = {
         "job_id": "j-8",
         "platform": "aws",
         "dry_run": False,
