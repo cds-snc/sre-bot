@@ -1,7 +1,8 @@
 """Unit tests for AWS ops group assignment handler."""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from modules.aws import ops_group_assignment
 
@@ -25,9 +26,7 @@ def test_should_return_none_when_feature_disabled(mock_get_aws_feature_settings)
 @pytest.mark.unit
 @patch("modules.aws.ops_group_assignment.get_aws_feature_settings")
 @patch("modules.aws.ops_group_assignment.identity_store")
-def test_should_return_failed_when_group_not_found(
-    mock_identity_store, mock_get_aws_feature_settings
-):
+def test_should_return_failed_when_group_not_found(mock_identity_store, mock_get_aws_feature_settings):
     """Test execute returns failed status when ops group not found."""
     # Arrange
     mock_feature_settings = MagicMock()
@@ -97,9 +96,7 @@ def test_should_return_ok_when_all_accounts_assigned(
     mock_organizations.list_organization_accounts.return_value = [
         {"Id": "111111111111", "Name": "Account1", "Status": "ACTIVE"},
     ]
-    mock_sso_admin.list_account_assignments_for_principal.return_value = [
-        {"AccountId": "111111111111"}
-    ]
+    mock_sso_admin.list_account_assignments_for_principal.return_value = [{"AccountId": "111111111111"}]
 
     # Act
     result = ops_group_assignment.execute()
@@ -261,9 +258,7 @@ def test_should_handle_multiple_accounts_with_mixed_status(
         {"Id": "333333333333", "Name": "Account3", "Status": "ACTIVE"},
         {"Id": "444444444444", "Name": "Account4", "Status": "CLOSED"},
     ]
-    mock_sso_admin.list_account_assignments_for_principal.return_value = [
-        {"AccountId": "111111111111"}
-    ]
+    mock_sso_admin.list_account_assignments_for_principal.return_value = [{"AccountId": "111111111111"}]
     mock_sso_admin.create_account_assignment.return_value = True
 
     # Act

@@ -1,8 +1,9 @@
 """Unit tests for AWS groups command handler."""
 
-import pytest
-from unittest.mock import MagicMock, patch
 import datetime
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from modules.aws import groups
 
@@ -20,9 +21,7 @@ def test_should_show_error_when_groups_command_empty():
     groups.command_handler(client, body, respond, args)
 
     # Assert
-    respond.assert_called_once_with(
-        "Invalid command. Type `/aws groups help` for more information."
-    )
+    respond.assert_called_once_with("Invalid command. Type `/aws groups help` for more information.")
 
 
 @pytest.mark.unit
@@ -144,9 +143,7 @@ def test_should_synchronize_groups_when_user_has_permission(
 @patch("modules.aws.groups.get_aws_feature_settings")
 @patch("modules.aws.groups.permissions")
 @patch("modules.aws.groups.slack_users")
-def test_should_deny_sync_when_user_lacks_permission(
-    mock_slack_users, mock_permissions, mock_get_aws_feature_settings
-):
+def test_should_deny_sync_when_user_lacks_permission(mock_slack_users, mock_permissions, mock_get_aws_feature_settings):
     """Test sync denial when user lacks permission."""
     # Arrange
     client = MagicMock()
@@ -220,9 +217,7 @@ def test_should_list_groups_when_user_has_permission(
 @patch("modules.aws.groups.get_aws_feature_settings")
 @patch("modules.aws.groups.permissions")
 @patch("modules.aws.groups.slack_users")
-def test_should_deny_list_when_user_lacks_permission(
-    mock_slack_users, mock_permissions, mock_get_aws_feature_settings
-):
+def test_should_deny_list_when_user_lacks_permission(mock_slack_users, mock_permissions, mock_get_aws_feature_settings):
     """Test list denial when user lacks permission."""
     # Arrange
     client = MagicMock()

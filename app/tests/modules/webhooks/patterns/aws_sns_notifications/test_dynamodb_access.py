@@ -52,9 +52,7 @@ def test_dynamodb_access_handler_formats_message():
     blocks = dynamodb_access.handle_dynamodb_access(payload, client)
     rendered_text = block_text(blocks)
 
-    assert (
-        blocks[1]["text"]["text"] == "Unexpected DynamoDB access in secret-production"
-    )
+    assert blocks[1]["text"]["text"] == "Unexpected DynamoDB access in secret-production"
     assert "Scan" in rendered_text
     assert "arn:aws:sts::637287734259:assumed-role" in rendered_text
     assert "142.114.34.223" in rendered_text

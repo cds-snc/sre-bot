@@ -1,7 +1,8 @@
 """Unit tests for AWS account health handler."""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from modules.aws import aws_account_health
 
@@ -43,15 +44,11 @@ def test_should_get_account_spend_with_data(mock_cost_explorer):
     """Test get_account_spend returns formatted cost when data available."""
     # Arrange
     mock_cost_explorer.get_cost_and_usage.return_value = {
-        "ResultsByTime": [
-            {"Groups": [{"Metrics": {"UnblendedCost": {"Amount": "123.456789"}}}]}
-        ]
+        "ResultsByTime": [{"Groups": [{"Metrics": {"UnblendedCost": {"Amount": "123.456789"}}}]}]
     }
 
     # Act
-    result = aws_account_health.get_account_spend(
-        "account-123", "2024-01-01", "2024-01-31"
-    )
+    result = aws_account_health.get_account_spend("account-123", "2024-01-01", "2024-01-31")
 
     # Assert
     assert result == "123.46"
@@ -65,9 +62,7 @@ def test_should_return_zero_when_no_spend_data(mock_cost_explorer):
     mock_cost_explorer.get_cost_and_usage.return_value = {"ResultsByTime": [{}]}
 
     # Act
-    result = aws_account_health.get_account_spend(
-        "account-123", "2024-01-01", "2024-01-31"
-    )
+    result = aws_account_health.get_account_spend("account-123", "2024-01-01", "2024-01-31")
 
     # Assert
     assert result == "0.00"
@@ -78,14 +73,10 @@ def test_should_return_zero_when_no_spend_data(mock_cost_explorer):
 def test_should_return_zero_when_no_groups_in_spend_data(mock_cost_explorer):
     """Test get_account_spend returns 0.00 when Groups is empty."""
     # Arrange
-    mock_cost_explorer.get_cost_and_usage.return_value = {
-        "ResultsByTime": [{"Groups": []}]
-    }
+    mock_cost_explorer.get_cost_and_usage.return_value = {"ResultsByTime": [{"Groups": []}]}
 
     # Act
-    result = aws_account_health.get_account_spend(
-        "account-123", "2024-01-01", "2024-01-31"
-    )
+    result = aws_account_health.get_account_spend("account-123", "2024-01-01", "2024-01-31")
 
     # Assert
     assert result == "0.00"
@@ -152,9 +143,7 @@ def test_should_return_zero_guardduty_when_no_findings(mock_guard_duty):
     """Test get_guardduty_summary returns 0 when no findings."""
     # Arrange
     mock_guard_duty.list_detectors.return_value = ["detector-123"]
-    mock_guard_duty.get_findings_statistics.return_value = {
-        "FindingStatistics": {"CountBySeverity": {}}
-    }
+    mock_guard_duty.get_findings_statistics.return_value = {"FindingStatistics": {"CountBySeverity": {}}}
 
     # Act
     result = aws_account_health.get_guardduty_summary("account-123")
@@ -166,9 +155,7 @@ def test_should_return_zero_guardduty_when_no_findings(mock_guard_duty):
 @pytest.mark.unit
 @patch("modules.aws.aws_account_health.get_ignored_security_hub_issues")
 @patch("modules.aws.aws_account_health.security_hub")
-def test_should_get_securityhub_summary_successfully(
-    mock_security_hub, mock_get_ignored
-):
+def test_should_get_securityhub_summary_successfully(mock_security_hub, mock_get_ignored):
     """Test get_securityhub_summary returns finding count."""
     # Arrange
     mock_get_ignored.return_value = []
@@ -191,9 +178,7 @@ def test_should_get_securityhub_summary_successfully(
 @pytest.mark.unit
 @patch("modules.aws.aws_account_health.get_ignored_security_hub_issues")
 @patch("modules.aws.aws_account_health.security_hub")
-def test_should_return_zero_securityhub_when_no_findings(
-    mock_security_hub, mock_get_ignored
-):
+def test_should_return_zero_securityhub_when_no_findings(mock_security_hub, mock_get_ignored):
     """Test get_securityhub_summary returns 0 when no findings."""
     # Arrange
     mock_get_ignored.return_value = []

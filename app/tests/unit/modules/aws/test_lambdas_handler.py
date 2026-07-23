@@ -1,7 +1,8 @@
 """Unit tests for AWS Lambda handler."""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from modules.aws import lambdas
 
@@ -29,9 +30,7 @@ def test_should_show_help_when_empty_command(make_command):
     lambdas.command_handler(client, body, respond, args)
 
     # Assert
-    respond.assert_called_once_with(
-        "Invalid command. Type `/aws lambda help` for more information."
-    )
+    respond.assert_called_once_with("Invalid command. Type `/aws lambda help` for more information.")
 
 
 @pytest.mark.unit
@@ -85,9 +84,7 @@ def test_should_delegate_functions_command(mock_request_functions, make_command)
 
 @pytest.mark.unit
 @patch("modules.aws.lambdas.request_list_functions")
-def test_should_delegate_function_singular_command(
-    mock_request_functions, make_command
-):
+def test_should_delegate_function_singular_command(mock_request_functions, make_command):
     """Test command_handler delegates function (singular) command."""
     # Arrange
     client = MagicMock()
@@ -149,9 +146,7 @@ def test_should_show_error_for_invalid_command(make_command):
     lambdas.command_handler(client, body, respond, args)
 
     # Assert
-    respond.assert_called_once_with(
-        "Invalid command. Type `/aws lambda help` for more information."
-    )
+    respond.assert_called_once_with("Invalid command. Type `/aws lambda help` for more information.")
 
 
 @pytest.mark.unit

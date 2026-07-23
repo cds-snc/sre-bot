@@ -1,6 +1,5 @@
 import json
 import re
-from typing import Dict, List, Union
 
 from slack_sdk import WebClient
 from structlog import get_logger
@@ -16,12 +15,12 @@ def nested_get(dictionary, keys):
     for key in keys:
         try:
             dictionary = dictionary[key]
-        except (KeyError, TypeError):
+        except KeyError, TypeError:
             return None
     return dictionary
 
 
-def handle_abuse_notification(payload: AwsSnsPayload, client: WebClient) -> List[Dict]:
+def handle_abuse_notification(payload: AwsSnsPayload, client: WebClient) -> list[dict]:
     """
     Handle AWS abuse notifications from AWS SNS.
 
@@ -38,10 +37,8 @@ def handle_abuse_notification(payload: AwsSnsPayload, client: WebClient) -> List
             return []
 
         msg = json.loads(message)
-    except (json.JSONDecodeError, TypeError):
-        logger.warning(
-            "failed_to_parse_abuse_notification_message", message=payload.Message
-        )
+    except json.JSONDecodeError, TypeError:
+        logger.warning("failed_to_parse_abuse_notification_message", message=payload.Message)
         return []
 
     # Extract account ID from TopicArn
@@ -50,10 +47,7 @@ def handle_abuse_notification(payload: AwsSnsPayload, client: WebClient) -> List
     account = topic_match.groups()[0] if topic_match else "unknown"
 
     event_type_code = nested_get(msg, ["detail", "eventTypeCode"]) or "Unknown Event"
-    event_description = (
-        nested_get(msg, ["detail", "eventDescription", 0, "latestDescription"])
-        or "No description available"
-    )
+    event_description = nested_get(msg, ["detail", "eventDescription", 0, "latestDescription"]) or "No description available"
 
     # Format the event type code for display
     formatted_event_type = event_type_code.replace("_", " ")
@@ -86,9 +80,7 @@ def handle_abuse_notification(payload: AwsSnsPayload, client: WebClient) -> List
     return blocks
 
 
-def is_abuse_notification(
-    payload: AwsSnsPayload, parsed_message: Union[str, dict]
-) -> bool:
+def is_abuse_notification(payload: AwsSnsPayload, parsed_message: str | dict) -> bool:
     """
     Check if the AWS SNS message is an abuse notification.
 

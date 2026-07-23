@@ -1,6 +1,6 @@
 .PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit backlog-board check-prefix-guardrail audit-client-usage-matrix
 
-RUFF_SCOPE := api tests/api infrastructure tests/unit/infrastructure integrations tests/integrations tests/unit/integrations modules/incident modules/atip modules/secret modules/role tests/modules/incident tests/modules/secret tests/modules/role tests/unit/modules/atip
+RUFF_SCOPE := api tests/api infrastructure tests/unit/infrastructure integrations tests/integrations tests/unit/integrations modules/incident modules/atip modules/secret modules/role modules/webhooks modules/aws tests/modules/incident tests/modules/secret tests/modules/role tests/modules/webhooks tests/unit/modules/atip tests/unit/modules/aws
 
 dev:
 	PREFIX="dev-" SLACK__COMMAND_PREFIX="dev-" uv run uvicorn main:server_app --reload

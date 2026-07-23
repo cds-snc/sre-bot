@@ -1,7 +1,8 @@
 """Unit tests for AWS Identity Center synchronization handler."""
 
-import pytest
 from unittest.mock import patch
+
+import pytest
 
 from modules.aws import identity_center
 
@@ -19,7 +20,7 @@ def mock_google_groups():
                     "email": f"aws-group{i}@example.com",
                     "members": [
                         {"primaryEmail": f"user{i}@example.com"},
-                        {"primaryEmail": f"user{i+1}@example.com"},
+                        {"primaryEmail": f"user{i + 1}@example.com"},
                     ],
                 }
             )
@@ -185,9 +186,7 @@ class TestSyncUsers:
         ]
 
         # Act
-        created, deleted = identity_center.sync_users(
-            source_users, target_users, enable_user_create=True
-        )
+        created, deleted = identity_center.sync_users(source_users, target_users, enable_user_create=True)
 
         # Assert
         assert len(created) == 1
@@ -210,9 +209,7 @@ class TestSyncUsers:
         # provision_entities should still be called for deletion
         assert mock_entities.provision_entities.call_count >= 1
 
-    def test_should_delete_all_when_delete_target_all(
-        self, mock_filters, mock_entities
-    ):
+    def test_should_delete_all_when_delete_target_all(self, mock_filters, mock_entities):
         """Test sync_users deletes all users when delete_target_all is True."""
         # Arrange
         source_users = []
@@ -224,9 +221,7 @@ class TestSyncUsers:
         ]
 
         # Act
-        created, deleted = identity_center.sync_users(
-            source_users, target_users, delete_target_all=True
-        )
+        created, deleted = identity_center.sync_users(source_users, target_users, delete_target_all=True)
 
         # Assert
         assert len(created) == 0
@@ -248,9 +243,7 @@ class TestSyncGroups:
                 "members": [{"primaryEmail": "user1@example.com"}],
             }
         ]
-        target_groups = [
-            {"GroupId": "group-123", "DisplayName": "Group1", "GroupMemberships": []}
-        ]
+        target_groups = [{"GroupId": "group-123", "DisplayName": "Group1", "GroupMemberships": []}]
         target_users = [{"UserId": "user-123", "UserName": "user1@example.com"}]
 
         # Setup filters mock
@@ -266,17 +259,13 @@ class TestSyncGroups:
         mock_entities.provision_entities.return_value = [{"MembershipId": "mem-1"}]
 
         # Act
-        created, deleted = identity_center.sync_groups(
-            source_groups, target_groups, target_users
-        )
+        created, deleted = identity_center.sync_groups(source_groups, target_groups, target_users)
 
         # Assert
         assert isinstance(created, list)
         assert isinstance(deleted, list)
 
-    def test_should_skip_membership_create_when_disabled(
-        self, mock_filters, mock_entities
-    ):
+    def test_should_skip_membership_create_when_disabled(self, mock_filters, mock_entities):
         """Test sync_groups skips membership creation when disabled."""
         # Arrange
         source_groups = [
@@ -285,9 +274,7 @@ class TestSyncGroups:
                 "members": [{"primaryEmail": "user1@example.com"}],
             }
         ]
-        target_groups = [
-            {"GroupId": "group-123", "DisplayName": "Group1", "GroupMemberships": []}
-        ]
+        target_groups = [{"GroupId": "group-123", "DisplayName": "Group1", "GroupMemberships": []}]
         target_users = [{"UserId": "user-123", "UserName": "user1@example.com"}]
 
         mock_filters.preformat_items.side_effect = [
@@ -300,9 +287,7 @@ class TestSyncGroups:
         mock_entities.provision_entities.return_value = []
 
         # Act
-        identity_center.sync_groups(
-            source_groups, target_groups, target_users, enable_membership_create=False
-        )
+        identity_center.sync_groups(source_groups, target_groups, target_users, enable_membership_create=False)
 
         # Assert
         calls = [call for call in mock_entities.provision_entities.call_args_list]
@@ -317,9 +302,7 @@ class TestSyncGroups:
 class TestProvisionAwsUsers:
     """Tests for provision_aws_users function."""
 
-    def test_should_create_users_successfully(
-        self, mock_identity_store, mock_entities, mock_filters, mock_users
-    ):
+    def test_should_create_users_successfully(self, mock_identity_store, mock_entities, mock_filters, mock_users):
         """Test provision_aws_users creates users successfully."""
         # Arrange
         user_emails = ["user1@example.com", "user2@example.com"]
@@ -346,9 +329,7 @@ class TestProvisionAwsUsers:
         assert len(result) == 2
         mock_entities.provision_entities.assert_called_once()
 
-    def test_should_delete_users_successfully(
-        self, mock_identity_store, mock_entities, mock_filters, mock_users
-    ):
+    def test_should_delete_users_successfully(self, mock_identity_store, mock_entities, mock_filters, mock_users):
         """Test provision_aws_users deletes users successfully."""
         # Arrange
         user_emails = ["user1@example.com"]
@@ -367,17 +348,13 @@ class TestProvisionAwsUsers:
         assert len(result) == 1
         mock_entities.provision_entities.assert_called_once()
 
-    def test_should_raise_error_for_invalid_operation(
-        self, mock_identity_store, mock_entities, mock_filters, mock_users
-    ):
+    def test_should_raise_error_for_invalid_operation(self, mock_identity_store, mock_entities, mock_filters, mock_users):
         """Test provision_aws_users raises error for invalid operation."""
         # Act & Assert
         with pytest.raises(ValueError):
             identity_center.provision_aws_users("invalid", ["user@example.com"])
 
-    def test_should_filter_emails_when_creating_users(
-        self, mock_identity_store, mock_entities, mock_filters, mock_users
-    ):
+    def test_should_filter_emails_when_creating_users(self, mock_identity_store, mock_entities, mock_filters, mock_users):
         """Test provision_aws_users filters users by email when creating."""
         # Arrange
         user_emails = ["user1@example.com"]
