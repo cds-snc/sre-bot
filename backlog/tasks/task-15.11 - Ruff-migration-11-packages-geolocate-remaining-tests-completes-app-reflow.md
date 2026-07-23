@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-23 14:19'
-updated_date: '2026-07-23 21:17'
+updated_date: '2026-07-23 21:21'
 labels: []
 dependencies:
   - TASK-15.10
@@ -57,13 +57,13 @@ Expected size: ~38 files.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 git diff feat/dev_env_setup_ruff -- app/packages app/tests is empty (every app source + test file now matches the reference branch)
-- [ ] #2 force-exclude + RUFF_SCOPE consolidated to 'packages' and 'tests'; make lint-ci && make fmt-ci pass over the whole tree
+- [x] #1 git diff feat/dev_env_setup_ruff -- app/packages app/tests is empty (every app source + test file now matches the reference branch)
+- [x] #2 force-exclude + RUFF_SCOPE consolidated to 'packages' and 'tests'; make lint-ci && make fmt-ci pass over the whole tree
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 make test passes; PR references decisions/toolchain.md and TASK-15
+- [x] #1 make test passes; PR references decisions/toolchain.md and TASK-15
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -88,3 +88,20 @@ AC-to-step traceability:
 - AC#2 (force-exclude + RUFF_SCOPE consolidated to packages/tests; make lint-ci && make fmt-ci pass) <- steps 3, 4, verified by step 6.
 - DoD#1 (make test passes; PR references decisions/toolchain.md + TASK-15) <- step 6 (user-run, deferred) + PR description (human/PR action).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented per plan (mirrors TASK-15.1/15.7-15.10 recipe):
+1. git checkout feat/dev_env_setup_ruff -- app/packages/geolocate app/tests/unit/packages/geolocate app/tests/integration app/tests/factories app/tests/fixtures app/tests/utils app/tests/smoke app/tests/conftest.py app/tests/test_factory_validation.py (37 files changed vs main, no adds/deletes -- matches expected ~38). git diff feat/dev_env_setup_ruff -- <same paths> empty (AC#1). packages/geolocate/routes.py and schemas.py confirmed carrying the reviewed S-family noqa markers verbatim.
+2. app/pyproject.toml [tool.black] force-exclude: replaced the full granular alternation (api | tests/api | infrastructure | tests/unit/infrastructure | integrations | tests/integrations | tests/unit/integrations | modules | tests/modules | tests/unit/modules | utils | models | jobs | bin | server | tests/unit/jobs | tests/unit/server | tests/unit/models | packages/access | tests/unit/packages/access) with the consolidated top-level list: api | infrastructure | integrations | modules | packages | utils | models | jobs | bin | server | tests. [tool.ruff.lint] select/extend-select unchanged.
+3. app/Makefile RUFF_SCOPE collapsed to: api infrastructure integrations modules packages utils models jobs bin server tests. fmt/lint/fmt-ci/lint-ci target bodies untouched (already generic).
+4. .github/workflows/scripts/run_bandit_scan.sh RUFF_MIGRATED_PATHS collapsed in sync to /data/app/api,/data/app/infrastructure,/data/app/integrations,/data/app/modules,/data/app/packages,/data/app/utils,/data/app/models,/data/app/jobs,/data/app/bin,/data/app/server,/data/app/tests.
+5. Validation from app/:
+   - make lint-ci -> both ruff invocations 'All checks passed!'; mypy soft-fails via existing '|| true' with 129 pre-existing errors, same profile as TASK-15.10's baseline, all in unrelated legacy modules -- not a regression.
+   - make fmt-ci -> black '1 file would be left unchanged' (only main.py remains in black's scope; everything else now force-excluded); ruff format --check -> 662 files already formatted over the consolidated RUFF_SCOPE.
+   - git diff feat/dev_env_setup_ruff -- app/packages app/tests -> empty (AC#1 confirmed).
+   - Sanity check: git diff feat/dev_env_setup_ruff -- app/pyproject.toml app/Makefile app/uv.lock shows only the expected transitional differences (RUFF_SCOPE/black scaffolding, black dev dependency, uv.lock black entry) -- confirms ALL app source and test content is now byte-identical to the reference branch; only toolchain config remains to be cut over in TASK-15.12.
+   - make test (full suite, run directly by the user from app/) -> exit 0, all green (user-confirmed).
+DoD#1 verified: user ran make test directly and confirmed all green. All ACs and DoD checked. PR should reference decisions/toolchain.md and TASK-15. Task left at In Progress for human review/merge and status transition to Done.
+<!-- SECTION:NOTES:END -->
