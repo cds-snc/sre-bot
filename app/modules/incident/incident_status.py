@@ -1,8 +1,9 @@
-from slack_sdk import WebClient
 from slack_bolt import Respond
-from integrations.google_workspace import google_docs
-from modules.incident import incident_document, incident_folder, db_operations
+from slack_sdk import WebClient
 from structlog import get_logger
+
+from integrations.google_workspace import google_docs
+from modules.incident import db_operations, incident_document, incident_folder
 
 logger = get_logger()
 
@@ -23,9 +24,7 @@ def update_status(
         if response["ok"]:
             for item in range(len(response["bookmarks"])):
                 if response["bookmarks"][item]["title"] == "Incident report":
-                    document_id = google_docs.extract_google_doc_id(
-                        response["bookmarks"][item]["link"]
-                    )
+                    document_id = google_docs.extract_google_doc_id(response["bookmarks"][item]["link"])
     except Exception as e:
         logger.warning(
             "incident_channel_bookmarks_not_found",
@@ -55,9 +54,7 @@ def update_status(
         respond(warning_message)
 
     try:
-        incident_folder.update_spreadsheet_incident_status(
-            incident_folder.return_channel_name(channel_name), status
-        )
+        incident_folder.update_spreadsheet_incident_status(incident_folder.return_channel_name(channel_name), status)
         if incident_id:
             db_operations.update_incident_field(incident_id, "status", status, user_id)
     except Exception as e:

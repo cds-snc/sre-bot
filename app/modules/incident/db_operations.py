@@ -1,9 +1,10 @@
 import datetime
-from boto3.dynamodb.types import TypeSerializer
 
-from models.incidents import Incident
-from integrations.aws import dynamodb
+from boto3.dynamodb.types import TypeSerializer
 from structlog import get_logger
+
+from integrations.aws import dynamodb
+from models.incidents import Incident
 
 logger = get_logger()
 
@@ -34,9 +35,7 @@ def create_incident(incident_data: dict) -> str | None:
         return existing_incident["id"]["S"]
 
     serializer = TypeSerializer()
-    serialized_data = {
-        k: serializer.serialize(v) for k, v in incident.model_dump().items()
-    }
+    serialized_data = {k: serializer.serialize(v) for k, v in incident.model_dump().items()}
 
     response = dynamodb.put_item(
         TableName="incidents",
@@ -54,9 +53,7 @@ def create_incident(incident_data: dict) -> str | None:
         log.info("incident_creation_success")
         return incident.id
     else:
-        message = (
-            f"Failed to create incident in database for channel `{incident.channel_id}`"
-        )
+        message = f"Failed to create incident in database for channel `{incident.channel_id}`"
         log = log.bind(channel_id=getattr(incident, "channel_id", None))
         log.error("incident_creation_failed")
 
@@ -117,9 +114,7 @@ def log_activity(incident_id, message):
                 "L": [
                     {
                         "M": {
-                            "timestamp": {
-                                "S": str(datetime.datetime.now().timestamp())
-                            },
+                            "timestamp": {"S": str(datetime.datetime.now().timestamp())},
                             "message": {"S": message},
                         }
                     }

@@ -74,11 +74,7 @@ def atip_command(ack, command, respond, client, body):
             i18n.set("locale", "fr-FR")
             request_start_modal(client, body, "fr-FR", *args)
         case _:
-            respond(
-                i18n.t(
-                    "atip.unknown_command", action=action, command=command["command"]
-                )
-            )
+            respond(i18n.t("atip.unknown_command", action=action, command=command["command"]))
 
 
 def atip_modal_view(user, ati_id, locale):
@@ -355,20 +351,13 @@ def update_modal_locale(ack, client, body):
     if ati_id is None:
         ati_id = ""
     locale_action = next(
-        (
-            action
-            for action in body["actions"]
-            if action["action_id"] == "atip_change_locale"
-        ),
+        (action for action in body["actions"] if action["action_id"] == "atip_change_locale"),
         None,
     )
     if locale_action is None:
         return
     locale = locale_action["value"]
-    if locale == "en-US":
-        locale = "fr-FR"
-    else:
-        locale = "en-US"
+    locale = "fr-FR" if locale == "en-US" else "en-US"
     i18n.set("locale", locale)
     view_id = body["view"]["id"]
     view = atip_modal_view(user, ati_id, locale)
@@ -386,30 +375,14 @@ def atip_view_handler(ack, body, say, client):
     ati_locale = body["view"]["blocks"][0]["elements"][0]["value"]
     ati_id = body["view"]["state"]["values"]["ati_id"]["ati_id"]["value"]
     ati_content = body["view"]["state"]["values"]["ati_content"]["ati_content"]["value"]
-    ati_contact = body["view"]["state"]["values"]["ati_contact"]["ati_contact"][
-        "selected_user"
-    ]
-    ati_due_date = body["view"]["state"]["values"]["ati_due_date"]["ati_due_date"][
-        "selected_date"
-    ]
-    ati_request_deadline = body["view"]["state"]["values"]["ati_request_deadline"][
-        "ati_request_deadline"
-    ]["selected_date"]
-    ati_tbs_email = body["view"]["state"]["values"]["ati_tbs_email"]["ati_tbs_email"][
-        "value"
-    ]
-    ati_search_width = body["view"]["state"]["values"]["ati_search_width"][
-        "ati_search_width"
-    ]["selected_options"]
-    ati_search_term_a = body["view"]["state"]["values"]["ati_search_term_a"][
-        "ati_search_term_a"
-    ]["value"]
-    ati_search_term_b = body["view"]["state"]["values"]["ati_search_term_b"][
-        "ati_search_term_b"
-    ]["value"]
-    ati_search_term_c = body["view"]["state"]["values"]["ati_search_term_c"][
-        "ati_search_term_c"
-    ]["value"]
+    ati_contact = body["view"]["state"]["values"]["ati_contact"]["ati_contact"]["selected_user"]
+    ati_due_date = body["view"]["state"]["values"]["ati_due_date"]["ati_due_date"]["selected_date"]
+    ati_request_deadline = body["view"]["state"]["values"]["ati_request_deadline"]["ati_request_deadline"]["selected_date"]
+    ati_tbs_email = body["view"]["state"]["values"]["ati_tbs_email"]["ati_tbs_email"]["value"]
+    ati_search_width = body["view"]["state"]["values"]["ati_search_width"]["ati_search_width"]["selected_options"]
+    ati_search_term_a = body["view"]["state"]["values"]["ati_search_term_a"]["ati_search_term_a"]["value"]
+    ati_search_term_b = body["view"]["state"]["values"]["ati_search_term_b"]["ati_search_term_b"]["value"]
+    ati_search_term_c = body["view"]["state"]["values"]["ati_search_term_c"]["ati_search_term_c"]["value"]
 
     errors = {}
 
@@ -524,6 +497,4 @@ Merci de votre compréhension! L’accès à l’information renforce notre dém
     say(text=post_content, channel=channel_id)
 
     # Add trello card
-    trello.add_atip_card_to_trello(
-        ati_id, ati_content, datetime.strptime(ati_request_deadline, "%Y-%m-%d")
-    )
+    trello.add_atip_card_to_trello(ati_id, ati_content, datetime.strptime(ati_request_deadline, "%Y-%m-%d"))

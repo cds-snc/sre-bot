@@ -36,9 +36,7 @@ def _get_channel_info_and_topic(client: WebClient, channel_id: str) -> tuple:
             return None, "", "Unknown"
 
         channel = channel_info["channel"]
-        topic = channel.get("topic", {}).get(
-            "value", "Placeholder / Site reliability engineering"
-        )
+        topic = channel.get("topic", {}).get("value", "Placeholder / Site reliability engineering")
 
         # Parse incident name and product from topic
         # Expected format: "Incident: {name} / {product}"
@@ -105,9 +103,7 @@ def _find_product_folder(product: str) -> str:
     return None
 
 
-def _create_meet_link_bookmark(
-    client: WebClient, channel_id: str, existing_bookmarks: dict, results: dict
-) -> str:
+def _create_meet_link_bookmark(client: WebClient, channel_id: str, existing_bookmarks: dict, results: dict) -> str:
     """Create Meet link bookmark if it doesn't exist.
 
     Returns:
@@ -162,9 +158,7 @@ def _create_document_bookmark(
         return existing_bookmarks["Incident report"]
 
     if not folder_id:
-        results["errors"].append(
-            "Cannot create incident document: product folder not found"
-        )
+        results["errors"].append("Cannot create incident document: product folder not found")
         return ""
 
     try:
@@ -188,9 +182,7 @@ def _create_document_bookmark(
             # Update boilerplate if we have the necessary info
             channel_url = f"https://gcdigital.slack.com/archives/{channel_id}"
             oncall = on_call.get_on_call_users_from_folder(client, folder_id)
-            oncall_names = ", ".join(
-                [user["profile"]["display_name_normalized"] for user in oncall]
-            )
+            oncall_names = ", ".join([user["profile"]["display_name_normalized"] for user in oncall])
 
             incident_document.update_boilerplate_text(
                 document_id,
@@ -226,9 +218,7 @@ def _create_document_bookmark(
             channel_id=channel_id,
             error=str(e),
         )
-        results["errors"].append(
-            f"Failed to create/bookmark incident document: {str(e)}"
-        )
+        results["errors"].append(f"Failed to create/bookmark incident document: {str(e)}")
         return ""
 
 
@@ -252,9 +242,7 @@ def _add_incident_to_sheet(
 
         already_in_sheet = False
         for inc in incidents_in_sheet:
-            if inc.get("channel_id") == channel_id or slug in inc.get(
-                "channel_name", ""
-            ):
+            if inc.get("channel_id") == channel_id or slug in inc.get("channel_name", ""):
                 already_in_sheet = True
                 break
 
@@ -358,9 +346,7 @@ def recreate_missing_resources(
     }
 
     # Get basic channel info
-    channel_info, incident_name, product = _get_channel_info_and_topic(
-        client, channel_id
-    )
+    channel_info, incident_name, product = _get_channel_info_and_topic(client, channel_id)
     if not channel_info:
         results["errors"].append("Failed to fetch channel information")
         return results
@@ -377,9 +363,7 @@ def recreate_missing_resources(
     folder_id = _find_product_folder(product)
 
     # Create resources in sequence
-    meet_url = _create_meet_link_bookmark(
-        client, channel_id, existing_bookmarks, results
-    )
+    meet_url = _create_meet_link_bookmark(client, channel_id, existing_bookmarks, results)
 
     document_link = _create_document_bookmark(
         client,
@@ -440,9 +424,7 @@ def initiate_resources_creation(
     )
 
     # Set the description
-    client.conversations_setPurpose(
-        channel=incident_payload.channel_id, purpose=f"{incident_payload.name}"
-    )
+    client.conversations_setPurpose(channel=incident_payload.channel_id, purpose=f"{incident_payload.name}")
 
     # Announce incident
     text = (
@@ -455,9 +437,7 @@ def initiate_resources_creation(
         client.chat_postMessage(text=text, channel=INCIDENT_CHANNEL)
 
     # Add incident creator to channel
-    client.conversations_invite(
-        channel=incident_payload.channel_id, users=incident_payload.user_id
-    )
+    client.conversations_invite(channel=incident_payload.channel_id, users=incident_payload.user_id)
 
     # Add meeting link
     meet_link = meet.create_space()
@@ -477,9 +457,7 @@ def initiate_resources_creation(
         },
     )
 
-    if isinstance(
-        incident_payload.severity, str
-    ) and incident_payload.severity.lower() in ["sev-1", "sev-2", "sev-3", "sev-4"]:
+    if isinstance(incident_payload.severity, str) and incident_payload.severity.lower() in ["sev-1", "sev-2", "sev-3", "sev-4"]:
         warning_string = f"\n:rotating_light: *SEVERITY WARNING: {incident_payload.severity.upper()}*  :rotating_light: \n\n\n_The incident was initially called with a {incident_payload.severity.upper()} severity level._"
         message_blocks: list[blocks.SectionBlock | blocks.DividerBlock] = [
             blocks.DividerBlock(),
@@ -495,9 +473,7 @@ def initiate_resources_creation(
     client.chat_postMessage(text=text, channel=incident_payload.channel_id)
 
     # Create incident document
-    document_id = incident_document.create_incident_document(
-        incident_payload.slug, incident_payload.folder
-    )
+    document_id = incident_document.create_incident_document(incident_payload.slug, incident_payload.folder)
     logger.info("incident_document_created", document_id=document_id)
 
     document_link = f"https://docs.google.com/document/d/{document_id}/edit"
@@ -579,9 +555,7 @@ def initiate_resources_creation(
     if incident_payload.product == "Notify" and SLACK_NOTIFY_MGMT_USER_GROUP_ID:
         # If this is a Notify product incident, get users from the Notify management user group
         # and add them to the list of users to invite
-        response = client.usergroups_users_list(
-            usergroup=SLACK_NOTIFY_MGMT_USER_GROUP_ID
-        )
+        response = client.usergroups_users_list(usergroup=SLACK_NOTIFY_MGMT_USER_GROUP_ID)
         if response.get("ok"):
             for notify_user in response["users"]:
                 if notify_user != incident_payload.user_id:
@@ -595,9 +569,7 @@ def initiate_resources_creation(
 
     # Invite all collected users to the channel in a single API call
     if users_to_invite:
-        client.conversations_invite(
-            channel=incident_payload.channel_id, users=users_to_invite
-        )
+        client.conversations_invite(channel=incident_payload.channel_id, users=users_to_invite)
     text = """🚨 *Incident Resources Created Successfully!*
 *Next Steps - Available Commands:*
 • `/sre incident roles manage` - Assign roles to the incident
@@ -619,7 +591,7 @@ _Type_ `/sre incident help` _for complete command list_"""
         incident_payload.name,
         incident_payload.product,
         channel_url,
-        ", ".join(list(map(lambda x: x["profile"]["display_name_normalized"], oncall))),
+        ", ".join([x["profile"]["display_name_normalized"] for x in oncall]),
     )
     logger.info(
         "incident_successfully_created",

@@ -1,4 +1,4 @@
-from unittest.mock import patch, MagicMock, ANY
+from unittest.mock import ANY, MagicMock, patch
 
 from modules.incident import incident_folder
 
@@ -6,13 +6,9 @@ from modules.incident import incident_folder
 @patch("modules.incident.incident_folder.SRE_INCIDENT_FOLDER", "SRE_INCIDENT_FOLDER")
 @patch("modules.incident.incident_folder.google_drive")
 def test_list_incident_folders(google_drive_mock):
-    google_drive_mock.list_folders_in_folder.return_value = [
-        {"id": "foo", "name": "bar"}
-    ]
+    google_drive_mock.list_folders_in_folder.return_value = [{"id": "foo", "name": "bar"}]
     assert incident_folder.list_incident_folders() == [{"id": "foo", "name": "bar"}]
-    google_drive_mock.list_folders_in_folder.assert_called_once_with(
-        "SRE_INCIDENT_FOLDER", "not name contains 'Templates'"
-    )
+    google_drive_mock.list_folders_in_folder.assert_called_once_with("SRE_INCIDENT_FOLDER", "not name contains 'Templates'")
 
 
 @patch("modules.incident.incident_folder.SRE_INCIDENT_FOLDER", "SRE_INCIDENT_FOLDER")
@@ -26,9 +22,7 @@ def test_list_incident_folders_sorted(google_drive_mock):
         {"id": "foo", "name": "bar"},
         {"id": "baz", "name": "qux"},
     ]
-    google_drive_mock.list_folders_in_folder.assert_called_once_with(
-        "SRE_INCIDENT_FOLDER", "not name contains 'Templates'"
-    )
+    google_drive_mock.list_folders_in_folder.assert_called_once_with("SRE_INCIDENT_FOLDER", "not name contains 'Templates'")
 
 
 @patch("modules.incident.incident_folder.google_drive.list_folders_in_folder")
@@ -49,9 +43,7 @@ def test_list_folders_view(folder_item_mock, list_folders_in_folder_mock):
 @patch("modules.incident.incident_folder.logger")
 @patch("modules.incident.incident_folder.google_drive.delete_metadata")
 @patch("modules.incident.incident_folder.view_folder_metadata")
-def test_delete_folder_metadata(
-    view_folder_metadata_mock, delete_metadata_mock, logger_mock
-):
+def test_delete_folder_metadata(view_folder_metadata_mock, delete_metadata_mock, logger_mock):
     client = MagicMock()
     body = {"actions": [{"value": "foo"}], "view": {"private_metadata": "bar"}}
     ack = MagicMock()
@@ -68,17 +60,13 @@ def test_delete_folder_metadata(
         {"actions": [{"value": "bar"}], "view": {"private_metadata": "bar"}},
         ack,
     )
-    logger_mock.info.assert_called_once_with(
-        "metadata_delete_success", key="foo", folder_id="bar"
-    )
+    logger_mock.info.assert_called_once_with("metadata_delete_success", key="foo", folder_id="bar")
 
 
 @patch("modules.incident.incident_folder.logger")
 @patch("modules.incident.incident_folder.google_drive.delete_metadata")
 @patch("modules.incident.incident_folder.view_folder_metadata")
-def test_delete_folder_metadata_failed(
-    view_folder_metadata_mock, delete_metadata_mock, logger_mock
-):
+def test_delete_folder_metadata_failed(view_folder_metadata_mock, delete_metadata_mock, logger_mock):
     client = MagicMock()
     body = {"actions": [{"value": "foo"}], "view": {"private_metadata": "bar"}}
     ack = MagicMock()
@@ -92,9 +80,7 @@ def test_delete_folder_metadata_failed(
         {"actions": [{"value": "bar"}], "view": {"private_metadata": "bar"}},
         ack,
     )
-    logger_mock.warning.assert_called_once_with(
-        "metadata_delete_failed", key="foo", folder_id="bar"
-    )
+    logger_mock.warning.assert_called_once_with("metadata_delete_failed", key="foo", folder_id="bar")
 
 
 @patch("modules.incident.incident_folder.google_drive.add_metadata")
@@ -149,9 +135,7 @@ def test_view_folder_metadata_open(metadata_items_mock, list_metadata_mock):
     incident_folder.view_folder_metadata(client, body, ack)
     ack.assert_called_once()
     list_metadata_mock.assert_called_once_with("foo")
-    metadata_items_mock.assert_called_once_with(
-        {"name": "folder", "appProperties": [{"key": "key", "value": "value"}]}
-    )
+    metadata_items_mock.assert_called_once_with({"name": "folder", "appProperties": [{"key": "key", "value": "value"}]})
     client.views_open(trigger_id="trigger_id", view=ANY)
 
 
@@ -170,9 +154,7 @@ def test_view_folder_metadata_update(metadata_items_mock, list_metadata_mock):
     incident_folder.view_folder_metadata(client, body, ack)
     ack.assert_called_once()
     list_metadata_mock.assert_called_once_with("foo")
-    metadata_items_mock.assert_called_once_with(
-        {"name": "folder", "appProperties": [{"key": "key", "value": "value"}]}
-    )
+    metadata_items_mock.assert_called_once_with({"name": "folder", "appProperties": [{"key": "key", "value": "value"}]})
     client.views_update(view_id="view_id", view=ANY)
 
 
@@ -274,9 +256,7 @@ def test_add_new_incident_to_list(sheets_mock, datetime_mock):
         ],
     }
     sheets_mock.append_values.return_value = ANY
-    updated_sheet = incident_folder.add_new_incident_to_list(
-        document_link, name, slug, product, channel_url
-    )
+    updated_sheet = incident_folder.add_new_incident_to_list(document_link, name, slug, product, channel_url)
     sheets_mock.append_values.assert_called_once_with(
         "INCIDENT_LIST",
         "Sheet1!A:A",
@@ -288,9 +268,7 @@ def test_add_new_incident_to_list(sheets_mock, datetime_mock):
 @patch("modules.incident.incident_folder.sheets")
 @patch("modules.incident.incident_folder.logger")
 def test_update_spreadsheet_incident_status_invalid_status(logger_mock, sheets_mock):
-    assert not incident_folder.update_spreadsheet_incident_status(
-        "foo", "InvalidStatus"
-    )
+    assert not incident_folder.update_spreadsheet_incident_status("foo", "InvalidStatus")
     logger_mock.warning.assert_called_once_with(
         "update_incident_spreadsheet_error",
         channel="foo",
@@ -318,9 +296,7 @@ def test_update_spreadsheet_incident_status_channel_found(sheets_mock):
     sheets_mock.get_values.return_value = {"values": [["foo", "bar", "baz", "qux"]]}
     sheets_mock.batch_update_values.return_value = True
     assert incident_folder.update_spreadsheet_incident_status("foo", "Closed")
-    sheets_mock.batch_update_values.assert_called_once_with(
-        "INCIDENT_LIST", "Sheet1!D1", [["Closed"]]
-    )
+    sheets_mock.batch_update_values.assert_called_once_with("INCIDENT_LIST", "Sheet1!D1", [["Closed"]])
 
 
 @patch("modules.incident.incident_folder.sheets")
@@ -364,9 +340,7 @@ def test_return_channel_name_dev_prefix_only():
 @patch("modules.incident.incident_folder.current_time_est")
 def test_store_update(mock_current_time_est, mock_update_item, mock_scan_item):
     mock_current_time_est.return_value = "2025-01-31 11:17:06"
-    mock_scan_item.return_value = [
-        {"incident_updates": {"L": [{"S": "Previous update"}]}}
-    ]
+    mock_scan_item.return_value = [{"incident_updates": {"L": [{"S": "Previous update"}]}}]
     mock_update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
     response = incident_folder.store_update("incident_id", "New update")
@@ -375,9 +349,7 @@ def test_store_update(mock_current_time_est, mock_update_item, mock_scan_item):
     mock_update_item.assert_called_once()
 
     expected_update = "2025-01-31 11:17:06 EST\nNew update\nPrevious update"
-    actual_updates = mock_update_item.call_args[1]["ExpressionAttributeValues"][
-        ":updates"
-    ]["L"]
+    actual_updates = mock_update_item.call_args[1]["ExpressionAttributeValues"][":updates"]["L"]
     assert len(actual_updates) == 1
     assert actual_updates[0]["S"] == expected_update
 
@@ -387,9 +359,7 @@ def test_store_update(mock_current_time_est, mock_update_item, mock_scan_item):
 @patch("modules.incident.incident_folder.current_time_est")
 def test_store_update_failed(mock_current_time_est, mock_update_item, mock_scan_item):
     mock_current_time_est.return_value = "2025-01-31 11:17:06"
-    mock_scan_item.return_value = [
-        {"incident_updates": {"L": [{"S": "Previous update"}]}}
-    ]
+    mock_scan_item.return_value = [{"incident_updates": {"L": [{"S": "Previous update"}]}}]
     mock_update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 400}}
 
     response = incident_folder.store_update("incident_id", "New update")
@@ -400,9 +370,7 @@ def test_store_update_failed(mock_current_time_est, mock_update_item, mock_scan_
 
 @patch("modules.incident.incident_folder.dynamodb.scan")
 def test_fetch_updates(mock_scan_item):
-    mock_scan_item.return_value = [
-        {"incident_updates": {"L": [{"S": "Update 1\n Update 2"}]}}
-    ]
+    mock_scan_item.return_value = [{"incident_updates": {"L": [{"S": "Update 1\n Update 2"}]}}]
 
     updates = incident_folder.fetch_updates("incident_id")
     assert updates == ["Update 1\n Update 2"]

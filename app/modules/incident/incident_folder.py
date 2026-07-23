@@ -26,27 +26,21 @@ logger = get_logger()
 
 
 def list_incident_folders():
-    folders = google_drive.list_folders_in_folder(
-        SRE_INCIDENT_FOLDER, "not name contains 'Templates'"
-    )
+    folders = google_drive.list_folders_in_folder(SRE_INCIDENT_FOLDER, "not name contains 'Templates'")
     folders.sort(key=lambda x: x["name"])
     return folders
 
 
 def list_folders_view(client: WebClient, body, ack: Ack):
     ack()
-    folders = google_drive.list_folders_in_folder(
-        SRE_INCIDENT_FOLDER, "not name contains 'Templates'"
-    )
+    folders = google_drive.list_folders_in_folder(SRE_INCIDENT_FOLDER, "not name contains 'Templates'")
     folders.sort(key=lambda x: x["name"])
     blocks = {
         "type": "modal",
         "callback_id": "list_folders_view",
         "title": {"type": "plain_text", "text": "SRE - Listing folders"},
         "close": {"type": "plain_text", "text": "Close"},
-        "blocks": [
-            item for sublist in list(map(folder_item, folders)) for item in sublist
-        ],
+        "blocks": [item for sublist in list(map(folder_item, folders)) for item in sublist],
     }
     client.views_open(trigger_id=body["trigger_id"], view=blocks)
 
@@ -318,12 +312,8 @@ def update_spreadsheet_incident_status(channel_name, status="Closed"):
     for i, row in enumerate(values):
         if channel_name in row:
             # Update the 4th column (index 3) of the found row
-            update_range = (
-                f"{sheet_name}!D{i+1}"  # Column D, Rows are 1-indexed in Sheets
-            )
-            updated_sheet = sheets.batch_update_values(
-                INCIDENT_LIST, update_range, [[status]]
-            )
+            update_range = f"{sheet_name}!D{i + 1}"  # Column D, Rows are 1-indexed in Sheets
+            updated_sheet = sheets.batch_update_values(INCIDENT_LIST, update_range, [[status]])
             if updated_sheet:
                 return True
     return False
@@ -355,16 +345,11 @@ def get_incidents_from_sheet(days=0) -> list:
             channel_url = values[4].get("hyperlink")
             channel_id = None
             if channel_url:
-                match = re.search(
-                    r"https://gcdigital\.slack\.com/archives/(\w+)", channel_url
-                )
+                match = re.search(r"https://gcdigital\.slack\.com/archives/(\w+)", channel_url)
                 if match:
                     channel_id = match.group(1)
             channel_name = values[4].get("formattedValue")
-            if not channel_name:
-                channel_name = "TBC"
-            else:
-                channel_name = channel_name[1:]
+            channel_name = "TBC" if not channel_name else channel_name[1:]
             incident_details = {
                 "channel_id": channel_id,
                 "channel_name": channel_name,
@@ -378,9 +363,8 @@ def get_incidents_from_sheet(days=0) -> list:
             }
             if incident_details["channel_id"] is None:
                 continue
-            if days > 0:
-                if incident_details["created_at"] < date_lookback_str:
-                    continue
+            if days > 0 and incident_details["created_at"] < date_lookback_str:
+                continue
             incidents_details.append(incident_details)
         return incidents_details
     return []
@@ -414,10 +398,7 @@ def get_incident_details(client: WebClient, incident):
                 if incident.get("user_id") == "":
                     incident["user_id"] = creator
 
-                if (
-                    "incident-dev-" in incident["channel_name"]
-                    or "Development" in incident["teams"]
-                ):
+                if "incident-dev-" in incident["channel_name"] or "Development" in incident["teams"]:
                     incident["environment"] = "dev"
                 else:
                     incident["environment"] = "prod"
@@ -463,9 +444,7 @@ def create_missing_incidents(incidents):
     """Create missing incidents"""
     count = 0
     for incident in incidents:
-        incident_exists = db_operations.lookup_incident(
-            "channel_id", incident["channel_id"]
-        )
+        incident_exists = db_operations.lookup_incident("channel_id", incident["channel_id"])
         if len(incident_exists) == 0:
             incident_data = {
                 "channel_id": incident["channel_id"],
@@ -511,9 +490,7 @@ def store_update(incident_id, update_text):
     current_updates = ""
     if existing_incident:
         existing_incident = existing_incident[0]
-        if "incident_updates" in existing_incident and (
-            existing_incident["incident_updates"]["L"] != []
-        ):
+        if "incident_updates" in existing_incident and (existing_incident["incident_updates"]["L"] != []):
             current_updates = existing_incident["incident_updates"]["L"][0]["S"]
 
     current_time_in_est = current_time_est() + " EST\n"

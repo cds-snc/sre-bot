@@ -1,8 +1,10 @@
 import json
-from slack_sdk.web import WebClient
 import re
-from integrations.google_workspace import google_drive
+
+from slack_sdk.web import WebClient
 from structlog import get_logger
+
+from integrations.google_workspace import google_drive
 
 logger = get_logger()
 
@@ -12,9 +14,7 @@ def save_incident_roles(client: WebClient, ack, view):
     selected_ic = view["state"]["values"]["ic_name"]["ic_select"]["selected_user"]
     selected_ol = view["state"]["values"]["ol_name"]["ol_select"]["selected_user"]
     metadata = json.loads(view["private_metadata"])
-    log = logger.bind(
-        operation="save_incident_roles", channel_id=metadata.get("channel_id")
-    )
+    log = logger.bind(operation="save_incident_roles", channel_id=metadata.get("channel_id"))
     file_id = metadata["id"]
     google_drive.add_metadata(file_id, "ic_id", selected_ic)
     google_drive.add_metadata(file_id, "ol_id", selected_ol)
@@ -30,9 +30,7 @@ def save_incident_roles(client: WebClient, ack, view):
             channel=metadata["channel_id"],
         )
     # Get the current channel description and append the new roles
-    description = client.conversations_info(channel=metadata["channel_id"])["channel"][
-        "purpose"
-    ]["value"]
+    description = client.conversations_info(channel=metadata["channel_id"])["channel"]["purpose"]["value"]
 
     # Regular expression to detect any existing "IC: <@user> / OL: <@user>"
     ic_ol_pattern = r"IC: <@[\w]+> / OL: <@[\w]+>"
@@ -52,38 +50,28 @@ def save_incident_roles(client: WebClient, ack, view):
     purpose_text = updated_description[:max_length]
 
     # Update the Slack channel purpose
-    client.conversations_setPurpose(
-        channel=metadata["channel_id"], purpose=purpose_text
-    )
+    client.conversations_setPurpose(channel=metadata["channel_id"], purpose=purpose_text)
 
 
 def manage_roles(client: WebClient, body, ack, respond):
     ack()
     log = logger.bind(operation="manage_roles", channel_id=body.get("channel_id"))
     channel_name = body["channel_name"]
-    channel_name = channel_name[
-        channel_name.startswith("incident-") and len("incident-") :
-    ]
+    channel_name = channel_name[channel_name.startswith("incident-") and len("incident-") :]
     channel_name = channel_name[channel_name.startswith("dev-") and len("dev-") :]
     documents = google_drive.find_files_by_name(channel_name)
 
     if len(documents) == 0:
         log.warning("no_incident_document_found", channel_name=channel_name)
-        respond(
-            f"No incident document found for `{channel_name}`. Please make sure the channel matches the document name."
-        )
+        respond(f"No incident document found for `{channel_name}`. Please make sure the channel matches the document name.")
         return
 
     document = documents[0]
     current_ic = (
-        document["appProperties"]["ic_id"]
-        if "appProperties" in document and "ic_id" in document["appProperties"]
-        else False
+        document["appProperties"]["ic_id"] if "appProperties" in document and "ic_id" in document["appProperties"] else False
     )
     current_ol = (
-        document["appProperties"]["ol_id"]
-        if "appProperties" in document and "ol_id" in document["appProperties"]
-        else False
+        document["appProperties"]["ol_id"] if "appProperties" in document and "ol_id" in document["appProperties"] else False
     )
 
     ic_element = {

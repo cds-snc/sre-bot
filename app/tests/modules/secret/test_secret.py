@@ -28,9 +28,7 @@ def test_secret_command(mock_get_user_locale, mock_generate_secret_command_modal
     secret.secret_command(client, ack, command, body)
 
     mock_get_user_locale.assert_called_once_with(client, "user_id")
-    mock_generate_secret_command_modal_view.assert_called_once_with(
-        command, "user_id", "en-US"
-    )
+    mock_generate_secret_command_modal_view.assert_called_once_with(command, "user_id", "en-US")
 
     client.views_open.assert_called_once_with(
         trigger_id="trigger_id",
@@ -41,9 +39,7 @@ def test_secret_command(mock_get_user_locale, mock_generate_secret_command_modal
 @patch("modules.secret.secret.logger")
 @patch("modules.secret.secret.requests")
 @patch("modules.secret.secret.time")
-def test_secret_view_handler_with_succesfull_request(
-    mock_time, mock_requests, mock_logger
-):
+def test_secret_view_handler_with_succesfull_request(mock_time, mock_requests, mock_logger):
     ack = MagicMock()
     client = MagicMock()
 
