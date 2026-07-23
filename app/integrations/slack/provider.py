@@ -1,4 +1,4 @@
-""" Transitory file for Slack platform provider implementation during refactoring.
+"""Transitory file for Slack platform provider implementation during refactoring.
 
 Slack platform provider implementation.
 
@@ -6,8 +6,9 @@ Provides integration with Slack using the Bolt SDK for Socket Mode.
 """
 
 import threading
+from collections.abc import Callable
 from functools import cache
-from typing import Any, Callable, Dict, FrozenSet, List, Optional, cast
+from typing import Any, cast
 
 import structlog
 from slack_bolt import Ack, App, Respond
@@ -73,12 +74,12 @@ class SlackPlatformProvider:
     def __init__(
         self,
         settings,  # SlackPlatformSettings type
-        formatter: Optional[SlackBlockKitFormatter] = None,
+        formatter: SlackBlockKitFormatter | None = None,
         command_prefix: str = "",
         name: str = "slack",
         enabled: bool = True,
         version: str = "1.0.0",
-        translation_service: Optional["Translator"] = None,
+        translation_service: Translator | None = None,
     ):
         """Initialize Slack platform provider.
 
@@ -94,8 +95,8 @@ class SlackPlatformProvider:
         self._enabled = enabled
         self._logger = logger.bind(provider=name, version=version)
         # Commands stored by full_path (e.g., "sre.dev.aws") as key
-        self._commands: Dict[str, CommandDefinition] = {}
-        self._translator: Optional["Translator"] = None
+        self._commands: dict[str, CommandDefinition] = {}
+        self._translator: Translator | None = None
         if translation_service:
             self.set_translator(translation_service)
 
@@ -104,8 +105,8 @@ class SlackPlatformProvider:
         self._command_prefix = command_prefix
 
         # Will be initialized when app is started
-        self._app: Optional[App] = None
-        self._client: Optional[Any] = None
+        self._app: App | None = None
+        self._client: Any | None = None
 
         # Help generator for unified help text generation
         self._help_generator = SlackHelpGenerator(
@@ -118,10 +119,8 @@ class SlackPlatformProvider:
             socket_mode=settings.SOCKET_MODE,
             enabled=settings.ENABLED,
         )
-        self._handler: Optional[SocketModeHandler] = (
-            None  # Socket Mode handler reference
-        )
-        self._socket_thread: Optional[threading.Thread] = None
+        self._handler: SocketModeHandler | None = None  # Socket Mode handler reference
+        self._socket_thread: threading.Thread | None = None
 
     @property
     def name(self) -> str:
@@ -162,13 +161,12 @@ class SlackPlatformProvider:
             )
 
         # Validate required tokens
-        if self._settings.SOCKET_MODE:
-            if not self._settings.APP_TOKEN:
-                log.error("missing_app_token")
-                return OperationResult.permanent_error(
-                    message="APP_TOKEN required for Socket Mode",
-                    error_code="MISSING_APP_TOKEN",
-                )
+        if self._settings.SOCKET_MODE and not self._settings.APP_TOKEN:
+            log.error("missing_app_token")
+            return OperationResult.permanent_error(
+                message="APP_TOKEN required for Socket Mode",
+                error_code="MISSING_APP_TOKEN",
+            )
 
         if not self._settings.BOT_TOKEN:
             log.error("missing_bot_token")
@@ -218,7 +216,7 @@ class SlackPlatformProvider:
         """
         return None  # Slack uses Socket Mode (WebSocket), not HTTP webhooks
 
-    def set_translator(self, translator: "Translator") -> None:
+    def set_translator(self, translator: Translator) -> None:
         """Set translator for i18n support in help generation.
 
         Args:
@@ -228,10 +226,10 @@ class SlackPlatformProvider:
 
     def _translate_or_fallback(
         self,
-        key: Optional[str],
+        key: str | None,
         fallback: str,
         locale: str = "en-US",
-        variables: Optional[Dict[str, Any]] = None,
+        variables: dict[str, Any] | None = None,
     ) -> str:
         """Translate a key or return fallback if translation unavailable.
 
@@ -264,9 +262,7 @@ class SlackPlatformProvider:
             locale_enum = Locale.from_string(locale)
 
             # Attempt translation
-            result = self._translator.translate_message(
-                translation_key, locale_enum, variables=variables
-            )
+            result = self._translator.translate_message(translation_key, locale_enum, variables=variables)
 
             # Return translation if successful, otherwise fallback
             translated = result if result else fallback
@@ -333,7 +329,7 @@ class SlackPlatformProvider:
                     parent=node_parent,
                 )
 
-    def _get_child_commands(self, parent_path: str) -> List[CommandDefinition]:
+    def _get_child_commands(self, parent_path: str) -> list[CommandDefinition]:
         """Get all direct children of a command node.
 
         Args:
@@ -350,7 +346,7 @@ class SlackPlatformProvider:
 
         return sorted(children, key=lambda c: c.name)
 
-    def get_help_keywords(self) -> FrozenSet[str]:
+    def get_help_keywords(self) -> frozenset[str]:
         """Get Slack-specific help keywords for text commands."""
         return self.SLACK_HELP_KEYWORDS
 
@@ -416,7 +412,7 @@ class SlackPlatformProvider:
 
         # Extract unique root commands from command tree
         root_commands = set()
-        for full_path in self._commands.keys():
+        for full_path in self._commands:
             # Extract root from paths like "sre.incident", "sre.webhooks" → "sre"
             root = full_path.split(".")[0]
             root_commands.add(root)
@@ -428,7 +424,7 @@ class SlackPlatformProvider:
 
             # Create handler closure that captures root_command
             def create_handler(captured_root: str):
-                def handler(ack: Ack, command: Dict[str, Any], respond: Respond):
+                def handler(ack: Ack, command: dict[str, Any], respond: Respond):
                     """Auto-generated root command handler."""
                     ack()
 
@@ -464,14 +460,12 @@ class SlackPlatformProvider:
                 root=root_command,
             )
 
-    def _tokenize_command_text(self, text: str) -> List[str]:
+    def _tokenize_command_text(self, text: str) -> list[str]:
         """Tokenize Slack command text using quote-aware parsing."""
         parser = CommandArgumentParser([])
         return parser._tokenize(text)
 
-    def route_hierarchical_command(
-        self, root_command: str, text: str, payload: CommandPayload
-    ) -> CommandResponse:
+    def route_hierarchical_command(self, root_command: str, text: str, payload: CommandPayload) -> CommandResponse:
         """Route a Slack hierarchical command recursively to leaf command.
 
         Handles multi-level command hierarchies by recursively routing through
@@ -527,9 +521,7 @@ class SlackPlatformProvider:
         payload.text = text
         return self.dispatch_command(root_command, payload)
 
-    def _send_command_response(
-        self, response: CommandResponse, respond: Respond
-    ) -> None:
+    def _send_command_response(self, response: CommandResponse, respond: Respond) -> None:
         """Send CommandResponse to Slack using respond function.
 
         Args:
@@ -592,7 +584,7 @@ class SlackPlatformProvider:
         return self._app
 
     @property
-    def socket_mode_handler(self) -> Optional[SocketModeHandler]:
+    def socket_mode_handler(self) -> SocketModeHandler | None:
         """Get the Socket Mode handler if initialized."""
         return self._handler
 
@@ -625,11 +617,7 @@ class SlackPlatformProvider:
             user_info = self._client.users_info(user=user_id, include_locale=True)
             if user_info.get("ok") and user_info.get("user"):
                 user_locale = user_info["user"].get("locale")
-                if (
-                    user_locale
-                    and isinstance(user_locale, str)
-                    and user_locale in supported_locales
-                ):
+                if user_locale and isinstance(user_locale, str) and user_locale in supported_locales:
                     self._logger.debug(
                         "user_locale_extracted_from_slack",
                         user_id=user_id,
@@ -661,18 +649,18 @@ class SlackPlatformProvider:
     def register_command(
         self,
         command: str,
-        handler: Optional[Callable[..., CommandResponse]],
+        handler: Callable[..., CommandResponse] | None,
         description: str = "",
-        description_key: Optional[str] = None,
+        description_key: str | None = None,
         usage_hint: str = "",
-        examples: Optional[list] = None,
-        example_keys: Optional[list] = None,
-        parent: Optional[str] = None,
+        examples: list | None = None,
+        example_keys: list | None = None,
+        parent: str | None = None,
         legacy_mode: bool = False,
-        arguments: Optional[list] = None,
-        schema: Optional[type] = None,
-        argument_mapper: Optional[Callable] = None,
-        fallback_handler: Optional[Callable[[CommandPayload], CommandResponse]] = None,
+        arguments: list | None = None,
+        schema: type | None = None,
+        argument_mapper: Callable | None = None,
+        fallback_handler: Callable[[CommandPayload], CommandResponse] | None = None,
     ) -> None:
         """Register a Slack command with hierarchical support and argument parsing.
 
@@ -753,7 +741,7 @@ class SlackPlatformProvider:
     def generate_help(
         self,
         locale: str = "en-US",
-        root_command: Optional[str] = None,
+        root_command: str | None = None,
     ) -> str:
         """Generate Slack-formatted help text for registered commands.
 
@@ -780,9 +768,7 @@ class SlackPlatformProvider:
             ```
         """
         if root_command:
-            return self._help_generator.generate(
-                root_command, mode="tree", locale=locale
-            )
+            return self._help_generator.generate(root_command, mode="tree", locale=locale)
         return self._help_generator.generate("", mode="tree", locale=locale)
 
     def generate_command_help(self, command_name: str, locale: str = "en-US") -> str:
@@ -798,9 +784,7 @@ class SlackPlatformProvider:
         Returns:
             Slack-formatted help text for the specified command
         """
-        return self._help_generator.generate(
-            command_name, mode="command", locale=locale
-        )
+        return self._help_generator.generate(command_name, mode="command", locale=locale)
 
     def dispatch_command(  # noqa: C901
         self, command_name: str, payload: CommandPayload
@@ -859,9 +843,7 @@ class SlackPlatformProvider:
         # platform-specific providers (e.g., SlackPlatformProvider) to avoid
         # duplicate checks and keep dispatch focused on execution.
         if cmd_def.handler is None:
-            help_text = self.generate_help(
-                locale=user_locale, root_command=command_name
-            )
+            help_text = self.generate_help(locale=user_locale, root_command=command_name)
             return CommandResponse(message=help_text, ephemeral=True)
 
         # Dispatch to handler
@@ -877,9 +859,7 @@ class SlackPlatformProvider:
                     if cmd_def.fallback_handler:
                         return cmd_def.fallback_handler(payload)
                     else:
-                        help_text = self.generate_command_help(
-                            command_name, locale=user_locale
-                        )
+                        help_text = self.generate_command_help(command_name, locale=user_locale)
                         return CommandResponse(message=help_text, ephemeral=True)
 
                 parser = CommandArgumentParser(cmd_def.arguments)
@@ -887,10 +867,7 @@ class SlackPlatformProvider:
                     parsed_args = parser.parse(payload.text)
 
                     # Apply argument mapper if provided
-                    if cmd_def.argument_mapper:
-                        mapped_args = cmd_def.argument_mapper(parsed_args)
-                    else:
-                        mapped_args = parsed_args
+                    mapped_args = cmd_def.argument_mapper(parsed_args) if cmd_def.argument_mapper else parsed_args
 
                     # Validate with schema if provided
                     if cmd_def.schema:
@@ -933,12 +910,7 @@ class SlackPlatformProvider:
 
     def __repr__(self) -> str:
         """String representation of the provider."""
-        return (
-            f"{self.__class__.__name__}("
-            f"name={self._name!r}, "
-            f"version={self._version!r}, "
-            f"enabled={self._enabled})"
-        )
+        return f"{self.__class__.__name__}(name={self._name!r}, version={self._version!r}, enabled={self._enabled})"
 
 
 @cache

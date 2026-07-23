@@ -4,7 +4,9 @@ To be ported in the new infrastructure clients packages."""
 
 import base64
 from email.message import EmailMessage
+
 import structlog
+
 from integrations.google_workspace import google_service
 
 logger = structlog.get_logger()

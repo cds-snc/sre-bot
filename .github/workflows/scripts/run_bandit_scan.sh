@@ -20,7 +20,7 @@ docker pull cytopia/bandit:latest
 # avoid false AST-parse failures without losing security coverage. Keep this
 # list in sync with RUFF_SCOPE as later TASK-15.x slices land; the whole
 # workflow is deleted once the migration completes (TASK-15.12).
-RUFF_MIGRATED_PATHS="/data/app/api,/data/app/tests/api,/data/app/infrastructure,/data/app/tests/unit/infrastructure,/data/app/integrations/aws,/data/app/integrations/utils,/data/app/integrations/maxmind,/data/app/integrations/trello,/data/app/integrations/notify,/data/app/integrations/sentinel,/data/app/integrations/opsgenie,/data/app/tests/integrations/aws,/data/app/tests/integrations/utils,/data/app/tests/integrations/maxmind,/data/app/tests/integrations/trello,/data/app/tests/integrations/notify,/data/app/tests/integrations/sentinel,/data/app/tests/integrations/opsgenie,/data/app/tests/unit/integrations"
+RUFF_MIGRATED_PATHS="/data/app/api,/data/app/tests/api,/data/app/infrastructure,/data/app/tests/unit/infrastructure,/data/app/integrations,/data/app/tests/integrations,/data/app/tests/unit/integrations"
 
 # Scan source code and only report on high severity issues
 docker run --rm -v "${REPO_ROOT}":/data cytopia/bandit \

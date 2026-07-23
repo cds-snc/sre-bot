@@ -3,12 +3,11 @@
 from unittest.mock import patch
 
 import pandas as pd
+
 from integrations.google_workspace import google_directory
 
 
-@patch(
-    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
 def test_get_user_returns_user(execute_google_api_call_mock):
     execute_google_api_call_mock.return_value = {
         "id": "test_user_id",
@@ -37,9 +36,7 @@ def test_get_user_returns_user(execute_google_api_call_mock):
     "integrations.google_workspace.google_directory.GOOGLE_WORKSPACE_CUSTOMER_ID",
     new="default_google_workspace_customer_id",
 )
-@patch(
-    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
 def test_list_users_returns_users(execute_google_api_call_mock):
     # Mock the results
     results = [
@@ -64,9 +61,7 @@ def test_list_users_returns_users(execute_google_api_call_mock):
     )
 
 
-@patch(
-    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
 def test_list_users_uses_custom_delegated_user_email_and_customer_id_if_provided(
     execute_google_api_call_mock,
 ):
@@ -107,9 +102,7 @@ def test_list_users_uses_custom_delegated_user_email_and_customer_id_if_provided
     "integrations.google_workspace.google_directory.GOOGLE_WORKSPACE_CUSTOMER_ID",
     new="default_google_workspace_customer_id",
 )
-@patch(
-    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
 def test_list_groups_calls_execute_google_api_call(
     mock_execute_google_api_call,
 ):
@@ -127,9 +120,7 @@ def test_list_groups_calls_execute_google_api_call(
     )
 
 
-@patch(
-    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
 def test_list_groups_uses_custom_delegated_user_email_and_customer_id_if_provided(
     execute_google_api_call_mock,
 ):
@@ -166,9 +157,7 @@ def test_list_groups_uses_custom_delegated_user_email_and_customer_id_if_provide
     )
 
 
-@patch(
-    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
 def test_list_group_members_calls_execute_google_api_call_with_correct_args(
     mock_execute_google_api_call,
 ):
@@ -187,9 +176,7 @@ def test_list_group_members_calls_execute_google_api_call_with_correct_args(
     )
 
 
-@patch(
-    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
 def test_list_group_members_uses_custom_delegated_user_email_if_provided(
     execute_google_api_call_mock,
 ):
@@ -204,12 +191,7 @@ def test_list_group_members_uses_custom_delegated_user_email_if_provided(
     group_key = "test_group_key"
     custom_delegated_user_email = "custom.email@domain.com"
 
-    assert (
-        google_directory.list_group_members(
-            group_key, delegated_user_email=custom_delegated_user_email
-        )
-        == results
-    )
+    assert google_directory.list_group_members(group_key, delegated_user_email=custom_delegated_user_email) == results
 
     execute_google_api_call_mock.assert_called_once_with(
         "admin",
@@ -225,9 +207,7 @@ def test_list_group_members_uses_custom_delegated_user_email_if_provided(
     )
 
 
-@patch(
-    "integrations.google_workspace.google_directory.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
 def test_get_group_calls_execute_google_api_call_with_correct_args(
     mock_execute_google_api_call,
 ):
@@ -325,10 +305,7 @@ def test_list_groups_with_members_filtered(
     mock_filter_by_condition.return_value = groups[:2]
     groups_filters = [lambda group: "test-" in group["name"]]
 
-    assert (
-        google_directory.list_groups_with_members(groups_filters=groups_filters)
-        == groups_with_users
-    )
+    assert google_directory.list_groups_with_members(groups_filters=groups_filters) == groups_with_users
     mock_filter_by_condition.assert_called_once_with(groups, groups_filters[0])
     assert mock_retry_request.call_count == 2
     assert mock_list_users.call_count == 1
@@ -554,9 +531,7 @@ def test_list_groups_with_members_filtered_dataframe(
     mock_filter_by_condition.return_value = groups[:2]
     groups_filters = [lambda group: "test-" in group["name"]]
 
-    groups_result = google_directory.list_groups_with_members(
-        groups_filters=groups_filters
-    )
+    groups_result = google_directory.list_groups_with_members(groups_filters=groups_filters)
     result = google_directory.convert_google_groups_members_to_dataframe(groups_result)
 
     assert isinstance(result, pd.DataFrame)

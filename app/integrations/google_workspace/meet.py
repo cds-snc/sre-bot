@@ -1,8 +1,8 @@
 """Google Meet API integration module."""
 
 from integrations.google_workspace.google_service import (
-    handle_google_api_errors,
     execute_google_api_call,
+    handle_google_api_errors,
 )
 
 

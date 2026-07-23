@@ -10,15 +10,11 @@ from tests.fixtures.google_clients import FakeGoogleService
 
 # --- Fixtures ---
 @pytest.fixture
-@patch(
-    "integrations.google_workspace.google_service_next.get_google_workspace_settings"
-)
+@patch("integrations.google_workspace.google_service_next.get_google_workspace_settings")
 def fake_settings(settings_mock):
     class FakeGoogleWorkspace:
         GOOGLE_WORKSPACE_CUSTOMER_ID = "fake_customer_id"
-        GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = (
-            '{"client_email": "bot@example.com", "private_key": "FAKE"}'
-        )
+        GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = '{"client_email": "bot@example.com", "private_key": "FAKE"}'
         SRE_BOT_EMAIL = "bot@example.com"
 
     class FakeSettings:
@@ -245,9 +241,7 @@ def test_execute_api_call_retry_logic():
     },
 )
 @patch("integrations.google_workspace.google_service_next.logger")
-@patch(
-    "integrations.google_workspace.google_service_next.time.sleep", return_value=None
-)
+@patch("integrations.google_workspace.google_service_next.time.sleep", return_value=None)
 def test_execute_api_call_http_error_retry(_sleep_mock, logger_mock):
     # Simulate HttpError with retryable status
     class FakeResp:
@@ -300,9 +294,7 @@ def test_execute_api_call_non_retryable_http_error(logger_mock):
     assert not resp.is_success
     assert resp.error is not None
     assert resp.error_code == "GOOGLE_API_ERROR_404"
-    logger_mock.error.assert_any_call(
-        "google_api_error_final", function="func", error=str(err), status_code=404
-    )
+    logger_mock.error.assert_any_call("google_api_error_final", function="func", error=str(err), status_code=404)
 
 
 @patch("integrations.google_workspace.google_service_next.logger")
@@ -314,9 +306,7 @@ def test_execute_api_call_raises(logger_mock):
     assert isinstance(result, OperationResult)
     assert not result.is_success
     assert result.message == "fail"
-    logger_mock.error.assert_any_call(
-        "google_api_error_final", function="func", error="fail", status_code=None
-    )
+    logger_mock.error.assert_any_call("google_api_error_final", function="func", error="fail", status_code=None)
 
 
 # --- paginate_all_results: auto-detect resource key, response as list, no execute_next_chunk ---
@@ -366,9 +356,7 @@ def test_paginate_all_results(_mock):
 def test_paginate_all_results_auto_detect_key(_mock):
 
     paginated_pages = [
-        {
-            "foo": [1, 2]
-        },  # No nextPageToken since pagination won't continue without list_resource
+        {"foo": [1, 2]},  # No nextPageToken since pagination won't continue without list_resource
     ]
 
     class FakeRequest:
@@ -449,9 +437,7 @@ def test_paginate_all_results_no_execute_next_chunk(_mock):
 
 # --- get_google_service ---
 @patch("integrations.google_workspace.google_service_next.build")
-@patch(
-    "integrations.google_workspace.google_service_next.service_account.Credentials.from_service_account_info"
-)
+@patch("integrations.google_workspace.google_service_next.service_account.Credentials.from_service_account_info")
 def test_get_google_service_valid_delegated_user_email(mock_creds, mock_build):
     # Simulate valid delegated user email
     mock_creds.return_value = MagicMock()
@@ -461,18 +447,14 @@ def test_get_google_service_valid_delegated_user_email(mock_creds, mock_build):
         "integrations.google_workspace.google_service_next.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
         key_file,
     ):
-        service = gs.get_google_service(
-            "admin", "v1", delegated_user_email="user@example.com"
-        )
+        service = gs.get_google_service("admin", "v1", delegated_user_email="user@example.com")
         assert service is not None
         mock_creds.assert_called()
         mock_build.assert_called()
 
 
 @patch("integrations.google_workspace.google_service_next.build")
-@patch(
-    "integrations.google_workspace.google_service_next.service_account.Credentials.from_service_account_info"
-)
+@patch("integrations.google_workspace.google_service_next.service_account.Credentials.from_service_account_info")
 def test_get_google_service_missing_creds_file(mock_creds, mock_build):
     # Simulate missing credential file
     mock_creds.return_value = MagicMock()
@@ -487,9 +469,7 @@ def test_get_google_service_missing_creds_file(mock_creds, mock_build):
 
 
 @patch("integrations.google_workspace.google_service_next.build")
-@patch(
-    "integrations.google_workspace.google_service_next.service_account.Credentials.from_service_account_info"
-)
+@patch("integrations.google_workspace.google_service_next.service_account.Credentials.from_service_account_info")
 def test_get_google_service_invalid_creds_file(mock_creds, mock_build):
     # Simulate invalid credential file (not JSON)
     mock_creds.return_value = MagicMock()
@@ -508,9 +488,7 @@ def test_get_google_service_invalid_creds_file(mock_creds, mock_build):
     '{"client_email": "bot@example.com", "private_key": "FAKE", "token_uri": "https://oauth2.googleapis.com/token"}',
 )
 @patch("integrations.google_workspace.google_service_next.build")
-@patch(
-    "integrations.google_workspace.google_service_next.service_account.Credentials.from_service_account_info"
-)
+@patch("integrations.google_workspace.google_service_next.service_account.Credentials.from_service_account_info")
 def test_get_google_service_success(creds_mock, build_mock):
     build_mock.return_value = "service"
     creds_mock.return_value = MagicMock()
@@ -520,9 +498,7 @@ def test_get_google_service_success(creds_mock, build_mock):
 
 
 @patch("integrations.google_workspace.google_service_next.build")
-@patch(
-    "integrations.google_workspace.google_service_next.service_account.Credentials.from_service_account_info"
-)
+@patch("integrations.google_workspace.google_service_next.service_account.Credentials.from_service_account_info")
 @patch(
     "integrations.google_workspace.google_service_next.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
     '{"client_email": "bot@example.com", "private_key": "FAKE", "token_uri": "https://oauth2.googleapis.com/token"}',
@@ -678,9 +654,7 @@ def test_execute_batch_request_mixed_success_and_non_critical_error():
         if request_id == "id1":
             fake_batch.callback(request_id, {"foo": 1}, None)
         elif request_id == "id2":
-            fake_batch.callback(
-                request_id, None, Exception("not found")
-            )  # non-critical error
+            fake_batch.callback(request_id, None, Exception("not found"))  # non-critical error
         fake_batch._added.append(request_id)
 
     fake_batch._added = []
@@ -701,10 +675,7 @@ def test_execute_batch_request_mixed_success_and_non_critical_error():
     # Error details are embedded in result.data['errors']
     assert "errors" in result.data
     # Ensure the non-critical error message appears in the aggregated data
-    assert any(
-        "not found" in str(v.get("message") or v)
-        for v in result.data.get("errors", {}).values()
-    )
+    assert any("not found" in str(v.get("message") or v) for v in result.data.get("errors", {}).values())
 
 
 def test_execute_batch_request_missing_request_id():

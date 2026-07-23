@@ -4,6 +4,7 @@ This module provides functions to create and manipulate Google Docs.
 """
 
 import re
+
 import structlog
 
 from integrations.google_workspace import google_service

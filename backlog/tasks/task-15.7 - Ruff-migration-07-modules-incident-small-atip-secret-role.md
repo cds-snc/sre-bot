@@ -23,7 +23,7 @@ Paths to pull:
     app/modules/incident app/modules/atip app/modules/secret app/modules/role \
     app/tests/modules/incident app/tests/modules/secret app/tests/modules/role app/tests/unit/modules/atip
 
-Note: modules/secret/secret.py is the actual secrets module and carries carefully-reviewed S-family noqa markers from the checkout -- keep them verbatim; do NOT reflexively add/remove noqa. modules/incident files carry reviewed B904/SIM/S fixes from the branch.
+Note: modules/secret/secret.py is the actual secrets module and carries carefully-reviewed S-family noqa markers from the checkout -- keep them verbatim; do NOT reflexively add/remove noqa. modules/incident files carry reviewed B904/SIM/S fixes from the branch. modules/atip had an unmerged PR that we are going to merge prior to starting this task. This means the feat/dev_env_setup_ruff branch may have diverging content from main on modules/atip and its tests. We will need to keep the logic change from main but migrate or adjust its formatting from to align with the reference branch feat/dev_env_setup_ruff 
 
 app/pyproject.toml -> add to [tool.black] force-exclude:
     | modules/incident
