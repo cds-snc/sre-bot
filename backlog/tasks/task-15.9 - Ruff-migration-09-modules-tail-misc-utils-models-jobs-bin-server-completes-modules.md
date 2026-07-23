@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-23 14:18'
-updated_date: '2026-07-23 20:48'
+updated_date: '2026-07-23 20:49'
 labels: []
 dependencies:
   - TASK-15.8
@@ -60,7 +60,7 @@ Expected size: ~39 files.
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 make test passes; PR references decisions/toolchain.md and TASK-15
+- [x] #1 make test passes; PR references decisions/toolchain.md and TASK-15
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -119,8 +119,8 @@ Implemented per plan (mirrors TASK-15.1/15.7/15.8 recipe):
    - make check-prefix-guardrail -> "PREFIX guardrail: clean tree" (after the baseline fix in step 5).
    - uv run pytest tests/modules tests/unit/modules tests/unit/jobs tests/unit/server tests/unit/models tests/utils -q -> 718 passed, 0 failures (46 pre-existing asyncio deprecation warnings only).
    - git diff feat/dev_env_setup_ruff -- <all pulled paths> -> empty (AC#1 confirmed for pull scope; see comment for the whole-app/modules-tree caveat re: atip/incident drift, which is out of this task's scope).
-DoD#1: full `make test` deferred to the user to run directly (long-running full suite) as the final check before closing this task -- not run by the agent per instructions.
-PR should reference decisions/toolchain.md and TASK-15.
+   - make test (full suite, run directly by the user from app/) -> exit 0, all green.
+DoD#1 verified: user ran `make test` directly and confirmed all green (exit 0). All ACs and DoD checked. PR should reference decisions/toolchain.md and TASK-15. Task left at In Progress for human review/merge and status transition to Done.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
