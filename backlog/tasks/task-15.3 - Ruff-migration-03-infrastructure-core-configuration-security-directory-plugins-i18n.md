@@ -3,9 +3,11 @@ id: TASK-15.3
 title: >-
   Ruff migration 03: infrastructure core (configuration, security, directory,
   plugins, i18n)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-23 14:17'
+updated_date: '2026-07-23 17:15'
 labels: []
 dependencies:
   - TASK-15.2
@@ -56,3 +58,36 @@ Expected size: ~52 files.
 <!-- DOD:BEGIN -->
 - [ ] #1 make test passes; PR references decisions/toolchain.md and TASK-15
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Branch from latest main (done): feat/dev_env_setup_ruff_3, branched after TASK-15.2 merged.
+2. Pull migrated content for this slice from the reference branch (never hand-edit migrated source):
+   git checkout feat/dev_env_setup_ruff -- app/infrastructure/configuration app/infrastructure/security app/infrastructure/directory app/infrastructure/plugins app/infrastructure/i18n app/tests/unit/infrastructure/configuration app/tests/unit/infrastructure/security app/tests/unit/infrastructure/directory app/tests/unit/infrastructure/plugins app/tests/unit/infrastructure/i18n
+   Verified against current main: git diff --stat main feat/dev_env_setup_ruff -- <paths> -> 52 files changed, no adds/deletes (git diff --diff-filter=AD --name-status is empty). Matches expected ~52 files in the task description.
+   This slice carries the pre-existing circular-import fix (infrastructure/security/current_user.py, infrastructure/directory/google.py importing from infrastructure.security.jwks / infrastructure.directory.models directly instead of parent-package self-imports) -- arrives automatically via checkout, do not re-introduce the old self-imports.
+3. Edit app/pyproject.toml [tool.black] force-exclude block: add five alternatives inside the existing /( ... )/ group (after infrastructure/clients, before tests/unit/infrastructure/clients, to keep src dirs grouped before test dirs -- order within the regex is not semantically significant, alternation matches any line):
+     | infrastructure/configuration
+     | infrastructure/security
+     | infrastructure/directory
+     | infrastructure/plugins
+     | infrastructure/i18n
+     | tests/unit/infrastructure/configuration
+     | tests/unit/infrastructure/security
+     | tests/unit/infrastructure/directory
+     | tests/unit/infrastructure/plugins
+     | tests/unit/infrastructure/i18n
+   Leave [tool.ruff.lint] select = ["E","F","W"] and everything else unchanged.
+4. Edit app/Makefile: append to RUFF_SCOPE:
+     RUFF_SCOPE := api tests/api infrastructure/clients tests/unit/infrastructure/clients infrastructure/configuration infrastructure/security infrastructure/directory infrastructure/plugins infrastructure/i18n tests/unit/infrastructure/configuration tests/unit/infrastructure/security tests/unit/infrastructure/directory tests/unit/infrastructure/plugins tests/unit/infrastructure/i18n
+   Do not touch fmt/lint/fmt-ci/lint-ci target bodies (already reference $(RUFF_SCOPE) generically per TASK-15.1 scaffolding, using --extend-select per the TASK-15.2 root-cause fix).
+5. Validate from app/: make lint-ci && make fmt-ci && uv run pytest tests/unit/infrastructure/configuration tests/unit/infrastructure/security tests/unit/infrastructure/directory tests/unit/infrastructure/plugins tests/unit/infrastructure/i18n. Run the full test suite (make test) to confirm no import regression from the circular-import fix, but defer that run to the end (long-running) with explicit user confirmation before executing.
+6. Confirm git diff feat/dev_env_setup_ruff -- <all ten paths> is empty (AC#1).
+7. Ship one mechanical PR; reference decisions/toolchain.md and TASK-15.
+
+AC-to-step traceability:
+- AC#1 (byte-identical to reference branch) <- step 2, verified by step 6.
+- AC#2 (RUFF_SCOPE + force-exclude updated for all 10 paths; make lint-ci && make fmt-ci pass) <- steps 3, 4, verified by step 5.
+- DoD#1 (make test passes; PR references decisions/toolchain.md + TASK-15) <- step 5 (full make test, user-confirmed) + PR description (human/PR action).
+<!-- SECTION:PLAN:END -->
