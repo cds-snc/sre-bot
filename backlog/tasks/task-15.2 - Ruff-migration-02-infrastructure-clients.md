@@ -71,3 +71,15 @@ AC-to-step traceability:
 - AC#2 (RUFF_SCOPE + force-exclude updated; make lint-ci && make fmt-ci pass) <- steps 2, 3, verified by step 4.
 - DoD#1 (make test passes; PR references decisions/toolchain.md + TASK-15) <- step 4 (test run) + PR description (human/PR action).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented per plan (mirrors TASK-15.1 recipe):
+1. git checkout feat/dev_env_setup_ruff -- app/infrastructure/clients app/tests/unit/infrastructure/clients (49 files, no adds/deletes). git diff feat/dev_env_setup_ruff -- app/infrastructure/clients app/tests/unit/infrastructure/clients is empty (AC#1 verified).
+2. app/pyproject.toml [tool.black] force-exclude: added "infrastructure/clients" and "tests/unit/infrastructure/clients" alternatives.
+3. app/Makefile: RUFF_SCOPE extended to "api tests/api infrastructure/clients tests/unit/infrastructure/clients".
+4. Root-cause fix (not in original recipe, required for AC#2): the scoped ruff invocations in `lint` and `lint-ci` used `--select=E,F,W,I,B,UP,C4,SIM,S`, which caused CLI --select to override pyproject's `ignore = ["E501"]`, producing 5 false-positive E501 (line too long) failures on migrated docstrings that are otherwise correctly ruff-formatted. Switched both occurrences to `--extend-select=I,B,UP,C4,SIM,S` (base select E,F,W + ignore E501 come from pyproject config as intended, CLI only extends with the additional migration categories). Verified equivalent rule coverage; no other files affected.
+5. Validation: make lint-ci -> both ruff checks "All checks passed!" (mypy remains soft-failing via existing "|| true", same pre-existing unrelated errors as TASK-15.1, not a regression). make fmt-ci -> black 596 files unchanged, ruff format 66 files already formatted. uv run pytest tests/unit/infrastructure/clients -> 226 passed, 37 skipped. make test -> run by user directly, confirmed green (exit 0).
+DoD#1 (make test) verified by user directly, as requested. PR should reference decisions/toolchain.md and TASK-15.
+<!-- SECTION:NOTES:END -->
