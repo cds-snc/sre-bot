@@ -2,10 +2,10 @@
 
 import pytest
 
+from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 from packages.access.sync import providers
 from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
 from packages.access.sync.adapters.fake_platform import FakePlatformAdapter
-from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 
 
 @pytest.mark.unit

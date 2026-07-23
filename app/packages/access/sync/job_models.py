@@ -11,8 +11,6 @@ converts to the wire representation expected by ``IdempotencyService``.
 
 import dataclasses
 from dataclasses import dataclass
-from typing import Dict, List
-
 
 # ---------------------------------------------------------------------------
 # Status and error constants
@@ -95,8 +93,8 @@ class CompletedUserRecord:
     dry_run: bool
     started_at: str
     completed_at: str
-    actions_planned: List[str]
-    actions_applied: List[str]
+    actions_planned: list[str]
+    actions_applied: list[str]
     requires_manual_action: bool
     sync_type: str = "user"
     status: str = JobStatus.COMPLETED
@@ -120,11 +118,9 @@ class CompletedPlatformRecord:
     requires_manual_action_count: int
     changed_user_count: int = 0
     unchanged_user_count: int = 0
-    action_counts: Dict[str, int] = dataclasses.field(default_factory=dict)
-    lifecycle_actions: Dict[str, List[str]] = dataclasses.field(default_factory=dict)
-    entitlements_by_action: Dict[str, Dict[str, List[str]]] = dataclasses.field(
-        default_factory=dict
-    )
+    action_counts: dict[str, int] = dataclasses.field(default_factory=dict)
+    lifecycle_actions: dict[str, list[str]] = dataclasses.field(default_factory=dict)
+    entitlements_by_action: dict[str, dict[str, list[str]]] = dataclasses.field(default_factory=dict)
     sync_type: str = "platform"
     status: str = JobStatus.COMPLETED
 

@@ -9,7 +9,7 @@ Command hierarchy under /sre:
             └── status  <job_id>
 """
 
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 
-def register_commands(provider: "SlackPlatformProvider") -> None:
+def register_commands(provider: SlackPlatformProvider) -> None:
     """Register access sync Slack commands.
 
     Registers the ``access`` parent (shared by all access subpackages), the
@@ -154,7 +154,7 @@ def register_commands(provider: "SlackPlatformProvider") -> None:
 
 def handle_sync_user_command(
     payload: CommandPayload,
-    parsed_args: Dict[str, Any],
+    parsed_args: dict[str, Any],
 ) -> CommandResponse:
     """Handle /sre access sync user <user_email> <platform> [--dry-run].
 
@@ -247,7 +247,7 @@ def handle_sync_user_command(
 
 def handle_sync_platform_command(
     payload: CommandPayload,
-    parsed_args: Dict[str, Any],
+    parsed_args: dict[str, Any],
 ) -> CommandResponse:
     """Handle /sre access sync platform <platform> [--dry-run].
 
@@ -336,7 +336,7 @@ def handle_sync_platform_command(
 
 def handle_sync_status_command(
     payload: CommandPayload,
-    parsed_args: Dict[str, Any],
+    parsed_args: dict[str, Any],
 ) -> CommandResponse:
     """Handle /sre access sync status <job_id>.
 

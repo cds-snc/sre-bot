@@ -13,7 +13,7 @@ Pattern mirrors PolicyEngine in packages/access/sync/policies.py.
 
 from __future__ import annotations
 
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from packages.access.common.config import EntitlementMode
 
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 def check_entitlement_mode(
-    runtime_config: "AccessRuntimeConfig",
+    runtime_config: AccessRuntimeConfig,
     platform: str,
     group_slug: str,
 ) -> EntitlementMode:
@@ -68,10 +68,10 @@ def check_entitlement_mode(
 
 
 def resolve_approver_candidates(
-    directory_group: "DirectoryGroup",
+    directory_group: DirectoryGroup,
     fallback_slug: str,
-    directory: "DirectoryProvider",
-) -> List[str]:
+    directory: DirectoryProvider,
+) -> list[str]:
     """Resolve an ordered list of eligible approver emails for a target group.
 
     Resolution order:
@@ -95,11 +95,7 @@ def resolve_approver_candidates(
         include_member_types={"USER"},
     )
     if members_result.is_success and members_result.data:
-        owners = [
-            m.email
-            for m in members_result.data
-            if m.role is not None and m.role.upper() in ("OWNER", "MANAGER")
-        ]
+        owners = [m.email for m in members_result.data if m.role is not None and m.role.upper() in ("OWNER", "MANAGER")]
         if owners:
             return owners
 
@@ -115,7 +111,7 @@ def resolve_approver_candidates(
 
 def is_auto_approvable(
     actor_type: str,
-    sensitive_entitlement_types: "frozenset[str] | None" = None,
+    sensitive_entitlement_types: frozenset[str] | None = None,
     entitlement_type: str = "group",
 ) -> bool:
     """Return True if the request qualifies for auto-approval.
@@ -135,13 +131,11 @@ def is_auto_approvable(
     """
     if actor_type != "delegated":
         return False
-    if sensitive_entitlement_types and entitlement_type in sensitive_entitlement_types:
-        return False
-    return True
+    return not (sensitive_entitlement_types and entitlement_type in sensitive_entitlement_types)
 
 
 def is_self_approval(
-    request: "AccessRequest",
+    request: AccessRequest,
     approver_email: str,
 ) -> bool:
     """Return True if the approver is the same person as the actor.
@@ -161,7 +155,7 @@ def is_self_approval(
 
 
 def meets_minimum_approver_count(
-    decisions: "List[ApprovalDecision]",
+    decisions: list[ApprovalDecision],
     required_count: int,
 ) -> bool:
     """Return True if the approved-decision count meets the required minimum.

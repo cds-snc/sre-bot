@@ -6,7 +6,7 @@ owns the HTTP-boundary Pydantic models.
 """
 
 from dataclasses import dataclass, field
-from typing import Literal, Optional
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -23,10 +23,10 @@ class ParsedEntitlementToken:
 
     raw: str
     product: str = ""
-    env: Optional[str] = None
+    env: str | None = None
     role: str = ""
-    service: Optional[str] = None
-    resource: Optional[str] = None
+    service: str | None = None
+    resource: str | None = None
     parsed: bool = False
 
 
@@ -37,7 +37,7 @@ class PlatformSummary:
     key: str
     display_name: str
     authn_group_slug: str
-    entitlement_count: Optional[int] = None
+    entitlement_count: int | None = None
 
 
 @dataclass(frozen=True)
@@ -49,7 +49,5 @@ class EntitlementEntry:
     group_email: str
     mode: Literal["sync_managed", "ephemeral", "deactivated"]
     requestable: bool
-    already_provisioned: Optional[bool]
-    parsed_token: ParsedEntitlementToken = field(
-        default_factory=lambda: ParsedEntitlementToken(raw="")
-    )
+    already_provisioned: bool | None
+    parsed_token: ParsedEntitlementToken = field(default_factory=lambda: ParsedEntitlementToken(raw=""))

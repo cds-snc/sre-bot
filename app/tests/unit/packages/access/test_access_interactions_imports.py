@@ -4,7 +4,6 @@ import importlib
 
 import pytest
 
-
 EXPECTED_INTERACTIONS_MODULES = (
     "packages.access.catalog.interactions.http",
     "packages.access.request.interactions.http",

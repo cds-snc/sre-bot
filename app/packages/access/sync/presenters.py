@@ -5,7 +5,7 @@ transport-appropriate response shapes. All status formatting logic lives
 here so HTTP routes and Slack handlers share a single source of truth.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from infrastructure.i18n import t
 from packages.access.sync.job_models import JobStatus
@@ -17,7 +17,7 @@ _MAX_USERS_PER_ENTITLEMENT = 3
 _MAX_USER_ACTIONS = 6
 
 
-def to_http_status_response(record: Dict[str, Any]) -> SyncJobStatusResponse:
+def to_http_status_response(record: dict[str, Any]) -> SyncJobStatusResponse:
     """Convert a stored job record dict to an HTTP polling response model."""
     return SyncJobStatusResponse(**record)
 
@@ -65,10 +65,7 @@ def to_slack_status_message(record: SyncJobStatusResponse, locale: str) -> str:
                     t(
                         "access_sync.status.result.completed_user_counts",
                         locale,
-                        (
-                            f"Actions planned: {len(actions_planned)} | "
-                            f"Applied: {len(actions_applied)}"
-                        ),
+                        (f"Actions planned: {len(actions_planned)} | Applied: {len(actions_applied)}"),
                         actions_planned_count=len(actions_planned),
                         actions_applied_count=len(actions_applied),
                     )
@@ -81,10 +78,7 @@ def to_slack_status_message(record: SyncJobStatusResponse, locale: str) -> str:
                         t(
                             "access_sync.status.result.completed_user_planned_actions",
                             locale,
-                            (
-                                "Planned actions: "
-                                f"{_truncate_list(actions_planned, _MAX_USER_ACTIONS)}"
-                            ),
+                            (f"Planned actions: {_truncate_list(actions_planned, _MAX_USER_ACTIONS)}"),
                             actions=_truncate_list(actions_planned, _MAX_USER_ACTIONS),
                         )
                     )
@@ -95,10 +89,7 @@ def to_slack_status_message(record: SyncJobStatusResponse, locale: str) -> str:
                         t(
                             "access_sync.status.result.completed_user_applied_actions",
                             locale,
-                            (
-                                "Applied actions: "
-                                f"{_truncate_list(actions_applied, _MAX_USER_ACTIONS)}"
-                            ),
+                            (f"Applied actions: {_truncate_list(actions_applied, _MAX_USER_ACTIONS)}"),
                             actions=_truncate_list(actions_applied, _MAX_USER_ACTIONS),
                         )
                     )
@@ -234,19 +225,13 @@ def to_slack_status_message(record: SyncJobStatusResponse, locale: str) -> str:
 
 
 def _format_lifecycle_details(
-    lifecycle_actions: Dict[str, Any],
+    lifecycle_actions: dict[str, Any],
     locale: str,
 ) -> list[str]:
     """Return a concise lifecycle preview block for Slack status messages."""
-    provision_users = [
-        str(user) for user in lifecycle_actions.get("provision_user", []) if user
-    ]
-    remove_users = [
-        str(user) for user in lifecycle_actions.get("remove_user", []) if user
-    ]
-    disable_users = [
-        str(user) for user in lifecycle_actions.get("disable_user", []) if user
-    ]
+    provision_users = [str(user) for user in lifecycle_actions.get("provision_user", []) if user]
+    remove_users = [str(user) for user in lifecycle_actions.get("remove_user", []) if user]
+    disable_users = [str(user) for user in lifecycle_actions.get("disable_user", []) if user]
 
     details: list[str] = []
     if provision_users:
@@ -255,10 +240,7 @@ def _format_lifecycle_details(
                 t(
                     "access_sync.status.result.completed_lifecycle_provision",
                     locale,
-                    (
-                        f"• Users to provision ({len(provision_users)}): "
-                        f"{_truncate_list(provision_users, _MAX_LIFECYCLE_USERS)}"
-                    ),
+                    (f"• Users to provision ({len(provision_users)}): {_truncate_list(provision_users, _MAX_LIFECYCLE_USERS)}"),
                     count=len(provision_users),
                     users=_truncate_list(provision_users, _MAX_LIFECYCLE_USERS),
                 )
@@ -270,10 +252,7 @@ def _format_lifecycle_details(
                 t(
                     "access_sync.status.result.completed_lifecycle_remove",
                     locale,
-                    (
-                        f"• Users to remove ({len(remove_users)}): "
-                        f"{_truncate_list(remove_users, _MAX_LIFECYCLE_USERS)}"
-                    ),
+                    (f"• Users to remove ({len(remove_users)}): {_truncate_list(remove_users, _MAX_LIFECYCLE_USERS)}"),
                     count=len(remove_users),
                     users=_truncate_list(remove_users, _MAX_LIFECYCLE_USERS),
                 )
@@ -285,10 +264,7 @@ def _format_lifecycle_details(
                 t(
                     "access_sync.status.result.completed_lifecycle_disable",
                     locale,
-                    (
-                        f"• Users to disable ({len(disable_users)}): "
-                        f"{_truncate_list(disable_users, _MAX_LIFECYCLE_USERS)}"
-                    ),
+                    (f"• Users to disable ({len(disable_users)}): {_truncate_list(disable_users, _MAX_LIFECYCLE_USERS)}"),
                     count=len(disable_users),
                     users=_truncate_list(disable_users, _MAX_LIFECYCLE_USERS),
                 )
@@ -298,7 +274,7 @@ def _format_lifecycle_details(
 
 
 def _format_entitlement_details(
-    entitlements_by_action: Dict[str, Any],
+    entitlements_by_action: dict[str, Any],
     locale: str,
 ) -> list[str]:
     """Return a concise entitlement preview block for Slack status messages."""
@@ -336,9 +312,7 @@ def _format_entitlement_action_details(
     for slug, users in sorted(mapping.items()):
         if not isinstance(slug, str):
             continue
-        normalized_users = (
-            [str(user) for user in users] if isinstance(users, list) else []
-        )
+        normalized_users = [str(user) for user in users] if isinstance(users, list) else []
         entries.append((slug, normalized_users))
 
     lines: list[str] = []
@@ -348,10 +322,7 @@ def _format_entitlement_action_details(
                 t(
                     action_key,
                     locale,
-                    (
-                        f"{fallback_prefix} — *{slug}* ({len(users)}): "
-                        f"{_truncate_list(users, _MAX_USERS_PER_ENTITLEMENT)}"
-                    ),
+                    (f"{fallback_prefix} — *{slug}* ({len(users)}): {_truncate_list(users, _MAX_USERS_PER_ENTITLEMENT)}"),
                     slug=slug,
                     count=len(users),
                     users=_truncate_list(users, _MAX_USERS_PER_ENTITLEMENT),

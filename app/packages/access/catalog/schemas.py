@@ -4,7 +4,7 @@ These models are the only types that cross the HTTP boundary.
 They are never used inside the service layer.
 """
 
-from typing import List, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -14,10 +14,10 @@ class ParsedTokenResponse(BaseModel):
 
     raw: str
     product: str = ""
-    env: Optional[str] = None
+    env: str | None = None
     role: str = ""
-    service: Optional[str] = None
-    resource: Optional[str] = None
+    service: str | None = None
+    resource: str | None = None
     parsed: bool = False
 
 
@@ -27,13 +27,13 @@ class PlatformSummaryResponse(BaseModel):
     key: str
     display_name: str
     authn_group_slug: str
-    entitlement_count: Optional[int] = None
+    entitlement_count: int | None = None
 
 
 class PlatformListResponse(BaseModel):
     """Response for GET /api/v1/access/catalog."""
 
-    platforms: List[PlatformSummaryResponse]
+    platforms: list[PlatformSummaryResponse]
 
 
 class EntitlementEntryResponse(BaseModel):
@@ -44,7 +44,7 @@ class EntitlementEntryResponse(BaseModel):
     group_email: str
     mode: Literal["sync_managed", "ephemeral", "deactivated"]
     requestable: bool
-    already_provisioned: Optional[bool] = None
+    already_provisioned: bool | None = None
     parsed: ParsedTokenResponse
 
 
@@ -52,4 +52,4 @@ class EntitlementListResponse(BaseModel):
     """Response for GET /api/v1/access/catalog/{platform}."""
 
     platform: str
-    entitlements: List[EntitlementEntryResponse]
+    entitlements: list[EntitlementEntryResponse]

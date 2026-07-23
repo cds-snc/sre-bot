@@ -46,9 +46,7 @@ def test_sync_startup_warmup_registers_handlers_and_warms_runtime_config(monkeyp
         provider_warm_called = True
         return object()
 
-    monkeypatch.setattr(
-        sync_pkg, "get_access_runtime_config", _runtime_config, raising=False
-    )
+    monkeypatch.setattr(sync_pkg, "get_access_runtime_config", _runtime_config, raising=False)
     monkeypatch.setattr(sync_pkg, "get_access_sync_settings", lambda: _Settings())
     monkeypatch.setattr(sync_pkg, "get_access_sync_coordinator", _warm_provider)
 
@@ -100,17 +98,13 @@ def test_sync_startup_warmup_registers_handlers_via_event_dispatcher(monkeypatch
     monkeypatch.setattr(
         sync_pkg,
         "register_event_handler",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("direct register_event_handler usage is forbidden")
-        ),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("direct register_event_handler usage is forbidden")),
         raising=False,
     )
     monkeypatch.setattr(
         sync_pkg,
         "get_handlers_for_event",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("direct get_handlers_for_event usage is forbidden")
-        ),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("direct get_handlers_for_event usage is forbidden")),
         raising=False,
     )
 
@@ -175,9 +169,7 @@ def test_sync_register_background_job_registers_reconciliation_when_enabled(
 
     class _BackgroundJobRegistry:
         def register(self, *, job_name: str, schedule: str, job) -> None:
-            registrations.append(
-                {"job_name": job_name, "schedule": schedule, "job": job}
-            )
+            registrations.append({"job_name": job_name, "schedule": schedule, "job": job})
 
     monkeypatch.setattr(sync_pkg, "get_access_sync_settings", lambda: _Settings())
 
@@ -211,9 +203,7 @@ def test_sync_register_background_job_skips_registration_when_disabled(
 
     class _BackgroundJobRegistry:
         def register(self, *, job_name: str, schedule: str, job) -> None:
-            registrations.append(
-                {"job_name": job_name, "schedule": schedule, "job": job}
-            )
+            registrations.append({"job_name": job_name, "schedule": schedule, "job": job})
 
     monkeypatch.setattr(sync_pkg, "get_access_sync_settings", lambda: _Settings())
 

@@ -23,8 +23,7 @@ trail with a single DynamoDB ``query`` against the request's PK, without table
 scans or GSIs.
 """
 
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
 
 import structlog
 
@@ -81,12 +80,8 @@ class AccessRequestRepository:
             "justification": request.justification,
             "resolved_approvers": request.resolved_approvers,
             "ticket_id": request.ticket_id,
-            "requested_at": (
-                request.requested_at.isoformat() if request.requested_at else None
-            ),
-            "updated_at": (
-                request.updated_at.isoformat() if request.updated_at else None
-            ),
+            "requested_at": (request.requested_at.isoformat() if request.requested_at else None),
+            "updated_at": (request.updated_at.isoformat() if request.updated_at else None),
         }
         result = self._storage.put(self.TABLE, item)
         if not result.is_success:
@@ -96,7 +91,7 @@ class AccessRequestRepository:
                 error=result.message,
             )
 
-    def get_request(self, request_id: str) -> Optional[AccessRequest]:
+    def get_request(self, request_id: str) -> AccessRequest | None:
         """Return the AccessRequest for the given request ID, or None."""
         result = self._storage.get(
             self.TABLE,
@@ -133,7 +128,7 @@ class AccessRequestRepository:
                 error=result.message,
             )
 
-    def get_decisions(self, request_id: str) -> List[ApprovalDecision]:
+    def get_decisions(self, request_id: str) -> list[ApprovalDecision]:
         """Return all decisions for the given request, ordered by SK."""
         result = self._storage.query(
             self.TABLE,
@@ -176,9 +171,7 @@ class AccessRequestRepository:
     # Full request context
     # ------------------------------------------------------------------
 
-    def get_request_with_decisions(
-        self, request_id: str
-    ) -> tuple[Optional[AccessRequest], List[ApprovalDecision]]:
+    def get_request_with_decisions(self, request_id: str) -> tuple[AccessRequest | None, list[ApprovalDecision]]:
         """Return the access request and all its recorded decisions.
 
         Uses a single DynamoDB query on the PK prefix to retrieve both
@@ -195,8 +188,8 @@ class AccessRequestRepository:
         if not result.is_success or result.data is None:
             return None, []
 
-        request: Optional[AccessRequest] = None
-        decisions: List[ApprovalDecision] = []
+        request: AccessRequest | None = None
+        decisions: list[ApprovalDecision] = []
 
         for item in result.data:
             sk = item.get("SK", "")
@@ -229,16 +222,8 @@ class AccessRequestRepository:
             justification=item["justification"],
             resolved_approvers=item.get("resolved_approvers") or [],
             ticket_id=item.get("ticket_id"),
-            requested_at=(
-                datetime.fromisoformat(item["requested_at"])
-                if item.get("requested_at")
-                else None
-            ),
-            updated_at=(
-                datetime.fromisoformat(item["updated_at"])
-                if item.get("updated_at")
-                else None
-            ),
+            requested_at=(datetime.fromisoformat(item["requested_at"]) if item.get("requested_at") else None),
+            updated_at=(datetime.fromisoformat(item["updated_at"]) if item.get("updated_at") else None),
         )
 
     @staticmethod
@@ -254,4 +239,4 @@ class AccessRequestRepository:
     @staticmethod
     def _now() -> datetime:
         """Return current UTC time."""
-        return datetime.now(tz=timezone.utc)
+        return datetime.now(tz=UTC)
