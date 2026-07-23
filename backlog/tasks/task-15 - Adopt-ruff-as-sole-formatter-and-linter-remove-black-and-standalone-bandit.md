@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-23 13:52'
+updated_date: '2026-07-23 14:20'
 labels:
   - toolchain
   - phase-2
@@ -134,3 +134,34 @@ DoD left for human verification:
 
 No git commits/pushes were made -- all git operations remain user-controlled.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-07-23 14:20
+---
+DECOMPOSITION (2026-07-23): the fully-migrated branch feat/dev_env_setup_ruff is a 484-file big-bang PR -- too large to review safely. It is retained UNCHANGED as the reference end-state. The migration is now delivered as 12 sequential child PRs (TASK-15.1 .. TASK-15.12), each ~40-60 files, using a parallel-toolchain strategy so main is green after every PR:
+  - LEGACY scope: black (@88) + ruff lint E,F,W keep running over not-yet-migrated paths.
+  - RUFF scope: ruff format (@130) + ruff lint E,F,W,I,B,UP,C4,SIM,S run over the migrated paths.
+  - A path joins the RUFF scope by (a) black [tool.black] force-exclude in app/pyproject.toml and (b) the RUFF_SCOPE variable in app/Makefile. Both run inside the existing ci_code.yml (make lint-ci / make fmt-ci) -- no CI YAML change until the final cutover.
+  - Each PR pulls already-migrated content from the reference branch (git checkout feat/dev_env_setup_ruff -- <paths>), so no file is hand-reformatted and the end state is guaranteed identical.
+
+PR sequence (each branches from main AFTER the previous merges; dependency chain 15.1<-...<-15.12):
+  15.1  scaffold parallel CI + pilot app/api                      (~8)
+  15.2  infrastructure/clients                                    (~49)
+  15.3  infrastructure core (configuration,security,directory,plugins,i18n) (~52)
+  15.4  infrastructure reliability tail -> completes infrastructure/ (~59)
+  15.5  integrations aws + small vendors                          (~51)
+  15.6  integrations google_workspace+slack -> completes integrations/ (~39)
+  15.7  modules incident + atip,secret,role                       (~38)
+  15.8  modules webhooks + aws                                    (~44)
+  15.9  modules tail + misc (utils,models,jobs,bin,server) -> completes modules/ (~39)
+  15.10 packages/access                                           (~60, splittable)
+  15.11 packages/geolocate + remaining tests -> completes app/ reflow (~38)
+  15.12 final cutover: drop black, expand ruff select, delete bandit (~6, config only)
+
+Invariant after 15.11: git diff feat/dev_env_setup_ruff -- app shows only pyproject/Makefile/uv.lock. After 15.12: git diff feat/dev_env_setup_ruff -- app .github is EMPTY.
+
+The AC checkboxes on this umbrella task describe the END state (all three ACs) and remain valid; they are satisfied cumulatively once 15.12 merges. Humans move this task to Done after the final cutover PR.
+---
+<!-- COMMENTS:END -->
