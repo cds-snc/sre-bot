@@ -55,9 +55,7 @@ class TestSpreadsheetOperations:
         }
 
         # Act
-        result = sheets_client.get_spreadsheet(
-            spreadsheet_id="sheet123", ranges=["Sheet1!A1:B10", "Sheet2!C1:D5"]
-        )
+        result = sheets_client.get_spreadsheet(spreadsheet_id="sheet123", ranges=["Sheet1!A1:B10", "Sheet2!C1:D5"])
 
         # Assert
         assert result.is_success
@@ -67,15 +65,11 @@ class TestSpreadsheetOperations:
         # Arrange
         mock_service.spreadsheets().get().execute.return_value = {
             "spreadsheetId": "sheet123",
-            "sheets": [
-                {"data": [{"rowData": [{"values": [{"formattedValue": "Test"}]}]}]}
-            ],
+            "sheets": [{"data": [{"rowData": [{"values": [{"formattedValue": "Test"}]}]}]}],
         }
 
         # Act
-        result = sheets_client.get_spreadsheet(
-            spreadsheet_id="sheet123", include_grid_data=True
-        )
+        result = sheets_client.get_spreadsheet(spreadsheet_id="sheet123", include_grid_data=True)
 
         # Assert
         assert result.is_success
@@ -134,9 +128,7 @@ class TestSpreadsheetOperations:
         ]
 
         # Act
-        result = sheets_client.batch_update_spreadsheet(
-            spreadsheet_id="sheet123", requests=requests
-        )
+        result = sheets_client.batch_update_spreadsheet(spreadsheet_id="sheet123", requests=requests)
 
         # Assert
         assert result.is_success
@@ -155,9 +147,7 @@ class TestValuesOperations:
         }
 
         # Act
-        result = sheets_client.get_values(
-            spreadsheet_id="sheet123", cell_range="Sheet1!A1:B2"
-        )
+        result = sheets_client.get_values(spreadsheet_id="sheet123", cell_range="Sheet1!A1:B2")
 
         # Assert
         assert result.is_success
@@ -173,9 +163,7 @@ class TestValuesOperations:
         }
 
         # Act
-        result = sheets_client.get_values(
-            spreadsheet_id="sheet123", cell_range="Sheet1!A1:B2"
-        )
+        result = sheets_client.get_values(spreadsheet_id="sheet123", cell_range="Sheet1!A1:B2")
 
         # Assert
         assert result.is_success
@@ -294,9 +282,7 @@ class TestValuesOperations:
         }
 
         # Act
-        result = sheets_client.clear_values(
-            spreadsheet_id="sheet123", cell_range="Sheet1!A1:B10"
-        )
+        result = sheets_client.clear_values(spreadsheet_id="sheet123", cell_range="Sheet1!A1:B10")
 
         # Assert
         assert result.is_success
@@ -306,14 +292,10 @@ class TestValuesOperations:
 class TestDelegation:
     """Test delegated authentication."""
 
-    def test_get_values_with_delegation(
-        self, sheets_client, mock_session_provider, mock_service
-    ):
+    def test_get_values_with_delegation(self, sheets_client, mock_session_provider, mock_service):
         """Test getting values with delegated authentication."""
         # Arrange
-        mock_service.spreadsheets().values().get().execute.return_value = {
-            "values": [[]]
-        }
+        mock_service.spreadsheets().values().get().execute.return_value = {"values": [[]]}
 
         # Act
         result = sheets_client.get_values(

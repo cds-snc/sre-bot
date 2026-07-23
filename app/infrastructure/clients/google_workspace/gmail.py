@@ -6,7 +6,7 @@ including email sending, draft creation, and message retrieval operations.
 
 import base64
 from email.message import EmailMessage
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
@@ -55,7 +55,7 @@ class GmailClient:
         recipient: str,
         content_type: str = "plain",
         user_id: str = "me",
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Send an email via Gmail API.
 
@@ -117,12 +117,7 @@ class GmailClient:
         )
 
         def api_call() -> Any:
-            return (
-                service.users()
-                .messages()
-                .send(userId=user_id, body={"raw": raw_message})
-                .execute()
-            )
+            return service.users().messages().send(userId=user_id, body={"raw": raw_message}).execute()
 
         return execute_google_api_call(
             operation_name="gmail.users.messages.send",
@@ -137,7 +132,7 @@ class GmailClient:
         recipient: str,
         content_type: str = "plain",
         user_id: str = "me",
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Create a draft email via Gmail API.
 
@@ -199,12 +194,7 @@ class GmailClient:
         )
 
         def api_call() -> Any:
-            return (
-                service.users()
-                .drafts()
-                .create(userId=user_id, body={"message": {"raw": raw_message}})
-                .execute()
-            )
+            return service.users().drafts().create(userId=user_id, body={"message": {"raw": raw_message}}).execute()
 
         return execute_google_api_call(
             operation_name="gmail.users.drafts.create",
@@ -220,7 +210,7 @@ class GmailClient:
         message_id: str,
         user_id: str = "me",
         format: str = "full",
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Get a specific email message by ID.
 
@@ -256,12 +246,7 @@ class GmailClient:
         )
 
         def api_call() -> Any:
-            return (
-                service.users()
-                .messages()
-                .get(userId=user_id, id=message_id, format=format)
-                .execute()
-            )
+            return service.users().messages().get(userId=user_id, id=message_id, format=format).execute()
 
         return execute_google_api_call(
             operation_name="gmail.users.messages.get",
@@ -270,11 +255,11 @@ class GmailClient:
 
     def list_messages(
         self,
-        query: Optional[str] = None,
+        query: str | None = None,
         max_results: int = 100,
         user_id: str = "me",
-        label_ids: Optional[list[str]] = None,
-        delegated_email: Optional[str] = None,
+        label_ids: list[str] | None = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """List messages in the user's mailbox.
 

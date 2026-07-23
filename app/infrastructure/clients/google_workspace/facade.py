@@ -54,7 +54,7 @@ class GoogleWorkspaceClients:
     sheets: SheetsClient
     gmail: GmailClient
 
-    def __init__(self, google_settings: "GoogleWorkspaceSettings") -> None:
+    def __init__(self, google_settings: GoogleWorkspaceSettings) -> None:
         """Initialize Google Workspace clients facade.
 
         Args:

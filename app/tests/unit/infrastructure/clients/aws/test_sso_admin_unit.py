@@ -1,5 +1,6 @@
-import pytest
 import importlib
+
+import pytest
 
 from infrastructure.operations.result import OperationResult
 

@@ -3,7 +3,7 @@
 Provides aggregated health check operations for AWS services, enabling monitoring and alerting for service availability and performance issues.
 """
 
-from typing import Callable, Dict, Iterable, Optional
+from collections.abc import Callable, Iterable
 
 import structlog
 
@@ -31,9 +31,9 @@ class AWSIntegrationHealth:
     def __init__(
         self,
         session_provider: SessionProvider,
-        default_identity_store_id: Optional[str] = None,
-        default_sso_instance_arn: Optional[str] = None,
-        config_aggregator_name: Optional[str] = None,
+        default_identity_store_id: str | None = None,
+        default_sso_instance_arn: str | None = None,
+        config_aggregator_name: str | None = None,
         include_guardduty: bool = True,
         include_cost_explorer: bool = True,
     ) -> None:
@@ -43,9 +43,7 @@ class AWSIntegrationHealth:
         # Clients with defaults inherited from facade
         self.dynamodb: DynamoDBClient = DynamoDBClient(
             session_provider,
-            default_role_arn=self._session_provider.get_role_arn_for_service(
-                "dynamodb"
-            ),
+            default_role_arn=self._session_provider.get_role_arn_for_service("dynamodb"),
         )
         self.identitystore: IdentityStoreClient = IdentityStoreClient(
             session_provider,
@@ -53,9 +51,7 @@ class AWSIntegrationHealth:
         )
         self.organizations: OrganizationsClient = OrganizationsClient(
             session_provider,
-            default_role_arn=self._session_provider.get_role_arn_for_service(
-                "organizations"
-            ),
+            default_role_arn=self._session_provider.get_role_arn_for_service("organizations"),
         )
         self.sso_admin: SsoAdminClient = SsoAdminClient(
             session_provider,
@@ -65,15 +61,13 @@ class AWSIntegrationHealth:
             session_provider,
             default_role_arn=self._session_provider.get_role_arn_for_service("config"),
         )
-        self.guardduty: Optional[GuardDutyClient] = None
+        self.guardduty: GuardDutyClient | None = None
         if include_guardduty:
             self.guardduty = GuardDutyClient(
                 session_provider,
-                default_role_arn=self._session_provider.get_role_arn_for_service(
-                    "guardduty"
-                ),
+                default_role_arn=self._session_provider.get_role_arn_for_service("guardduty"),
             )
-        self.cost_explorer: Optional[CostExplorerClient]
+        self.cost_explorer: CostExplorerClient | None
         if include_cost_explorer:
             self.cost_explorer = CostExplorerClient(
                 session_provider,
@@ -85,7 +79,7 @@ class AWSIntegrationHealth:
         self._config_aggregator_name = config_aggregator_name
 
         # Registry of cheap health checks per service
-        self._checks: Dict[str, Callable[[], OperationResult]] = {
+        self._checks: dict[str, Callable[[], OperationResult]] = {
             "dynamodb": self._check_dynamodb,
             "identitystore": self._check_identity_store,
             "organizations": self._check_organizations,
@@ -112,8 +106,8 @@ class AWSIntegrationHealth:
 
     def check_all(
         self,
-        include: Optional[Iterable[str]] = None,
-        exclude: Optional[Iterable[str]] = None,
+        include: Iterable[str] | None = None,
+        exclude: Iterable[str] | None = None,
     ) -> OperationResult:
         """Run health checks for all (or filtered) services.
 
@@ -124,7 +118,7 @@ class AWSIntegrationHealth:
         exclude_set = set(exclude) if exclude else set()
         services = [s for s in include_set if s not in exclude_set]
 
-        results: Dict[str, OperationResult] = {}
+        results: dict[str, OperationResult] = {}
         all_success = True
 
         for service in sorted(services):
@@ -134,15 +128,9 @@ class AWSIntegrationHealth:
                 all_success = False
 
         if all_success:
-            return OperationResult.success(
-                data={"services": results}, message="All services healthy"
-            )
+            return OperationResult.success(data={"services": results}, message="All services healthy")
         # Use first failed service's status, or TRANSIENT_ERROR if no results
-        first_status = (
-            results[next(iter(results))].status
-            if results
-            else OperationStatus.TRANSIENT_ERROR
-        )
+        first_status = results[next(iter(results))].status if results else OperationStatus.TRANSIENT_ERROR
         return OperationResult.error(
             status=first_status,
             message="One or more services unhealthy",

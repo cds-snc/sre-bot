@@ -4,7 +4,7 @@ Provides factory-as-fixture pattern for creating configurable fake boto3 clients
 used across AWS client unit tests, following the testing strategy.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -44,9 +44,9 @@ class FakeClient:
 
     def __init__(
         self,
-        paginated_pages: Optional[List[Dict[str, Any]]] = None,
-        api_responses: Optional[Dict[str, Any]] = None,
-        can_paginate: Optional[Any] = None,
+        paginated_pages: list[dict[str, Any]] | None = None,
+        api_responses: dict[str, Any] | None = None,
+        can_paginate: Any | None = None,
     ):
         self._paginated_pages = paginated_pages or []
         self._api_responses = api_responses or {}
@@ -127,9 +127,9 @@ def make_fake_client():
     """
 
     def _factory(
-        paginated_pages: Optional[List[Dict[str, Any]]] = None,
-        api_responses: Optional[Dict[str, Any]] = None,
-        can_paginate: Optional[Any] = None,
+        paginated_pages: list[dict[str, Any]] | None = None,
+        api_responses: dict[str, Any] | None = None,
+        can_paginate: Any | None = None,
     ) -> FakeClient:
         """Create a FakeClient with the given configuration."""
         return FakeClient(

@@ -4,8 +4,9 @@ Provides type-safe access to Google Workspace Directory API (users, groups, memb
 with consistent error handling and OperationResult return types.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, cast
+from typing import Any, cast
 
 import structlog
 
@@ -33,11 +34,11 @@ class ListGroupsWithMembersRequest:
         exclude_empty_groups: Whether to exclude groups with no members
     """
 
-    groups_filters: Optional[list[Callable]] = None
-    member_filters: Optional[list[Callable]] = None
-    groups_kwargs: Optional[dict] = field(default_factory=dict)
-    members_kwargs: Optional[dict] = field(default_factory=dict)
-    users_kwargs: Optional[dict] = field(default_factory=dict)
+    groups_filters: list[Callable] | None = None
+    member_filters: list[Callable] | None = None
+    groups_kwargs: dict | None = field(default_factory=dict)
+    members_kwargs: dict | None = field(default_factory=dict)
+    users_kwargs: dict | None = field(default_factory=dict)
     include_users_details: bool = True
     exclude_empty_groups: bool = False
 
@@ -65,7 +66,7 @@ class DirectoryClient:
     def get_user(
         self,
         user_key: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Get a user by key (email or user ID).
 
@@ -82,9 +83,7 @@ class DirectoryClient:
             service = self._session_provider.get_service(
                 "admin",
                 "directory_v1",
-                scopes=[
-                    "https://www.googleapis.com/auth/admin.directory.user.readonly"
-                ],
+                scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
                 delegated_user_email=delegated_email,
             )
             request = service.users().get(userKey=user_key)
@@ -94,8 +93,8 @@ class DirectoryClient:
 
     def list_users(
         self,
-        customer: Optional[str] = None,
-        delegated_email: Optional[str] = None,
+        customer: str | None = None,
+        delegated_email: str | None = None,
         **kwargs: Any,
     ) -> OperationResult:
         """List all users in domain with automatic pagination.
@@ -115,9 +114,7 @@ class DirectoryClient:
             service = self._session_provider.get_service(
                 "admin",
                 "directory_v1",
-                scopes=[
-                    "https://www.googleapis.com/auth/admin.directory.user.readonly"
-                ],
+                scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
                 delegated_user_email=delegated_email,
             )
 
@@ -138,7 +135,7 @@ class DirectoryClient:
     def create_user(
         self,
         body: dict[str, Any],
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Create a new user in domain.
 
@@ -167,7 +164,7 @@ class DirectoryClient:
         self,
         user_key: str,
         body: dict[str, Any],
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Update an existing user.
 
@@ -196,7 +193,7 @@ class DirectoryClient:
     def delete_user(
         self,
         user_key: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Delete a user from domain.
 
@@ -225,7 +222,7 @@ class DirectoryClient:
     def get_group(
         self,
         group_key: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Get a group by key (email or group ID).
 
@@ -242,9 +239,7 @@ class DirectoryClient:
             service = self._session_provider.get_service(
                 "admin",
                 "directory_v1",
-                scopes=[
-                    "https://www.googleapis.com/auth/admin.directory.group.readonly"
-                ],
+                scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
                 delegated_user_email=delegated_email,
             )
             request = service.groups().get(groupKey=group_key)
@@ -254,8 +249,8 @@ class DirectoryClient:
 
     def list_groups(
         self,
-        customer: Optional[str] = None,
-        delegated_email: Optional[str] = None,
+        customer: str | None = None,
+        delegated_email: str | None = None,
         **kwargs: Any,
     ) -> OperationResult:
         """List all groups in domain with automatic pagination.
@@ -275,9 +270,7 @@ class DirectoryClient:
             service = self._session_provider.get_service(
                 "admin",
                 "directory_v1",
-                scopes=[
-                    "https://www.googleapis.com/auth/admin.directory.group.readonly"
-                ],
+                scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
                 delegated_user_email=delegated_email,
             )
 
@@ -297,8 +290,8 @@ class DirectoryClient:
 
     def health_check(
         self,
-        customer: Optional[str] = None,
-        delegated_email: Optional[str] = None,
+        customer: str | None = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Perform a lightweight remote health probe against the customer.
 
@@ -323,9 +316,7 @@ class DirectoryClient:
             service = self._session_provider.get_service(
                 "admin",
                 "directory_v1",
-                scopes=[
-                    "https://www.googleapis.com/auth/admin.directory.customer.readonly"
-                ],
+                scopes=["https://www.googleapis.com/auth/admin.directory.customer.readonly"],
                 delegated_user_email=delegated_email,
             )
             request = service.customers().get(customerKey=customer_id)
@@ -336,7 +327,7 @@ class DirectoryClient:
     def create_group(
         self,
         body: dict[str, Any],
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Create a new group in domain.
 
@@ -365,7 +356,7 @@ class DirectoryClient:
         self,
         group_key: str,
         body: dict[str, Any],
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Update an existing group.
 
@@ -394,7 +385,7 @@ class DirectoryClient:
     def delete_group(
         self,
         group_key: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Delete a group from domain.
 
@@ -423,7 +414,7 @@ class DirectoryClient:
     def list_members(
         self,
         group_key: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
         **kwargs: Any,
     ) -> OperationResult:
         """List all members of a group with automatic pagination.
@@ -442,9 +433,7 @@ class DirectoryClient:
             service = self._session_provider.get_service(
                 "admin",
                 "directory_v1",
-                scopes=[
-                    "https://www.googleapis.com/auth/admin.directory.group.member.readonly"
-                ],
+                scopes=["https://www.googleapis.com/auth/admin.directory.group.member.readonly"],
                 delegated_user_email=delegated_email,
             )
 
@@ -466,7 +455,7 @@ class DirectoryClient:
         self,
         group_key: str,
         body: dict[str, Any],
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Add a member to a group.
 
@@ -478,9 +467,7 @@ class DirectoryClient:
         Returns:
             OperationResult with member data in data field
         """
-        self._logger.info(
-            "adding_member", group_key=group_key, member_email=body.get("email")
-        )
+        self._logger.info("adding_member", group_key=group_key, member_email=body.get("email"))
 
         def api_call() -> dict[str, Any]:
             service = self._session_provider.get_service(
@@ -498,7 +485,7 @@ class DirectoryClient:
         self,
         group_key: str,
         member_key: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Remove a member from a group.
 
@@ -529,7 +516,7 @@ class DirectoryClient:
         self,
         group_key: str,
         member_key: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Get a specific member from a group.
 
@@ -547,9 +534,7 @@ class DirectoryClient:
             service = self._session_provider.get_service(
                 "admin",
                 "directory_v1",
-                scopes=[
-                    "https://www.googleapis.com/auth/admin.directory.group.member.readonly"
-                ],
+                scopes=["https://www.googleapis.com/auth/admin.directory.group.member.readonly"],
                 delegated_user_email=delegated_email,
             )
             request = service.members().get(groupKey=group_key, memberKey=member_key)
@@ -561,7 +546,7 @@ class DirectoryClient:
         self,
         group_key: str,
         member_key: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Check if a member exists in a group.
 
@@ -573,22 +558,16 @@ class DirectoryClient:
         Returns:
             OperationResult with boolean data indicating membership
         """
-        self._logger.debug(
-            "checking_member", group_key=group_key, member_key=member_key
-        )
+        self._logger.debug("checking_member", group_key=group_key, member_key=member_key)
 
         def api_call() -> dict[str, Any]:
             service = self._session_provider.get_service(
                 "admin",
                 "directory_v1",
-                scopes=[
-                    "https://www.googleapis.com/auth/admin.directory.group.member.readonly"
-                ],
+                scopes=["https://www.googleapis.com/auth/admin.directory.group.member.readonly"],
                 delegated_user_email=delegated_email,
             )
-            request = service.members().hasMember(
-                groupKey=group_key, memberKey=member_key
-            )
+            request = service.members().hasMember(groupKey=group_key, memberKey=member_key)
             return request.execute()
 
         return execute_google_api_call("has_member", api_call)
@@ -596,7 +575,7 @@ class DirectoryClient:
     def get_batch_users(
         self,
         user_keys: list[str],
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
         **kwargs: Any,
     ) -> OperationResult:
         """Get multiple users using batch requests.
@@ -611,13 +590,11 @@ class DirectoryClient:
         """
         self._logger.debug("getting_batch_users", user_keys=user_keys, kwargs=kwargs)
 
-        def api_call() -> dict[str, Optional[dict]]:
+        def api_call() -> dict[str, dict | None]:
             service = self._session_provider.get_service(
                 "admin",
                 "directory_v1",
-                scopes=[
-                    "https://www.googleapis.com/auth/admin.directory.user.readonly"
-                ],
+                scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
                 delegated_user_email=delegated_email,
             )
 
@@ -631,25 +608,19 @@ class DirectoryClient:
                 # Propagate batch error instead of returning empty dict
                 raise RuntimeError(resp.message or "Batch request failed")
 
-            results = (
-                resp.data.get("results", {}) if isinstance(resp.data, dict) else {}
-            )
-            users_by_key: dict[str, Optional[dict]] = {
-                k: results.get(k) for k in user_keys
-            }
+            results = resp.data.get("results", {}) if isinstance(resp.data, dict) else {}
+            users_by_key: dict[str, dict | None] = {k: results.get(k) for k in user_keys}
             return users_by_key
 
         result = execute_google_api_call("get_batch_users", api_call)
         if result.is_success:
-            return OperationResult.success(
-                data=result.data, message="Batch users retrieved successfully"
-            )
+            return OperationResult.success(data=result.data, message="Batch users retrieved successfully")
         return result
 
     def get_batch_groups(
         self,
         group_keys: list[str],
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
         **kwargs: Any,
     ) -> OperationResult:
         """Get multiple groups using batch requests.
@@ -664,13 +635,11 @@ class DirectoryClient:
         """
         self._logger.debug("getting_batch_groups", group_keys=group_keys, kwargs=kwargs)
 
-        def api_call() -> dict[str, Optional[dict]]:
+        def api_call() -> dict[str, dict | None]:
             service = self._session_provider.get_service(
                 "admin",
                 "directory_v1",
-                scopes=[
-                    "https://www.googleapis.com/auth/admin.directory.group.readonly"
-                ],
+                scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
                 delegated_user_email=delegated_email,
             )
 
@@ -684,25 +653,19 @@ class DirectoryClient:
                 # Propagate batch error instead of returning empty dict
                 raise RuntimeError(resp.message or "Batch request failed")
 
-            results = (
-                resp.data.get("results", {}) if isinstance(resp.data, dict) else {}
-            )
-            groups_by_key: dict[str, Optional[dict]] = {
-                k: results.get(k) for k in group_keys
-            }
+            results = resp.data.get("results", {}) if isinstance(resp.data, dict) else {}
+            groups_by_key: dict[str, dict | None] = {k: results.get(k) for k in group_keys}
             return groups_by_key
 
         result = execute_google_api_call("get_batch_groups", api_call)
         if result.is_success:
-            return OperationResult.success(
-                data=result.data, message="Batch groups retrieved successfully"
-            )
+            return OperationResult.success(data=result.data, message="Batch groups retrieved successfully")
         return result
 
     def list_user_groups(
         self,
         user_key: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """List all groups a user is a direct member of.
 
@@ -729,9 +692,7 @@ class DirectoryClient:
             service = self._session_provider.get_service(
                 "admin",
                 "directory_v1",
-                scopes=[
-                    "https://www.googleapis.com/auth/admin.directory.group.readonly"
-                ],
+                scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
                 delegated_user_email=delegated_email,
             )
 
@@ -751,7 +712,7 @@ class DirectoryClient:
         self,
         group_keys: list[str],
         user_key: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
         **kwargs: Any,
     ) -> OperationResult:
         """Get member objects for a user across multiple groups using batch requests.
@@ -772,21 +733,17 @@ class DirectoryClient:
             kwargs=kwargs,
         )
 
-        def api_call() -> dict[str, Optional[dict]]:
+        def api_call() -> dict[str, dict | None]:
             service = self._session_provider.get_service(
                 "admin",
                 "directory_v1",
-                scopes=[
-                    "https://www.googleapis.com/auth/admin.directory.group.member.readonly"
-                ],
+                scopes=["https://www.googleapis.com/auth/admin.directory.group.member.readonly"],
                 delegated_user_email=delegated_email,
             )
 
             requests = []
             for group_key in group_keys:
-                req = service.members().get(
-                    groupKey=group_key, memberKey=user_key, **kwargs
-                )
+                req = service.members().get(groupKey=group_key, memberKey=user_key, **kwargs)
                 requests.append((group_key, req))
 
             resp = execute_batch_request(service, requests)
@@ -794,12 +751,8 @@ class DirectoryClient:
                 # Propagate batch error instead of returning empty dict
                 raise RuntimeError(resp.message or "Batch request failed")
 
-            results = (
-                resp.data.get("results", {}) if isinstance(resp.data, dict) else {}
-            )
-            members_by_group: dict[str, Optional[dict]] = {
-                k: results.get(k) for k in group_keys
-            }
+            results = resp.data.get("results", {}) if isinstance(resp.data, dict) else {}
+            members_by_group: dict[str, dict | None] = {k: results.get(k) for k in group_keys}
             return members_by_group
 
         result = execute_google_api_call("get_batch_members_for_user", api_call)
@@ -813,7 +766,7 @@ class DirectoryClient:
     def get_batch_group_members(
         self,
         group_keys: list[str],
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
         **kwargs: Any,
     ) -> OperationResult:
         """Get members for multiple groups using batch requests.
@@ -826,17 +779,13 @@ class DirectoryClient:
         Returns:
             OperationResult with dict mapping group_key to list of members
         """
-        self._logger.debug(
-            "getting_batch_group_members", group_keys=group_keys, kwargs=kwargs
-        )
+        self._logger.debug("getting_batch_group_members", group_keys=group_keys, kwargs=kwargs)
 
         def api_call() -> dict[str, list[dict]]:
             service = self._session_provider.get_service(
                 "admin",
                 "directory_v1",
-                scopes=[
-                    "https://www.googleapis.com/auth/admin.directory.group.readonly"
-                ],
+                scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
                 delegated_user_email=delegated_email,
             )
 
@@ -850,9 +799,7 @@ class DirectoryClient:
                 # Propagate batch error instead of returning empty dict
                 raise RuntimeError(resp.message or "Batch request failed")
 
-            results = (
-                resp.data.get("results", {}) if isinstance(resp.data, dict) else {}
-            )
+            results = resp.data.get("results", {}) if isinstance(resp.data, dict) else {}
             members_by_group: dict[str, list[dict]] = {}
 
             for group_key in group_keys:
@@ -868,15 +815,13 @@ class DirectoryClient:
 
         result = execute_google_api_call("get_batch_group_members", api_call)
         if result.is_success:
-            return OperationResult.success(
-                data=result.data, message="Batch group members retrieved successfully"
-            )
+            return OperationResult.success(data=result.data, message="Batch group members retrieved successfully")
         return result
 
     def list_groups_with_members(
         self,
-        request: Optional[ListGroupsWithMembersRequest] = None,
-        delegated_email: Optional[str] = None,
+        request: ListGroupsWithMembersRequest | None = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """List groups with members, optionally filtered at group and member levels.
 
@@ -906,9 +851,7 @@ class DirectoryClient:
         self._logger.info("listing_groups_with_members", request=request)
 
         # Get groups
-        groups_resp = self.list_groups(
-            delegated_email=delegated_email, **(request.groups_kwargs or {})
-        )
+        groups_resp = self.list_groups(delegated_email=delegated_email, **(request.groups_kwargs or {}))
         self._logger.debug("fetched_groups", groups_count=len(groups_resp.data or []))
         if not groups_resp.is_success:
             return groups_resp
@@ -916,16 +859,10 @@ class DirectoryClient:
         # Apply group filters
         groups_list = groups_resp.data or []
         if request.groups_filters:
-            groups_list = [
-                g
-                for g in groups_list
-                if all(filter_fn(g) for filter_fn in request.groups_filters)
-            ]
+            groups_list = [g for g in groups_list if all(filter_fn(g) for filter_fn in request.groups_filters)]
 
         if not groups_list:
-            return OperationResult.success(
-                data=[], message="No groups found matching filters"
-            )
+            return OperationResult.success(data=[], message="No groups found matching filters")
 
         # Get members for all groups
         group_keys = [g.get("email") for g in groups_list]
@@ -938,15 +875,11 @@ class DirectoryClient:
             return members_resp
 
         members_by_group: dict[str, list[dict]] = (
-            members_resp.data
-            if isinstance(members_resp.data, dict)
-            else {k: [] for k in group_keys}
+            members_resp.data if isinstance(members_resp.data, dict) else {k: [] for k in group_keys}
         )
 
         # Assemble groups with members
-        results = self._assemble_groups_with_members(
-            groups_list, members_by_group, request.exclude_empty_groups
-        )
+        results = self._assemble_groups_with_members(groups_list, members_by_group, request.exclude_empty_groups)
 
         # Filter groups based on member criteria
         if request.member_filters:
@@ -971,9 +904,7 @@ class DirectoryClient:
                     users_by_email = users_resp.data or {}
                     results = self._enrich_members_with_users(results, users_by_email)
 
-        return OperationResult.success(
-            data=results, message="Groups with members retrieved successfully"
-        )
+        return OperationResult.success(data=results, message="Groups with members retrieved successfully")
 
     def _assemble_groups_with_members(
         self,
@@ -1025,10 +956,7 @@ class DirectoryClient:
                 email = cast(str, member.get("email"))
                 user_details = users_by_email.get(email) if email else None
 
-                if user_details:
-                    enriched_member = {**member, "user": user_details}
-                else:
-                    enriched_member = member
+                enriched_member = {**member, "user": user_details} if user_details else member
 
                 enriched_members.append(enriched_member)
 
@@ -1040,7 +968,7 @@ class DirectoryClient:
     def _filter_groups_by_members(
         self,
         groups_with_members: list[dict],
-        member_filters: Optional[list] = None,
+        member_filters: list | None = None,
     ) -> list[dict]:
         """Filter groups based on member criteria.
 
@@ -1060,10 +988,7 @@ class DirectoryClient:
         filtered_groups = []
         for group in groups_with_members:
             members = group.get("members", [])
-            has_matching_member = any(
-                all(filter_fn(member) for filter_fn in member_filters)
-                for member in members
-            )
+            has_matching_member = any(all(filter_fn(member) for filter_fn in member_filters) for member in members)
 
             if has_matching_member:
                 filtered_groups.append(group)
