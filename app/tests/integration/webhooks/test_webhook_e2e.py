@@ -14,8 +14,9 @@ These tests prevent regressions like:
 - Graceful degradation when Slack bot not initialized
 """
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 
 @pytest.mark.integration
@@ -54,9 +55,7 @@ def test_webhook_handler_with_cloudwatch_alarm_and_bot_initialized(
 
     if response.status_code == 503:
         # If bot not initialized, should return clear error message
-        assert (
-            "Slack bot not initialized" in response.text or "Slack bot" in response.text
-        )
+        assert "Slack bot not initialized" in response.text or "Slack bot" in response.text
 
 
 @pytest.mark.integration
@@ -96,9 +95,7 @@ def test_webhook_handler_with_subscription_confirmation(
     )
 
     # Should handle subscription confirmation without crash
-    assert (
-        response.status_code != 500
-    ), f"Got ASGI crash: {response.status_code}: {response.text}"
+    assert response.status_code != 500, f"Got ASGI crash: {response.status_code}: {response.text}"
 
 
 @pytest.mark.integration
@@ -144,15 +141,11 @@ def test_webhook_handler_with_all_payload_types(
     )
 
     # Never crash with 500 ASGI error
-    assert response.status_code != 500, (
-        f"Payload type '{payload_type_name}' caused ASGI crash "
-        f"(500): {response.text}"
-    )
+    assert response.status_code != 500, f"Payload type '{payload_type_name}' caused ASGI crash (500): {response.text}"
 
     # Should return valid HTTP status (200, 400, 503, etc.)
     assert 100 <= response.status_code < 600, (
-        f"Invalid HTTP status for payload type '{payload_type_name}': "
-        f"{response.status_code}"
+        f"Invalid HTTP status for payload type '{payload_type_name}': {response.status_code}"
     )
 
 
@@ -241,8 +234,7 @@ def test_app_state_bot_accessible_in_webhook_context(app_with_lifespan):
     """
     # app.state.bot can be None if Slack not configured, but must exist
     assert hasattr(app_with_lifespan.app.state, "bot"), (
-        "app.state.bot not found. Routes that use getattr(app.state, 'bot') "
-        "will fail if the attribute doesn't exist."
+        "app.state.bot not found. Routes that use getattr(app.state, 'bot') will fail if the attribute doesn't exist."
     )
 
     # If bot exists, it should be either None or have a client attribute

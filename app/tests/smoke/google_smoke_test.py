@@ -97,15 +97,11 @@ def test_get_user(domain: str):
 
     # If live mode and 403 returned, print remediation steps and exit non-zero
     if _LIVE and not resp.is_success:
-        err: dict[str, Any] = (
-            cast(dict[str, Any], resp.message) if isinstance(resp.message, dict) else {}
-        )
+        err: dict[str, Any] = cast(dict[str, Any], resp.message) if isinstance(resp.message, dict) else {}
         code = str(err.get("error_code")) if err.get("error_code") is not None else None
         msg = str(err.get("message", ""))
         if code == "403" or "Not Authorized" in msg or "not authorized" in msg.lower():
-            print(
-                "ERROR: Google Admin Directory returned 403 Forbidden.", file=sys.stderr
-            )
+            print("ERROR: Google Admin Directory returned 403 Forbidden.", file=sys.stderr)
             print(
                 "This usually means the service account or impersonation lacks Admin SDK permissions or domain-wide delegation is not configured.",
                 file=sys.stderr,
@@ -179,9 +175,7 @@ def test_list_groups_with_members(domain: str):
 
     # If live mode and 403 returned, give remediation guidance and exit non-zero
     if _LIVE and not resp.is_success:
-        err: dict[str, Any] = (
-            cast(dict[str, Any], resp.message) if isinstance(resp.message, dict) else {}
-        )
+        err: dict[str, Any] = cast(dict[str, Any], resp.message) if isinstance(resp.message, dict) else {}
         code = str(err.get("error_code")) if err.get("error_code") is not None else None
         msg = str(err.get("message", ""))
         if code == "403" or "Not Authorized" in msg or "not authorized" in msg.lower():
@@ -307,9 +301,7 @@ if __name__ == "__main__":
             # Allow JSON path via env var for convenience
             gcp_key_env = os.environ.get("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE")
             if not gcp_key_env:
-                raise SystemExit(
-                    "Live mode requested but GCP_SRE_SERVICE_ACCOUNT_KEY_FILE is not set in settings or env"
-                )
+                raise SystemExit("Live mode requested but GCP_SRE_SERVICE_ACCOUNT_KEY_FILE is not set in settings or env")
     else:
         # default: mocked mode
         pass

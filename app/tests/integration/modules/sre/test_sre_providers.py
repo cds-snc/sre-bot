@@ -99,9 +99,7 @@ class TestIncidentCommandHandler:
     """Test /sre incident command handler integration."""
 
     @patch("modules.sre.platforms.slack.incident_helper.handle_incident_command")
-    def test_should_delegate_to_legacy_incident_helper(
-        self, mock_incident_handler, mock_slack_client
-    ):
+    def test_should_delegate_to_legacy_incident_helper(self, mock_incident_handler, mock_slack_client):
         """Incident handler should bridge to legacy incident_helper."""
         # Arrange
         payload = CommandPayload(
@@ -122,9 +120,7 @@ class TestIncidentCommandHandler:
         assert call_args[1]["body"]["channel_id"] == "C12345"
 
     @patch("modules.sre.platforms.slack.incident_helper.handle_incident_command")
-    def test_should_parse_command_text_into_args(
-        self, mock_incident_handler, mock_slack_client
-    ):
+    def test_should_parse_command_text_into_args(self, mock_incident_handler, mock_slack_client):
         """Incident handler should split text into args array."""
         # Arrange
         payload = CommandPayload(
@@ -141,9 +137,7 @@ class TestIncidentCommandHandler:
         assert call_args[1]["args"] == ["create", "high-priority", "bug-123"]
 
     @patch("modules.sre.platforms.slack.incident_helper.handle_incident_command")
-    def test_should_capture_legacy_respond_blocks(
-        self, mock_incident_handler, mock_slack_client
-    ):
+    def test_should_capture_legacy_respond_blocks(self, mock_incident_handler, mock_slack_client):
         """Incident handler should capture blocks from legacy respond calls."""
         # Arrange
         test_blocks = [{"type": "section", "text": {"type": "mrkdwn", "text": "Test"}}]
@@ -172,9 +166,7 @@ class TestWebhooksCommandHandler:
     """Test /sre webhooks command handler integration."""
 
     @patch("modules.sre.platforms.slack.webhook_helper.handle_webhook_command")
-    def test_should_delegate_to_legacy_webhook_helper(
-        self, mock_webhook_handler, mock_slack_client
-    ):
+    def test_should_delegate_to_legacy_webhook_helper(self, mock_webhook_handler, mock_slack_client):
         """Webhooks handler should bridge to legacy webhook_helper."""
         # Arrange
         payload = CommandPayload(

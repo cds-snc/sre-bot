@@ -9,8 +9,8 @@ import ipaddress
 
 import structlog
 
-from infrastructure.operations import OperationResult
 from infrastructure.clients.maxmind import get_maxmind_client
+from infrastructure.operations import OperationResult
 
 logger = structlog.get_logger()
 

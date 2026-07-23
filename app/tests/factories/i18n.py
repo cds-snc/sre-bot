@@ -7,8 +7,6 @@ Provides deterministic test data builders for:
 - Translation data structures
 """
 
-from typing import Optional
-
 from infrastructure.i18n import (
     Locale,
     LocaleResolutionContext,
@@ -17,9 +15,7 @@ from infrastructure.i18n import (
 )
 
 
-def make_translation_key(
-    namespace: str = "incident", message_key: str = "created"
-) -> TranslationKey:
+def make_translation_key(namespace: str = "incident", message_key: str = "created") -> TranslationKey:
     """Create a TranslationKey instance.
 
     Args:
@@ -66,10 +62,10 @@ def make_translation_catalog(
 
 
 def make_locale_resolution_context(
-    requested_locale: Optional[Locale] = None,
-    user_locale: Optional[Locale] = None,
+    requested_locale: Locale | None = None,
+    user_locale: Locale | None = None,
     default_locale: Locale = Locale.EN_US,
-    supported_locales: Optional[list] = None,
+    supported_locales: list | None = None,
 ) -> LocaleResolutionContext:
     """Create a LocaleResolutionContext instance.
 

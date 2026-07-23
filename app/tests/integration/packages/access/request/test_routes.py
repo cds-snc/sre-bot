@@ -7,22 +7,14 @@ These tests exercise the HTTP-layer mapping (OperationResult → HTTP status)
 without touching real DynamoDB, directory providers, or event dispatchers.
 """
 
-from datetime import datetime, timezone
-from typing import List
+from datetime import UTC, datetime
 
 import pytest
 from fastapi import HTTPException
 
-from infrastructure.security.models import AuthPrincipalSource, User
 from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.security.models import AuthPrincipalSource, User
 from packages.access.request.domain import AccessRequest, ApprovalDecision
-from packages.access.request.schemas import (
-    ApproveRequestBody,
-    CancelRequestBody,
-    RejectRequestBody,
-    RetryRequestBody,
-    SubmitAccessRequestBody,
-)
 from packages.access.request.interactions.http import (
     approve_request,
     cancel_request,
@@ -31,7 +23,13 @@ from packages.access.request.interactions.http import (
     retry_request,
     submit_request,
 )
-
+from packages.access.request.schemas import (
+    ApproveRequestBody,
+    CancelRequestBody,
+    RejectRequestBody,
+    RetryRequestBody,
+    SubmitAccessRequestBody,
+)
 
 # ---------------------------------------------------------------------------
 # Stubs
@@ -73,8 +71,8 @@ def _make_request(
         status=status,  # type: ignore[arg-type]
         justification="Need access.",
         resolved_approvers=["approver@example.com"],
-        requested_at=datetime.now(tz=timezone.utc),
-        updated_at=datetime.now(tz=timezone.utc),
+        requested_at=datetime.now(tz=UTC),
+        updated_at=datetime.now(tz=UTC),
     )
 
 
@@ -295,7 +293,7 @@ def test_cancel_request_returns_response_on_success():
 @pytest.mark.integration
 def test_get_request_status_returns_full_response():
     request = _make_request(status="pending_approval")
-    decisions: List[ApprovalDecision] = []
+    decisions: list[ApprovalDecision] = []
     service = _FakeService(OperationResult.success(data=(request, decisions)))
 
     response = get_request_status(
