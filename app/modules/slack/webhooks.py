@@ -2,7 +2,6 @@ import json
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Type
 
 from boto3.dynamodb.types import TypeDeserializer
 from pydantic import BaseModel
@@ -116,9 +115,7 @@ def toggle_webhook(id):
         TableName=table,
         Key={"id": {"S": id}},
         UpdateExpression="SET active = :active",
-        ExpressionAttributeValues={
-            ":active": {"BOOL": not get_webhook(id)["active"]["BOOL"]}
-        },
+        ExpressionAttributeValues={":active": {"BOOL": not get_webhook(id)["active"]["BOOL"]}},
     )
     return response
 
@@ -154,7 +151,7 @@ def validate_string_payload_type(payload: str) -> tuple:
         logger.warning("string_payload_validation_error", error="Invalid JSON payload")
         return None, None
 
-    known_models: List[Type[BaseModel]] = [
+    known_models: list[type[BaseModel]] = [
         AwsSnsPayload,
         AccessRequest,
         SimpleTextPayload,

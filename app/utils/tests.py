@@ -1,7 +1,6 @@
-from typing import Optional
-
 import httpx
 from fastapi import FastAPI
+
 from infrastructure.security import setup_rate_limiter
 
 
@@ -44,7 +43,7 @@ async def rate_limiting_helper(
     request_limit: int,
     method: str = "get",
     expected_status: int = 200,
-    headers: Optional[dict] = None,
+    headers: dict | None = None,
 ):
     """
     Helper function to test rate limiting for an endpoint.
@@ -66,9 +65,7 @@ async def rate_limiting_helper(
         # Make requests up to the limit
         for i in range(request_limit):
             response = await http_method(endpoint, headers=headers)
-            assert (
-                response.status_code == expected_status
-            ), f"Request {i+1} failed with status {response.status_code}"
+            assert response.status_code == expected_status, f"Request {i + 1} failed with status {response.status_code}"
 
         # The next request should be rate limited
         response = await http_method(endpoint, headers=headers)

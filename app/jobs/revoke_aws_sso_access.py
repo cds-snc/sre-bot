@@ -1,4 +1,5 @@
 from structlog import get_logger
+
 from integrations.aws import identity_store, sso_admin
 from modules.aws import aws_access_requests
 from modules.ops.notifications import log_ops_message
@@ -28,9 +29,7 @@ def revoke_aws_sso_access(client):
         try:
             aws_user_id = identity_store.get_user_id(email)
             sso_admin.delete_account_assignment(aws_user_id, account_id, access_type)
-            aws_access_requests.expire_request(
-                account_id=account_id, created_at=created_at
-            )
+            aws_access_requests.expire_request(account_id=account_id, created_at=created_at)
             msg = f"Revoked access to {account_name} ({account_id}) for <@{user_id}> ({email}) with access type: {access_type}"
             client.chat_postEphemeral(
                 channel=user_id,

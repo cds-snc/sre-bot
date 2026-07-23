@@ -85,18 +85,17 @@ force-exclude = '''
     | integrations
     | tests/integrations
   | tests/unit/integrations
-    | modules/incident
-    | modules/atip
-    | modules/secret
-    | modules/role
-    | modules/webhooks
-    | modules/aws
-    | tests/modules/incident
-    | tests/modules/secret
-    | tests/modules/role
-    | tests/modules/webhooks
-    | tests/unit/modules/atip
-    | tests/unit/modules/aws
+    | modules
+    | tests/modules
+    | tests/unit/modules
+    | utils
+    | models
+    | jobs
+    | bin
+    | server
+    | tests/unit/jobs
+    | tests/unit/server
+    | tests/unit/models
 )/
 '''
 

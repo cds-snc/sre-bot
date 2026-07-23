@@ -113,9 +113,7 @@ def test_create_webhook_with_creation_error(create_webhook_mock, logger_mock):
         "foo",
         "alert",
     )
-    bound_logger.error.assert_called_with(
-        "webhook_creation_failure", channel="channel", user="user", name="foo"
-    )
+    bound_logger.error.assert_called_with("webhook_creation_failure", channel="channel", user="user", name="foo")
 
     client.chat_postEphemeral.assert_called_with(
         channel="channel",

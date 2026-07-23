@@ -73,38 +73,20 @@ def compare_lists(source, target, mode="sync"):
     if not source_key or not target_key:
         return [], []
 
-    filtered_source_values = {
-        get_nested_value(value, source_key): value for value in source_values
-    }
-    filtered_target_values = {
-        get_nested_value(value, target_key): value for value in target_values
-    }
+    filtered_source_values = {get_nested_value(value, source_key): value for value in source_values}
+    filtered_target_values = {get_nested_value(value, target_key): value for value in target_values}
 
     if mode == "sync":
-        values_to_add = [
-            filtered_source_values[key]
-            for key in filtered_source_values
-            if key not in filtered_target_values
-        ]
-        values_to_remove = [
-            filtered_target_values[key]
-            for key in filtered_target_values
-            if key not in filtered_source_values
-        ]
+        values_to_add = [filtered_source_values[key] for key in filtered_source_values if key not in filtered_target_values]
+        values_to_remove = [filtered_target_values[key] for key in filtered_target_values if key not in filtered_source_values]
 
         return values_to_add, values_to_remove
 
     elif mode == "match":
-        matching_values = set(filtered_source_values.keys()) & set(
-            filtered_target_values.keys()
-        )
+        matching_values = set(filtered_source_values.keys()) & set(filtered_target_values.keys())
 
-        filtered_source_groups = [
-            filtered_source_values[value] for value in matching_values
-        ]
-        filtered_target_groups = [
-            filtered_target_values[value] for value in matching_values
-        ]
+        filtered_source_groups = [filtered_source_values[value] for value in matching_values]
+        filtered_target_groups = [filtered_target_values[value] for value in matching_values]
 
         filtered_source_groups.sort(key=lambda x: x[source_key])
         filtered_target_groups.sort(key=lambda x: x[target_key])
@@ -135,9 +117,7 @@ def get_unique_nested_dicts(source_items, nested_key):
         for nested_dict in get_nested_value(source_items, nested_key):
             if nested_dict:
                 unique_dicts[str(nested_dict)] = nested_dict
-    logger.info(
-        "unique_dictionaries_found", count=len(unique_dicts), source_items=source_items
-    )
+    logger.info("unique_dictionaries_found", count=len(unique_dicts), source_items=source_items)
     return list(unique_dicts.values())
 
 

@@ -1,8 +1,9 @@
 import sys
 import threading
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import AsyncIterator, Optional, cast
+from typing import cast
 
 from fastapi import FastAPI
 from pluggy import PluginManager
@@ -10,6 +11,10 @@ from slack_bolt import App
 from structlog.stdlib import BoundLogger
 
 from infrastructure.configuration.app import AppSettings, get_app_settings
+from infrastructure.configuration.features.sre_ops import (
+    SreOpsSettings,
+    get_sre_ops_settings,
+)
 from infrastructure.configuration.infrastructure.directory import (
     DirectorySettings,
     get_directory_settings,
@@ -17,10 +22,6 @@ from infrastructure.configuration.infrastructure.directory import (
 from infrastructure.configuration.infrastructure.server import (
     ServerSettings,
     get_server_settings,
-)
-from infrastructure.configuration.features.sre_ops import (
-    SreOpsSettings,
-    get_sre_ops_settings,
 )
 from infrastructure.directory import get_directory_provider
 from infrastructure.i18n import (
@@ -101,18 +102,18 @@ def _start_scheduled_tasks(
     bot: App,
     app_settings: AppSettings,
     logger: BoundLogger,
-) -> Optional[threading.Event]:
+) -> threading.Event | None:
     if app_settings.ENVIRONMENT != "production":
         logger.info("scheduled_tasks_skipped", reason="environment_is_not_production")
         return None
 
     scheduled_tasks.init(bot)
-    stop_event = cast(Optional[threading.Event], scheduled_tasks.run_continuously())
+    stop_event = cast(threading.Event | None, scheduled_tasks.run_continuously())
     logger.info("scheduled_tasks_started")
     return stop_event
 
 
-def _stop_scheduled_tasks(stop_event: Optional[threading.Event]) -> None:
+def _stop_scheduled_tasks(stop_event: threading.Event | None) -> None:
     if stop_event is None:
         return
     stop_event.set()
@@ -120,7 +121,7 @@ def _stop_scheduled_tasks(stop_event: Optional[threading.Event]) -> None:
 
 def _initialize_security_services(
     app: FastAPI,
-    settings: "ServerSettings",
+    settings: ServerSettings,
     logger: BoundLogger,
 ) -> None:
     """Pre-initialize JWT/JWKS security infrastructure at startup.
@@ -170,9 +171,7 @@ def _initialize_directory_provider(
     log.info("directory_provider_initialization_completed")
 
 
-def _initialize_translation_service(
-    pm: PluginManager, logger: BoundLogger
-) -> TranslationService:
+def _initialize_translation_service(pm: PluginManager, logger: BoundLogger) -> TranslationService:
     """"""
     # Phase 1: Discover feature plugins and collect i18n resource registrations.
     log = logger.bind(phase="i18n_resource_collection")
@@ -182,9 +181,7 @@ def _initialize_translation_service(
 
     i18n_registry = I18nResourceRegistry()
     pm.hook.register_i18n_resources(registry=i18n_registry)
-    logger.info(
-        "i18n_resources_collected", resource_count=i18n_registry.get_resource_count()
-    )
+    logger.info("i18n_resources_collected", resource_count=i18n_registry.get_resource_count())
 
     # Phase 2: Initialize translation service with all registered resources.
     log = logger.bind(phase="i18n_initialization")
@@ -274,22 +271,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 channel=sre_ops_settings.SRE_OPS_CHANNEL_ID,
                 text="SRE Bot has started up and is ready to receive commands.",
             )
-        if (
-            server_settings.SRE_TEST_CHANNEL_ID
-            and not app_settings.ENVIRONMENT == "production"
-        ):
+        if server_settings.SRE_TEST_CHANNEL_ID:
             app.state.bot.client.chat_postMessage(
                 channel=server_settings.SRE_TEST_CHANNEL_ID,
                 text="SRE Bot has started up in test mode.",
             )
-        if not _is_test_environment():
-            scheduled_stop_event = _start_scheduled_tasks(
+        scheduled_stop_event = (
+            _start_scheduled_tasks(
                 slack_app,
                 app_settings,
                 logger,
             )
-        else:
-            scheduled_stop_event = None
+            if not _is_test_environment()
+            else None
+        )
 
     else:
         logger.warning("slack_provider_app_unavailable", reason="initialization_failed")

@@ -1,6 +1,7 @@
-from utils import filters
-from integrations.sentinel import log_to_sentinel
 from structlog import get_logger
+
+from integrations.sentinel import log_to_sentinel
+from utils import filters
 
 logger = get_logger()
 
@@ -55,9 +56,7 @@ def provision_entities(
             "operation": operation_name,
             "status": "dry_run",
         }
-        entity_string = (
-            filters.get_nested_value(entity, display_key) if display_key else entity
-        )
+        entity_string = filters.get_nested_value(entity, display_key) if display_key else entity
         if execute:
             response = function(**entity, **kwargs)
             if response:

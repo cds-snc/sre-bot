@@ -31,16 +31,10 @@ class Violation:
 
 def _is_prefix_read(node: ast.expr) -> bool:
     """Check if an expr node reads PREFIX (Name or Attribute)."""
-    if isinstance(node, ast.Name) and node.id == "PREFIX":
-        return True
-    if isinstance(node, ast.Attribute) and node.attr == "PREFIX":
-        return True
-    return False
+    return (isinstance(node, ast.Name) and node.id == "PREFIX") or (isinstance(node, ast.Attribute) and node.attr == "PREFIX")
 
 
-def _find_violations_in_ast(
-    tree: ast.Module, file_rel: str, baseline: set[str]
-) -> list[Violation]:
+def _find_violations_in_ast(tree: ast.Module, file_rel: str, baseline: set[str]) -> list[Violation]:
     """Find violations by walking an AST.
 
     Rules:
@@ -67,25 +61,24 @@ def _find_violations_in_ast(
         # Rule (c): PREFIX equality/inequality comparison
         # Match: Compare(left=PREFIX, ops=[Eq/NotEq], comparators=[...])
         # Do NOT match: Compare inside UnaryOp (bool), If test, ternary IfExp
-        if isinstance(node, ast.Compare):
-            if _is_prefix_read(node.left):
-                for op in node.ops:
-                    if isinstance(op, ast.Eq):
-                        violations.append(
-                            Violation(
-                                file=file_rel,
-                                line=node.lineno,
-                                reason="PREFIX == derivation form found (not a legitimate namespace read)",
-                            )
+        if isinstance(node, ast.Compare) and _is_prefix_read(node.left):
+            for op in node.ops:
+                if isinstance(op, ast.Eq):
+                    violations.append(
+                        Violation(
+                            file=file_rel,
+                            line=node.lineno,
+                            reason="PREFIX == derivation form found (not a legitimate namespace read)",
                         )
-                    elif isinstance(op, ast.NotEq):
-                        violations.append(
-                            Violation(
-                                file=file_rel,
-                                line=node.lineno,
-                                reason="PREFIX != derivation form found (not a legitimate namespace read)",
-                            )
+                    )
+                elif isinstance(op, ast.NotEq):
+                    violations.append(
+                        Violation(
+                            file=file_rel,
+                            line=node.lineno,
+                            reason="PREFIX != derivation form found (not a legitimate namespace read)",
                         )
+                    )
 
         # Track if this file reads PREFIX (for rule b + baseline stale-check)
         if _is_prefix_read(node):
@@ -135,7 +128,7 @@ def find_violations(root: Path, baseline: set[str]) -> list[Violation]:
             code = py_file.read_text()
             tree = ast.parse(code, filename=rel)
             violations.extend(_find_violations_in_ast(tree, rel, baseline))
-        except (SyntaxError, OSError):
+        except SyntaxError, OSError:
             # Log but don't fail on parse errors
             pass
 
@@ -166,7 +159,7 @@ def find_violations(root: Path, baseline: set[str]) -> list[Violation]:
                         reason="Stale baseline entry: file no longer reads PREFIX (reader migrated; remove from baseline)",
                     )
                 )
-        except (SyntaxError, OSError):
+        except SyntaxError, OSError:
             pass
 
     return violations
@@ -199,9 +192,7 @@ def _run_self_tests() -> bool:
 
     # Test (b): net-new PREFIX reader detection
     print("  [b] net-new PREFIX reader...", end=" ")
-    tmpdir, _ = make_tree(
-        "from infrastructure.configuration.app import get_app_settings\nprefix = get_app_settings().PREFIX\n"
-    )
+    tmpdir, _ = make_tree("from infrastructure.configuration.app import get_app_settings\nprefix = get_app_settings().PREFIX\n")
     violations = find_violations(tmpdir, set())  # empty baseline
     if violations and any("net-new" in v.reason.lower() for v in violations):
         print("✓")
@@ -223,9 +214,7 @@ def _run_self_tests() -> bool:
 
     # Test (d-i): truthy ternary acceptance (baseline file)
     print("  [d-i] truthy ternary accepted...", end=" ")
-    tmpdir, _ = make_tree(
-        "prefix = app_settings.PREFIX if app_settings.PREFIX else ''\n"
-    )
+    tmpdir, _ = make_tree("prefix = app_settings.PREFIX if app_settings.PREFIX else ''\n")
     violations = find_violations(tmpdir, {"test_module.py"})
     if not violations:
         print("✓")
@@ -248,9 +237,7 @@ def _run_self_tests() -> bool:
     # Test (d-iii): stale baseline detection
     print("  [d-iii] stale baseline entry...", end=" ")
     tmpdir, _ = make_tree("# no PREFIX read\n")
-    violations = find_violations(
-        tmpdir, {"test_module.py"}
-    )  # baseline has it, but file doesn't read PREFIX
+    violations = find_violations(tmpdir, {"test_module.py"})  # baseline has it, but file doesn't read PREFIX
     if violations and any("stale" in v.reason.lower() for v in violations):
         print("✓")
         tests_passed += 1
@@ -277,11 +264,7 @@ def main() -> int:
 
     # Parse baseline: skip comments and blank lines
     baseline_lines = baseline_file.read_text().strip().split("\n")
-    baseline = {
-        line.strip()
-        for line in baseline_lines
-        if line.strip() and not line.strip().startswith("#")
-    }
+    baseline = {line.strip() for line in baseline_lines if line.strip() and not line.strip().startswith("#")}
 
     # Scan tree
     violations = find_violations(app_root, baseline)

@@ -1,9 +1,10 @@
 """Module for getting users from integrations."""
 
-from integrations.google_workspace import google_directory
-from integrations.aws import identity_store
-from utils import filters
 from structlog import get_logger
+
+from integrations.aws import identity_store
+from integrations.google_workspace import google_directory
+from utils import filters
 
 logger = get_logger()
 
