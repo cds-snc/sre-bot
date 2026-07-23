@@ -1,5 +1,7 @@
 .PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit backlog-board check-prefix-guardrail audit-client-usage-matrix
 
+RUFF_SCOPE := api tests/api
+
 dev:
 	PREFIX="dev-" SLACK__COMMAND_PREFIX="dev-" uv run uvicorn main:server_app --reload
 
@@ -13,6 +15,7 @@ debug:
 
 fmt:
 	uv run black . $(ARGS) --target-version py311
+	uv run ruff format $(RUFF_SCOPE) $(ARGS)
 
 install:
 	uv sync
@@ -22,6 +25,7 @@ install-dev:
 
 lint:
 	uv run ruff check .
+	uv run ruff check --select=E,F,W,I,B,UP,C4,SIM,S $(RUFF_SCOPE)
 
 lint-types:
 	@command -v uv >/dev/null 2>&1 && uv run mypy . --check-untyped-defs --explicit-package-bases || echo "⚠️  uv not installed. Run 'make install-dev' to enable type checking."
@@ -77,10 +81,12 @@ test-coverage-all:
 
 lint-ci:
 	uv run ruff check .
+	uv run ruff check --select=E,F,W,I,B,UP,C4,SIM,S $(RUFF_SCOPE)
 	@command -v uv >/dev/null 2>&1 && uv run mypy . --check-untyped-defs || true
 
 fmt-ci:
 	uv run black --check . --target-version py311
+	uv run ruff format --check $(RUFF_SCOPE)
 
 check-prefix-guardrail:
 	python bin/check_prefix_command_namespace.py

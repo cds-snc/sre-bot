@@ -70,6 +70,19 @@ select = ["E", "F", "W"]
 ignore = ["E501"]
 mccabe.max-complexity = 16
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "S107", "B007", "B008", "B011", "B017", "B018", "B905", "C408", "C416", "C418", "SIM116", "SIM117", "SIM118", "UP028"]
+"utils/tests.py" = ["S101"]
+
+[tool.black]
+target-version = ["py311"]
+force-exclude = '''
+/(
+    api
+  | tests/api
+)/
+'''
+
 [tool.mypy]
 python_version = "3.14"
 warn_return_any = true

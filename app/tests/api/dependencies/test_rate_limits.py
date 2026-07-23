@@ -1,12 +1,13 @@
 from unittest.mock import Mock, patch
-import pytest
+
 import httpx
-from fastapi import Request, FastAPI
+import pytest
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
-from infrastructure.security import rate_limiter as rate_limits
 from api.routes.system import router as system_router
+from infrastructure.security import rate_limiter as rate_limits
 
 
 def test_header_exists_and_not_empty():
