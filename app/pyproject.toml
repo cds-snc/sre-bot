@@ -82,20 +82,8 @@ force-exclude = '''
   | tests/api
   | infrastructure
   | tests/unit/infrastructure
-  | integrations/aws
-  | integrations/utils
-  | integrations/maxmind
-  | integrations/trello
-  | integrations/notify
-  | integrations/sentinel
-  | integrations/opsgenie
-  | tests/integrations/aws
-  | tests/integrations/utils
-  | tests/integrations/maxmind
-  | tests/integrations/trello
-  | tests/integrations/notify
-  | tests/integrations/sentinel
-  | tests/integrations/opsgenie
+    | integrations
+    | tests/integrations
   | tests/unit/integrations
 )/
 '''

@@ -1,4 +1,5 @@
 from slack_sdk import WebClient
+
 from integrations.slack.settings import get_slack_settings
 
 

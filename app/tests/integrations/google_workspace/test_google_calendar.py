@@ -1,10 +1,12 @@
 """Unit tests for google_calendar module."""
 
 import json
-from unittest.mock import patch, MagicMock
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock, patch
+
 import pytest
 import pytz
+
 from integrations.google_workspace import google_calendar
 
 
@@ -50,17 +52,11 @@ def fixed_utc_now():
 def mock_datetime_now(est_timezone):
     """Fixture to mock datetime.now() to return a specific time in the EST timezone."""
     # Mocking the specific date we want to consider as "now"
-    specific_now = datetime(
-        2023, 4, 10, 10, 0, tzinfo=est_timezone
-    )  # Assuming April 10, 2023, is a Monday
+    specific_now = datetime(2023, 4, 10, 10, 0, tzinfo=est_timezone)  # Assuming April 10, 2023, is a Monday
 
-    with patch(
-        "integrations.google_workspace.google_calendar.datetime"
-    ) as mock_datetime:
+    with patch("integrations.google_workspace.google_calendar.datetime") as mock_datetime:
         mock_datetime.now.return_value = specific_now
-        mock_datetime.strptime.side_effect = lambda *args, **kw: datetime.strptime(
-            *args, **kw
-        )
+        mock_datetime.strptime.side_effect = lambda *args, **kw: datetime.strptime(*args, **kw)
         yield mock_datetime
 
 
@@ -85,9 +81,7 @@ def time_range():
     }
 
 
-@patch(
-    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
 def test_get_freebusy_required_args_only(mock_execute_google_api_call, items):
     mock_execute_google_api_call.return_value = {}
     time_min = "2022-01-01T00:00:00Z"
@@ -109,9 +103,7 @@ def test_get_freebusy_required_args_only(mock_execute_google_api_call, items):
     )
 
 
-@patch(
-    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
 def test_get_freebusy_optional_args(mock_execute_google_api_call, items):
     mock_execute_google_api_call.return_value = {}
     time_min = "2022-01-01T00:00:00Z"
@@ -144,9 +136,7 @@ def test_get_freebusy_optional_args(mock_execute_google_api_call, items):
     )
 
 
-@patch(
-    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
 def test_get_freebusy_returns_object(mock_execute):
     mock_execute.return_value = {}
     time_min = "2022-01-01T00:00:00Z"
@@ -158,9 +148,7 @@ def test_get_freebusy_returns_object(mock_execute):
     assert isinstance(result, dict)
 
 
-@patch(
-    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
 @patch("integrations.google_workspace.google_calendar.generate_unique_id")
 def test_insert_event_no_kwargs_no_delegated_email(
@@ -185,9 +173,7 @@ def test_insert_event_no_kwargs_no_delegated_email(
     emails = ["test1@test.com", "test2@test.com"]
     title = "Test Event"
     document_id = "test_document_id"
-    result = google_calendar.insert_event(
-        start, end, emails, title, incident_document=document_id
-    )
+    result = google_calendar.insert_event(start, end, emails, title, incident_document=document_id)
     assert result == {
         "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
         "event_link": "test_link",
@@ -227,9 +213,7 @@ def test_insert_event_no_kwargs_no_delegated_email(
     assert not mock_convert_string_to_camel_case.called
 
 
-@patch(
-    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
 @patch("integrations.google_workspace.google_calendar.generate_unique_id")
 def test_insert_event_with_kwargs(
@@ -249,9 +233,7 @@ def test_insert_event_with_kwargs(
         },
     }
     mock_unique_id.return_value = "abc-123-de4"
-    mock_convert_string_to_camel_case.side_effect = (
-        lambda x: x
-    )  # just return the same value
+    mock_convert_string_to_camel_case.side_effect = lambda x: x  # just return the same value
     start = datetime.now()
     end = start
     emails = ["test1@test.com", "test2@test.com"]
@@ -314,9 +296,7 @@ def test_insert_event_with_kwargs(
         mock_convert_string_to_camel_case.assert_any_call(key)
 
 
-@patch(
-    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
 @patch("integrations.google_workspace.google_calendar.generate_unique_id")
 def test_insert_event_with_no_document(
@@ -336,9 +316,7 @@ def test_insert_event_with_no_document(
         },
     }
     mock_unique_id.return_value = "abc-123-de4"
-    mock_convert_string_to_camel_case.side_effect = (
-        lambda x: x
-    )  # just return the same value
+    mock_convert_string_to_camel_case.side_effect = lambda x: x  # just return the same value
     start = datetime.now()
     end = start
     emails = ["test1@test.com", "test2@test.com"]
@@ -394,9 +372,7 @@ def test_insert_event_with_no_document(
         mock_convert_string_to_camel_case.assert_any_call(key)
 
 
-@patch(
-    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
 @patch("integrations.google_workspace.google_calendar.generate_unique_id")
 def test_insert_event_google_hangout_link_created(
@@ -422,9 +398,7 @@ def test_insert_event_google_hangout_link_created(
     title = "Test Event"
     document_id = "test_document_id"
 
-    result = google_calendar.insert_event(
-        start, end, emails, title, incident_document=document_id
-    )
+    result = google_calendar.insert_event(start, end, emails, title, incident_document=document_id)
     assert result == {
         "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
         "event_link": "test_link",
@@ -467,9 +441,7 @@ def test_insert_event_google_hangout_link_created(
 
 
 @patch("integrations.google_workspace.google_service.handle_google_api_errors")
-@patch(
-    "integrations.google_workspace.google_calendar.google_service.execute_google_api_call"
-)
+@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
 def test_insert_event_api_call_error(
     mock_convert_string_to_camel_case,
@@ -495,9 +467,7 @@ def test_insert_event_api_call_error(
 
 @patch("integrations.google_workspace.google_calendar.get_federal_holidays")
 @patch("integrations.google_workspace.google_calendar.datetime")
-def test_available_slot_on_first_weekday(
-    mock_datetime, mock_federal_holidays, fixed_utc_now, mock_year, est_timezone
-):
+def test_available_slot_on_first_weekday(mock_datetime, mock_federal_holidays, fixed_utc_now, mock_year, est_timezone):
     # Mock datetime to control the flow of time in the test
     mock_datetime.utcnow.return_value = fixed_utc_now
     mock_datetime.return_value.year = 2024
@@ -517,16 +487,14 @@ def test_available_slot_on_first_weekday(
             }
         }
     }
-    mock_federal_holidays.return_value = {
-        "holidays": [{"observedDate": "2024-01-01"}, {"observedDate": "2024-07-01"}]
-    }
+    mock_federal_holidays.return_value = {"holidays": [{"observedDate": "2024-01-01"}, {"observedDate": "2024-07-01"}]}
 
     # Expected search date is three days in the future (which should be Thursday)
     # Busy period is from 1 PM to 1:30 PM EST on the first day being checked (April 13th)
     # The function should find an available slot after the busy period
-    expected_start_time = fixed_utc_now.replace(
-        day=fixed_utc_now.day + 3, hour=17, minute=0, second=0, microsecond=0
-    ).astimezone(est_timezone)
+    expected_start_time = fixed_utc_now.replace(day=fixed_utc_now.day + 3, hour=17, minute=0, second=0, microsecond=0).astimezone(
+        est_timezone
+    )
     expected_end_time = expected_start_time + timedelta(minutes=30)
 
     # Run the function under test
@@ -542,9 +510,7 @@ def test_available_slot_on_first_weekday(
 # Test out the find_first_available_slot function when multiple busy days
 @patch("integrations.google_workspace.google_calendar.get_federal_holidays")
 @patch("integrations.google_workspace.google_calendar.datetime")
-def test_opening_exists_after_busy_days(
-    mock_datetime, mock_federal_holidays, fixed_utc_now, est_timezone
-):
+def test_opening_exists_after_busy_days(mock_datetime, mock_federal_holidays, fixed_utc_now, est_timezone):
     # Mock datetime to control the flow of time in the test
     mock_datetime.utcnow.return_value = fixed_utc_now
     mock_datetime.return_value.year = 2024
@@ -563,29 +529,23 @@ def test_opening_exists_after_busy_days(
         }
     }
 
-    mock_federal_holidays.return_value = {
-        "holidays": [{"observedDate": "2024-01-01"}, {"observedDate": "2024-07-01"}]
-    }
+    mock_federal_holidays.return_value = {"holidays": [{"observedDate": "2024-01-01"}, {"observedDate": "2024-07-01"}]}
 
     start, end = google_calendar.find_first_available_slot(
         freebusy_response, days_in_future=3, duration_minutes=30, search_days_limit=60
     )
-    expected_start = fixed_utc_now.replace(
-        day=fixed_utc_now.day + 9, hour=17, minute=0, second=0, microsecond=0
-    ).astimezone(est_timezone)
+    expected_start = fixed_utc_now.replace(day=fixed_utc_now.day + 9, hour=17, minute=0, second=0, microsecond=0).astimezone(
+        est_timezone
+    )
     expected_end = expected_start + timedelta(minutes=30)
 
-    assert (
-        start == expected_start and end == expected_end
-    ), "Expected to find an available slot correctly."
+    assert start == expected_start and end == expected_end, "Expected to find an available slot correctly."
 
 
 # Test that weekends are skipped when searching for available slots
 @patch("integrations.google_workspace.google_calendar.get_federal_holidays")
 @patch("integrations.google_workspace.google_calendar.datetime")
-def test_skipping_weekends(
-    mock_datetime, mock_federal_holidays, fixed_utc_now, est_timezone
-):
+def test_skipping_weekends(mock_datetime, mock_federal_holidays, fixed_utc_now, est_timezone):
     mock_datetime.utcnow.return_value = fixed_utc_now
     mock_datetime.fromisoformat.side_effect = lambda d: datetime.fromisoformat(d[:-1])
     mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
@@ -599,9 +559,7 @@ def test_skipping_weekends(
         }
     }
 
-    mock_federal_holidays.return_value = {
-        "holidays": [{"observedDate": "2024-01-01"}, {"observedDate": "2024-07-01"}]
-    }
+    mock_federal_holidays.return_value = {"holidays": [{"observedDate": "2024-01-01"}, {"observedDate": "2024-07-01"}]}
 
     # For this test, ensure the mocked 'now' falls before a weekend, and verify that the function skips to the next weekday
     start, end = google_calendar.find_first_available_slot(
@@ -609,22 +567,18 @@ def test_skipping_weekends(
     )
 
     # Adjust these expected values based on the specific 'now' being mocked
-    expected_start = fixed_utc_now.replace(
-        day=fixed_utc_now.day + 1, hour=17, minute=0, second=0, microsecond=0
-    ).astimezone(est_timezone)
+    expected_start = fixed_utc_now.replace(day=fixed_utc_now.day + 1, hour=17, minute=0, second=0, microsecond=0).astimezone(
+        est_timezone
+    )
     expected_end = expected_start + timedelta(minutes=30)
 
-    assert (
-        start == expected_start and end == expected_end
-    ), "Expected to find an available slot after skipping the weekend"
+    assert start == expected_start and end == expected_end, "Expected to find an available slot after skipping the weekend"
 
 
 # Test that no available slots are found within the search limit
 @patch("integrations.google_workspace.google_calendar.get_federal_holidays")
 @patch("integrations.google_workspace.google_calendar.datetime")
-def test_no_available_slots_within_search_limit(
-    mock_datetime, mock_federal_holidays, fixed_utc_now, est_timezone
-):
+def test_no_available_slots_within_search_limit(mock_datetime, mock_federal_holidays, fixed_utc_now, est_timezone):
     mock_datetime.utcnow.return_value = fixed_utc_now
     mock_datetime.fromisoformat.side_effect = lambda d: datetime.fromisoformat(d[:-1])
     mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
@@ -640,17 +594,13 @@ def test_no_available_slots_within_search_limit(
         }
     }
 
-    mock_federal_holidays.return_value = {
-        "holidays": [{"observedDate": "2024-01-01"}, {"observedDate": "2024-07-01"}]
-    }
+    mock_federal_holidays.return_value = {"holidays": [{"observedDate": "2024-01-01"}, {"observedDate": "2024-07-01"}]}
 
     start, end = google_calendar.find_first_available_slot(
         freebusy_response, duration_minutes=30, days_in_future=3, search_days_limit=60
     )
 
-    assert (
-        start is None and end is None
-    ), "Expected no available slots within the search limit"
+    assert start is None and end is None, "Expected no available slots within the search limit"
 
 
 # test that the federal holidays are correctly parsed
@@ -670,8 +620,7 @@ def test_get_federal_holidays(requests_mock):
     }
     # Bandit skip security check for the requests_mock.get call
     requests_mock.get(  # nosec
-        "https://canada-holidays.ca/api/v1/holidays?federal=true&year="
-        + str(current_year),
+        "https://canada-holidays.ca/api/v1/holidays?federal=true&year=" + str(current_year),
         json=mocked_response,
     )
 
@@ -694,9 +643,7 @@ def test_get_federal_holidays_with_different_year(requests_mock):
     )
 
     # Patch datetime to control the current year
-    with patch(
-        "integrations.google_workspace.google_calendar.datetime"
-    ) as mock_datetime:
+    with patch("integrations.google_workspace.google_calendar.datetime") as mock_datetime:
         mock_datetime.now.return_value = datetime(2025, 1, 1)
 
         # Call the function
@@ -716,8 +663,7 @@ def test_api_returns_empty_list(requests_mock):
     # Mock no holidays
     # Bandit skip security check for the requests_mock.get call
     requests_mock.get(  # nosec
-        "https://canada-holidays.ca/api/v1/holidays?federal=true&year="
-        + str(current_year),
+        "https://canada-holidays.ca/api/v1/holidays?federal=true&year=" + str(current_year),
         json={"holidays": []},
     )
 
@@ -756,24 +702,18 @@ def test_leap_year_handling(requests_mock):
     requests_mock.DEFAULT_TIMEOUT = 10
 
     # Mock the current date to a date in 2024
-    with patch(
-        "integrations.google_workspace.google_calendar.datetime"
-    ) as mock_datetime:
+    with patch("integrations.google_workspace.google_calendar.datetime") as mock_datetime:
         # Configure the mock to return 2024 when .now() is called
         mock_now = datetime(2024, 6, 15)  # Any date in 2024
         mock_datetime.now.return_value = mock_now
-        mock_datetime.side_effect = lambda *args, **kwargs: datetime.datetime(
-            *args, **kwargs
-        )
+        mock_datetime.side_effect = lambda *args, **kwargs: datetime.datetime(*args, **kwargs)
 
         # Mock the API response for 2024
         requests_mock.get(  # nosec
             "https://canada-holidays.ca/api/v1/holidays?federal=true&year=2024",
             json={
                 "holidays": [
-                    {
-                        "observedDate": "2024-02-29"
-                    }  # Assuming this is a special leap year holiday
+                    {"observedDate": "2024-02-29"}  # Assuming this is a special leap year holiday
                 ]
             },
         )
@@ -782,18 +722,14 @@ def test_leap_year_handling(requests_mock):
         holidays = google_calendar.get_federal_holidays()
 
         # Verify leap year is considered
-        assert (
-            "2024-02-29" in holidays
-        ), "Leap year date should be included in the holidays"
+        assert "2024-02-29" in holidays, "Leap year date should be included in the holidays"
 
 
 def test_get_utc_hour_same_zone():
     """
     Test case for the same timezone (UTC).
     """
-    assert (
-        google_calendar.get_utc_hour(13, 0, "UTC") == 13
-    )  # 1 PM UTC should remain 13 in UTC.
+    assert google_calendar.get_utc_hour(13, 0, "UTC") == 13  # 1 PM UTC should remain 13 in UTC.
 
 
 def test_get_utc_hour_us_eastern_daylight_time_winter():
@@ -832,9 +768,7 @@ def test_get_utc_hour_pacific_time():
     """
     test_date = datetime(2023, 12, 1, 13, 0)  # December 1, 2023, 1 PM PDT
 
-    assert (
-        google_calendar.get_utc_hour(13, 0, "US/Pacific", test_date) == 21
-    )  # 1 PM PST should be 9 PM UTC.
+    assert google_calendar.get_utc_hour(13, 0, "US/Pacific", test_date) == 21  # 1 PM PST should be 9 PM UTC.
 
 
 def test_get_utc_hour_with_invalid_timezone():
@@ -898,9 +832,7 @@ def test_identify_unavailable_users_exact_match(time_range):
         }
     }
 
-    result = google_calendar.identify_unavailable_users(
-        freebusy_response, time_range["time_min"], time_range["time_max"]
-    )
+    result = google_calendar.identify_unavailable_users(freebusy_response, time_range["time_min"], time_range["time_max"])
 
     assert result == ["user1@example.com"]
 
@@ -908,17 +840,11 @@ def test_identify_unavailable_users_exact_match(time_range):
 def test_identify_unavailable_users_within_threshold(time_range):
     """Test identifying users with busy periods just outside the 1-hour threshold for end time."""
     # Create a time 30 minutes after start but more than 1 hour before end
-    start_dt = datetime.fromisoformat(time_range["time_min"][:-1]).replace(
-        tzinfo=timezone.utc
-    )
-    end_dt = datetime.fromisoformat(time_range["time_max"][:-1]).replace(
-        tzinfo=timezone.utc
-    )
+    start_dt = datetime.fromisoformat(time_range["time_min"][:-1]).replace(tzinfo=UTC)
+    end_dt = datetime.fromisoformat(time_range["time_max"][:-1]).replace(tzinfo=UTC)
 
     close_start = (start_dt + timedelta(minutes=30)).isoformat() + "Z"
-    far_end = (
-        end_dt - timedelta(minutes=61)
-    ).isoformat() + "Z"  # Just outside 1-hour threshold
+    far_end = (end_dt - timedelta(minutes=61)).isoformat() + "Z"  # Just outside 1-hour threshold
 
     freebusy_response = {
         "calendars": {
@@ -933,9 +859,7 @@ def test_identify_unavailable_users_within_threshold(time_range):
         }
     }
 
-    result = google_calendar.identify_unavailable_users(
-        freebusy_response, time_range["time_min"], time_range["time_max"]
-    )
+    result = google_calendar.identify_unavailable_users(freebusy_response, time_range["time_min"], time_range["time_max"])
 
     # Should not be identified as problematic since end is more than 1 hour from range end
     assert result == []
@@ -944,12 +868,8 @@ def test_identify_unavailable_users_within_threshold(time_range):
 def test_identify_unavailable_users_outside_threshold(time_range):
     """Test users with busy periods outside the 1-hour threshold."""
     # Create a time 2 hours after start
-    start_dt = datetime.fromisoformat(time_range["time_min"][:-1]).replace(
-        tzinfo=timezone.utc
-    )
-    end_dt = datetime.fromisoformat(time_range["time_max"][:-1]).replace(
-        tzinfo=timezone.utc
-    )
+    start_dt = datetime.fromisoformat(time_range["time_min"][:-1]).replace(tzinfo=UTC)
+    end_dt = datetime.fromisoformat(time_range["time_max"][:-1]).replace(tzinfo=UTC)
 
     far_start = (start_dt + timedelta(hours=2)).isoformat() + "Z"
     far_end = (end_dt - timedelta(hours=2)).isoformat() + "Z"
@@ -967,9 +887,7 @@ def test_identify_unavailable_users_outside_threshold(time_range):
         }
     }
 
-    result = google_calendar.identify_unavailable_users(
-        freebusy_response, time_range["time_min"], time_range["time_max"]
-    )
+    result = google_calendar.identify_unavailable_users(freebusy_response, time_range["time_min"], time_range["time_max"])
 
     assert result == []
 
@@ -1001,9 +919,7 @@ def test_identify_unavailable_users_multiple_busy_periods(time_range):
         }
     }
 
-    result = google_calendar.identify_unavailable_users(
-        freebusy_response, time_range["time_min"], time_range["time_max"]
-    )
+    result = google_calendar.identify_unavailable_users(freebusy_response, time_range["time_min"], time_range["time_max"])
 
     # Only user1 should be identified, not user2 (who has multiple entries)
     assert result == ["user1@example.com"]
@@ -1027,9 +943,7 @@ def test_identify_unavailable_users_with_errors(time_range):
         }
     }
 
-    result = google_calendar.identify_unavailable_users(
-        freebusy_response, time_range["time_min"], time_range["time_max"]
-    )
+    result = google_calendar.identify_unavailable_users(freebusy_response, time_range["time_min"], time_range["time_max"])
 
     # user1 should be skipped due to errors
     assert result == ["user2@example.com"]
@@ -1053,9 +967,7 @@ def test_identify_unavailable_users_no_busy_data(time_range):
         }
     }
 
-    result = google_calendar.identify_unavailable_users(
-        freebusy_response, time_range["time_min"], time_range["time_max"]
-    )
+    result = google_calendar.identify_unavailable_users(freebusy_response, time_range["time_min"], time_range["time_max"])
 
     # user1 should be skipped due to no busy data
     assert result == ["user2@example.com"]
@@ -1077,9 +989,7 @@ def test_identify_unavailable_users_empty_busy_list(time_range):
         }
     }
 
-    result = google_calendar.identify_unavailable_users(
-        freebusy_response, time_range["time_min"], time_range["time_max"]
-    )
+    result = google_calendar.identify_unavailable_users(freebusy_response, time_range["time_min"], time_range["time_max"])
 
     # user1 should not be identified as problematic
     assert result == ["user2@example.com"]
@@ -1087,19 +997,11 @@ def test_identify_unavailable_users_empty_busy_list(time_range):
 
 def test_identify_unavailable_users_edge_case_threshold(time_range):
     """Test edge cases exactly at the 1-hour threshold."""
-    start_dt = datetime.fromisoformat(time_range["time_min"][:-1]).replace(
-        tzinfo=timezone.utc
-    )
-    end_dt = datetime.fromisoformat(time_range["time_max"][:-1]).replace(
-        tzinfo=timezone.utc
-    )
+    start_dt = datetime.fromisoformat(time_range["time_min"][:-1]).replace(tzinfo=UTC)
+    end_dt = datetime.fromisoformat(time_range["time_max"][:-1]).replace(tzinfo=UTC)
 
-    threshold_start = (
-        start_dt + timedelta(seconds=3599)
-    ).isoformat() + "Z"  # Just under 1 hour
-    threshold_end = (
-        end_dt - timedelta(seconds=3599)
-    ).isoformat() + "Z"  # Just under 1 hour
+    threshold_start = (start_dt + timedelta(seconds=3599)).isoformat() + "Z"  # Just under 1 hour
+    threshold_end = (end_dt - timedelta(seconds=3599)).isoformat() + "Z"  # Just under 1 hour
 
     freebusy_response = {
         "calendars": {
@@ -1114,9 +1016,7 @@ def test_identify_unavailable_users_edge_case_threshold(time_range):
         }
     }
 
-    result = google_calendar.identify_unavailable_users(
-        freebusy_response, time_range["time_min"], time_range["time_max"]
-    )
+    result = google_calendar.identify_unavailable_users(freebusy_response, time_range["time_min"], time_range["time_max"])
 
     # Should be identified as problematic (both within threshold)
     assert result == ["user1@example.com"]
@@ -1126,8 +1026,6 @@ def test_identify_unavailable_users_empty_response(time_range):
     """Test with empty response."""
     freebusy_response = {"calendars": {}}
 
-    result = google_calendar.identify_unavailable_users(
-        freebusy_response, time_range["time_min"], time_range["time_max"]
-    )
+    result = google_calendar.identify_unavailable_users(freebusy_response, time_range["time_min"], time_range["time_max"])
 
     assert result == []

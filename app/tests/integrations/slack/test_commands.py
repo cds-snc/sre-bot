@@ -28,15 +28,11 @@ def test_parse_flags_no_flags():
 
 
 def test_parse_flags_with_flags():
-    args, flags = slack_commands.parse_flags(
-        ["sre", "foo", "--flag", "--key", "value", "-f"]
-    )
+    args, flags = slack_commands.parse_flags(["sre", "foo", "--flag", "--key", "value", "-f"])
     assert args == ["sre", "foo"]
     assert flags == {"flag": True, "key": "value", "f": True}
 
-    args, flags = slack_commands.parse_flags(
-        ["-f", "--key", "value", "sre", "foo", "--flag"]
-    )
+    args, flags = slack_commands.parse_flags(["-f", "--key", "value", "sre", "foo", "--flag"])
     assert args == ["sre", "foo"]
     assert flags == {"flag": True, "key": "value", "f": True}
 
