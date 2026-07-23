@@ -7,11 +7,22 @@ refactoring (split by domain pattern).
 from infrastructure.configuration.app import get_app_settings
 from infrastructure.configuration.base import (
     FeatureSettings,
-    IntegrationSettings,
     InfrastructureSettings,
+    IntegrationSettings,
+)
+from infrastructure.configuration.features import (
+    AtipSettings,
+    AWSFeatureSettings,
+    IncidentFeatureSettings,
+    SreOpsSettings,
 )
 from infrastructure.configuration.features.aws_ops import (
     get_aws_feature_settings,
+)
+from infrastructure.configuration.infrastructure import (
+    DevSettings,
+    IdempotencySettings,
+    ServerSettings,
 )
 from infrastructure.configuration.infrastructure.retry import (
     RetrySettings,
@@ -20,30 +31,19 @@ from infrastructure.configuration.infrastructure.retry import (
 from infrastructure.configuration.infrastructure.server import (
     get_server_settings,
 )
-from infrastructure.configuration.integrations.google import (
-    get_google_workspace_settings,
-)
 from infrastructure.configuration.integrations import (
     AwsSettings,
-    GoogleWorkspaceSettings,
     GoogleResourcesConfig,
+    GoogleWorkspaceSettings,
     MaxMindSettings,
     NotifySettings,
-    SlackSettings,
     OpsGenieSettings,
     SentinelSettings,
+    SlackSettings,
     TrelloSettings,
 )
-from infrastructure.configuration.features import (
-    AWSFeatureSettings,
-    AtipSettings,
-    IncidentFeatureSettings,
-    SreOpsSettings,
-)
-from infrastructure.configuration.infrastructure import (
-    DevSettings,
-    IdempotencySettings,
-    ServerSettings,
+from infrastructure.configuration.integrations.google import (
+    get_google_workspace_settings,
 )
 
 

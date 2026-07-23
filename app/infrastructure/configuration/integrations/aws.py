@@ -1,7 +1,6 @@
 """AWS integration settings."""
 
 from functools import lru_cache
-from typing import Optional
 
 from pydantic import Field
 
@@ -33,24 +32,17 @@ class AwsSettings(IntegrationSettings):
     """
 
     AWS_REGION: str = Field(default="ca-central-1", alias="AWS_REGION")
-    SYSTEM_ADMIN_PERMISSIONS: str = Field(
-        default="", alias="AWS_SSO_SYSTEM_ADMIN_PERMISSIONS"
-    )
-    VIEW_ONLY_PERMISSIONS: str = Field(
-        default="", alias="AWS_SSO_VIEW_ONLY_PERMISSIONS"
-    )
+    SYSTEM_ADMIN_PERMISSIONS: str = Field(default="", alias="AWS_SSO_SYSTEM_ADMIN_PERMISSIONS")
+    VIEW_ONLY_PERMISSIONS: str = Field(default="", alias="AWS_SSO_VIEW_ONLY_PERMISSIONS")
     AUDIT_ROLE_ARN: str = Field(default="", alias="AWS_AUDIT_ACCOUNT_ROLE_ARN")
     ORG_ROLE_ARN: str = Field(default="", alias="AWS_ORG_ACCOUNT_ROLE_ARN")
     LOGGING_ROLE_ARN: str = Field(default="", alias="AWS_LOGGING_ACCOUNT_ROLE_ARN")
     INSTANCE_ID: str = Field(default="", alias="AWS_SSO_INSTANCE_ID")
     INSTANCE_ARN: str = Field(default="", alias="AWS_SSO_INSTANCE_ARN")
-    ENDPOINT_URL: Optional[str] = Field(
+    ENDPOINT_URL: str | None = Field(
         default=None,
         alias="AWS_ENDPOINT_URL",
-        description=(
-            "Override endpoint URL for DynamoDB clients only. "
-            "Set to http://dynamodb-local:8000 for local development."
-        ),
+        description=("Override endpoint URL for DynamoDB clients only. Set to http://dynamodb-local:8000 for local development."),
     )
 
     THROTTLING_ERRS: list[str] = [

@@ -1,7 +1,9 @@
 import datetime
 import json
-from unittest.mock import ANY, MagicMock, patch, call
+from unittest.mock import ANY, MagicMock, call, patch
+
 from slack_sdk.errors import SlackApiError
+
 from models.incidents import IncidentPayload
 from modules import incident
 
@@ -38,13 +40,8 @@ def test_incident_open_modal_calls_ack(
     assert kwargs["view"]["type"] == "modal"
     assert kwargs["view"]["callback_id"] == "incident_view"
     assert kwargs["view"]["title"]["text"] == "SRE - Start an incident"
-    assert (
-        kwargs["view"]["blocks"][0]["text"]["text"]
-        == ":beach-ball: Launching incident process..."
-    )
-    mock_generate_incident_modal_view.assert_called_once_with(
-        command, ANY, None, "en-US"
-    )
+    assert kwargs["view"]["blocks"][0]["text"]["text"] == ":beach-ball: Launching incident process..."
+    mock_generate_incident_modal_view.assert_called_once_with(command, ANY, None, "en-US")
     client.views_update.assert_called_once_with(view_id=ANY, view=loaded_view)
 
 
@@ -86,9 +83,7 @@ def test_incident_open_modal_passes_source_private_metadata(
 
 @patch("modules.incident.incident.generate_incident_modal_view")
 @patch("modules.incident.incident.incident_folder.list_incident_folders")
-def test_incident_open_modal_calls_generate_incident_modal_view(
-    mock_list_incident_folders, mock_generate_incident_modal_view
-):
+def test_incident_open_modal_calls_generate_incident_modal_view(mock_list_incident_folders, mock_generate_incident_modal_view):
     mock_list_incident_folders.return_value = [{"id": "id", "name": "name"}]
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
@@ -143,16 +138,12 @@ def test_incident_open_modal_calls_get_user_locale(
     incident.open_create_incident_modal(client, ack, command, body)
     ack.assert_called_once()
     mock_get_user_locale.assert_called_once_with(client, "user_id")
-    mock_generate_incident_modal_view.assert_called_once_with(
-        command, ANY, None, "fr-FR"
-    )
+    mock_generate_incident_modal_view.assert_called_once_with(command, ANY, None, "fr-FR")
 
 
 @patch("modules.incident.incident.i18n")
 @patch("modules.incident.incident.incident_folder.list_incident_folders")
-def test_incident_open_modal_displays_localized_strings(
-    mock_list_incident_folders, mock_i18n
-):
+def test_incident_open_modal_displays_localized_strings(mock_list_incident_folders, mock_i18n):
     mock_list_incident_folders.return_value = [{"id": "id", "name": "name"}]
     client = MagicMock()
     client.users_info.return_value = helper_client_locale()
@@ -167,9 +158,7 @@ def test_incident_open_modal_displays_localized_strings(
 @patch("modules.incident.incident.i18n")
 @patch("integrations.slack.users.get_user_locale")
 @patch("modules.incident.incident.incident_folder")
-def test_incident_locale_button_calls_ack(
-    mock_incident_folder, mock_get_user_locale, mock_i18n
-):
+def test_incident_locale_button_calls_ack(mock_incident_folder, mock_get_user_locale, mock_i18n):
     ack = MagicMock()
     client = MagicMock()
     command = {"text": "incident_command"}
@@ -200,16 +189,12 @@ def test_incident_locale_button_updates_view_modal_locale_value(
         "trigger_id": "trigger_id",
         "user_id": "user_id",
         "actions": [{"value": "fr-FR"}],
-        "view": helper_generate_view(
-            "command_name", private_metadata='{"source_channel_id": "channel"}'
-        ),
+        "view": helper_generate_view("command_name", private_metadata='{"source_channel_id": "channel"}'),
     }
     incident.handle_change_locale_button(ack, client, body)
 
     ack.assert_called()
-    mock_generate_incident_modal_view.assert_called_with(
-        command, options, '{"source_channel_id": "channel"}', "en-US"
-    )
+    mock_generate_incident_modal_view.assert_called_with(command, options, '{"source_channel_id": "channel"}', "en-US")
 
 
 @patch("modules.incident.incident.incident_folder.list_incident_folders")
@@ -321,9 +306,7 @@ def test_incident_submit_adds_source_alert_permalink(
 
     incident.submit(ack, view, say, body, client)
 
-    client.chat_getPermalink.assert_called_once_with(
-        channel="source_channel", message_ts="123.456"
-    )
+    client.chat_getPermalink.assert_called_once_with(channel="source_channel", message_ts="123.456")
     mock_core.initiate_resources_creation.assert_called_once_with(
         client=client,
         incident_payload=IncidentPayload(
@@ -366,12 +349,7 @@ def test_incident_submit_ignores_malformed_source_metadata(
 
     client.chat_getPermalink.assert_not_called()
     mock_logger.warning.assert_called_once()
-    assert (
-        mock_core.initiate_resources_creation.call_args.kwargs[
-            "incident_payload"
-        ].source_alert_permalink
-        is None
-    )
+    assert mock_core.initiate_resources_creation.call_args.kwargs["incident_payload"].source_alert_permalink is None
 
 
 @patch("modules.incident.incident.core")
@@ -411,12 +389,7 @@ def test_incident_submit_continues_when_source_permalink_fails(
         source_message_ts="123.456",
         error="slack error",
     )
-    assert (
-        mock_core.initiate_resources_creation.call_args.kwargs[
-            "incident_payload"
-        ].source_alert_permalink
-        is None
-    )
+    assert mock_core.initiate_resources_creation.call_args.kwargs["incident_payload"].source_alert_permalink is None
 
 
 @patch("modules.incident.incident.core")
@@ -472,9 +445,7 @@ def test_incident_submit_returns_error_if_description_is_too_long(
     incident.submit(ack, view, say, body, client)
     ack.assert_any_call(
         response_action="errors",
-        errors={
-            "name": "Description must be less than 60 characters // La description doit contenir moins de 60 caractères"
-        },
+        errors={"name": "Description must be less than 60 characters // La description doit contenir moins de 60 caractères"},
     )
 
 
@@ -493,8 +464,8 @@ def test_submit_conversation_creation_error(
     say = MagicMock()
     body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
     client = MagicMock()
-    mock_create_incident_conversation.create_incident_conversation.side_effect = (
-        SlackApiError(message="error", response=MagicMock())
+    mock_create_incident_conversation.create_incident_conversation.side_effect = SlackApiError(
+        message="error", response=MagicMock()
     )
     incident.submit(ack, view, say, body, client)
     ack.assert_called()
@@ -502,9 +473,7 @@ def test_submit_conversation_creation_error(
         text=":warning: Channel creation failed. Please contact the SRE team.",
         channel="user_id",
     )
-    mock_logger.error.assert_called_once_with(
-        "incident_channel_creation_failed", error=ANY, incident_name="name"
-    )
+    mock_logger.error.assert_called_once_with("incident_channel_creation_failed", error=ANY, incident_name="name")
 
 
 @patch("modules.incident.incident.core")

@@ -10,15 +10,21 @@ FastAPI ``Depends`` factories for the coordinator and settings are declared in
 so they are test-substitutable without monkey-patching FastAPI.
 """
 
-from typing import Annotated, Protocol, Union
+from typing import Annotated, Protocol
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Response, Security
 
-from infrastructure.security.models import User
+from infrastructure.idempotency import get_idempotency_service
 from infrastructure.operations import OperationResult
 from infrastructure.security import get_current_user
-from infrastructure.idempotency import get_idempotency_service
+from infrastructure.security.models import User
+from packages.access.sync.interactions.ingress import (
+    EnqueuedJob,
+    enqueue_platform_sync,
+    enqueue_user_sync,
+)
+from packages.access.sync.presenters import to_http_status_response
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
     get_access_sync_settings,
@@ -30,12 +36,6 @@ from packages.access.sync.schemas import (
     UserSyncJobAcceptedResponse,
     UserSyncRequest,
 )
-from packages.access.sync.interactions.ingress import (
-    EnqueuedJob,
-    enqueue_platform_sync,
-    enqueue_user_sync,
-)
-from packages.access.sync.presenters import to_http_status_response
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/access", tags=["Access Sync"])
@@ -104,7 +104,7 @@ def _noop_coordinator() -> _AccessSyncApplicationServicePort | None:
 
 @router.post(
     "/sync-runs",
-    response_model=Union[UserSyncJobAcceptedResponse, PlatformSyncJobAcceptedResponse],
+    response_model=UserSyncJobAcceptedResponse | PlatformSyncJobAcceptedResponse,
     summary="Sync access",
     description=(
         "Converge user or platform access state to match IDP group membership policy. "
@@ -123,13 +123,9 @@ def sync_endpoint(
     request: AccessSyncRequest,
     response: Response,
     settings: Annotated[_AccessSyncSettingsPort, Depends(get_access_sync_settings)],
-    current_user: Annotated[
-        User, Security(get_current_user, scopes=["sre-bot:access-sync"])
-    ],
-    coordinator: Annotated[
-        _AccessSyncApplicationServicePort | None, Depends(_noop_coordinator)
-    ] = None,
-) -> Union[UserSyncJobAcceptedResponse, PlatformSyncJobAcceptedResponse]:
+    current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-sync"])],
+    coordinator: Annotated[_AccessSyncApplicationServicePort | None, Depends(_noop_coordinator)] = None,
+) -> UserSyncJobAcceptedResponse | PlatformSyncJobAcceptedResponse:
     """Enqueue an on-demand user sync or a full platform sync job."""
     log = logger.bind(
         sync_type=request.sync_type,
@@ -158,9 +154,7 @@ def sync_endpoint(
             request_id=request.request_id or "",
         )
         if not result.is_success or result.data is None:
-            raise _http_error_from_enqueue(
-                result.error_code or "", result.message or ""
-            )
+            raise _http_error_from_enqueue(result.error_code or "", result.message or "")
         job: EnqueuedJob = result.data
         response.status_code = 202
         return UserSyncJobAcceptedResponse(
@@ -213,9 +207,7 @@ def sync_endpoint(
 )
 def get_sync_job_status(
     job_id: str,
-    current_user: Annotated[
-        User, Security(get_current_user, scopes=["sre-bot:access-sync"])
-    ],
+    current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-sync"])],
 ) -> SyncJobStatusResponse:
     """Return the current status and outcome of a sync job."""
     idempotency = get_idempotency_service()

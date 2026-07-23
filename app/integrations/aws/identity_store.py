@@ -19,7 +19,9 @@ def resolve_identity_store_id(kwargs):
         kwargs["IdentityStoreId"] = kwargs.get("identity_store_id", INSTANCE_ID)
         kwargs.pop("identity_store_id", None)
     if kwargs["IdentityStoreId"] is None:
-        error_message = "IdentityStoreId must be provided either as a keyword argument or as the AWS_SSO_INSTANCE_ID environment variable"
+        error_message = (
+            "IdentityStoreId must be provided either as a keyword argument or as the AWS_SSO_INSTANCE_ID environment variable"
+        )
         logger.error("resolve_identity_store_error", error=error_message)
         raise ValueError(error_message)
     return kwargs
@@ -34,7 +36,7 @@ def healthcheck():
     healthy = False
     try:
         response = list_users()
-        healthy = True if response else False
+        healthy = bool(response)
         logger.info(
             "identity_store_healthcheck_success",
             status="healthy" if healthy else "unhealthy",
@@ -140,9 +142,7 @@ def list_users(**kwargs):
     params = {"IdentityStoreId": kwargs.get("IdentityStoreId"), "role_arn": ROLE_ARN}
     if "filters" in kwargs:
         params["Filters"] = kwargs["filters"]
-    return execute_aws_api_call(
-        "identitystore", "list_users", paginated=True, keys=["Users"], **params
-    )
+    return execute_aws_api_call("identitystore", "list_users", paginated=True, keys=["Users"], **params)
 
 
 @handle_aws_api_errors
@@ -187,9 +187,7 @@ def list_groups(**kwargs):
     }
     if "filters" in kwargs:
         params["Filters"] = kwargs["filters"]
-    response = execute_aws_api_call(
-        "identitystore", "list_groups", paginated=True, keys=["Groups"], **params
-    )
+    response = execute_aws_api_call("identitystore", "list_groups", paginated=True, keys=["Groups"], **params)
     return response if response else []
 
 
@@ -212,9 +210,7 @@ def create_group_membership(group_id, user_id, **kwargs):
         "MemberId": {"UserId": user_id},
         "role_arn": ROLE_ARN,
     }
-    response = execute_aws_api_call(
-        "identitystore", "create_group_membership", **params
-    )
+    response = execute_aws_api_call("identitystore", "create_group_membership", **params)
     return response["MembershipId"] if response else False
 
 
@@ -235,9 +231,7 @@ def delete_group_membership(membership_id, **kwargs):
         "MembershipId": membership_id,
         "role_arn": ROLE_ARN,
     }
-    response = execute_aws_api_call(
-        "identitystore", "delete_group_membership", **params
-    )
+    response = execute_aws_api_call("identitystore", "delete_group_membership", **params)
     del response["ResponseMetadata"]
     return response == {}
 
@@ -258,9 +252,7 @@ def get_group_membership_id(group_id, user_id, **kwargs):
         "MemberId": {"UserId": user_id},
         "role_arn": ROLE_ARN,
     }
-    response = execute_aws_api_call(
-        "identitystore", "get_group_membership_id", **params
-    )
+    response = execute_aws_api_call("identitystore", "get_group_membership_id", **params)
     return response["MembershipId"] if response else False
 
 
@@ -331,12 +323,7 @@ def list_groups_with_memberships(
         )
 
     filtered_groups = [
-        {
-            k: v
-            for k, v in group.items()
-            if k in ["GroupId", "DisplayName", "Description", "IdentityStoreId"]
-        }
-        for group in groups
+        {k: v for k, v in group.items() if k in ["GroupId", "DisplayName", "Description", "IdentityStoreId"]} for group in groups
     ]
 
     users = list_users()
@@ -368,11 +355,7 @@ def list_groups_with_memberships(
         for membership in memberships:
             member_details = {}
             try:
-                member_details = next(
-                    member
-                    for member in users
-                    if member["UserId"] == membership["MemberId"]["UserId"]
-                )
+                member_details = next(member for member in users if member["UserId"] == membership["MemberId"]["UserId"])
             except Exception as error:
                 logger.warning(
                     "aws_identity_store_member_error",

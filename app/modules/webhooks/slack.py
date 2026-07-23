@@ -48,7 +48,7 @@ def _is_inside_slack_link(text: str, start: int) -> bool:
 def _geolocate_url(ip_address: str, base_url: str | None = None) -> str:
     if base_url is None:
         base_url = get_server_settings().BACKEND_URL
-    return f"{base_url.rstrip('/')}/geolocate/" f"{quote(ip_address, safe='')}"
+    return f"{base_url.rstrip('/')}/geolocate/{quote(ip_address, safe='')}"
 
 
 def link_ip_addresses_to_geolocate(

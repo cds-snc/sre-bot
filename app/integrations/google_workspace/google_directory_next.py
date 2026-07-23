@@ -3,17 +3,18 @@ Google Directory module using simplified Google service functions.
 
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional
 
 import structlog
+
+from infrastructure.operations.result import OperationResult
 from integrations.google_workspace import google_service_next as google_service
 from integrations.google_workspace.google_service_next import (
     execute_batch_request,
     execute_google_api_call,
     get_google_service,
 )
-from infrastructure.operations.result import OperationResult
 
 GOOGLE_WORKSPACE_CUSTOMER_ID = google_service.GOOGLE_WORKSPACE_CUSTOMER_ID
 
@@ -36,11 +37,11 @@ class ListGroupsWithMembersRequest:
         exclude_empty_groups: Whether to exclude groups with no members
     """
 
-    groups_filters: Optional[List[Callable]] = None
-    member_filters: Optional[List[Callable]] = None
-    groups_kwargs: Optional[Dict] = field(default_factory=dict)
-    members_kwargs: Optional[Dict] = field(default_factory=dict)
-    users_kwargs: Optional[Dict] = field(default_factory=dict)
+    groups_filters: list[Callable] | None = None
+    member_filters: list[Callable] | None = None
+    groups_kwargs: dict | None = field(default_factory=dict)
+    members_kwargs: dict | None = field(default_factory=dict)
+    users_kwargs: dict | None = field(default_factory=dict)
     include_users_details: bool = True
     exclude_empty_groups: bool = False
 
@@ -61,7 +62,7 @@ def get_user(user_key: str, **kwargs) -> OperationResult:
     )
 
 
-def get_batch_users(user_keys: List[str], **kwargs) -> OperationResult:
+def get_batch_users(user_keys: list[str], **kwargs) -> OperationResult:
     """Get multiple users from Google Directory using batch requests.
 
     Returns an OperationResult with data = {user_key: user_dict | None}
@@ -91,10 +92,8 @@ def get_batch_users(user_keys: List[str], **kwargs) -> OperationResult:
         )
 
     results = resp.data.get("results", {}) if isinstance(resp.data, dict) else {}
-    users_by_key: Dict[str, Optional[dict]] = {k: results.get(k) for k in user_keys}
-    return OperationResult.success(
-        data=users_by_key, message="Batch users retrieved successfully"
-    )
+    users_by_key: dict[str, dict | None] = {k: results.get(k) for k in user_keys}
+    return OperationResult.success(data=users_by_key, message="Batch users retrieved successfully")
 
 
 def list_users(**kwargs) -> OperationResult:
@@ -140,7 +139,7 @@ def get_group(group_key: str, **kwargs) -> OperationResult:
     )
 
 
-def get_batch_groups(group_keys: List[str], **kwargs) -> OperationResult:
+def get_batch_groups(group_keys: list[str], **kwargs) -> OperationResult:
     """Get multiple groups from Google Directory using batch requests.
 
     Returns an OperationResult with data = {group_key: group_dict | None}
@@ -170,10 +169,8 @@ def get_batch_groups(group_keys: List[str], **kwargs) -> OperationResult:
         )
 
     results = resp.data.get("results", {}) if isinstance(resp.data, dict) else {}
-    groups_by_key: Dict[str, Optional[dict]] = {k: results.get(k) for k in group_keys}
-    return OperationResult.success(
-        data=groups_by_key, message="Operation completed successfully"
-    )
+    groups_by_key: dict[str, dict | None] = {k: results.get(k) for k in group_keys}
+    return OperationResult.success(data=groups_by_key, message="Operation completed successfully")
 
 
 def list_groups(**kwargs) -> OperationResult:
@@ -214,18 +211,14 @@ def get_member(group_key: str, member_key: str, **kwargs) -> OperationResult:
         "directory_v1",
         "members",
         "get",
-        scopes=[
-            "https://www.googleapis.com/auth/admin.directory.group.member.readonly"
-        ],
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.member.readonly"],
         groupKey=group_key,
         memberKey=member_key,
         **kwargs,
     )
 
 
-def get_batch_members_for_user(
-    group_keys: List[str], user_key: str, **kwargs
-) -> OperationResult:
+def get_batch_members_for_user(group_keys: list[str], user_key: str, **kwargs) -> OperationResult:
     """Get multiple groups' member object for a user using batch requests."""
     logger.debug(
         "get_batch_members_for_user",
@@ -236,9 +229,7 @@ def get_batch_members_for_user(
     service = get_google_service(
         "admin",
         "directory_v1",
-        scopes=[
-            "https://www.googleapis.com/auth/admin.directory.group.member.readonly"
-        ],
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.member.readonly"],
     )
     requests = []
     for group_key in group_keys:
@@ -259,16 +250,14 @@ def get_batch_members_for_user(
         )
 
     results = resp.data.get("results", {}) if isinstance(resp.data, dict) else {}
-    members_by_group: Dict[str, Optional[dict]] = {
-        k: results.get(k) for k in group_keys
-    }
+    members_by_group: dict[str, dict | None] = {k: results.get(k) for k in group_keys}
     return OperationResult.success(
         data=members_by_group,
         message="get_batch_members_for_user completed successfully",
     )
 
 
-def get_batch_group_members(group_keys: List[str], **kwargs) -> OperationResult:
+def get_batch_group_members(group_keys: list[str], **kwargs) -> OperationResult:
     """Get multiple groups' members using batch requests.
 
     Args:
@@ -303,7 +292,7 @@ def get_batch_group_members(group_keys: List[str], **kwargs) -> OperationResult:
         )
 
     results = resp.data.get("results", {}) if isinstance(resp.data, dict) else {}
-    members_by_group: Dict[str, List[dict]] = {}
+    members_by_group: dict[str, list[dict]] = {}
     for group_key in group_keys:
         members = results.get(group_key)
         if not members:
@@ -316,9 +305,7 @@ def get_batch_group_members(group_keys: List[str], **kwargs) -> OperationResult:
         else:
             members_by_group[group_key] = []
 
-    return OperationResult.success(
-        data=members_by_group, message="Operation completed successfully"
-    )
+    return OperationResult.success(data=members_by_group, message="Operation completed successfully")
 
 
 def list_members(group_key: str, **kwargs) -> OperationResult:
@@ -364,9 +351,7 @@ def has_member(group_key: str, member_key: str, **kwargs) -> OperationResult:
         "directory_v1",
         "members",
         "hasMember",
-        scopes=[
-            "https://www.googleapis.com/auth/admin.directory.group.member.readonly"
-        ],
+        scopes=["https://www.googleapis.com/auth/admin.directory.group.member.readonly"],
         groupKey=group_key,
         memberKey=member_key,
         **kwargs,
@@ -378,7 +363,7 @@ def insert_member(
     email: str,
     role: str = "MEMBER",
     type_: str = "USER",
-    member_body: Optional[dict] = None,
+    member_body: dict | None = None,
     **kwargs,
 ) -> OperationResult:
     """
@@ -439,10 +424,10 @@ def delete_member(group_key: str, member_key: str) -> OperationResult:
 
 
 def _assemble_groups_with_members(
-    groups_list: List[dict],
-    members_by_group: Dict[str, List[dict]],
-    exclude_empty_groups: Optional[bool] = False,
-) -> List[dict]:
+    groups_list: list[dict],
+    members_by_group: dict[str, list[dict]],
+    exclude_empty_groups: bool | None = False,
+) -> list[dict]:
     """Assemble groups with their members.
 
     This is a pure assembly function that combines group data with member data.
@@ -456,7 +441,7 @@ def _assemble_groups_with_members(
     Returns:
         List of groups with members assembled
     """
-    results: List[dict] = []
+    results: list[dict] = []
     for g in groups_list:
         if not isinstance(g, dict):
             continue
@@ -478,9 +463,9 @@ def _assemble_groups_with_members(
 
 
 def _enrich_members_with_users(
-    groups_with_members: List[dict],
-    users_by_email: Dict[str, dict],
-) -> List[dict]:
+    groups_with_members: list[dict],
+    users_by_email: dict[str, dict],
+) -> list[dict]:
     """Enrich group members with user details.
 
     Takes already-assembled groups with members and adds user enrichment.
@@ -492,7 +477,7 @@ def _enrich_members_with_users(
     Returns:
         Groups with enriched members
     """
-    results: List[dict] = []
+    results: list[dict] = []
     for group in groups_with_members:
         if not isinstance(group, dict):
             continue
@@ -524,9 +509,9 @@ def _enrich_members_with_users(
 
 
 def _filter_groups_by_members(
-    groups_with_members: List[dict],
-    member_filters: Optional[List] = None,
-) -> List[dict]:
+    groups_with_members: list[dict],
+    member_filters: list | None = None,
+) -> list[dict]:
     """Filter groups based on member criteria.
 
     A group is included if it has AT LEAST ONE member matching ALL filter criteria.
@@ -568,9 +553,7 @@ def _filter_groups_by_members(
         members = group.get("members", [])
 
         # Check if ANY member matches ALL filter criteria
-        has_matching_member = any(
-            all(f(m) for f in member_filters) for m in members if isinstance(m, dict)
-        )
+        has_matching_member = any(all(f(m) for f in member_filters) for m in members if isinstance(m, dict))
 
         if has_matching_member:
             filtered_groups.append(group)
@@ -579,7 +562,7 @@ def _filter_groups_by_members(
 
 
 def list_groups_with_members(
-    request: Optional[ListGroupsWithMembersRequest] = None,
+    request: ListGroupsWithMembersRequest | None = None,
 ) -> OperationResult:
     """List groups with members, optionally filtered at group and member levels.
 
@@ -617,9 +600,7 @@ def list_groups_with_members(
     # Apply filters and early return if empty
     groups_list = groups_resp.data or []
     if request.groups_filters:
-        groups_list = [
-            g for g in groups_list if all(f(g) for f in request.groups_filters)
-        ]
+        groups_list = [g for g in groups_list if all(f(g) for f in request.groups_filters)]
 
     if not groups_list:
         return OperationResult.permanent_error(
@@ -632,15 +613,11 @@ def list_groups_with_members(
     members_resp = get_batch_group_members(group_keys, **(request.members_kwargs or {}))
     if not members_resp.is_success:
         return members_resp
-    members_by_group: Dict[str, List[dict]] = (
-        members_resp.data
-        if isinstance(members_resp.data, dict)
-        else {k: [] for k in group_keys}
+    members_by_group: dict[str, list[dict]] = (
+        members_resp.data if isinstance(members_resp.data, dict) else {k: [] for k in group_keys}
     )
     # Assemble groups with members
-    results = _assemble_groups_with_members(
-        groups_list, members_by_group, request.exclude_empty_groups
-    )
+    results = _assemble_groups_with_members(groups_list, members_by_group, request.exclude_empty_groups)
     # Filter groups based on member criteria
     if request.member_filters:
         results = _filter_groups_by_members(results, request.member_filters)
@@ -654,15 +631,8 @@ def list_groups_with_members(
             if isinstance(m, dict) and (email := m.get("email")) is not None
         }
         if member_emails:
-            users_resp = get_batch_users(
-                list(member_emails), **(request.users_kwargs or {})
-            )
-            if users_resp.is_success:
-                users_by_email = users_resp.data or {}
-            else:
-                users_by_email = {}
+            users_resp = get_batch_users(list(member_emails), **(request.users_kwargs or {}))
+            users_by_email = users_resp.data or {} if users_resp.is_success else {}
             results = _enrich_members_with_users(results, users_by_email)
 
-    return OperationResult.success(
-        data=results, message="Operation completed successfully"
-    )
+    return OperationResult.success(data=results, message="Operation completed successfully")

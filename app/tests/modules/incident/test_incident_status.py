@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock, call, patch
+
 from slack_sdk import WebClient
+
 from modules.incident import incident_status
 
 
@@ -35,17 +37,11 @@ def test_update_status_success(
     mock_incident_folder.update_spreadsheet_incident_status.return_value = True
     mock_incident_folder.return_channel_name.return_value = "123"
 
-    incident_status.update_status(
-        client, respond, status, channel_id, channel_name, user_id
-    )
+    incident_status.update_status(client, respond, status, channel_id, channel_name, user_id)
 
     client.bookmarks_list.assert_called_once_with(channel_id=channel_id)
-    mock_google_docs.extract_google_doc_id.assert_called_once_with(
-        "https://docs.google.com/document/d/1234567890/edit"
-    )
-    mock_incident_document.update_incident_document_status.assert_called_once_with(
-        "1234567890", status
-    )
+    mock_google_docs.extract_google_doc_id.assert_called_once_with("https://docs.google.com/document/d/1234567890/edit")
+    mock_incident_document.update_incident_document_status.assert_called_once_with("1234567890", status)
 
     mock_incident_folder.update_spreadsheet_incident_status.assert_called_once_with(
         mock_incident_folder.return_channel_name.return_value, status
@@ -92,24 +88,16 @@ def test_update_status_success_with_incident_id(
     mock_incident_folder.update_spreadsheet_incident_status.return_value = True
     mock_incident_folder.return_channel_name.return_value = "123"
 
-    incident_status.update_status(
-        client, respond, status, channel_id, channel_name, user_id, incident_id
-    )
+    incident_status.update_status(client, respond, status, channel_id, channel_name, user_id, incident_id)
 
     client.bookmarks_list.assert_called_once_with(channel_id=channel_id)
-    mock_google_docs.extract_google_doc_id.assert_called_once_with(
-        "https://docs.google.com/document/d/1234567890/edit"
-    )
-    mock_incident_document.update_incident_document_status.assert_called_once_with(
-        "1234567890", status
-    )
+    mock_google_docs.extract_google_doc_id.assert_called_once_with("https://docs.google.com/document/d/1234567890/edit")
+    mock_incident_document.update_incident_document_status.assert_called_once_with("1234567890", status)
 
     mock_incident_folder.update_spreadsheet_incident_status.assert_called_once_with(
         mock_incident_folder.return_channel_name.return_value, status
     )
-    mock_db_operations.update_incident_field.assert_called_once_with(
-        incident_id, "status", status, user_id
-    )
+    mock_db_operations.update_incident_field.assert_called_once_with(incident_id, "status", status, user_id)
     client.chat_postMessage.assert_called_once_with(
         channel=channel_id,
         text=f"<@{user_id}> has updated the incident status to {status}.",
@@ -138,9 +126,7 @@ def test_update_status_handles_bookmarks_list_errors(
 
     client.bookmarks_list.side_effect = (Exception("error_bookmarks"),)
 
-    incident_status.update_status(
-        client, respond, status, channel_id, channel_name, user_id
-    )
+    incident_status.update_status(client, respond, status, channel_id, channel_name, user_id)
 
     logger_calls = [
         call(
@@ -154,9 +140,7 @@ def test_update_status_handles_bookmarks_list_errors(
     # Respond calls as formatted strings for Slack user
     respond_calls = [
         call("Could not get bookmarks for channel incident-123: error_bookmarks"),
-        call(
-            "No bookmark link for the incident document found for channel incident-123"
-        ),
+        call("No bookmark link for the incident document found for channel incident-123"),
     ]
 
     client.bookmarks_list.assert_called_once_with(channel_id=channel_id)
@@ -197,12 +181,8 @@ def test_update_status_handles_update_document_errors(
         ],
     }
     mock_google_docs.extract_google_doc_id.return_value = "1234567890"
-    mock_incident_document.update_incident_document_status.side_effect = Exception(
-        "error_document"
-    )
-    incident_status.update_status(
-        client, respond, status, channel_id, channel_name, user_id
-    )
+    mock_incident_document.update_incident_document_status.side_effect = Exception("error_document")
+    incident_status.update_status(client, respond, status, channel_id, channel_name, user_id)
     logger_calls = [
         call(
             "incident_document_status_update_failed",
@@ -210,11 +190,7 @@ def test_update_status_handles_update_document_errors(
             error="error_document",
         )
     ]
-    respond_calls = [
-        call(
-            "Could not update the incident status in the document for channel incident-123: error_document"
-        )
-    ]
+    respond_calls = [call("Could not update the incident status in the document for channel incident-123: error_document")]
 
     client.bookmarks_list.assert_called_once_with(channel_id=channel_id)
     mock_logger.warning.assert_has_calls(logger_calls)
@@ -257,12 +233,8 @@ def test_update_status_handles_update_spreadsheet_errors(
     )
 
     mock_google_docs.extract_google_doc_id.return_value = "1234567890"
-    mock_incident_folder.update_spreadsheet_incident_status.side_effect = Exception(
-        "error_spreadsheet"
-    )
-    incident_status.update_status(
-        client, respond, status, channel_id, channel_name, user_id
-    )
+    mock_incident_folder.update_spreadsheet_incident_status.side_effect = Exception("error_spreadsheet")
+    incident_status.update_status(client, respond, status, channel_id, channel_name, user_id)
     logger_calls = [
         call(
             "incident_folder_status_update_failed",
@@ -271,9 +243,7 @@ def test_update_status_handles_update_spreadsheet_errors(
         ),
     ]
     respond_calls = [
-        call(
-            "Could not update the incident status in the spreadsheet for channel incident-123: error_spreadsheet"
-        ),
+        call("Could not update the incident status in the spreadsheet for channel incident-123: error_spreadsheet"),
     ]
     client.bookmarks_list.assert_called_once_with(channel_id=channel_id)
     mock_logger.warning.assert_has_calls(logger_calls)
@@ -315,9 +285,7 @@ def test_update_status_handles_chat_postMessage_errors(
         },
     )
     client.chat_postMessage.side_effect = Exception("error_chat_postMessage")
-    incident_status.update_status(
-        client, respond, status, channel_id, channel_name, user_id
-    )
+    incident_status.update_status(client, respond, status, channel_id, channel_name, user_id)
 
     logger_calls = [
         call(
@@ -328,9 +296,7 @@ def test_update_status_handles_chat_postMessage_errors(
     ]
 
     respond_calls = [
-        call(
-            "Could not post the incident status update to the channel incident-123: error_chat_postMessage"
-        ),
+        call("Could not post the incident status update to the channel incident-123: error_chat_postMessage"),
     ]
     client.bookmarks_list.assert_called_once_with(channel_id=channel_id)
     client.chat_postMessage.assert_called_once_with(

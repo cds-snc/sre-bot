@@ -1,4 +1,5 @@
 import json
+
 import structlog
 
 from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
@@ -16,43 +17,30 @@ def execute():
     if not aws_feature_settings.AWS_OPS_GROUP_NAME:
         return
 
-    aws_ops_group_id = identity_store.get_group_id(
-        aws_feature_settings.AWS_OPS_GROUP_NAME
-    )
+    aws_ops_group_id = identity_store.get_group_id(aws_feature_settings.AWS_OPS_GROUP_NAME)
     if not aws_ops_group_id:
         status = {
             "status": "failed",
-            "message": (
-                f"Ops group '{aws_feature_settings.AWS_OPS_GROUP_NAME}' not found in AWS Identity Center."
-            ),
+            "message": (f"Ops group '{aws_feature_settings.AWS_OPS_GROUP_NAME}' not found in AWS Identity Center."),
         }
-        log.error(
-            "ops_group_not_found", group_name=aws_feature_settings.AWS_OPS_GROUP_NAME
-        )
+        log.error("ops_group_not_found", group_name=aws_feature_settings.AWS_OPS_GROUP_NAME)
         return status
 
     organizations_accounts = organizations.list_organization_accounts()
-    account_assignments = sso_admin.list_account_assignments_for_principal(
-        principal_id=aws_ops_group_id, principal_type="GROUP"
-    )
-    assigned_account_ids = {
-        assignment["AccountId"] for assignment in account_assignments
-    }
+    account_assignments = sso_admin.list_account_assignments_for_principal(principal_id=aws_ops_group_id, principal_type="GROUP")
+    assigned_account_ids = {assignment["AccountId"] for assignment in account_assignments}
 
     # get the accounts not yet assigned
     unassigned_accounts = [
         account
         for account in organizations_accounts
-        if account.get("Id") not in assigned_account_ids
-        and account.get("Status") == "ACTIVE"
+        if account.get("Id") not in assigned_account_ids and account.get("Status") == "ACTIVE"
     ]
 
     if not unassigned_accounts:
         status = {
             "status": "ok",
-            "message": (
-                f"Ops group '{aws_feature_settings.AWS_OPS_GROUP_NAME}' is already assigned to all active accounts."
-            ),
+            "message": (f"Ops group '{aws_feature_settings.AWS_OPS_GROUP_NAME}' is already assigned to all active accounts."),
         }
         log.info(
             "all_accounts_already_assigned",

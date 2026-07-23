@@ -27,9 +27,7 @@ class NotifySettings(IntegrationSettings):
     """
 
     NOTIFY_SRE_USER_NAME: str | None = Field(default=None, alias="NOTIFY_SRE_USER_NAME")
-    NOTIFY_SRE_CLIENT_SECRET: str | None = Field(
-        default=None, alias="NOTIFY_SRE_CLIENT_SECRET"
-    )
+    NOTIFY_SRE_CLIENT_SECRET: str | None = Field(default=None, alias="NOTIFY_SRE_CLIENT_SECRET")
     NOTIFY_API_URL: str = Field(default="", alias="NOTIFY_API_URL")
 
 

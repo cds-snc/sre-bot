@@ -2,7 +2,9 @@ import importlib
 import json
 import os
 import re
-from typing import Any, Callable, Dict, List, Literal, Optional, Pattern, Union
+from collections.abc import Callable
+from re import Pattern
+from typing import Any, Literal
 
 from pydantic import field_validator
 from pydantic.dataclasses import dataclass
@@ -23,12 +25,8 @@ class AwsNotificationPattern:
     name: str
     pattern: str  # regex, substring, or callable import path
     handler: str  # import path like "modules.webhooks.patterns.aws_sns_notification.cloudwatch_alarm.handle_cloudwatch_alarm"
-    match_type: Literal["regex", "contains", "callable", "message_structure"] = (
-        "contains"
-    )
-    match_target: Literal["message", "subject", "topic_arn", "parsed_message"] = (
-        "message"
-    )
+    match_type: Literal["regex", "contains", "callable", "message_structure"] = "contains"
+    match_target: Literal["message", "subject", "topic_arn", "parsed_message"] = "message"
     priority: int = 0
     enabled: bool = True
 
@@ -91,9 +89,7 @@ class AwsNotificationPattern:
         try:
             return int(v)
         except Exception as exc:
-            raise TypeError(
-                "AwsNotificationPattern.priority must be an int-like value"
-            ) from exc
+            raise TypeError("AwsNotificationPattern.priority must be an int-like value") from exc
 
     def get_compiled_pattern(self) -> str | Pattern | Callable[[Any], bool]:
         """Get the compiled pattern based on match_type."""
@@ -101,22 +97,18 @@ class AwsNotificationPattern:
             try:
                 return re.compile(self.pattern)
             except re.error as exc:
-                raise ValueError(
-                    f"Invalid regex pattern '{self.pattern}': {exc}"
-                ) from exc
+                raise ValueError(f"Invalid regex pattern '{self.pattern}': {exc}") from exc
         elif self.match_type == "callable":
             try:
                 module_path, func_name = self.pattern.rsplit(".", 1)
                 module = importlib.import_module(module_path)
                 return getattr(module, func_name)
             except (ImportError, AttributeError, ValueError) as exc:
-                raise ValueError(
-                    f"Cannot import callable '{self.pattern}': {exc}"
-                ) from exc
+                raise ValueError(f"Cannot import callable '{self.pattern}': {exc}") from exc
         else:  # contains or message_structure
             return self.pattern
 
-    def get_handler_function(self) -> Callable[[AwsSnsPayload, WebClient], List[Dict]]:
+    def get_handler_function(self) -> Callable[[AwsSnsPayload, WebClient], list[dict]]:
         """Dynamically import and return the handler function."""
         try:
             module_path, func_name = self.handler.rsplit(".", 1)
@@ -125,9 +117,7 @@ class AwsNotificationPattern:
         except (ImportError, AttributeError, ValueError) as exc:
             raise ValueError(f"Cannot import handler '{self.handler}': {exc}") from exc
 
-    def get_match_text(
-        self, payload: AwsSnsPayload, parsed_message: Union[str, dict]
-    ) -> str:
+    def get_match_text(self, payload: AwsSnsPayload, parsed_message: str | dict) -> str:
         """Extract the text to match against based on match_target."""
         if self.match_target == "message":
             return payload.Message or ""
@@ -142,7 +132,7 @@ class AwsNotificationPattern:
         return ""
 
     @classmethod
-    def from_dict(cls, d: dict) -> "AwsNotificationPattern":
+    def from_dict(cls, d: dict) -> AwsNotificationPattern:
         """Create an AwsNotificationPattern from a dictionary."""
         if "name" not in d:
             raise ValueError("Missing required field 'name'")
@@ -161,10 +151,10 @@ class AwsNotificationPattern:
         )
 
 
-NOTIFICATION_HANDLERS: List[AwsNotificationPattern] = []
+NOTIFICATION_HANDLERS: list[AwsNotificationPattern] = []
 
 
-def register_notification_pattern(pattern: AwsNotificationPattern | Dict[str, Any]):
+def register_notification_pattern(pattern: AwsNotificationPattern | dict[str, Any]):
     """Register a new notification pattern handler at runtime."""
     if isinstance(pattern, AwsNotificationPattern):
         NOTIFICATION_HANDLERS.append(pattern)
@@ -172,9 +162,7 @@ def register_notification_pattern(pattern: AwsNotificationPattern | Dict[str, An
         NOTIFICATION_HANDLERS.append(AwsNotificationPattern.from_dict(pattern))
 
 
-def handle_generic_notification(
-    payload: AwsSnsPayload, client: WebClient
-) -> List[Dict]:
+def handle_generic_notification(payload: AwsSnsPayload, client: WebClient) -> list[dict]:
     """
     Fallback handler for unrecognized AWS SNS notifications.
     Logs the unidentified event for manual review.
@@ -188,7 +176,7 @@ def handle_generic_notification(
     return []
 
 
-def parse_message_content(payload: AwsSnsPayload) -> Union[str, dict]:
+def parse_message_content(payload: AwsSnsPayload) -> str | dict:
     """
     Parse the AWS SNS message content, attempting to decode JSON if possible.
 
@@ -202,13 +190,11 @@ def parse_message_content(payload: AwsSnsPayload) -> Union[str, dict]:
 
     try:
         return json.loads(message)
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         return message
 
 
-def find_matching_handler(
-    payload: AwsSnsPayload, parsed_message: Union[str, dict]
-) -> Optional[AwsNotificationPattern]:
+def find_matching_handler(payload: AwsSnsPayload, parsed_message: str | dict) -> AwsNotificationPattern | None:
     """
     Find the first matching pattern handler for the given AWS SNS notification.
     Handlers are checked in order of priority (highest first), then registration order.
@@ -230,20 +216,19 @@ def find_matching_handler(
             match_text = handler.get_match_text(payload, parsed_message)
 
             # Handle different pattern types
-            if handler.match_type == "callable" and callable(compiled_pattern):
-                if compiled_pattern(payload, parsed_message):
-                    return handler
-            elif handler.match_type == "regex" and isinstance(
-                compiled_pattern, re.Pattern
+            if (
+                handler.match_type == "callable"
+                and callable(compiled_pattern)
+                and compiled_pattern(payload, parsed_message)
             ):
+                return handler
+            elif handler.match_type == "regex" and isinstance(compiled_pattern, re.Pattern):
                 if compiled_pattern.search(match_text):
                     return handler
             elif handler.match_type == "contains" and isinstance(compiled_pattern, str):
                 if compiled_pattern in match_text:
                     return handler
-            elif handler.match_type == "message_structure" and isinstance(
-                parsed_message, dict
-            ):
+            elif handler.match_type == "message_structure" and isinstance(parsed_message, dict):
                 # For message_structure, pattern should be a key that exists in the parsed message
                 if compiled_pattern in parsed_message:
                     return handler
@@ -262,9 +247,7 @@ def find_matching_handler(
     return None
 
 
-def process_aws_notification_payload(
-    payload: AwsSnsPayload, client: WebClient
-) -> List[Dict]:
+def process_aws_notification_payload(payload: AwsSnsPayload, client: WebClient) -> list[dict]:
     """
     Process an AWS SNS Notification payload by matching against registered pattern handlers.
 
@@ -408,9 +391,7 @@ def _load_pattern_module(mod_name: str, fname: str) -> tuple[int, int]:
 
 def init_notification_handlers():
     """Initialize and register default notification pattern handlers."""
-    patterns_dir = os.path.join(
-        os.path.dirname(__file__), "patterns", "aws_sns_notification"
-    )
+    patterns_dir = os.path.join(os.path.dirname(__file__), "patterns", "aws_sns_notification")
     log = logger.bind(patterns_dir=patterns_dir)
 
     if not patterns_dir or not os.path.isdir(patterns_dir):

@@ -1,5 +1,4 @@
 import re
-from typing import Dict, List, Union
 
 from slack_sdk import WebClient
 from structlog import get_logger
@@ -10,7 +9,7 @@ from modules.webhooks.aws_sns_notification import AwsNotificationPattern
 logger = get_logger()
 
 
-def handle_auto_mitigation(payload: AwsSnsPayload, client: WebClient) -> List[Dict]:
+def handle_auto_mitigation(payload: AwsSnsPayload, client: WebClient) -> list[dict]:
     """
     Handle auto-mitigation notifications from AWS SNS.
 
@@ -57,9 +56,7 @@ def handle_auto_mitigation(payload: AwsSnsPayload, client: WebClient) -> List[Di
     return blocks
 
 
-def is_auto_mitigation(
-    payload: AwsSnsPayload, parsed_message: Union[str, dict]
-) -> bool:
+def is_auto_mitigation(payload: AwsSnsPayload, parsed_message: str | dict) -> bool:
     """
     Check if the AWS SNS message is an auto-mitigation notification.
 

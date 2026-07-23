@@ -41,12 +41,8 @@ class GoogleDirectoryProvider:
         """
         self._directory = google_clients.directory
         self._directory_settings = directory_settings
-        self._managed_group_domain = (
-            directory_settings.managed_group_domain.strip().lower()
-        )
-        self._managed_group_prefix = (
-            directory_settings.managed_group_prefix.strip().lower()
-        )
+        self._managed_group_domain = directory_settings.managed_group_domain.strip().lower()
+        self._managed_group_prefix = directory_settings.managed_group_prefix.strip().lower()
         self._logger = logger.bind(provider="google")
 
     def _normalize_email(self, value: str) -> str:
@@ -76,9 +72,7 @@ class GoogleDirectoryProvider:
                 if not isinstance(email_item, dict):
                     continue
 
-                address = str(
-                    email_item.get("address") or email_item.get("value") or ""
-                ).strip()
+                address = str(email_item.get("address") or email_item.get("value") or "").strip()
                 if not address:
                     continue
 
@@ -140,11 +134,7 @@ class GoogleDirectoryProvider:
         if not normalized_query:
             return None
         if ":" not in normalized_query and "=" not in normalized_query:
-            return (
-                normalized_query
-                if normalized_query.startswith(self._managed_group_prefix)
-                else None
-            )
+            return normalized_query if normalized_query.startswith(self._managed_group_prefix) else None
         if normalized_query.startswith("email:") and normalized_query.endswith("*"):
             prefix = normalized_query[len("email:") : -1]
             return prefix if prefix.startswith(self._managed_group_prefix) else None
@@ -173,9 +163,7 @@ class GoogleDirectoryProvider:
 
             given_name = str(name.get("givenName") or "").strip()
             family_name = str(name.get("familyName") or "").strip()
-            combined_name = " ".join(
-                part for part in [given_name, family_name] if part
-            ).strip()
+            combined_name = " ".join(part for part in [given_name, family_name] if part).strip()
             if combined_name:
                 return combined_name
 
@@ -203,9 +191,7 @@ class GoogleDirectoryProvider:
             operation=result.operation,
         )
 
-    def _build_directory_user(
-        self, item: dict[str, Any]
-    ) -> OperationResult[DirectoryUser]:
+    def _build_directory_user(self, item: dict[str, Any]) -> OperationResult[DirectoryUser]:
         """Convert a Google user record into a canonical directory user."""
 
         email = self._extract_email(item, "primaryEmail", "email")
@@ -253,9 +239,7 @@ class GoogleDirectoryProvider:
             provider="google",
         )
 
-    def _build_directory_group(
-        self, item: dict[str, Any]
-    ) -> OperationResult[DirectoryGroup | None]:
+    def _build_directory_group(self, item: dict[str, Any]) -> OperationResult[DirectoryGroup | None]:
         """Convert a Google group record into a canonical directory group."""
 
         group_email = self._extract_managed_group_email(item)
@@ -342,9 +326,7 @@ class GoogleDirectoryProvider:
 
         return OperationResult.success(data=user_result.data)
 
-    def list_users(
-        self, query: str = "", limit: int = 100
-    ) -> OperationResult[list[DirectoryUser]]:
+    def list_users(self, query: str = "", limit: int = 100) -> OperationResult[list[DirectoryUser]]:
         """Return canonical users matching a query."""
 
         if limit <= 0:
@@ -417,9 +399,7 @@ class GoogleDirectoryProvider:
         allowed_member_types = None
         if include_member_types is not None:
             allowed_member_types = {
-                str(member_type).strip().upper()
-                for member_type in include_member_types
-                if str(member_type).strip()
+                str(member_type).strip().upper() for member_type in include_member_types if str(member_type).strip()
             }
 
         if include_member_types is not None and not allowed_member_types:
@@ -434,11 +414,7 @@ class GoogleDirectoryProvider:
                 continue
 
             member_type = str(item.get("type") or "").strip().upper()
-            if (
-                allowed_member_types is not None
-                and member_type
-                and member_type not in allowed_member_types
-            ):
+            if allowed_member_types is not None and member_type and member_type not in allowed_member_types:
                 continue
 
             member = self._build_directory_member(item)
@@ -482,9 +458,7 @@ class GoogleDirectoryProvider:
 
         allowed_member_types = None
         if include_member_types is not None:
-            allowed_member_types = {
-                str(t).strip().upper() for t in include_member_types if str(t).strip()
-            }
+            allowed_member_types = {str(t).strip().upper() for t in include_member_types if str(t).strip()}
             if not allowed_member_types:
                 return OperationResult.permanent_error(
                     message="include_member_types must contain at least one type",
@@ -499,11 +473,7 @@ class GoogleDirectoryProvider:
                     if not isinstance(item, dict):
                         continue
                     member_type = str(item.get("type") or "").strip().upper()
-                    if (
-                        allowed_member_types is not None
-                        and member_type
-                        and member_type not in allowed_member_types
-                    ):
+                    if allowed_member_types is not None and member_type and member_type not in allowed_member_types:
                         continue
                     member = self._build_directory_member(item)
                     if member is not None:
@@ -621,9 +591,7 @@ class GoogleDirectoryProvider:
 
         return OperationResult.success()
 
-    def check_membership(
-        self, group_key: str, user_email: str
-    ) -> OperationResult[MembershipCheckResult]:
+    def check_membership(self, group_key: str, user_email: str) -> OperationResult[MembershipCheckResult]:
         """Check whether a user is a member of a group.
 
         Uses the members.hasMember API for a single-call, server-side check
@@ -680,10 +648,7 @@ class GoogleDirectoryProvider:
             )
             result = self._directory.list_groups()
         else:
-            if ":" not in query and "=" not in query:
-                google_query = f"email:{query}*"
-            else:
-                google_query = query
+            google_query = f"email:{query}*" if ":" not in query and "=" not in query else query
             result = self._directory.list_groups(query=google_query)
         if not result.is_success:
             return self._typed_error(result)
@@ -697,10 +662,7 @@ class GoogleDirectoryProvider:
         raw_groups = result.data
         if managed_prefix is not None:
             raw_groups = [
-                item
-                for item in raw_groups
-                if isinstance(item, dict)
-                and self._matches_managed_group_prefix(item, managed_prefix)
+                item for item in raw_groups if isinstance(item, dict) and self._matches_managed_group_prefix(item, managed_prefix)
             ]
 
         groups: list[DirectoryGroup] = []

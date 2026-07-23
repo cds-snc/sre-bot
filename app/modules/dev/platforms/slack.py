@@ -7,7 +7,8 @@ load-incidents, add-incident, and aws.
 Only available in development environment (ENVIRONMENT=dev).
 """
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, List
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -41,9 +42,7 @@ def _require_dev_environment(
     app_settings = get_app_settings()
     if app_settings.ENVIRONMENT not in ["dev", "local"]:
         return CommandResponse(
-            message=(
-                "This command is only available in the " "development " "environment."
-            ),
+            message=("This command is only available in the development environment."),
             ephemeral=True,
         )
     return None
@@ -76,7 +75,7 @@ def _call_legacy_handler(
         handler=handler.__name__,
         parsed_payload=payload,
     )
-    captured_responses: List[str] = []
+    captured_responses: list[str] = []
 
     def capture_respond(text: str | None = None, **kwargs):
         if text:
@@ -100,9 +99,7 @@ def _call_legacy_handler(
     )
 
     # Return captured response
-    message = (
-        "\n".join(captured_responses) if captured_responses else "Command completed"
-    )
+    message = "\n".join(captured_responses) if captured_responses else "Command completed"
     return CommandResponse(message=message, ephemeral=True)
 
 
@@ -171,17 +168,14 @@ def handle_stale_dev_command(payload: CommandPayload) -> CommandResponse:
         "depuis 14 jours. Pensez à planifier une rétro ou à l'archiver."
     )
 
-    attachments: List[Dict[str, Any]] = [
+    attachments: list[dict[str, Any]] = [
         {
             "text": (
                 "Would you like to archive the channel now or schedule a "
                 "retro? | Souhaitez-vous archiver le canal maintenant ou "
                 "planifier une rétro?"
             ),
-            "fallback": (
-                "You are unable to archive the channel | Vous ne pouvez pas "
-                "archiver ce canal"
-            ),
+            "fallback": ("You are unable to archive the channel | Vous ne pouvez pas archiver ce canal"),
             "callback_id": "archive_channel",
             "color": "#3AA3E3",
             "attachment_type": "default",
@@ -224,9 +218,7 @@ def handle_stale_dev_command(payload: CommandPayload) -> CommandResponse:
             attachments=attachments,
         )
         return CommandResponse(
-            message=(
-                "Stale channel notification sent (check channel for the " "message)"
-            ),
+            message=("Stale channel notification sent (check channel for the message)"),
             ephemeral=True,
         )
     except Exception as e:
@@ -255,9 +247,7 @@ def handle_incident_dev_command(payload: CommandPayload) -> CommandResponse:
     def noop_ack():
         pass
 
-    return _call_legacy_handler(
-        payload, incident.list_incidents, noop_ack, logger=logger
-    )
+    return _call_legacy_handler(payload, incident.list_incidents, noop_ack, logger=logger)
 
 
 def handle_load_incidents_command(payload: CommandPayload) -> CommandResponse:
@@ -273,9 +263,7 @@ def handle_load_incidents_command(payload: CommandPayload) -> CommandResponse:
     def noop_ack():
         pass
 
-    return _call_legacy_handler(
-        payload, incident.load_incidents, noop_ack, logger=logger
-    )
+    return _call_legacy_handler(payload, incident.load_incidents, noop_ack, logger=logger)
 
 
 def handle_add_incident_command(payload: CommandPayload) -> CommandResponse:
@@ -348,7 +336,7 @@ def handle_add_incident_command(payload: CommandPayload) -> CommandResponse:
 #     return CommandResponse(message=message, ephemeral=True)
 
 
-def register_commands(provider: "SlackPlatformProvider") -> None:
+def register_commands(provider: SlackPlatformProvider) -> None:
     """Register dev module commands with Slack provider.
 
     Args:

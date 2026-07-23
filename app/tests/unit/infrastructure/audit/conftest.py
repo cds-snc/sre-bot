@@ -1,6 +1,7 @@
 """Pytest fixtures for audit infrastructure tests."""
 
 import pytest
+
 from infrastructure.audit.models import AuditEvent
 
 

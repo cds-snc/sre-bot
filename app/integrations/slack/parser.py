@@ -10,12 +10,12 @@ Handles:
 - Default value substitution
 """
 
-from typing import Dict, List, Any, Optional
+from typing import Any
 
 from integrations.slack.models import (
     Argument,
-    ArgumentType,
     ArgumentParsingError,
+    ArgumentType,
 )
 
 
@@ -26,7 +26,7 @@ class CommandArgumentParser:
     containing spaces, special characters, and escape sequences.
     """
 
-    def __init__(self, arguments: List[Argument]):
+    def __init__(self, arguments: list[Argument]):
         """Initialize parser with argument definitions.
 
         Args:
@@ -37,10 +37,10 @@ class CommandArgumentParser:
 
     def _build_lookup(self) -> None:
         """Build fast lookup maps for flags, options, and positional args."""
-        self._flags: Dict[str, Argument] = {}  # name -> Argument for boolean flags
-        self._options: Dict[str, Argument] = {}  # name -> Argument for options
-        self._positional: List[Argument] = []  # List[Argument] in order
-        self._aliases: Dict[str, str] = {}  # alias -> canonical_name
+        self._flags: dict[str, Argument] = {}  # name -> Argument for boolean flags
+        self._options: dict[str, Argument] = {}  # name -> Argument for options
+        self._positional: list[Argument] = []  # List[Argument] in order
+        self._aliases: dict[str, str] = {}  # alias -> canonical_name
 
         for arg in self.arguments:
             canonical_name = arg.get_canonical_name()
@@ -60,7 +60,7 @@ class CommandArgumentParser:
             else:
                 self._positional.append(arg)
 
-    def parse(self, raw_text: str) -> Dict[str, Any]:
+    def parse(self, raw_text: str) -> dict[str, Any]:
         """Parse raw command text into structured arguments.
 
         Args:
@@ -83,7 +83,7 @@ class CommandArgumentParser:
             {'--managed': True, '--role': 'OWNER', 'group_id': 'group_123'}
         """
         tokens = self._tokenize(raw_text) if raw_text and raw_text.strip() else []
-        parsed: Dict[str, Any] = {}
+        parsed: dict[str, Any] = {}
         positional_index = 0
         i = 0
 
@@ -158,7 +158,7 @@ class CommandArgumentParser:
 
         return parsed
 
-    def _tokenize(self, text: str) -> List[str]:
+    def _tokenize(self, text: str) -> list[str]:
         """Tokenize command text respecting quotes.
 
         CRITICAL: This tokenizer MUST preserve quoted values intact.
@@ -196,10 +196,10 @@ class CommandArgumentParser:
         Returns:
             List of tokens with quotes stripped and values preserved.
         """
-        tokens: List[str] = []
-        current_token: List[str] = []
+        tokens: list[str] = []
+        current_token: list[str] = []
         in_quotes = False
-        quote_char: Optional[str] = None
+        quote_char: str | None = None
         escaped = False
         was_quoted = False  # Track if we just finished a quoted section
 
@@ -284,11 +284,11 @@ class CommandArgumentParser:
         elif arg_def.type == ArgumentType.INTEGER:
             try:
                 return int(value)
-            except ValueError:
+            except ValueError as e:
                 raise ArgumentParsingError(
                     argument=arg_def.name,
                     message=f"Expected integer, got: {value}",
-                )
+                ) from e
 
         elif arg_def.type == ArgumentType.CHOICE:
             if value not in (arg_def.choices or []):
@@ -307,7 +307,7 @@ class CommandArgumentParser:
         # STRING type - no additional validation
         return value
 
-    def _validate_required(self, parsed: Dict[str, Any]) -> None:
+    def _validate_required(self, parsed: dict[str, Any]) -> None:
         """Check all required arguments are present.
 
         Args:
@@ -324,7 +324,7 @@ class CommandArgumentParser:
                     suggestion=arg.description,
                 )
 
-    def _apply_defaults(self, parsed: Dict[str, Any]) -> None:
+    def _apply_defaults(self, parsed: dict[str, Any]) -> None:
         """Apply default values for missing arguments.
 
         Args:

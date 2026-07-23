@@ -29,7 +29,8 @@ Notes:
 """
 
 import time
-from typing import Any, Callable, List, Optional, cast
+from collections.abc import Callable
+from typing import Any, cast
 
 import boto3  # type: ignore
 import structlog
@@ -38,7 +39,6 @@ from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 
 from infrastructure.configuration.app import get_app_settings
 from infrastructure.configuration.integrations.aws import get_aws_settings
-
 from infrastructure.operations.result import OperationResult
 
 logger = structlog.get_logger()
@@ -75,8 +75,8 @@ class AWSAPIError(Exception):
     def __init__(
         self,
         message: str,
-        error_code: Optional[str] = None,
-        function_name: Optional[str] = None,
+        error_code: str | None = None,
+        function_name: str | None = None,
     ):
         self.message = message
         self.error_code = error_code
@@ -85,11 +85,7 @@ class AWSAPIError(Exception):
 
 
 def _should_retry(error: Exception, attempt: int, max_attempts: int) -> bool:
-    error_code = (
-        getattr(error, "response", {}).get("Error", {}).get("Code")
-        if hasattr(error, "response")
-        else None
-    )
+    error_code = getattr(error, "response", {}).get("Error", {}).get("Code") if hasattr(error, "response") else None
     retry_errors = ERROR_CONFIG.get("retry_errors", [])
     if not isinstance(retry_errors, (list, set, tuple)):
         retry_errors = []
@@ -101,7 +97,7 @@ def _calculate_retry_delay(attempt: int) -> float:
     try:
         # Cast to Any so type checkers accept passing it to float()
         backoff = float(cast(Any, backoff_obj))
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         backoff = 0.5  # fallback to default
     return backoff * (2**attempt)
 
@@ -114,24 +110,14 @@ def _handle_final_error(
     error_message = str(error).lower()
 
     # Check if this is a known non-critical error
-    raw_nc = (
-        ERROR_CONFIG.get("non_critical_errors")
-        if isinstance(ERROR_CONFIG, dict)
-        else None
-    )
+    raw_nc = ERROR_CONFIG.get("non_critical_errors") if isinstance(ERROR_CONFIG, dict) else None
     is_non_critical_config = False
     if isinstance(raw_nc, dict):
         function_errs = raw_nc.get(function_name)
         if isinstance(function_errs, (list, tuple, set)):
-            is_non_critical_config = any(
-                isinstance(err, str) and (err in error_message) for err in function_errs
-            )
+            is_non_critical_config = any(isinstance(err, str) and (err in error_message) for err in function_errs)
 
-    error_code = (
-        getattr(error, "response", {}).get("Error", {}).get("Code")
-        if hasattr(error, "response")
-        else None
-    )
+    error_code = getattr(error, "response", {}).get("Error", {}).get("Code") if hasattr(error, "response") else None
 
     if is_non_critical_config:
         logger.warning(
@@ -170,16 +156,16 @@ def _can_paginate_method(client: BaseClient, method: str) -> bool:
     """
     try:
         return client.can_paginate(method)
-    except (AttributeError, TypeError, ValueError):
+    except AttributeError, TypeError, ValueError:
         # Fallback to False if method doesn't exist or can't be checked
         return False
 
 
 def get_aws_client(
     service_name: str,
-    session_config: Optional[dict] = None,
-    client_config: Optional[dict] = None,
-    role_arn: Optional[str] = None,
+    session_config: dict | None = None,
+    client_config: dict | None = None,
+    role_arn: str | None = None,
     session_name: str = "DefaultSession",
 ) -> BaseClient:
     """
@@ -205,9 +191,7 @@ def get_aws_client(
 
     if role_arn:
         sts_client = boto3.client("sts")
-        assumed_role = sts_client.assume_role(
-            RoleArn=role_arn, RoleSessionName=session_name
-        )
+        assumed_role = sts_client.assume_role(RoleArn=role_arn, RoleSessionName=session_name)
         credentials = assumed_role["Credentials"]
         session = boto3.Session(
             aws_access_key_id=credentials["AccessKeyId"],
@@ -220,9 +204,7 @@ def get_aws_client(
     return session.client(service_name, **client_config)
 
 
-def _paginate_all_results(
-    client: BaseClient, method: str, keys: Optional[List[str]] = None, **kwargs
-) -> List[dict]:
+def _paginate_all_results(client: BaseClient, method: str, keys: list[str] | None = None, **kwargs) -> list[dict]:
     paginator = client.get_paginator(method)
     results = []
     for page in paginator.paginate(**kwargs):
@@ -243,7 +225,7 @@ def _paginate_all_results(
 def execute_api_call(
     func_name: str,
     api_call: Callable[[], Any],
-    max_retries: Optional[int] = None,
+    max_retries: int | None = None,
 ) -> OperationResult:
     """
     Module-level error handling for AWS API calls.
@@ -259,10 +241,8 @@ def execute_api_call(
         OperationResult: Standardized response model for external API operations.
     """
     default_retries = ERROR_CONFIG.get("default_max_retries", 3)
-    max_retry_attempts = (
-        max_retries if max_retries is not None else cast(int, default_retries)
-    )
-    last_exception: Optional[Exception] = None
+    max_retry_attempts = max_retries if max_retries is not None else cast(int, default_retries)
+    last_exception: Exception | None = None
 
     for attempt in range(max_retry_attempts + 1):
         try:
@@ -282,9 +262,7 @@ def execute_api_call(
                     attempt=attempt + 1,
                 )
 
-            return OperationResult.success(
-                data=result, message=f"AWS call {func_name} succeeded"
-            )
+            return OperationResult.success(data=result, message=f"AWS call {func_name} succeeded")
 
         except (BotoCoreError, ClientError) as e:
             last_exception = e
@@ -327,11 +305,11 @@ def execute_api_call(
 def execute_aws_api_call(
     service_name: str,
     method: str,
-    keys: Optional[List[str]] = None,
-    role_arn: Optional[str] = None,
-    session_config: Optional[dict] = None,
-    client_config: Optional[dict] = None,
-    max_retries: Optional[int] = None,
+    keys: list[str] | None = None,
+    role_arn: str | None = None,
+    session_config: dict | None = None,
+    client_config: dict | None = None,
+    max_retries: int | None = None,
     force_paginate: bool = False,
     **kwargs,
 ) -> OperationResult:
@@ -360,11 +338,7 @@ def execute_aws_api_call(
         api_method = getattr(client, method)
 
         # Auto-paginate list operations unless force_paginate is explicitly requested
-        should_paginate = (
-            force_paginate
-            or _can_paginate_method(client, method)
-            and not force_paginate
-        )
+        should_paginate = force_paginate or _can_paginate_method(client, method) and not force_paginate
 
         if should_paginate:
             return _paginate_all_results(client, method, keys, **kwargs)

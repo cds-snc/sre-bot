@@ -11,8 +11,10 @@ AWS IC has no native "disable" state; disable_user signals manual_action_require
 """
 
 import re
-from dataclasses import dataclass, field, replace as dc_replace
-from typing import Any, Dict, List, Mapping, Optional, Set
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from dataclasses import replace as dc_replace
+from typing import Any
 
 import structlog
 
@@ -57,9 +59,9 @@ def _looks_like_group_id(value: str) -> bool:
 class _AwsGroupIndex:
     """Immutable index of AWS Identity Center groups built from a single list call."""
 
-    by_id: Dict[str, str] = field(default_factory=dict)
-    by_display_name_exact: Dict[str, str] = field(default_factory=dict)
-    by_display_name_norm: Dict[str, Set[str]] = field(default_factory=dict)
+    by_id: dict[str, str] = field(default_factory=dict)
+    by_display_name_exact: dict[str, str] = field(default_factory=dict)
+    by_display_name_norm: dict[str, set[str]] = field(default_factory=dict)
 
 
 class AwsIdentityCenterAdapter:
@@ -79,11 +81,11 @@ class AwsIdentityCenterAdapter:
 
     def __init__(self, aws_clients: AWSClients) -> None:
         self._aws = aws_clients
-        self._group_id_cache: Dict[str, str] = {}
-        self._group_index: Optional[_AwsGroupIndex] = None
+        self._group_id_cache: dict[str, str] = {}
+        self._group_index: _AwsGroupIndex | None = None
 
     @staticmethod
-    def _build_identitystore_name(user_email: str) -> Dict[str, str]:
+    def _build_identitystore_name(user_email: str) -> dict[str, str]:
         """Build a minimal AWS Identity Store Name payload from an email address."""
         local_part = user_email.split("@", 1)[0].strip()
         normalized = re.sub(r"[._-]+", " ", local_part)
@@ -99,7 +101,7 @@ class AwsIdentityCenterAdapter:
             "FamilyName": " ".join(token.title() for token in tokens[1:]),
         }
 
-    def _extract_primary_email(self, user: Mapping[str, Any]) -> Optional[str]:
+    def _extract_primary_email(self, user: Mapping[str, Any]) -> str | None:
         """Return the primary email from an Identity Store user payload."""
         emails = user.get("Emails", [])
         if not isinstance(emails, list):
@@ -124,9 +126,7 @@ class AwsIdentityCenterAdapter:
                 message="Unexpected Identity Store list_users payload",
                 error_code="INVALID_AWS_RESPONSE",
             )
-        users: List[Mapping[str, Any]] = [
-            item for item in result.data if isinstance(item, dict)
-        ]
+        users: list[Mapping[str, Any]] = [item for item in result.data if isinstance(item, dict)]
         return OperationResult.success(data=users)
 
     def capabilities(self) -> AdapterCapabilities:
@@ -169,15 +169,13 @@ class AwsIdentityCenterAdapter:
             log.error("build_group_index_failed", error=result.message)
             return result
 
-        groups: List[Mapping[str, Any]] = (
-            [item for item in result.data if isinstance(item, dict)]
-            if isinstance(result.data, list)
-            else []
+        groups: list[Mapping[str, Any]] = (
+            [item for item in result.data if isinstance(item, dict)] if isinstance(result.data, list) else []
         )
 
-        by_id: Dict[str, str] = {}
-        by_display_name_exact: Dict[str, str] = {}
-        by_display_name_norm: Dict[str, Set[str]] = {}
+        by_id: dict[str, str] = {}
+        by_display_name_exact: dict[str, str] = {}
+        by_display_name_norm: dict[str, set[str]] = {}
 
         for group in groups:
             group_id = group.get("GroupId")
@@ -259,9 +257,7 @@ class AwsIdentityCenterAdapter:
         exact_group_id = index.by_display_name_exact.get(token)
         if exact_group_id is not None:
             self._group_id_cache[candidate] = exact_group_id
-            log.info(
-                "resolve_group_id_exact_name", group_id=exact_group_id, token=token
-            )
+            log.info("resolve_group_id_exact_name", group_id=exact_group_id, token=token)
             return OperationResult.success(data=exact_group_id)
 
         # Step 3 & 4: normalized display-name match.
@@ -288,10 +284,7 @@ class AwsIdentityCenterAdapter:
             )
             return OperationResult.error(
                 OperationStatus.PERMANENT_ERROR,
-                message=(
-                    f"Ambiguous group name '{token}': {len(matching_ids)} AWS IC groups "
-                    f"normalize to the same token."
-                ),
+                message=(f"Ambiguous group name '{token}': {len(matching_ids)} AWS IC groups normalize to the same token."),
                 error_code="AMBIGUOUS_GROUP_NAME",
             )
 
@@ -376,15 +369,10 @@ class AwsIdentityCenterAdapter:
         Returns PERMANENT_ERROR with error_code="UNSUPPORTED_OPERATION" so the
         service can flag the run as requiring manual action.
         """
-        logger.bind(user_email=user_email, adapter="aws_identity_center").warning(
-            "disable_user_not_supported"
-        )
+        logger.bind(user_email=user_email, adapter="aws_identity_center").warning("disable_user_not_supported")
         return OperationResult.error(
             OperationStatus.PERMANENT_ERROR,
-            message=(
-                f"AWS Identity Center does not support native disable. "
-                f"Manual action required for user: {user_email}"
-            ),
+            message=(f"AWS Identity Center does not support native disable. Manual action required for user: {user_email}"),
             error_code="UNSUPPORTED_OPERATION",
         )
 
@@ -498,9 +486,7 @@ class AwsIdentityCenterAdapter:
         if not id_result.is_success:
             if id_result.status == OperationStatus.NOT_FOUND:
                 log.info("remove_entitlement_user_absent")
-                return OperationResult.success(
-                    message="user_absent_entitlement_skipped"
-                )
+                return OperationResult.success(message="user_absent_entitlement_skipped")
             return id_result
         user_id: str = (id_result.data or {}).get("user_id", "")
 
@@ -516,9 +502,7 @@ class AwsIdentityCenterAdapter:
         if not membership_result.is_success:
             if membership_result.status == OperationStatus.NOT_FOUND:
                 log.info("remove_entitlement_not_member", group_id=group_id)
-                return OperationResult.success(
-                    message="group_membership_already_absent"
-                )
+                return OperationResult.success(message="group_membership_already_absent")
             return membership_result
 
         membership_id: str = (membership_result.data or {}).get("MembershipId", "")
@@ -551,10 +535,8 @@ class AwsIdentityCenterAdapter:
             log.error("fetch_current_state_failed", error=result.message)
             return result
 
-        memberships: List[Mapping[str, Any]] = (
-            [item for item in result.data if isinstance(item, dict)]
-            if isinstance(result.data, list)
-            else []
+        memberships: list[Mapping[str, Any]] = (
+            [item for item in result.data if isinstance(item, dict)] if isinstance(result.data, list) else []
         )
         group_ids = [
             group_id
@@ -563,9 +545,7 @@ class AwsIdentityCenterAdapter:
             if isinstance(group_id, str) and group_id
         ]
         log.info("fetch_current_state_ok", group_count=len(group_ids))
-        return OperationResult.success(
-            data={"user_id": user_id, "group_ids": group_ids}
-        )
+        return OperationResult.success(data={"user_id": user_id, "group_ids": group_ids})
 
     def list_all_provisioned_users(self) -> OperationResult:
         """Return the set of all user emails provisioned in AWS Identity Store.
@@ -581,7 +561,7 @@ class AwsIdentityCenterAdapter:
             log.error("list_all_provisioned_users_failed", error=result.message)
             return result
 
-        emails: Set[str] = set()
+        emails: set[str] = set()
         users = result.data if isinstance(result.data, list) else []
         for user in users:
             email = self._extract_primary_email(user)
@@ -611,19 +591,17 @@ class AwsIdentityCenterAdapter:
         log = logger.bind(group_id=resolved_group_id, adapter="aws_identity_center")
         log.info("list_group_members_started")
 
-        memberships_result = self._aws.identitystore.list_group_memberships(
-            group_id=resolved_group_id
-        )
+        memberships_result = self._aws.identitystore.list_group_memberships(group_id=resolved_group_id)
         if not memberships_result.is_success:
             log.error("list_group_memberships_failed", error=memberships_result.message)
             return memberships_result
 
-        memberships: List[Mapping[str, Any]] = (
+        memberships: list[Mapping[str, Any]] = (
             [item for item in memberships_result.data if isinstance(item, dict)]
             if isinstance(memberships_result.data, list)
             else []
         )
-        member_user_ids: Set[str] = {
+        member_user_ids: set[str] = {
             user_id
             for membership in memberships
             for member_id in [membership.get("MemberId")]
@@ -638,17 +616,13 @@ class AwsIdentityCenterAdapter:
         map_result = self._build_user_id_email_map()
         if not map_result.is_success:
             return map_result
-        user_id_to_email: Dict[str, str] = (
-            map_result.data if isinstance(map_result.data, dict) else {}
-        )
+        user_id_to_email: dict[str, str] = map_result.data if isinstance(map_result.data, dict) else {}
 
-        member_emails: Set[str] = {
-            user_id_to_email[uid] for uid in member_user_ids if uid in user_id_to_email
-        }
+        member_emails: set[str] = {user_id_to_email[uid] for uid in member_user_ids if uid in user_id_to_email}
         log.info("list_group_members_ok", count=len(member_emails))
         return OperationResult.success(data=member_emails)
 
-    def list_members_for_groups(self, group_ids: Set[str]) -> OperationResult:
+    def list_members_for_groups(self, group_ids: set[str]) -> OperationResult:
         """Return group_id -> member email set using a bulk read path.
 
         Prefers the infrastructure client's list_groups_with_memberships orchestration
@@ -658,9 +632,7 @@ class AwsIdentityCenterAdapter:
             return OperationResult.success(data={})
 
         resolved_group_ids_result = self._resolve_group_ids(group_ids)
-        if not resolved_group_ids_result.is_success or not isinstance(
-            resolved_group_ids_result.data, set
-        ):
+        if not resolved_group_ids_result.is_success or not isinstance(resolved_group_ids_result.data, set):
             return resolved_group_ids_result
         resolved_group_ids = resolved_group_ids_result.data
 
@@ -669,9 +641,7 @@ class AwsIdentityCenterAdapter:
             group_count=len(resolved_group_ids),
         )
         bulk_mapping_result = self._list_members_for_groups_bulk(resolved_group_ids)
-        if bulk_mapping_result.is_success and isinstance(
-            bulk_mapping_result.data, dict
-        ):
+        if bulk_mapping_result.is_success and isinstance(bulk_mapping_result.data, dict):
             log.info("list_members_for_groups_ok", groups=len(bulk_mapping_result.data))
             return bulk_mapping_result
         if not bulk_mapping_result.is_success:
@@ -680,33 +650,29 @@ class AwsIdentityCenterAdapter:
                 error=bulk_mapping_result.message,
             )
 
-        fallback_mapping: Dict[str, Set[str]] = {}
+        fallback_mapping: dict[str, set[str]] = {}
         for group_id in resolved_group_ids:
             result = self.list_group_members(group_id)
             if not result.is_success:
                 return result
             members = result.data if isinstance(result.data, set) else set()
-            fallback_mapping[group_id] = {
-                email for email in members if isinstance(email, str)
-            }
+            fallback_mapping[group_id] = {email for email in members if isinstance(email, str)}
 
         log.info("list_members_for_groups_ok_fallback", groups=len(fallback_mapping))
         return OperationResult.success(data=fallback_mapping)
 
-    def _resolve_group_ids(self, group_ids: Set[str]) -> OperationResult:
+    def _resolve_group_ids(self, group_ids: set[str]) -> OperationResult:
         """Resolve many group identifiers to canonical GroupIds."""
-        resolved_group_ids: Set[str] = set()
+        resolved_group_ids: set[str] = set()
         for group_identifier in group_ids:
             resolved_result = self._resolve_group_id(group_identifier)
-            if not resolved_result.is_success or not isinstance(
-                resolved_result.data, str
-            ):
+            if not resolved_result.is_success or not isinstance(resolved_result.data, str):
                 return resolved_result
             resolved_group_ids.add(resolved_result.data)
         return OperationResult.success(data=resolved_group_ids)
 
     def _list_members_for_groups_bulk(  # noqa: C901
-        self, group_ids: Set[str]
+        self, group_ids: set[str]
     ) -> OperationResult:
         """Attempt one bulk list path for many groups."""
         identitystore = self._aws.identitystore
@@ -719,28 +685,22 @@ class AwsIdentityCenterAdapter:
 
         target_ids = set(group_ids)
         bulk_result = identitystore.list_groups_with_memberships(
-            groups_filters=[
-                lambda group: isinstance(group, dict)
-                and group.get("GroupId") in target_ids
-            ]
+            groups_filters=[lambda group: isinstance(group, dict) and group.get("GroupId") in target_ids]
         )
         if not bulk_result.is_success or not isinstance(bulk_result.data, list):
             return bulk_result
 
-        mapping: Dict[str, Set[str]] = {}
-        user_ids_by_group: Dict[str, Set[str]] = {}
+        mapping: dict[str, set[str]] = {}
+        user_ids_by_group: dict[str, set[str]] = {}
         for group in bulk_result.data:
             if not isinstance(group, dict):
                 continue
             group_identifier = group.get("GroupId")
-            if (
-                not isinstance(group_identifier, str)
-                or group_identifier not in target_ids
-            ):
+            if not isinstance(group_identifier, str) or group_identifier not in target_ids:
                 continue
             members = group.get("GroupMemberships", [])
-            emails: Set[str] = set()
-            pending_user_ids: Set[str] = set()
+            emails: set[str] = set()
+            pending_user_ids: set[str] = set()
             if isinstance(members, list):
                 for membership in members:
                     if not isinstance(membership, dict):
@@ -760,22 +720,16 @@ class AwsIdentityCenterAdapter:
             mapping[group_identifier] = emails
             user_ids_by_group[group_identifier] = pending_user_ids
 
-        unresolved_user_ids = {
-            user_id for user_ids in user_ids_by_group.values() for user_id in user_ids
-        }
+        unresolved_user_ids = {user_id for user_ids in user_ids_by_group.values() for user_id in user_ids}
         if unresolved_user_ids:
             user_map_result = self._build_user_id_email_map()
-            if not user_map_result.is_success or not isinstance(
-                user_map_result.data, dict
-            ):
+            if not user_map_result.is_success or not isinstance(user_map_result.data, dict):
                 return user_map_result
-            user_id_to_email: Dict[str, str] = user_map_result.data
+            user_id_to_email: dict[str, str] = user_map_result.data
 
             for group_identifier, pending_user_ids in user_ids_by_group.items():
                 mapping.setdefault(group_identifier, set()).update(
-                    user_id_to_email[user_id]
-                    for user_id in pending_user_ids
-                    if user_id in user_id_to_email
+                    user_id_to_email[user_id] for user_id in pending_user_ids if user_id in user_id_to_email
                 )
 
         for group_identifier in target_ids:
@@ -793,7 +747,7 @@ class AwsIdentityCenterAdapter:
         if not result.is_success:
             return result
 
-        mapping: Dict[str, str] = {}
+        mapping: dict[str, str] = {}
         users = result.data if isinstance(result.data, list) else []
         for user in users:
             user_id = user.get("UserId", "")
@@ -810,7 +764,7 @@ class AwsIdentityCenterAdapter:
 
     def _canonicalize_rules(
         self,
-        rules: List[EntitlementRule],
+        rules: list[EntitlementRule],
     ) -> OperationResult:
         """Resolve entitlement tokens to canonical AWS IC GroupIds.
 
@@ -820,7 +774,7 @@ class AwsIdentityCenterAdapter:
         """
         _SKIP_CODES = frozenset({"GROUP_ID_NOT_FOUND", "AMBIGUOUS_GROUP_NAME"})
         log = logger.bind(adapter="aws_identity_center")
-        canonical: List[EntitlementRule] = []
+        canonical: list[EntitlementRule] = []
         for rule in rules:
             if rule.entitlement_type != "group":
                 canonical.append(rule)
@@ -852,10 +806,10 @@ class AwsIdentityCenterAdapter:
     def _execute_planned_actions(
         self,
         user_email: str,
-        planned: List[PlannedAction],
+        planned: list[PlannedAction],
     ) -> OperationResult:
         """Execute a list of planned actions; return SyncOutcome or error."""
-        applied: List[str] = []
+        applied: list[str] = []
         requires_manual_action = False
         for action in planned:
             if action.action == "provision_user":
@@ -872,13 +826,9 @@ class AwsIdentityCenterAdapter:
                         error_code="INVALID_PLANNED_ACTION",
                     )
                 if action.action == "apply_entitlement":
-                    result = self.apply_entitlement(
-                        user_email, action.entitlement_type, action.entitlement_id
-                    )
+                    result = self.apply_entitlement(user_email, action.entitlement_type, action.entitlement_id)
                 else:
-                    result = self.remove_entitlement(
-                        user_email, action.entitlement_type, action.entitlement_id
-                    )
+                    result = self.remove_entitlement(user_email, action.entitlement_type, action.entitlement_id)
             else:
                 return OperationResult.error(
                     OperationStatus.PERMANENT_ERROR,
@@ -910,15 +860,11 @@ class AwsIdentityCenterAdapter:
         log: Any,
         dry_run: bool,
         plan: PlatformActionPlan,
-        entitlement_slug_by_id: Dict[str, str],
+        entitlement_slug_by_id: dict[str, str],
         unchanged_user_count: int,
     ) -> None:
         """Emit a concise slug-first summary for full-platform reconciliation."""
-        changed_users: Set[str] = (
-            set(plan.users_to_provision)
-            | set(plan.users_to_disable)
-            | set(plan.users_to_remove)
-        )
+        changed_users: set[str] = set(plan.users_to_provision) | set(plan.users_to_disable) | set(plan.users_to_remove)
         for members in plan.entitlement_adds_by_id.values():
             changed_users.update(members)
         for members in plan.entitlement_removes_by_id.values():
@@ -930,14 +876,10 @@ class AwsIdentityCenterAdapter:
             changed_user_count=len(changed_users),
             unchanged_user_count=unchanged_user_count,
             action_counts={
-                "apply_entitlement": sum(
-                    len(members) for members in plan.entitlement_adds_by_id.values()
-                ),
+                "apply_entitlement": sum(len(members) for members in plan.entitlement_adds_by_id.values()),
                 "disable_user": len(plan.users_to_disable),
                 "provision_user": len(plan.users_to_provision),
-                "remove_entitlement": sum(
-                    len(members) for members in plan.entitlement_removes_by_id.values()
-                ),
+                "remove_entitlement": sum(len(members) for members in plan.entitlement_removes_by_id.values()),
                 "remove_user": len(plan.users_to_remove),
             },
             lifecycle_actions={
@@ -947,20 +889,12 @@ class AwsIdentityCenterAdapter:
             },
             entitlements_by_action={
                 "apply_entitlement": {
-                    entitlement_slug_by_id.get(entitlement_id, entitlement_id): sorted(
-                        members
-                    )
-                    for entitlement_id, members in sorted(
-                        plan.entitlement_adds_by_id.items()
-                    )
+                    entitlement_slug_by_id.get(entitlement_id, entitlement_id): sorted(members)
+                    for entitlement_id, members in sorted(plan.entitlement_adds_by_id.items())
                 },
                 "remove_entitlement": {
-                    entitlement_slug_by_id.get(entitlement_id, entitlement_id): sorted(
-                        members
-                    )
-                    for entitlement_id, members in sorted(
-                        plan.entitlement_removes_by_id.items()
-                    )
+                    entitlement_slug_by_id.get(entitlement_id, entitlement_id): sorted(members)
+                    for entitlement_id, members in sorted(plan.entitlement_removes_by_id.items())
                 },
             },
         )
@@ -968,20 +902,16 @@ class AwsIdentityCenterAdapter:
     def _build_canonical_platform_state(
         self,
         desired_state: DesiredPlatformState,
-        canonical_rules: List[EntitlementRule],
+        canonical_rules: list[EntitlementRule],
     ) -> DesiredPlatformState:
         """Translate desired platform state to canonical AWS group IDs."""
-        canonical_id_by_slug: Dict[str, str] = {
-            rule.group_slug: rule.entitlement_id
-            for rule in canonical_rules
-            if rule.entitlement_type == "group"
+        canonical_id_by_slug: dict[str, str] = {
+            rule.group_slug: rule.entitlement_id for rule in canonical_rules if rule.entitlement_type == "group"
         }
-        desired_members_by_entitlement: Dict[str, Set[str]] = {
+        desired_members_by_entitlement: dict[str, set[str]] = {
             canonical_id: set() for canonical_id in canonical_id_by_slug.values()
         }
-        entitlement_slug_by_id: Dict[str, str] = {
-            canonical_id: slug for slug, canonical_id in canonical_id_by_slug.items()
-        }
+        entitlement_slug_by_id: dict[str, str] = {canonical_id: slug for slug, canonical_id in canonical_id_by_slug.items()}
 
         for (
             entitlement_id,
@@ -993,9 +923,7 @@ class AwsIdentityCenterAdapter:
             canonical_id = canonical_id_by_slug.get(slug)
             if canonical_id is None:
                 continue
-            desired_members_by_entitlement.setdefault(canonical_id, set()).update(
-                member.lower() for member in members
-            )
+            desired_members_by_entitlement.setdefault(canonical_id, set()).update(member.lower() for member in members)
 
         return DesiredPlatformState(
             desired_users={email.lower() for email in desired_state.desired_users},
@@ -1005,36 +933,26 @@ class AwsIdentityCenterAdapter:
 
     def _build_current_platform_state(
         self,
-        managed_entitlement_ids: Set[str],
+        managed_entitlement_ids: set[str],
     ) -> OperationResult:
         """Read current AWS users and entitlement memberships once per run."""
         provisioned_result = self.list_all_provisioned_users()
-        if not provisioned_result.is_success or not isinstance(
-            provisioned_result.data, set
-        ):
+        if not provisioned_result.is_success or not isinstance(provisioned_result.data, set):
             return provisioned_result
 
-        current_members_by_entitlement: Dict[str, Set[str]] = {}
+        current_members_by_entitlement: dict[str, set[str]] = {}
         if managed_entitlement_ids:
             memberships_result = self.list_members_for_groups(managed_entitlement_ids)
-            if not memberships_result.is_success or not isinstance(
-                memberships_result.data, dict
-            ):
+            if not memberships_result.is_success or not isinstance(memberships_result.data, dict):
                 return memberships_result
             current_members_by_entitlement = {
-                entitlement_id: {
-                    email.lower() for email in members if isinstance(email, str)
-                }
+                entitlement_id: {email.lower() for email in members if isinstance(email, str)}
                 for entitlement_id, members in memberships_result.data.items()
             }
 
         return OperationResult.success(
             data=CurrentPlatformState(
-                current_users={
-                    email.lower()
-                    for email in provisioned_result.data
-                    if isinstance(email, str)
-                },
+                current_users={email.lower() for email in provisioned_result.data if isinstance(email, str)},
                 current_members_by_entitlement=current_members_by_entitlement,
             )
         )
@@ -1042,14 +960,12 @@ class AwsIdentityCenterAdapter:
     def _build_user_action_map(
         self,
         plan: PlatformActionPlan,
-    ) -> Dict[str, List[PlannedAction]]:
+    ) -> dict[str, list[PlannedAction]]:
         """Translate grouped platform deltas into targeted per-user actions."""
-        actions_by_user: Dict[str, List[PlannedAction]] = {}
+        actions_by_user: dict[str, list[PlannedAction]] = {}
 
         for user_email in sorted(plan.users_to_provision):
-            actions_by_user.setdefault(user_email, []).append(
-                PlannedAction(action="provision_user")
-            )
+            actions_by_user.setdefault(user_email, []).append(PlannedAction(action="provision_user"))
         for entitlement_id, members in sorted(plan.entitlement_adds_by_id.items()):
             for user_email in sorted(members):
                 actions_by_user.setdefault(user_email, []).append(
@@ -1069,13 +985,9 @@ class AwsIdentityCenterAdapter:
                     )
                 )
         for user_email in sorted(plan.users_to_disable):
-            actions_by_user.setdefault(user_email, []).append(
-                PlannedAction(action="disable_user")
-            )
+            actions_by_user.setdefault(user_email, []).append(PlannedAction(action="disable_user"))
         for user_email in sorted(plan.users_to_remove):
-            actions_by_user.setdefault(user_email, []).append(
-                PlannedAction(action="remove_user")
-            )
+            actions_by_user.setdefault(user_email, []).append(PlannedAction(action="remove_user"))
 
         return actions_by_user
 
@@ -1104,12 +1016,12 @@ class AwsIdentityCenterAdapter:
         canon_result = self._canonicalize_rules(context.entitlement_rules)
         if not canon_result.is_success or not isinstance(canon_result.data, list):
             return canon_result
-        canonical_rules: List[EntitlementRule] = canon_result.data
+        canonical_rules: list[EntitlementRule] = canon_result.data
 
         required_result = self._canonicalize_rules(desired_state.required_entitlements)
         if not required_result.is_success or not isinstance(required_result.data, list):
             return required_result
-        canonical_required: List[EntitlementRule] = required_result.data
+        canonical_required: list[EntitlementRule] = required_result.data
 
         assessment = self._assess_live(user_email)
         if not assessment.is_success or assessment.data is None:
@@ -1126,15 +1038,13 @@ class AwsIdentityCenterAdapter:
             current_entitlement_ids=current.current_entitlement_ids,
             platform_user_exists=current.platform_user_exists,
         )
-        planned_names: List[str] = [a.action for a in planned]
+        planned_names: list[str] = [a.action for a in planned]
         log.debug(
             "reconcile_user_plan_summary",
             dry_run=dry_run,
             user_should_exist=desired_state.user_should_exist,
             platform_user_exists=current.platform_user_exists,
-            desired_entitlement_ids=sorted(
-                rule.entitlement_id for rule in canonical_required
-            ),
+            desired_entitlement_ids=sorted(rule.entitlement_id for rule in canonical_required),
             current_entitlement_ids=sorted(current.current_entitlement_ids),
             planned_actions=planned_names,
         )
@@ -1168,7 +1078,7 @@ class AwsIdentityCenterAdapter:
         canon_result = self._canonicalize_rules(context.entitlement_rules)
         if not canon_result.is_success or not isinstance(canon_result.data, list):
             return canon_result
-        canonical_rules: List[EntitlementRule] = canon_result.data
+        canonical_rules: list[EntitlementRule] = canon_result.data
         canonical_context = dc_replace(context, entitlement_rules=canonical_rules)
         canonical_desired = self._build_canonical_platform_state(
             desired_state=desired_state,
@@ -1176,13 +1086,9 @@ class AwsIdentityCenterAdapter:
         )
 
         current_state_result = self._build_current_platform_state(
-            managed_entitlement_ids=set(
-                canonical_desired.desired_members_by_entitlement.keys()
-            )
+            managed_entitlement_ids=set(canonical_desired.desired_members_by_entitlement.keys())
         )
-        if not current_state_result.is_success or not isinstance(
-            current_state_result.data, CurrentPlatformState
-        ):
+        if not current_state_result.is_success or not isinstance(current_state_result.data, CurrentPlatformState):
             return current_state_result
         current_state: CurrentPlatformState = current_state_result.data
 
@@ -1197,8 +1103,7 @@ class AwsIdentityCenterAdapter:
         actions_by_user = self._build_user_action_map(plan)
 
         failed_group_slugs = sorted(
-            set(desired_state.entitlement_slug_by_id.values())
-            - set(canonical_desired.entitlement_slug_by_id.values())
+            set(desired_state.entitlement_slug_by_id.values()) - set(canonical_desired.entitlement_slug_by_id.values())
         )
         log.info(
             "reconcile_platform_groups_matched",
@@ -1212,13 +1117,10 @@ class AwsIdentityCenterAdapter:
             dry_run=dry_run,
             plan=plan,
             entitlement_slug_by_id=canonical_desired.entitlement_slug_by_id,
-            unchanged_user_count=len(
-                canonical_desired.desired_users | current_state.current_users
-            )
-            - len(actions_by_user),
+            unchanged_user_count=len(canonical_desired.desired_users | current_state.current_users) - len(actions_by_user),
         )
 
-        per_user: Dict[str, SyncOutcome] = {}
+        per_user: dict[str, SyncOutcome] = {}
         users_converged = 0
         requires_manual_action_count = 0
         for user_email in sorted(actions_by_user):
@@ -1230,9 +1132,7 @@ class AwsIdentityCenterAdapter:
                 )
             else:
                 exec_result = self._execute_planned_actions(user_email, planned_actions)
-                if not exec_result.is_success or not isinstance(
-                    exec_result.data, SyncOutcome
-                ):
+                if not exec_result.is_success or not isinstance(exec_result.data, SyncOutcome):
                     return exec_result
                 outcome = exec_result.data
             per_user[user_email] = outcome
@@ -1241,12 +1141,8 @@ class AwsIdentityCenterAdapter:
             if outcome.requires_manual_action:
                 requires_manual_action_count += 1
 
-        users_synced = len(
-            canonical_desired.desired_users | current_state.current_users
-        )
-        orphans_found = len(
-            current_state.current_users - canonical_desired.desired_users
-        )
+        users_synced = len(canonical_desired.desired_users | current_state.current_users)
+        orphans_found = len(current_state.current_users - canonical_desired.desired_users)
         log.info(
             "reconcile_platform_completed",
             users_synced=users_synced,
@@ -1264,20 +1160,12 @@ class AwsIdentityCenterAdapter:
                 dry_run=dry_run,
                 per_user=per_user,
                 changed_user_count=len(actions_by_user),
-                unchanged_user_count=len(
-                    canonical_desired.desired_users | current_state.current_users
-                )
-                - len(actions_by_user),
+                unchanged_user_count=len(canonical_desired.desired_users | current_state.current_users) - len(actions_by_user),
                 action_counts={
-                    "apply_entitlement": sum(
-                        len(members) for members in plan.entitlement_adds_by_id.values()
-                    ),
+                    "apply_entitlement": sum(len(members) for members in plan.entitlement_adds_by_id.values()),
                     "disable_user": len(plan.users_to_disable),
                     "provision_user": len(plan.users_to_provision),
-                    "remove_entitlement": sum(
-                        len(members)
-                        for members in plan.entitlement_removes_by_id.values()
-                    ),
+                    "remove_entitlement": sum(len(members) for members in plan.entitlement_removes_by_id.values()),
                     "remove_user": len(plan.users_to_remove),
                 },
                 lifecycle_actions={
@@ -1287,20 +1175,12 @@ class AwsIdentityCenterAdapter:
                 },
                 entitlements_by_action={
                     "apply_entitlement": {
-                        canonical_desired.entitlement_slug_by_id.get(
-                            entitlement_id, entitlement_id
-                        ): sorted(members)
-                        for entitlement_id, members in sorted(
-                            plan.entitlement_adds_by_id.items()
-                        )
+                        canonical_desired.entitlement_slug_by_id.get(entitlement_id, entitlement_id): sorted(members)
+                        for entitlement_id, members in sorted(plan.entitlement_adds_by_id.items())
                     },
                     "remove_entitlement": {
-                        canonical_desired.entitlement_slug_by_id.get(
-                            entitlement_id, entitlement_id
-                        ): sorted(members)
-                        for entitlement_id, members in sorted(
-                            plan.entitlement_removes_by_id.items()
-                        )
+                        canonical_desired.entitlement_slug_by_id.get(entitlement_id, entitlement_id): sorted(members)
+                        for entitlement_id, members in sorted(plan.entitlement_removes_by_id.items())
                     },
                 },
             )
@@ -1318,7 +1198,7 @@ class AwsIdentityCenterAdapter:
                     )
                 )
             return state_result
-        group_ids: Set[str] = set((state_result.data or {}).get("group_ids", []))
+        group_ids: set[str] = set((state_result.data or {}).get("group_ids", []))
         return OperationResult.success(
             data=AdapterAssessment(
                 platform_user_exists=True,

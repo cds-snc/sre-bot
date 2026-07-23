@@ -5,18 +5,14 @@ stub service and settings objects via the FastAPI dependency-injection
 protocol used in test_routes patterns across this codebase.
 """
 
-from typing import Optional
-
 import pytest
-from fastapi import FastAPI
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
-from infrastructure.security.models import AuthPrincipalSource, User
 from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.security import get_current_user
-from packages.access.catalog.providers import get_catalog_service, get_catalog_settings
+from infrastructure.security.models import AuthPrincipalSource, User
 from packages.access.catalog.domain import (
     EntitlementEntry,
     ParsedEntitlementToken,
@@ -27,15 +23,12 @@ from packages.access.catalog.interactions.http import (
     list_platforms,
     router,
 )
+from packages.access.catalog.providers import get_catalog_service, get_catalog_settings
 
 
 def _get_route(path: str, method: str) -> APIRoute:
     for route in router.routes:
-        if (
-            isinstance(route, APIRoute)
-            and route.path == path
-            and method in route.methods
-        ):
+        if isinstance(route, APIRoute) and route.path == path and method in route.methods:
             return route
     raise AssertionError(f"Route {method} {path} not found")
 
@@ -53,13 +46,11 @@ class _FakeSettings:
 class _FakeCatalogService:
     def __init__(
         self,
-        platforms_result: Optional[OperationResult] = None,
-        entitlements_result: Optional[OperationResult] = None,
+        platforms_result: OperationResult | None = None,
+        entitlements_result: OperationResult | None = None,
     ) -> None:
         self._platforms_result = platforms_result or OperationResult.success(data=[])
-        self._entitlements_result = entitlements_result or OperationResult.success(
-            data=[]
-        )
+        self._entitlements_result = entitlements_result or OperationResult.success(data=[])
 
     def list_platforms(self) -> OperationResult:
         return self._platforms_result
@@ -91,7 +82,7 @@ def _make_entry(
     token: str = "admin",
     mode: str = "sync_managed",
     requestable: bool = True,
-    already_provisioned: Optional[bool] = False,
+    already_provisioned: bool | None = False,
 ) -> EntitlementEntry:
     return EntitlementEntry(
         token=token,
@@ -133,9 +124,7 @@ def test_list_platforms_should_return_503_when_feature_disabled():
 def test_list_platforms_should_return_platform_list_on_success():
     # Arrange
     summaries = [_make_platform_summary("aws"), _make_platform_summary("gcp")]
-    service = _FakeCatalogService(
-        platforms_result=OperationResult.success(data=summaries)
-    )
+    service = _FakeCatalogService(platforms_result=OperationResult.success(data=summaries))
 
     # Act
     response = list_platforms(
@@ -157,9 +146,7 @@ def test_list_platforms_should_return_platform_list_on_success():
 def test_list_platforms_should_return_500_when_service_fails():
     # Arrange
     service = _FakeCatalogService(
-        platforms_result=OperationResult.error(
-            OperationStatus.PERMANENT_ERROR, message="unexpected failure"
-        )
+        platforms_result=OperationResult.error(OperationStatus.PERMANENT_ERROR, message="unexpected failure")
     )
 
     # Act / Assert
@@ -226,9 +213,7 @@ def test_list_platforms_returns_503_without_service_dependency_assembly():
         service_provider_called = True
         raise AssertionError("catalog service dependency should not be assembled")
 
-    app.dependency_overrides[get_catalog_settings] = lambda: _FakeSettings(
-        enabled=False
-    )
+    app.dependency_overrides[get_catalog_settings] = lambda: _FakeSettings(enabled=False)
     app.dependency_overrides[get_catalog_service] = _service_provider
     app.dependency_overrides[get_current_user] = _make_user
 
@@ -248,9 +233,7 @@ def test_list_platforms_returns_503_without_service_dependency_assembly():
 def test_list_entitlements_should_return_entitlement_list_on_success():
     # Arrange
     entries = [_make_entry("admin"), _make_entry("readonly")]
-    service = _FakeCatalogService(
-        entitlements_result=OperationResult.success(data=entries)
-    )
+    service = _FakeCatalogService(entitlements_result=OperationResult.success(data=entries))
 
     # Act
     response = list_entitlements(
@@ -268,9 +251,7 @@ def test_list_entitlements_should_return_entitlement_list_on_success():
 def test_list_entitlements_should_normalize_platform_in_response():
     # Arrange — caller submits mixed-case platform; route normalises it
     entries = [_make_entry("admin")]
-    service = _FakeCatalogService(
-        entitlements_result=OperationResult.success(data=entries)
-    )
+    service = _FakeCatalogService(entitlements_result=OperationResult.success(data=entries))
 
     # Act
     response = list_entitlements(
@@ -340,9 +321,7 @@ def test_list_entitlements_should_return_500_when_service_fails():
 def test_list_entitlements_should_propagate_membership_status():
     # Arrange
     entries = [_make_entry("admin", already_provisioned=True)]
-    service = _FakeCatalogService(
-        entitlements_result=OperationResult.success(data=entries)
-    )
+    service = _FakeCatalogService(entitlements_result=OperationResult.success(data=entries))
 
     # Act
     response = list_entitlements(
@@ -359,9 +338,7 @@ def test_list_entitlements_should_propagate_membership_status():
 def test_list_entitlements_should_propagate_requestable_flag():
     # Arrange
     entries = [_make_entry("legacy-role", mode="deactivated", requestable=False)]
-    service = _FakeCatalogService(
-        entitlements_result=OperationResult.success(data=entries)
-    )
+    service = _FakeCatalogService(entitlements_result=OperationResult.success(data=entries))
 
     # Act
     response = list_entitlements(

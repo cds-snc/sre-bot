@@ -19,12 +19,8 @@ class FakeIdentityStoreClient:
         self.describe_user_result: OperationResult = OperationResult.success(
             data={"UserId": "user-123", "UserName": "alice@example.com"}
         )
-        self.user_lookup_result: OperationResult = OperationResult.success(
-            data={"UserId": "user-123"}
-        )
-        self.create_user_result: OperationResult = OperationResult.success(
-            data={"UserId": "user-123"}
-        )
+        self.user_lookup_result: OperationResult = OperationResult.success(data={"UserId": "user-123"})
+        self.create_user_result: OperationResult = OperationResult.success(data={"UserId": "user-123"})
         self.membership_lookup_result: OperationResult = OperationResult.error(
             OperationStatus.NOT_FOUND,
             message="membership not found",
@@ -32,19 +28,11 @@ class FakeIdentityStoreClient:
         )
         self.create_membership_result: OperationResult = OperationResult.success()
         self.delete_membership_result: OperationResult = OperationResult.success()
-        self.list_group_memberships_for_member_result: OperationResult = (
-            OperationResult.success(data=[])
-        )
-        self.list_group_memberships_result: OperationResult = OperationResult.success(
-            data=[]
-        )
+        self.list_group_memberships_for_member_result: OperationResult = OperationResult.success(data=[])
+        self.list_group_memberships_result: OperationResult = OperationResult.success(data=[])
         self.describe_group_result: OperationResult = OperationResult.success(data={})
-        self.get_group_id_by_group_name_result: OperationResult = (
-            OperationResult.success(data={"GroupId": "group-123"})
-        )
-        self.list_groups_with_memberships_result: OperationResult = (
-            OperationResult.success(data=[])
-        )
+        self.get_group_id_by_group_name_result: OperationResult = OperationResult.success(data={"GroupId": "group-123"})
+        self.list_groups_with_memberships_result: OperationResult = OperationResult.success(data=[])
         self.list_groups_result: OperationResult = OperationResult.success(data=[])
         self.list_users_result: OperationResult = OperationResult.success(data=[])
         self.delete_user_result: OperationResult = OperationResult.success()
@@ -172,9 +160,7 @@ def test_ensure_user_create_payload_matches_identitystore_requirements() -> None
     assert payload["UserName"] == "sre-bot@cds-snc.ca"
     assert payload["DisplayName"] == "Sre Bot"
     assert payload["Name"] == {"GivenName": "Sre", "FamilyName": "Bot"}
-    assert payload["Emails"] == [
-        {"Value": "sre-bot@cds-snc.ca", "Primary": True, "Type": "WORK"}
-    ]
+    assert payload["Emails"] == [{"Value": "sre-bot@cds-snc.ca", "Primary": True, "Type": "WORK"}]
 
 
 @pytest.mark.unit
@@ -304,9 +290,7 @@ def test_list_members_for_groups_falls_back_when_bulk_fails() -> None:
 
 
 @pytest.mark.unit
-def test_list_members_for_groups_bulk_resolves_member_ids_without_user_details() -> (
-    None
-):
+def test_list_members_for_groups_bulk_resolves_member_ids_without_user_details() -> None:
     """Bulk group read should resolve MemberId.UserId when UserDetails is omitted."""
     client = FakeIdentityStoreClient()
     group_1_id = "11111111-2222-3333-4444-555555555555"
@@ -352,9 +336,7 @@ def test_apply_entitlement_resolves_group_name_to_group_id() -> None:
         message="group id not found",
         error_code="GROUP_NOT_FOUND",
     )
-    client.list_groups_result = OperationResult.success(
-        data=_make_group_list(("team1-prd-admin", "resolved-group-id"))
-    )
+    client.list_groups_result = OperationResult.success(data=_make_group_list(("team1-prd-admin", "resolved-group-id")))
     adapter = make_adapter(client)
 
     result = adapter.apply_entitlement(
@@ -364,9 +346,7 @@ def test_apply_entitlement_resolves_group_name_to_group_id() -> None:
     )
 
     assert result.is_success
-    create_call = next(
-        call for call in client.calls if call[0] == "create_group_membership"
-    )
+    create_call = next(call for call in client.calls if call[0] == "create_group_membership")
     assert create_call[1]["GroupId"] == "resolved-group-id"
 
 
@@ -396,9 +376,7 @@ def test_resolve_group_id_uuid_passthrough() -> None:
     """A UUID that describe_group confirms should be returned as-is without index."""
     client = FakeIdentityStoreClient()
     group_id = "11111111-2222-3333-4444-555555555555"
-    client.describe_group_result = OperationResult.success(
-        data={"GroupId": group_id, "DisplayName": "Admin"}
-    )
+    client.describe_group_result = OperationResult.success(data={"GroupId": group_id, "DisplayName": "Admin"})
     adapter = make_adapter(client)
 
     result = adapter.canonicalize_entitlement_id("group", group_id)
@@ -413,12 +391,8 @@ def test_resolve_group_id_uuid_passthrough() -> None:
 def test_resolve_group_id_exact_display_name() -> None:
     """A token that exactly matches an AWS IC display name resolves via the index."""
     client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(
-        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
-    )
-    client.list_groups_result = OperationResult.success(
-        data=_make_group_list(("admin", "group-admin-id"))
-    )
+    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
+    client.list_groups_result = OperationResult.success(data=_make_group_list(("admin", "group-admin-id")))
     adapter = make_adapter(client)
 
     result = adapter.canonicalize_entitlement_id("group", "admin")
@@ -431,9 +405,7 @@ def test_resolve_group_id_exact_display_name() -> None:
 def test_resolve_group_id_non_uuid_skips_describe_group() -> None:
     """Display-name tokens should not trigger describe_group UUID validation calls."""
     client = FakeIdentityStoreClient()
-    client.list_groups_result = OperationResult.success(
-        data=_make_group_list(("scratch", "group-scratch-id"))
-    )
+    client.list_groups_result = OperationResult.success(data=_make_group_list(("scratch", "group-scratch-id")))
     adapter = make_adapter(client)
 
     result = adapter.canonicalize_entitlement_id("group", "scratch")
@@ -447,12 +419,8 @@ def test_resolve_group_id_non_uuid_skips_describe_group() -> None:
 def test_resolve_group_id_normalized_display_name() -> None:
     """A token whose casefold matches an AWS IC group resolves via the index."""
     client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(
-        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
-    )
-    client.list_groups_result = OperationResult.success(
-        data=_make_group_list(("FinOps-ReadOnly", "group-finops-id"))
-    )
+    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
+    client.list_groups_result = OperationResult.success(data=_make_group_list(("FinOps-ReadOnly", "group-finops-id")))
     adapter = make_adapter(client)
 
     # Token "finops-readonly" normalizes via casefold to "finops-readonly"
@@ -467,9 +435,7 @@ def test_resolve_group_id_normalized_display_name() -> None:
 def test_resolve_group_id_ambiguous_name_returns_error() -> None:
     """When normalized token matches multiple groups, AMBIGUOUS_GROUP_NAME is returned."""
     client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(
-        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
-    )
+    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
     client.list_groups_result = OperationResult.success(
         data=_make_group_list(
             ("Admin", "group-admin-1"),
@@ -488,12 +454,8 @@ def test_resolve_group_id_ambiguous_name_returns_error() -> None:
 def test_resolve_group_id_not_found_returns_error() -> None:
     """When no group matches the token, GROUP_ID_NOT_FOUND is returned."""
     client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(
-        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
-    )
-    client.list_groups_result = OperationResult.success(
-        data=_make_group_list(("other-group", "group-other-id"))
-    )
+    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
+    client.list_groups_result = OperationResult.success(data=_make_group_list(("other-group", "group-other-id")))
     adapter = make_adapter(client)
 
     result = adapter.canonicalize_entitlement_id("group", "missing")
@@ -506,12 +468,8 @@ def test_resolve_group_id_not_found_returns_error() -> None:
 def test_resolve_group_id_caches_result() -> None:
     """Repeated resolution of the same token should not re-call list_groups."""
     client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(
-        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
-    )
-    client.list_groups_result = OperationResult.success(
-        data=_make_group_list(("admin", "group-cached-id"))
-    )
+    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
+    client.list_groups_result = OperationResult.success(data=_make_group_list(("admin", "group-cached-id")))
     adapter = make_adapter(client)
 
     result1 = adapter.canonicalize_entitlement_id("group", "admin")
@@ -526,9 +484,7 @@ def test_resolve_group_id_caches_result() -> None:
 def test_resolve_group_id_list_groups_failure_propagates() -> None:
     """If list_groups fails, the error propagates from canonicalize_entitlement_id."""
     client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(
-        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
-    )
+    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
     client.list_groups_result = OperationResult.error(
         OperationStatus.TRANSIENT_ERROR,
         message="throttled",
@@ -546,12 +502,8 @@ def test_resolve_group_id_list_groups_failure_propagates() -> None:
 def test_resolve_group_id_no_prefix_matches_full_slug() -> None:
     """Token passed directly (pre-stripped) resolves via exact display-name match."""
     client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(
-        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
-    )
-    client.list_groups_result = OperationResult.success(
-        data=_make_group_list(("platform-admin", "group-platform-admin-id"))
-    )
+    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
+    client.list_groups_result = OperationResult.success(data=_make_group_list(("platform-admin", "group-platform-admin-id")))
     adapter = make_adapter(client)
 
     result = adapter.canonicalize_entitlement_id("group", "platform-admin")
@@ -564,12 +516,8 @@ def test_resolve_group_id_no_prefix_matches_full_slug() -> None:
 def test_resolve_group_id_token_direct_lookup() -> None:
     """Pre-stripped token resolves directly without any prefix handling."""
     client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(
-        OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND"
-    )
-    client.list_groups_result = OperationResult.success(
-        data=_make_group_list(("ops-team", "group-ops-id"))
-    )
+    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
+    client.list_groups_result = OperationResult.success(data=_make_group_list(("ops-team", "group-ops-id")))
     adapter = make_adapter(client)
 
     result = adapter.canonicalize_entitlement_id("group", "ops-team")

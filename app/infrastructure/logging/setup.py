@@ -19,15 +19,17 @@ Dependencies:
     - infrastructure.configuration.Settings
 """
 
+import contextlib
 import logging
 import sys
-from pathlib import Path
 from collections.abc import Callable, Mapping, MutableMapping
+from pathlib import Path
 from typing import Any
 
 import structlog
 from structlog.processors import CallsiteParameter
 from structlog.stdlib import BoundLogger
+
 from infrastructure.configuration.app import AppSettings
 
 
@@ -65,7 +67,7 @@ def _apply_otel_code_conventions(
                     event_dict["code.file.path"] = pathname
             else:
                 event_dict["code.file.path"] = pathname
-        except (ValueError, IndexError):
+        except ValueError, IndexError:
             event_dict["code.file.path"] = pathname
 
     # Create fully qualified function name (module.function)
@@ -192,10 +194,8 @@ def configure_logging(
     # 6. Final rendering (environment-specific)
     if not prod_mode:  # Development mode
         # Pretty exceptions with colors (requires rich or better-exceptions)
-        try:
+        with contextlib.suppress(ImportError):
             processors.append(structlog.processors.ExceptionPrettyPrinter())
-        except ImportError:
-            pass  # Fall back to plain exceptions if rich not installed
         processors.append(structlog.dev.ConsoleRenderer())
     else:  # Production mode
         processors.append(structlog.processors.JSONRenderer())

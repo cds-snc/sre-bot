@@ -12,9 +12,10 @@ should be provided via extra_metadata() dict, which will be flattened with
 the audit_meta_ prefix by output adapters (e.g., SentinelAdapter).
 """
 
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
-from pydantic import BaseModel, Field, ConfigDict
+from datetime import UTC, datetime
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AuditEvent(BaseModel):
@@ -54,11 +55,9 @@ class AuditEvent(BaseModel):
             transform these (e.g., for SIEM queryability).
     """
 
-    correlation_id: str = Field(
-        ..., description="Unique request ID for distributed tracing"
-    )
+    correlation_id: str = Field(..., description="Unique request ID for distributed tracing")
     timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat(),
+        default_factory=lambda: datetime.now(UTC).isoformat(),
         description="ISO 8601 timestamp (UTC)",
     )
     action: str = Field(..., description="Operation type (snake_case)")
@@ -68,23 +67,15 @@ class AuditEvent(BaseModel):
         description="Operation result: 'success' or 'failure'",
         pattern="^(success|failure)$",
     )
-    resource_type: Optional[str] = Field(
-        default=None, description="Type of resource affected (optional)"
-    )
-    resource_id: Optional[str] = Field(
-        default=None, description="Primary resource identifier (optional)"
-    )
-    error_type: Optional[str] = Field(
+    resource_type: str | None = Field(default=None, description="Type of resource affected (optional)")
+    resource_id: str | None = Field(default=None, description="Primary resource identifier (optional)")
+    error_type: str | None = Field(
         default=None,
         description="Error category if failed: transient, permanent, auth, etc.",
     )
-    error_message: Optional[str] = Field(
-        default=None, description="Human-readable error description"
-    )
-    provider: Optional[str] = Field(default=None, description="External system name")
-    duration_ms: Optional[int] = Field(
-        default=None, description="Operation duration in milliseconds"
-    )
+    error_message: str | None = Field(default=None, description="Human-readable error description")
+    provider: str | None = Field(default=None, description="External system name")
+    duration_ms: int | None = Field(default=None, description="Operation duration in milliseconds")
 
     model_config = ConfigDict(
         extra="allow",  # Allow audit_meta_* fields to be added dynamically
@@ -105,7 +96,7 @@ class AuditEvent(BaseModel):
         },
     )
 
-    def to_sentinel_payload(self) -> Dict[str, Any]:
+    def to_sentinel_payload(self) -> dict[str, Any]:
         """Convert to flat dict suitable for SIEM ingestion.
 
         Returns:
@@ -122,14 +113,14 @@ class AuditEvent(BaseModel):
         action: str,
         user_email: str,
         result: str,
-        resource_type: Optional[str] = None,
-        resource_id: Optional[str] = None,
-        error_type: Optional[str] = None,
-        error_message: Optional[str] = None,
-        provider: Optional[str] = None,
-        duration_ms: Optional[int] = None,
-        metadata: Optional[Dict[str, Any]] = None,
-    ) -> "AuditEvent":
+        resource_type: str | None = None,
+        resource_id: str | None = None,
+        error_type: str | None = None,
+        error_message: str | None = None,
+        provider: str | None = None,
+        duration_ms: int | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> AuditEvent:
         """Construct an AuditEvent from primitive operation metadata.
 
         Flattens the optional ``metadata`` dict into top-level fields with the
@@ -163,7 +154,7 @@ class AuditEvent(BaseModel):
         if result not in ("success", "failure"):
             raise ValueError(f"result must be 'success' or 'failure', got: {result}")
 
-        event_data: Dict[str, Any] = {
+        event_data: dict[str, Any] = {
             "correlation_id": correlation_id,
             "action": action,
             "user_email": user_email,
@@ -186,8 +177,6 @@ class AuditEvent(BaseModel):
         # Flatten metadata with 'audit_meta_' prefix for SIEM queryability
         if metadata:
             for key, value in metadata.items():
-                event_data[f"audit_meta_{key}"] = (
-                    str(value) if value is not None else None
-                )
+                event_data[f"audit_meta_{key}"] = str(value) if value is not None else None
 
         return cls(**event_data)

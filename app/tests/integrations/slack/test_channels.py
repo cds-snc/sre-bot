@@ -1,5 +1,5 @@
 from datetime import timedelta
-from unittest.mock import MagicMock, patch, ANY
+from unittest.mock import ANY, MagicMock, patch
 
 from integrations.slack import channels
 
@@ -137,26 +137,20 @@ def test_get_stale_channels_without_pattern_calls_get_channels_with_client_only(
         {"id": "id", "name": "incident-2022-channel", "created": 0},
     ]
     get_messages_in_time_period_mock.return_value = []
-    assert channels.get_stale_channels(client) == [
-        {"id": "id", "name": "incident-2022-channel", "created": 0}
-    ]
+    assert channels.get_stale_channels(client) == [{"id": "id", "name": "incident-2022-channel", "created": 0}]
     get_channels_mock.assert_called_once_with(client, pattern=None)
 
 
 @patch("integrations.slack.channels.get_channels")
 @patch("integrations.slack.channels.get_messages_in_time_period")
-def test_get_stale_channels_with_pattern_calls_get_channels_with_pattern(
-    get_messages_in_time_period_mock, get_channels_mock
-):
+def test_get_stale_channels_with_pattern_calls_get_channels_with_pattern(get_messages_in_time_period_mock, get_channels_mock):
     client = MagicMock()
     pattern = r"^incident-\d{4}-"
     get_channels_mock.return_value = [
         {"id": "id", "name": "incident-2022-channel", "created": 0},
     ]
     get_messages_in_time_period_mock.return_value = []
-    assert channels.get_stale_channels(client, pattern) == [
-        {"id": "id", "name": "incident-2022-channel", "created": 0}
-    ]
+    assert channels.get_stale_channels(client, pattern) == [{"id": "id", "name": "incident-2022-channel", "created": 0}]
     get_channels_mock.assert_called_once_with(client, pattern=pattern)
 
 
@@ -174,34 +168,25 @@ def test_get_messages_in_time_period():
             },
         ],
     }
-    assert channels.get_messages_in_time_period(
-        client, "channel_id", timedelta(days=1)
-    ) == [
+    assert channels.get_messages_in_time_period(client, "channel_id", timedelta(days=1)) == [
         {
             "message": "message",
             "team": "team",
         }
     ]
     client.conversations_join.assert_called_with(channel="channel_id")
-    client.conversations_history.assert_called_with(
-        channel="channel_id", oldest=ANY, limit=10
-    )
+    client.conversations_history.assert_called_with(channel="channel_id", oldest=ANY, limit=10)
 
 
 def test_get_messages_in_time_period_with_error():
     client = MagicMock()
     client.conversations_history.return_value = {"ok": False}
-    assert (
-        channels.get_messages_in_time_period(client, "channel_id", timedelta(days=1))
-        == []
-    )
+    assert channels.get_messages_in_time_period(client, "channel_id", timedelta(days=1)) == []
 
 
 def test_fetch_user_details():
     client_mock = MagicMock()
-    client_mock.conversations_members.return_value = {
-        "members": ["U123", "U456", "U789"]
-    }
+    client_mock.conversations_members.return_value = {"members": ["U123", "U456", "U789"]}
     client_mock.users_info.side_effect = [
         {"user": {"real_name": "Alice", "id": "U123"}},
         {"user": {"real_name": "SRE", "id": "U456"}},

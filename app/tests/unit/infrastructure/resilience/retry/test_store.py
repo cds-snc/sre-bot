@@ -2,7 +2,7 @@
 
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from infrastructure.resilience.retry import (
     InMemoryRetryStore,
@@ -32,16 +32,14 @@ class TestInMemoryRetryStore:
 
         assert int(id2) == int(id1) + 1
 
-    def test_save_record_initializes_timestamps(
-        self, retry_store, retry_record_factory
-    ):
+    def test_save_record_initializes_timestamps(self, retry_store, retry_record_factory):
         """Test that save initializes timestamps."""
         record = retry_record_factory()
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
 
         retry_store.save(record)
 
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
         assert before <= record.created_at <= after
         assert before <= record.updated_at <= after
         assert record.next_retry_at is not None
@@ -51,9 +49,7 @@ class TestInMemoryRetryStore:
         due_records = retry_store.fetch_due()
         assert due_records == []
 
-    def test_fetch_due_returns_immediately_due_records(
-        self, retry_store, retry_record_factory
-    ):
+    def test_fetch_due_returns_immediately_due_records(self, retry_store, retry_record_factory):
         """Test fetch_due returns records that are immediately due."""
         record = retry_record_factory()
         retry_store.save(record)
@@ -73,9 +69,7 @@ class TestInMemoryRetryStore:
 
         assert len(due_records) == 3
 
-    def test_fetch_due_excludes_claimed_records(
-        self, retry_store, retry_record_factory
-    ):
+    def test_fetch_due_excludes_claimed_records(self, retry_store, retry_record_factory):
         """Test fetch_due excludes currently claimed records."""
         record = retry_record_factory()
         record_id = retry_store.save(record)
@@ -102,9 +96,7 @@ class TestInMemoryRetryStore:
         due_records = retry_store.fetch_due()
         assert len(due_records) == 1
 
-    def test_fetch_due_excludes_future_retry_times(
-        self, retry_config_factory, retry_record_factory
-    ):
+    def test_fetch_due_excludes_future_retry_times(self, retry_config_factory, retry_record_factory):
         """Test fetch_due excludes records not yet due for retry."""
         config = retry_config_factory(base_delay_seconds=10)
         store = InMemoryRetryStore(config)
@@ -119,9 +111,7 @@ class TestInMemoryRetryStore:
         due_records = store.fetch_due()
         assert len(due_records) == 0
 
-    def test_claim_record_succeeds_for_available_record(
-        self, retry_store, retry_record_factory
-    ):
+    def test_claim_record_succeeds_for_available_record(self, retry_store, retry_record_factory):
         """Test claiming an available record succeeds."""
         record = retry_record_factory()
         record_id = retry_store.save(record)
@@ -130,9 +120,7 @@ class TestInMemoryRetryStore:
 
         assert claimed is True
 
-    def test_claim_record_fails_for_already_claimed(
-        self, retry_store, retry_record_factory
-    ):
+    def test_claim_record_fails_for_already_claimed(self, retry_store, retry_record_factory):
         """Test claiming an already claimed record fails."""
         record = retry_record_factory()
         record_id = retry_store.save(record)
@@ -149,9 +137,7 @@ class TestInMemoryRetryStore:
         claimed = retry_store.claim_record("nonexistent", "worker-1", 300)
         assert claimed is False
 
-    def test_claim_record_succeeds_after_claim_expires(
-        self, retry_store, retry_record_factory
-    ):
+    def test_claim_record_succeeds_after_claim_expires(self, retry_store, retry_record_factory):
         """Test claiming succeeds after previous claim expires."""
         record = retry_record_factory()
         record_id = retry_store.save(record)
@@ -187,9 +173,7 @@ class TestInMemoryRetryStore:
         stats = retry_store.get_stats()
         assert stats["claimed_records"] == 0
 
-    def test_mark_permanent_failure_moves_to_dlq(
-        self, retry_store, retry_record_factory
-    ):
+    def test_mark_permanent_failure_moves_to_dlq(self, retry_store, retry_record_factory):
         """Test mark_permanent_failure moves record to DLQ."""
         record = retry_record_factory()
         record_id = retry_store.save(record)
@@ -204,9 +188,7 @@ class TestInMemoryRetryStore:
         assert len(dlq_entries) == 1
         assert dlq_entries[0].last_error == "Permanent error"
 
-    def test_increment_attempt_increases_counter(
-        self, retry_store, retry_record_factory
-    ):
+    def test_increment_attempt_increases_counter(self, retry_store, retry_record_factory):
         """Test increment_attempt increases attempt counter."""
         record = retry_record_factory()
         record_id = retry_store.save(record)
@@ -219,9 +201,7 @@ class TestInMemoryRetryStore:
         stats = retry_store.get_stats()
         assert stats["active_records"] == 1
 
-    def test_increment_attempt_moves_to_dlq_at_max(
-        self, retry_config_factory, retry_record_factory
-    ):
+    def test_increment_attempt_moves_to_dlq_at_max(self, retry_config_factory, retry_record_factory):
         """Test increment_attempt moves to DLQ at max attempts."""
         config = retry_config_factory(max_attempts=3)
         store = InMemoryRetryStore(config)
@@ -231,7 +211,7 @@ class TestInMemoryRetryStore:
 
         # Increment to max attempts
         for i in range(3):
-            store.increment_attempt(record_id, f"Error {i+1}")
+            store.increment_attempt(record_id, f"Error {i + 1}")
 
         stats = store.get_stats()
         assert stats["active_records"] == 0
@@ -248,9 +228,7 @@ class TestInMemoryRetryStore:
         stats = retry_store.get_stats()
         assert stats["claimed_records"] == 0
 
-    def test_calculate_retry_delay_exponential_backoff(
-        self, retry_config_factory, retry_record_factory
-    ):
+    def test_calculate_retry_delay_exponential_backoff(self, retry_config_factory, retry_record_factory):
         """Test that retry delay uses exponential backoff."""
         config = retry_config_factory(base_delay_seconds=10, max_delay_seconds=1000)
         store = InMemoryRetryStore(config)
@@ -261,9 +239,7 @@ class TestInMemoryRetryStore:
         assert store._calculate_retry_delay(2) == 40  # 10 * 2^2
         assert store._calculate_retry_delay(3) == 80  # 10 * 2^3
 
-    def test_calculate_retry_delay_respects_max(
-        self, retry_config_factory, retry_record_factory
-    ):
+    def test_calculate_retry_delay_respects_max(self, retry_config_factory, retry_record_factory):
         """Test that retry delay respects max_delay_seconds."""
         config = retry_config_factory(base_delay_seconds=100, max_delay_seconds=500)
         store = InMemoryRetryStore(config)

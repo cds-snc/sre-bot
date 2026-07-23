@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock
+
 from modules.webhooks.patterns.aws_sns_notification import auto_mitigation
 
 
@@ -21,9 +22,7 @@ def test_auto_mitigation_handler_extracts_security_group():
     client = MagicMock()
     payload = mock_auto_mitigation()
     blocks = auto_mitigation.handle_auto_mitigation(payload, client)
-    assert any(
-        "sg-09d2738530b93476d" in b["text"]["text"] for b in blocks if "text" in b
-    )
+    assert any("sg-09d2738530b93476d" in b["text"]["text"] for b in blocks if "text" in b)
 
 
 def test_auto_mitigation_handler_extracts_account():
@@ -44,9 +43,7 @@ def test_auto_mitigation_handler_extracts_user():
     client = MagicMock()
     payload = mock_auto_mitigation()
     blocks = auto_mitigation.handle_auto_mitigation(payload, client)
-    assert any(
-        "test_user@cds-snc.ca" in b["text"]["text"] for b in blocks if "text" in b
-    )
+    assert any("test_user@cds-snc.ca" in b["text"]["text"] for b in blocks if "text" in b)
 
 
 def test_auto_mitigation_matcher():

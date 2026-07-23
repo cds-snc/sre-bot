@@ -1,11 +1,12 @@
+from datetime import datetime
+
 import structlog
 
-from datetime import datetime
+from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
+from integrations.slack import users as slack_users
 from modules.aws import identity_center, ops_group_assignment
 from modules.permissions import handler as permissions
 from modules.provisioning import groups as provisioning_groups
-from integrations.slack import users as slack_users
-from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
 
 logger = structlog.get_logger()
 
@@ -55,14 +56,12 @@ def request_groups_sync(client, body, respond, args):
     requestor_email = slack_users.get_user_email_from_body(client, body)
     log = logger.bind(requestor_email=requestor_email)
     log.info("aws_groups_sync_request_received")
-    if permissions.is_user_member_of_groups(
-        requestor_email, aws_feature_settings.AWS_ADMIN_GROUPS
-    ):
+    if permissions.is_user_member_of_groups(requestor_email, aws_feature_settings.AWS_ADMIN_GROUPS):
         pre_processing_filters = (
             [
-                lambda group, arg=arg: arg.lower()
-                in group.get("DisplayName", "").lower()
-                or arg.lower() in group.get("name", "").lower()
+                lambda group, arg=arg: (
+                    arg.lower() in group.get("DisplayName", "").lower() or arg.lower() in group.get("name", "").lower()
+                )
                 for arg in args
             ]
             if args
@@ -83,9 +82,7 @@ def request_groups_sync(client, body, respond, args):
         )
         end_time = datetime.now()
         time = end_time - start_time
-        respond(
-            f"AWS Groups Memberships Synchronization Completed in {time.total_seconds():.6f} seconds."
-        )
+        respond(f"AWS Groups Memberships Synchronization Completed in {time.total_seconds():.6f} seconds.")
     else:
         log.warning(
             "aws_groups_sync_request_denied",
@@ -103,16 +100,12 @@ def request_groups_list(client, body, respond, args):
     log.info(
         "aws_groups_list_request_received",
     )
-    if permissions.is_user_member_of_groups(
-        requestor_email, aws_feature_settings.AWS_ADMIN_GROUPS
-    ):
+    if permissions.is_user_member_of_groups(requestor_email, aws_feature_settings.AWS_ADMIN_GROUPS):
         respond("AWS Groups List request received.")
         log.info(
             "aws_groups_list_request_processing",
         )
-        response = provisioning_groups.get_groups_from_integration(
-            "aws_identity_center"
-        )
+        response = provisioning_groups.get_groups_from_integration("aws_identity_center")
         response.sort(key=lambda x: x["DisplayName"])
         formatted_string = "Groups found:\n"
         for group in response:
@@ -138,9 +131,7 @@ def request_groups_ops(client, body, respond, args):
     log.info(
         "aws_ops_group_assignment_received",
     )
-    if permissions.is_user_member_of_groups(
-        requestor_email, aws_feature_settings.AWS_ADMIN_GROUPS
-    ):
+    if permissions.is_user_member_of_groups(requestor_email, aws_feature_settings.AWS_ADMIN_GROUPS):
         respond("AWS Ops Group Assignment request received.")
         log.info(
             "aws_ops_group_assignment_processing",

@@ -12,7 +12,7 @@ of IDP groups is handled by ``discover_group_slugs`` which queries the
 directory with the platform prefix and returns matching slugs.
 """
 
-from typing import Dict, List, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import structlog
 
@@ -38,7 +38,7 @@ class DirectoryMembershipBuilder:
     failures through the standard result contract without catching exceptions.
     """
 
-    def __init__(self, directory: "DirectoryProvider") -> None:
+    def __init__(self, directory: DirectoryProvider) -> None:
         self._directory = directory
 
     def build_user_state_from_effective(
@@ -64,9 +64,7 @@ class DirectoryMembershipBuilder:
         before calling this method.
         """
         log = logger.bind(user_email=user_email, platform=effective.platform)
-        authn_result = self._check_group_membership(
-            effective.authn_group_slug, user_email
-        )
+        authn_result = self._check_group_membership(effective.authn_group_slug, user_email)
         log.debug(
             "check_authn_group_membership_completed",
             authn_group_slug=effective.authn_group_slug,
@@ -82,7 +80,7 @@ class DirectoryMembershipBuilder:
 
         user_should_exist: bool = authn_result.data or False
 
-        required_entitlements: List[EntitlementRule] = []
+        required_entitlements: list[EntitlementRule] = []
         if user_should_exist:
             user_groups_result = self._directory.get_user_groups(user_email)
             if not user_groups_result.is_success:
@@ -92,28 +90,20 @@ class DirectoryMembershipBuilder:
                     error_code=user_groups_result.error_code,
                 )
 
-            user_group_slugs: Set[str] = {
-                group.group_slug.lower()
-                for group in (user_groups_result.data or [])
-                if group.group_slug
+            user_group_slugs: set[str] = {
+                group.group_slug.lower() for group in (user_groups_result.data or []) if group.group_slug
             }
 
             required_entitlements = [
-                rule
-                for rule in effective.sync_managed_rules()
-                if rule.group_slug.lower() in user_group_slugs
+                rule for rule in effective.sync_managed_rules() if rule.group_slug.lower() in user_group_slugs
             ]
 
         logger.bind(user_email=user_email, platform=effective.platform).info(
             "build_user_state_completed",
             user_should_exist=user_should_exist,
             required_entitlement_count=len(required_entitlements),
-            required_entitlement_group_slugs=[
-                rule.group_slug for rule in required_entitlements
-            ],
-            required_entitlement_ids=[
-                rule.entitlement_id for rule in required_entitlements
-            ],
+            required_entitlement_group_slugs=[rule.group_slug for rule in required_entitlements],
+            required_entitlement_ids=[rule.entitlement_id for rule in required_entitlements],
         )
         return OperationResult.success(
             data=DesiredUserState(
@@ -149,12 +139,10 @@ class DirectoryMembershipBuilder:
                 error_code=authn_members_result.error_code,
             )
 
-        desired_users: Set[str] = {
-            member.email.lower() for member in (authn_members_result.data or [])
-        }
+        desired_users: set[str] = {member.email.lower() for member in (authn_members_result.data or [])}
         log.info("build_desired_state_authn_members", count=len(desired_users))
 
-        email_to_rule: Dict[str, EntitlementRule] = {}
+        email_to_rule: dict[str, EntitlementRule] = {}
         for rule in effective.sync_managed_rules():
             group_result = self._directory.get_group(rule.group_slug)
             if not group_result.is_success or not group_result.data:
@@ -165,11 +153,8 @@ class DirectoryMembershipBuilder:
                 continue
             email_to_rule[group_result.data.group_email] = rule
 
-        desired_members_by_entitlement: Dict[str, Set[str]] = {}
-        entitlement_slug_by_id: Dict[str, str] = {
-            rule.entitlement_id: rule.group_slug
-            for rule in effective.sync_managed_rules()
-        }
+        desired_members_by_entitlement: dict[str, set[str]] = {}
+        entitlement_slug_by_id: dict[str, str] = {rule.entitlement_id: rule.group_slug for rule in effective.sync_managed_rules()}
 
         if email_to_rule:
             batch_result = self._directory.get_group_members_batch(
@@ -186,12 +171,8 @@ class DirectoryMembershipBuilder:
                     matched_rule = email_to_rule.get(group_email)
                     if matched_rule is None:
                         continue
-                    desired_members_by_entitlement.setdefault(
-                        matched_rule.entitlement_id, set()
-                    ).update(
-                        member.email.lower()
-                        for member in members
-                        if member.email.lower() in desired_users
+                    desired_members_by_entitlement.setdefault(matched_rule.entitlement_id, set()).update(
+                        member.email.lower() for member in members if member.email.lower() in desired_users
                     )
 
         return OperationResult.success(
@@ -204,9 +185,9 @@ class DirectoryMembershipBuilder:
 
     def discover_group_slugs(
         self,
-        config: "AccessRuntimeConfig",
+        config: AccessRuntimeConfig,
         platform: str,
-    ) -> Set[str]:
+    ) -> set[str]:
         """Discover IDP group slugs for a platform by querying with the platform prefix.
 
         Uses ``config.group_prefix(platform)`` as the query and filters results

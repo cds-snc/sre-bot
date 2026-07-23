@@ -1,7 +1,7 @@
 """Unit tests for DynamoDB retry store using standardized dynamodb_next utilities."""
 
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
@@ -16,9 +16,7 @@ class TestDynamoDBRetryStoreInitialization:
         assert dynamodb_retry_store.ttl_days == 30
         assert dynamodb_retry_store.config.max_attempts == 5
 
-    def test_init_with_custom_ttl(
-        self, retry_config_factory, mock_dynamodb_next, monkeypatch
-    ):
+    def test_init_with_custom_ttl(self, retry_config_factory, mock_dynamodb_next, monkeypatch):
         """Test store initialization with custom TTL."""
         monkeypatch.setattr(
             "infrastructure.resilience.retry.dynamodb_store.dynamodb_next",
@@ -53,9 +51,7 @@ class TestDynamoDBRetryStoreSave:
         """Test that save calls DynamoDB put_item."""
         mock_next = dynamodb_retry_store._mock_dynamodb_next
 
-        record = retry_record_factory(
-            operation_type="test.op", payload={"key": "value"}
-        )
+        record = retry_record_factory(operation_type="test.op", payload={"key": "value"})
         dynamodb_retry_store.save(record)
 
         mock_next.put_item.assert_called_once()
@@ -69,10 +65,10 @@ class TestDynamoDBRetryStoreSave:
 
     def test_save_sets_timestamps(self, retry_record_factory, dynamodb_retry_store):
         """Test that save sets timestamps on the record."""
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
         record = retry_record_factory()
         dynamodb_retry_store.save(record)
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
 
         assert before <= record.created_at <= after
         assert before <= record.updated_at <= after
@@ -91,10 +87,7 @@ class TestDynamoDBRetryStoreFetchDue:
         mock_next.query.assert_called_once()
         call_args = mock_next.query.call_args
         assert call_args[1]["IndexName"] == "status-next_retry_at-index"
-        assert (
-            call_args[1]["KeyConditionExpression"]
-            == "#status = :status AND next_retry_at <= :now"
-        )
+        assert call_args[1]["KeyConditionExpression"] == "#status = :status AND next_retry_at <= :now"
 
     def test_fetch_due_returns_records(self, dynamodb_retry_store):
         """Test that fetch_due returns RetryRecord instances."""
@@ -109,8 +102,8 @@ class TestDynamoDBRetryStoreFetchDue:
                         "operation_type": {"S": "test.op"},
                         "payload": {"S": '{"key": "value"}'},
                         "attempts": {"N": "0"},
-                        "created_at": {"S": datetime.now(timezone.utc).isoformat()},
-                        "updated_at": {"S": datetime.now(timezone.utc).isoformat()},
+                        "created_at": {"S": datetime.now(UTC).isoformat()},
+                        "updated_at": {"S": datetime.now(UTC).isoformat()},
                         "next_retry_at": {"N": str(now - 100)},
                         "status": {"S": "ACTIVE"},
                     }
@@ -137,8 +130,8 @@ class TestDynamoDBRetryStoreFetchDue:
                         "operation_type": {"S": "test.op"},
                         "payload": {"S": "{}"},
                         "attempts": {"N": "0"},
-                        "created_at": {"S": datetime.now(timezone.utc).isoformat()},
-                        "updated_at": {"S": datetime.now(timezone.utc).isoformat()},
+                        "created_at": {"S": datetime.now(UTC).isoformat()},
+                        "updated_at": {"S": datetime.now(UTC).isoformat()},
                         "next_retry_at": {"N": str(now - 100)},
                         "status": {"S": "ACTIVE"},
                         "claim_worker": {"S": "worker-1"},
@@ -179,9 +172,7 @@ class TestDynamoDBRetryStoreClaimRecord:
 
         call_args = dynamodb_retry_store._mock_dynamodb_next.update_item.call_args
         assert "ConditionExpression" in call_args[1]
-        assert (
-            "attribute_not_exists(claim_worker)" in call_args[1]["ConditionExpression"]
-        )
+        assert "attribute_not_exists(claim_worker)" in call_args[1]["ConditionExpression"]
 
     def test_claim_record_fails_on_condition_check(self, dynamodb_retry_store):
         """Test claim failure when condition check fails."""
@@ -333,7 +324,7 @@ class TestDynamoDBRetryStoreGetDlqEntries:
         """Test that get_dlq_entries queries DLQ status."""
         mock_next = dynamodb_retry_store._mock_dynamodb_next
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         mock_next.query.return_value = OperationResult.success(
             data={
                 "Items": [

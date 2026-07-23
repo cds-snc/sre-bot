@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from integrations.slack.provider import SlackPlatformProvider
 from integrations.slack.formatter import SlackBlockKitFormatter
+from integrations.slack.provider import SlackPlatformProvider
 from modules.sre.platforms import slack as sre_slack
 
 

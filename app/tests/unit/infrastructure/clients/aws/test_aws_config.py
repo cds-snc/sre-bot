@@ -21,9 +21,7 @@ def test_describe_aggregate_compliance_calls_execute(monkeypatch, session_provid
         called["method"] = method
         return []
 
-    monkeypatch.setattr(
-        "infrastructure.clients.aws.executor.execute_aws_api_call", fake_execute
-    )
+    monkeypatch.setattr("infrastructure.clients.aws.executor.execute_aws_api_call", fake_execute)
 
     result = client.describe_aggregate_compliance_by_config_rules("agg", {})
     assert result is not None

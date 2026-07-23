@@ -4,7 +4,6 @@ Tests the model parameter extraction, validation, and best-model selection logic
 without external dependencies.
 """
 
-from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -32,31 +31,31 @@ class MockModelA(BaseModel):
     """Test model with required and optional fields."""
 
     field1: str
-    field2: Optional[int] = None
+    field2: int | None = None
 
 
 class MockModelB(BaseModel):
     """Test model with different optional fields."""
 
     field3: float
-    field4: Optional[str] = None
+    field4: str | None = None
 
 
 class MockModelC(BaseModel):
     """Test model with optional boolean field."""
 
     field1: str
-    field5: Optional[bool] = None
+    field5: bool | None = None
 
 
 class MockModelD(BaseModel):
     """Test model with all optional fields."""
 
-    field1: Optional[str] = None
-    field2: Optional[int] = None
-    field3: Optional[float] = None
-    field4: Optional[str] = None
-    field5: Optional[bool] = None
+    field1: str | None = None
+    field2: int | None = None
+    field3: float | None = None
+    field4: str | None = None
+    field5: bool | None = None
 
 
 # Fixtures

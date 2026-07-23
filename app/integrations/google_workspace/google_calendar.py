@@ -1,6 +1,7 @@
-from datetime import datetime, timedelta, timezone
-import requests
+from datetime import UTC, datetime, timedelta
+
 import pytz
+import requests
 import structlog
 
 from integrations.google_workspace import google_service
@@ -30,9 +31,7 @@ def get_freebusy(time_min, time_max, items, body_kwargs=None, **kwargs):
         "items": items,
     }
     if body_kwargs is not None and isinstance(body_kwargs, dict):
-        body.update(
-            {convert_string_to_camel_case(k): v for k, v in body_kwargs.items()}
-        )
+        body.update({convert_string_to_camel_case(k): v for k, v in body_kwargs.items()})
 
     return google_service.execute_google_api_call(
         "calendar",
@@ -104,14 +103,10 @@ def insert_event(
     else:
         # Optionally handle the case where 'incident_document' is None or empty
         # For example, remove 'attachments' from 'body' if it shouldn't exist without a valid document
-        body.pop(
-            "attachments", None
-        )  # This removes 'attachments' if it exists, does nothing if it doesn't
+        body.pop("attachments", None)  # This removes 'attachments' if it exists, does nothing if it doesn't
 
     if body_kwargs is not None and isinstance(body_kwargs, dict):
-        body.update(
-            {convert_string_to_camel_case(k): v for k, v in body_kwargs.items()}
-        )
+        body.update({convert_string_to_camel_case(k): v for k, v in body_kwargs.items()})
 
     result = google_service.execute_google_api_call(
         "calendar",
@@ -142,16 +137,14 @@ def insert_event(
     event_info = f"Retro has been scheduled for {formatted_datetime} EDT. Check your calendar for more details."
 
     # Create a dictionary to return the event link and the event info
-    result = dict(event_link=htmllink, event_info=event_info)
+    result = {"event_link": htmllink, "event_info": event_info}
 
     return result
 
 
 # Function to use the freebusy response to find the first available spot in the next 60 days. We look for a 30 minute windows, 3
 # days in the future, ignoring weekends
-def find_first_available_slot(
-    freebusy_response, days_in_future, duration_minutes=30, search_days_limit=60
-):
+def find_first_available_slot(freebusy_response, days_in_future, duration_minutes=30, search_days_limit=60):
     # EST timezone
     est = pytz.timezone("US/Eastern")
 
@@ -179,28 +172,19 @@ def find_first_available_slot(
         if search_date.weekday() in [5, 6]:
             continue
 
-        search_start = search_date.replace(
-            hour=starting_hour, minute=0, second=0, microsecond=0
-        )  # 1 PM EST, times are in UTC
-        search_end = search_date.replace(
-            hour=ending_hour, minute=0, second=0, microsecond=0
-        )  # 3 PM EST, times are in UTC
+        search_start = search_date.replace(hour=starting_hour, minute=0, second=0, microsecond=0)  # 1 PM EST, times are in UTC
+        search_end = search_date.replace(hour=ending_hour, minute=0, second=0, microsecond=0)  # 3 PM EST, times are in UTC
 
         # if the day is a federal holiday, skip it
         if search_date.date().strftime("%Y-%m-%d") in federal_holidays:
             continue
 
         # Attempt to find an available slot within this day's search window
-        for current_time in (
-            search_start + timedelta(minutes=i) for i in range(0, 121, duration_minutes)
-        ):
+        for current_time in (search_start + timedelta(minutes=i) for i in range(0, 121, duration_minutes)):
             slot_end = current_time + timedelta(minutes=duration_minutes)
-            if all(
-                slot_end <= start or current_time >= end for start, end in busy_times
-            ):
-                if slot_end <= search_end:
-                    # return the time and convert them to EST timezone
-                    return current_time.astimezone(est), slot_end.astimezone(est)
+            if all(slot_end <= start or current_time >= end for start, end in busy_times) and slot_end <= search_end:
+                # return the time and convert them to EST timezone
+                return current_time.astimezone(est), slot_end.astimezone(est)
 
     return None, None  # No available slot found after searching the limit
 
@@ -250,9 +234,7 @@ def get_utc_hour(hour, minute, tz_name, date=None):
         date = datetime.utcnow()
 
     # Create a datetime object for the given time in the local timezone
-    local_time = local_tz.localize(
-        datetime(date.year, date.month, date.day, hour, minute)
-    )
+    local_time = local_tz.localize(datetime(date.year, date.month, date.day, hour, minute))
 
     # Convert to UTC
     utc_time = local_time.astimezone(pytz.utc)
@@ -276,8 +258,8 @@ def identify_unavailable_users(freebusy_response, time_min: str, time_max: str):
     unavailable_user_emails = []
 
     # Convert time_min and time_max to datetime objects
-    start_dt = datetime.fromisoformat(time_min[:-1]).replace(tzinfo=timezone.utc)
-    end_dt = datetime.fromisoformat(time_max[:-1]).replace(tzinfo=timezone.utc)
+    start_dt = datetime.fromisoformat(time_min[:-1]).replace(tzinfo=UTC)
+    end_dt = datetime.fromisoformat(time_max[:-1]).replace(tzinfo=UTC)
 
     # Check each calendar
     for email, calendar_data in freebusy_response["calendars"].items():
@@ -288,12 +270,8 @@ def identify_unavailable_users(freebusy_response, time_min: str, time_max: str):
         busy_periods = calendar_data["busy"]
 
         if len(busy_periods) == 1:
-            busy_start = datetime.fromisoformat(busy_periods[0]["start"][:-1]).replace(
-                tzinfo=timezone.utc
-            )
-            busy_end = datetime.fromisoformat(busy_periods[0]["end"][:-1]).replace(
-                tzinfo=timezone.utc
-            )
+            busy_start = datetime.fromisoformat(busy_periods[0]["start"][:-1]).replace(tzinfo=UTC)
+            busy_end = datetime.fromisoformat(busy_periods[0]["end"][:-1]).replace(tzinfo=UTC)
 
             # Calculate how close the busy period is to the search period boundaries
             start_diff = abs((busy_start - start_dt).total_seconds())

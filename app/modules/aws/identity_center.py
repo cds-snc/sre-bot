@@ -3,7 +3,7 @@
 import structlog
 
 from integrations.aws import identity_store
-from modules.provisioning import groups, entities, users
+from modules.provisioning import entities, groups, users
 from utils import filters
 
 logger = structlog.get_logger()
@@ -17,7 +17,7 @@ def synchronize(
     enable_membership_create: bool = True,
     enable_membership_delete: bool = False,
     query: str = "email:aws-*",
-    pre_processing_filters: list = [],
+    pre_processing_filters: list | None = None,
 ):
     """Sync the AWS Identity Center with the Google Workspace.
 
@@ -43,6 +43,8 @@ def synchronize(
         enable_membership_delete=enable_membership_delete,
         query=query,
     )
+    if pre_processing_filters is None:
+        pre_processing_filters = []
     log.info(
         "synchronize_task_requested",
         pre_processing_filters_count=len(pre_processing_filters),
@@ -64,9 +66,7 @@ def synchronize(
         users_count=len(source_users),
         source="google_groups",
     )
-    target_groups = groups.get_groups_from_integration(
-        "aws_identity_center", pre_processing_filters=pre_processing_filters
-    )
+    target_groups = groups.get_groups_from_integration("aws_identity_center", pre_processing_filters=pre_processing_filters)
     target_users = identity_store.list_users()
     log.info(
         "target_groups_users_fetched",
@@ -75,9 +75,7 @@ def synchronize(
         source="aws_identity_center",
     )
     if enable_users_sync:
-        users_sync_status = sync_users(
-            source_users, target_users, enable_user_create, enable_user_delete
-        )
+        users_sync_status = sync_users(source_users, target_users, enable_user_create, enable_user_delete)
         target_users = identity_store.list_users()
 
     if enable_groups_sync:
@@ -215,9 +213,7 @@ def sync_groups(
     logger.info(
         "synchronize_groups_comparison_started",
     )
-    source_groups = filters.preformat_items(
-        source_groups, "name", "DisplayName", pattern=r"^AWS-", replace=""
-    )
+    source_groups = filters.preformat_items(source_groups, "name", "DisplayName", pattern=r"^AWS-", replace="")
     source_groups_to_sync, target_groups_to_sync = filters.compare_lists(
         {"values": source_groups, "key": "DisplayName"},
         {"values": target_groups, "key": "DisplayName"},
@@ -315,9 +311,7 @@ def provision_aws_users(operation, users_emails):
 
     if operation == "create":
         source_users = users.get_users_from_integration("google_directory")
-        users_to_create = [
-            user for user in source_users if user["primaryEmail"] in users_emails
-        ]
+        users_to_create = [user for user in source_users if user["primaryEmail"] in users_emails]
         preformatting_keys = [
             ("primaryEmail", "email"),
             ("primaryEmail", "log_user_name"),
@@ -338,9 +332,7 @@ def provision_aws_users(operation, users_emails):
         )
     else:
         target_users = users.get_users_from_integration("aws_identity_center")
-        users_to_delete = [
-            user for user in target_users if user["UserName"] in users_emails
-        ]
+        users_to_delete = [user for user in target_users if user["UserName"] in users_emails]
         preformatting_keys = [
             ("UserId", "user_id"),
             ("UserName", "log_user_name"),

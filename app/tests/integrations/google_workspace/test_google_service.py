@@ -1,10 +1,12 @@
 """Unit Tests for the google_service module."""
 
-from unittest.mock import patch, MagicMock
 from json import JSONDecodeError
+from unittest.mock import MagicMock, patch
+
 import pytest
-from googleapiclient.errors import HttpError, Error  # type: ignore
 from google.auth.exceptions import RefreshError  # type: ignore
+from googleapiclient.errors import Error, HttpError  # type: ignore
+
 from integrations.google_workspace import google_service
 
 
@@ -19,9 +21,7 @@ def test_get_google_service_returns_build_object(mock_service_account, build_moc
     """
     Test case to verify that the function returns a build object.
     """
-    mock_service_account.Credentials.from_service_account_info.return_value = (
-        MagicMock()
-    )
+    mock_service_account.Credentials.from_service_account_info.return_value = MagicMock()
     google_service.get_google_service("drive", "v3")
     build_mock.assert_called_once_with(
         "drive",
@@ -38,21 +38,13 @@ def test_get_google_service_returns_build_object(mock_service_account, build_moc
     "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
     new="{}",
 )
-def test_get_google_service_with_delegated_user_email(
-    mock_service_account, _build_mock
-):
+def test_get_google_service_with_delegated_user_email(mock_service_account, _build_mock):
     """
     Test case to verify that the function works correctly with a delegated user email.
     """
-    mock_service_account.Credentials.from_service_account_info.return_value = (
-        MagicMock()
-    )
-    google_service.get_google_service(
-        "drive", "v3", delegated_user_email="test@test.com"
-    )
-    mock_service_account.Credentials.from_service_account_info.return_value.with_subject.assert_called_once_with(
-        "test@test.com"
-    )
+    mock_service_account.Credentials.from_service_account_info.return_value = MagicMock()
+    google_service.get_google_service("drive", "v3", delegated_user_email="test@test.com")
+    mock_service_account.Credentials.from_service_account_info.return_value.with_subject.assert_called_once_with("test@test.com")
 
 
 @patch("integrations.google_workspace.google_service.build")
@@ -66,9 +58,7 @@ def test_get_google_service_with_scopes(mock_service_account, _build_mock):
     """
     Test case to verify that the function works correctly with scopes.
     """
-    mock_service_account.Credentials.from_service_account_info.return_value = (
-        MagicMock()
-    )
+    mock_service_account.Credentials.from_service_account_info.return_value = MagicMock()
     google_service.get_google_service("drive", "v3", scopes=["scope1", "scope2"])
     mock_service_account.Credentials.from_service_account_info.return_value.with_scopes.assert_called_once_with(
         ["scope1", "scope2"]
@@ -106,9 +96,7 @@ def test_get_google_service_raises_exception_if_credentials_json_is_invalid(
     with pytest.raises(JSONDecodeError) as e:
         google_service.get_google_service("drive", "v3")
     assert "Invalid credentials JSON" in str(e.value)
-    mocked_logger.error.assert_called_once_with(
-        "invalid_credentials_json", error="Expecting value: line 1 column 1 (char 0)"
-    )
+    mocked_logger.error.assert_called_once_with("invalid_credentials_json", error="Expecting value: line 1 column 1 (char 0)")
 
 
 @patch("integrations.google_workspace.google_service.logger")
@@ -265,12 +253,8 @@ def test_handle_google_api_errors_processes_unsupported_params(
 @patch("integrations.google_workspace.google_service.get_google_service")
 @patch.object(google_service.settings, "SRE_BOT_EMAIL", new="sre_bot_email")
 def test_execute_google_api_call_calls_get_google_service(mock_get_google_service):
-    google_service.execute_google_api_call(
-        "service_name", "version", "resource", "method"
-    )
-    mock_get_google_service.assert_called_once_with(
-        "service_name", "version", None, "sre_bot_email"
-    )
+    google_service.execute_google_api_call("service_name", "version", "resource", "method")
+    mock_get_google_service.assert_called_once_with("service_name", "version", None, "sre_bot_email")
 
 
 @patch("integrations.google_workspace.google_service.get_google_service")
@@ -304,9 +288,7 @@ def test_execute_google_api_call_calls_getattr_with_service_and_resource(
     mock_service = MagicMock()
     mock_get_google_service.return_value = mock_service
 
-    google_service.execute_google_api_call(
-        "service_name", "version", "resource", "method"
-    )
+    google_service.execute_google_api_call("service_name", "version", "resource", "method")
 
     mock_service.resource.assert_called_once()
 
@@ -335,9 +317,7 @@ def test_execute_google_api_call_when_paginate_is_false(
     # Set up the MagicMock for method
     mock_resource.method.return_value = mock_request
 
-    result = google_service.execute_google_api_call(
-        "service_name", "version", "resource", "method", arg1="value1"
-    )
+    result = google_service.execute_google_api_call("service_name", "version", "resource", "method", arg1="value1")
 
     mock_resource.method.assert_called_once_with(arg1="value1")
     assert result == ({"key": "value"}, set())
@@ -391,15 +371,11 @@ def test_execute_google_api_call_when_paginate_is_true(
 
     mock_method_next.side_effect = side_effect
 
-    result = google_service.execute_google_api_call(
-        "service_name", "version", "resource", "method", paginate=True, arg1="value1"
-    )
+    result = google_service.execute_google_api_call("service_name", "version", "resource", "method", paginate=True, arg1="value1")
 
     assert result == (["value1", "value2", "value3"], set())
     mock_resource.method.assert_called_once_with(arg1="value1")
-    mock_resource.method_next.assert_any_call(
-        mock_request1, {"resource": ["value1", "value2"], "nextPageToken": "token"}
-    )
+    mock_resource.method_next.assert_any_call(mock_request1, {"resource": ["value1", "value2"], "nextPageToken": "token"})
     assert mock_method_next.call_count == 2
 
 
@@ -429,9 +405,7 @@ def test_execute_google_api_call_with_nested_resource_path(
 
     mock_method.execute.return_value = "result"
 
-    result = google_service.execute_google_api_call(
-        "service_name", "version", "resource1.resource2", "method", arg1="value1"
-    )
+    result = google_service.execute_google_api_call("service_name", "version", "resource1.resource2", "method", arg1="value1")
 
     mock_resource2.method.assert_called_once_with(arg1="value1")
     assert result == ("result", set())
@@ -452,15 +426,11 @@ def test_execute_google_api_call_with_nested_resource_path_throws_error(
     mock_get_google_service.return_value = mock_service
 
     mock_resource1 = MagicMock()
-    mock_resource1.resource2.side_effect = AttributeError(
-        "resource2 cannot be accessed"
-    )
+    mock_resource1.resource2.side_effect = AttributeError("resource2 cannot be accessed")
     mock_service.resource1.return_value = mock_resource1
 
     with pytest.raises(AttributeError) as e:
-        google_service.execute_google_api_call(
-            "service_name", "version", "resource1.resource2", "method", arg1="value1"
-        )
+        google_service.execute_google_api_call("service_name", "version", "resource1.resource2", "method", arg1="value1")
 
     assert "Error accessing resource2 on resource object" in str(e.value)
 
@@ -489,14 +459,9 @@ def test_execute_google_api_call_with_generic_exception_throws_attribute_error(
     ]
 
     with pytest.raises(AttributeError) as e:
-        google_service.execute_google_api_call(
-            "service_name", "version", "resource", "method", arg1="value1"
-        )
+        google_service.execute_google_api_call("service_name", "version", "resource", "method", arg1="value1")
 
-    assert (
-        "Error executing API method method. Exception: method cannot be accessed"
-        in str(e.value)
-    )
+    assert "Error executing API method method. Exception: method cannot be accessed" in str(e.value)
 
 
 def test_get_google_api_command_parameters_returns_correct_parameters():

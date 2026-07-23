@@ -1,7 +1,8 @@
 """Fixtures for infrastructure.logging tests."""
 
-import pytest
 from unittest.mock import Mock
+
+import pytest
 
 from infrastructure.configuration.app import AppSettings
 

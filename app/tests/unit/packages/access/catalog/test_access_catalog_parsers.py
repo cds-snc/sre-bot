@@ -5,7 +5,6 @@ from packages.access.catalog.parsers import (
     FallbackCatalogSlugParser,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers / Factories
 # ---------------------------------------------------------------------------
@@ -13,9 +12,7 @@ from packages.access.catalog.parsers import (
 
 def make_aws_parser(known_envs=None):
     """Factory for AwsCatalogSlugParser with optional known_envs."""
-    return AwsCatalogSlugParser(
-        known_envs=set(known_envs or ["dev", "staging", "prod"])
-    )
+    return AwsCatalogSlugParser(known_envs=set(known_envs or ["dev", "staging", "prod"]))
 
 
 # ---------------------------------------------------------------------------

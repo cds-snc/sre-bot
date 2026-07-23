@@ -4,7 +4,6 @@ Configuration for collaboration platform integrations (Slack, etc.).
 """
 
 from functools import lru_cache
-from typing import Optional
 
 from pydantic import Field, model_validator
 from pydantic_settings import SettingsConfigDict
@@ -45,17 +44,17 @@ class SlackPlatformSettings(InfrastructureSettings):
         description="Use Socket Mode (True) or HTTP webhooks (False)",
     )
 
-    APP_TOKEN: Optional[str] = Field(
+    APP_TOKEN: str | None = Field(
         default=None,
         description="Slack app-level token (xapp-...) for Socket Mode",
     )
 
-    BOT_TOKEN: Optional[str] = Field(
+    BOT_TOKEN: str | None = Field(
         default=None,
         description="Slack bot token (xoxb-...) for API calls",
     )
 
-    SIGNING_SECRET: Optional[str] = Field(
+    SIGNING_SECRET: str | None = Field(
         default=None,
         description="Slack signing secret for webhook verification",
     )
@@ -86,9 +85,7 @@ class SlackPlatformSettings(InfrastructureSettings):
 
         # BOT_TOKEN always required
         if not self.BOT_TOKEN:
-            raise ValueError(
-                "SLACK_BOT_TOKEN is required when Slack provider is enabled"
-            )
+            raise ValueError("SLACK_BOT_TOKEN is required when Slack provider is enabled")
 
         # Socket Mode: APP_TOKEN required
         if self.SOCKET_MODE:

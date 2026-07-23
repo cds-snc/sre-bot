@@ -1,7 +1,7 @@
 """Server and development infrastructure settings."""
 
 from functools import lru_cache
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import Field, field_validator
 
@@ -42,18 +42,18 @@ class ServerSettings(InfrastructureSettings):
     SECRET_KEY: str | None = Field(default=None, alias="SESSION_SECRET_KEY")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     ACCESS_TOKEN_MAX_AGE_MINUTES: int = 1440  # Defaults to 24 hours
-    ISSUER_CONFIG: Optional[Dict[str, Dict[str, Any]]] = Field(
+    ISSUER_CONFIG: dict[str, dict[str, Any]] | None = Field(
         default=None,
         alias="ISSUER_CONFIG",
     )
-    DEV_BYPASS_TOKEN: Optional[str] = Field(
+    DEV_BYPASS_TOKEN: str | None = Field(
         default=None,
         alias="DEV_BYPASS_TOKEN",
     )
 
     @field_validator("ISSUER_CONFIG", mode="before")
     @classmethod
-    def validate_issuer_config(cls, v: Optional[Dict[str, Dict[str, Any]]]) -> Any:
+    def validate_issuer_config(cls, v: dict[str, dict[str, Any]] | None) -> Any:
         """Validate the ISSUER_CONFIG field."""
         if v is None or not isinstance(v, dict):
             return {}

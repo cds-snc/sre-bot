@@ -19,7 +19,6 @@ from packages.access.common.config import AccessRuntimeConfig, PlatformPolicy
 from packages.access.common.settings import AccessSyncSettings
 from packages.access.sync.policies import AdapterCapabilities
 
-
 # ---------------------------------------------------------------------------
 # Settings factory
 # ---------------------------------------------------------------------------

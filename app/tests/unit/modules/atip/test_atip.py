@@ -113,9 +113,7 @@ def make_view_submission_payload():
                 ],
                 "state": {
                     "values": {
-                        "ati_id": {
-                            "ati_id": {"type": "plain_text_input", "value": "number"}
-                        },
+                        "ati_id": {"ati_id": {"type": "plain_text_input", "value": "number"}},
                         "ati_content": {
                             "ati_content": {
                                 "type": "plain_text_input",
@@ -186,9 +184,7 @@ def make_view_submission_payload():
 # atip_command Tests
 @pytest.mark.unit
 @patch("modules.atip.atip.slack_users.get_user_locale")
-def test_should_respond_with_help_when_atip_command_empty_english(
-    mock_get_locale, make_command, make_client
-):
+def test_should_respond_with_help_when_atip_command_empty_english(mock_get_locale, make_command, make_client):
     """Test that empty atip command responds with English help text."""
     # Arrange
     mock_get_locale.return_value = "en-US"
@@ -204,20 +200,14 @@ def test_should_respond_with_help_when_atip_command_empty_english(
     # Assert
     ack.assert_called_once()
     respond.assert_called_once()
-    call_arg = (
-        respond.call_args[1]["text"]
-        if respond.call_args[1]
-        else respond.call_args[0][0]
-    )
+    call_arg = respond.call_args[1]["text"] if respond.call_args[1] else respond.call_args[0][0]
     # Just check that help text was provided (exact text may vary due to i18n)
     assert "help" in str(call_arg).lower() or "/atip" in str(call_arg)
 
 
 @pytest.mark.unit
 @patch("modules.atip.atip.slack_users.get_user_locale")
-def test_should_respond_with_help_when_atip_command_empty_french(
-    mock_get_locale, make_command, make_client
-):
+def test_should_respond_with_help_when_atip_command_empty_french(mock_get_locale, make_command, make_client):
     """Test that empty atip command responds with French help text for French users."""
     # Arrange
     mock_get_locale.return_value = "fr-FR"
@@ -238,9 +228,7 @@ def test_should_respond_with_help_when_atip_command_empty_french(
 @pytest.mark.unit
 @patch("modules.atip.atip.slack_users.get_user_locale")
 @pytest.mark.parametrize("action,locale", [("help", "en-US"), ("aide", "fr-FR")])
-def test_should_respond_with_help_when_action_is_help(
-    mock_get_locale, action, locale, make_command, make_client
-):
+def test_should_respond_with_help_when_action_is_help(mock_get_locale, action, locale, make_command, make_client):
     """Test that 'help' and 'aide' commands respond with appropriate help text."""
     # Arrange
     mock_get_locale.return_value = locale
@@ -264,9 +252,7 @@ def test_should_respond_with_help_when_action_is_help(
     "unknown_action",
     ["foo", "bar", "invalid_command"],
 )
-def test_should_respond_with_unknown_command_error(
-    mock_get_locale, unknown_action, make_command, make_client
-):
+def test_should_respond_with_unknown_command_error(mock_get_locale, unknown_action, make_command, make_client):
     """Test that unknown commands trigger unknown command response."""
     # Arrange
     mock_get_locale.return_value = "en-US"
@@ -282,20 +268,14 @@ def test_should_respond_with_unknown_command_error(
     # Assert
     ack.assert_called_once()
     respond.assert_called_once()
-    call_arg = (
-        respond.call_args[1]["text"]
-        if respond.call_args[1]
-        else respond.call_args[0][0]
-    )
+    call_arg = respond.call_args[1]["text"] if respond.call_args[1] else respond.call_args[0][0]
     assert "unknown" in str(call_arg).lower() or unknown_action in str(call_arg)
 
 
 @pytest.mark.unit
 @patch("modules.atip.atip.request_start_modal")
 @patch("modules.atip.atip.slack_users.get_user_locale")
-def test_should_open_modal_when_start_command_given(
-    mock_get_locale, mock_request_start, make_command, make_client
-):
+def test_should_open_modal_when_start_command_given(mock_get_locale, mock_request_start, make_command, make_client):
     """Test that 'start' command opens the ATIP modal."""
     # Arrange
     mock_get_locale.return_value = "en-US"
@@ -316,9 +296,7 @@ def test_should_open_modal_when_start_command_given(
 @pytest.mark.unit
 @patch("modules.atip.atip.request_start_modal")
 @patch("modules.atip.atip.slack_users.get_user_locale")
-def test_should_open_modal_when_lancer_command_given(
-    mock_get_locale, mock_request_start, make_command, make_client
-):
+def test_should_open_modal_when_lancer_command_given(mock_get_locale, mock_request_start, make_command, make_client):
     """Test that 'lancer' command opens the ATIP modal in French."""
     # Arrange
     mock_get_locale.return_value = "fr-FR"
@@ -404,9 +382,7 @@ def test_should_return_error_when_no_search_width_selected_english(
     # Arrange
     ack = MagicMock()
     body = make_view_submission_payload(locale="en-US")
-    body["view"]["state"]["values"]["ati_search_width"]["ati_search_width"][
-        "selected_options"
-    ] = []
+    body["view"]["state"]["values"]["ati_search_width"]["ati_search_width"]["selected_options"] = []
     say = MagicMock()
     client = MagicMock()
 
@@ -428,9 +404,7 @@ def test_should_return_error_when_no_search_width_selected_french(
     # Arrange
     ack = MagicMock()
     body = make_view_submission_payload(locale="fr-FR")
-    body["view"]["state"]["values"]["ati_search_width"]["ati_search_width"][
-        "selected_options"
-    ] = []
+    body["view"]["state"]["values"]["ati_search_width"]["ati_search_width"]["selected_options"] = []
     say = MagicMock()
     client = MagicMock()
 
@@ -446,18 +420,14 @@ def test_should_return_error_when_no_search_width_selected_french(
 
 @pytest.mark.unit
 @patch("integrations.trello.add_atip_card_to_trello")
-def test_should_successfully_create_atip_channel(
-    mock_trello, make_view_submission_payload
-):
+def test_should_successfully_create_atip_channel(mock_trello, make_view_submission_payload):
     """Test successful ATIP channel creation and notifications."""
     # Arrange
     ack = MagicMock()
     body = make_view_submission_payload(locale="en-US")
     say = MagicMock()
     client = MagicMock()
-    client.conversations_create.return_value = {
-        "channel": {"id": "C123", "name": "tmp-atip-number"}
-    }
+    client.conversations_create.return_value = {"channel": {"id": "C123", "name": "tmp-atip-number"}}
 
     # Act
     atip.atip_view_handler(ack, body, say, client)

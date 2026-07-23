@@ -87,33 +87,15 @@ def test_app_state_directory_provider_is_initialized(app_with_lifespan):
 
     assert directory_provider is not None, "directory_provider must not be None"
     assert hasattr(directory_provider, "warmup"), "directory_provider missing warmup"
-    assert hasattr(
-        directory_provider, "health_check"
-    ), "directory_provider missing health_check"
-    assert hasattr(
-        directory_provider, "get_user"
-    ), "directory_provider missing get_user"
-    assert hasattr(
-        directory_provider, "list_users"
-    ), "directory_provider missing list_users"
-    assert hasattr(
-        directory_provider, "get_group_members"
-    ), "directory_provider missing get_group_members"
-    assert hasattr(
-        directory_provider, "get_group"
-    ), "directory_provider missing get_group"
-    assert hasattr(
-        directory_provider, "add_group_member"
-    ), "directory_provider missing add_group_member"
-    assert hasattr(
-        directory_provider, "remove_group_member"
-    ), "directory_provider missing remove_group_member"
-    assert hasattr(
-        directory_provider, "check_membership"
-    ), "directory_provider missing check_membership"
-    assert hasattr(
-        directory_provider, "list_groups"
-    ), "directory_provider missing list_groups"
+    assert hasattr(directory_provider, "health_check"), "directory_provider missing health_check"
+    assert hasattr(directory_provider, "get_user"), "directory_provider missing get_user"
+    assert hasattr(directory_provider, "list_users"), "directory_provider missing list_users"
+    assert hasattr(directory_provider, "get_group_members"), "directory_provider missing get_group_members"
+    assert hasattr(directory_provider, "get_group"), "directory_provider missing get_group"
+    assert hasattr(directory_provider, "add_group_member"), "directory_provider missing add_group_member"
+    assert hasattr(directory_provider, "remove_group_member"), "directory_provider missing remove_group_member"
+    assert hasattr(directory_provider, "check_membership"), "directory_provider missing check_membership"
+    assert hasattr(directory_provider, "list_groups"), "directory_provider missing list_groups"
 
 
 @pytest.mark.integration
@@ -125,8 +107,7 @@ def test_app_state_bot_may_be_none_but_exists(app_with_lifespan):
     """
     # bot can be None if SLACK_TOKEN is not set, but the attribute must exist
     assert hasattr(app_with_lifespan.app.state, "bot"), (
-        "app.state.bot attribute missing. Routes cannot safely check "
-        "getattr(app.state, 'bot', None) if attribute doesn't exist."
+        "app.state.bot attribute missing. Routes cannot safely check getattr(app.state, 'bot', None) if attribute doesn't exist."
     )
 
 
@@ -141,6 +122,4 @@ def test_app_routes_respond_without_crashes(app_with_lifespan):
     response = app_with_lifespan.get("/docs", follow_redirects=False)
 
     # Should not be a 500 ASGI crash
-    assert (
-        response.status_code != 500
-    ), "Got 500 ASGI crash, indicating app.state initialization failed"
+    assert response.status_code != 500, "Got 500 ASGI crash, indicating app.state initialization failed"

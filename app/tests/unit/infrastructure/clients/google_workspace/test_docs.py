@@ -149,9 +149,7 @@ class TestDocumentOperations:
         requests = [{"insertText": {"location": {"index": 1}, "text": "Test"}}]
 
         # Execute
-        result = client.batch_update(
-            "doc789", requests, delegated_email="service@example.com"
-        )
+        result = client.batch_update("doc789", requests, delegated_email="service@example.com")
 
         # Assert
         assert result.is_success
@@ -219,9 +217,7 @@ class TestErrorHandling:
 
         # Simulate API error by having execute() raise an exception
 
-        mock_service.documents().get().execute.side_effect = HttpError(
-            resp=MagicMock(status=404), content=b"Not found"
-        )
+        mock_service.documents().get().execute.side_effect = HttpError(resp=MagicMock(status=404), content=b"Not found")
 
         # Execute
         result = client.get_document("nonexistent_doc")

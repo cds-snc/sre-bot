@@ -3,21 +3,23 @@
 Provides a class-based interface to circuit breakers and retry stores for easier DI and testing.
 """
 
+from collections.abc import Callable
 from functools import cache
-from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import structlog
-from infrastructure.resilience.retry.config import RetryConfig
-from infrastructure.resilience.retry.factory import create_retry_store
+
+from infrastructure.configuration.infrastructure.retry import get_retry_settings
 from infrastructure.resilience.circuit_breaker import (
     CircuitBreaker,
     CircuitState,
 )
-from infrastructure.configuration.infrastructure.retry import get_retry_settings
+from infrastructure.resilience.retry.config import RetryConfig
+from infrastructure.resilience.retry.factory import create_retry_store
 
 if TYPE_CHECKING:
-    from infrastructure.resilience.retry.store import RetryStore
     from infrastructure.configuration.infrastructure.retry import RetrySettings
+    from infrastructure.resilience.retry.store import RetryStore
 
 logger = structlog.get_logger()
 
@@ -36,9 +38,9 @@ class ResilienceService:
 
     def __init__(
         self,
-        retry_settings: Optional["RetrySettings"] = None,
-        retry_store: Optional["RetryStore"] = None,
-        retry_config: Optional["RetryConfig"] = None,
+        retry_settings: RetrySettings | None = None,
+        retry_store: RetryStore | None = None,
+        retry_config: RetryConfig | None = None,
     ):
         """Initialize resilience service.
 
@@ -49,7 +51,7 @@ class ResilienceService:
             retry_config: Optional RetryConfig for creating retry store.
                          Used only if retry_store is None.
         """
-        self._circuit_breakers: Dict[str, CircuitBreaker] = {}
+        self._circuit_breakers: dict[str, CircuitBreaker] = {}
 
         if retry_store is not None:
             self._retry_store = retry_store
@@ -98,7 +100,7 @@ class ResilienceService:
 
         return cb
 
-    def get_circuit_breaker(self, name: str) -> Optional[CircuitBreaker]:
+    def get_circuit_breaker(self, name: str) -> CircuitBreaker | None:
         """Get a circuit breaker by name.
 
         Args:
@@ -164,7 +166,7 @@ class ResilienceService:
         cb = self.get_or_create_circuit_breaker(name)
         return cb.call(func, *args, **kwargs)
 
-    def get_all_circuit_breaker_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_circuit_breaker_stats(self) -> dict[str, dict[str, Any]]:
         """Get statistics for all registered circuit breakers.
 
         Returns:
@@ -178,11 +180,7 @@ class ResilienceService:
         Returns:
             List of circuit breaker names in OPEN state
         """
-        return [
-            name
-            for name, cb in self._circuit_breakers.items()
-            if cb.state == CircuitState.OPEN
-        ]
+        return [name for name, cb in self._circuit_breakers.items() if cb.state == CircuitState.OPEN]
 
     def reset_circuit_breaker(self, name: str) -> None:
         """Manually reset a circuit breaker.
@@ -200,7 +198,7 @@ class ResilienceService:
         cb.reset()
 
     @property
-    def retry_store(self) -> "RetryStore":
+    def retry_store(self) -> RetryStore:
         """Access underlying RetryStore instance.
 
         Provided for retry operations and worker integration.

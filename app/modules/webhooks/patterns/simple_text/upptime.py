@@ -9,12 +9,7 @@ def handle_upptime_payload(text: str) -> WebhookPayload:
     text_lower = text.lower()
 
     # Check for down status indicators
-    if (
-        ":large_red_square:" in text
-        or "🟥" in text
-        or "**down**" in text
-        or "down" in text_lower
-    ):
+    if ":large_red_square:" in text or "🟥" in text or "**down**" in text or "down" in text_lower:
         header_text = "🚨 Service Down Alert"
     # Check for recovery status indicators
     elif (
@@ -78,9 +73,7 @@ def is_upptime_pattern(text: str) -> bool:
     ]
 
     has_emoji = any(emoji in text for emoji in emoji_indicators)
-    has_status = any(
-        keyword in text.lower() for keyword in [k.lower() for k in status_keywords]
-    )
+    has_status = any(keyword in text.lower() for keyword in [k.lower() for k in status_keywords])
 
     # Must have both an emoji indicator AND a status keyword to be considered Upptime
     return has_emoji and has_status

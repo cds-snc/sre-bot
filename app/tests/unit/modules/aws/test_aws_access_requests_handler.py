@@ -1,8 +1,9 @@
 """Unit tests for AWS access requests handler."""
 
-import pytest
-from unittest.mock import patch
 import datetime
+from unittest.mock import patch
+
+import pytest
 
 from modules.aws import aws_access_requests
 

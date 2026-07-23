@@ -1,7 +1,6 @@
 import json
 import re
 import urllib.parse
-from typing import Dict, List, Union
 
 from slack_sdk import WebClient
 from structlog import get_logger
@@ -12,7 +11,7 @@ from modules.webhooks.aws_sns_notification import AwsNotificationPattern
 logger = get_logger()
 
 
-def handle_cloudwatch_alarm(payload: AwsSnsPayload, client: WebClient) -> List[Dict]:
+def handle_cloudwatch_alarm(payload: AwsSnsPayload, client: WebClient) -> list[dict]:
     """
     Handle CloudWatch alarm notifications from AWS SNS.
 
@@ -29,10 +28,8 @@ def handle_cloudwatch_alarm(payload: AwsSnsPayload, client: WebClient) -> List[D
             return []
 
         msg = json.loads(message)
-    except (json.JSONDecodeError, TypeError):
-        logger.warning(
-            "failed_to_parse_cloudwatch_alarm_message", message=payload.Message
-        )
+    except json.JSONDecodeError, TypeError:
+        logger.warning("failed_to_parse_cloudwatch_alarm_message", message=payload.Message)
         return []
 
     # Extract alarm details
@@ -93,9 +90,7 @@ def handle_cloudwatch_alarm(payload: AwsSnsPayload, client: WebClient) -> List[D
     return blocks
 
 
-def is_cloudwatch_alarm_message(
-    payload: AwsSnsPayload, parsed_message: Union[str, dict]
-) -> bool:
+def is_cloudwatch_alarm_message(payload: AwsSnsPayload, parsed_message: str | dict) -> bool:
     """
     Check if the AWS SNS message is a CloudWatch alarm notification.
 

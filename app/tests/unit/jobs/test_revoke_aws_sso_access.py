@@ -4,8 +4,10 @@ Tests the core business logic of revoking AWS SSO access for expired requests.
 Focuses on unit-level behavior: data transformation, error handling, and dependencies.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from jobs.revoke_aws_sso_access import revoke_aws_sso_access
 
 
@@ -80,12 +82,8 @@ def test_revoke_access_success(
 
     # Verify sequence of calls
     mock_identity_store.get_user_id.assert_called_once_with("user@example.com")
-    mock_sso.delete_account_assignment.assert_called_once_with(
-        "aws-user-123", "123456789", "ReadOnlyAccess"
-    )
-    mock_aws_requests.expire_request.assert_called_once_with(
-        account_id="123456789", created_at="1704067200"
-    )
+    mock_sso.delete_account_assignment.assert_called_once_with("aws-user-123", "123456789", "ReadOnlyAccess")
+    mock_aws_requests.expire_request.assert_called_once_with(account_id="123456789", created_at="1704067200")
 
     # Verify notifications
     assert mock_slack_client.chat_postEphemeral.call_count == 1
@@ -119,9 +117,7 @@ def test_revoke_access_handles_identity_store_error(
     - No Slack message is sent for failed request
     """
     mock_aws_requests.get_expired_requests.return_value = [expired_request]
-    mock_identity_store.get_user_id.side_effect = RuntimeError(
-        "Identity store unavailable"
-    )
+    mock_identity_store.get_user_id.side_effect = RuntimeError("Identity store unavailable")
 
     revoke_aws_sso_access(mock_slack_client)
 

@@ -1,6 +1,7 @@
-from unittest.mock import MagicMock
-from modules.webhooks.patterns.aws_sns_notification import abuse_notification
 import json
+from unittest.mock import MagicMock
+
+from modules.webhooks.patterns.aws_sns_notification import abuse_notification
 
 
 def mock_abuse_alert():

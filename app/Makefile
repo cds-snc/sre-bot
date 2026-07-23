@@ -12,7 +12,7 @@ debug:
 	PREFIX="dev-" SLACK__COMMAND_PREFIX="dev-" LOG_LEVEL=DEBUG uv run uvicorn main:server_app --reload
 
 fmt:
-	uv run black . $(ARGS) --target-version py311
+	uv run ruff format . $(ARGS)
 
 install:
 	uv sync
@@ -80,7 +80,7 @@ lint-ci:
 	@command -v uv >/dev/null 2>&1 && uv run mypy . --check-untyped-defs || true
 
 fmt-ci:
-	uv run black --check . --target-version py311
+	uv run ruff format --check .
 
 check-prefix-guardrail:
 	python bin/check_prefix_command_namespace.py

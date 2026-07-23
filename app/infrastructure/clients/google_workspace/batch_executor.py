@@ -1,7 +1,8 @@
 """Batch execution utilities for Google Workspace API operations."""
 
 import time
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 import structlog
 from googleapiclient.discovery import Resource
@@ -14,7 +15,7 @@ logger = structlog.get_logger()
 def execute_batch_request(
     service: Resource,
     requests: list[tuple[str, Any]],
-    callback_fn: Optional[Callable] = None,
+    callback_fn: Callable | None = None,
 ) -> OperationResult:
     """Execute multiple Google API calls in a single batch request.
 
@@ -92,9 +93,7 @@ def execute_batch_request(
             "total": total_requests,
             "successful": successful_requests,
             "failed": failed_requests,
-            "success_rate": (
-                successful_requests / total_requests if total_requests > 0 else 0
-            ),
+            "success_rate": (successful_requests / total_requests if total_requests > 0 else 0),
         },
     }
 

@@ -28,9 +28,7 @@ class TestDirectoryClientUsers:
         mock_session_provider.get_service.return_value = mock_service
 
         # Execute
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.get_user("user@example.com")
 
         # Verify
@@ -48,12 +46,8 @@ class TestDirectoryClientUsers:
         mock_service.users().get.return_value = mock_request
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
-        result = client.get_user(
-            "user@example.com", delegated_email="admin@example.com"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
+        result = client.get_user("user@example.com", delegated_email="admin@example.com")
 
         assert result.is_success
         mock_session_provider.get_service.assert_called_once()
@@ -74,9 +68,7 @@ class TestDirectoryClientUsers:
         mock_service.users().list_next.return_value = None
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.list_users()
 
         assert result.is_success
@@ -98,17 +90,13 @@ class TestDirectoryClientUsers:
 
         # Page 2
         mock_request2 = Mock()
-        mock_request2.execute.return_value = {
-            "users": [{"primaryEmail": "user2@example.com", "id": "2"}]
-        }
+        mock_request2.execute.return_value = {"users": [{"primaryEmail": "user2@example.com", "id": "2"}]}
 
         mock_service.users().list.return_value = mock_request1
         mock_service.users().list_next.side_effect = [mock_request2, None]
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.list_users()
 
         assert result.is_success
@@ -126,9 +114,7 @@ class TestDirectoryClientUsers:
         mock_service.users().list_next.return_value = None
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.list_users(customer="custom_customer")
 
         assert result.is_success
@@ -143,15 +129,11 @@ class TestDirectoryClientUsers:
         mock_service.users().list_next.return_value = None
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.list_users(maxResults=10, query="name:John")
 
         assert result.is_success
-        mock_service.users().list.assert_called_once_with(
-            customer="my_customer", maxResults=10, query="name:John"
-        )
+        mock_service.users().list.assert_called_once_with(customer="my_customer", maxResults=10, query="name:John")
 
     def test_create_user_success(self, mock_session_provider: Mock):
         """Test successful user creation."""
@@ -172,9 +154,7 @@ class TestDirectoryClientUsers:
             "password": "SecurePass123!",
         }
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.create_user(user_body)
 
         assert result.is_success
@@ -196,17 +176,13 @@ class TestDirectoryClientUsers:
 
         update_body = {"suspended": True}
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.update_user("user@example.com", update_body)
 
         assert result.is_success
         assert result.data is not None
         assert result.data["suspended"] is True
-        mock_service.users().update.assert_called_once_with(
-            userKey="user@example.com", body=update_body
-        )
+        mock_service.users().update.assert_called_once_with(userKey="user@example.com", body=update_body)
 
     def test_delete_user_success(self, mock_session_provider: Mock):
         """Test successful user deletion."""
@@ -216,9 +192,7 @@ class TestDirectoryClientUsers:
         mock_service.users().delete.return_value = mock_request
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.delete_user("user@example.com")
 
         assert result.is_success
@@ -240,9 +214,7 @@ class TestDirectoryClientGroups:
         mock_service.groups().get.return_value = mock_request
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.get_group("group@example.com")
 
         assert result.is_success
@@ -265,9 +237,7 @@ class TestDirectoryClientGroups:
         mock_service.groups().list_next.return_value = None
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.list_groups()
 
         assert result.is_success
@@ -288,17 +258,13 @@ class TestDirectoryClientGroups:
 
         # Page 2
         mock_request2 = Mock()
-        mock_request2.execute.return_value = {
-            "groups": [{"email": "group2@example.com", "id": "2"}]
-        }
+        mock_request2.execute.return_value = {"groups": [{"email": "group2@example.com", "id": "2"}]}
 
         mock_service.groups().list.return_value = mock_request1
         mock_service.groups().list_next.side_effect = [mock_request2, None]
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.list_groups()
 
         assert result.is_success
@@ -316,9 +282,7 @@ class TestDirectoryClientGroups:
         mock_service.customers().get.return_value = mock_request
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.health_check()
 
         assert result.is_success
@@ -326,9 +290,7 @@ class TestDirectoryClientGroups:
         assert result.data["id"] == "C123abc"
         mock_service.customers().get.assert_called_once_with(customerKey="my_customer")
 
-    def test_health_check_falls_back_to_my_customer_when_default_is_empty(
-        self, mock_session_provider: Mock
-    ):
+    def test_health_check_falls_back_to_my_customer_when_default_is_empty(self, mock_session_provider: Mock):
         """Test blank configured customer IDs still probe the stable default."""
         mock_service = Mock()
         mock_request = Mock()
@@ -336,9 +298,7 @@ class TestDirectoryClientGroups:
         mock_service.customers().get.return_value = mock_request
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id=""
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="")
 
         result = client.health_check()
 
@@ -363,9 +323,7 @@ class TestDirectoryClientGroups:
             "name": "New Group",
         }
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.create_group(group_body)
 
         assert result.is_success
@@ -387,17 +345,13 @@ class TestDirectoryClientGroups:
 
         update_body = {"name": "Updated Name"}
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.update_group("group@example.com", update_body)
 
         assert result.is_success
         assert result.data is not None
         assert result.data["name"] == "Updated Name"
-        mock_service.groups().update.assert_called_once_with(
-            groupKey="group@example.com", body=update_body
-        )
+        mock_service.groups().update.assert_called_once_with(groupKey="group@example.com", body=update_body)
 
     def test_delete_group_success(self, mock_session_provider: Mock):
         """Test successful group deletion."""
@@ -407,15 +361,11 @@ class TestDirectoryClientGroups:
         mock_service.groups().delete.return_value = mock_request
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.delete_group("group@example.com")
 
         assert result.is_success
-        mock_service.groups().delete.assert_called_once_with(
-            groupKey="group@example.com"
-        )
+        mock_service.groups().delete.assert_called_once_with(groupKey="group@example.com")
 
 
 class TestDirectoryClientMembers:
@@ -435,9 +385,7 @@ class TestDirectoryClientMembers:
         mock_service.members().list_next.return_value = None
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.list_members("group@example.com")
 
         assert result.is_success
@@ -445,9 +393,7 @@ class TestDirectoryClientMembers:
         assert len(result.data) == 2
         assert result.data[0]["email"] == "user1@example.com"
         assert result.data[1]["role"] == "OWNER"
-        mock_service.members().list.assert_called_once_with(
-            groupKey="group@example.com"
-        )
+        mock_service.members().list.assert_called_once_with(groupKey="group@example.com")
 
     def test_list_members_pagination(self, mock_session_provider: Mock):
         """Test listing members with automatic pagination."""
@@ -462,17 +408,13 @@ class TestDirectoryClientMembers:
 
         # Page 2
         mock_request2 = Mock()
-        mock_request2.execute.return_value = {
-            "members": [{"email": "user2@example.com", "role": "OWNER"}]
-        }
+        mock_request2.execute.return_value = {"members": [{"email": "user2@example.com", "role": "OWNER"}]}
 
         mock_service.members().list.return_value = mock_request1
         mock_service.members().list_next.side_effect = [mock_request2, None]
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.list_members("group@example.com")
 
         assert result.is_success
@@ -496,17 +438,13 @@ class TestDirectoryClientMembers:
             "role": "MEMBER",
         }
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.add_member("group@example.com", member_body)
 
         assert result.is_success
         assert result.data is not None
         assert result.data["email"] == "newmember@example.com"
-        mock_service.members().insert.assert_called_once_with(
-            groupKey="group@example.com", body=member_body
-        )
+        mock_service.members().insert.assert_called_once_with(groupKey="group@example.com", body=member_body)
 
     def test_remove_member_success(self, mock_session_provider: Mock):
         """Test successful member removal."""
@@ -516,15 +454,11 @@ class TestDirectoryClientMembers:
         mock_service.members().delete.return_value = mock_request
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.remove_member("group@example.com", "user@example.com")
 
         assert result.is_success
-        mock_service.members().delete.assert_called_once_with(
-            groupKey="group@example.com", memberKey="user@example.com"
-        )
+        mock_service.members().delete.assert_called_once_with(groupKey="group@example.com", memberKey="user@example.com")
 
 
 class TestDirectoryClientErrorHandling:
@@ -536,16 +470,12 @@ class TestDirectoryClientErrorHandling:
         mock_service = Mock()
         mock_request = Mock()
         # Simulate 404 Not Found
-        http_error = HttpError(
-            resp=Mock(status=404), content=b'{"error": "User not found"}'
-        )
+        http_error = HttpError(resp=Mock(status=404), content=b'{"error": "User not found"}')
         mock_request.execute.side_effect = http_error
         mock_service.users().get.return_value = mock_request
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.get_user("nonexistent@example.com")
 
         assert not result.is_success
@@ -557,16 +487,12 @@ class TestDirectoryClientErrorHandling:
         mock_service = Mock()
         mock_request = Mock()
         # Simulate 403 Forbidden
-        http_error = HttpError(
-            resp=Mock(status=403), content=b'{"error": "Permission denied"}'
-        )
+        http_error = HttpError(resp=Mock(status=403), content=b'{"error": "Permission denied"}')
         mock_request.execute.side_effect = http_error
         mock_service.users().list.return_value = mock_request
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.list_users()
 
         assert not result.is_success
@@ -588,18 +514,14 @@ class TestDirectoryClientMembershipChecks:
         mock_service.members().get.return_value = mock_request
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.get_member("group@example.com", "member@example.com")
 
         assert result.is_success
         assert result.data is not None
         assert result.data["email"] == "member@example.com"
         assert result.data["role"] == "MEMBER"
-        mock_service.members().get.assert_called_once_with(
-            groupKey="group@example.com", memberKey="member@example.com"
-        )
+        mock_service.members().get.assert_called_once_with(groupKey="group@example.com", memberKey="member@example.com")
 
     def test_has_member_success(self, mock_session_provider: Mock):
         """Test successful membership check."""
@@ -609,17 +531,13 @@ class TestDirectoryClientMembershipChecks:
         mock_service.members().hasMember.return_value = mock_request
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.has_member("group@example.com", "member@example.com")
 
         assert result.is_success
         assert result.data is not None
         assert result.data["isMember"] is True
-        mock_service.members().hasMember.assert_called_once_with(
-            groupKey="group@example.com", memberKey="member@example.com"
-        )
+        mock_service.members().hasMember.assert_called_once_with(groupKey="group@example.com", memberKey="member@example.com")
 
 
 class TestDirectoryClientBatchOperations:
@@ -659,9 +577,7 @@ class TestDirectoryClientBatchOperations:
         mock_service.users().get.return_value = Mock()  # API request objects
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.get_batch_users(["user1@example.com", "user2@example.com"])
 
         assert result.is_success
@@ -700,9 +616,7 @@ class TestDirectoryClientBatchOperations:
         mock_service.groups().get.return_value = Mock()
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.get_batch_groups(["group1@example.com", "group2@example.com"])
 
         assert result.is_success
@@ -741,12 +655,8 @@ class TestDirectoryClientBatchOperations:
         mock_service.members().get.return_value = Mock()
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
-        result = client.get_batch_members_for_user(
-            ["group1@example.com", "group2@example.com"], "user@example.com"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
+        result = client.get_batch_members_for_user(["group1@example.com", "group2@example.com"], "user@example.com")
 
         assert result.is_success
         assert result.data is not None
@@ -789,12 +699,8 @@ class TestDirectoryClientBatchOperations:
         mock_service.members().list.return_value = Mock()
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
-        result = client.get_batch_group_members(
-            ["group1@example.com", "group2@example.com"]
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
+        result = client.get_batch_group_members(["group1@example.com", "group2@example.com"])
 
         assert result.is_success
         assert result.data is not None
@@ -850,9 +756,7 @@ class TestDirectoryClientAdvancedFeatures:
 
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         request = ListGroupsWithMembersRequest(include_users_details=False)
         result = client.list_groups_with_members(request)
 
@@ -864,9 +768,7 @@ class TestDirectoryClientAdvancedFeatures:
         assert result.data[1]["email"] == "group2@example.com"
         assert len(result.data[1]["members"]) == 1
 
-    def test_list_groups_with_members_with_group_filters(
-        self, mock_session_provider: Mock
-    ):
+    def test_list_groups_with_members_with_group_filters(self, mock_session_provider: Mock):
         """Test list_groups_with_members with group filters."""
 
         mock_service = Mock()
@@ -910,9 +812,7 @@ class TestDirectoryClientAdvancedFeatures:
 
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         request = ListGroupsWithMembersRequest(
             groups_filters=[lambda g: g.get("email", "").startswith("team-")],
             include_users_details=False,
@@ -924,9 +824,7 @@ class TestDirectoryClientAdvancedFeatures:
         assert len(result.data) == 2
         assert all(g["email"].startswith("team-") for g in result.data)
 
-    def test_list_groups_with_members_with_member_filters(
-        self, mock_session_provider: Mock
-    ):
+    def test_list_groups_with_members_with_member_filters(self, mock_session_provider: Mock):
         """Test list_groups_with_members with member filters."""
 
         mock_service = Mock()
@@ -974,9 +872,7 @@ class TestDirectoryClientAdvancedFeatures:
 
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         # Filter for groups that have at least one OWNER
         request = ListGroupsWithMembersRequest(
             member_filters=[lambda m: m.get("role") == "OWNER"],
@@ -1028,12 +924,8 @@ class TestDirectoryClientAdvancedFeatures:
 
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
-        request = ListGroupsWithMembersRequest(
-            exclude_empty_groups=True, include_users_details=False
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
+        request = ListGroupsWithMembersRequest(exclude_empty_groups=True, include_users_details=False)
         result = client.list_groups_with_members(request)
 
         assert result.is_success
@@ -1041,9 +933,7 @@ class TestDirectoryClientAdvancedFeatures:
         assert len(result.data) == 1
         assert result.data[0]["email"] == "group1@example.com"
 
-    def test_list_groups_with_members_with_user_details(
-        self, mock_session_provider: Mock
-    ):
+    def test_list_groups_with_members_with_user_details(self, mock_session_provider: Mock):
         """Test list_groups_with_members with user details enrichment."""
 
         mock_service = Mock()
@@ -1112,9 +1002,7 @@ class TestDirectoryClientAdvancedFeatures:
 
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         request = ListGroupsWithMembersRequest(include_users_details=True)
         result = client.list_groups_with_members(request)
 
@@ -1129,9 +1017,7 @@ class TestDirectoryClientAdvancedFeatures:
         assert "user" in group["members"][1]
         assert group["members"][1]["user"]["name"]["fullName"] == "User Two"
 
-    def test_list_groups_with_members_no_matching_groups(
-        self, mock_session_provider: Mock
-    ):
+    def test_list_groups_with_members_no_matching_groups(self, mock_session_provider: Mock):
         """Test list_groups_with_members when filters return no groups."""
 
         mock_service = Mock()
@@ -1147,9 +1033,7 @@ class TestDirectoryClientAdvancedFeatures:
 
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
 
         # Filter that excludes all groups
         request = ListGroupsWithMembersRequest(
@@ -1186,9 +1070,7 @@ class TestDirectoryClientAdvancedFeatures:
 
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         request = ListGroupsWithMembersRequest(include_users_details=False)
         result = client.list_groups_with_members(request)
 
@@ -1210,9 +1092,7 @@ class TestDirectoryClientBatchOperationEdgeCases:
         mock_service.users().get.return_value = Mock()
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.get_batch_users(["user1@example.com", "user2@example.com"])
 
         # Batch failure should propagate as error
@@ -1229,18 +1109,14 @@ class TestDirectoryClientBatchOperationEdgeCases:
         mock_service.groups().get.return_value = Mock()
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
         result = client.get_batch_groups(["group1@example.com", "group2@example.com"])
 
         # Batch failure should propagate as error
         assert not result.is_success
         assert result.error_code == "GOOGLE_API_ERROR"
 
-    def test_get_batch_members_for_user_with_batch_failure(
-        self, mock_session_provider: Mock
-    ):
+    def test_get_batch_members_for_user_with_batch_failure(self, mock_session_provider: Mock):
         """Test get_batch_members_for_user propagates batch execution failure as error."""
         mock_service = Mock()
         mock_batch = Mock()
@@ -1250,20 +1126,14 @@ class TestDirectoryClientBatchOperationEdgeCases:
         mock_service.members().get.return_value = Mock()
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
-        result = client.get_batch_members_for_user(
-            ["group1@example.com", "group2@example.com"], "user@example.com"
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
+        result = client.get_batch_members_for_user(["group1@example.com", "group2@example.com"], "user@example.com")
 
         # Batch failure should propagate as error
         assert not result.is_success
         assert result.error_code == "GOOGLE_API_ERROR"
 
-    def test_get_batch_group_members_with_batch_failure(
-        self, mock_session_provider: Mock
-    ):
+    def test_get_batch_group_members_with_batch_failure(self, mock_session_provider: Mock):
         """Test get_batch_group_members propagates batch execution failure as error."""
         mock_service = Mock()
         mock_batch = Mock()
@@ -1273,20 +1143,14 @@ class TestDirectoryClientBatchOperationEdgeCases:
         mock_service.members().list.return_value = Mock()
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
-        result = client.get_batch_group_members(
-            ["group1@example.com", "group2@example.com"]
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
+        result = client.get_batch_group_members(["group1@example.com", "group2@example.com"])
 
         # Batch failure should propagate as error
         assert not result.is_success
         assert result.error_code == "GOOGLE_API_ERROR"
 
-    def test_get_batch_group_members_handles_various_result_types(
-        self, mock_session_provider: Mock
-    ):
+    def test_get_batch_group_members_handles_various_result_types(self, mock_session_provider: Mock):
         """Test get_batch_group_members handles dict, None, and other result types."""
         mock_service = Mock()
         mock_batch = Mock()
@@ -1317,12 +1181,8 @@ class TestDirectoryClientBatchOperationEdgeCases:
         mock_service.members().list.return_value = Mock()
         mock_session_provider.get_service.return_value = mock_service
 
-        client = DirectoryClient(
-            session_provider=mock_session_provider, default_customer_id="my_customer"
-        )
-        result = client.get_batch_group_members(
-            ["group1@example.com", "group2@example.com", "group3@example.com"]
-        )
+        client = DirectoryClient(session_provider=mock_session_provider, default_customer_id="my_customer")
+        result = client.get_batch_group_members(["group1@example.com", "group2@example.com", "group3@example.com"])
 
         assert result.is_success
         assert result.data is not None

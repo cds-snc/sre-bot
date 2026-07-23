@@ -22,8 +22,8 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import replace
-from datetime import datetime, timezone
-from typing import Optional, Protocol, TYPE_CHECKING, Union
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Protocol
 
 import structlog
 
@@ -70,7 +70,7 @@ class AccessRequestServicePort(Protocol):
         group_slug: str,
         entitlement_type: str,
         justification: str,
-        ticket_id: Optional[str] = None,
+        ticket_id: str | None = None,
     ) -> OperationResult[AccessRequest]: ...
 
     def approve_request(
@@ -101,9 +101,7 @@ class AccessRequestServicePort(Protocol):
         comment: str = "",
     ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]: ...
 
-    def get_request_status(
-        self, request_id: str
-    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]: ...
+    def get_request_status(self, request_id: str) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]: ...
 
     def advance_from_sync_result(self, event: Event) -> None: ...
 
@@ -127,7 +125,7 @@ class AccessRequestService:
     def __init__(
         self,
         repository: AccessRequestRepository,
-        directory: "DirectoryProvider",
+        directory: DirectoryProvider,
         runtime_config: AccessRuntimeConfig,
         dispatcher: EventDispatcher,
         fallback_approver_slug: str = "sg-org-admins",
@@ -155,7 +153,7 @@ class AccessRequestService:
         group_slug: str,
         entitlement_type: str,
         justification: str,
-        ticket_id: Optional[str] = None,
+        ticket_id: str | None = None,
     ) -> OperationResult[AccessRequest]:
         """Accept and process a new access request through intake.
 
@@ -214,11 +212,7 @@ class AccessRequestService:
         # Derive entitlement_id from the group slug by stripping the platform prefix.
         # For sg-aws-scratch with platform=aws and prefix sg-aws-, token is "scratch".
         group_prefix = self._config.group_prefix(platform)
-        entitlement_id = (
-            group_slug[len(group_prefix) :]
-            if group_slug.startswith(group_prefix)
-            else group_slug
-        )
+        entitlement_id = group_slug[len(group_prefix) :] if group_slug.startswith(group_prefix) else group_slug
 
         # Step 2: entitlement mode pre-check
         mode = check_entitlement_mode(self._config, platform, group_slug)
@@ -230,9 +224,7 @@ class AccessRequestService:
             )
             return OperationResult.error(
                 OperationStatus.PERMANENT_ERROR,
-                message=(
-                    "Automation is suspended for this group. Contact an administrator."
-                ),
+                message=("Automation is suspended for this group. Contact an administrator."),
                 error_code="ENTITLEMENT_MODE_DEACTIVATED",
             )
         if mode == "ephemeral":
@@ -243,17 +235,12 @@ class AccessRequestService:
             )
             return OperationResult.error(
                 OperationStatus.PERMANENT_ERROR,
-                message=(
-                    "This group uses ephemeral access. "
-                    "Use the elevated-access workflow instead."
-                ),
+                message=("This group uses ephemeral access. Use the elevated-access workflow instead."),
                 error_code="ENTITLEMENT_MODE_EPHEMERAL",
             )
 
         # Step 3: eligibility — direction-aware membership check
-        membership_result = self._directory.check_membership(
-            directory_group.group_email, user_email
-        )
+        membership_result = self._directory.check_membership(directory_group.group_email, user_email)
         if membership_result.is_success and membership_result.data is not None:
             is_member = membership_result.data.is_member
             if request_type == "grant" and is_member:
@@ -296,9 +283,7 @@ class AccessRequestService:
                 )
             members = members_result.data or []
             actor_is_owner_or_manager = any(
-                m.email.lower() == actor_email.lower()
-                and m.role is not None
-                and m.role.upper() in ("OWNER", "MANAGER")
+                m.email.lower() == actor_email.lower() and m.role is not None and m.role.upper() in ("OWNER", "MANAGER")
                 for m in members
             )
             if not actor_is_owner_or_manager:
@@ -346,7 +331,7 @@ class AccessRequestService:
             entitlement_type=entitlement_type,
         )
 
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         initial_status = "approved" if auto_approved else "pending_approval"
 
         request = AccessRequest(
@@ -384,17 +369,13 @@ class AccessRequestService:
         # Step 8: for auto-approved requests, write the membership change to the
         # IDP immediately. Direction is determined by request_type.
         if auto_approved:
-            idp_result: Union[OperationResult[DirectoryMember], OperationResult[None]]
+            idp_result: OperationResult[DirectoryMember] | OperationResult[None]
             if request_type == "grant":
-                idp_result = self._directory.add_group_member(
-                    directory_group.group_email, user_email
-                )
+                idp_result = self._directory.add_group_member(directory_group.group_email, user_email)
             else:
-                idp_result = self._directory.remove_group_member(
-                    directory_group.group_email, user_email
-                )
+                idp_result = self._directory.remove_group_member(directory_group.group_email, user_email)
             if not idp_result.is_success:
-                fail_now = datetime.now(tz=timezone.utc)
+                fail_now = datetime.now(tz=UTC)
                 failed = replace(request, status="failed", updated_at=fail_now)
                 self._repo.save_request(failed)
                 self._repo.save_audit_event(
@@ -518,16 +499,11 @@ class AccessRequestService:
         if request.status != "pending_approval":
             return OperationResult.error(
                 OperationStatus.PERMANENT_ERROR,
-                message=(
-                    f"Request is in '{request.status}' state; "
-                    "only 'pending_approval' requests can be approved."
-                ),
+                message=(f"Request is in '{request.status}' state; only 'pending_approval' requests can be approved."),
                 error_code="INVALID_STATE_TRANSITION",
             )
 
-        if approver_email.lower() not in [
-            a.lower() for a in request.resolved_approvers
-        ]:
+        if approver_email.lower() not in [a.lower() for a in request.resolved_approvers]:
             return OperationResult.error(
                 OperationStatus.PERMANENT_ERROR,
                 message="Actor is not in the resolved approver list.",
@@ -541,7 +517,7 @@ class AccessRequestService:
                 error_code="SELF_APPROVAL_DENIED",
             )
 
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         decision = ApprovalDecision(
             request_id=request_id,
             actor_email=approver_email,
@@ -564,15 +540,11 @@ class AccessRequestService:
         if meets_minimum_approver_count(all_decisions, self._min_approver_count):
             # Write the membership change to the IDP — source of truth — before
             # publishing the event. Direction is determined by request_type.
-            idp_result: Union[OperationResult[DirectoryMember], OperationResult[None]]
+            idp_result: OperationResult[DirectoryMember] | OperationResult[None]
             if request.request_type == "grant":
-                idp_result = self._directory.add_group_member(
-                    request.group_email, request.user_email
-                )
+                idp_result = self._directory.add_group_member(request.group_email, request.user_email)
             else:
-                idp_result = self._directory.remove_group_member(
-                    request.group_email, request.user_email
-                )
+                idp_result = self._directory.remove_group_member(request.group_email, request.user_email)
             if not idp_result.is_success:
                 failed = replace(request, status="failed", updated_at=now)
                 self._repo.save_request(failed)
@@ -656,23 +628,18 @@ class AccessRequestService:
         if request.status != "pending_approval":
             return OperationResult.error(
                 OperationStatus.PERMANENT_ERROR,
-                message=(
-                    f"Request is in '{request.status}' state; "
-                    "only 'pending_approval' requests can be rejected."
-                ),
+                message=(f"Request is in '{request.status}' state; only 'pending_approval' requests can be rejected."),
                 error_code="INVALID_STATE_TRANSITION",
             )
 
-        if approver_email.lower() not in [
-            a.lower() for a in request.resolved_approvers
-        ]:
+        if approver_email.lower() not in [a.lower() for a in request.resolved_approvers]:
             return OperationResult.error(
                 OperationStatus.PERMANENT_ERROR,
                 message="Actor is not in the resolved approver list.",
                 error_code="APPROVER_NOT_AUTHORIZED",
             )
 
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         decision = ApprovalDecision(
             request_id=request_id,
             actor_email=approver_email,
@@ -744,9 +711,7 @@ class AccessRequestService:
         if request.status not in ("submitted", "pending_approval"):
             return OperationResult.error(
                 OperationStatus.PERMANENT_ERROR,
-                message=(
-                    f"Request is in '{request.status}' state and cannot be cancelled."
-                ),
+                message=(f"Request is in '{request.status}' state and cannot be cancelled."),
                 error_code="INVALID_STATE_TRANSITION",
             )
 
@@ -757,7 +722,7 @@ class AccessRequestService:
                 error_code="CANCELLATION_NOT_AUTHORIZED",
             )
 
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         updated = replace(request, status="cancelled", updated_at=now)
         self._repo.save_request(updated)
         self._repo.save_audit_event(
@@ -825,10 +790,7 @@ class AccessRequestService:
         if request.status != "failed":
             return OperationResult.error(
                 OperationStatus.PERMANENT_ERROR,
-                message=(
-                    f"Request is in '{request.status}' state; "
-                    "only 'failed' requests can be retried."
-                ),
+                message=(f"Request is in '{request.status}' state; only 'failed' requests can be retried."),
                 error_code="INVALID_STATE_TRANSITION",
             )
 
@@ -839,17 +801,13 @@ class AccessRequestService:
                 error_code="APPROVER_NOT_AUTHORIZED",
             )
 
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
 
-        idp_result: Union[OperationResult[DirectoryMember], OperationResult[None]]
+        idp_result: OperationResult[DirectoryMember] | OperationResult[None]
         if request.request_type == "grant":
-            idp_result = self._directory.add_group_member(
-                request.group_email, request.user_email
-            )
+            idp_result = self._directory.add_group_member(request.group_email, request.user_email)
         else:
-            idp_result = self._directory.remove_group_member(
-                request.group_email, request.user_email
-            )
+            idp_result = self._directory.remove_group_member(request.group_email, request.user_email)
         if not idp_result.is_success:
             self._repo.save_audit_event(
                 RequestAuditEvent(
@@ -905,9 +863,7 @@ class AccessRequestService:
             message="Retry succeeded. Access provisioning re-triggered.",
         )
 
-    def get_request_status(
-        self, request_id: str
-    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]:
+    def get_request_status(self, request_id: str) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]:
         """Return the access request and all recorded decisions.
 
         Returns:
@@ -940,9 +896,7 @@ class AccessRequestService:
             event: Domain event with ``event_type`` SYNC_COMPLETED or SYNC_FAILED.
         """
         metadata = event.metadata or {}
-        request_id = (
-            metadata.get("request_id", "") if isinstance(metadata, dict) else ""
-        )
+        request_id = metadata.get("request_id", "") if isinstance(metadata, dict) else ""
         if not request_id:
             return
 
@@ -967,7 +921,7 @@ class AccessRequestService:
             )
             return
 
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
 
         if event.event_type == SYNC_COMPLETED:
             updated = replace(request, status="completed", updated_at=now)

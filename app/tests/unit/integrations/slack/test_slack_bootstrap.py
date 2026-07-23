@@ -20,8 +20,8 @@ from slack_sdk.http_retry.builtin_async_handlers import (
 )
 from slack_sdk.web.async_client import AsyncWebClient
 
-from integrations.slack.settings import SlackSettings
 from integrations.slack.bootstrap import LegacySlackBootstrap, SlackBootstrap
+from integrations.slack.settings import SlackSettings
 
 pytestmark = pytest.mark.unit
 

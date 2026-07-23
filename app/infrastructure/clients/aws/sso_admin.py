@@ -4,8 +4,6 @@ Provides type-safe access to AWS SSO Admin operations (create_account_assignment
 with consistent error handling and OperationResult return types.
 """
 
-from typing import Optional
-
 import structlog
 
 from infrastructure.clients.aws.executor import execute_aws_api_call
@@ -28,7 +26,7 @@ class SsoAdminClient:
     def __init__(
         self,
         session_provider: SessionProvider,
-        default_sso_instance_arn: Optional[str] = None,
+        default_sso_instance_arn: str | None = None,
     ) -> None:
         self._service_name = "sso-admin"
         self._session_provider = session_provider
@@ -42,8 +40,8 @@ class SsoAdminClient:
         principal_type: str,
         target_id: str,
         target_type: str = "AWS_ACCOUNT",
-        instance_arn: Optional[str] = None,
-        role_arn: Optional[str] = None,
+        instance_arn: str | None = None,
+        role_arn: str | None = None,
         **kwargs,
     ) -> OperationResult:
         """Create an account assignment in AWS SSO.
@@ -65,9 +63,7 @@ class SsoAdminClient:
             if not self._default_sso_instance_arn:
                 raise ValueError("instance_arn must be provided if no default is set")
             instance_arn = self._default_sso_instance_arn
-        client_kwargs = self._session_provider.build_client_kwargs(
-            service_name=self._service_name, role_arn=role_arn
-        )
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "sso-admin",
             "create_account_assignment",
@@ -88,8 +84,8 @@ class SsoAdminClient:
         principal_type: str,
         target_id: str,
         target_type: str = "AWS_ACCOUNT",
-        instance_arn: Optional[str] = None,
-        role_arn: Optional[str] = None,
+        instance_arn: str | None = None,
+        role_arn: str | None = None,
         **kwargs,
     ) -> OperationResult:
         """Delete an account assignment from AWS SSO.
@@ -111,9 +107,7 @@ class SsoAdminClient:
             if not self._default_sso_instance_arn:
                 raise ValueError("instance_arn must be provided if no default is set")
             instance_arn = self._default_sso_instance_arn
-        client_kwargs = self._session_provider.build_client_kwargs(
-            service_name=self._service_name, role_arn=role_arn
-        )
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "sso-admin",
             "delete_account_assignment",
@@ -131,8 +125,8 @@ class SsoAdminClient:
         self,
         principal_id: str,
         principal_type: str,
-        instance_arn: Optional[str] = None,
-        role_arn: Optional[str] = None,
+        instance_arn: str | None = None,
+        role_arn: str | None = None,
         **kwargs,
     ) -> OperationResult:
         """List account assignments for a principal.
@@ -151,9 +145,7 @@ class SsoAdminClient:
             if not self._default_sso_instance_arn:
                 raise ValueError("instance_arn must be provided if no default is set")
             instance_arn = self._default_sso_instance_arn
-        client_kwargs = self._session_provider.build_client_kwargs(
-            service_name=self._service_name, role_arn=role_arn
-        )
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "sso-admin",
             "list_account_assignments",
@@ -166,8 +158,8 @@ class SsoAdminClient:
 
     def list_permission_sets(
         self,
-        instance_arn: Optional[str] = None,
-        role_arn: Optional[str] = None,
+        instance_arn: str | None = None,
+        role_arn: str | None = None,
         **kwargs,
     ) -> OperationResult:
         """List permission sets in the SSO instance.
@@ -183,9 +175,7 @@ class SsoAdminClient:
             if not self._default_sso_instance_arn:
                 raise ValueError("instance_arn must be provided if no default is set")
             instance_arn = self._default_sso_instance_arn
-        client_kwargs = self._session_provider.build_client_kwargs(
-            service_name=self._service_name, role_arn=role_arn
-        )
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "sso-admin",
             "list_permission_sets",
@@ -194,9 +184,7 @@ class SsoAdminClient:
             **kwargs,
         )
 
-    def healthcheck(
-        self, instance_arn: Optional[str] = None, role_arn: Optional[str] = None
-    ) -> OperationResult:
+    def healthcheck(self, instance_arn: str | None = None, role_arn: str | None = None) -> OperationResult:
         """Lightweight health check for SSO Admin.
 
         Calls `list_account_assignments` if an `instance_arn` is provided; otherwise
@@ -206,9 +194,7 @@ class SsoAdminClient:
             if not self._default_sso_instance_arn:
                 raise ValueError("instance_arn must be provided if no default is set")
             instance_arn = self._default_sso_instance_arn
-        client_kwargs = self._session_provider.build_client_kwargs(
-            service_name=self._service_name, role_arn=role_arn
-        )
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=role_arn)
         return execute_aws_api_call(
             "sso-admin",
             "list_permission_sets",

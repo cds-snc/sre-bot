@@ -8,7 +8,7 @@ The `sync_type` Literal field acts as a Pydantic discriminator so the
 correct schema is validated before the request reaches the service layer.
 """
 
-from typing import Annotated, Dict, List, Literal, Optional, Union
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -18,14 +18,12 @@ class UserSyncRequest(BaseModel):
 
     sync_type: Literal["user"] = "user"
     user_email: EmailStr = Field(..., description="Email of the user to sync.")
-    platform: str = Field(
-        ..., min_length=2, description="Target platform key, e.g. 'aws'."
-    )
+    platform: str = Field(..., min_length=2, description="Target platform key, e.g. 'aws'.")
     dry_run: bool = Field(
         default=False,
         description="If true, return planned actions without executing them.",
     )
-    request_id: Optional[str] = Field(
+    request_id: str | None = Field(
         default=None,
         description="Optional correlation ID for tracing.",
     )
@@ -35,21 +33,19 @@ class PlatformSyncRequest(BaseModel):
     """Batch platform-wide sync: converge all users on a platform."""
 
     sync_type: Literal["platform"] = "platform"
-    platform: str = Field(
-        ..., min_length=2, description="Platform key to sync, e.g. 'aws'."
-    )
+    platform: str = Field(..., min_length=2, description="Platform key to sync, e.g. 'aws'.")
     dry_run: bool = Field(
         default=False,
         description="If true, return planned actions without executing them.",
     )
-    request_id: Optional[str] = Field(
+    request_id: str | None = Field(
         default=None,
         description="Optional correlation ID for tracing.",
     )
 
 
 AccessSyncRequest = Annotated[
-    Union[UserSyncRequest, PlatformSyncRequest],
+    UserSyncRequest | PlatformSyncRequest,
     Field(discriminator="sync_type"),
 ]
 
@@ -87,25 +83,25 @@ class SyncJobStatusResponse(BaseModel):
     """
 
     job_id: str
-    sync_type: Optional[str] = None
+    sync_type: str | None = None
     platform: str
     dry_run: bool
     status: str
-    started_at: Optional[str] = None
-    completed_at: Optional[str] = None
-    error: Optional[str] = None
+    started_at: str | None = None
+    completed_at: str | None = None
+    error: str | None = None
     # Platform sync outcome fields
-    users_synced: Optional[int] = None
-    users_converged: Optional[int] = None
-    orphans_found: Optional[int] = None
-    requires_manual_action_count: Optional[int] = None
-    changed_user_count: Optional[int] = None
-    unchanged_user_count: Optional[int] = None
-    action_counts: Optional[Dict[str, int]] = None
-    lifecycle_actions: Optional[Dict[str, List[str]]] = None
-    entitlements_by_action: Optional[Dict[str, Dict[str, List[str]]]] = None
+    users_synced: int | None = None
+    users_converged: int | None = None
+    orphans_found: int | None = None
+    requires_manual_action_count: int | None = None
+    changed_user_count: int | None = None
+    unchanged_user_count: int | None = None
+    action_counts: dict[str, int] | None = None
+    lifecycle_actions: dict[str, list[str]] | None = None
+    entitlements_by_action: dict[str, dict[str, list[str]]] | None = None
     # User sync outcome fields
-    user_email: Optional[str] = None
-    actions_planned: Optional[List[str]] = None
-    actions_applied: Optional[List[str]] = None
-    requires_manual_action: Optional[bool] = None
+    user_email: str | None = None
+    actions_planned: list[str] | None = None
+    actions_applied: list[str] | None = None
+    requires_manual_action: bool | None = None

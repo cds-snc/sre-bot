@@ -21,15 +21,11 @@ class TestCreateRetryStore:
         assert isinstance(store, InMemoryRetryStore)
         assert store.config == config
 
-    def test_create_memory_store_explicit(
-        self, retry_config_factory, mock_settings_with_dynamodb
-    ):
+    def test_create_memory_store_explicit(self, retry_config_factory, mock_settings_with_dynamodb):
         """Test explicit memory store creation overrides settings."""
         config = retry_config_factory()
 
-        store = create_retry_store(
-            config, mock_settings_with_dynamodb, backend="memory"
-        )
+        store = create_retry_store(config, mock_settings_with_dynamodb, backend="memory")
 
         assert isinstance(store, InMemoryRetryStore)
 
@@ -77,9 +73,7 @@ class TestCreateRetryStore:
 
         assert isinstance(store, DynamoDBRetryStore)
 
-    def test_create_store_unknown_backend_raises_error(
-        self, retry_config_factory, mock_settings
-    ):
+    def test_create_store_unknown_backend_raises_error(self, retry_config_factory, mock_settings):
         """Test that unknown backend raises ValueError."""
         config = retry_config_factory()
 
@@ -120,16 +114,12 @@ class TestCreateRetryStore:
         assert store.config.max_attempts == 7
         assert store.config.base_delay_seconds == 45
 
-    def test_factory_respects_backend_parameter_over_settings(
-        self, retry_config_factory, mock_settings_with_dynamodb
-    ):
+    def test_factory_respects_backend_parameter_over_settings(self, retry_config_factory, mock_settings_with_dynamodb):
         """Test that backend parameter overrides settings."""
         config = retry_config_factory()
 
         # Settings say dynamodb, but we explicitly request memory
-        store = create_retry_store(
-            config, mock_settings_with_dynamodb, backend="memory"
-        )
+        store = create_retry_store(config, mock_settings_with_dynamodb, backend="memory")
 
         assert isinstance(store, InMemoryRetryStore)
         assert not isinstance(store, DynamoDBRetryStore)

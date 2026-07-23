@@ -8,8 +8,10 @@ Tests cover:
 """
 
 import json
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
 from infrastructure.audit.models import AuditEvent
 from integrations.sentinel.client import log_audit_event
 

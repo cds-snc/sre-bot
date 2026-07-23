@@ -1,7 +1,7 @@
 import json
 import re
+from collections.abc import Callable
 from datetime import datetime
-from typing import Callable
 
 from slack_bolt import Ack, App, Respond
 from slack_sdk import WebClient
@@ -135,9 +135,7 @@ def register(bot: App):
     Args:
         bot (SlackBot): The SlackBot instance to which the module will be registered.
     """
-    bot.action("handle_incident_action_buttons")(
-        incident_alert.handle_incident_action_buttons
-    )
+    bot.action("handle_incident_action_buttons")(incident_alert.handle_incident_action_buttons)
     bot.action("add_folder_metadata")(incident_folder.add_folder_metadata)
     bot.action("view_folder_metadata")(incident_folder.view_folder_metadata)
     bot.view("view_folder_metadata_modal")(incident_folder.list_folders_view)
@@ -148,18 +146,10 @@ def register(bot: App):
     bot.action("confirm_click")(schedule_retro.confirm_click)
     bot.action("user_select_action")(schedule_retro.incident_selected_users_updated)
     bot.action("archive_channel")(incident_conversation.archive_channel_action)
-    bot.event("reaction_added", matchers=[incident_conversation.is_floppy_disk])(
-        incident_conversation.handle_reaction_added
-    )
-    bot.event("reaction_removed", matchers=[incident_conversation.is_floppy_disk])(
-        incident_conversation.handle_reaction_removed
-    )
-    bot.event("reaction_added")(
-        incident_conversation.just_ack_the_rest_of_reaction_events
-    )
-    bot.event("reaction_removed")(
-        incident_conversation.just_ack_the_rest_of_reaction_events
-    )
+    bot.event("reaction_added", matchers=[incident_conversation.is_floppy_disk])(incident_conversation.handle_reaction_added)
+    bot.event("reaction_removed", matchers=[incident_conversation.is_floppy_disk])(incident_conversation.handle_reaction_removed)
+    bot.event("reaction_added")(incident_conversation.just_ack_the_rest_of_reaction_events)
+    bot.event("reaction_removed")(incident_conversation.just_ack_the_rest_of_reaction_events)
     bot.view("incident_updates_view")(handle_updates_submission)
     bot.action("update_incident_field")(information_update.open_update_field_view)
     bot.view("update_field_modal")(information_update.handle_update_field_submission)
@@ -236,13 +226,9 @@ def handle_incident_command(
         action_handler(client, body, respond, ack, args_list, flags)
     else:
         if first_arg:
-            respond(
-                f"Unknown command: {first_arg}. Type `/sre incident help` to see a list of commands."
-            )
+            respond(f"Unknown command: {first_arg}. Type `/sre incident help` to see a list of commands.")
         else:
-            respond(
-                "Please provide a valid command. Type `/sre incident help` to see a list of commands."
-            )
+            respond("Please provide a valid command. Type `/sre incident help` to see a list of commands.")
 
 
 def handle_help(_client, _body, respond, _ack, args, _flags) -> None:
@@ -378,9 +364,7 @@ def handle_status(client, body, respond, ack, action, args, _flags):
 • `update <status>` — update the incident status to one of the valid statuses
 
 *Valid Statuses:*
-""" + ", ".join(
-        VALID_STATUS
-    )
+""" + ", ".join(VALID_STATUS)
     match action:
         case "update":
             if args:
@@ -485,9 +469,7 @@ def close_incident(client: WebClient, body, ack, respond):
         if channel_info is None or not channel_info.get("is_member", False):
             client.conversations_join(channel=channel_id)
     except Exception as e:
-        logger.exception(
-            "client_conversations_error", channel_id=channel_id, error=str(e)
-        )
+        logger.exception("client_conversations_error", channel_id=channel_id, error=str(e))
         return
 
     if not channel_name.startswith("incident-"):
@@ -547,9 +529,7 @@ def close_incident(client: WebClient, body, ack, respond):
             user_id=user_id,
             error=str(e),
         )
-        error_message = (
-            f"Could not archive the channel {channel_name} due to error: {e}"
-        )
+        error_message = f"Could not archive the channel {channel_name} due to error: {e}"
         respond(error_message)
 
 
@@ -572,25 +552,17 @@ def stale_incidents(client: WebClient, body, ack: Ack):
         ],
     }
 
-    placeholder_modal = client.views_open(
-        trigger_id=body["trigger_id"], view=placeholder
-    )
+    placeholder_modal = client.views_open(trigger_id=body["trigger_id"], view=placeholder)
 
     # stale_channels = get_stale_channels(client)
-    stale_channels = slack_channels.get_stale_channels(
-        client, INCIDENT_CHANNELS_PATTERN
-    )
+    stale_channels = slack_channels.get_stale_channels(client, INCIDENT_CHANNELS_PATTERN)
 
     blocks = {
         "type": "modal",
         "callback_id": "stale_incidents_view",
         "title": {"type": "plain_text", "text": "SRE - Stale incidents"},
         "close": {"type": "plain_text", "text": "Close"},
-        "blocks": [
-            item
-            for sublist in list(map(channel_item, stale_channels))
-            for item in sublist
-        ],
+        "blocks": [item for sublist in list(map(channel_item, stale_channels)) for item in sublist],
     }
 
     client.views_update(view_id=placeholder_modal["view"]["id"], view=blocks)
@@ -610,11 +582,7 @@ def channel_item(channel):
             "elements": [
                 {
                     "type": "mrkdwn",
-                    "text": (
-                        channel["topic"]["value"]
-                        if channel["topic"]["value"]
-                        else "No information available"
-                    ),
+                    "text": (channel["topic"]["value"] if channel["topic"]["value"] else "No information available"),
                 }
             ],
         },
@@ -622,9 +590,7 @@ def channel_item(channel):
     ]
 
 
-def handle_update_status_command(
-    client: WebClient, body, respond: Respond, ack: Ack, args
-):
+def handle_update_status_command(client: WebClient, body, respond: Respond, ack: Ack, args):
     ack()
     status = str.join(" ", args)
     user_id = slack_users.get_user_id_from_request(body)
@@ -636,17 +602,12 @@ def handle_update_status_command(
         "Closed",
     ]
     if status not in valid_statuses:
-        respond(
-            "A valid status must be used with this command:\n"
-            + ", ".join(valid_statuses)
-        )
+        respond("A valid status must be used with this command:\n" + ", ".join(valid_statuses))
         return
     incident = db_operations.get_incident_by_channel_id(body["channel_id"])
 
     if not incident:
-        respond(
-            "No incident found for this channel. Will not update status in DB record."
-        )
+        respond("No incident found for this channel. Will not update status in DB record.")
         return
     else:
         respond(f"Updating incident status to {status}...")
@@ -673,9 +634,7 @@ def parse_incident_datetime_string(datetime_string: str) -> str:
 
 def convert_timestamp(timestamp: str) -> str:
     try:
-        datetime_str = datetime.fromtimestamp(float(timestamp)).strftime(
-            "%Y-%m-%d %H:%M:%S"
-        )
+        datetime_str = datetime.fromtimestamp(float(timestamp)).strftime("%Y-%m-%d %H:%M:%S")
     except ValueError:
         datetime_str = "Unknown"
     return datetime_str
@@ -733,16 +692,12 @@ def display_current_updates(client: WebClient, body, respond: Respond, ack: Ack)
     updates = incident_folder.fetch_updates(incident_id)
     if updates:
         updates_text = "\n".join(updates)
-        client.chat_postMessage(
-            channel=incident_id, text=f"Current updates:\n{updates_text}"
-        )
+        client.chat_postMessage(channel=incident_id, text=f"Current updates:\n{updates_text}")
     else:
         respond("No updates found for this incident.")
 
 
-def recreate_missing_incident_resources(
-    client: WebClient, body: dict, respond: Respond, ack: Ack
-):
+def recreate_missing_incident_resources(client: WebClient, body: dict, respond: Respond, ack: Ack):
     """
     Recreate missing resources for an existing incident channel.
 
@@ -757,9 +712,7 @@ def recreate_missing_incident_resources(
 
     # Verify this is an incident channel
     if not channel_name.startswith("incident-"):
-        respond(
-            "❌ This command can only be used in incident channels (channels starting with `incident-`)."
-        )
+        respond("❌ This command can only be used in incident channels (channels starting with `incident-`).")
         return
 
     # Show initial message
@@ -767,9 +720,7 @@ def recreate_missing_incident_resources(
 
     try:
         # Call the core function to recreate missing resources
-        results = core.recreate_missing_resources(
-            client, channel_id, channel_name, user_id
-        )
+        results = core.recreate_missing_resources(client, channel_id, channel_name, user_id)
 
         # Build response message
         response_blocks = [
@@ -784,9 +735,7 @@ def recreate_missing_incident_resources(
 
         # Add success messages
         if results["success"]:
-            success_text = "*Successfully Created/Updated:*\n" + "\n".join(
-                [f"• {item}" for item in results["success"]]
-            )
+            success_text = "*Successfully Created/Updated:*\n" + "\n".join([f"• {item}" for item in results["success"]])
             response_blocks.append(
                 {
                     "type": "section",
@@ -796,9 +745,7 @@ def recreate_missing_incident_resources(
 
         # Add skipped messages
         if results["skipped"]:
-            skipped_text = "*Already Exists (Skipped):*\n" + "\n".join(
-                [f"• {item}" for item in results["skipped"]]
-            )
+            skipped_text = "*Already Exists (Skipped):*\n" + "\n".join([f"• {item}" for item in results["skipped"]])
             response_blocks.append(
                 {
                     "type": "section",
@@ -808,9 +755,7 @@ def recreate_missing_incident_resources(
 
         # Add error messages
         if results["errors"]:
-            error_text = "*Errors Encountered:*\n" + "\n".join(
-                [f"• {item}" for item in results["errors"]]
-            )
+            error_text = "*Errors Encountered:*\n" + "\n".join([f"• {item}" for item in results["errors"]])
             response_blocks.append(
                 {
                     "type": "section",

@@ -8,7 +8,6 @@ from structlog import get_logger
 from infrastructure.configuration.integrations.google import get_google_resources_config
 from integrations.google_workspace import google_docs, google_drive
 
-
 google_resources = get_google_resources_config()
 INCIDENT_TEMPLATE = google_resources.incident_template_id
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
@@ -112,10 +111,7 @@ def update_incident_document_status(document_id, new_status="Closed"):
     ]
     result = google_docs.batch_update(document_id, changes)
     replies = result.get("replies", []) if isinstance(result, dict) else []
-    return any(
-        reply.get("replaceAllText", {}).get("occurrencesChanged", 0) > 0
-        for reply in replies
-    )
+    return any(reply.get("replaceAllText", {}).get("occurrencesChanged", 0) > 0 for reply in replies)
 
 
 def get_timeline_section(document_id):
@@ -185,13 +181,7 @@ def replace_text_between_headings(doc_id, new_content, start_heading, end_headin
 
     if start_index is not None and end_index is not None:
         # Delete the existing content from the document
-        requests = [
-            {
-                "deleteContentRange": {
-                    "range": {"startIndex": start_index, "endIndex": end_index}
-                }
-            }
-        ]
+        requests = [{"deleteContentRange": {"range": {"startIndex": start_index, "endIndex": end_index}}}]
 
         # split the formatted content by the emoji
         line = new_content.split(" ➡ ")
@@ -230,9 +220,7 @@ def replace_text_between_headings(doc_id, new_content, start_heading, end_headin
                     date = match.group("date") + " ET"
                     url = match.group("url")
                     name = match.group("name")
-                    message = match.group(
-                        "message"
-                    ).strip()  # Remove leading/trailing whitespace
+                    message = match.group("message").strip()  # Remove leading/trailing whitespace
 
                     # Construct the text to be inserted with the date as a link
                     text_to_insert = f" ➡️ {date} {name}: {message}\n"

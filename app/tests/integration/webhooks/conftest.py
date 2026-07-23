@@ -6,7 +6,7 @@ Provides:
 - Mock database lookups for webhook validation
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -110,9 +110,7 @@ def simple_text_payload():
 @pytest.fixture
 def upptime_status_payload():
     """Upptime status check webhook payload."""
-    return {
-        "text": "🟥 API Server (https://api.example.com/) is **down** : https://github.com/example/status/issues/123"
-    }
+    return {"text": "🟥 API Server (https://api.example.com/) is **down** : https://github.com/example/status/issues/123"}
 
 
 # Access Request Payloads
@@ -120,7 +118,7 @@ def upptime_status_payload():
 def access_request_payload():
     """AWS access request payload."""
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return {
         "account": "ExampleAccount",
         "reason": "Testing access request webhook",

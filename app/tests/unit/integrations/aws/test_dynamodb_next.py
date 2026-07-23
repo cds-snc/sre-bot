@@ -1,17 +1,18 @@
 """Unit tests for dynamodb_next.py wrapper module."""
 
-import pytest
 from unittest.mock import MagicMock
 
+import pytest
+
+from infrastructure.operations.result import OperationResult, OperationStatus
 from integrations.aws.dynamodb_next import (
+    delete_item,
     get_item,
     put_item,
-    update_item,
-    delete_item,
     query,
     scan,
+    update_item,
 )
-from infrastructure.operations.result import OperationResult, OperationStatus
 
 pytestmark = pytest.mark.unit
 

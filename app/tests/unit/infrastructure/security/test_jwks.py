@@ -48,9 +48,7 @@ class TestJWKSManager:
         assert result is None
 
     @patch("infrastructure.security.jwks.PyJWKClient")
-    def test_get_jwks_client_creates_and_caches_client(
-        self, mock_pyjwk_client, mock_issuer_config
-    ):
+    def test_get_jwks_client_creates_and_caches_client(self, mock_pyjwk_client, mock_issuer_config):
         """Test get_jwks_client creates and caches PyJWKClient."""
         mock_client = MagicMock()
         mock_pyjwk_client.return_value = mock_client
@@ -68,9 +66,7 @@ class TestJWKSManager:
         assert mock_pyjwk_client.call_count == 1  # Still only 1 call
 
     @patch("infrastructure.security.jwks.PyJWKClient")
-    def test_get_jwks_client_handles_initialization_error(
-        self, mock_pyjwk_client, mock_issuer_config
-    ):
+    def test_get_jwks_client_handles_initialization_error(self, mock_pyjwk_client, mock_issuer_config):
         """Test get_jwks_client returns None on initialization error."""
 
         mock_pyjwk_client.side_effect = PyJWKClientError("Connection failed")
@@ -101,9 +97,7 @@ class TestJWKSManager:
         assert len(manager.jwks_clients) == 0
 
     @patch("infrastructure.security.jwks.PyJWKClient")
-    def test_get_jwks_client_uses_correct_config(
-        self, mock_pyjwk_client, mock_issuer_config
-    ):
+    def test_get_jwks_client_uses_correct_config(self, mock_pyjwk_client, mock_issuer_config):
         """Test get_jwks_client uses correct config for issuer."""
         mock_client = MagicMock()
         mock_pyjwk_client.return_value = mock_client
@@ -122,9 +116,7 @@ class TestJWKSManager:
         )
 
     @patch("infrastructure.security.jwks.PyJWKClient")
-    def test_get_jwks_client_initializes_different_clients_per_issuer(
-        self, mock_pyjwk_client, mock_issuer_config
-    ):
+    def test_get_jwks_client_initializes_different_clients_per_issuer(self, mock_pyjwk_client, mock_issuer_config):
         """Test get_jwks_client initializes separate clients for different issuers."""
         client1 = MagicMock()
         client2 = MagicMock()

@@ -33,9 +33,10 @@ Key Functions:
 
 import json
 import time
+from collections.abc import Callable
 from functools import wraps
 from json import JSONDecodeError
-from typing import Any, Callable, List, Optional, Tuple, Union, cast
+from typing import Any, cast
 
 import structlog
 from google.oauth2 import service_account
@@ -80,9 +81,9 @@ class GoogleAPIError(Exception):
     def __init__(
         self,
         message: str,
-        status_code: Optional[int] = None,
-        function_name: Optional[str] = None,
-        retry_after: Optional[int] = None,
+        status_code: int | None = None,
+        function_name: str | None = None,
+        retry_after: int | None = None,
     ):
         self.message = message
         self.status_code = status_code
@@ -95,16 +96,14 @@ def _calculate_retry_delay(attempt: int, status_code: int) -> float:
     """Calculate retry delay based on attempt and error type."""
     if status_code == 429:
         raw = ERROR_CONFIG["rate_limit_delay"]
-        numeric = cast(Union[int, float, str], raw)
+        numeric = cast(int | float | str, raw)
         try:
             return float(numeric)
         except (TypeError, ValueError) as exc:
-            raise TypeError(
-                f"ERROR_CONFIG['rate_limit_delay'] must be numeric or numeric string, got {type(raw)!r}"
-            ) from exc
+            raise TypeError(f"ERROR_CONFIG['rate_limit_delay'] must be numeric or numeric string, got {type(raw)!r}") from exc
     else:
         raw = ERROR_CONFIG["default_backoff_factor"]
-        numeric = cast(Union[int, float, str], raw)
+        numeric = cast(int | float | str, raw)
         try:
             return float(numeric) * (2**attempt)
         except (TypeError, ValueError) as exc:
@@ -113,32 +112,25 @@ def _calculate_retry_delay(attempt: int, status_code: int) -> float:
             ) from exc
 
 
-def _get_retry_codes(error_config) -> Optional[set]:
+def _get_retry_codes(error_config) -> set | None:
     """Extract retry codes from error config, handling type errors gracefully."""
-    raw_retry_errors = (
-        error_config.get("retry_errors") if isinstance(error_config, dict) else None
-    )
+    raw_retry_errors = error_config.get("retry_errors") if isinstance(error_config, dict) else None
     if isinstance(raw_retry_errors, (list, tuple, set)):
         try:
             return {int(x) for x in raw_retry_errors}
-        except (TypeError, ValueError):
+        except TypeError, ValueError:
             return None
     return None
 
 
 def _should_retry(
     auto_retry: bool,
-    retry_codes: Optional[set],
+    retry_codes: set | None,
     error: HttpError,
     is_last_attempt: bool,
 ) -> bool:
     """Determine if the API call should be retried based on error and config."""
-    return (
-        auto_retry
-        and retry_codes is not None
-        and int(error.resp.status) in retry_codes
-        and not is_last_attempt
-    )
+    return auto_retry and retry_codes is not None and int(error.resp.status) in retry_codes and not is_last_attempt
 
 
 def _handle_final_error(
@@ -149,25 +141,15 @@ def _handle_final_error(
     error_message = str(error).lower()
 
     # Check if this is a known non-critical error (only via config)
-    raw_nc = (
-        ERROR_CONFIG.get("non_critical_errors")
-        if isinstance(ERROR_CONFIG, dict)
-        else None
-    )
+    raw_nc = ERROR_CONFIG.get("non_critical_errors") if isinstance(ERROR_CONFIG, dict) else None
     is_non_critical_config = False
     if isinstance(raw_nc, dict):
         function_errs = raw_nc.get(function_name)
         if isinstance(function_errs, (list, tuple, set)):
-            is_non_critical_config = any(
-                isinstance(err, str) and (err in error_message) for err in function_errs
-            )
+            is_non_critical_config = any(isinstance(err, str) and (err in error_message) for err in function_errs)
 
-    status_code = (
-        getattr(error, "resp", {}).get("status") if hasattr(error, "resp") else None
-    )
-    error_code = (
-        f"GOOGLE_API_ERROR_{status_code}" if status_code else "GOOGLE_API_ERROR"
-    )
+    status_code = getattr(error, "resp", {}).get("status") if hasattr(error, "resp") else None
+    error_code = f"GOOGLE_API_ERROR_{status_code}" if status_code else "GOOGLE_API_ERROR"
 
     if is_non_critical_config:
         logger.warning(
@@ -196,7 +178,7 @@ def _handle_final_error(
 def execute_api_call(
     func_name: str,
     api_call: Callable[[], Any],
-    max_retries: Optional[int] = None,
+    max_retries: int | None = None,
 ) -> OperationResult:
     """
     Execute a Google API call with standardized error handling, retry logic, and response modeling.
@@ -215,31 +197,18 @@ def execute_api_call(
         - Non-critical errors are only supported via config, not as a function argument.
         - Legacy flags (response_metadata, non_critical, auto_retry, return_none_on_error) are no longer supported.
     """
-    max_retry_attempts = (
-        max_retries
-        if isinstance(max_retries, int)
-        else ERROR_CONFIG["default_max_retries"]
-    )
-    last_exception: Optional[Exception] = None
+    max_retry_attempts = max_retries if isinstance(max_retries, int) else ERROR_CONFIG["default_max_retries"]
+    last_exception: Exception | None = None
 
     retry_codes = _get_retry_codes(ERROR_CONFIG)
 
-    for attempt in range(
-        max_retry_attempts
-        if isinstance(max_retry_attempts, int)
-        else int(max_retry_attempts) + 1
-    ):
+    for attempt in range(max_retry_attempts if isinstance(max_retry_attempts, int) else int(max_retry_attempts) + 1):
         try:
             logger.debug(
                 "google_api_call_start",
                 function=func_name,
                 attempt=attempt + 1,
-                max_attempts=(
-                    max_retry_attempts
-                    if isinstance(max_retry_attempts, int)
-                    else int(max_retry_attempts)
-                )
-                + 1,
+                max_attempts=(max_retry_attempts if isinstance(max_retry_attempts, int) else int(max_retry_attempts)) + 1,
             )
 
             result = api_call()
@@ -265,11 +234,7 @@ def execute_api_call(
             last_exception = e
             is_last_attempt = attempt == max_retry_attempts
 
-            if (
-                retry_codes is not None
-                and int(e.resp.status) in retry_codes
-                and not is_last_attempt
-            ):
+            if retry_codes is not None and int(e.resp.status) in retry_codes and not is_last_attempt:
                 delay = _calculate_retry_delay(attempt, e.resp.status)
                 logger.warning(
                     "google_api_retrying",
@@ -307,8 +272,8 @@ def execute_api_call(
 def get_google_service(
     service: str,
     version: str,
-    scopes: Optional[List[str]] = None,
-    delegated_user_email: Optional[str] = None,
+    scopes: list[str] | None = None,
+    delegated_user_email: str | None = None,
 ) -> Resource:
     """
     Get an authenticated Google service with built-in retry and timeout.
@@ -342,9 +307,7 @@ def get_google_service(
 
     except JSONDecodeError as json_decode_exception:
         logger.error("invalid_credentials_json", error=str(json_decode_exception))
-        raise JSONDecodeError(
-            msg="Invalid credentials JSON", doc="Credentials JSON", pos=0
-        ) from json_decode_exception
+        raise JSONDecodeError(msg="Invalid credentials JSON", doc="Credentials JSON", pos=0) from json_decode_exception
 
     # Build service
     return build(
@@ -358,8 +321,8 @@ def get_google_service(
 
 def execute_batch_request(
     service: Resource,
-    requests: List[Tuple],
-    callback_fn: Optional[Callable] = None,
+    requests: list[tuple],
+    callback_fn: Callable | None = None,
 ) -> OperationResult:
     """
     Execute multiple Google API calls in a single batch request with standardized error handling and response modeling.
@@ -447,11 +410,7 @@ def execute_batch_request(
                     "total": total_requests,
                     "successful": successful_requests,
                     "failed": failed_requests,
-                    "success_rate": (
-                        successful_requests / total_requests
-                        if total_requests > 0
-                        else 0
-                    ),
+                    "success_rate": (successful_requests / total_requests if total_requests > 0 else 0),
                 },
             },
         )
@@ -463,9 +422,7 @@ def execute_batch_request(
                 "total": total_requests,
                 "successful": successful_requests,
                 "failed": failed_requests,
-                "success_rate": (
-                    successful_requests / total_requests if total_requests > 0 else 0
-                ),
+                "success_rate": (successful_requests / total_requests if total_requests > 0 else 0),
             },
         }
         return OperationResult.success(
@@ -476,9 +433,9 @@ def execute_batch_request(
 
 def paginate_all_results(
     request,
-    resource_key: Optional[str] = None,
-    list_resource: Optional[Resource] = None,
-    method_name: Optional[str] = None,
+    resource_key: str | None = None,
+    list_resource: Resource | None = None,
+    method_name: str | None = None,
 ) -> OperationResult:
     """
     Simplified pagination using built-in Google API client features with standardized error handling and response modeling.
@@ -522,11 +479,7 @@ def paginate_all_results(
 
                 # extract items from current page
                 page_item_count = 0
-                if (
-                    detected_key
-                    and isinstance(response, dict)
-                    and detected_key in response
-                ):
+                if detected_key and isinstance(response, dict) and detected_key in response:
                     page_items = response[detected_key]
                     if isinstance(page_items, list):
                         page_item_count = len(page_items)
@@ -536,11 +489,7 @@ def paginate_all_results(
                     all_results.extend(response)
 
                 # Get next page if available
-                next_page_token = (
-                    response.get("nextPageToken")
-                    if isinstance(response, dict)
-                    else None
-                )
+                next_page_token = response.get("nextPageToken") if isinstance(response, dict) else None
 
                 logger.debug(
                     "pagination_page_processed",
@@ -556,9 +505,7 @@ def paginate_all_results(
                     if list_next_method:
                         try:
                             # pylint: disable=not-callable
-                            current_request = list_next_method(
-                                current_request, response
-                            )
+                            current_request = list_next_method(current_request, response)
                         except Exception as e:
                             logger.error("pagination_error", error=str(e))
                             current_request = None
@@ -596,8 +543,8 @@ def execute_google_api_call(
     version: str,
     resource_path: str,
     method: str,
-    scopes: Optional[List[str]] = None,
-    delegated_user_email: Optional[str] = None,
+    scopes: list[str] | None = None,
+    delegated_user_email: str | None = None,
     **kwargs: Any,
 ) -> OperationResult:
     """
@@ -628,9 +575,7 @@ def execute_google_api_call(
 
     def api_call():
         # Step 1: Get the root service connection with authentication
-        service = get_google_service(
-            service_name, version, scopes, delegated_user_email
-        )
+        service = get_google_service(service_name, version, scopes, delegated_user_email)
 
         # Step 2: Traverse resource path
         resource_chain = service
@@ -658,12 +603,8 @@ def execute_google_api_call(
 
         if method == "list":
             # Use simplified pagination for list operations
-            resource_key = resource_path.split(".")[
-                -1
-            ]  # e.g., "users" from "users" or "members" from "groups.members"
-            return paginate_all_results(
-                request, resource_key, list_resource=resource_chain, method_name=method
-            )
+            resource_key = resource_path.split(".")[-1]  # e.g., "users" from "users" or "members" from "groups.members"
+            return paginate_all_results(request, resource_key, list_resource=resource_chain, method_name=method)
         else:
             # Simple execution for non-list operations
             return request.execute()

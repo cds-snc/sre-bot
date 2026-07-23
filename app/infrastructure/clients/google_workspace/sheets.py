@@ -4,7 +4,7 @@ Provides type-safe access to Google Sheets API (spreadsheets, values, formatting
 All methods return OperationResult for consistent error handling.
 """
 
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -57,7 +57,7 @@ class SheetsClient:
         )
     """
 
-    def __init__(self, session_provider: "SessionProvider") -> None:
+    def __init__(self, session_provider: SessionProvider) -> None:
         """Initialize Sheets client.
 
         Args:
@@ -73,10 +73,10 @@ class SheetsClient:
     def get_spreadsheet(
         self,
         spreadsheet_id: str,
-        ranges: Optional[List[str]] = None,
+        ranges: list[str] | None = None,
         include_grid_data: bool = False,
-        fields: Optional[str] = None,
-        delegated_email: Optional[str] = None,
+        fields: str | None = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Get spreadsheet metadata and optionally data.
 
@@ -130,8 +130,8 @@ class SheetsClient:
     def create_spreadsheet(
         self,
         title: str,
-        sheet_titles: Optional[List[str]] = None,
-        delegated_email: Optional[str] = None,
+        sheet_titles: list[str] | None = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Create a new spreadsheet.
 
@@ -160,21 +160,13 @@ class SheetsClient:
             delegated_user_email=delegated_email,
         )
 
-        body: Dict[str, Any] = {"properties": {"title": title}}
+        body: dict[str, Any] = {"properties": {"title": title}}
 
         if sheet_titles:
-            body["sheets"] = [
-                {"properties": {"title": sheet_title}} for sheet_title in sheet_titles
-            ]
+            body["sheets"] = [{"properties": {"title": sheet_title}} for sheet_title in sheet_titles]
 
         def api_call() -> Any:
-            return (
-                service.spreadsheets()
-                .create(
-                    body=body, fields="spreadsheetId,spreadsheetUrl,sheets.properties"
-                )
-                .execute()
-            )
+            return service.spreadsheets().create(body=body, fields="spreadsheetId,spreadsheetUrl,sheets.properties").execute()
 
         return execute_google_api_call(
             operation_name="sheets.spreadsheets.create",
@@ -184,8 +176,8 @@ class SheetsClient:
     def batch_update_spreadsheet(
         self,
         spreadsheet_id: str,
-        requests: List[Dict[str, Any]],
-        delegated_email: Optional[str] = None,
+        requests: list[dict[str, Any]],
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Apply batch updates to a spreadsheet (formatting, sheet operations).
 
@@ -215,11 +207,7 @@ class SheetsClient:
         )
 
         def api_call() -> Any:
-            return (
-                service.spreadsheets()
-                .batchUpdate(spreadsheetId=spreadsheet_id, body={"requests": requests})
-                .execute()
-            )
+            return service.spreadsheets().batchUpdate(spreadsheetId=spreadsheet_id, body={"requests": requests}).execute()
 
         return execute_google_api_call(
             operation_name="sheets.spreadsheets.batchUpdate",
@@ -237,7 +225,7 @@ class SheetsClient:
         major_dimension: str = "ROWS",
         value_render_option: str = "FORMATTED_VALUE",
         date_time_render_option: str = "SERIAL_NUMBER",
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Get values from a range in a spreadsheet.
 
@@ -292,9 +280,9 @@ class SheetsClient:
         self,
         spreadsheet_id: str,
         cell_range: str,
-        values: List[List[Any]],
+        values: list[list[Any]],
         value_input_option: str = VALUE_INPUT_OPTION_USER_ENTERED,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Update values in a range.
 
@@ -347,9 +335,9 @@ class SheetsClient:
     def batch_update_values(
         self,
         spreadsheet_id: str,
-        data: List[Dict[str, Any]],
+        data: list[dict[str, Any]],
         value_input_option: str = VALUE_INPUT_OPTION_USER_ENTERED,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Update multiple ranges in a single request.
 
@@ -399,10 +387,10 @@ class SheetsClient:
         self,
         spreadsheet_id: str,
         cell_range: str,
-        values: List[List[Any]],
+        values: list[list[Any]],
         value_input_option: str = VALUE_INPUT_OPTION_USER_ENTERED,
         insert_data_option: str = INSERT_DATA_OPTION_INSERT_ROWS,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Append values to the end of a range.
 
@@ -458,7 +446,7 @@ class SheetsClient:
         self,
         spreadsheet_id: str,
         cell_range: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Clear values from a range.
 
@@ -488,12 +476,7 @@ class SheetsClient:
         )
 
         def api_call() -> Any:
-            return (
-                service.spreadsheets()
-                .values()
-                .clear(spreadsheetId=spreadsheet_id, range=cell_range, body={})
-                .execute()
-            )
+            return service.spreadsheets().values().clear(spreadsheetId=spreadsheet_id, range=cell_range, body={}).execute()
 
         return execute_google_api_call(
             operation_name="sheets.values.clear",

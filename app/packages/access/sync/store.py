@@ -12,8 +12,7 @@ This allows efficient per-user, per-platform pagination (newest first via
 ``ScanIndexForward=False``).
 """
 
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
 
 import structlog
 
@@ -67,7 +66,7 @@ class SyncRunRepository:
         platform: str,
         user_email: str,
         limit: int = 10,
-    ) -> List[SyncRunRecord]:
+    ) -> list[SyncRunRecord]:
         """Return recent runs for the given platform + user, newest first."""
         pk = f"SYNC_RUN#{platform}#{user_email}"
         result = self._storage.query(
@@ -89,12 +88,8 @@ class SyncRunRepository:
 
     @staticmethod
     def _deserialize(item: dict) -> SyncRunRecord:
-        created_raw: Optional[str] = item.get("created_at")
-        created_at = (
-            datetime.fromisoformat(created_raw)
-            if created_raw
-            else datetime.now(timezone.utc)
-        )
+        created_raw: str | None = item.get("created_at")
+        created_at = datetime.fromisoformat(created_raw) if created_raw else datetime.now(UTC)
         return SyncRunRecord(
             run_id=item.get("run_id", ""),
             user_email=item.get("user_email", ""),

@@ -9,6 +9,8 @@ This module contains event name constants only.
 
 from packages.access.common.events import (
     SYNC_COMPLETED as COMMON_SYNC_COMPLETED,
+)
+from packages.access.common.events import (
     SYNC_FAILED as COMMON_SYNC_FAILED,
 )
 

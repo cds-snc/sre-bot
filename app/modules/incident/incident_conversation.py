@@ -37,9 +37,7 @@ def create_incident_conversation(client: WebClient, incident_name: str):
     """
     date_now = datetime.now().strftime("%Y-%m-%d")
     slug = f"{date_now} {incident_name}".strip().replace(" ", "-").lower()
-    channel_name_prefix = (
-        "incident-dev-" if settings.ENVIRONMENT != "production" else "incident-"
-    )
+    channel_name_prefix = "incident-dev-" if settings.ENVIRONMENT != "production" else "incident-"
     base_channel_name = channel_name_prefix + slug
     # Ensure base_channel_name is at most 80 chars
     if len(base_channel_name) > 80:
@@ -55,9 +53,7 @@ def create_incident_conversation(client: WebClient, incident_name: str):
             truncated_base = base_channel_name[:max_base_length]
             attempt_channel_name = f"{truncated_base}{suffix}"
         try:
-            response: SlackResponse = client.conversations_create(
-                name=attempt_channel_name
-            )
+            response: SlackResponse = client.conversations_create(name=attempt_channel_name)
             if response.get("ok"):
                 if i > 0:
                     slug = f"{slug}{suffix}"
@@ -71,10 +67,7 @@ def create_incident_conversation(client: WebClient, incident_name: str):
                 raise SlackApiError("Error creating the channel", response)
         except SlackApiError as e:
             # If the error is name_taken, continue to next attempt; otherwise, raise
-            if (
-                hasattr(e, "response")
-                and getattr(e.response, "data", {}).get("error") == "name_taken"
-            ):
+            if hasattr(e, "response") and getattr(e.response, "data", {}).get("error") == "name_taken":
                 pass  # Try next channel name
             else:
                 raise
@@ -92,9 +85,7 @@ def just_ack_the_rest_of_reaction_events():
     pass
 
 
-def is_incident_channel(
-    client: WebClient, channel_id: str, notify: bool = True
-) -> tuple[bool, bool]:
+def is_incident_channel(client: WebClient, channel_id: str, notify: bool = True) -> tuple[bool, bool]:
     """Check if the channel is an incident channel."""
     is_incident = False
     is_dev_incident = False
@@ -132,15 +123,15 @@ def rearrange_by_datetime_ascending(text):
     lines = text.split("\n")
     entries = []
 
-    pattern = r"\s*➡️\s*\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) ET\]\((https?://[\w./-]+(?:\?\w+=\d+\.\d+&\w+=\w+)?)\)\s([\w\s]+):\s"
+    pattern = (
+        r"\s*➡️\s*\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) ET\]\((https?://[\w./-]+(?:\?\w+=\d+\.\d+&\w+=\w+)?)\)\s([\w\s]+):\s"
+    )
 
     current_message = []
     for line in lines:
         match = re.match(pattern, line)
         if match:
-            if (
-                current_message
-            ):  # If there's a current message, finalize it before starting a new one
+            if current_message:  # If there's a current message, finalize it before starting a new one
                 entries.append(current_message)
                 current_message = []
             date_str, url, name = match.groups()
@@ -158,10 +149,7 @@ def rearrange_by_datetime_ascending(text):
 
     # Reformat the entries back into strings, including 'ET' and the full message
     sorted_text = "\n\n".join(
-        [
-            f"➡️ [{entry[0].strftime('%Y-%m-%d %H:%M:%S')} ET]({entry[1]}) {entry[2]} {entry[3]}"
-            for entry in sorted_entries
-        ]
+        [f"➡️ [{entry[0].strftime('%Y-%m-%d %H:%M:%S')} ET]({entry[1]}) {entry[2]} {entry[3]}" for entry in sorted_entries]
     )
 
     return sorted_text
@@ -262,9 +250,7 @@ def get_incident_document_id(client, channel_id):
     if response["ok"]:
         for item in range(len(response["bookmarks"])):
             if response["bookmarks"][item]["title"] == "Incident report":
-                document_id = google_docs.extract_google_doc_id(
-                    response["bookmarks"][item]["link"]
-                )
+                document_id = google_docs.extract_google_doc_id(response["bookmarks"][item]["link"])
                 if document_id == "":
                     logger.error(
                         "incident_document_bookmark_not_found",
@@ -302,9 +288,7 @@ def handle_reaction_added(client, ack, body):
                 message_date_time = convert_epoch_to_datetime_est(message_ts)
 
                 # get a link to the message
-                link = client.chat_getPermalink(
-                    channel=channel_id, message_ts=message_ts
-                )["permalink"]
+                link = client.chat_getPermalink(channel=channel_id, message_ts=message_ts)["permalink"]
 
                 # get the user name from the message
                 user = client.users_profile_get(user=message["user"])
@@ -318,24 +302,18 @@ def handle_reaction_added(client, ack, body):
                 message = handle_images_in_message(message)
 
                 # if the message contains mentions to other slack users, replace those mentions with their name
-                message = slack_users.replace_user_id_with_handle(
-                    client, message["text"]
-                )
+                message = slack_users.replace_user_id_with_handle(client, message["text"])
 
                 # if the message already exists in the timeline, then don't put it there again
                 if content and message_date_time not in content:
                     # append the new message to the content
-                    content += (
-                        f" ➡️ [{message_date_time}]({link}) {user_full_name}: {message}"
-                    )
+                    content += f" ➡️ [{message_date_time}]({link}) {user_full_name}: {message}"
 
                     # sort all the message to be in ascending chronological order
                     sorted_content = rearrange_by_datetime_ascending(content)
 
                     # replace the content in the file with the new headings
-                    replace_text_between_headings(
-                        document_id, sorted_content, START_HEADING, END_HEADING
-                    )
+                    replace_text_between_headings(document_id, sorted_content, START_HEADING, END_HEADING)
         except Exception as e:
             logger.error(
                 "incident_document_update_failed",
@@ -395,14 +373,10 @@ def handle_reaction_removed(client, ack, body):
             message = slack_users.replace_user_id_with_handle(client, message["text"])
 
             # get a link to the message
-            link = client.chat_getPermalink(channel=channel_id, message_ts=message_ts)[
-                "permalink"
-            ]
+            link = client.chat_getPermalink(channel=channel_id, message_ts=message_ts)["permalink"]
 
             # Construct the message to remove
-            message_to_remove = (
-                f" ➡️ [{message_date_time}]({link}) {user_full_name}: {message}\n"
-            )
+            message_to_remove = f" ➡️ [{message_date_time}]({link}) {user_full_name}: {message}\n"
 
             # Remove the message
             if message_to_remove in content:
@@ -475,12 +449,8 @@ def archive_channel_action(client: WebClient, body, ack, respond):
     }
 
     if action == "ignore":
-        msg = (
-            f"<@{user}> has delayed scheduling and archiving this channel for 14 days."
-        )
-        client.chat_update(
-            channel=channel_id, text=msg, ts=body["message_ts"], attachments=[]
-        )
+        msg = f"<@{user}> has delayed scheduling and archiving this channel for 14 days."
+        client.chat_update(channel=channel_id, text=msg, ts=body["message_ts"], attachments=[])
         log_to_sentinel("incident_channel_archive_delayed", body)
     elif action == "archive":
         # Call the close_incident function to update the incident document to closed, update the spreadsheet and archive the channel

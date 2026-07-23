@@ -4,38 +4,32 @@ Tests invoke route handlers directly with fakes to validate HTTP mapping and
 response-shape behavior at the transport boundary.
 """
 
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 import pytest
-from fastapi import FastAPI
-from fastapi import HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
-from infrastructure.security.models import AuthPrincipalSource, User
-from infrastructure.security import get_current_user
 from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.security import get_current_user
+from infrastructure.security.models import AuthPrincipalSource, User
 from packages.access.request.domain import AccessRequest, ApprovalDecision
-from packages.access.request.providers import (
-    get_access_request_service,
-    get_access_request_settings,
-)
-from packages.access.request.schemas import ApproveRequestBody, SubmitAccessRequestBody
 from packages.access.request.interactions.http import (
     approve_request,
     router,
     submit_request,
 )
+from packages.access.request.providers import (
+    get_access_request_service,
+    get_access_request_settings,
+)
+from packages.access.request.schemas import ApproveRequestBody, SubmitAccessRequestBody
 
 
 def _get_route(path: str, method: str) -> APIRoute:
     for route in router.routes:
-        if (
-            isinstance(route, APIRoute)
-            and route.path == path
-            and method in route.methods
-        ):
+        if isinstance(route, APIRoute) and route.path == path and method in route.methods:
             return route
     raise AssertionError(f"Route {method} {path} not found")
 
@@ -48,8 +42,8 @@ class _FakeSettings:
 class _FakeAccessRequestService:
     def __init__(
         self,
-        submit_result: Optional[OperationResult] = None,
-        approve_result: Optional[OperationResult] = None,
+        submit_result: OperationResult | None = None,
+        approve_result: OperationResult | None = None,
     ) -> None:
         self._submit_result = submit_result
         self._approve_result = approve_result
@@ -64,7 +58,7 @@ class _FakeAccessRequestService:
         group_slug: str,
         entitlement_type: str,
         justification: str,
-        ticket_id: Optional[str] = None,
+        ticket_id: str | None = None,
     ) -> OperationResult:
         return self._submit_result or OperationResult.success(data=_make_request())
 
@@ -76,9 +70,7 @@ class _FakeAccessRequestService:
     ) -> OperationResult:
         if self._approve_result is not None:
             return self._approve_result
-        return OperationResult.success(
-            data=(_make_request(), [_make_decision(request_id)])
-        )
+        return OperationResult.success(data=(_make_request(), [_make_decision(request_id)]))
 
 
 def _make_user(email: str = "approver@example.com") -> User:
@@ -92,7 +84,7 @@ def _make_user(email: str = "approver@example.com") -> User:
 
 
 def _make_request(request_id: str = "req-1") -> AccessRequest:
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     return AccessRequest(
         request_id=request_id,
         user_email="user@example.com",
@@ -119,7 +111,7 @@ def _make_decision(request_id: str = "req-1") -> ApprovalDecision:
         actor_email="approver@example.com",
         decision="approved",
         comment="approved",
-        decided_at=datetime.now(tz=timezone.utc),
+        decided_at=datetime.now(tz=UTC),
     )
 
 
@@ -179,13 +171,9 @@ def test_submit_request_returns_503_without_service_dependency_assembly() -> Non
         service_provider_called = True
         raise AssertionError("service dependency should not be assembled")
 
-    app.dependency_overrides[get_access_request_settings] = lambda: _FakeSettings(
-        enabled=False
-    )
+    app.dependency_overrides[get_access_request_settings] = lambda: _FakeSettings(enabled=False)
     app.dependency_overrides[get_access_request_service] = _service_provider
-    app.dependency_overrides[get_current_user] = lambda: _make_user(
-        "caller@example.com"
-    )
+    app.dependency_overrides[get_current_user] = lambda: _make_user("caller@example.com")
 
     client = TestClient(app)
     response = client.post(

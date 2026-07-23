@@ -1,7 +1,8 @@
 """Unit tests for geolocate service."""
 
-import pytest
 from unittest.mock import Mock
+
+import pytest
 
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.geolocate.service import geolocate_ip
@@ -22,9 +23,7 @@ def test_geolocate_ip_success(monkeypatch):
     mock_client.geolocate.return_value = mock_result
 
     # Mock the get_maxmind_client provider
-    monkeypatch.setattr(
-        "packages.geolocate.service.get_maxmind_client", lambda: mock_client
-    )
+    monkeypatch.setattr("packages.geolocate.service.get_maxmind_client", lambda: mock_client)
 
     result = geolocate_ip("8.8.8.8")
 
@@ -55,9 +54,7 @@ def test_geolocate_ip_not_found(monkeypatch):
     )
     mock_client.geolocate.return_value = mock_result
 
-    monkeypatch.setattr(
-        "packages.geolocate.service.get_maxmind_client", lambda: mock_client
-    )
+    monkeypatch.setattr("packages.geolocate.service.get_maxmind_client", lambda: mock_client)
 
     result = geolocate_ip("192.168.1.1")
 
@@ -80,9 +77,7 @@ def test_geolocate_ip_ipv6_success(monkeypatch):
     )
     mock_client.geolocate.return_value = mock_result
 
-    monkeypatch.setattr(
-        "packages.geolocate.service.get_maxmind_client", lambda: mock_client
-    )
+    monkeypatch.setattr("packages.geolocate.service.get_maxmind_client", lambda: mock_client)
 
     result = geolocate_ip("2001:4860:4860::8888")
 

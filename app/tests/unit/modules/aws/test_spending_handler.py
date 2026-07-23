@@ -1,8 +1,9 @@
 """Unit tests for AWS spending data handler."""
 
-import pytest
 from unittest.mock import patch
+
 import pandas as pd
+import pytest
 
 from modules.aws import spending
 
@@ -12,9 +13,7 @@ from modules.aws import spending
 def test_should_generate_spending_data_successfully(mock_organizations):
     """Test successful spending data generation."""
     # Arrange
-    mock_organizations.list_organization_accounts.return_value = [
-        {"Id": "123456789012", "Name": "TestAccount"}
-    ]
+    mock_organizations.list_organization_accounts.return_value = [{"Id": "123456789012", "Name": "TestAccount"}]
 
     # Act - Test with actual spending data to avoid merge issues
     with patch("modules.aws.spending.get_accounts_details") as mock_get_details:
@@ -137,9 +136,7 @@ def test_should_skip_update_when_spreadsheet_id_not_set(mock_sheets):
 @pytest.mark.unit
 @patch("modules.aws.spending.generate_spending_data")
 @patch("modules.aws.spending.update_spending_data")
-def test_should_execute_and_update_spending_job_successfully(
-    mock_update, mock_generate
-):
+def test_should_execute_and_update_spending_job_successfully(mock_update, mock_generate):
     """Test successful execution of spending data update job."""
     # Arrange
     mock_spending_data = pd.DataFrame({"Account": ["123456789012"], "Cost": [100.00]})

@@ -14,18 +14,14 @@ def test_map_emails_to_slack_users_text_only(mock_replace_users_emails_with_ment
     mock_replace_users_emails_with_mention.return_value = "hello <@U12345>"
     result = map_emails_to_slack_users(payload)
     assert result.text == "hello <@U12345>"
-    mock_replace_users_emails_with_mention.assert_called_once_with(
-        "hello user@example.com"
-    )
+    mock_replace_users_emails_with_mention.assert_called_once_with("hello user@example.com")
 
 
 @patch("modules.webhooks.slack.replace_users_emails_in_dict")
 def test_map_emails_to_slack_users_blocks_only(mock_replace_users_emails_in_dict):
     blocks = [{"type": "section", "text": "user@example.com"}]
     payload = WebhookPayload(text=None, blocks=blocks)
-    mock_replace_users_emails_in_dict.return_value = [
-        {"type": "section", "text": "<@U12345>"}
-    ]
+    mock_replace_users_emails_in_dict.return_value = [{"type": "section", "text": "<@U12345>"}]
     result = map_emails_to_slack_users(payload)
     assert result.blocks == [{"type": "section", "text": "<@U12345>"}]
     mock_replace_users_emails_in_dict.assert_called_once_with(blocks)
@@ -33,21 +29,15 @@ def test_map_emails_to_slack_users_blocks_only(mock_replace_users_emails_in_dict
 
 @patch("modules.webhooks.slack.replace_users_emails_in_dict")
 @patch("modules.webhooks.slack.replace_users_emails_with_mention")
-def test_map_emails_to_slack_users_text_and_blocks(
-    mock_replace_users_emails_with_mention, mock_replace_users_emails_in_dict
-):
+def test_map_emails_to_slack_users_text_and_blocks(mock_replace_users_emails_with_mention, mock_replace_users_emails_in_dict):
     blocks = [{"type": "section", "text": "user@example.com"}]
     payload = WebhookPayload(text="hello user@example.com", blocks=blocks)
     mock_replace_users_emails_with_mention.return_value = "hello <@U12345>"
-    mock_replace_users_emails_in_dict.return_value = [
-        {"type": "section", "text": "<@U12345>"}
-    ]
+    mock_replace_users_emails_in_dict.return_value = [{"type": "section", "text": "<@U12345>"}]
     result = map_emails_to_slack_users(payload)
     assert result.text == "hello <@U12345>"
     assert result.blocks == [{"type": "section", "text": "<@U12345>"}]
-    mock_replace_users_emails_with_mention.assert_called_once_with(
-        "hello user@example.com"
-    )
+    mock_replace_users_emails_with_mention.assert_called_once_with("hello user@example.com")
     mock_replace_users_emails_in_dict.assert_called_once_with(blocks)
 
 
@@ -109,10 +99,7 @@ def test_link_ip_addresses_to_geolocate_supports_ipv6():
         base_url="https://sre-bot.example.com",
     )
 
-    assert (
-        result
-        == "resolver <https://sre-bot.example.com/geolocate/2001%3A4860%3A4860%3A%3A8888|2001:4860:4860::8888>"
-    )
+    assert result == "resolver <https://sre-bot.example.com/geolocate/2001%3A4860%3A4860%3A%3A8888|2001:4860:4860::8888>"
 
 
 def test_hydrate_ip_addresses_links_text_and_block_strings():
@@ -130,9 +117,7 @@ def test_hydrate_ip_addresses_links_text_and_block_strings():
         mock_get_settings.return_value.BACKEND_URL = "https://sre-bot.example.com"
         result = hydrate_ip_addresses(payload)
 
-    assert (
-        result.text == "source <https://sre-bot.example.com/geolocate/8.8.8.8|8.8.8.8>"
-    )
+    assert result.text == "source <https://sre-bot.example.com/geolocate/8.8.8.8|8.8.8.8>"
     assert result.blocks == [
         {
             "type": "section",

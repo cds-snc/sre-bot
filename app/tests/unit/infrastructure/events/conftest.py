@@ -1,14 +1,14 @@
 """Fixtures for infrastructure event system tests."""
 
 from datetime import datetime
-from uuid import uuid4
 from unittest.mock import MagicMock
+from uuid import uuid4
 
 import pytest
 
+from infrastructure.events import get_event_dispatcher
 from infrastructure.events.models import Event
 from infrastructure.events.service import EventDispatcher
-from infrastructure.events import get_event_dispatcher
 
 
 @pytest.fixture(autouse=True)

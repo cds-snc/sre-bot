@@ -19,9 +19,7 @@ def test_get_groups_from_integration_google(
 
     assert response == google_groups
 
-    mock_google_list_groups_with_members.assert_called_once_with(
-        groups_filters=[], query=None
-    )
+    mock_google_list_groups_with_members.assert_called_once_with(groups_filters=[], query=None)
     assert not mock_filters.filter_by_condition.called
     assert not mock_aws_list_groups_with_memberships.called
 
@@ -44,9 +42,7 @@ def test_get_groups_from_integration_google_query(
 
     assert response == google_groups[:3]
 
-    mock_google_list_groups_with_members.assert_called_once_with(
-        groups_filters=[], query="email:aws-*"
-    )
+    mock_google_list_groups_with_members.assert_called_once_with(groups_filters=[], query="email:aws-*")
     assert not mock_filters.filter_by_condition.called
     assert not mock_aws_list_groups_with_memberships.called
 
@@ -87,9 +83,7 @@ def test_get_groups_from_integration_empty_groups(
 
     assert response == google_groups
 
-    mock_google_list_groups_with_members.assert_called_once_with(
-        groups_filters=[], query=None
-    )
+    mock_google_list_groups_with_members.assert_called_once_with(groups_filters=[], query=None)
     assert not mock_filters.filter_by_condition.called
     assert not mock_aws_list_groups_with_memberships.called
 
@@ -132,9 +126,7 @@ def test_get_groups_from_integration_filters_applied(
         lambda group: "prefix" in group["Description"],
     ]
 
-    response = groups.get_groups_from_integration(
-        "aws_identity_center", post_processing_filters=post_processing_filters
-    )
+    response = groups.get_groups_from_integration("aws_identity_center", post_processing_filters=post_processing_filters)
 
     assert response == []
 
@@ -168,16 +160,12 @@ def test_get_groups_from_integration_filters_returns_subset(
         lambda group: "prefix" in group["DisplayName"],
     ]
 
-    response = groups.get_groups_from_integration(
-        "aws_identity_center", post_processing_filters=post_processing_filters
-    )
+    response = groups.get_groups_from_integration("aws_identity_center", post_processing_filters=post_processing_filters)
 
     assert response == aws_groups_prefix
 
     assert mock_filters.filter_by_condition.call_count == 1
-    mock_filters.filter_by_condition.assert_called_once_with(
-        aws_groups, post_processing_filters[0]
-    )
+    mock_filters.filter_by_condition.assert_called_once_with(aws_groups, post_processing_filters[0])
 
     mock_aws_list_groups_with_memberships.assert_called_once_with(groups_filters=[])
 

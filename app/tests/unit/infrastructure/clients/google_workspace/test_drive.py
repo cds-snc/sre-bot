@@ -2,7 +2,7 @@
 
 import pytest
 
-from infrastructure.clients.google_workspace.drive import DriveClient, MIME_TYPES
+from infrastructure.clients.google_workspace.drive import MIME_TYPES, DriveClient
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
 
@@ -35,9 +35,7 @@ class TestMetadataOperations:
         }
 
         # Act
-        result = drive_client.add_metadata(
-            file_id="file123", key="incident_id", value="INC-001"
-        )
+        result = drive_client.add_metadata(file_id="file123", key="incident_id", value="INC-001")
 
         # Assert
         assert result.is_success
@@ -46,9 +44,7 @@ class TestMetadataOperations:
         # Verify update was called with correct parameters
         assert mock_service.files().update.called
 
-    def test_add_metadata_with_delegation(
-        self, drive_client, mock_session_provider, mock_service
-    ):
+    def test_add_metadata_with_delegation(self, drive_client, mock_session_provider, mock_service):
         """Test adding metadata with delegated authentication."""
         # Arrange
         mock_service.files().update().execute.return_value = {"id": "file123"}
@@ -114,9 +110,7 @@ class TestFolderOperations:
         }
 
         # Act
-        result = drive_client.create_folder(
-            name="Incidents 2026", parent_folder_id="parent123"
-        )
+        result = drive_client.create_folder(name="Incidents 2026", parent_folder_id="parent123")
 
         # Assert
         assert result.is_success
@@ -148,14 +142,10 @@ class TestFolderOperations:
     def test_list_folders_with_query(self, drive_client, mock_service):
         """Test listing folders with additional query filter."""
         # Arrange
-        mock_service.files().list().execute.return_value = {
-            "files": [{"id": "folder1", "name": "Active Folder"}]
-        }
+        mock_service.files().list().execute.return_value = {"files": [{"id": "folder1", "name": "Active Folder"}]}
 
         # Act
-        result = drive_client.list_folders_in_folder(
-            folder_id="parent123", query="name contains 'Active'"
-        )
+        result = drive_client.list_folders_in_folder(folder_id="parent123", query="name contains 'Active'")
 
         # Assert
         assert result.is_success
@@ -257,14 +247,10 @@ class TestFileOperations:
     def test_find_files_by_name_in_folder(self, drive_client, mock_service):
         """Test finding files by name within a specific folder."""
         # Arrange
-        mock_service.files().list().execute.return_value = {
-            "files": [{"id": "file1", "name": "incident.doc"}]
-        }
+        mock_service.files().list().execute.return_value = {"files": [{"id": "file1", "name": "incident.doc"}]}
 
         # Act
-        result = drive_client.find_files_by_name(
-            name="incident.doc", folder_id="folder123"
-        )
+        result = drive_client.find_files_by_name(name="incident.doc", folder_id="folder123")
 
         # Assert
         assert result.is_success
@@ -315,9 +301,7 @@ class TestFileOperations:
             ("form", MIME_TYPES["form"]),
         ],
     )
-    def test_create_file_types(
-        self, drive_client, mock_service, file_type, expected_mime
-    ):
+    def test_create_file_types(self, drive_client, mock_service, file_type, expected_mime):
         """Test creating different file types."""
         # Arrange
         mock_service.files().create().execute.return_value = {"id": "file123"}

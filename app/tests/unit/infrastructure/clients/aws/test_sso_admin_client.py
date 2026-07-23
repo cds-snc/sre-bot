@@ -6,8 +6,8 @@ Validates AWS SSO Admin operations with default SSO instance ARN and service_nam
 import pytest
 
 from infrastructure.clients.aws import executor as aws_client
-from infrastructure.clients.aws.sso_admin import SsoAdminClient
 from infrastructure.clients.aws.session_provider import SessionProvider
+from infrastructure.clients.aws.sso_admin import SsoAdminClient
 
 
 @pytest.mark.unit
@@ -21,9 +21,7 @@ class TestSsoAdminClient:
             session_provider=session_provider,
             default_sso_instance_arn="arn:aws:sso:::instance/sso-1234567890",
         )
-        assert (
-            client._default_sso_instance_arn == "arn:aws:sso:::instance/sso-1234567890"
-        )
+        assert client._default_sso_instance_arn == "arn:aws:sso:::instance/sso-1234567890"
         assert client._service_name == "sso-admin"
 
     def test_init_without_default_sso_instance_arn(self):
@@ -41,15 +39,9 @@ class TestSsoAdminClient:
             default_sso_instance_arn="arn:aws:sso:::instance/sso-1234567890",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             return make_fake_client(
-                api_responses={
-                    "create_account_assignment": {
-                        "AccountAssignmentCreationStatus": {"RequestId": "req-12345"}
-                    }
-                }
+                api_responses={"create_account_assignment": {"AccountAssignmentCreationStatus": {"RequestId": "req-12345"}}}
             )
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
@@ -64,9 +56,7 @@ class TestSsoAdminClient:
         )
         assert result.is_success
 
-    def test_create_account_assignment_uses_default_instance_arn(
-        self, monkeypatch, make_fake_client
-    ):
+    def test_create_account_assignment_uses_default_instance_arn(self, monkeypatch, make_fake_client):
         """Test create_account_assignment uses default_sso_instance_arn when not provided."""
 
         session_provider = SessionProvider(region="us-east-1")
@@ -77,17 +67,11 @@ class TestSsoAdminClient:
 
         call_count = 0
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             nonlocal call_count
             call_count += 1
             fake_client = make_fake_client(
-                api_responses={
-                    "create_account_assignment": {
-                        "AccountAssignmentCreationStatus": {"RequestId": "req-12345"}
-                    }
-                }
+                api_responses={"create_account_assignment": {"AccountAssignmentCreationStatus": {"RequestId": "req-12345"}}}
             )
             # Store the first call's instance_arn for validation
             return fake_client
@@ -113,15 +97,9 @@ class TestSsoAdminClient:
             default_sso_instance_arn="arn:aws:sso:::instance/sso-1234567890",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             return make_fake_client(
-                api_responses={
-                    "delete_account_assignment": {
-                        "AccountAssignmentDeletionStatus": {"RequestId": "req-12345"}
-                    }
-                }
+                api_responses={"delete_account_assignment": {"AccountAssignmentDeletionStatus": {"RequestId": "req-12345"}}}
             )
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
@@ -145,9 +123,7 @@ class TestSsoAdminClient:
             default_sso_instance_arn="arn:aws:sso:::instance/sso-1234567890",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             return make_fake_client(
                 api_responses={
                     "list_account_assignments": {
@@ -181,22 +157,14 @@ class TestSsoAdminClient:
             default_sso_instance_arn="arn:aws:sso:::instance/sso-1234567890",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             return make_fake_client(
-                api_responses={
-                    "list_permission_sets": {
-                        "PermissionSets": ["arn:aws:sso:::permissionSet/ps-1234567890"]
-                    }
-                }
+                api_responses={"list_permission_sets": {"PermissionSets": ["arn:aws:sso:::permissionSet/ps-1234567890"]}}
             )
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
-        result = client.list_permission_sets(
-            instance_arn="arn:aws:sso:::instance/sso-1234567890"
-        )
+        result = client.list_permission_sets(instance_arn="arn:aws:sso:::instance/sso-1234567890")
         assert result.is_success
 
     def test_healthcheck_with_default_instance_arn(self, monkeypatch, make_fake_client):
@@ -208,12 +176,8 @@ class TestSsoAdminClient:
             default_sso_instance_arn="arn:aws:sso:::instance/sso-1234567890",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
-            return make_fake_client(
-                api_responses={"list_permission_sets": {"PermissionSets": []}}
-            )
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
+            return make_fake_client(api_responses={"list_permission_sets": {"PermissionSets": []}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 

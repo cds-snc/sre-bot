@@ -1,6 +1,7 @@
 import threading
 import time
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import schedule
 from structlog import get_logger
@@ -60,35 +61,25 @@ def safe_run(job: Callable[..., Any]) -> Callable[..., None]:
 
 def init(bot):
     """Initialize the scheduled tasks."""
-    logger.info(
-        "initializing_scheduled_tasks", module="scheduled_tasks", function="init"
-    )
+    logger.info("initializing_scheduled_tasks", module="scheduled_tasks", function="init")
 
-    schedule.every().day.at("16:00").do(
-        notify_stale_incident_channels, client=bot.client
-    )
+    schedule.every().day.at("16:00").do(notify_stale_incident_channels, client=bot.client)
     schedule.every(5).minutes.do(safe_run(scheduler_heartbeat))
     schedule.every(5).minutes.do(safe_run(integration_healthchecks))
     schedule.every(2).hours.do(safe_run(provision_aws_identity_center))
-    schedule.every().day.at("00:00").do(
-        safe_run(spending.generate_spending_data), logger=logger
-    )
+    schedule.every().day.at("00:00").do(safe_run(spending.generate_spending_data), logger=logger)
 
     registry = _ScheduleBackgroundJobRegistry()
     get_plugin_manager().hook.register_background_jobs(registry=registry)
 
 
 def scheduler_heartbeat():
-    logger.info(
-        "running_scheduler_heartbeat", module="scheduled_tasks", time=time.ctime()
-    )
+    logger.info("running_scheduler_heartbeat", module="scheduled_tasks", time=time.ctime())
 
 
 def integration_healthchecks():
     """Run integration healthchecks."""
-    logger.info(
-        "running_integration_healthchecks", module="scheduled_tasks", time=time.ctime()
-    )
+    logger.info("running_integration_healthchecks", module="scheduled_tasks", time=time.ctime())
     healthchecks: dict[str, Callable[[], bool]] = {
         "google_drive": google_drive.healthcheck,
         "maxmind": maxmind.healthcheck,

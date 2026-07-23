@@ -5,14 +5,14 @@ All command routing is handled by the platform provider's route_command()
 method.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import structlog
 from slack_bolt import Ack, App, Respond
 
 from infrastructure.slack.settings import get_slack_transport_settings
-from integrations.slack.provider import get_slack_provider
 from integrations.slack.models import CommandPayload, CommandResponse
+from integrations.slack.provider import get_slack_provider
 
 logger = structlog.get_logger()
 
@@ -47,7 +47,7 @@ def _send_response(response: CommandResponse, respond: Respond) -> None:
 
 def sre_command(
     ack: Ack,
-    command: Dict[str, Any],
+    command: dict[str, Any],
     respond: Respond,
 ) -> None:
     """Main /sre command handler that delegates to the platform provider."""

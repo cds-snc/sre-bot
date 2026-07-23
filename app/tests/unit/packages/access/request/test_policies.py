@@ -4,8 +4,7 @@ All functions are pure — no mocks required for entitlement-mode and
 approval-count tests.  DirectoryProvider tests use simple in-memory stubs.
 """
 
-from datetime import datetime, timezone
-from typing import List
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -66,7 +65,7 @@ def make_request(
     actor_email: str = "actor@example.com",
     actor_type: str = "self",
     status: str = "pending_approval",
-    resolved_approvers: List[str] | None = None,
+    resolved_approvers: list[str] | None = None,
 ) -> AccessRequest:
     return AccessRequest(
         request_id=request_id,
@@ -95,7 +94,7 @@ def make_decision(
         actor_email=actor_email,
         decision=decision,  # type: ignore[arg-type]
         comment="",
-        decided_at=datetime.now(tz=timezone.utc),
+        decided_at=datetime.now(tz=UTC),
     )
 
 
@@ -174,12 +173,8 @@ def test_resolve_approver_candidates_falls_back_to_org_admins():
 
     def get_group_members(group_key, include_member_types=None):
         if "sg-aws-admins" in group_key:
-            return OperationResult.success(
-                data=[make_member("member@example.com", role="MEMBER")]
-            )
-        return OperationResult.success(
-            data=[make_member("admin@example.com", role="OWNER")]
-        )
+            return OperationResult.success(data=[make_member("member@example.com", role="MEMBER")])
+        return OperationResult.success(data=[make_member("admin@example.com", role="OWNER")])
 
     directory.get_group_members.side_effect = get_group_members
     group = make_directory_group()

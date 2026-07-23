@@ -1,4 +1,5 @@
 from unittest.mock import patch
+
 from integrations.aws import security_hub
 
 

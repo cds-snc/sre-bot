@@ -40,10 +40,7 @@ def secret_command(client, ack, command, body):
     log.info(
         "secret_command_received",
     )
-    if "user" in body:
-        user_id = body["user"]["id"]
-    else:
-        user_id = body["user_id"]
+    user_id = body["user"]["id"] if "user" in body else body["user_id"]
     locale = slack_users.get_user_locale(client, user_id)
     i18n.set("locale", locale)
     view = generate_secret_command_modal_view(command, user_id, locale)
@@ -60,9 +57,7 @@ def secret_view_handler(ack, client, view):
     # Encrypted message API
     endpoint = "https://encrypted-message.cdssandbox.xyz/encrypt"
     json = {"body": secret, "ttl": int(ttl) + int(time.time())}
-    response = requests.post(
-        endpoint, json=json, timeout=10, headers={"Content-Type": "application/json"}
-    )
+    response = requests.post(endpoint, json=json, timeout=10, headers={"Content-Type": "application/json"})
 
     try:
         id = response.json()["id"]
@@ -88,21 +83,11 @@ def secret_view_handler(ack, client, view):
 
 def handle_change_locale_button(ack, client, body):
     ack()
-    if "user" in body:
-        user_id = body["user"]["id"]
-    else:
-        user_id = body["user_id"]
+    user_id = body["user"]["id"] if "user" in body else body["user_id"]
     locale = body["actions"][0]["value"]
-    if locale == "en-US":
-        locale = "fr-FR"
-    else:
-        locale = "en-US"
+    locale = "fr-FR" if locale == "en-US" else "en-US"
     i18n.set("locale", locale)
-    command = {
-        "text": body["view"]["state"]["values"]["secret_input"]["secret_submission"][
-            "value"
-        ]
-    }
+    command = {"text": body["view"]["state"]["values"]["secret_input"]["secret_submission"]["value"]}
     if command["text"] is None:
         command["text"] = ""
     view = generate_secret_command_modal_view(command, user_id, locale)

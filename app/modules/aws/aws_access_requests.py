@@ -16,11 +16,7 @@ def _get_dynamodb_client():
     app_settings = get_app_settings()
     return boto3.client(
         "dynamodb",
-        endpoint_url=(
-            "http://dynamodb-local:8000"
-            if app_settings.ENVIRONMENT in ("local", "dev", "ci")
-            else None
-        ),
+        endpoint_url=("http://dynamodb-local:8000" if app_settings.ENVIRONMENT in ("local", "dev", "ci") else None),
         region_name="ca-central-1",
     )
 
@@ -33,14 +29,10 @@ table = "aws_access_requests"
 def already_has_access(account_id, user_id, access_type):
     response = dynamodb_client.query(
         TableName=table,
-        KeyConditionExpression=(
-            "account_id = :account_id and created_at > :created_at"
-        ),
+        KeyConditionExpression=("account_id = :account_id and created_at > :created_at"),
         ExpressionAttributeValues={
             ":account_id": {"S": account_id},
-            ":created_at": {
-                "N": str(datetime.datetime.now().timestamp() - (4 * 60 * 60))
-            },
+            ":created_at": {"N": str(datetime.datetime.now().timestamp() - (4 * 60 * 60))},
         },
     )
 
@@ -48,19 +40,8 @@ def already_has_access(account_id, user_id, access_type):
         return False
 
     for item in response["Items"]:
-        if (
-            item["user_id"]["S"] == user_id
-            and item["access_type"]["S"] == access_type
-            and item["expired"]["BOOL"] is False
-        ):
-            return round(
-                (
-                    float(item["created_at"]["N"])
-                    + (4 * 60 * 60)
-                    - datetime.datetime.now().timestamp()
-                )
-                / 60
-            )
+        if item["user_id"]["S"] == user_id and item["access_type"]["S"] == access_type and item["expired"]["BOOL"] is False:
+            return round((float(item["created_at"]["N"]) + (4 * 60 * 60) - datetime.datetime.now().timestamp()) / 60)
 
     return False
 
@@ -72,9 +53,13 @@ def create_aws_access_request(
     email,
     access_type,
     rationale,
-    start_date_time=datetime.datetime.now(),
-    end_date_time=datetime.datetime.now() + datetime.timedelta(hours=1),
+    start_date_time=None,
+    end_date_time=None,
 ):
+    if start_date_time is None:
+        start_date_time = datetime.datetime.now()
+    if end_date_time is None:
+        end_date_time = datetime.datetime.now() + datetime.timedelta(hours=1)
     id = str(uuid.uuid4())
     response = dynamodb_client.put_item(
         TableName=table,
@@ -92,10 +77,7 @@ def create_aws_access_request(
             "expired": {"BOOL": False},
         },
     )
-    if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
-        return True
-    else:
-        return False
+    return response["ResponseMetadata"]["HTTPStatusCode"] == 200
 
 
 def expire_request(account_id, created_at):
@@ -108,10 +90,7 @@ def expire_request(account_id, created_at):
         UpdateExpression="set expired = :expired",
         ExpressionAttributeValues={":expired": {"BOOL": True}},
     )
-    if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
-        return True
-    else:
-        return False
+    return response["ResponseMetadata"]["HTTPStatusCode"] == 200
 
 
 def get_expired_requests():
@@ -120,9 +99,7 @@ def get_expired_requests():
         FilterExpression="expired = :expired and created_at < :created_at",
         ExpressionAttributeValues={
             ":expired": {"BOOL": False},
-            ":created_at": {
-                "N": str(datetime.datetime.now().timestamp() - (4 * 60 * 60))
-            },
+            ":created_at": {"N": str(datetime.datetime.now().timestamp() - (4 * 60 * 60))},
         },
     )
     return response.get("Items", [])
@@ -190,17 +167,11 @@ def access_view_handler(ack, body, request_logger, client: WebClient):
     user = client.users_info(user=user_id)["user"]
     email = user["profile"]["email"]
 
-    account = body["view"]["state"]["values"]["account"]["account"]["selected_option"][
-        "value"
-    ]
+    account = body["view"]["state"]["values"]["account"]["account"]["selected_option"]["value"]
 
-    account_name = body["view"]["state"]["values"]["account"]["account"][
-        "selected_option"
-    ]["text"]["text"]
+    account_name = body["view"]["state"]["values"]["account"]["account"]["selected_option"]["text"]["text"]
 
-    access_type = body["view"]["state"]["values"]["access_type"]["access_type"][
-        "selected_option"
-    ]["value"]
+    access_type = body["view"]["state"]["values"]["access_type"]["access_type"]["selected_option"]["value"]
 
     msg = (
         f"<@{user_id}> ({email}) requested access to {account_name} "
@@ -267,10 +238,7 @@ def access_view_handler(ack, body, request_logger, client: WebClient):
 
 
 def request_access_modal(client: WebClient, body):
-    accounts = {
-        account["Id"]: account["Name"]
-        for account in organizations.list_organization_accounts()
-    }
+    accounts = {account["Id"]: account["Name"] for account in organizations.list_organization_accounts()}
     accounts = dict(sorted(accounts.items(), key=lambda i: i[1]))
 
     options = [
@@ -295,10 +263,7 @@ def request_access_modal(client: WebClient, body):
                         "type": "static_select",
                         "placeholder": {
                             "type": "plain_text",
-                            "text": (
-                                "Select an account to access | "
-                                "Choisissez un compte à accéder"
-                            ),
+                            "text": ("Select an account to access | Choisissez un compte à accéder"),
                         },
                         "options": options,
                         "action_id": "account",
@@ -336,9 +301,7 @@ def request_access_modal(client: WebClient, body):
                                 "text": {
                                     "type": "plain_text",
                                     "text": (
-                                        "Write access - need to modify "
-                                        "something \n Écriture - je dois "
-                                        "modifier quelque chose"
+                                        "Write access - need to modify something \n Écriture - je dois modifier quelque chose"
                                     ),
                                     "emoji": True,
                                 },
@@ -358,9 +321,7 @@ def request_access_modal(client: WebClient, body):
                     },
                     "label": {
                         "type": "plain_text",
-                        "text": (
-                            "What do you plan on doing? | " "Que planifiez-vous faire?"
-                        ),
+                        "text": ("What do you plan on doing? | Que planifiez-vous faire?"),
                         "emoji": True,
                     },
                 },

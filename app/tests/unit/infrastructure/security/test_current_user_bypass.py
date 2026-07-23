@@ -29,9 +29,7 @@ def test_bypass_denied_when_environment_is_prod(
 ) -> None:
     """Bypass must be denied in production even when token matches."""
     mock_get_server_settings.return_value = MagicMock(DEV_BYPASS_TOKEN="dev-token")
-    mock_get_app_settings.return_value = AppSettings(
-        ENVIRONMENT="production", DEV_BYPASS_ENABLED=True
-    )
+    mock_get_app_settings.return_value = AppSettings(ENVIRONMENT="production", DEV_BYPASS_ENABLED=True)
     mock_validate_jwt_token.side_effect = _jwt_failure()
 
     with pytest.raises(HTTPException, match="jwt_validation_failed"):
@@ -53,9 +51,7 @@ def test_bypass_denied_when_bypass_disabled(
 ) -> None:
     """Bypass must be denied when DEV_BYPASS_ENABLED is false."""
     mock_get_server_settings.return_value = MagicMock(DEV_BYPASS_TOKEN="dev-token")
-    mock_get_app_settings.return_value = AppSettings(
-        ENVIRONMENT="local", DEV_BYPASS_ENABLED=False
-    )
+    mock_get_app_settings.return_value = AppSettings(ENVIRONMENT="local", DEV_BYPASS_ENABLED=False)
     mock_validate_jwt_token.side_effect = _jwt_failure()
 
     with pytest.raises(HTTPException, match="jwt_validation_failed"):
@@ -77,9 +73,7 @@ def test_bypass_denied_when_token_mismatch(
 ) -> None:
     """Bypass must be denied when the presented token does not match."""
     mock_get_server_settings.return_value = MagicMock(DEV_BYPASS_TOKEN="dev-token")
-    mock_get_app_settings.return_value = AppSettings(
-        ENVIRONMENT="local", DEV_BYPASS_ENABLED=True
-    )
+    mock_get_app_settings.return_value = AppSettings(ENVIRONMENT="local", DEV_BYPASS_ENABLED=True)
     mock_validate_jwt_token.side_effect = _jwt_failure()
 
     with pytest.raises(HTTPException, match="jwt_validation_failed"):
@@ -103,9 +97,7 @@ def test_bypass_allowed_and_logged(
 ) -> None:
     """Bypass should return synthetic user and log when both guards pass."""
     mock_get_server_settings.return_value = MagicMock(DEV_BYPASS_TOKEN="dev-token")
-    mock_get_app_settings.return_value = AppSettings(
-        ENVIRONMENT="local", DEV_BYPASS_ENABLED=True
-    )
+    mock_get_app_settings.return_value = AppSettings(ENVIRONMENT="local", DEV_BYPASS_ENABLED=True)
 
     user = get_current_user(
         security_scopes=SecurityScopes(scopes=["sre-bot:access-sync"]),
@@ -117,6 +109,4 @@ def test_bypass_allowed_and_logged(
     assert user.permissions == ["sre-bot:access-sync"]
     mock_validate_jwt_token.assert_not_called()
     mock_logger.bind.assert_called_once_with(bypass="dev_token")
-    mock_logger.bind.return_value.warning.assert_called_once_with(
-        "dev_bypass_token_used"
-    )
+    mock_logger.bind.return_value.warning.assert_called_once_with("dev_bypass_token_used")

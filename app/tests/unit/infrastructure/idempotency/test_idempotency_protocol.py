@@ -4,7 +4,7 @@ Validates that the Protocol contract is properly defined and that
 implementations conform to the runtime-checkable interface.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 from infrastructure.idempotency.cache import IdempotencyCache
 from infrastructure.idempotency.protocol import IdempotencyService
@@ -15,18 +15,18 @@ class FakeIdempotencyCache(IdempotencyCache):
     """In-memory fake implementation of IdempotencyCache for testing."""
 
     def __init__(self) -> None:
-        self._store: Dict[str, Dict[str, Any]] = {}
+        self._store: dict[str, dict[str, Any]] = {}
 
-    def get(self, key: str) -> Optional[Dict[str, Any]]:
+    def get(self, key: str) -> dict[str, Any] | None:
         return self._store.get(key)
 
-    def set(self, key: str, response: Dict[str, Any], ttl_seconds: int) -> None:
+    def set(self, key: str, response: dict[str, Any], ttl_seconds: int) -> None:
         self._store[key] = response
 
     def clear(self) -> None:
         self._store.clear()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         return {"size": len(self._store)}
 
 
@@ -36,16 +36,16 @@ class FakeIdempotencyService:
     def __init__(self, cache: IdempotencyCache) -> None:
         self._cache = cache
 
-    def get(self, key: str) -> Optional[Dict[str, Any]]:
+    def get(self, key: str) -> dict[str, Any] | None:
         return self._cache.get(key)
 
-    def set(self, key: str, response: Dict[str, Any], ttl_seconds: int) -> None:
+    def set(self, key: str, response: dict[str, Any], ttl_seconds: int) -> None:
         self._cache.set(key, response, ttl_seconds)
 
     def clear(self) -> None:
         self._cache.clear()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         return self._cache.get_stats()
 
     @property

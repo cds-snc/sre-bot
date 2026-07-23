@@ -1,7 +1,9 @@
 import importlib
 import os
 import re
-from typing import Any, Callable, Dict, List, Literal, Optional, Pattern
+from collections.abc import Callable
+from re import Pattern
+from typing import Any, Literal
 
 from pydantic import field_validator
 from pydantic.dataclasses import dataclass
@@ -52,9 +54,7 @@ class SimpleTextPattern:
     def validate_match_type(cls, v):
         """Validate the match_type of the runtime pattern."""
         if v not in {"regex", "contains", "callable"}:
-            raise ValueError(
-                "SimpleTextPattern.match_type must be one of 'regex', 'contains', or 'callable'"
-            )
+            raise ValueError("SimpleTextPattern.match_type must be one of 'regex', 'contains', or 'callable'")
         return v
 
     @field_validator("enabled")
@@ -72,9 +72,7 @@ class SimpleTextPattern:
         try:
             return int(v)
         except Exception as exc:
-            raise TypeError(
-                "SimpleTextPattern.priority must be an int-like value"
-            ) from exc
+            raise TypeError("SimpleTextPattern.priority must be an int-like value") from exc
 
     def get_compiled_pattern(self) -> str | Pattern | Callable[[str], bool]:
         """Get the compiled pattern based on match_type."""
@@ -82,18 +80,14 @@ class SimpleTextPattern:
             try:
                 return re.compile(self.pattern)
             except re.error as exc:
-                raise ValueError(
-                    f"Invalid regex pattern '{self.pattern}': {exc}"
-                ) from exc
+                raise ValueError(f"Invalid regex pattern '{self.pattern}': {exc}") from exc
         elif self.match_type == "callable":
             try:
                 module_path, func_name = self.pattern.rsplit(".", 1)
                 module = importlib.import_module(module_path)
                 return getattr(module, func_name)
             except (ImportError, AttributeError, ValueError) as exc:
-                raise ValueError(
-                    f"Cannot import callable '{self.pattern}': {exc}"
-                ) from exc
+                raise ValueError(f"Cannot import callable '{self.pattern}': {exc}") from exc
         else:  # contains
             return self.pattern
 
@@ -107,7 +101,7 @@ class SimpleTextPattern:
             raise ValueError(f"Cannot import handler '{self.handler}': {exc}") from exc
 
     @classmethod
-    def from_dict(cls, d: dict) -> "SimpleTextPattern":
+    def from_dict(cls, d: dict) -> SimpleTextPattern:
         """Create a SimpleTextPattern from a dictionary."""
         if "name" not in d:
             raise ValueError("Missing required field 'name'")
@@ -125,10 +119,10 @@ class SimpleTextPattern:
         )
 
 
-PATTERN_HANDLERS: List[SimpleTextPattern] = []
+PATTERN_HANDLERS: list[SimpleTextPattern] = []
 
 
-def register_pattern(pattern: SimpleTextPattern | Dict[str, Any]):
+def register_pattern(pattern: SimpleTextPattern | dict[str, Any]):
     """Register a new pattern handler at runtime."""
     if isinstance(pattern, SimpleTextPattern):
         PATTERN_HANDLERS.append(pattern)
@@ -144,7 +138,7 @@ def handle_generic_text(text: str) -> WebhookPayload:
     return WebhookPayload(text=text)
 
 
-def find_matching_handler(text: str) -> Optional[SimpleTextPattern]:
+def find_matching_handler(text: str) -> SimpleTextPattern | None:
     """
     Find the first matching pattern handler for the given text.
     Handlers are checked in order of priority (highest first), then registration order.
@@ -164,19 +158,21 @@ def find_matching_handler(text: str) -> Optional[SimpleTextPattern]:
             compiled_pattern = handler.get_compiled_pattern()
 
             # Handle different pattern types
-            if handler.match_type == "callable" and callable(compiled_pattern):
-                if compiled_pattern(text):
-                    return handler
-            elif handler.match_type == "regex" and isinstance(
-                compiled_pattern, re.Pattern
-            ):
+            if handler.match_type == "callable" and callable(compiled_pattern) and compiled_pattern(text):
+                return handler
+            elif handler.match_type == "regex" and isinstance(compiled_pattern, re.Pattern):
                 if compiled_pattern.search(text):
                     return handler
             elif handler.match_type == "contains" and isinstance(compiled_pattern, str):
                 if compiled_pattern in text:
                     return handler
-        except Exception:  # pylint: disable=broad-except
+        except Exception as exc:  # pylint: disable=broad-except
             # Skip handlers that raise exceptions during matching or compilation
+            logger.warning(
+                "handler_pattern_matching_failed",
+                handler_name=handler.name,
+                error=str(exc),
+            )
             continue
 
     return None
@@ -231,13 +227,9 @@ def init_pattern_handlers():
                     for attr in dir(mod):
                         if attr.endswith("_HANDLER"):
                             register_pattern(getattr(mod, attr))
-                            logger.info(
-                                "registered_pattern", pattern=attr, module=mod_name
-                            )
+                            logger.info("registered_pattern", pattern=attr, module=mod_name)
                 except Exception as e:
-                    logger.warning(
-                        "register_pattern_failed", module=mod_name, error=str(e)
-                    )
+                    logger.warning("register_pattern_failed", module=mod_name, error=str(e))
 
 
 # Initialize default patterns on module load

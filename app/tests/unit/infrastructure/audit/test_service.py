@@ -4,7 +4,7 @@ Tests write and query operations on AuditTrailService using a mocked
 StorageService — no DynamoDB calls are made.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 from uuid import uuid4
 
@@ -19,7 +19,7 @@ from infrastructure.operations.result import OperationResult
 def _make_event(**kwargs) -> AuditEvent:
     defaults = dict(
         correlation_id=str(uuid4()),
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         action="group_member_added",
         user_email="alice@example.com",
         result="success",
@@ -60,9 +60,7 @@ class TestWriteAuditEvent:
         storage = MagicMock()
         storage.put.return_value = OperationResult.success(data=None)
         service = _make_service(storage)
-        event = _make_event(
-            provider="google", resource_id="eng@example.com", resource_type="group"
-        )
+        event = _make_event(provider="google", resource_id="eng@example.com", resource_type="group")
 
         service.write_audit_event(event)
 
@@ -96,10 +94,7 @@ class TestWriteAuditEvent:
         service.write_audit_event(event)
 
         _, item = storage.put.call_args[0]
-        assert (
-            item["timestamp_correlation_id"]
-            == f"{event.timestamp}#{event.correlation_id}"
-        )
+        assert item["timestamp_correlation_id"] == f"{event.timestamp}#{event.correlation_id}"
 
     def test_write_includes_justification_metadata(self):
         storage = MagicMock()
@@ -110,9 +105,7 @@ class TestWriteAuditEvent:
         service.write_audit_event(event)
 
         _, item = storage.put.call_args[0]
-        assert (
-            item.get("audit_meta_justification") == "User joining team for Q1 project"
-        )
+        assert item.get("audit_meta_justification") == "User joining team for Q1 project"
 
     def test_write_ttl_is_future_timestamp(self):
         storage = MagicMock()
@@ -122,7 +115,7 @@ class TestWriteAuditEvent:
         service.write_audit_event(_make_event(), retention_days=90)
 
         _, item = storage.put.call_args[0]
-        assert item["ttl_timestamp"] > int(datetime.now(timezone.utc).timestamp())
+        assert item["ttl_timestamp"] > int(datetime.now(UTC).timestamp())
 
     def test_write_storage_error_returns_false(self):
         storage = MagicMock()
@@ -193,7 +186,7 @@ class TestGetAuditTrail:
         storage = MagicMock()
         storage.query.return_value = OperationResult.success(data=[])
         service = _make_service(storage)
-        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        start = datetime(2026, 1, 1, tzinfo=UTC)
 
         service.get_audit_trail("eng@example.com", start_time=start)
 
@@ -203,9 +196,7 @@ class TestGetAuditTrail:
 
     def test_query_error_returns_empty_list(self):
         storage = MagicMock()
-        storage.query.return_value = OperationResult.permanent_error(
-            message="Error", error_code="InternalServerError"
-        )
+        storage.query.return_value = OperationResult.permanent_error(message="Error", error_code="InternalServerError")
         service = _make_service(storage)
 
         result = service.get_audit_trail("eng@example.com")
@@ -240,9 +231,7 @@ class TestGetUserAuditTrail:
 
     def test_query_error_returns_empty_list(self):
         storage = MagicMock()
-        storage.query.return_value = OperationResult.permanent_error(
-            message="Error", error_code="InternalServerError"
-        )
+        storage.query.return_value = OperationResult.permanent_error(message="Error", error_code="InternalServerError")
         service = _make_service(storage)
 
         result = service.get_user_audit_trail("alice@example.com")
@@ -286,9 +275,7 @@ class TestGetByCorrelationId:
 
     def test_query_error_returns_none(self):
         storage = MagicMock()
-        storage.query.return_value = OperationResult.permanent_error(
-            message="Error", error_code="InternalServerError"
-        )
+        storage.query.return_value = OperationResult.permanent_error(message="Error", error_code="InternalServerError")
         service = _make_service(storage)
 
         result = service.get_by_correlation_id("req-abc")

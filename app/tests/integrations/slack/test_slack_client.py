@@ -1,15 +1,13 @@
 import unittest
 from unittest.mock import patch
+
 from integrations.slack.client import SlackClientManager
 
 
 class TestSlackClientManager(unittest.TestCase):
-
     @patch("integrations.slack.client.get_slack_settings")
     @patch("integrations.slack.client.WebClient")
-    def test_get_client_creates_instance(
-        self, mock_web_client, mock_get_slack_settings
-    ):
+    def test_get_client_creates_instance(self, mock_web_client, mock_get_slack_settings):
         SlackClientManager._client = None  # pylint: disable=protected-access
         mock_get_slack_settings.return_value.BOT_TOKEN = "test-token"
 

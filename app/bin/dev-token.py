@@ -34,18 +34,17 @@ import socket
 import sys
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 try:
+    import jwt as pyjwt
     from cryptography.hazmat.primitives.asymmetric.ec import (
         SECP256R1,
         generate_private_key,
     )
-    import jwt as pyjwt
 except ImportError:
     print(
-        "ERROR: cryptography and PyJWT are required.\n"
-        "       pip install cryptography PyJWT",
+        "ERROR: cryptography and PyJWT are required.\n       pip install cryptography PyJWT",
         file=sys.stderr,
     )
     sys.exit(1)
@@ -89,7 +88,7 @@ def generate_keypair():
 
 
 def mint_token(private_key, kid: str = "dev-key-1") -> str:
-    now = int(datetime.now(timezone.utc).timestamp())
+    now = int(datetime.now(UTC).timestamp())
     payload = {
         "iss": ISSUER,
         "sub": SUBJECT,

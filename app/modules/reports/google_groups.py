@@ -10,9 +10,7 @@ from integrations.google_workspace import (
     sheets,
 )
 
-FOLDER_REPORTS_GOOGLE_GROUPS = (
-    get_google_resources_config().google_groups_reports_folder_id
-)
+FOLDER_REPORTS_GOOGLE_GROUPS = get_google_resources_config().google_groups_reports_folder_id
 
 logger = get_logger()
 
@@ -40,20 +38,14 @@ def generate_group_members_report(args, respond):
 
     if len(files) == 0:
         log.info("file_not_found_creating_new_file", filename=filename)
-        file = google_drive.create_file(
-            filename, FOLDER_REPORTS_GOOGLE_GROUPS, "spreadsheet"
-        )
+        file = google_drive.create_file(filename, FOLDER_REPORTS_GOOGLE_GROUPS, "spreadsheet")
     else:
         file = files[0]
         log.info("file_found", filename=filename, file=file)
 
     log.info("getting_google_groups")
     groups = google_directory.list_groups()
-    groups = [
-        group
-        for group in groups
-        if not any(exclude in group["name"] for exclude in exclude_groups)
-    ]
+    groups = [group for group in groups if not any(exclude in group["name"] for exclude in exclude_groups)]
 
     if not groups:
         respond("No groups found.")

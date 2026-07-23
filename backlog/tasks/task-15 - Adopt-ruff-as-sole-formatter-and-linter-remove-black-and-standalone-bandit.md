@@ -1,10 +1,11 @@
 ---
 id: TASK-15
 title: Adopt ruff as sole formatter and linter; remove black and standalone bandit
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-22 22:07'
+updated_date: '2026-07-23 13:11'
 labels:
   - toolchain
   - phase-2

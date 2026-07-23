@@ -1,8 +1,8 @@
 from models.webhooks import WebhookPayload
 from modules.webhooks.patterns.simple_text.upptime import (
+    UPPTIME_HANDLER,
     handle_upptime_payload,
     is_upptime_pattern,
-    UPPTIME_HANDLER,
 )
 from modules.webhooks.simple_text import SimpleTextPattern
 
@@ -123,14 +123,8 @@ def test_upptime_handler_pattern_configuration():
     assert isinstance(UPPTIME_HANDLER, SimpleTextPattern)
     assert UPPTIME_HANDLER.name == "upptime_monitoring"
     assert UPPTIME_HANDLER.match_type == "callable"
-    assert (
-        UPPTIME_HANDLER.pattern
-        == "modules.webhooks.patterns.simple_text.upptime.is_upptime_pattern"
-    )
-    assert (
-        UPPTIME_HANDLER.handler
-        == "modules.webhooks.patterns.simple_text.upptime.handle_upptime_payload"
-    )
+    assert UPPTIME_HANDLER.pattern == "modules.webhooks.patterns.simple_text.upptime.is_upptime_pattern"
+    assert UPPTIME_HANDLER.handler == "modules.webhooks.patterns.simple_text.upptime.handle_upptime_payload"
     assert UPPTIME_HANDLER.priority == 10
     assert UPPTIME_HANDLER.enabled is True
 
@@ -178,19 +172,10 @@ def test_handle_upptime_payload_priority_order():
 
 def test_handle_upptime_payload_unicode_emojis():
     """Test handling with unicode emojis."""
+    assert handle_upptime_payload("🟥 Service is down").blocks[1]["text"]["text"] == "🚨 Service Down Alert"
+    assert handle_upptime_payload("🟩 Service is back up").blocks[1]["text"]["text"] == "✅ Service Recovered"
     assert (
-        handle_upptime_payload("🟥 Service is down").blocks[1]["text"]["text"]
-        == "🚨 Service Down Alert"
-    )
-    assert (
-        handle_upptime_payload("🟩 Service is back up").blocks[1]["text"]["text"]
-        == "✅ Service Recovered"
-    )
-    assert (
-        handle_upptime_payload("🟨 Service experiencing degraded performance").blocks[
-            1
-        ]["text"]["text"]
-        == "⚠️ Service Degraded"
+        handle_upptime_payload("🟨 Service experiencing degraded performance").blocks[1]["text"]["text"] == "⚠️ Service Degraded"
     )
 
 
@@ -207,17 +192,8 @@ def test_handle_upptime_payload_real_examples():
 
 def test_handle_upptime_payload_case_insensitive():
     """Test that status detection is case insensitive."""
+    assert handle_upptime_payload("🟥 Service is DOWN").blocks[1]["text"]["text"] == "🚨 Service Down Alert"
+    assert handle_upptime_payload("🟩 Service is BACK UP").blocks[1]["text"]["text"] == "✅ Service Recovered"
     assert (
-        handle_upptime_payload("🟥 Service is DOWN").blocks[1]["text"]["text"]
-        == "🚨 Service Down Alert"
-    )
-    assert (
-        handle_upptime_payload("🟩 Service is BACK UP").blocks[1]["text"]["text"]
-        == "✅ Service Recovered"
-    )
-    assert (
-        handle_upptime_payload("🟨 Service EXPERIENCING DEGRADED PERFORMANCE").blocks[
-            1
-        ]["text"]["text"]
-        == "⚠️ Service Degraded"
+        handle_upptime_payload("🟨 Service EXPERIENCING DEGRADED PERFORMANCE").blocks[1]["text"]["text"] == "⚠️ Service Degraded"
     )

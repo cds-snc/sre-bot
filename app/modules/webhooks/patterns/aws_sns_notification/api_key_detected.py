@@ -1,5 +1,4 @@
 import re
-from typing import Dict, List, Union
 
 from slack_sdk import WebClient
 from structlog import get_logger
@@ -15,22 +14,18 @@ app_settings = get_app_settings()
 server_settings = get_server_settings()
 
 
-def send_message_to_notify_channel(client: WebClient, blocks: List[Dict]):
+def send_message_to_notify_channel(client: WebClient, blocks: list[dict]):
     """Send message to the notification ops channel."""
     if app_settings.ENVIRONMENT != "production":
-        client.chat_postMessage(
-            channel=server_settings.SRE_TEST_CHANNEL_ID, blocks=blocks
-        )
+        client.chat_postMessage(channel=server_settings.SRE_TEST_CHANNEL_ID, blocks=blocks)
     else:
         if not server_settings.NOTIFY_OPS_CHANNEL_ID:
             raise ValueError("NOTIFY_OPS_CHANNEL_ID is not set in server settings")
         # post the message to the notification channel
-        client.chat_postMessage(
-            channel=server_settings.NOTIFY_OPS_CHANNEL_ID, blocks=blocks
-        )
+        client.chat_postMessage(channel=server_settings.NOTIFY_OPS_CHANNEL_ID, blocks=blocks)
 
 
-def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> List[Dict]:
+def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> list[dict]:
     """
     Handle API key detection notifications from AWS SNS.
 
@@ -73,19 +68,13 @@ def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> List[D
     revocation_result = notify.revoke_api_key(api_key, key_type, github_repo, source)
 
     if revocation_result == "revoked":
-        revoke_api_key_message = (
-            f"API key {api_key_name} has been successfully revoked."
-        )
+        revoke_api_key_message = f"API key {api_key_name} has been successfully revoked."
         header_text = "🙀 Notify API Key has been exposed and revoked! 😌"
     elif revocation_result == "not_found":
-        revoke_api_key_message = (
-            f"API key {api_key_name} was not found and may have already been revoked."
-        )
+        revoke_api_key_message = f"API key {api_key_name} was not found and may have already been revoked."
         header_text = "🙀 Notify API Key has been exposed but was not found! 🤔"
     else:
-        revoke_api_key_message = (
-            f"API key {api_key_name} could not be revoked due to an error."
-        )
+        revoke_api_key_message = f"API key {api_key_name} could not be revoked due to an error."
         header_text = "🙀 Notify API Key has been exposed but could not be revoked! 😱"
 
     blocks = [
@@ -116,9 +105,7 @@ def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> List[D
     return blocks
 
 
-def is_api_key_detected(
-    payload: AwsSnsPayload, parsed_message: Union[str, dict]
-) -> bool:
+def is_api_key_detected(payload: AwsSnsPayload, parsed_message: str | dict) -> bool:
     """
     Check if the AWS SNS message is an API key detection notification.
 

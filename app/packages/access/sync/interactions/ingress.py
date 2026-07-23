@@ -9,7 +9,7 @@ Transports are responsible only for request parsing and response formatting.
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Protocol
 
 import structlog
@@ -53,7 +53,7 @@ class EnqueuedJob:
 def enqueue_user_sync(
     coordinator: AccessSyncApplicationServicePort,
     idempotency: IdempotencyService,
-    settings: "_IngressSettings",
+    settings: _IngressSettings,
     user_email: str,
     platform: str,
     dry_run: bool = False,
@@ -78,9 +78,7 @@ def enqueue_user_sync(
     running = check_lock(lock_key, idempotency, settings.lock_stale_seconds)
     if running is not None:
         existing_job_id = running.get("job_id", "")
-        logger.bind(platform=platform, user_email=user_email).info(
-            "user_sync_already_running", existing_job_id=existing_job_id
-        )
+        logger.bind(platform=platform, user_email=user_email).info("user_sync_already_running", existing_job_id=existing_job_id)
         return OperationResult.success(
             data=EnqueuedJob(
                 job_id=existing_job_id,
@@ -93,7 +91,7 @@ def enqueue_user_sync(
         )
 
     job_id = str(uuid.uuid4())
-    started_at = datetime.now(timezone.utc).isoformat()
+    started_at = datetime.now(UTC).isoformat()
     spawn_user_sync_thread(
         coordinator=coordinator,
         idempotency=idempotency,
@@ -120,7 +118,7 @@ def enqueue_user_sync(
 def enqueue_platform_sync(
     coordinator: AccessSyncApplicationServicePort,
     idempotency: IdempotencyService,
-    settings: "_IngressSettings",
+    settings: _IngressSettings,
     platform: str,
     dry_run: bool = False,
     request_id: str = "",
@@ -144,9 +142,7 @@ def enqueue_platform_sync(
     running = check_lock(lock_key, idempotency, settings.lock_stale_seconds)
     if running is not None:
         existing_job_id = running.get("job_id", "")
-        logger.bind(platform=platform).info(
-            "platform_sync_already_running", existing_job_id=existing_job_id
-        )
+        logger.bind(platform=platform).info("platform_sync_already_running", existing_job_id=existing_job_id)
         return OperationResult.success(
             data=EnqueuedJob(
                 job_id=existing_job_id,
@@ -159,7 +155,7 @@ def enqueue_platform_sync(
         )
 
     job_id = str(uuid.uuid4())
-    started_at = datetime.now(timezone.utc).isoformat()
+    started_at = datetime.now(UTC).isoformat()
     spawn_platform_sync_thread(
         coordinator=coordinator,
         idempotency=idempotency,

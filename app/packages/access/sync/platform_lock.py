@@ -9,8 +9,8 @@ from ``AccessSyncSettings``) is treated as stale so a crashed background
 thread cannot block future syncs indefinitely.
 """
 
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 from infrastructure.idempotency import IdempotencyService
 
@@ -27,7 +27,7 @@ def check_lock(
     key: str,
     idempotency: IdempotencyService,
     lock_stale_after_seconds: int,
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any] | None:
     """Return the running job record if an active lock exists, else None.
 
     Returns None when no record exists, status is not "running", or the lock
@@ -39,9 +39,7 @@ def check_lock(
     started_at_raw: str = record.get("started_at", "")
     if started_at_raw:
         try:
-            elapsed = (
-                datetime.now(timezone.utc) - datetime.fromisoformat(started_at_raw)
-            ).total_seconds()
+            elapsed = (datetime.now(UTC) - datetime.fromisoformat(started_at_raw)).total_seconds()
             if elapsed > lock_stale_after_seconds:
                 return None
         except ValueError:
@@ -51,7 +49,7 @@ def check_lock(
 
 def acquire_lock(
     key: str,
-    payload: Dict[str, Any],
+    payload: dict[str, Any],
     idempotency: IdempotencyService,
     ttl_seconds: int,
 ) -> None:
@@ -61,7 +59,7 @@ def acquire_lock(
 
 def release_lock(
     key: str,
-    final_payload: Dict[str, Any],
+    final_payload: dict[str, Any],
     idempotency: IdempotencyService,
     ttl_seconds: int,
 ) -> None:

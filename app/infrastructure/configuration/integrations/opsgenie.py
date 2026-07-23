@@ -23,9 +23,7 @@ class OpsGenieSettings(IntegrationSettings):
         ```
     """
 
-    OPSGENIE_INTEGRATIONS_KEY: str | None = Field(
-        default=None, alias="OPSGENIE_INTEGRATIONS_KEY"
-    )
+    OPSGENIE_INTEGRATIONS_KEY: str | None = Field(default=None, alias="OPSGENIE_INTEGRATIONS_KEY")
 
 
 @lru_cache(maxsize=1)

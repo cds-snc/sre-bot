@@ -45,9 +45,7 @@ class TestSessionProvider:
         assert captured["role_arn"] == "arn:aws:iam::123456789012:role/Explicit"
         assert captured["session_config"] == {"region_name": "ca-central-1"}
 
-    def test_get_boto3_client_uses_service_role_map_when_role_missing(
-        self, monkeypatch
-    ):
+    def test_get_boto3_client_uses_service_role_map_when_role_missing(self, monkeypatch):
         """Mapped service role should be used when role_arn is not provided."""
         captured = {}
 
@@ -84,9 +82,7 @@ class TestSessionProvider:
         )
 
         dynamodb_kwargs = provider.build_client_kwargs(service_name="dynamodb")
-        identitystore_kwargs = provider.build_client_kwargs(
-            service_name="identitystore"
-        )
+        identitystore_kwargs = provider.build_client_kwargs(service_name="identitystore")
 
         assert dynamodb_kwargs["client_config"] == {
             "region_name": "ca-central-1",

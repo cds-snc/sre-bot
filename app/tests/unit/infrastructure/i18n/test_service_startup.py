@@ -34,9 +34,7 @@ class TestTranslationServiceInitialization:
         service = TranslationService()
         service._translator = Mock()
         service._translator.catalogs = {}
-        service._translator.get_available_locales = Mock(
-            return_value=[Locale.EN_US, Locale.FR_FR]
-        )
+        service._translator.get_available_locales = Mock(return_value=[Locale.EN_US, Locale.FR_FR])
 
         core_dir = tmp_path / "core_locales"
         core_dir.mkdir()
@@ -90,12 +88,8 @@ class TestTranslationServiceInitialization:
         core_dir.mkdir()
 
         spec = I18nResourceSpec(owner="core", path=str(core_dir))
-        with patch(
-            "infrastructure.i18n.service.YAMLTranslationLoader"
-        ) as mock_loader_cls:
-            mock_loader_cls.return_value.load_all.side_effect = RuntimeError(
-                "Parse error"
-            )
+        with patch("infrastructure.i18n.service.YAMLTranslationLoader") as mock_loader_cls:
+            mock_loader_cls.return_value.load_all.side_effect = RuntimeError("Parse error")
             result = service.initialize(resources=[spec], strict=True)
 
         assert not result.is_success
@@ -130,9 +124,7 @@ class TestTranslationServiceHealthCheck:
         """Test health check passes when service initialized properly."""
         service = TranslationService()
         service._translator = Mock()
-        service._translator.get_available_locales = Mock(
-            return_value=[Locale.EN_US, Locale.FR_FR]
-        )
+        service._translator.get_available_locales = Mock(return_value=[Locale.EN_US, Locale.FR_FR])
         service._is_initialized = True
 
         result = service.health_check()

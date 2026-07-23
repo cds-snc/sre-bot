@@ -4,7 +4,7 @@ import structlog
 from fastapi import APIRouter, HTTPException, Query
 
 from infrastructure.operations import OperationStatus
-from packages.geolocate.schemas import GeolocateResponse, GeolocateRequest
+from packages.geolocate.schemas import GeolocateRequest, GeolocateResponse
 from packages.geolocate.service import geolocate_ip
 
 logger = structlog.get_logger()
@@ -18,7 +18,7 @@ router = APIRouter(prefix="/v1", tags=["Geolocation"])
     description="Query MaxMind database for IP geolocation data",
 )
 def get_geolocate(
-    request: GeolocateRequest = Query(..., description="Geolocate request payload"),
+    request: GeolocateRequest = Query(..., description="Geolocate request payload"),  # noqa: B008 -- FastAPI dependency injection requires a call in the default
     # ip_address: str = Query(..., description="IP address to geolocate"),
 ) -> GeolocateResponse:
     """Geolocate an IP address via HTTP GET.
