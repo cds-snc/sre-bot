@@ -79,25 +79,16 @@ target-version = ["py311"]
 force-exclude = '''
 /(
     api
-  | tests/api
   | infrastructure
-  | tests/unit/infrastructure
-    | integrations
-    | tests/integrations
-  | tests/unit/integrations
-    | modules
-    | tests/modules
-    | tests/unit/modules
-    | utils
-    | models
-    | jobs
-    | bin
-    | server
-    | tests/unit/jobs
-    | tests/unit/server
-    | tests/unit/models
-  | packages/access
-  | tests/unit/packages/access
+  | integrations
+  | modules
+  | packages
+  | utils
+  | models
+  | jobs
+  | bin
+  | server
+  | tests
 )/
 '''
 
