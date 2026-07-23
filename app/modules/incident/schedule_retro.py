@@ -44,18 +44,14 @@ def schedule_event(client: WebClient, days, users, days_lookup=60):
 
     # Execute the query to find all the busy times for all the participants
     freebusy_result = get_freebusy(time_min, time_max, items)
-    unavailable_users_emails = identify_unavailable_users(
-        freebusy_result, time_min, time_max
-    )
+    unavailable_users_emails = identify_unavailable_users(freebusy_result, time_min, time_max)
     if set(unavailable_users_emails) == set(user_emails):
         logger.warning(
             "schedule_event_could_not_schedule",
             message="All users are unavailable for the selected time range.",
         )
     # # return the first available slot to book the event
-    first_available_start, first_available_end = find_first_available_slot(
-        freebusy_result, days
-    )
+    first_available_start, first_available_end = find_first_available_slot(freebusy_result, days)
     return {
         "first_available_start": first_available_start,
         "first_available_end": first_available_end,
@@ -72,9 +68,7 @@ def open_incident_retro_modal(client: WebClient, body, ack):
     channel_id = body["channel_id"]
     channel_name = body["channel_name"]
 
-    is_incident, _is_dev_incident = incident_conversation.is_incident_channel(
-        client, channel_id
-    )
+    is_incident, _is_dev_incident = incident_conversation.is_incident_channel(client, channel_id)
     if not is_incident:
         return
 
@@ -102,9 +96,7 @@ def open_incident_retro_modal(client: WebClient, body, ack):
     )
 
 
-def generate_retro_options_view(
-    private_metadata, all_users, unavailable_users: list | None = None
-):
+def generate_retro_options_view(private_metadata, all_users, unavailable_users: list | None = None):
     """Create the modal for the schedule retro options. Adds a warning message if there are unavailable users."""
     blocks = [
         {
@@ -248,9 +240,7 @@ def handle_schedule_retro_submit(client: WebClient, ack, body, view):
     """Handle the submission of the retro event modal."""
     ack()
     saving_view = generate_retro_saving_view()
-    loading_view = client.views_open(trigger_id=body["trigger_id"], view=saving_view)[
-        "view"
-    ]
+    loading_view = client.views_open(trigger_id=body["trigger_id"], view=saving_view)["view"]
 
     private_metadata = json.loads(view["private_metadata"])
     incident_name = private_metadata.get("name")
@@ -259,9 +249,7 @@ def handle_schedule_retro_submit(client: WebClient, ack, body, view):
     days = int(view["state"]["values"]["number_of_days"]["number_of_days"]["value"])
 
     # get all the users selected in the multi select block
-    users = view["state"]["values"]["user_select_block"]["user_select_action"][
-        "selected_options"
-    ]
+    users = view["state"]["values"]["user_select_block"]["user_select_action"]["selected_options"]
 
     # pass the data using the view["private_metadata"] to the schedule_event function
     scheduled_event_details = schedule_event(client, days, users)
@@ -276,9 +264,7 @@ def handle_schedule_retro_submit(client: WebClient, ack, body, view):
             days_offset=days,
             unavailable_users=scheduled_event_details["unavailable_users"],
         )
-        client.views_update(
-            view_id=loading_view["id"], hash=loading_view["hash"], view=saving_view
-        )
+        client.views_update(view_id=loading_view["id"], hash=loading_view["hash"], view=saving_view)
         return
     user_emails = get_users_emails_from_selected_options(client, users)
     result = save_retro_event(
@@ -319,9 +305,7 @@ def handle_schedule_retro_submit(client: WebClient, ack, body, view):
         client.chat_postMessage(channel=channel_id, text=event_info, unfurl_links=False)
 
     # Open the modal and log that the event was scheduled successfully
-    client.views_update(
-        view_id=loading_view["id"], hash=loading_view["hash"], view=saving_view
-    )
+    client.views_update(view_id=loading_view["id"], hash=loading_view["hash"], view=saving_view)
 
 
 def save_retro_event(
@@ -399,7 +383,5 @@ def incident_selected_users_updated(client: WebClient, body, ack):
                 user_id = details.get("id")
                 formatted_user = f"<@{user_id}>"
                 unavailable_users.append(formatted_user)
-        view = generate_retro_options_view(
-            private_metadata, all_users, unavailable_users
-        )
+        view = generate_retro_options_view(private_metadata, all_users, unavailable_users)
     client.views_update(view_id=view_id, view=view)

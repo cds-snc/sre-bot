@@ -1,17 +1,19 @@
-from datetime import datetime
 import json
+from datetime import datetime
+
 from slack_bolt import Ack
 from slack_sdk import WebClient
+from structlog import get_logger
+
+from integrations.google_workspace import google_docs
 from models.incidents import Incident
 from modules.incident import (
     db_operations,
-    information_display,
     incident_document,
     incident_folder,
+    information_display,
     utils,
 )
-from integrations.google_workspace import google_docs
-from structlog import get_logger
 
 FIELD_SCHEMA = {
     "detection_time": {"type": "datetime"},
@@ -49,9 +51,7 @@ def open_update_field_view(client: WebClient, body, ack: Ack):
     action = body["actions"][0]["value"]
     incident_data = json.loads(body["view"]["private_metadata"])
     view = update_field_view(client, body, action, incident_data)
-    client.views_push(
-        view_id=body["view"]["id"], view=view, trigger_id=body["trigger_id"]
-    )
+    client.views_push(view_id=body["view"]["id"], view=view, trigger_id=body["trigger_id"])
 
 
 def update_field_view(client, body, action, incident_data):
@@ -104,9 +104,7 @@ def generate_date_field_update_view(client: WebClient, body, action, incident_da
     tz = user_info["tz"]
     now = utils.convert_utc_datetime_to_tz(datetime.now(), tz)
     if incident_data[action] != "Unknown":
-        now = utils.convert_utc_datetime_to_tz(
-            datetime.fromtimestamp(float(incident_data[action])), tz
-        )
+        now = utils.convert_utc_datetime_to_tz(datetime.fromtimestamp(float(incident_data[action])), tz)
     initial_date = now.strftime("%Y-%m-%d")
     initial_time = now.strftime("%H:%M")
     return {
@@ -119,9 +117,7 @@ def generate_date_field_update_view(client: WebClient, body, action, incident_da
         },
         "submit": {"type": "plain_text", "text": "Submit", "emoji": True},
         "close": {"type": "plain_text", "text": "OK", "emoji": True},
-        "private_metadata": json.dumps(
-            {"action": action, "incident_data": incident_data}
-        ),
+        "private_metadata": json.dumps({"action": action, "incident_data": incident_data}),
         "blocks": [
             {
                 "type": "header",
@@ -183,9 +179,7 @@ def generate_text_field_update_view(action, incident_data):
         },
         "submit": {"type": "plain_text", "text": "Submit", "emoji": True},
         "close": {"type": "plain_text", "text": "OK", "emoji": True},
-        "private_metadata": json.dumps(
-            {"action": action, "incident_data": incident_data}
-        ),
+        "private_metadata": json.dumps({"action": action, "incident_data": incident_data}),
         "blocks": [
             {
                 "type": "header",
@@ -200,9 +194,7 @@ def generate_text_field_update_view(action, incident_data):
                 "block_id": "plain_text_input",
                 "element": {
                     "type": "plain_text_input",
-                    "initial_value": (
-                        incident_data[action] if incident_data[action] else ""
-                    ),
+                    "initial_value": (incident_data[action] if incident_data[action] else ""),
                     "action_id": "text_input",
                 },
                 "label": {
@@ -226,9 +218,7 @@ def generate_drop_down_field_update_view(action, incident_data, options):
         },
         "submit": {"type": "plain_text", "text": "Submit", "emoji": True},
         "close": {"type": "plain_text", "text": "OK", "emoji": True},
-        "private_metadata": json.dumps(
-            {"action": action, "incident_data": incident_data}
-        ),
+        "private_metadata": json.dumps({"action": action, "incident_data": incident_data}),
         "blocks": [
             {
                 "type": "header",
@@ -283,12 +273,10 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view):
     report_url = incident_data["report_url"]
 
     if action not in FIELD_SCHEMA or not FIELD_SCHEMA[action]["type"]:
-        logger.error(
-            "update_field_submission", action=action, message="Unsupported action type"
-        )
+        logger.error("update_field_submission", action=action, message="Unsupported action type")
         return
 
-    field_info = FIELD_SCHEMA.get(action, None)
+    field_info = FIELD_SCHEMA.get(action)
 
     value = None
     value_type = None
@@ -306,9 +294,7 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view):
             value_type = "S"
             message += value if value else "Unknown"
         case "dropdown":
-            value = view["state"]["values"]["drop_down_input"]["static_select"][
-                "selected_option"
-            ]["value"]
+            value = view["state"]["values"]["drop_down_input"]["static_select"]["selected_option"]["value"]
             value_type = "S"
             message += value if value else "Unknown"
         case _:
@@ -324,9 +310,7 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view):
             incident_document.update_incident_document_status(document_id, value)
             incident_folder.update_spreadsheet_incident_status(channel_name, value)
 
-        db_operations.update_incident_field(
-            incident_id, action, value, user_id, type=value_type
-        )
+        db_operations.update_incident_field(incident_id, action, value, user_id, type=value_type)
         client.chat_postMessage(
             channel=channel_id,
             text=message,

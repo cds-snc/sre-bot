@@ -1,9 +1,10 @@
 """Manage on call users"""
 
 from slack_sdk import WebClient
+from structlog import get_logger
+
 from integrations.opsgenie import get_on_call_users
 from modules.incident.incident_folder import get_folder_metadata
-from structlog import get_logger
 
 logger = get_logger()
 

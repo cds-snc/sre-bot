@@ -1,7 +1,9 @@
 """Tests for recreate_missing_resources functionality."""
 
 from unittest.mock import MagicMock, patch
+
 import pytest
+
 from modules.incident import core
 
 
@@ -85,9 +87,7 @@ def test_recreate_missing_resources_all_missing(
     """Test recreating all resources when everything is missing."""
     # Setup mocks
     mock_db_operations.get_incident_by_channel_id.return_value = None
-    mock_incident_folder.list_incident_folders.return_value = [
-        {"id": "folder_123", "name": "Test Product"}
-    ]
+    mock_incident_folder.list_incident_folders.return_value = [{"id": "folder_123", "name": "Test Product"}]
     mock_google_drive.list_files_in_folder.return_value = []
     mock_incident_document.create_incident_document.return_value = "doc_123"
     mock_on_call.get_on_call_users_from_folder.return_value = [
@@ -96,9 +96,7 @@ def test_recreate_missing_resources_all_missing(
             "profile": {"display_name_normalized": "On Call User"},
         }
     ]
-    mock_meet.create_space.return_value = {
-        "meetingUri": "https://meet.google.com/test-meet"
-    }
+    mock_meet.create_space.return_value = {"meetingUri": "https://meet.google.com/test-meet"}
     mock_incident_folder.get_incidents_from_sheet.return_value = []
     mock_db_operations.create_incident.return_value = "incident_id_123"
 
@@ -239,12 +237,8 @@ def test_recreate_missing_resources_partial_missing(
         "id": {"S": "existing_incident"},
         "channel_id": {"S": basic_params["channel_id"]},
     }
-    mock_incident_folder.list_incident_folders.return_value = [
-        {"id": "folder_123", "name": "Test Product"}
-    ]
-    mock_google_drive.list_files_in_folder.return_value = [
-        {"id": "existing_doc_123", "name": "2024-001 Incident Report"}
-    ]
+    mock_incident_folder.list_incident_folders.return_value = [{"id": "folder_123", "name": "Test Product"}]
+    mock_google_drive.list_files_in_folder.return_value = [{"id": "existing_doc_123", "name": "2024-001 Incident Report"}]
     mock_incident_folder.get_incidents_from_sheet.return_value = []
 
     # Execute
@@ -316,12 +310,8 @@ def test_recreate_missing_resources_unknown_product(
     """Test when product folder cannot be found."""
     # Setup mocks
     mock_db_operations.get_incident_by_channel_id.return_value = None
-    mock_incident_folder.list_incident_folders.return_value = [
-        {"id": "folder_999", "name": "Different Product"}
-    ]
-    mock_meet.create_space.return_value = {
-        "meetingUri": "https://meet.google.com/test-meet"
-    }
+    mock_incident_folder.list_incident_folders.return_value = [{"id": "folder_999", "name": "Different Product"}]
+    mock_meet.create_space.return_value = {"meetingUri": "https://meet.google.com/test-meet"}
 
     # Execute
     results = core.recreate_missing_resources(

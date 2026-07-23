@@ -1,6 +1,7 @@
 import json
 import uuid
-from unittest.mock import ANY, MagicMock, patch, call
+from unittest.mock import ANY, MagicMock, call, patch
+
 import pytest
 
 from modules import incident_helper
@@ -16,9 +17,7 @@ def test_legacy_handle_incident_command_with_create_command(mock_create_folder):
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.handle_incident_command(
-        ["create-folder", "foo", "bar"], MagicMock(), MagicMock(), respond, ack
-    )
+    incident_helper.handle_incident_command(["create-folder", "foo", "bar"], MagicMock(), MagicMock(), respond, ack)
     mock_create_folder.assert_called_once_with("foo bar", ANY)
 
     respond.assert_has_calls(
@@ -37,9 +36,7 @@ def test_legacy_handle_incident_command_with_create_command_error(mock_create_fo
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.handle_incident_command(
-        ["create-folder", "foo", "bar"], MagicMock(), MagicMock(), respond, ack
-    )
+    incident_helper.handle_incident_command(["create-folder", "foo", "bar"], MagicMock(), MagicMock(), respond, ack)
     respond.assert_has_calls(
         [
             call(
@@ -72,9 +69,7 @@ def test_legacy_handle_incident_command_with_list_folders(mock_list_folders):
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.handle_incident_command(
-        ["list-folders"], client, body, respond, ack
-    )
+    incident_helper.handle_incident_command(["list-folders"], client, body, respond, ack)
     mock_list_folders.assert_called_once_with(client, body, ack)
 
 
@@ -95,9 +90,7 @@ def test_legacy_handle_incident_command_with_update_status_command(
     respond.assert_called_once_with(
         "The `/sre incident status <status>` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident status update <status>` instead."
     )
-    mock_handle_update_status_command.assert_called_once_with(
-        client, body, respond, ack, args
-    )
+    mock_handle_update_status_command.assert_called_once_with(client, body, respond, ack, args)
 
 
 @patch("modules.incident.incident_helper.open_updates_dialog")
@@ -187,20 +180,14 @@ def test_handle_incident_command_with_empty_args():
     ack = MagicMock()
     body = MagicMock()
     incident_helper.handle_incident_command([], client, body, respond, ack)
-    respond.assert_called_once_with(
-        "Please provide a valid command. Type `/sre incident help` to see a list of commands."
-    )
+    respond.assert_called_once_with("Please provide a valid command. Type `/sre incident help` to see a list of commands.")
 
 
 def test_handle_incident_command_with_unknown_command():
     respond = MagicMock()
     ack = MagicMock()
-    incident_helper.handle_incident_command(
-        ["foo"], MagicMock(), MagicMock(), respond, ack
-    )
-    respond.assert_called_once_with(
-        "Unknown command: foo. Type `/sre incident help` to see a list of commands."
-    )
+    incident_helper.handle_incident_command(["foo"], MagicMock(), MagicMock(), respond, ack)
+    respond.assert_called_once_with("Unknown command: foo. Type `/sre incident help` to see a list of commands.")
 
 
 def test_handle_incident_command_dispatches_to_correct_handler():
@@ -218,9 +205,7 @@ def test_handle_incident_command_dispatches_to_correct_handler():
         with patch(f"modules.incident.incident_helper.{handler_name}") as handler_mock:
             args = [first_arg, "dummy_action"]
             incident_helper.handle_incident_command(args, client, body, respond, ack)
-            assert (
-                handler_mock.called
-            ), f"{handler_name} should be called for first_arg '{first_arg}'"
+            assert handler_mock.called, f"{handler_name} should be called for first_arg '{first_arg}'"
 
 
 # Incident level actions
@@ -281,9 +266,7 @@ def test_handle_help():
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.handle_incident_command(
-        ["help"], MagicMock(), MagicMock(), respond, ack
-    )
+    incident_helper.handle_incident_command(["help"], MagicMock(), MagicMock(), respond, ack)
     respond.assert_called_once_with(incident_helper.help_text)
 
 
@@ -358,9 +341,7 @@ def test_handle_schedule_with_no_option(mock_schedule_retro):
     ack = MagicMock()
 
     incident_helper.handle_schedule(client, body, respond, ack, [], {})
-    mock_schedule_retro.open_incident_retro_modal.assert_called_once_with(
-        client, body, ack
-    )
+    mock_schedule_retro.open_incident_retro_modal.assert_called_once_with(client, body, ack)
 
 
 def test_handle_schedule_with_invalid_option():
@@ -390,9 +371,7 @@ def test_handle_schedule_with_retro(mock_schedule_retro):
     ack = MagicMock()
 
     incident_helper.handle_schedule(client, body, respond, ack, ["retro"], {})
-    mock_schedule_retro.open_incident_retro_modal.assert_called_once_with(
-        client, body, ack
-    )
+    mock_schedule_retro.open_incident_retro_modal.assert_called_once_with(client, body, ack)
 
 
 @patch("modules.incident.incident_helper.schedule_retro")
@@ -406,12 +385,8 @@ def test_handle_incident_command_with_schedule(mock_schedule_retro):
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.handle_incident_command(
-        ["schedule", "retro"], client, body, respond, ack
-    )
-    mock_schedule_retro.open_incident_retro_modal.assert_called_once_with(
-        client, body, ack
-    )
+    incident_helper.handle_incident_command(["schedule", "retro"], client, body, respond, ack)
+    mock_schedule_retro.open_incident_retro_modal.assert_called_once_with(client, body, ack)
 
 
 # resource level actions
@@ -441,9 +416,7 @@ def test_handle_products_with_no_action():
 • `list` — list all products currently available in the incident resources
 
 Use `/sre incident help` to see a list of commands."""
-    incident_helper.handle_products(
-        MagicMock(), MagicMock(), respond, ack, None, [], {}
-    )
+    incident_helper.handle_products(MagicMock(), MagicMock(), respond, ack, None, [], {})
     respond.assert_called_once_with(product_help_text)
 
 
@@ -453,9 +426,7 @@ def test_handle_products_with_create(mock_create_folder):
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.handle_products(
-        MagicMock(), MagicMock(), respond, ack, "create", ["foo", "bar"], {}
-    )
+    incident_helper.handle_products(MagicMock(), MagicMock(), respond, ack, "create", ["foo", "bar"], {})
     mock_create_folder.assert_called_once_with("foo bar", ANY)
 
     respond.assert_called_once_with("Product `foo bar` created.")
@@ -466,13 +437,9 @@ def test_handle_products_create_without_name(mock_create_folder):
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.handle_products(
-        MagicMock(), MagicMock(), respond, ack, "create", [], {}
-    )
+    incident_helper.handle_products(MagicMock(), MagicMock(), respond, ack, "create", [], {})
 
-    respond.assert_called_once_with(
-        "Please provide a product name using `create <product_name>`"
-    )
+    respond.assert_called_once_with("Please provide a product name using `create <product_name>`")
 
 
 @patch("modules.incident.incident_helper.google_drive.create_folder")
@@ -481,9 +448,7 @@ def test_handle_products_with_create_error(mock_create_folder):
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.handle_products(
-        MagicMock(), MagicMock(), respond, ack, "create", ["foo", "bar"], {}
-    )
+    incident_helper.handle_products(MagicMock(), MagicMock(), respond, ack, "create", ["foo", "bar"], {})
     mock_create_folder.assert_called_once_with("foo bar", ANY)
 
     respond.assert_called_once_with("Failed to create product `foo bar`.")
@@ -499,9 +464,7 @@ def test_handle_status_with_no_action():
 • `update <status>` — update the incident status to one of the valid statuses
 
 *Valid Statuses:*
-""" + ", ".join(
-        VALID_STATUS
-    )
+""" + ", ".join(VALID_STATUS)
     incident_helper.handle_status(MagicMock(), MagicMock(), respond, ack, None, [], {})
     respond.assert_called_once_with(status_help_text)
 
@@ -513,12 +476,8 @@ def test_handle_status_with_update(mock_update_status_command):
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.handle_status(
-        client, body, respond, ack, "update", ["Ready", "to", "be", "Reviewed"], {}
-    )
-    mock_update_status_command.assert_called_once_with(
-        client, body, respond, ack, ["Ready", "to", "be", "Reviewed"]
-    )
+    incident_helper.handle_status(client, body, respond, ack, "update", ["Ready", "to", "be", "Reviewed"], {})
+    mock_update_status_command.assert_called_once_with(client, body, respond, ack, ["Ready", "to", "be", "Reviewed"])
 
 
 @patch("modules.incident.incident_helper.handle_update_status_command")
@@ -633,9 +592,7 @@ def test_stale_incidents(get_stale_channels_mock):
     client = MagicMock()
     body = {"trigger_id": "foo"}
     ack = MagicMock()
-    get_stale_channels_mock.return_value = [
-        {"id": "id", "topic": {"value": "topic_value"}}
-    ]
+    get_stale_channels_mock.return_value = [{"id": "id", "topic": {"value": "topic_value"}}]
     client.views_open.return_value = {"view": {"id": "view_id"}}
     incident_helper.stale_incidents(client, body, ack)
     ack.assert_called_once()
@@ -644,9 +601,7 @@ def test_stale_incidents(get_stale_channels_mock):
 
 
 def test_channel_item():
-    assert incident_helper.channel_item(
-        {"id": "id", "topic": {"value": "topic_value"}}
-    ) == [
+    assert incident_helper.channel_item({"id": "id", "topic": {"value": "topic_value"}}) == [
         {
             "type": "section",
             "text": {
@@ -671,9 +626,7 @@ def test_channel_item():
 @patch("modules.incident.incident_helper.db_operations")
 @patch("modules.incident.incident_helper.slack_users")
 @patch("modules.incident.incident_helper.incident_status")
-def test_close_incident(
-    mock_incident_status, mock_slack_users, mock_db_operations, mock_logger
-):
+def test_close_incident(mock_incident_status, mock_slack_users, mock_db_operations, mock_logger):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
@@ -682,9 +635,7 @@ def test_close_incident(
     mock_db_operations.get_incident_by_channel_id.return_value = {
         "id": {"S": "incident_id"},
     }
-    mock_client.conversations_info.return_value = {
-        "channel": {"name": "incident-2024-01-12-test", "is_member": True}
-    }
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-2024-01-12-test", "is_member": True}}
     # Mock the response of client.conversations_archive
     mock_client.conversations_archive.return_value = {"ok": True}
 
@@ -728,9 +679,7 @@ def test_close_incident(
 @patch("modules.incident.incident_helper.db_operations")
 @patch("modules.incident.incident_helper.slack_users")
 @patch("modules.incident.incident_helper.incident_status")
-def test_close_incident_not_incident_channel(
-    mock_incident_status, mock_slack_users, mock_db_operations, mock_logger
-):
+def test_close_incident_not_incident_channel(mock_incident_status, mock_slack_users, mock_db_operations, mock_logger):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
@@ -757,9 +706,7 @@ def test_close_incident_not_incident_channel(
 
     # Assert that the private message was posted as expected with the expected text
     expected_text = "Channel some-other-channel is not an incident channel. Please use this command in an incident channel."
-    mock_client.chat_postEphemeral.assert_called_once_with(
-        channel="C12345", user="U12345", text=expected_text
-    )
+    mock_client.chat_postEphemeral.assert_called_once_with(channel="C12345", user="U12345", text=expected_text)
 
     mock_incident_status.update_status.assert_not_called()
 
@@ -768,9 +715,7 @@ def test_close_incident_not_incident_channel(
 @patch("modules.incident.incident_helper.db_operations")
 @patch("modules.incident.incident_helper.slack_users")
 @patch("modules.incident.incident_helper.incident_status")
-def test_close_incident_when_client_not_in_channel(
-    mock_incident_status, mock_slack_users, mock_db_operations, mock_logger
-):
+def test_close_incident_when_client_not_in_channel(mock_incident_status, mock_slack_users, mock_db_operations, mock_logger):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
@@ -779,9 +724,7 @@ def test_close_incident_when_client_not_in_channel(
     mock_db_operations.get_incident_by_channel_id.return_value = {
         "id": {"S": "incident_id"},
     }
-    mock_client.conversations_info.return_value = {
-        "channel": {"name": "incident-2024-01-12-test", "is_member": False}
-    }
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-2024-01-12-test", "is_member": False}}
     mock_client.conversations_join.return_value = {"ok": True}
     mock_client.conversations_archive.return_value = {"ok": True}
 
@@ -847,9 +790,7 @@ def test_close_incident_when_client_not_in_channel_throws_error(
         mock_respond,
     )
 
-    mock_logger.exception.assert_called_once_with(
-        "client_conversations_error", channel_id="C12345", error="is_archived"
-    )
+    mock_logger.exception.assert_called_once_with("client_conversations_error", channel_id="C12345", error="is_archived")
 
 
 # Test that the channel that the command is ran in,  is not an incident channel.
@@ -1006,9 +947,7 @@ def test_close_incident_handles_post_message_failure(
         mock_respond,
     )
 
-    mock_client.chat_postMessage.assert_called_once_with(
-        channel="C12345", text="<@U12345> has archived this channel 👋"
-    )
+    mock_client.chat_postMessage.assert_called_once_with(channel="C12345", text="<@U12345> has archived this channel 👋")
     mock_logger.exception.assert_called_once_with(
         "client_post_message_error",
         channel_id="C12345",
@@ -1021,18 +960,14 @@ def test_close_incident_handles_post_message_failure(
 @patch("modules.incident.incident_helper.slack_users")
 @patch("modules.incident.incident_helper.db_operations")
 @patch("modules.incident.incident_helper.incident_status")
-def test_handle_update_status_command(
-    mock_incident_status, mock_db_operations, mock_slack_users, mock_logger
-):
+def test_handle_update_status_command(mock_incident_status, mock_db_operations, mock_slack_users, mock_logger):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
 
     args = ["Closed"]
     mock_slack_users.get_user_id_from_request.return_value = "U12345"
-    mock_db_operations.get_incident_by_channel_id.return_value = [
-        {"id": {"S": "incident-2024-01-12-test"}}
-    ]
+    mock_db_operations.get_incident_by_channel_id.return_value = [{"id": {"S": "incident-2024-01-12-test"}}]
     incident_helper.handle_update_status_command(
         mock_client,
         {
@@ -1061,17 +996,13 @@ def test_handle_update_status_command(
 @patch("modules.incident.incident_helper.slack_users")
 @patch("modules.incident.incident_helper.incident_status")
 @patch("modules.incident.incident_helper.db_operations")
-def test_handle_update_status_command_invalid_status(
-    mock_db_operations, mock_incident_status, mock_slack_users, mock_logger
-):
+def test_handle_update_status_command_invalid_status(mock_db_operations, mock_incident_status, mock_slack_users, mock_logger):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
 
     args = ["InvalidStatus"]
-    mock_db_operations.get_incident_by_channel_id.return_value = {
-        "id": {"S": "incident-2024-01-12-test"}
-    }
+    mock_db_operations.get_incident_by_channel_id.return_value = {"id": {"S": "incident-2024-01-12-test"}}
     # Call the function
     incident_helper.handle_update_status_command(
         mock_client,
@@ -1096,9 +1027,7 @@ def test_handle_update_status_command_invalid_status(
 @patch("modules.incident.incident_helper.slack_users")
 @patch("modules.incident.incident_helper.incident_status")
 @patch("modules.incident.incident_helper.db_operations")
-def test_handle_update_status_command_no_incidents_found(
-    mock_db_operations, mock_incident_status, mock_slack_users
-):
+def test_handle_update_status_command_no_incidents_found(mock_db_operations, mock_incident_status, mock_slack_users):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     mock_respond = MagicMock()
@@ -1120,20 +1049,13 @@ def test_handle_update_status_command_no_incidents_found(
     )
 
     mock_ack.assert_called_once()
-    mock_respond.assert_called_once_with(
-        "No incident found for this channel. Will not update status in DB record."
-    )
+    mock_respond.assert_called_once_with("No incident found for this channel. Will not update status in DB record.")
     mock_incident_status.update_status.assert_not_called()
 
 
 def test_parse_incident_datetime_string():
-    assert (
-        incident_helper.parse_incident_datetime_string("2025-01-23 17:02:16.915368")
-        == "2025-01-23 17:02"
-    )
-    assert (
-        incident_helper.parse_incident_datetime_string("2025-01-23 17:02") == "Unknown"
-    )
+    assert incident_helper.parse_incident_datetime_string("2025-01-23 17:02:16.915368") == "2025-01-23 17:02"
+    assert incident_helper.parse_incident_datetime_string("2025-01-23 17:02") == "Unknown"
     assert incident_helper.parse_incident_datetime_string("") == "Unknown"
     assert incident_helper.parse_incident_datetime_string("asdf") == "Unknown"
     with pytest.raises(TypeError):
@@ -1142,9 +1064,7 @@ def test_parse_incident_datetime_string():
 
 def test_convert_timestamp():
     assert incident_helper.convert_timestamp("1234567890") == "2009-02-13 23:31:30"
-    assert (
-        incident_helper.convert_timestamp("1234567890.123456") == "2009-02-13 23:31:30"
-    )
+    assert incident_helper.convert_timestamp("1234567890.123456") == "2009-02-13 23:31:30"
 
     assert incident_helper.convert_timestamp("asdf") == "Unknown"
 
@@ -1201,9 +1121,7 @@ def test_open_updates_dialog(mock_db_operations):
         "user_id": "user_id",
         "trigger_id": "trigger_id",
     }
-    mock_db_operations.get_incident_by_channel_id.return_value = {
-        "id": {"S": "incident_id"}
-    }
+    mock_db_operations.get_incident_by_channel_id.return_value = {"id": {"S": "incident_id"}}
     incident_helper.open_updates_dialog(client, body, ack)
     client.views_open.assert_called_once_with(
         trigger_id="trigger_id",
@@ -1223,16 +1141,12 @@ def test_handle_updates_submission(mock_store_update):
                 "channel_id": "channel_id",
             }
         ),
-        "state": {
-            "values": {"updates_block": {"updates_input": {"value": "Test update"}}}
-        },
+        "state": {"values": {"updates_block": {"updates_input": {"value": "Test update"}}}},
     }
     incident_helper.handle_updates_submission(client, ack, respond, view)
     ack.assert_called_once()
     mock_store_update.assert_called_once_with("incident_id", "Test update")
-    client.chat_postMessage.assert_called_once_with(
-        channel="channel_id", text="Summary has been updated."
-    )
+    client.chat_postMessage.assert_called_once_with(channel="channel_id", text="Summary has been updated.")
 
 
 @patch("modules.incident.incident_helper.incident_folder.fetch_updates")
@@ -1245,9 +1159,7 @@ def test_display_current_updates(mock_fetch_updates):
     incident_helper.display_current_updates(client, body, respond, ack)
     ack.assert_called_once()
     mock_fetch_updates.assert_called_once_with("incident_id")
-    client.chat_postMessage.assert_called_once_with(
-        channel="incident_id", text="Current updates:\nUpdate 1\nUpdate 2"
-    )
+    client.chat_postMessage.assert_called_once_with(channel="incident_id", text="Current updates:\nUpdate 1\nUpdate 2")
 
     # Test case when no updates are found
     mock_fetch_updates.return_value = []

@@ -1,4 +1,5 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from modules.incident import on_call
 
 
@@ -24,9 +25,7 @@ def test_get_on_call_user_from_folder(
             },
         },
     }
-    mock_get_folder_metadata.return_value = {
-        "appProperties": {"genie_schedule": "schedule_id"}
-    }
+    mock_get_folder_metadata.return_value = {"appProperties": {"genie_schedule": "schedule_id"}}
     mock_opsgenie_get_on_call_users.return_value = [email]
     client.users_lookupByEmail.return_value = user_info
 
@@ -131,9 +130,7 @@ def test_get_on_call_user_from_folder_handles_slack_lookup_exception(
     folder = "folder_id"
     email = "missing-user@example.com"
 
-    mock_get_folder_metadata.return_value = {
-        "appProperties": {"genie_schedule": "schedule_id"}
-    }
+    mock_get_folder_metadata.return_value = {"appProperties": {"genie_schedule": "schedule_id"}}
     mock_opsgenie_get_on_call_users.return_value = [email]
     client.users_lookupByEmail.side_effect = Exception(
         "The request to the Slack API failed. (url: https://slack.com/api/users.lookupByEmail) "

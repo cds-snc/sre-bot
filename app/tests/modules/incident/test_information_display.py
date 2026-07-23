@@ -1,6 +1,7 @@
 import json
-from unittest.mock import MagicMock, patch
 import uuid
+from unittest.mock import MagicMock, patch
+
 from models.incidents import Incident
 from modules.incident import information_display
 
