@@ -216,11 +216,7 @@ def find_matching_handler(payload: AwsSnsPayload, parsed_message: str | dict) ->
             match_text = handler.get_match_text(payload, parsed_message)
 
             # Handle different pattern types
-            if (
-                handler.match_type == "callable"
-                and callable(compiled_pattern)
-                and compiled_pattern(payload, parsed_message)
-            ):
+            if handler.match_type == "callable" and callable(compiled_pattern) and compiled_pattern(payload, parsed_message):
                 return handler
             elif handler.match_type == "regex" and isinstance(compiled_pattern, re.Pattern):
                 if compiled_pattern.search(match_text):
@@ -228,10 +224,13 @@ def find_matching_handler(payload: AwsSnsPayload, parsed_message: str | dict) ->
             elif handler.match_type == "contains" and isinstance(compiled_pattern, str):
                 if compiled_pattern in match_text:
                     return handler
-            elif handler.match_type == "message_structure" and isinstance(parsed_message, dict):
+            elif (
+                handler.match_type == "message_structure"
+                and isinstance(parsed_message, dict)
+                and compiled_pattern in parsed_message
+            ):
                 # For message_structure, pattern should be a key that exists in the parsed message
-                if compiled_pattern in parsed_message:
-                    return handler
+                return handler
         except Exception as exc:  # pylint: disable=broad-except
             # Skip handlers that raise exceptions during matching or compilation
             logger.warning(

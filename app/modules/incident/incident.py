@@ -63,10 +63,7 @@ def open_create_incident_modal(client: WebClient, ack, command, body):
         command=command,
         body=body,
     )
-    if "user" in body:
-        user_id = body["user"]["id"]
-    else:
-        user_id = body["user_id"]
+    user_id = body["user"]["id"] if "user" in body else body["user_id"]
     locale = slack_users.get_user_locale(client, user_id)
     i18n.set("locale", locale)
     loading_view = _incident_modal_loading_view()

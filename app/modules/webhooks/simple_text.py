@@ -163,9 +163,8 @@ def find_matching_handler(text: str) -> SimpleTextPattern | None:
             elif handler.match_type == "regex" and isinstance(compiled_pattern, re.Pattern):
                 if compiled_pattern.search(text):
                     return handler
-            elif handler.match_type == "contains" and isinstance(compiled_pattern, str):
-                if compiled_pattern in text:
-                    return handler
+            elif handler.match_type == "contains" and isinstance(compiled_pattern, str) and compiled_pattern in text:
+                return handler
         except Exception as exc:  # pylint: disable=broad-except
             # Skip handlers that raise exceptions during matching or compilation
             logger.warning(

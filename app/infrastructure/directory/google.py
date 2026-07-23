@@ -6,7 +6,7 @@ import structlog
 
 from infrastructure.clients.google_workspace import GoogleWorkspaceClients
 from infrastructure.configuration.infrastructure import DirectorySettings
-from infrastructure.directory import (
+from infrastructure.directory.models import (
     DirectoryGroup,
     DirectoryMember,
     DirectoryUser,

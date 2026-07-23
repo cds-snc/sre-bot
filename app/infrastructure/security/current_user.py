@@ -44,8 +44,7 @@ from infrastructure.configuration import get_app_settings
 from infrastructure.configuration.infrastructure.server import (
     get_server_settings,
 )
-from infrastructure.security import get_jwks_manager
-from infrastructure.security.jwks import JWKSManager
+from infrastructure.security.jwks import JWKSManager, get_jwks_manager
 from infrastructure.security.jwt import validate_jwt_token
 from infrastructure.security.models import AuthPrincipalSource, User
 
