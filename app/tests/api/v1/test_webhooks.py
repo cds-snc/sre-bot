@@ -1,8 +1,9 @@
-from unittest.mock import patch, MagicMock, PropertyMock, call, ANY
+from unittest.mock import ANY, MagicMock, PropertyMock, call, patch
 
-import pytest
 import httpx
+import pytest
 from fastapi.testclient import TestClient
+
 from api.v1.routes import webhooks
 from models.webhooks import (
     WebhookPayload,
@@ -74,9 +75,7 @@ def test_handle_webhook_malformed_json_string(test_client):
     payload = '{"invalid_json": "missing_end_quote}'
     response = test_client.post("/hook/id", json=payload)
     assert response.status_code == 400
-    assert response.json() == {
-        "detail": "Unterminated string starting at: line 1 column 18 (char 17)"
-    }
+    assert response.json() == {"detail": "Unterminated string starting at: line 1 column 18 (char 17)"}
 
 
 @patch("api.v1.routes.webhooks.webhooks.get_webhook")
@@ -220,9 +219,7 @@ def test_handle_webhook_with_none_payload_none(
         "hook_type": {"S": "standard"},
         "active": {"BOOL": True},
     }
-    handle_webhook_payload_mock.return_value = WebhookResult(
-        status="error", action=None, payload=None
-    )
+    handle_webhook_payload_mock.return_value = WebhookResult(status="error", action=None, payload=None)
 
     response = test_client.post("/hook/id", json=payload)
 
@@ -429,9 +426,7 @@ async def test_webhooks_rate_limiting(
         payload = '{"Type": "Notification"}'
         # Return a proper WebhookPayload instance
         mock_webhook_payload = WebhookPayload(text="Test message")
-        handle_webhook_payload_mock.return_value = WebhookResult(
-            status="success", action="post", payload=mock_webhook_payload
-        )
+        handle_webhook_payload_mock.return_value = WebhookResult(status="success", action="post", payload=mock_webhook_payload)
         # Make 30 requests to the handle_webhook endpoint
         for _ in range(30):
             response = await client.post("/hook/test-id", json=payload)

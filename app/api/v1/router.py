@@ -1,7 +1,7 @@
 from fastapi import APIRouter
+
 from api.v1.routes.geolocate import router as legacy_geolocate_router
 from api.v1.routes.webhooks import router as webhooks_router
-
 
 # Main v1 router (includes all endpoints)
 router = APIRouter()

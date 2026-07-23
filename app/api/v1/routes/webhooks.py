@@ -1,8 +1,8 @@
 import json
-from typing import Any, Dict, Optional, Union
-import structlog
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, Body
+import structlog
+from fastapi import APIRouter, Body, HTTPException, Request
 from slack_sdk import WebClient
 
 from infrastructure.security import get_limiter
@@ -12,13 +12,12 @@ from modules.slack import webhooks
 from modules.webhooks.base import handle_webhook_payload
 from modules.webhooks.slack import hydrate_ip_addresses, map_emails_to_slack_users
 
-
 logger = structlog.get_logger()
 router = APIRouter(tags=["Webhooks"])
 limiter = get_limiter()
 
 
-def _get_bot_client(request: Request) -> Optional[WebClient]:
+def _get_bot_client(request: Request) -> WebClient | None:
     bot = getattr(request.app.state, "bot", None)
     if bot is None:
         return None
@@ -32,7 +31,7 @@ def _get_bot_client(request: Request) -> Optional[WebClient]:
 def handle_webhook(
     webhook_id: str,
     request: Request,
-    payload: Union[Dict[Any, Any], str] = Body(...),
+    payload: dict[Any, Any] | str = Body(...),  # noqa: B008 -- FastAPI dependency injection requires a call in the default
 ):
     """Handle incoming webhook requests and post to Slack channel.
 
@@ -84,16 +83,12 @@ def handle_webhook(
             detail=webhook_result.message or "Invalid payload",
         )
 
-    if webhook_result.action == "post" and isinstance(
-        webhook_result.payload, WebhookPayload
-    ):
+    if webhook_result.action == "post" and isinstance(webhook_result.payload, WebhookPayload):
         webhook_payload = webhook_result.payload
         webhook_payload = map_emails_to_slack_users(webhook_payload)
         webhook_payload = hydrate_ip_addresses(webhook_payload)
         webhook_payload.channel = webhook["channel"]["S"]
-        hook_type = webhook.get("hook_type", {}).get(
-            "S", "alert"
-        )  # Default to "alert" if hook_type is missing
+        hook_type = webhook.get("hook_type", {}).get("S", "alert")  # Default to "alert" if hook_type is missing
         if hook_type == "alert":
             webhook_payload = append_incident_buttons(webhook_payload, webhook_id)
 

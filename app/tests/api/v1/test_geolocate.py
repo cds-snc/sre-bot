@@ -1,5 +1,7 @@
 from unittest.mock import patch
+
 from fastapi.testclient import TestClient
+
 from api.v1.routes import geolocate
 from utils.tests import create_test_app
 

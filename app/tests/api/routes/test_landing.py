@@ -20,9 +20,7 @@ def test_app():
 def landing_content():
     """Load the landing content JSON."""
 
-    content_path = (
-        Path(__file__).parent.parent.parent / "api" / "routes" / "landing_content.json"
-    )
+    content_path = Path(__file__).parent.parent.parent / "api" / "routes" / "landing_content.json"
     with open(content_path) as f:
         return json.load(f)
 
@@ -67,9 +65,7 @@ class TestLandingPage:
 
         # Check for French content strings (may be JSON-encoded in the response)
         # Check for French heading and other French markers
-        assert (
-            "Ingénierie de fiabilité de site" in html_content or "Ing" in html_content
-        )
+        assert "Ingénierie de fiabilité de site" in html_content or "Ing" in html_content
         assert "Backstage" in html_content  # Present in both EN and FR
         assert '"fr":' in html_content  # Check that FR language data is present
 
@@ -104,10 +100,7 @@ class TestLandingPage:
 
         # Check for API documentation link (may be JSON-encoded)
         assert "/docs" in html_content
-        assert (
-            "View API Documentation" in html_content
-            or "Afficher la documentation" in html_content
-        )
+        assert "View API Documentation" in html_content or "Afficher la documentation" in html_content
 
     def test_landing_page_responsive_design(self, test_app):
         """Test that the landing page includes responsive design styles."""

@@ -1,9 +1,10 @@
 import structlog
-from fastapi import APIRouter, Request, Depends
-from api.routes.system import router as system_router
-from api.routes.landing import router as landing_router
-from api.v1.router import router as v1_router, legacy_router
+from fastapi import APIRouter, Depends, Request
 
+from api.routes.landing import router as landing_router
+from api.routes.system import router as system_router
+from api.v1.router import legacy_router
+from api.v1.router import router as v1_router
 
 logger = structlog.get_logger()
 
