@@ -170,9 +170,7 @@ def handle_webhooks_command(payload: CommandPayload) -> CommandResponse:
 
     # Return captured response
     if captured_response["blocks"]:
-        return CommandResponse(
-            message="", blocks=captured_response["blocks"], ephemeral=True
-        )
+        return CommandResponse(message="", blocks=captured_response["blocks"], ephemeral=True)
     elif captured_response["message"]:
         return CommandResponse(message=captured_response["message"], ephemeral=True)
     else:
@@ -182,7 +180,7 @@ def handle_webhooks_command(payload: CommandPayload) -> CommandResponse:
         )
 
 
-def register_commands(provider: "SlackPlatformProvider") -> None:
+def register_commands(provider: SlackPlatformProvider) -> None:
     """Register SRE module commands with Slack provider.
 
     Note: No need to register explicit "help" handlers - the platform provider

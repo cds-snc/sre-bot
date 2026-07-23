@@ -11,13 +11,13 @@ from structlog.stdlib import BoundLogger
 
 from infrastructure.directory import get_directory_provider
 from infrastructure.operations import OperationResult
+from integrations.slack.models import CommandPayload
 from integrations.slack.parser import (
     Argument,
     ArgumentParsingError,
     ArgumentType,
     CommandArgumentParser,
 )
-from integrations.slack.models import CommandPayload
 
 logger: BoundLogger = structlog.get_logger()
 
@@ -158,16 +158,10 @@ def google_service_command(
     try:
         user_email, group_email = _parse_command_inputs(command_payload)
     except ArgumentParsingError as exc:
-        respond(
-            "Usage: /sre dev google <user_email> <group_email>\n"
-            f"Argument parsing error: {exc.message}"
-        )
+        respond(f"Usage: /sre dev google <user_email> <group_email>\nArgument parsing error: {exc.message}")
         return
 
-    respond(
-        "Running Google directory provider smoke tests for "
-        f"{user_email} and {group_email}..."
-    )
+    respond(f"Running Google directory provider smoke tests for {user_email} and {group_email}...")
     smoke_warmup()
     smoke_get_user(user_email)
     smoke_list_users()
@@ -176,7 +170,5 @@ def google_service_command(
         smoke_get_group_members(resolved_group_email)
         smoke_check_membership(user_email, resolved_group_email)
     else:
-        respond(
-            "Group lookup returned no exact match; skipped membership-related smoke tests."
-        )
+        respond("Group lookup returned no exact match; skipped membership-related smoke tests.")
     respond("Google directory provider smoke tests completed.")

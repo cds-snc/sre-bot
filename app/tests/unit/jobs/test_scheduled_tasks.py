@@ -4,9 +4,11 @@ Tests the scheduling logic, error handling, and task integration without
 executing the actual scheduled work.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
-from jobs.scheduled_tasks import safe_run, scheduler_heartbeat, reconcile_access_sync
+
+import pytest
+
+from jobs.scheduled_tasks import reconcile_access_sync, safe_run, scheduler_heartbeat
 
 
 class TestSafeRun:
@@ -85,9 +87,7 @@ class TestSchedulerHeartbeat:
     @pytest.mark.unit
     @patch("jobs.scheduled_tasks.time")
     @patch("jobs.scheduled_tasks.logger")
-    def test_scheduler_heartbeat_logs_current_time(
-        self, mock_logger, mock_time
-    ) -> None:
+    def test_scheduler_heartbeat_logs_current_time(self, mock_logger, mock_time) -> None:
         """Test that scheduler_heartbeat logs the current time."""
         mock_time.ctime.return_value = "Thu Feb  6 10:30:00 2026"
 
@@ -116,9 +116,7 @@ class TestReconcileAccessSync:
     @patch("jobs.scheduled_tasks.get_access_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
-    def test_reconcile_syncs_each_registered_platform(
-        self, mock_logger, mock_get_coordinator, mock_get_runtime_config
-    ) -> None:
+    def test_reconcile_syncs_each_registered_platform(self, mock_logger, mock_get_coordinator, mock_get_runtime_config) -> None:
         """reconcile_access_sync calls sync_platform once per platform in config."""
         mock_coordinator = MagicMock()
         mock_get_coordinator.return_value = mock_coordinator
@@ -129,19 +127,14 @@ class TestReconcileAccessSync:
         reconcile_access_sync()
 
         assert mock_coordinator.sync_platform.call_count == 2
-        called_platforms = {
-            call.kwargs["platform"]
-            for call in mock_coordinator.sync_platform.call_args_list
-        }
+        called_platforms = {call.kwargs["platform"] for call in mock_coordinator.sync_platform.call_args_list}
         assert called_platforms == {"aws", "fake"}
 
     @pytest.mark.unit
     @patch("jobs.scheduled_tasks.get_access_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
-    def test_reconcile_runs_with_dry_run_false(
-        self, mock_logger, mock_get_coordinator, mock_get_runtime_config
-    ) -> None:
+    def test_reconcile_runs_with_dry_run_false(self, mock_logger, mock_get_coordinator, mock_get_runtime_config) -> None:
         """reconcile_access_sync always executes with dry_run=False."""
         mock_coordinator = MagicMock()
         mock_get_coordinator.return_value = mock_coordinator
@@ -151,17 +144,13 @@ class TestReconcileAccessSync:
 
         reconcile_access_sync()
 
-        mock_coordinator.sync_platform.assert_called_once_with(
-            platform="aws", dry_run=False
-        )
+        mock_coordinator.sync_platform.assert_called_once_with(platform="aws", dry_run=False)
 
     @pytest.mark.unit
     @patch("jobs.scheduled_tasks.get_access_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
-    def test_reconcile_no_platforms_does_nothing(
-        self, mock_logger, mock_get_coordinator, mock_get_runtime_config
-    ) -> None:
+    def test_reconcile_no_platforms_does_nothing(self, mock_logger, mock_get_coordinator, mock_get_runtime_config) -> None:
         """reconcile_access_sync with an empty platforms map calls sync_platform zero times."""
         mock_coordinator = MagicMock()
         mock_get_coordinator.return_value = mock_coordinator
@@ -177,9 +166,7 @@ class TestReconcileAccessSync:
     @patch("jobs.scheduled_tasks.get_access_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
-    def test_reconcile_logs_started(
-        self, mock_logger, mock_get_coordinator, mock_get_runtime_config
-    ) -> None:
+    def test_reconcile_logs_started(self, mock_logger, mock_get_coordinator, mock_get_runtime_config) -> None:
         """reconcile_access_sync emits a start log entry."""
         mock_get_coordinator.return_value = MagicMock()
         mock_runtime_config = MagicMock()
@@ -188,6 +175,4 @@ class TestReconcileAccessSync:
 
         reconcile_access_sync()
 
-        mock_logger.info.assert_called_once_with(
-            "reconcile_access_sync_started", module="scheduled_tasks"
-        )
+        mock_logger.info.assert_called_once_with("reconcile_access_sync_started", module="scheduled_tasks")

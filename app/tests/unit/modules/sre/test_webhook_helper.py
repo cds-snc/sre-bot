@@ -6,7 +6,8 @@ Tests cover:
 - Error handling for unknown commands
 """
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from modules.sre import webhook_helper
 
 
@@ -25,9 +26,7 @@ class TestWebhookHelperCommands:
 
     @patch("modules.sre.webhook_helper.webhooks_list.list_all_webhooks")
     @patch("modules.sre.webhook_helper.webhooks.lookup_webhooks")
-    def test_handle_webhooks_with_empty_args_and_webhooks_found(
-        self, mock_lookup, mock_list_view, mock_client, mock_body
-    ):
+    def test_handle_webhooks_with_empty_args_and_webhooks_found(self, mock_lookup, mock_list_view, mock_client, mock_body):
         """Should display webhooks list when webhooks exist."""
         hooks = [
             {"id": "1", "name": "hook1", "channel": "channel_id"},
@@ -51,9 +50,7 @@ class TestWebhookHelperCommands:
 
     @patch("modules.sre.webhook_helper.webhooks_list.list_all_webhooks")
     @patch("modules.sre.webhook_helper.webhooks.lookup_webhooks")
-    def test_handle_webhooks_with_empty_args_no_webhooks(
-        self, mock_lookup, mock_list_view, mock_client, mock_body
-    ):
+    def test_handle_webhooks_with_empty_args_no_webhooks(self, mock_lookup, mock_list_view, mock_client, mock_body):
         """Should show message when no webhooks exist."""
         mock_lookup.return_value = []
         respond = MagicMock()
@@ -66,9 +63,7 @@ class TestWebhookHelperCommands:
         mock_list_view.assert_not_called()
 
     @patch("modules.sre.webhook_helper.webhooks_create.create_webhook_modal")
-    def test_handle_webhooks_create_command(
-        self, mock_create_modal, mock_client, mock_body
-    ):
+    def test_handle_webhooks_create_command(self, mock_create_modal, mock_client, mock_body):
         """Should open webhook creation modal."""
         webhook_helper.handle_webhook_command(
             ["create"],
@@ -88,9 +83,7 @@ class TestWebhookHelperCommands:
 
     @patch("modules.sre.webhook_helper.webhooks_list.list_all_webhooks")
     @patch("modules.sre.webhook_helper.webhooks.list_all_webhooks")
-    def test_handle_webhooks_list_command(
-        self, mock_list_all, mock_list_view, mock_client, mock_body
-    ):
+    def test_handle_webhooks_list_command(self, mock_list_all, mock_list_view, mock_client, mock_body):
         """Should list all webhooks across channels."""
         all_hooks = [
             {"id": "1", "name": "hook1", "channel": "channel1"},
@@ -101,16 +94,12 @@ class TestWebhookHelperCommands:
 
         webhook_helper.handle_webhook_command(["list"], mock_client, mock_body, respond)
 
-        mock_list_view.assert_called_once_with(
-            mock_client, mock_body, 0, webhook_helper.MAX_BLOCK_SIZE, "all", all_hooks
-        )
+        mock_list_view.assert_called_once_with(mock_client, mock_body, 0, webhook_helper.MAX_BLOCK_SIZE, "all", all_hooks)
         respond.assert_not_called()
 
     @patch("modules.sre.webhook_helper.webhooks_list.list_all_webhooks")
     @patch("modules.sre.webhook_helper.webhooks.list_all_webhooks")
-    def test_handle_webhooks_list_command_no_webhooks(
-        self, mock_list_all, mock_list_view, mock_client, mock_body
-    ):
+    def test_handle_webhooks_list_command_no_webhooks(self, mock_list_all, mock_list_view, mock_client, mock_body):
         """Should show message when no webhooks exist in list."""
         mock_list_all.return_value = []
         respond = MagicMock()
@@ -123,9 +112,7 @@ class TestWebhookHelperCommands:
     def test_handle_webhooks_unknown_command(self, mock_client, mock_body):
         """Should handle unknown commands gracefully."""
         respond = MagicMock()
-        webhook_helper.handle_webhook_command(
-            ["unknown"], mock_client, mock_body, respond
-        )
+        webhook_helper.handle_webhook_command(["unknown"], mock_client, mock_body, respond)
 
         respond.assert_called_once_with(
             "Unknown command: `unknown`. Type `/sre webhooks help` to see a list of commands.\n"

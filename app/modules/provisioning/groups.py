@@ -9,8 +9,8 @@ logger = get_logger()
 
 def get_groups_from_integration(
     integration_source: str,
-    pre_processing_filters: list = [],
-    post_processing_filters: list = [],
+    pre_processing_filters: list | None = None,
+    post_processing_filters: list | None = None,
     query: str | None = None,
     return_dataframe: bool = False,
 ) -> list:
@@ -33,6 +33,10 @@ def get_groups_from_integration(
         integration=integration_source,
         operation="get_groups_from_integration",
     )
+    if pre_processing_filters is None:
+        pre_processing_filters = []
+    if post_processing_filters is None:
+        post_processing_filters = []
     groups = []
     group_display_key = None
     members = None
@@ -51,9 +55,7 @@ def get_groups_from_integration(
                 query=query,
             )
             if return_dataframe:
-                groups_dataframe = (
-                    google_directory.convert_google_groups_members_to_dataframe(groups)
-                )
+                groups_dataframe = google_directory.convert_google_groups_members_to_dataframe(groups)
             integration_name = "Google"
             group_display_key = "name"
             members = "members"
@@ -67,9 +69,7 @@ def get_groups_from_integration(
                 groups_filters=pre_processing_filters,
             )
             if return_dataframe:
-                groups_dataframe = (
-                    identity_store.convert_aws_groups_members_to_dataframe(groups)
-                )
+                groups_dataframe = identity_store.convert_aws_groups_members_to_dataframe(groups)
             integration_name = "AWS"
             group_display_key = "DisplayName"
             members = "GroupMemberships"
@@ -139,9 +139,7 @@ def log_groups(
                 members_count=len(group[members]),
             )
             for member in group[members]:
-                members_display_name = filters.get_nested_value(
-                    member, members_display_key
-                )
+                members_display_name = filters.get_nested_value(member, members_display_key)
                 if not members_display_name:
                     members_display_name = "<User Name not found>"
                 log.info(

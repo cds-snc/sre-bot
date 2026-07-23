@@ -1,6 +1,6 @@
 import uuid
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -12,23 +12,21 @@ class Incident(BaseModel):
     channel_name: str
     name: str
     user_id: str
-    teams: List[str]
+    teams: list[str]
     report_url: str
     status: str = "Open"
-    created_at: str = Field(
-        default_factory=lambda: str(datetime.now(timezone.utc).timestamp())
-    )
+    created_at: str = Field(default_factory=lambda: str(datetime.now(UTC).timestamp()))
     start_impact_time: str = "Unknown"
     end_impact_time: str = "Unknown"
     detection_time: str = "Unknown"
     environment: str = "prod"
-    logs: List[str | dict] = []
-    meet_url: Optional[str] = None
-    incident_commander: Optional[str] = None
-    operations_lead: Optional[str] = None
-    severity: Optional[str] = None
-    retrospective_url: Optional[str] = None
-    incident_updates: Optional[List[str | dict]] = []
+    logs: list[str | dict] = []
+    meet_url: str | None = None
+    incident_commander: str | None = None
+    operations_lead: str | None = None
+    severity: str | None = None
+    retrospective_url: str | None = None
+    incident_updates: list[str | dict] | None = []
 
     model_config = {
         "extra": "forbid",
@@ -46,8 +44,8 @@ class IncidentPayload(BaseModel):
     channel_id: str
     channel_name: str
     slug: str
-    severity: Optional[str] = None
-    source_alert_permalink: Optional[str] = None
+    severity: str | None = None
+    source_alert_permalink: str | None = None
 
     model_config = {
         "extra": "forbid",

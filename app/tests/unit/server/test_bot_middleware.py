@@ -58,9 +58,7 @@ async def test_bot_middleware_preserves_response_from_next():
     request = MagicMock()
     request.state = MagicMock()
     call_next = AsyncMock()
-    expected_response = MagicMock(
-        status_code=201, headers={"X-Custom": "header"}, body=b"test"
-    )
+    expected_response = MagicMock(status_code=201, headers={"X-Custom": "header"}, body=b"test")
     call_next.return_value = expected_response
 
     # Act
