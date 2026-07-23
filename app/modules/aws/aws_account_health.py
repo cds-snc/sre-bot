@@ -1,14 +1,14 @@
-import structlog
 import arrow
+import structlog
 from slack_bolt import Ack
 from slack_sdk import WebClient
 
 from integrations.aws import (
-    organizations,
-    security_hub,
-    guard_duty,
     config,
     cost_explorer,
+    guard_duty,
+    organizations,
+    security_hub,
 )
 
 logger = structlog.get_logger()
@@ -17,12 +17,8 @@ logger = structlog.get_logger()
 def get_account_health(account_id):
     last_day_of_current_month = arrow.utcnow().span("month")[1].format("YYYY-MM-DD")
     first_day_of_current_month = arrow.utcnow().span("month")[0].format("YYYY-MM-DD")
-    last_day_of_last_month = (
-        arrow.utcnow().shift(months=-1).span("month")[1].format("YYYY-MM-DD")
-    )
-    first_day_of_last_month = (
-        arrow.utcnow().shift(months=-1).span("month")[0].format("YYYY-MM-DD")
-    )
+    last_day_of_last_month = arrow.utcnow().shift(months=-1).span("month")[1].format("YYYY-MM-DD")
+    first_day_of_last_month = arrow.utcnow().shift(months=-1).span("month")[0].format("YYYY-MM-DD")
 
     data = {
         "account_id": account_id,
@@ -30,16 +26,12 @@ def get_account_health(account_id):
             "last_month": {
                 "start_date": first_day_of_last_month,
                 "end_date": last_day_of_last_month,
-                "amount": get_account_spend(
-                    account_id, first_day_of_last_month, last_day_of_last_month
-                ),
+                "amount": get_account_spend(account_id, first_day_of_last_month, last_day_of_last_month),
             },
             "current_month": {
                 "start_date": first_day_of_current_month,
                 "end_date": last_day_of_current_month,
-                "amount": get_account_spend(
-                    account_id, first_day_of_current_month, last_day_of_current_month
-                ),
+                "amount": get_account_spend(account_id, first_day_of_current_month, last_day_of_current_month),
             },
         },
         "security": {
@@ -58,20 +50,9 @@ def get_account_spend(account_id, start_date, end_date):
     metrics = ["UnblendedCost"]
     group_by = [{"Type": "DIMENSION", "Key": "LINKED_ACCOUNT"}]
     filter = {"Dimensions": {"Key": "LINKED_ACCOUNT", "Values": [account_id]}}
-    response = cost_explorer.get_cost_and_usage(
-        time_period, granularity, metrics, filter, group_by
-    )
-    if (
-        "Groups" in response["ResultsByTime"][0]
-        and len(response["ResultsByTime"][0]["Groups"]) > 0
-    ):
-        return "{:0,.2f}".format(
-            float(
-                response["ResultsByTime"][0]["Groups"][0]["Metrics"]["UnblendedCost"][
-                    "Amount"
-                ]
-            )
-        )
+    response = cost_explorer.get_cost_and_usage(time_period, granularity, metrics, filter, group_by)
+    if "Groups" in response["ResultsByTime"][0] and len(response["ResultsByTime"][0]["Groups"]) > 0:
+        return "{:0,.2f}".format(float(response["ResultsByTime"][0]["Groups"][0]["Metrics"]["UnblendedCost"]["Amount"]))
     else:
         return "0.00"
 
@@ -82,9 +63,7 @@ def get_config_summary(account_id):
         "AccountId": account_id,
         "ComplianceType": "NON_COMPLIANT",
     }
-    return len(
-        config.describe_aggregate_compliance_by_config_rules(config_name, filters)
-    )
+    return len(config.describe_aggregate_compliance_by_config_rules(config_name, filters))
 
 
 def get_guardduty_summary(account_id):
@@ -137,7 +116,7 @@ def get_ignored_security_hub_issues():
         '1.14 Ensure hardware MFA is enabled for the "root" account',
     ]
 
-    return list(map(lambda t: {"Value": t, "Comparison": "NOT_EQUALS"}, ignored_issues))
+    return [{"Value": t, "Comparison": "NOT_EQUALS"} for t in ignored_issues]
 
 
 def health_view_handler(ack: Ack, body, client: WebClient):
@@ -146,13 +125,9 @@ def health_view_handler(ack: Ack, body, client: WebClient):
     log.info(
         "aws_health_request_received",
     )
-    account_id = body["view"]["state"]["values"]["account"]["account"][
-        "selected_option"
-    ]["value"]
+    account_id = body["view"]["state"]["values"]["account"]["account"]["selected_option"]["value"]
 
-    account_name = body["view"]["state"]["values"]["account"]["account"][
-        "selected_option"
-    ]["text"]["text"]
+    account_name = body["view"]["state"]["values"]["account"]["account"]["selected_option"]["text"]["text"]
 
     temporary_blocks = {
         "type": "modal",
@@ -182,9 +157,7 @@ def health_view_handler(ack: Ack, body, client: WebClient):
     view_id = client.views_open(
         trigger_id=body["trigger_id"],
         view=temporary_blocks,
-    )[
-        "view"
-    ]["id"]
+    )["view"]["id"]
 
     account_info = get_account_health(account_id)
 
@@ -209,8 +182,8 @@ def health_view_handler(ack: Ack, body, client: WebClient):
                     "text": f"""
 *Cost:*
 
-{account_info['cost']['last_month']['start_date']} - {account_info['cost']['last_month']['end_date']}: ${account_info['cost']['last_month']['amount']} USD
-{account_info['cost']['current_month']['start_date']} - {account_info['cost']['current_month']['end_date']}: ${account_info['cost']['current_month']['amount']} USD
+{account_info["cost"]["last_month"]["start_date"]} - {account_info["cost"]["last_month"]["end_date"]}: ${account_info["cost"]["last_month"]["amount"]} USD
+{account_info["cost"]["current_month"]["start_date"]} - {account_info["cost"]["current_month"]["end_date"]}: ${account_info["cost"]["current_month"]["amount"]} USD
                         """,
                 },
             },
@@ -222,9 +195,9 @@ def health_view_handler(ack: Ack, body, client: WebClient):
                     "text": f"""
 *Security:*
 
-{"✅" if account_info['security']['config'] == 0 else "❌"} Config ({account_info['security']['config']} issues)\n
-{"✅" if account_info['security']['guardduty'] == 0 else "❌"} GuardDuty ({account_info['security']['guardduty']} issues)\n
-{"✅" if account_info['security']['securityhub'] == 0 else "❌"} SecurityHub ({account_info['security']['securityhub']} issues)\n
+{"✅" if account_info["security"]["config"] == 0 else "❌"} Config ({account_info["security"]["config"]} issues)\n
+{"✅" if account_info["security"]["guardduty"] == 0 else "❌"} GuardDuty ({account_info["security"]["guardduty"]} issues)\n
+{"✅" if account_info["security"]["securityhub"] == 0 else "❌"} SecurityHub ({account_info["security"]["securityhub"]} issues)\n
                         """,
                 },
             },

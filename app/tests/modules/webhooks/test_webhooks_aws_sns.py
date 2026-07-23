@@ -1,9 +1,6 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from infrastructure.configuration.app import AppSettings
-from models.webhooks import AwsSnsPayload, WebhookPayload
-from modules.webhooks import aws_sns
 from fastapi import HTTPException
 from sns_message_validator import (
     InvalidCertURLException,
@@ -11,6 +8,10 @@ from sns_message_validator import (
     InvalidSignatureVersionException,
     SignatureVerificationFailureException,
 )
+
+from infrastructure.configuration.app import AppSettings
+from models.webhooks import AwsSnsPayload, WebhookPayload
+from modules.webhooks import aws_sns
 
 
 @pytest.fixture
@@ -23,9 +24,7 @@ def force_production_app_settings(monkeypatch):
 
 @patch("modules.webhooks.aws_sns.log_ops_message")
 @patch("modules.webhooks.aws_sns.SNSMessageValidator.validate_message")
-def test_validate_sns_payload_validates_model(
-    validate_message_mock, log_ops_message_mock, force_production_app_settings
-):
+def test_validate_sns_payload_validates_model(validate_message_mock, log_ops_message_mock, force_production_app_settings):
     client = MagicMock()
     payload = AwsSnsPayload(
         Type="Notification",
@@ -60,9 +59,7 @@ def test_validate_sns_payload_invalid_message_type(
         Signature="valid_signature",
         TopicArn="arn:aws:sns:us-east-1:123456789012:MyTopic",
     )
-    validate_message_mock.side_effect = InvalidMessageTypeException(
-        "InvalidType is not a valid message type."
-    )
+    validate_message_mock.side_effect = InvalidMessageTypeException("InvalidType is not a valid message type.")
     with pytest.raises(HTTPException) as e:
         aws_sns.validate_sns_payload(payload, client)
     assert e.value.status_code == 500
@@ -88,9 +85,7 @@ def test_validate_sns_payload_invalid_signature_version(
         Signature="valid_signature",
         TopicArn="arn:aws:sns:us-east-1:123456789012:MyTopic",
     )
-    validate_message_mock.side_effect = InvalidSignatureVersionException(
-        "Invalid signature version. Unable to verify signature."
-    )
+    validate_message_mock.side_effect = InvalidSignatureVersionException("Invalid signature version. Unable to verify signature.")
     with pytest.raises(HTTPException) as e:
         aws_sns.validate_sns_payload(payload, client)
     assert e.value.status_code == 500
@@ -116,9 +111,7 @@ def test_validate_sns_payload_invalid_signature_url(
         Signature="valid_signature",
         TopicArn="arn:aws:sns:us-east-1:123456789012:MyTopic",
     )
-    validate_message_mock.side_effect = InvalidCertURLException(
-        "Invalid certificate URL."
-    )
+    validate_message_mock.side_effect = InvalidCertURLException("Invalid certificate URL.")
     with pytest.raises(HTTPException) as e:
         aws_sns.validate_sns_payload(payload, client)
     assert e.value.status_code == 500
@@ -144,9 +137,7 @@ def test_validate_sns_payload_signature_verification_failure(
         Signature="invalid_signature",
         TopicArn="arn:aws:sns:us-east-1:123456789012:MyTopic",
     )
-    validate_message_mock.side_effect = SignatureVerificationFailureException(
-        "Invalid signature."
-    )
+    validate_message_mock.side_effect = SignatureVerificationFailureException("Invalid signature.")
     with pytest.raises(HTTPException) as e:
         aws_sns.validate_sns_payload(payload, client)
     assert e.value.status_code == 500
@@ -182,9 +173,7 @@ def test_validate_sns_payload_unexpected_exception(
 
 @patch("modules.webhooks.aws_sns.process_aws_notification_payload")
 @patch("modules.webhooks.aws_sns.validate_sns_payload")
-def test_process_aws_sns_payload_with_notification_no_message(
-    validate_sns_payload_mock, process_aws_notification_payload_mock
-):
+def test_process_aws_sns_payload_with_notification_no_message(validate_sns_payload_mock, process_aws_notification_payload_mock):
     client = MagicMock()
     payload = AwsSnsPayload(
         Type="Notification",
@@ -204,9 +193,7 @@ def test_process_aws_sns_payload_with_notification_no_message(
 
 @patch("modules.webhooks.aws_sns.process_aws_notification_payload")
 @patch("modules.webhooks.aws_sns.validate_sns_payload")
-def test_process_aws_sns_payload_aws_sns_notification(
-    validate_sns_payload_mock, process_aws_notification_payload_mock
-):
+def test_process_aws_sns_payload_aws_sns_notification(validate_sns_payload_mock, process_aws_notification_payload_mock):
     client = MagicMock()
     payload = AwsSnsPayload(
         Type="Notification",
@@ -228,9 +215,7 @@ def test_process_aws_sns_payload_aws_sns_notification(
 @patch("modules.webhooks.aws_sns.log_ops_message")
 @patch("modules.webhooks.aws_sns.requests.get")
 @patch("modules.webhooks.aws_sns.validate_sns_payload")
-def test_process_aws_sns_payload_aws_sns_subscription_confirmation(
-    validate_sns_payload_mock, get_mock, log_ops_message_mock
-):
+def test_process_aws_sns_payload_aws_sns_subscription_confirmation(validate_sns_payload_mock, get_mock, log_ops_message_mock):
     client = MagicMock()
     payload = AwsSnsPayload(
         Type="SubscriptionConfirmation",
@@ -248,9 +233,7 @@ def test_process_aws_sns_payload_aws_sns_subscription_confirmation(
 @patch("modules.webhooks.aws_sns.log_ops_message")
 @patch("modules.webhooks.aws_sns.requests.get")
 @patch("modules.webhooks.aws_sns.validate_sns_payload")
-def test_process_aws_sns_payload_with_aws_sns_unsubscribe_confirmation(
-    validate_sns_payload_mock, get_mock, log_ops_message_mock
-):
+def test_process_aws_sns_payload_with_aws_sns_unsubscribe_confirmation(validate_sns_payload_mock, get_mock, log_ops_message_mock):
     client = MagicMock()
     payload = AwsSnsPayload(
         Type="UnsubscribeConfirmation",

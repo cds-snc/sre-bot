@@ -9,21 +9,21 @@ This module provides the following features:
 """
 
 import structlog
-from slack_bolt import App, Ack, Respond
+from slack_bolt import Ack, App, Respond
 from slack_sdk.web import WebClient
 
-from integrations.aws.organizations import get_account_id_by_name
+from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.aws import identity_store
+from integrations.aws.organizations import get_account_id_by_name
 from integrations.slack import commands as slack_commands
 from modules.aws import (
     aws_access_requests,
     aws_account_health,
     groups,
-    users,
     lambdas,
     spending,
+    users,
 )
-from infrastructure.slack.settings import get_slack_transport_settings
 
 logger = structlog.get_logger()
 
@@ -92,9 +92,7 @@ def aws_command(ack: Ack, command, respond: Respond, client: WebClient, body) ->
     )
 
     if command["text"] == "":
-        respond(
-            "Type `/aws help` to see a list of commands. \n Tapez `/aws help` pour une liste des commandes"
-        )
+        respond("Type `/aws help` to see a list of commands. \n Tapez `/aws help` pour une liste des commandes")
         return
 
     action, *args = slack_commands.parse_command(command["text"])
@@ -112,9 +110,7 @@ def aws_command(ack: Ack, command, respond: Respond, client: WebClient, body) ->
         case "lambda" | "lambdas":
             lambdas.command_handler(client, body, respond, args)
         case "spending":
-            respond(
-                "Generating spending data...\nGénération des données de dépenses..."
-            )
+            respond("Generating spending data...\nGénération des données de dépenses...")
             spending_df = spending.generate_spending_data()
             if spending_df is None:
                 respond(
@@ -123,9 +119,7 @@ def aws_command(ack: Ack, command, respond: Respond, client: WebClient, body) ->
                 )
                 return
             spending.update_spending_data(spending_df)
-            respond(
-                "Spending data has been updated.\nLes données de dépenses ont été mises à jour."
-            )
+            respond("Spending data has been updated.\nLes données de dépenses ont été mises à jour.")
         case _:
             respond(
                 f"Unknown command: `{action}`. Type `/aws help` to see a list of commands.\n"
@@ -133,9 +127,7 @@ def aws_command(ack: Ack, command, respond: Respond, client: WebClient, body) ->
             )
 
 
-def request_aws_account_access(
-    account_name, rationale, start_date, end_date, user_email, access_type
-):
+def request_aws_account_access(account_name, rationale, start_date, end_date, user_email, access_type):
     """
     Request AWS account access for a user.
 

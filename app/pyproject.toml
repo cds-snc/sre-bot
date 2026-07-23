@@ -89,10 +89,14 @@ force-exclude = '''
     | modules/atip
     | modules/secret
     | modules/role
+    | modules/webhooks
+    | modules/aws
     | tests/modules/incident
     | tests/modules/secret
     | tests/modules/role
+    | tests/modules/webhooks
     | tests/unit/modules/atip
+    | tests/unit/modules/aws
 )/
 '''
 

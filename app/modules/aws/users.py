@@ -1,11 +1,12 @@
 import json
-import structlog
 
+import structlog
 from slack_sdk.web import WebClient
+
+from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
+from integrations.slack import users as slack_users
 from modules.aws import identity_center
 from modules.permissions import handler as permissions
-from integrations.slack import users as slack_users
-from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
 
 logger = structlog.get_logger()
 
@@ -52,24 +53,15 @@ def request_user_provisioning(client: WebClient, body, respond, args):
     requestor_email = slack_users.get_user_email_from_body(client, body)
     log = logger.bind(requestor_email=requestor_email)
     log.info("aws_users_provisioning_request_received")
-    if permissions.is_user_member_of_groups(
-        requestor_email, aws_feature_settings.AWS_ADMIN_GROUPS
-    ):
+    if permissions.is_user_member_of_groups(requestor_email, aws_feature_settings.AWS_ADMIN_GROUPS):
         operation = args[0]
         users_emails = args[1:]
         users_emails = [
-            (
-                slack_users.get_user_email_from_handle(client, email)
-                if email.startswith("@")
-                else email
-            )
-            for email in users_emails
+            (slack_users.get_user_email_from_handle(client, email) if email.startswith("@") else email) for email in users_emails
         ]
         response = identity_center.provision_aws_users(operation, users_emails)
         respond(f"Request completed:\n{json.dumps(response, indent=2)}")
     else:
-        respond(
-            "This function is restricted to admins only. Please contact #sre-and-tech-ops for assistance."
-        )
+        respond("This function is restricted to admins only. Please contact #sre-and-tech-ops for assistance.")
 
     log.info("aws_users_provisioning_request_completed")

@@ -1,13 +1,15 @@
-from unittest.mock import patch, ANY, MagicMock
-from modules.webhooks import base
+from unittest.mock import ANY, MagicMock, patch
+
 from pydantic import BaseModel
+
 from models.webhooks import (
-    WebhookPayload,
-    AwsSnsPayload,
     AccessRequest,
+    AwsSnsPayload,
     SimpleTextPayload,
+    WebhookPayload,
     WebhookResult,
 )
+from modules.webhooks import base
 
 
 @patch("modules.webhooks.base.logger")
@@ -119,9 +121,7 @@ def test_handle_webhook_payload_with_sns_payload(
     assert response.action == "post"
     assert isinstance(response.payload, WebhookPayload)
     assert response.payload.text == "Processed SNS message"
-    process_aws_sns_payload_mock.assert_called_once_with(
-        ANY, request.app.state.bot.client
-    )  # Ensure the client is passed
+    process_aws_sns_payload_mock.assert_called_once_with(ANY, request.app.state.bot.client)  # Ensure the client is passed
 
 
 @patch("modules.webhooks.base.validate_payload")
@@ -154,9 +154,7 @@ def test_handle_webhook_payload_with_access_request(validate_payload_mock):
 
 @patch("modules.webhooks.base.process_simple_text_payload")
 @patch("modules.webhooks.base.validate_payload")
-def test_handle_webhook_payload_upptime(
-    validate_payload_mock, process_simple_text_payload_mock
-):
+def test_handle_webhook_payload_upptime(validate_payload_mock, process_simple_text_payload_mock):
     request = MagicMock()
     payload = {
         "text": "🟥 Payload Test (https://not-valid.cdssandbox.xyz/) is **down** : https://github.com/cds-snc/status-statut/issues/222"

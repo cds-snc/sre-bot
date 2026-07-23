@@ -1,7 +1,8 @@
 """Unit tests for AWS users command handler."""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from modules.aws import users
 
@@ -55,9 +56,7 @@ def test_should_delegate_to_provisioning_handler_when_create_command_given(
     users.command_handler(client, body, respond, args)
 
     # Assert
-    mock_provisioning.assert_called_once_with(
-        client, body, respond, ["create", "user@example.com"]
-    )
+    mock_provisioning.assert_called_once_with(client, body, respond, ["create", "user@example.com"])
 
 
 @pytest.mark.unit
@@ -76,9 +75,7 @@ def test_should_delegate_to_provisioning_handler_when_delete_command_given(
     users.command_handler(client, body, respond, args)
 
     # Assert
-    mock_provisioning.assert_called_once_with(
-        client, body, respond, ["delete", "user@example.com"]
-    )
+    mock_provisioning.assert_called_once_with(client, body, respond, ["delete", "user@example.com"])
 
 
 @pytest.mark.unit
@@ -113,9 +110,7 @@ def test_should_provision_user_when_user_has_permission(
     # Assert
     mock_slack_users.get_user_email_from_body.assert_called_once_with(client, body)
     mock_permissions.is_user_member_of_groups.assert_called_once()
-    mock_identity_center.provision_aws_users.assert_called_once_with(
-        "create", ["newuser@example.com"]
-    )
+    mock_identity_center.provision_aws_users.assert_called_once_with("create", ["newuser@example.com"])
     respond.assert_called_once()
     assert "success" in respond.call_args[0][0]
 
@@ -124,9 +119,7 @@ def test_should_provision_user_when_user_has_permission(
 @patch("modules.aws.users.get_aws_feature_settings")
 @patch("modules.aws.users.permissions")
 @patch("modules.aws.users.slack_users")
-def test_should_deny_provisioning_when_user_lacks_permission(
-    mock_slack_users, mock_permissions, mock_get_aws_feature_settings
-):
+def test_should_deny_provisioning_when_user_lacks_permission(mock_slack_users, mock_permissions, mock_get_aws_feature_settings):
     """Test provisioning denial when user lacks permission."""
     # Arrange
     client = MagicMock()
