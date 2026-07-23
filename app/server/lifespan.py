@@ -274,7 +274,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 channel=sre_ops_settings.SRE_OPS_CHANNEL_ID,
                 text="SRE Bot has started up and is ready to receive commands.",
             )
-        if server_settings.SRE_TEST_CHANNEL_ID and not app_settings.ENVIRONMENT == "production":
+        if (
+            server_settings.SRE_TEST_CHANNEL_ID
+            and not app_settings.ENVIRONMENT == "production"
+        ):
             app.state.bot.client.chat_postMessage(
                 channel=server_settings.SRE_TEST_CHANNEL_ID,
                 text="SRE Bot has started up in test mode.",
