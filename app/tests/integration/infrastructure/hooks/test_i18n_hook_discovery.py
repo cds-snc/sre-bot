@@ -39,9 +39,7 @@ def test_i18n_hook_registers_geolocate_resources() -> None:
     specs = registry.list_specs()
     geolocate_specs = [s for s in specs if "geolocate" in s.owner.lower()]
 
-    assert (
-        len(geolocate_specs) > 0
-    ), f"geolocate resources not registered. All specs: {specs}"
+    assert len(geolocate_specs) > 0, f"geolocate resources not registered. All specs: {specs}"
 
     # Verify geolocate spec details
     geolocate_spec = geolocate_specs[0]

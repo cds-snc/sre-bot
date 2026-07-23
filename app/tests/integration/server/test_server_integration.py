@@ -26,9 +26,7 @@ def test_server_app_initializes_with_handlers(integration_server_app):
 def test_server_has_cors_middleware_configured(integration_server_app):
     """Test that server has CORS middleware configured."""
     # Assert
-    middleware_classes = [
-        m.cls.__name__ for m in integration_server_app.user_middleware
-    ]
+    middleware_classes = [m.cls.__name__ for m in integration_server_app.user_middleware]
     assert "CORSMiddleware" in middleware_classes
 
 

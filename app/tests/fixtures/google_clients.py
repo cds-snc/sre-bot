@@ -1,4 +1,6 @@
-from typing import Any, Callable, Dict, List, Optional
+import builtins
+from collections.abc import Callable
+from typing import Any
 
 
 class FakeGoogleService:
@@ -9,8 +11,8 @@ class FakeGoogleService:
 
     def __init__(
         self,
-        api_responses: Optional[Dict[str, Any]] = None,
-        paginated_pages: Optional[List[Dict[str, Any]]] = None,
+        api_responses: dict[str, Any] | None = None,
+        paginated_pages: builtins.list[dict[str, Any]] | None = None,
     ):
         self.api_responses = api_responses or {}
         self.paginated_pages = paginated_pages or []

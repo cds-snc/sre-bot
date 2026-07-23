@@ -4,8 +4,10 @@ Tests the scheduling system integration with all components,
 verifying task registration and error handling across the system.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from jobs import scheduled_tasks
 
 
@@ -46,28 +48,18 @@ class TestScheduledTasksInitialization:
         scheduled_tasks.init(bot)
 
         # Verify daily task times were called (at least once each)
-        daily_do_calls = [
-            call
-            for call in mock_schedule.mock_calls
-            if ".day.at(" in str(call) and ".do(" in str(call)
-        ]
+        daily_do_calls = [call for call in mock_schedule.mock_calls if ".day.at(" in str(call) and ".do(" in str(call)]
         assert len(daily_do_calls) >= 2  # At least two daily scheduled tasks
 
         # Verify 5-minute intervals
-        minutes_do_calls = [
-            call for call in mock_schedule.mock_calls if ".minutes.do(" in str(call)
-        ]
+        minutes_do_calls = [call for call in mock_schedule.mock_calls if ".minutes.do(" in str(call)]
         assert len(minutes_do_calls) >= 2  # At least two 5-minute tasks
 
         # Verify 2-hour interval
-        hours_do_calls = [
-            call for call in mock_schedule.mock_calls if ".hours.do(" in str(call)
-        ]
+        hours_do_calls = [call for call in mock_schedule.mock_calls if ".hours.do(" in str(call)]
         assert len(hours_do_calls) >= 1  # At least one 2-hour task
         # Verify bot.client was passed
-        client_mentions = [
-            call for call in mock_schedule.mock_calls if "client=" in str(call)
-        ]
+        client_mentions = [call for call in mock_schedule.mock_calls if "client=" in str(call)]
         assert len(client_mentions) >= 1
 
     @patch("jobs.scheduled_tasks.schedule")
@@ -162,9 +154,7 @@ class TestIntegrationHealthchecksWorkflow:
         assert mock_identity_store.healthcheck.call_count == 1
 
         # Errors should be logged for unhealthy checks
-        error_logs = [
-            call for call in mock_logger.mock_calls if "error" in str(call).lower()
-        ]
+        error_logs = [call for call in mock_logger.mock_calls if "error" in str(call).lower()]
         assert len(error_logs) >= 2
 
 

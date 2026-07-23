@@ -5,9 +5,10 @@ For true integration tests with real DynamoDB, use local DynamoDB or
 AWS DynamoDB with test tables.
 """
 
-import pytest
 import json
 from unittest.mock import patch
+
+import pytest
 
 from infrastructure.idempotency.dynamodb import DynamoDBCache
 from infrastructure.operations.result import OperationResult, OperationStatus
@@ -20,9 +21,7 @@ class TestDynamoDBCacheIntegration:
 
     @patch("infrastructure.idempotency.dynamodb.get_item")
     @patch("infrastructure.idempotency.dynamodb.put_item")
-    def test_cache_roundtrip_store_and_retrieve(
-        self, mock_put, mock_get, mock_settings
-    ):
+    def test_cache_roundtrip_store_and_retrieve(self, mock_put, mock_get, mock_settings):
         """Test storing and retrieving a response from cache."""
         response_data = {
             "success": True,
@@ -54,9 +53,7 @@ class TestDynamoDBCacheIntegration:
         assert result == response_data
 
     @patch("infrastructure.idempotency.dynamodb.get_item")
-    def test_cache_json_serialization_with_complex_response(
-        self, mock_get, mock_settings
-    ):
+    def test_cache_json_serialization_with_complex_response(self, mock_get, mock_settings):
         """Test cache handles complex nested responses."""
         complex_response = {
             "success": True,
@@ -88,9 +85,7 @@ class TestDynamoDBCacheIntegration:
 
     @patch("infrastructure.idempotency.dynamodb.scan")
     @patch("infrastructure.idempotency.dynamodb.delete_item")
-    def test_cache_clear_removes_all_entries(
-        self, mock_delete, mock_scan, mock_settings
-    ):
+    def test_cache_clear_removes_all_entries(self, mock_delete, mock_scan, mock_settings):
         """Test cache clear removes all entries."""
         mock_scan.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
@@ -162,9 +157,7 @@ class TestDynamoDBCacheIntegration:
 
     def test_cache_stats_contains_all_fields(self, mock_settings):
         """Test cache stats contains all required fields."""
-        cache = DynamoDBCache(
-            idempotency_settings=mock_settings, table_name="custom_table"
-        )
+        cache = DynamoDBCache(idempotency_settings=mock_settings, table_name="custom_table")
         cache.ttl_seconds = 7200
 
         stats = cache.get_stats()
@@ -176,9 +169,7 @@ class TestDynamoDBCacheIntegration:
 
     @patch("infrastructure.idempotency.dynamodb.put_item")
     @patch("infrastructure.idempotency.dynamodb.get_item")
-    def test_cache_multiple_operations_same_table(
-        self, mock_get, mock_put, mock_settings
-    ):
+    def test_cache_multiple_operations_same_table(self, mock_get, mock_put, mock_settings):
         """Test cache handles multiple operations on same table."""
         mock_put.return_value = OperationResult(
             status=OperationStatus.SUCCESS,
