@@ -1,11 +1,13 @@
 import logging
+
 from botocore.exceptions import ClientError
-from integrations.aws import identity_store_next as isn
+
 from infrastructure.operations import OperationResult
+from integrations.aws import identity_store_next as isn
 from tests.fixtures.aws_clients import FakeClient
 from tests.integrations.aws.fixtures_identity_store import (
-    assert_integration_success,
     assert_integration_error,
+    assert_integration_success,
 )
 
 
@@ -48,9 +50,7 @@ class TestGetUser:
             "execute_aws_api_call",
             lambda **kw: OperationResult.success(data={"UserId": "u-10"}),
         )
-        resp = isn.create_user(
-            email="new@example.com", first_name="New", family_name="User"
-        )
+        resp = isn.create_user(email="new@example.com", first_name="New", family_name="User")
         assert_integration_success(resp)
         assert resp.data.get("UserId") == "u-10"
 
@@ -62,9 +62,7 @@ class TestListUsers:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: OperationResult.success(
-                data=[{"UserId": "u1"}, {"UserId": "u2"}]
-            ),
+            lambda **kw: OperationResult.success(data=[{"UserId": "u1"}, {"UserId": "u2"}]),
         )
         resp = isn.list_users()
         assert_integration_success(resp)
@@ -74,9 +72,7 @@ class TestListUsers:
         monkeypatch.setattr(
             isn,
             "execute_aws_api_call",
-            lambda **kw: OperationResult.success(
-                data=[{"UserId": "u1"}, {"UserId": "u2"}]
-            ),
+            lambda **kw: OperationResult.success(data=[{"UserId": "u1"}, {"UserId": "u2"}]),
         )
 
         resp = isn.list_users()
@@ -119,9 +115,7 @@ class TestCreateUser:
             lambda **kw: OperationResult.success(data={"UserId": "u-10"}),
         )
 
-        resp = isn.create_user(
-            email="new@example.com", first_name="New", family_name="User"
-        )
+        resp = isn.create_user(email="new@example.com", first_name="New", family_name="User")
         assert_integration_success(resp)
         assert resp.data.get("UserId") == "u-10"
 
@@ -236,16 +230,12 @@ class TestListGroupsWithMemberships:
         monkeypatch.setattr(
             "concurrent.futures.ThreadPoolExecutor",
             lambda max_workers: __import__("types").SimpleNamespace(
-                submit=lambda fn, arg: __import__("types").SimpleNamespace(
-                    result=lambda: fn(arg)
-                ),
+                submit=lambda fn, arg: __import__("types").SimpleNamespace(result=lambda: fn(arg)),
                 __enter__=lambda s: s,
                 __exit__=lambda s, a, b, c: None,
             ),
         )
-        monkeypatch.setattr(
-            "concurrent.futures.as_completed", lambda futures: [f for f in futures]
-        )
+        monkeypatch.setattr("concurrent.futures.as_completed", lambda futures: [f for f in futures])
         group_ids = ["g-ok", "g-error", "g-nonlist"]
         memberships = isn._fetch_group_memberships_parallel(group_ids)
         assert memberships["g-ok"] == [{"MemberId": {"UserId": "u1"}}]
@@ -263,16 +253,12 @@ class TestListGroupsWithMemberships:
         monkeypatch.setattr(
             "concurrent.futures.ThreadPoolExecutor",
             lambda max_workers: __import__("types").SimpleNamespace(
-                submit=lambda fn, arg: __import__("types").SimpleNamespace(
-                    result=lambda: fn(arg)
-                ),
+                submit=lambda fn, arg: __import__("types").SimpleNamespace(result=lambda: fn(arg)),
                 __enter__=lambda s: s,
                 __exit__=lambda s, a, b, c: None,
             ),
         )
-        monkeypatch.setattr(
-            "concurrent.futures.as_completed", lambda futures: [f for f in futures]
-        )
+        monkeypatch.setattr("concurrent.futures.as_completed", lambda futures: [f for f in futures])
         group_ids = ["g-ok", "g-exc"]
         memberships = isn._fetch_group_memberships_parallel(group_ids)
         assert memberships["g-ok"] == [{"MemberId": {"UserId": "u1"}}]
@@ -284,15 +270,11 @@ class TestListGroupsWithMemberships:
         memberships_by_group = {"g1": None, "g2": []}
         users_by_id = {"u1": {"UserId": "u1"}}
         # tolerate_errors True: should include g1 with error, g2 with no members
-        result = isn._assemble_groups_with_memberships(
-            groups, memberships_by_group, users_by_id, tolerate_errors=True
-        )
+        result = isn._assemble_groups_with_memberships(groups, memberships_by_group, users_by_id, tolerate_errors=True)
         group_ids = [g["GroupId"] for g in result]
         assert "g1" in group_ids and "g2" in group_ids
         # tolerate_errors False: should exclude g1 and g2 (no members)
-        result2 = isn._assemble_groups_with_memberships(
-            groups, memberships_by_group, users_by_id, tolerate_errors=False
-        )
+        result2 = isn._assemble_groups_with_memberships(groups, memberships_by_group, users_by_id, tolerate_errors=False)
         group_ids2 = [g["GroupId"] for g in result2]
         assert "g1" not in group_ids2 and "g2" not in group_ids2
 
@@ -311,9 +293,7 @@ class TestListGroupsWithMemberships:
             "list_groups",
             lambda **kw: OperationResult.success(data=[{"GroupId": "g1"}]),
         )
-        monkeypatch.setattr(
-            isn, "_fetch_group_memberships_parallel", lambda gids: {"g1": []}
-        )
+        monkeypatch.setattr(isn, "_fetch_group_memberships_parallel", lambda gids: {"g1": []})
         monkeypatch.setattr(
             isn,
             "list_users",
@@ -345,9 +325,7 @@ class TestListGroupsWithMemberships:
             lambda **kw: OperationResult.success(data=[]),
         )
         filters = [lambda g: g["DisplayName"].startswith("A")]
-        resp = isn.list_groups_with_memberships(
-            groups_filters=filters, tolerate_errors=True
-        )
+        resp = isn.list_groups_with_memberships(groups_filters=filters, tolerate_errors=True)
         assert_integration_success(resp)
         assert len(resp.data) == 1 and resp.data[0]["GroupId"] == "g1"
 
@@ -525,23 +503,17 @@ class TestBatchOperations:
                     return OperationResult.success(data="not-a-list")
                 return OperationResult.success(data=[{"MemberId": {"UserId": "u1"}}])
 
-            monkeypatch.setattr(
-                isn, "list_group_memberships", fake_list_group_memberships
-            )
+            monkeypatch.setattr(isn, "list_group_memberships", fake_list_group_memberships)
             # Patch ThreadPoolExecutor to run synchronously for test
             monkeypatch.setattr(
                 "concurrent.futures.ThreadPoolExecutor",
                 lambda max_workers: __import__("types").SimpleNamespace(
-                    submit=lambda fn, arg: __import__("types").SimpleNamespace(
-                        result=lambda: fn(arg)
-                    ),
+                    submit=lambda fn, arg: __import__("types").SimpleNamespace(result=lambda: fn(arg)),
                     __enter__=lambda s: s,
                     __exit__=lambda s, a, b, c: None,
                 ),
             )
-            monkeypatch.setattr(
-                "concurrent.futures.as_completed", lambda futures: [f for f in futures]
-            )
+            monkeypatch.setattr("concurrent.futures.as_completed", lambda futures: [f for f in futures])
             group_ids = ["g-ok", "g-error", "g-nonlist"]
             memberships = isn._fetch_group_memberships_parallel(group_ids)
             assert memberships["g-ok"] == [{"MemberId": {"UserId": "u1"}}]
@@ -555,22 +527,16 @@ class TestBatchOperations:
                     raise Exception("boom")
                 return OperationResult.success(data=[{"MemberId": {"UserId": "u1"}}])
 
-            monkeypatch.setattr(
-                isn, "list_group_memberships", fake_list_group_memberships
-            )
+            monkeypatch.setattr(isn, "list_group_memberships", fake_list_group_memberships)
             monkeypatch.setattr(
                 "concurrent.futures.ThreadPoolExecutor",
                 lambda max_workers: __import__("types").SimpleNamespace(
-                    submit=lambda fn, arg: __import__("types").SimpleNamespace(
-                        result=lambda: fn(arg)
-                    ),
+                    submit=lambda fn, arg: __import__("types").SimpleNamespace(result=lambda: fn(arg)),
                     __enter__=lambda s: s,
                     __exit__=lambda s, a, b, c: None,
                 ),
             )
-            monkeypatch.setattr(
-                "concurrent.futures.as_completed", lambda futures: [f for f in futures]
-            )
+            monkeypatch.setattr("concurrent.futures.as_completed", lambda futures: [f for f in futures])
             group_ids = ["g-ok", "g-exc"]
             memberships = isn._fetch_group_memberships_parallel(group_ids)
             assert memberships["g-ok"] == [{"MemberId": {"UserId": "u1"}}]
@@ -582,15 +548,11 @@ class TestBatchOperations:
             memberships_by_group = {"g1": None, "g2": []}
             users_by_id = {"u1": {"UserId": "u1"}}
             # tolerate_errors True: should include g1 with error, g2 with no members
-            result = isn._assemble_groups_with_memberships(
-                groups, memberships_by_group, users_by_id, tolerate_errors=True
-            )
+            result = isn._assemble_groups_with_memberships(groups, memberships_by_group, users_by_id, tolerate_errors=True)
             group_ids = [g["GroupId"] for g in result]
             assert "g1" in group_ids and "g2" in group_ids
             # tolerate_errors False: should exclude g1 and g2 (no members)
-            result2 = isn._assemble_groups_with_memberships(
-                groups, memberships_by_group, users_by_id, tolerate_errors=False
-            )
+            result2 = isn._assemble_groups_with_memberships(groups, memberships_by_group, users_by_id, tolerate_errors=False)
             group_ids2 = [g["GroupId"] for g in result2]
             assert "g1" not in group_ids2 and "g2" not in group_ids2
 
@@ -609,9 +571,7 @@ class TestBatchOperations:
                 "list_groups",
                 lambda **kw: OperationResult.success(data=[{"GroupId": "g1"}]),
             )
-            monkeypatch.setattr(
-                isn, "_fetch_group_memberships_parallel", lambda gids: {"g1": []}
-            )
+            monkeypatch.setattr(isn, "_fetch_group_memberships_parallel", lambda gids: {"g1": []})
             monkeypatch.setattr(
                 isn,
                 "list_users",

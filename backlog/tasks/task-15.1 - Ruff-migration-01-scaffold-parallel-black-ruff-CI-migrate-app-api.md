@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@me'
 created_date: '2026-07-23 14:11'
-updated_date: '2026-07-23 16:34'
+updated_date: '2026-07-23 18:21'
 labels: []
 dependencies:
   - TASK-15
@@ -29,9 +29,10 @@ This first PR establishes the parallel-CI scaffolding and migrates the smallest 
 2. Pull already-migrated content for THIS PR's paths from the reference branch (never hand-edit migrated source):
      git checkout feat/dev_env_setup_ruff -- <PATHS>
    Unchanged files are byte-identical to main; changed files arrive in their final ruff form.
-3. Move THIS PR's paths into the migrated set in TWO places:
+3. Move THIS PR's paths into the migrated set in THREE places:
      a. app/pyproject.toml -> [tool.black] force-exclude regex  (black stops checking them)
      b. app/Makefile -> RUFF_SCOPE variable                     (ruff starts checking them)
+     c. .github/workflows/scripts/run_bandit_scan.sh -> RUFF_MIGRATED_PATHS list (added in TASK-15.5; keep in sync with RUFF_SCOPE, one /data/app/<path> entry per RUFF_SCOPE token, comma-separated). Ruff's S rules already cover these paths, and cytopia/bandit's bundled Python predates PEP 695 (3.12)/PEP 758 (3.14) syntax that may appear in migrated files, so leaving migrated paths in Bandit's scan risks false AST-parse failures with zero added security coverage. This list is deleted whole-cloth in TASK-15.12 along with the rest of the workflow.
 4. Validate from app/:  make lint-ci && make fmt-ci && make test
 5. Ship ONE mechanical PR; reference decisions/toolchain.md + TASK-15. Migrated content must equal the reference branch.
 
@@ -78,7 +79,7 @@ Edit app/Makefile -- replace the fmt/lint/fmt-ci/lint-ci targets with the transi
 
 Notes:
 - black --check . reads [tool.black] force-exclude from pyproject, so migrated paths are skipped automatically -- no per-command regex needed.
-- Do NOT delete the bandit workflow here; S (security) rules only cover migrated paths until the final cutover PR (TASK-15.12).
+- Do NOT delete the bandit workflow here; S (security) rules only cover migrated paths until the final cutover PR (TASK-15.12). Starting with TASK-15.5, migrated paths are additionally excluded from the standalone Bandit scan itself (see recipe step 3c) so the stale cytopia/bandit image never has to parse them.
 - Expected size: ~8 files + config. Validate: cd app && make lint-ci && make fmt-ci && make test
 <!-- SECTION:DESCRIPTION:END -->
 

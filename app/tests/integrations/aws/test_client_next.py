@@ -28,9 +28,7 @@ def test__paginate_all_results_respects_keys():
     # Provide a client that has paginator pages and also exposes the API method
     # name so getattr(client, method) doesn't raise when execute_aws_api_call
     # constructs api_method before deciding to paginate.
-    client = FakeClient(
-        paginated_pages=pages, api_responses={"list_items": lambda **kw: {}}
-    )
+    client = FakeClient(paginated_pages=pages, api_responses={"list_items": lambda **kw: {}})
 
     results = client_next._paginate_all_results(client, "list_items", keys=["Items"])
     assert results == [{"id": 1}, {"id": 2}]
@@ -119,9 +117,7 @@ def test_paginate_all_results_aggregates_pages():
     # Provide a client that has paginator pages and exposes the API method name so
     # getattr(client, method) doesn't raise when execute_aws_api_call constructs
     # api_method before deciding to paginate.
-    client = FakeClient(
-        paginated_pages=pages, api_responses={"list_items": lambda **kw: {}}
-    )
+    client = FakeClient(paginated_pages=pages, api_responses={"list_items": lambda **kw: {}})
 
     # Monkeypatch get_aws_client to return our fake client so execute_aws_api_call
     # follows the paginated branch and uses _paginate_all_results internally.
@@ -152,9 +148,7 @@ def test_execute_api_call_retries_on_retryable_error(monkeypatch, caplog):
     def api_call() -> dict:
         if attempts["count"] < 2:
             attempts["count"] += 1
-            raise ClientError(
-                {"Error": {"Code": "Throttling", "Message": "throttle"}}, "Op"
-            )
+            raise ClientError({"Error": {"Code": "Throttling", "Message": "throttle"}}, "Op")
         return {"ok": True}
 
     sleeps: list[float] = []
@@ -232,9 +226,7 @@ def test_execute_aws_api_call_force_paginate_even_if_client_cant_paginate(monkey
 
     monkeypatch.setattr(client_next, "get_aws_client", fake_get_aws_client)
 
-    resp = client_next.execute_aws_api_call(
-        service_name="svc", method="list_items", keys=["Items"], force_paginate=True
-    )
+    resp = client_next.execute_aws_api_call(service_name="svc", method="list_items", keys=["Items"], force_paginate=True)
 
     assert isinstance(resp, OperationResult)
     assert resp.is_success is True
@@ -294,9 +286,7 @@ def test_default_max_retries_honored(monkeypatch):
 
 
 def test_calculate_retry_delay_fallback_on_invalid_backoff(monkeypatch):
-    monkeypatch.setitem(
-        client_next.ERROR_CONFIG, "default_backoff_factor", "not-a-number"
-    )
+    monkeypatch.setitem(client_next.ERROR_CONFIG, "default_backoff_factor", "not-a-number")
     # attempt 1 => backoff fallback 0.5 * 2**1 = 1.0
     val = client_next._calculate_retry_delay(1)
     assert pytest.approx(val, rel=1e-6) == 1.0

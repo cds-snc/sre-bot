@@ -5,17 +5,13 @@ from integrations import trello
 
 @patch("integrations.trello.client.get_trello_client")
 @patch("integrations.trello.client.get_atip_inbox_list_id_in_board")
-def test_add_atip_card_to_trello(
-    atip_inbox_list_id_in_board_mock, get_trello_client_mock
-):
+def test_add_atip_card_to_trello(atip_inbox_list_id_in_board_mock, get_trello_client_mock):
     trello_mock = MagicMock()
     trello_mock.cards.new.return_value = "card"
     get_trello_client_mock.return_value = trello_mock
     atip_inbox_list_id_in_board_mock.return_value = "list_id"
     assert trello.add_atip_card_to_trello("title", "description", "due_date") == "card"
-    trello_mock.cards.new.assert_called_with(
-        "title", idList="list_id", desc="description", due="due_date"
-    )
+    trello_mock.cards.new.assert_called_with("title", idList="list_id", desc="description", due="due_date")
 
 
 @patch("integrations.trello.client.get_trello_client")

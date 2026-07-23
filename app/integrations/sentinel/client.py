@@ -2,14 +2,14 @@ import base64
 import hashlib
 import hmac
 import json
-from datetime import date, datetime, time, timezone
+from datetime import UTC, date, datetime, time
 from typing import Any
 
 import requests
 import structlog
 
-from infrastructure.configuration.integrations.sentinel import get_sentinel_settings
 from infrastructure.audit.models import AuditEvent
+from infrastructure.configuration.integrations.sentinel import get_sentinel_settings
 
 logger = structlog.get_logger()
 sentinel_settings = get_sentinel_settings()
@@ -64,23 +64,11 @@ def build_signature(
     resource: str,
 ) -> str:
     x_headers = "x-ms-date:" + date
-    string_to_hash = (
-        method
-        + "\n"
-        + str(content_length)
-        + "\n"
-        + content_type
-        + "\n"
-        + x_headers
-        + "\n"
-        + resource
-    )
+    string_to_hash = method + "\n" + str(content_length) + "\n" + content_type + "\n" + x_headers + "\n" + resource
     bytes_to_hash = bytes(string_to_hash, encoding="utf-8")
     decoded_key = base64.b64decode(shared_key)
-    encoded_hash = base64.b64encode(
-        hmac.new(decoded_key, bytes_to_hash, digestmod=hashlib.sha256).digest()
-    ).decode()
-    authorization = "SharedKey {}:{}".format(customer_id, encoded_hash)
+    encoded_hash = base64.b64encode(hmac.new(decoded_key, bytes_to_hash, digestmod=hashlib.sha256).digest()).decode()
+    authorization = f"SharedKey {customer_id}:{encoded_hash}"
     return authorization
 
 
@@ -92,7 +80,7 @@ def post_data(customer_id: str, shared_key: str, body: str, log_type: str) -> bo
     method = "POST"
     content_type = "application/json"
     resource = "/api/logs"
-    rfc1123date = datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S GMT")
+    rfc1123date = datetime.now(UTC).strftime("%a, %d %b %Y %H:%M:%S GMT")
     content_length = len(body)
     signature = build_signature(
         customer_id,
@@ -103,13 +91,7 @@ def post_data(customer_id: str, shared_key: str, body: str, log_type: str) -> bo
         content_type,
         resource,
     )
-    uri = (
-        "https://"
-        + customer_id
-        + ".ods.opinsights.azure.com"
-        + resource
-        + "?api-version=2016-04-01"
-    )
+    uri = "https://" + customer_id + ".ods.opinsights.azure.com" + resource + "?api-version=2016-04-01"
 
     headers = {
         "content-type": content_type,

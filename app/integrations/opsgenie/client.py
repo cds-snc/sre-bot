@@ -18,7 +18,7 @@ def get_on_call_users(schedule):
     )
     try:
         data = json.loads(content)
-        return list(map(lambda x: x["name"], data["data"]["onCallParticipants"]))
+        return [x["name"] for x in data["data"]["onCallParticipants"]]
     except Exception as e:
         log.exception(
             "get_on_call_users_error",
@@ -80,17 +80,17 @@ def healthcheck():
 
 
 def api_get_request(url, auth):
-    req = Request(url)
+    req = Request(url)  # noqa: S310 -- scheme is hardcoded to https call sites
     req.add_header("Authorization", f"{auth['name']} {auth['token']}")
-    conn = urlopen(req)  # nosec - Scheme is hardcoded to https
+    conn = urlopen(req)  # noqa: S310 -- scheme is hardcoded to https call sites
     return conn.read().decode("utf-8")
 
 
 # Post the API request to the Opsgenie API
 def api_post_request(url, auth, data):
     data = json.dumps(data).encode("utf-8")
-    req = Request(url, data=data)
+    req = Request(url, data=data)  # noqa: S310 -- scheme is hardcoded to https call sites
     req.add_header("Content-Type", "application/json")
     req.add_header("Authorization", f"{auth['name']} {auth['token']}")
-    conn = urlopen(req)  # nosec - Scheme is hardcoded to https
+    conn = urlopen(req)  # noqa: S310 -- scheme is hardcoded to https call sites
     return conn.read().decode("utf-8")

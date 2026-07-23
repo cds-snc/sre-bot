@@ -10,9 +10,7 @@ from integrations.notify import client as notify
 
 @pytest.fixture(autouse=True)
 def setup_notify_settings():
-    with patch(
-        "integrations.notify.client.get_notify_settings"
-    ) as mock_get_notify_settings:
+    with patch("integrations.notify.client.get_notify_settings") as mock_get_notify_settings:
         mock_get_notify_settings.return_value = MagicMock(
             NOTIFY_SRE_USER_NAME="test-client-id",
             NOTIFY_SRE_CLIENT_SECRET="test-secret",
@@ -23,9 +21,7 @@ def setup_notify_settings():
 
 # helper function to decode the token for testing
 def decode_token(token, secret):
-    return jwt.decode(
-        token, key=secret, options={"verify_signature": True}, algorithms=["HS256"]
-    )
+    return jwt.decode(token, key=secret, options={"verify_signature": True}, algorithms=["HS256"])
 
 
 # Test that an exception is raised if the secret is missing
@@ -35,9 +31,7 @@ def test_create_jwt_token_secret_missing(mock_logger):
     with pytest.raises(ValueError) as err:
         notify.create_jwt_token(None, "client_id")
     assert str(err.value) == "Missing secret key"
-    bound_logger_mock.error.assert_called_once_with(
-        "jwt_token_creation_failed", error="Missing secret key"
-    )
+    bound_logger_mock.error.assert_called_once_with("jwt_token_creation_failed", error="Missing secret key")
 
 
 # Test that an exception is raised if the client_id is missing
@@ -47,9 +41,7 @@ def test_create_jwt_token_client_id_missing(mock_logger):
     with pytest.raises(ValueError) as err:
         notify.create_jwt_token("secret", None)
     assert str(err.value) == "Missing client id"
-    bound_logger_mock.error.assert_called_once_with(
-        "jwt_token_creation_failed", error="Missing client id"
-    )
+    bound_logger_mock.error.assert_called_once_with("jwt_token_creation_failed", error="Missing client id")
 
 
 # Test that the token is created correctly and the type and alg headers are set correctly
@@ -98,9 +90,7 @@ def test_token_contains_correct_iat():
 @patch("integrations.notify.client.notify_settings", new_callable=MagicMock)
 @patch("integrations.notify.client.logger")
 @patch("integrations.notify.client.create_jwt_token")
-def test_authorization_header_missing_client_id(
-    mock_jwt_token, mock_logger, mock_notify_settings
-):
+def test_authorization_header_missing_client_id(mock_jwt_token, mock_logger, mock_notify_settings):
     mock_notify_settings.NOTIFY_SRE_USER_NAME = ""
     mock_notify_settings.NOTIFY_SRE_CLIENT_SECRET = "foo"
     with pytest.raises(ValueError) as err:
@@ -117,9 +107,7 @@ def test_authorization_header_missing_client_id(
 @patch("integrations.notify.client.notify_settings", new_callable=MagicMock)
 @patch("integrations.notify.client.logger")
 @patch("integrations.notify.client.create_jwt_token")
-def test_authorization_header_missing_secret(
-    mock_jwt_token, mock_logger, mock_notify_settings
-):
+def test_authorization_header_missing_secret(mock_jwt_token, mock_logger, mock_notify_settings):
     mock_notify_settings.NOTIFY_SRE_USER_NAME = "foo"
     mock_notify_settings.NOTIFY_SRE_CLIENT_SECRET = ""
     with pytest.raises(ValueError) as err:
@@ -186,9 +174,7 @@ def test_revoke_api_key_missing_url(mock_logger, mock_settings, mock_notify_sett
     result = notify.revoke_api_key("api-key-123", "api-type", "github.com/repo", "test")
 
     assert result == "error"
-    bound_logger_mock.error.assert_called_once_with(
-        "revoke_api_key_error", error="NOTIFY_API_URL is missing"
-    )
+    bound_logger_mock.error.assert_called_once_with("revoke_api_key_error", error="NOTIFY_API_URL is missing")
 
 
 # Test successful API key revocation (status code 201)
@@ -196,9 +182,7 @@ def test_revoke_api_key_missing_url(mock_logger, mock_settings, mock_notify_sett
 @patch("integrations.notify.client.post_event")
 @patch("integrations.notify.client.settings", new_callable=MagicMock)
 @patch("integrations.notify.client.logger")
-def test_revoke_api_key_success(
-    mock_logger, mock_settings, mock_post_event, mock_notify_settings
-):
+def test_revoke_api_key_success(mock_logger, mock_settings, mock_post_event, mock_notify_settings):
     mock_settings.ENVIRONMENT = "production"
     # Mock successful response
     mock_response = MagicMock()
@@ -230,9 +214,7 @@ def test_revoke_api_key_success(
 
     # Verify logger was called correctly
     bound_logger_mock = mock_logger.bind.return_value
-    bound_logger_mock.info.assert_called_once_with(
-        "revoke_api_key_success", api_key=api_key
-    )
+    bound_logger_mock.info.assert_called_once_with("revoke_api_key_success", api_key=api_key)
 
 
 # Test failed API key revocation (non-201 status code)
@@ -240,9 +222,7 @@ def test_revoke_api_key_success(
 @patch("integrations.notify.client.post_event")
 @patch("integrations.notify.client.settings", new_callable=MagicMock)
 @patch("integrations.notify.client.logger")
-def test_revoke_api_key_failure(
-    mock_logger, mock_settings, mock_post_event, mock_notify_settings
-):
+def test_revoke_api_key_failure(mock_logger, mock_settings, mock_post_event, mock_notify_settings):
     mock_settings.ENVIRONMENT = "production"
     mock_notify_settings.NOTIFY_API_URL = "https://notify.example.com"
     # Mock failed response
@@ -254,9 +234,7 @@ def test_revoke_api_key_failure(
     api_key = "test-api-key-123"
 
     # Call the function
-    result = notify.revoke_api_key(
-        api_key, "test-type", "github.com/test/repo", "test-source"
-    )
+    result = notify.revoke_api_key(api_key, "test-type", "github.com/test/repo", "test-source")
 
     # Verify results
     assert result == "error"
@@ -275,9 +253,7 @@ def test_revoke_api_key_failure(
 @patch("integrations.notify.client.post_event")
 @patch("integrations.notify.client.settings", new_callable=MagicMock)
 @patch("integrations.notify.client.logger")
-def test_revoke_api_key_not_found(
-    mock_logger, mock_settings, mock_post_event, mock_notify_settings
-):
+def test_revoke_api_key_not_found(mock_logger, mock_settings, mock_post_event, mock_notify_settings):
     mock_settings.ENVIRONMENT = "production"
     mock_notify_settings.NOTIFY_API_URL = "https://notify.example.com"
     mock_response = MagicMock()
@@ -286,13 +262,9 @@ def test_revoke_api_key_not_found(
 
     api_key = "test-api-key-123"
 
-    result = notify.revoke_api_key(
-        api_key, "test-type", "github.com/test/repo", "test-source"
-    )
+    result = notify.revoke_api_key(api_key, "test-type", "github.com/test/repo", "test-source")
 
     assert result == "not_found"
 
     bound_logger_mock = mock_logger.bind.return_value
-    bound_logger_mock.warning.assert_called_once_with(
-        "revoke_api_key_not_found", api_key=api_key
-    )
+    bound_logger_mock.warning.assert_called_once_with("revoke_api_key_not_found", api_key=api_key)

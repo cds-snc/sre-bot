@@ -1,9 +1,10 @@
 import os
-from botocore.client import BaseClient  # type: ignore
-from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 from unittest.mock import MagicMock, patch
 
 import pytest
+from botocore.client import BaseClient  # type: ignore
+from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
+
 from integrations.aws import client as aws_client
 
 ROLE_ARN = "test_role_arn"
@@ -21,9 +22,7 @@ def test_handle_aws_api_errors_catches_botocore_error(mock_logger):
 
     assert result is False
     mock_func.assert_called_once()
-    mock_logger.bind.assert_called_once_with(
-        module="mock_module", function="mock_func_name"
-    )
+    mock_logger.bind.assert_called_once_with(module="mock_module", function="mock_func_name")
     mock_logger_bind.error.assert_called_once_with(
         "boto_core_error",
         error="An unspecified error occurred",
@@ -33,11 +32,7 @@ def test_handle_aws_api_errors_catches_botocore_error(mock_logger):
 
 @patch("integrations.aws.client.logger")
 def test_handle_aws_api_errors_catches_client_error_resource_not_found(mock_logger):
-    mock_func = MagicMock(
-        side_effect=ClientError(
-            {"Error": {"Code": "ResourceNotFoundException"}}, "operation_name"
-        )
-    )
+    mock_func = MagicMock(side_effect=ClientError({"Error": {"Code": "ResourceNotFoundException"}}, "operation_name"))
     mock_func.__name__ = "mock_func_name"
     mock_func.__module__ = "mock_module"
     mock_bind_logger = MagicMock()
@@ -79,9 +74,7 @@ def test_handle_aws_api_errors_catches_client_error_other(mock_logger):
 
     assert result is False
     mock_func.assert_called_once()
-    mock_logger.bind.assert_called_once_with(
-        module="mock_module", function="mock_func_name", error_code="OtherError"
-    )
+    mock_logger.bind.assert_called_once_with(module="mock_module", function="mock_func_name", error_code="OtherError")
     mock_bind_logger.error.assert_called_once_with(
         "aws_client_error",
         error="An error occurred (OtherError) when calling the operation_name operation: An error occurred",
@@ -101,9 +94,7 @@ def test_handle_aws_api_errors_catches_exception(mock_logger):
 
     assert result is False
     mock_func.assert_called_once()
-    mock_logger.bind.assert_called_once_with(
-        module="mock_module", function="mock_func_name"
-    )
+    mock_logger.bind.assert_called_once_with(module="mock_module", function="mock_func_name")
     mock_bind_logger.error.assert_called_once_with(
         "unexpected_error",
         error="Exception message",
@@ -168,9 +159,7 @@ def test_paginate_multiple_keys(mock_boto3_client):
         {"Key1": ["Value5", "Value6"]},
     ]
 
-    result = aws_client.paginator(
-        mock_boto3_client.return_value, "operation", ["Key1", "Key2"]
-    )
+    result = aws_client.paginator(mock_boto3_client.return_value, "operation", ["Key1", "Key2"])
 
     assert result == ["Value1", "Value2", "Value3", "Value4", "Value5", "Value6"]
 
@@ -238,12 +227,8 @@ def test_paginator_raises_exception_on_non_200_status(mock_logger):
     with pytest.raises(Exception) as excinfo:
         aws_client.paginator(mock_client, "operation")
 
-    assert str(excinfo.value) == (
-        "API call to mock_service.operation failed with status code 500"
-    )
-    mock_logger.bind.assert_called_once_with(
-        service="mock_service", operation="operation"
-    )
+    assert str(excinfo.value) == ("API call to mock_service.operation failed with status code 500")
+    mock_logger.bind.assert_called_once_with(service="mock_service", operation="operation")
     mock_bound_logger.error.assert_called_once()
     mock_bound_logger.error.assert_called_once_with(
         "api_call_failed_during_pagination",
@@ -270,9 +255,7 @@ def test_assume_role_session_returns_credentials(mock_boto3):
     session = aws_client.assume_role_session("test_role_arn")
 
     mock_boto3.client.assert_called_once_with("sts")
-    mock_sts_client.assume_role.assert_called_once_with(
-        RoleArn="test_role_arn", RoleSessionName="DefaultSession"
-    )
+    mock_sts_client.assume_role.assert_called_once_with(RoleArn="test_role_arn", RoleSessionName="DefaultSession")
     mock_boto3.Session.assert_called_once_with(
         aws_access_key_id="test_access_key_id",
         aws_secret_access_key="test_secret_access_key",
@@ -283,9 +266,7 @@ def test_assume_role_session_returns_credentials(mock_boto3):
 
 @patch("integrations.aws.client.assume_role_session")
 @patch("integrations.aws.client.boto3.Session")
-def test_get_aws_service_client_assumes_role(
-    mock_boto3_session, mock_assume_role_session
-):
+def test_get_aws_service_client_assumes_role(mock_boto3_session, mock_assume_role_session):
     mock_client = MagicMock()
     mock_session = MagicMock()
     mock_session.client.return_value = mock_client
@@ -297,9 +278,7 @@ def test_get_aws_service_client_assumes_role(
     service_name = "service_name"
     config = {"some_config": "value"}
 
-    client = aws_client.get_aws_service_client(
-        service_name, role_arn, session_name, client_config=config
-    )
+    client = aws_client.get_aws_service_client(service_name, role_arn, session_name, client_config=config)
 
     mock_assume_role_session.assert_called_once_with(role_arn, session_name)
     mock_boto3_session.assert_not_called()
@@ -324,18 +303,14 @@ def test_get_aws_service_client_no_role(mock_boto3, mock_assume_role_session):
 @patch.dict(os.environ, {"AWS_ORG_ACCOUNT_ROLE_ARN": "test_role_arn"})
 @patch("integrations.aws.client.paginator")
 @patch("integrations.aws.client.get_aws_service_client")
-def test_execute_aws_api_call_non_paginated(
-    mock_get_aws_service_client, mock_paginator
-):
+def test_execute_aws_api_call_non_paginated(mock_get_aws_service_client, mock_paginator):
     mock_client = MagicMock()
     mock_get_aws_service_client.return_value = mock_client
     mock_method = MagicMock()
     mock_method.return_value = {"key": "value"}
     mock_client.some_method = mock_method
 
-    result = aws_client.execute_aws_api_call(
-        "service_name", "some_method", arg1="value1"
-    )
+    result = aws_client.execute_aws_api_call("service_name", "some_method", arg1="value1")
 
     mock_get_aws_service_client.assert_called_once_with(
         "service_name",
@@ -369,27 +344,21 @@ def test_execute_aws_api_call_paginated(mock_paginator, mock_get_aws_service_cli
         session_config={"region_name": "ca-central-1"},
         client_config={"region_name": "ca-central-1"},
     )
-    mock_paginator.assert_called_once_with(
-        mock_client, "some_method", None, arg1="value1"
-    )
+    mock_paginator.assert_called_once_with(mock_client, "some_method", None, arg1="value1")
     assert result == ["value1", "value2", "value3"]
 
 
 @patch("integrations.aws.client.AWS_REGION", "ca-central-1")
 @patch("integrations.aws.client.paginator")
 @patch("integrations.aws.client.get_aws_service_client")
-def test_execute_aws_api_call_with_role_arn(
-    mock_get_aws_service_client, mock_paginator
-):
+def test_execute_aws_api_call_with_role_arn(mock_get_aws_service_client, mock_paginator):
     mock_client = MagicMock()
     mock_get_aws_service_client.return_value = mock_client
     mock_method = MagicMock()
     mock_method.return_value = {"key": "value"}
     mock_client.some_method = mock_method
 
-    result = aws_client.execute_aws_api_call(
-        "service_name", "some_method", role_arn="test_role_arn", arg1="value1"
-    )
+    result = aws_client.execute_aws_api_call("service_name", "some_method", role_arn="test_role_arn", arg1="value1")
 
     mock_get_aws_service_client.assert_called_once_with(
         "service_name",

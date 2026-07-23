@@ -83,7 +83,7 @@ def create_authorization_header():
 
     # Create the jwt token and return the authorization header
     token = create_jwt_token(secret=secret, client_id=client_id)
-    return "Authorization", "Bearer {}".format(token)
+    return "Authorization", f"Bearer {token}"
 
 
 def post_event(url, payload):

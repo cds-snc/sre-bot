@@ -62,9 +62,7 @@ def get_findings_statistics(detector_id, finding_criteria=None):
         **params,
     )
 
-    has_findings = bool(
-        response.get("FindingStatistics", {}).get("CountBySeverity", {})
-    )
+    has_findings = bool(response.get("FindingStatistics", {}).get("CountBySeverity", {}))
     log.debug(
         "guard_duty_get_findings_statistics_completed",
         has_findings=has_findings,
