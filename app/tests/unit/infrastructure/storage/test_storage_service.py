@@ -119,9 +119,7 @@ class TestStorageServiceGet:
 
     def test_get_returns_deserialized_item(self):
         service, dynamo = _make_service()
-        dynamo.get_item.return_value = OperationResult.success(
-            data={"Item": {"pk": {"S": "abc"}, "count": {"N": "5"}}}
-        )
+        dynamo.get_item.return_value = OperationResult.success(data={"Item": {"pk": {"S": "abc"}, "count": {"N": "5"}}})
 
         result = service.get("my_table", {"pk": "abc"})
 
@@ -141,9 +139,7 @@ class TestStorageServiceGet:
 
     def test_get_serializes_key(self):
         service, dynamo = _make_service()
-        dynamo.get_item.return_value = OperationResult.success(
-            data={"Item": {"pk": {"S": "abc"}}}
-        )
+        dynamo.get_item.return_value = OperationResult.success(data={"Item": {"pk": {"S": "abc"}}})
 
         service.get("my_table", {"pk": "abc"})
 
@@ -152,9 +148,7 @@ class TestStorageServiceGet:
 
     def test_get_propagates_dynamo_error(self):
         service, dynamo = _make_service()
-        dynamo.get_item.return_value = OperationResult.permanent_error(
-            message="Error", error_code="InternalServerError"
-        )
+        dynamo.get_item.return_value = OperationResult.permanent_error(message="Error", error_code="InternalServerError")
 
         result = service.get("my_table", {"pk": "abc"})
 
@@ -232,9 +226,7 @@ class TestStorageServiceQuery:
 
     def test_query_error_propagates(self):
         service, dynamo = _make_service()
-        dynamo.query.return_value = OperationResult.permanent_error(
-            message="Error", error_code="InternalServerError"
-        )
+        dynamo.query.return_value = OperationResult.permanent_error(message="Error", error_code="InternalServerError")
 
         result = service.query(
             "my_table",
@@ -268,9 +260,7 @@ class TestStorageServiceDelete:
 
     def test_delete_propagates_error(self):
         service, dynamo = _make_service()
-        dynamo.delete_item.return_value = OperationResult.permanent_error(
-            message="Error", error_code="InternalServerError"
-        )
+        dynamo.delete_item.return_value = OperationResult.permanent_error(message="Error", error_code="InternalServerError")
 
         result = service.delete("my_table", {"pk": "abc"})
 

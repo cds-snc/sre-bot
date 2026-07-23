@@ -1,7 +1,8 @@
 """Module-level fixtures for infrastructure tests (Level 2)."""
 
-import pytest
 from unittest.mock import Mock
+
+import pytest
 
 from infrastructure.configuration import AppSettings
 

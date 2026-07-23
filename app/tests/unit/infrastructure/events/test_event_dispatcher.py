@@ -102,9 +102,7 @@ def test_dispatch_logs_handler_failure(dispatcher, event_factory, monkeypatch) -
     assert bound_logger.exception.call_args.kwargs["handler"] == "bad_handler"
 
 
-def test_dispatch_does_not_propagate_handler_exception(
-    dispatcher, event_factory
-) -> None:
+def test_dispatch_does_not_propagate_handler_exception(dispatcher, event_factory) -> None:
     def bad_handler(_event) -> None:
         raise RuntimeError("failed")
 
@@ -114,9 +112,7 @@ def test_dispatch_does_not_propagate_handler_exception(
     dispatcher.dispatch(event)
 
 
-def test_register_handler_logs_registration(
-    dispatcher, mock_handler, monkeypatch
-) -> None:
+def test_register_handler_logs_registration(dispatcher, mock_handler, monkeypatch) -> None:
     bound_logger = MagicMock()
     service_logger = MagicMock()
     service_logger.bind.return_value = bound_logger
@@ -129,9 +125,7 @@ def test_register_handler_logs_registration(
     assert bound_logger.info.call_args.kwargs["handler_count"] == 1
 
 
-def test_dispatch_background_submits_to_executor(
-    dispatcher: EventDispatcher, event_factory
-) -> None:
+def test_dispatch_background_submits_to_executor(dispatcher: EventDispatcher, event_factory) -> None:
     event = event_factory(event_type="background.event")
     executor = _ImmediateExecutor()
     dispatcher._get_or_create_executor = MagicMock(return_value=executor)  # type: ignore[method-assign]
@@ -141,9 +135,7 @@ def test_dispatch_background_submits_to_executor(
     assert len(executor.calls) == 1
 
 
-def test_dispatch_background_error_isolation(
-    dispatcher, event_factory, monkeypatch
-) -> None:
+def test_dispatch_background_error_isolation(dispatcher, event_factory, monkeypatch) -> None:
     def bad_handler(_event) -> None:
         raise RuntimeError("failed")
 
@@ -187,9 +179,7 @@ def test_shutdown_executor_idempotent(dispatcher: EventDispatcher) -> None:
     dispatcher.shutdown_executor(wait=False)
 
 
-def test_dispatch_background_after_shutdown_logs_error(
-    dispatcher, event_factory, monkeypatch
-) -> None:
+def test_dispatch_background_after_shutdown_logs_error(dispatcher, event_factory, monkeypatch) -> None:
     event = event_factory(event_type="post.shutdown")
     dispatcher.start_executor(max_workers=1)
     dispatcher.shutdown_executor(wait=True)
@@ -205,9 +195,7 @@ def test_dispatch_background_after_shutdown_logs_error(
     assert bound_logger.error.call_args.args[0] == "event_executor_unavailable"
 
 
-def test_dispatch_background_logs_submit_failure(
-    dispatcher, event_factory, monkeypatch
-) -> None:
+def test_dispatch_background_logs_submit_failure(dispatcher, event_factory, monkeypatch) -> None:
     event = event_factory(event_type="submit.error")
 
     bound_logger = MagicMock()
@@ -220,9 +208,7 @@ def test_dispatch_background_logs_submit_failure(
     dispatcher.dispatch_background(event)
 
     bound_logger.exception.assert_called_once()
-    assert (
-        bound_logger.exception.call_args.args[0] == "failed_to_submit_event_to_executor"
-    )
+    assert bound_logger.exception.call_args.args[0] == "failed_to_submit_event_to_executor"
 
 
 def test_get_registered_event_types(dispatcher, mock_handler) -> None:

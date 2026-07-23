@@ -1,11 +1,13 @@
 """Fixtures for idempotency cache tests."""
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
+
+from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
 from infrastructure.idempotency.dynamodb import DynamoDBCache
 from infrastructure.idempotency.factory import reset_cache
 from infrastructure.operations.result import OperationResult, OperationStatus
-from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
 
 
 @pytest.fixture
@@ -49,9 +51,7 @@ def operation_result_failure():
 @pytest.fixture
 def mock_dynamodb_cache(mock_settings):
     """Create a DynamoDB cache for testing with mocked AWS calls."""
-    cache = DynamoDBCache(
-        idempotency_settings=mock_settings, table_name="test_idempotency"
-    )
+    cache = DynamoDBCache(idempotency_settings=mock_settings, table_name="test_idempotency")
     return cache
 
 

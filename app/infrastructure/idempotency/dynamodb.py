@@ -2,12 +2,13 @@
 
 import json
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 import structlog
-from infrastructure.idempotency.cache import IdempotencyCache
+
 from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
-from integrations.aws.dynamodb_next import get_item, put_item, delete_item, scan
+from infrastructure.idempotency.cache import IdempotencyCache
+from integrations.aws.dynamodb_next import delete_item, get_item, put_item, scan
 
 logger = structlog.get_logger().bind(component="idempotency.dynamodb")
 
@@ -40,11 +41,9 @@ class DynamoDBCache(IdempotencyCache):
         self.table_name = table_name
         self.ttl_seconds = idempotency_settings.IDEMPOTENCY_TTL_SECONDS
         self.log = logger.bind(table_name=table_name)
-        self.log.bind(ttl_seconds=self.ttl_seconds).info(
-            "initialized_dynamodb_idempotency_cache"
-        )
+        self.log.bind(ttl_seconds=self.ttl_seconds).info("initialized_dynamodb_idempotency_cache")
 
-    def get(self, key: str) -> Optional[Dict[str, Any]]:
+    def get(self, key: str) -> dict[str, Any] | None:
         """Get cached response for idempotency key.
 
         Args:
@@ -86,9 +85,7 @@ class DynamoDBCache(IdempotencyCache):
             log.exception("idempotency_cache_get_error", error=str(e))
             return None
 
-    def set(
-        self, key: str, response: Dict[str, Any], ttl_seconds: Optional[int] = None
-    ) -> None:
+    def set(self, key: str, response: dict[str, Any], ttl_seconds: int | None = None) -> None:
         """Cache a response for the given idempotency key.
 
         Args:
@@ -162,7 +159,7 @@ class DynamoDBCache(IdempotencyCache):
         except Exception as e:
             log.exception("idempotency_cache_clear_error", error=str(e))
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

@@ -47,9 +47,7 @@ class TestLoggingConfiguration:
 
         # Restore pytest if it was there before the test
         if had_pytest:
-            sys.modules["pytest"] = (
-                original_pytest if original_pytest is not None else pytest_module
-            )
+            sys.modules["pytest"] = original_pytest if original_pytest is not None else pytest_module
 
     def test_configure_logging_returns_bound_logger(self, mock_settings):
         """configure_logging returns a logger instance."""
@@ -72,9 +70,7 @@ class TestLoggingConfiguration:
         assert logger is not None
         assert hasattr(logger, "bind")
 
-    def test_configure_logging_uses_environment_for_production_mode(
-        self, mock_settings
-    ):
+    def test_configure_logging_uses_environment_for_production_mode(self, mock_settings):
         """configure_logging derives production mode from ENVIRONMENT."""
         mock_settings.ENVIRONMENT = "production"
         logger1 = configure_logging(settings=mock_settings)
@@ -84,9 +80,7 @@ class TestLoggingConfiguration:
         assert logger1 is not None
         assert logger2 is not None
 
-    def test_contract_configure_logging_does_not_accept_legacy_production_kwarg(
-        self, mock_settings
-    ):
+    def test_contract_configure_logging_does_not_accept_legacy_production_kwarg(self, mock_settings):
         """Contract: legacy production override is removed from configure_logging."""
         legacy_kwarg = "is" + "_production"
         with pytest.raises(TypeError):

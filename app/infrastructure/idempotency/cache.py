@@ -1,7 +1,7 @@
 """Idempotency cache abstract base class."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class IdempotencyCache(ABC):
@@ -13,7 +13,7 @@ class IdempotencyCache(ABC):
     """
 
     @abstractmethod
-    def get(self, key: str) -> Optional[Dict[str, Any]]:
+    def get(self, key: str) -> dict[str, Any] | None:
         """Get cached response for idempotency key.
 
         Args:
@@ -25,7 +25,7 @@ class IdempotencyCache(ABC):
         pass
 
     @abstractmethod
-    def set(self, key: str, response: Dict[str, Any], ttl_seconds: int) -> None:
+    def set(self, key: str, response: dict[str, Any], ttl_seconds: int) -> None:
         """Cache a response for the given idempotency key.
 
         Args:
@@ -44,7 +44,7 @@ class IdempotencyCache(ABC):
         pass
 
     @abstractmethod
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

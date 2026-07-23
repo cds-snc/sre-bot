@@ -4,7 +4,7 @@ Defines the runtime-checkable interface consumed by features and
 infrastructure. Concrete implementations can vary by backing store.
 """
 
-from typing import Any, Dict, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from infrastructure.idempotency.cache import IdempotencyCache
 
@@ -18,7 +18,7 @@ class IdempotencyService(Protocol):
     multi-instance deployments.
     """
 
-    def get(self, key: str) -> Optional[Dict[str, Any]]:
+    def get(self, key: str) -> dict[str, Any] | None:
         """Get cached response for idempotency key.
 
         Args:
@@ -29,7 +29,7 @@ class IdempotencyService(Protocol):
         """
         ...
 
-    def set(self, key: str, response: Dict[str, Any], ttl_seconds: int) -> None:
+    def set(self, key: str, response: dict[str, Any], ttl_seconds: int) -> None:
         """Cache a response for the given idempotency key.
 
         Args:
@@ -47,7 +47,7 @@ class IdempotencyService(Protocol):
         """
         ...
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics.
 
         Returns:

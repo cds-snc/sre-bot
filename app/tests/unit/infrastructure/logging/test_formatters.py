@@ -9,12 +9,13 @@ Tests cover:
 """
 
 import pytest
+
 from infrastructure.logging.formatters import (
+    SENSITIVE_PATTERNS,
     add_app_info,
+    add_environment_info,
     mask_sensitive_data,
     truncate_large_values,
-    add_environment_info,
-    SENSITIVE_PATTERNS,
 )
 
 
@@ -178,9 +179,7 @@ class TestMaskSensitiveData:
 
     def test_mask_sensitive_data_additional_patterns(self):
         """Additional patterns can be added."""
-        processor = mask_sensitive_data(
-            additional_patterns=frozenset({"ssn", "credit_card"})
-        )
+        processor = mask_sensitive_data(additional_patterns=frozenset({"ssn", "credit_card"}))
         event_dict = {
             "event": "test",
             "user_ssn": "123-45-6789",

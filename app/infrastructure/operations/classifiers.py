@@ -22,10 +22,10 @@ Usage:
         return classify_http_error(exc)
 """
 
-from typing import Optional
+import contextlib
 
-from googleapiclient.errors import HttpError
 from botocore.exceptions import ClientError
+from googleapiclient.errors import HttpError
 
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
@@ -74,7 +74,7 @@ def classify_http_error(exc: Exception) -> OperationResult:
         )
 
     # Extract HTTP status code from response
-    status_code: Optional[int] = None
+    status_code: int | None = None
     if hasattr(exc, "resp") and exc.resp:
         status_code = exc.resp.status
 
@@ -86,10 +86,8 @@ def classify_http_error(exc: Exception) -> OperationResult:
         if hasattr(exc, "resp") and hasattr(exc.resp, "get"):
             header_value = exc.resp.get("retry-after")
             if header_value:
-                try:
+                with contextlib.suppress(ValueError, TypeError):
                     retry_after = int(header_value)
-                except (ValueError, TypeError):
-                    pass  # Use default if header is malformed
 
         return OperationResult.error(
             OperationStatus.TRANSIENT_ERROR,
