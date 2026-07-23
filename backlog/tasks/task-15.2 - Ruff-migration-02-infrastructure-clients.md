@@ -1,11 +1,11 @@
 ---
 id: TASK-15.2
 title: 'Ruff migration 02: infrastructure/clients'
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-23 14:16'
-updated_date: '2026-07-23 16:46'
+updated_date: '2026-07-23 21:43'
 labels: []
 dependencies:
   - TASK-15.1

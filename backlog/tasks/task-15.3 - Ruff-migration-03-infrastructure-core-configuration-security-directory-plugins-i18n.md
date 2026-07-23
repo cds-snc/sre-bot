@@ -3,11 +3,11 @@ id: TASK-15.3
 title: >-
   Ruff migration 03: infrastructure core (configuration, security, directory,
   plugins, i18n)
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-23 14:17'
-updated_date: '2026-07-23 17:20'
+updated_date: '2026-07-23 21:44'
 labels: []
 dependencies:
   - TASK-15.2

@@ -3,11 +3,11 @@ id: TASK-15.6
 title: >-
   Ruff migration 06: integrations google_workspace + slack (completes
   integrations/)
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-23 14:18'
-updated_date: '2026-07-23 18:50'
+updated_date: '2026-07-23 21:44'
 labels: []
 dependencies:
   - TASK-15.5
