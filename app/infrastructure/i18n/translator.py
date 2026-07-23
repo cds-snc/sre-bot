@@ -4,9 +4,10 @@ Core component for i18n that integrates with infrastructure.events for notificat
 """
 
 import re
-from typing import Any, Dict, Optional
+from typing import Any
 
 import structlog
+
 from infrastructure.i18n.loader import TranslationLoader
 from infrastructure.i18n.models import Locale, TranslationCatalog, TranslationKey
 
@@ -38,7 +39,7 @@ class Translator:
         """
         self.loader = loader
         self.fallback_locale = fallback_locale
-        self.catalogs: Dict[Locale, TranslationCatalog] = {}
+        self.catalogs: dict[Locale, TranslationCatalog] = {}
         self.log = logger.bind(fallback_locale=fallback_locale.value)
         self.log.info("initialized_translator")
 
@@ -63,7 +64,7 @@ class Translator:
         self,
         key: TranslationKey,
         locale: Locale,
-        variables: Optional[Dict[str, Any]] = None,
+        variables: dict[str, Any] | None = None,
     ) -> str:
         """Retrieve and interpolate a translated message.
 
@@ -107,9 +108,7 @@ class Translator:
                 locale=locale.value,
                 fallback_locale=self.fallback_locale.value,
             )
-            raise KeyError(
-                f"Translation not found for key {key} in {locale.value} or fallback {self.fallback_locale.value}"
-            )
+            raise KeyError(f"Translation not found for key {key} in {locale.value} or fallback {self.fallback_locale.value}")
 
         # Interpolate variables (always call to validate required variables)
         message = self._interpolate(message, variables)
@@ -137,7 +136,7 @@ class Translator:
         """
         return list(self.catalogs.keys())
 
-    def _interpolate(self, message: str, variables: Dict[str, Any]) -> str:
+    def _interpolate(self, message: str, variables: dict[str, Any]) -> str:
         """Perform variable interpolation in message string.
 
         Replaces {{variable_name}} with corresponding value from variables dict.
@@ -188,7 +187,7 @@ class Translator:
 
         return message
 
-    def get_catalog(self, locale: Locale) -> Optional[TranslationCatalog]:
+    def get_catalog(self, locale: Locale) -> TranslationCatalog | None:
         """Get complete catalog for a locale.
 
         Args:

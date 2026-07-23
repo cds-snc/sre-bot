@@ -25,9 +25,7 @@ class AWSFeatureSettings(FeatureSettings):
         ```
     """
 
-    AWS_ADMIN_GROUPS: list[str] = Field(
-        default=["sre-ifs@cds-snc.ca"], alias="AWS_ADMIN_GROUPS"
-    )
+    AWS_ADMIN_GROUPS: list[str] = Field(default=["sre-ifs@cds-snc.ca"], alias="AWS_ADMIN_GROUPS")
     AWS_OPS_GROUP_NAME: str = Field(default="", alias="AWS_OPS_GROUP_NAME")
 
 

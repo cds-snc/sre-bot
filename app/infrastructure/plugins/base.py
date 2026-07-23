@@ -3,7 +3,6 @@
 import importlib
 import pkgutil
 from pathlib import Path
-from typing import List
 
 import pluggy
 import structlog
@@ -13,7 +12,7 @@ logger = structlog.get_logger()
 
 def auto_discover_plugins(
     pm: pluggy.PluginManager,
-    base_paths: List[str],
+    base_paths: list[str],
 ) -> None:
     """Auto-discover and register plugins from base paths.
 

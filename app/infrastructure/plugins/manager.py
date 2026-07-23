@@ -39,7 +39,7 @@ def get_plugin_manager() -> pluggy.PluginManager:
 
 
 def collect_feature_i18n_resources(
-    logger: "BoundLogger",
+    logger: BoundLogger,
 ) -> I18nResourceRegistry:
     """Phase 1 — Discover plugins and collect i18n resource registrations.
 
@@ -59,18 +59,16 @@ def collect_feature_i18n_resources(
 
     i18n_registry = I18nResourceRegistry()
     pm.hook.register_i18n_resources(registry=i18n_registry)
-    logger.info(
-        "i18n_resources_collected", resource_count=i18n_registry.get_resource_count()
-    )
+    logger.info("i18n_resources_collected", resource_count=i18n_registry.get_resource_count())
 
     return i18n_registry
 
 
 def register_feature_integrations(
-    app: "FastAPI",
-    logger: "BoundLogger",
-    slack_provider: "SlackPlatformProvider | None" = None,
-    event_dispatcher: "EventDispatcher | None" = None,
+    app: FastAPI,
+    logger: BoundLogger,
+    slack_provider: SlackPlatformProvider | None = None,
+    event_dispatcher: EventDispatcher | None = None,
 ) -> None:
     """Phase 2 — Register commands, routes, and run startup warmup.
 
@@ -101,10 +99,10 @@ def register_feature_integrations(
 
 
 def discover_and_init_features(
-    app: "FastAPI",
-    logger: "BoundLogger",
-    slack_provider: "SlackPlatformProvider | None" = None,
-    event_dispatcher: "EventDispatcher | None" = None,
+    app: FastAPI,
+    logger: BoundLogger,
+    slack_provider: SlackPlatformProvider | None = None,
+    event_dispatcher: EventDispatcher | None = None,
 ) -> I18nResourceRegistry:
     """Discover all feature packages and run their full startup lifecycle.
 

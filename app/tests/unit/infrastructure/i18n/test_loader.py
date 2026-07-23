@@ -43,16 +43,10 @@ class TestYAMLTranslationLoader:
         catalog = loader.load(Locale.EN_US)
 
         # Check incident namespace
-        assert (
-            catalog.get_message(TranslationKey("incident", "created"))
-            == "Incident {{incident_id}} created"
-        )
+        assert catalog.get_message(TranslationKey("incident", "created")) == "Incident {{incident_id}} created"
 
         # Check role namespace
-        assert (
-            catalog.get_message(TranslationKey("role", "created"))
-            == "Role {{role_name}} created"
-        )
+        assert catalog.get_message(TranslationKey("role", "created")) == "Role {{role_name}} created"
 
     def test_load_french_locale(self, temp_translations_dir):
         """load() loads French translations correctly."""

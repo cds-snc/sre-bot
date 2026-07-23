@@ -2,10 +2,10 @@
 
 import json
 from functools import lru_cache
-from typing import Any, Dict, Optional
+from typing import Any
 
-from pydantic import Field, field_validator
 import structlog
+from pydantic import Field, field_validator
 
 from infrastructure.configuration.base import FeatureSettings
 
@@ -87,7 +87,7 @@ class GroupsFeatureSettings(FeatureSettings):
 
     @field_validator("providers", mode="before")
     @classmethod
-    def _parse_providers(cls, v: Optional[Any]) -> Any:
+    def _parse_providers(cls, v: Any | None) -> Any:
         """Parse GROUP_PROVIDERS from JSON string or dict."""
         if v is None:
             return {}
@@ -95,41 +95,29 @@ class GroupsFeatureSettings(FeatureSettings):
             return v
         if isinstance(v, str):
             s = v.strip()
-            if (s.startswith("'") and s.endswith("'")) or (
-                s.startswith('"') and s.endswith('"')
-            ):
+            if (s.startswith("'") and s.endswith("'")) or (s.startswith('"') and s.endswith('"')):
                 s = s[1:-1]
             try:
                 parsed = json.loads(s) if s else {}
                 return parsed
             except (json.JSONDecodeError, ValueError) as e:
-                raise ValueError(
-                    f"Invalid GROUP_PROVIDERS JSON: {e} (value: {s[:80]}...)"
-                ) from e
+                raise ValueError(f"Invalid GROUP_PROVIDERS JSON: {e} (value: {s[:80]}...)") from e
         raise ValueError("GROUP_PROVIDERS must be a JSON string or a mapping")
 
     @field_validator("providers", mode="after")
     @classmethod
-    def _validate_providers_config(cls, v: Optional[Dict[str, dict]]):
+    def _validate_providers_config(cls, v: dict[str, dict] | None):
         """Validate GROUP_PROVIDERS configuration."""
         if not v or not isinstance(v, dict):
             return {}
 
-        enabled_providers = {
-            pname: cfg
-            for pname, cfg in v.items()
-            if isinstance(cfg, dict) and cfg.get("enabled", True)
-        }
+        enabled_providers = {pname: cfg for pname, cfg in v.items() if isinstance(cfg, dict) and cfg.get("enabled", True)}
 
         if not enabled_providers:
             logger.warning("no_enabled_providers_configured")
             return v
 
-        primary_count = sum(
-            1
-            for cfg in enabled_providers.values()
-            if isinstance(cfg, dict) and cfg.get("primary")
-        )
+        primary_count = sum(1 for cfg in enabled_providers.values() if isinstance(cfg, dict) and cfg.get("primary"))
 
         if primary_count != 1:
             raise ValueError(
@@ -142,10 +130,7 @@ class GroupsFeatureSettings(FeatureSettings):
                 logger.warning(
                     "provider_missing_prefix",
                     provider=pname,
-                    msg=(
-                        "Enabled non-primary provider has no 'prefix' configured; "
-                        "mapping to primary provider may fail"
-                    ),
+                    msg=("Enabled non-primary provider has no 'prefix' configured; mapping to primary provider may fail"),
                 )
 
         return v

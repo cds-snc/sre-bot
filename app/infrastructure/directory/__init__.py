@@ -4,6 +4,9 @@ Provides an IDP-agnostic directory abstraction for security group reads.
 Feature packages should access the service via the singleton accessor:
 """
 
+from infrastructure.directory.factory import (
+    get_directory_provider,
+)
 from infrastructure.directory.models import (
     DirectoryGroup,
     DirectoryMember,
@@ -11,9 +14,6 @@ from infrastructure.directory.models import (
     MembershipCheckResult,
 )
 from infrastructure.directory.provider import DirectoryProvider
-from infrastructure.directory.factory import (
-    get_directory_provider,
-)
 
 __all__ = [
     "DirectoryGroup",

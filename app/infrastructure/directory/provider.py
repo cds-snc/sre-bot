@@ -50,9 +50,7 @@ class DirectoryProvider(Protocol):
         """
         ...
 
-    def list_users(
-        self, query: str = "", limit: int = 100
-    ) -> OperationResult[list[DirectoryUser]]:
+    def list_users(self, query: str = "", limit: int = 100) -> OperationResult[list[DirectoryUser]]:
         """Return canonical users for a directory query.
 
         Args:
@@ -135,9 +133,7 @@ class DirectoryProvider(Protocol):
         """
         ...
 
-    def check_membership(
-        self, group_key: str, user_email: str
-    ) -> OperationResult[MembershipCheckResult]:
+    def check_membership(self, group_key: str, user_email: str) -> OperationResult[MembershipCheckResult]:
         """Check whether a user is a member of a group.
 
         Args:

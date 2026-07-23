@@ -4,11 +4,11 @@ Defines core data structures for managing translations and locales.
 """
 
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, Optional
+from enum import StrEnum
+from typing import Any
 
 
-class Locale(str, Enum):
+class Locale(StrEnum):
     """Supported locale identifiers.
 
     Uses IETF BCP 47 language tag format (e.g., en-US, fr-FR).
@@ -18,7 +18,7 @@ class Locale(str, Enum):
     FR_FR = "fr-FR"
 
     @classmethod
-    def from_string(cls, locale_str: str) -> "Locale":
+    def from_string(cls, locale_str: str) -> Locale:
         """Convert string to Locale enum.
 
         Args:
@@ -79,7 +79,7 @@ class TranslationKey:
         return f"{self.namespace}.{self.message_key}"
 
     @classmethod
-    def from_string(cls, key_string: str) -> "TranslationKey":
+    def from_string(cls, key_string: str) -> TranslationKey:
         """Create TranslationKey from dot-separated string.
 
         Args:
@@ -93,9 +93,7 @@ class TranslationKey:
         """
         parts = key_string.split(".", 1)
         if len(parts) != 2:
-            raise ValueError(
-                f"Translation key must be in format 'namespace.key': {key_string}"
-            )
+            raise ValueError(f"Translation key must be in format 'namespace.key': {key_string}")
         return cls(namespace=parts[0], message_key=parts[1])
 
 
@@ -112,10 +110,10 @@ class TranslationCatalog:
     """
 
     locale: Locale
-    messages: Dict[str, Dict[str, Any]] = field(default_factory=dict)
-    loaded_at: Optional[str] = None
+    messages: dict[str, dict[str, Any]] = field(default_factory=dict)
+    loaded_at: str | None = None
 
-    def get_message(self, key: TranslationKey) -> Optional[str]:
+    def get_message(self, key: TranslationKey) -> str | None:
         """Retrieve a translation message by key.
 
         Args:
@@ -149,7 +147,7 @@ class TranslationCatalog:
         """
         return key.message_key in self.get_namespace(key.namespace)
 
-    def get_namespace(self, namespace: str) -> Dict[str, Any]:
+    def get_namespace(self, namespace: str) -> dict[str, Any]:
         """Get all messages for a specific namespace.
 
         Args:
@@ -160,7 +158,7 @@ class TranslationCatalog:
         """
         return self.messages.get(namespace, {})
 
-    def merge(self, other: "TranslationCatalog") -> None:
+    def merge(self, other: TranslationCatalog) -> None:
         """Merge another catalog into this one.
 
         Later entries override earlier ones.
@@ -185,12 +183,10 @@ class LocaleResolutionContext:
         supported_locales: List of locales supported by the system.
     """
 
-    requested_locale: Optional[Locale] = None
-    user_locale: Optional[Locale] = None
+    requested_locale: Locale | None = None
+    user_locale: Locale | None = None
     default_locale: Locale = Locale.EN_US
-    supported_locales: Optional[list] = field(
-        default_factory=lambda: [Locale.EN_US, Locale.FR_FR]
-    )
+    supported_locales: list | None = field(default_factory=lambda: [Locale.EN_US, Locale.FR_FR])
 
     def resolve(self) -> Locale:
         """Resolve the best matching locale from available options.
@@ -203,9 +199,7 @@ class LocaleResolutionContext:
         Returns:
             Resolved Locale.
         """
-        if self.requested_locale and self.requested_locale in (
-            self.supported_locales or []
-        ):
+        if self.requested_locale and self.requested_locale in (self.supported_locales or []):
             return self.requested_locale
         if self.user_locale and self.user_locale in (self.supported_locales or []):
             return self.user_locale

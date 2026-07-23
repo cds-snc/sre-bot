@@ -82,6 +82,16 @@ force-exclude = '''
   | tests/api
   | infrastructure/clients
   | tests/unit/infrastructure/clients
+  | infrastructure/configuration
+  | infrastructure/security
+  | infrastructure/directory
+  | infrastructure/plugins
+  | infrastructure/i18n
+  | tests/unit/infrastructure/configuration
+  | tests/unit/infrastructure/security
+  | tests/unit/infrastructure/directory
+  | tests/unit/infrastructure/plugins
+  | tests/unit/infrastructure/i18n
 )/
 '''
 

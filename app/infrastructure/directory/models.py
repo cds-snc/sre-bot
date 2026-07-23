@@ -1,7 +1,6 @@
 """Canonical typed models for directory provider results."""
 
 from dataclasses import dataclass
-from typing import Optional
 
 __all__ = [
     "DirectoryUser",
@@ -17,9 +16,9 @@ class DirectoryUser:
 
     email: str
     provider_user_id: str
-    display_name: Optional[str] = None
-    is_active: Optional[bool] = None
-    provider: Optional[str] = None
+    display_name: str | None = None
+    is_active: bool | None = None
+    provider: str | None = None
 
 
 @dataclass(frozen=True)
@@ -27,11 +26,11 @@ class DirectoryMember:
     """Canonical member returned by all directory providers."""
 
     email: str
-    membership_id: Optional[str] = None
-    provider_user_id: Optional[str] = None
-    member_type: Optional[str] = None
-    role: Optional[str] = None
-    provider: Optional[str] = None
+    membership_id: str | None = None
+    provider_user_id: str | None = None
+    member_type: str | None = None
+    role: str | None = None
+    provider: str | None = None
 
 
 @dataclass(frozen=True)
@@ -41,9 +40,9 @@ class DirectoryGroup:
     group_email: str
     group_slug: str
     provider_group_id: str
-    name: Optional[str] = None
-    description: Optional[str] = None
-    provider: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
+    provider: str | None = None
 
 
 @dataclass(frozen=True)
@@ -52,6 +51,6 @@ class MembershipCheckResult:
 
     group_email: str
     group_slug: str
-    provider_group_id: Optional[str]
+    provider_group_id: str | None
     user_email: str
     is_member: bool

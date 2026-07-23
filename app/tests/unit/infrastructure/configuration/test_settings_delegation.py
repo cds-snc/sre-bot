@@ -7,30 +7,30 @@ Settings().slack is get_slack_settings() (same object identity).
 import pytest
 
 from infrastructure.configuration.app import get_app_settings
+from infrastructure.configuration.features import (
+    get_atip_settings,
+    get_aws_feature_settings,
+    get_incident_settings,
+    get_sre_ops_settings,
+)
+from infrastructure.configuration.infrastructure import (
+    get_dev_settings,
+    get_directory_settings,
+    get_idempotency_settings,
+    get_platforms_settings,
+    get_retry_settings,
+    get_server_settings,
+)
 from infrastructure.configuration.integrations import (
-    get_slack_settings,
     get_aws_settings,
-    get_google_workspace_settings,
     get_google_resources_config,
+    get_google_workspace_settings,
     get_maxmind_settings,
     get_notify_settings,
     get_opsgenie_settings,
     get_sentinel_settings,
+    get_slack_settings,
     get_trello_settings,
-)
-from infrastructure.configuration.features import (
-    get_incident_settings,
-    get_aws_feature_settings,
-    get_atip_settings,
-    get_sre_ops_settings,
-)
-from infrastructure.configuration.infrastructure import (
-    get_server_settings,
-    get_dev_settings,
-    get_idempotency_settings,
-    get_retry_settings,
-    get_platforms_settings,
-    get_directory_settings,
 )
 
 

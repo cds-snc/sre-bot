@@ -23,9 +23,7 @@ class AtipSettings(FeatureSettings):
         ```
     """
 
-    ATIP_ANNOUNCE_CHANNEL: str | None = Field(
-        default=None, alias="ATIP_ANNOUNCE_CHANNEL"
-    )
+    ATIP_ANNOUNCE_CHANNEL: str | None = Field(default=None, alias="ATIP_ANNOUNCE_CHANNEL")
 
 
 @lru_cache(maxsize=1)
