@@ -30,9 +30,7 @@ def get_predefined_permission_sets(permission_set_name):
 
 
 @handle_aws_api_errors
-def create_account_assignment(
-    user_id, account_id, permission_set, principal_type="USER"
-):
+def create_account_assignment(user_id, account_id, permission_set, principal_type="USER"):
     """Create an account assignment for an AWS SSO user.
 
     Args:

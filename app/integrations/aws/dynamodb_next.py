@@ -18,7 +18,7 @@ Usage:
         error = result.message
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import structlog
 
@@ -33,7 +33,7 @@ AWS_REGION = settings.AWS_REGION
 
 def get_item(
     table_name: str,
-    Key: Dict[str, Any],
+    Key: dict[str, Any],
     **kwargs,
 ) -> OperationResult:
     """Get an item from DynamoDB table.
@@ -57,7 +57,7 @@ def get_item(
 
 def put_item(
     table_name: str,
-    Item: Dict[str, Any],
+    Item: dict[str, Any],
     **kwargs,
 ) -> OperationResult:
     """Put an item into DynamoDB table.
@@ -81,7 +81,7 @@ def put_item(
 
 def update_item(
     table_name: str,
-    Key: Dict[str, Any],
+    Key: dict[str, Any],
     **kwargs,
 ) -> OperationResult:
     """Update an item in DynamoDB table.
@@ -105,7 +105,7 @@ def update_item(
 
 def delete_item(
     table_name: str,
-    Key: Dict[str, Any],
+    Key: dict[str, Any],
     **kwargs,
 ) -> OperationResult:
     """Delete an item from DynamoDB table.

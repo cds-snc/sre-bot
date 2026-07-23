@@ -92,9 +92,7 @@ def make_command_handler():
 class TestRootCommandAutoRegistration:
     """Test automatic registration of root Slack commands."""
 
-    def test_should_extract_unique_roots_from_command_tree(
-        self, slack_provider, make_command_handler
-    ):
+    def test_should_extract_unique_roots_from_command_tree(self, slack_provider, make_command_handler):
         """Should extract unique root commands from registered command tree."""
         # Arrange - Register commands with various parents
         handler = make_command_handler()
@@ -140,9 +138,7 @@ class TestRootCommandAutoRegistration:
         assert "sre" in slack_provider._commands
         assert "geolocate" in slack_provider._commands
 
-    def test_should_create_handlers_for_each_unique_root(
-        self, slack_provider, make_command_handler
-    ):
+    def test_should_create_handlers_for_each_unique_root(self, slack_provider, make_command_handler):
         """Should create Slack Bolt handlers for each unique root command."""
         # Arrange
         handler = make_command_handler()
@@ -177,9 +173,7 @@ class TestRootCommandAutoRegistration:
         assert "sre.incident" in slack_provider._commands
         assert "aws.list" in slack_provider._commands
 
-    def test_should_skip_auto_registration_when_app_not_initialized(
-        self, slack_provider
-    ):
+    def test_should_skip_auto_registration_when_app_not_initialized(self, slack_provider):
         """Should skip auto-registration if app is None."""
         # Arrange - Force app to None (simulating initialization failure)
         slack_provider._app = None
@@ -190,9 +184,7 @@ class TestRootCommandAutoRegistration:
         # Assert - No error raised, just skips gracefully
         assert slack_provider._app is None
 
-    def test_should_handle_nested_parent_paths(
-        self, slack_provider, make_command_handler
-    ):
+    def test_should_handle_nested_parent_paths(self, slack_provider, make_command_handler):
         """Should handle commands with nested parent paths (e.g., sre.dev.aws)."""
         # Arrange
         handler = make_command_handler()
@@ -214,9 +206,7 @@ class TestRootCommandAutoRegistration:
         # Assert - Intermediate nodes auto-generated
         assert slack_provider._commands.get("sre") is not None  # Auto-generated
         assert slack_provider._commands.get("sre.dev") is not None  # Auto-generated
-        assert (
-            slack_provider._commands.get("sre.dev.aws") is not None
-        )  # Explicit registration
+        assert slack_provider._commands.get("sre.dev.aws") is not None  # Explicit registration
 
     def test_should_handle_empty_command_tree(self, slack_provider):
         """Should handle initialization with no registered commands."""
@@ -229,9 +219,7 @@ class TestRootCommandAutoRegistration:
         assert slack_provider.app is not None
         assert len(slack_provider._commands) == 0
 
-    def test_should_accept_transport_command_prefix_at_provider_construction(
-        self, make_slack_settings
-    ):
+    def test_should_accept_transport_command_prefix_at_provider_construction(self, make_slack_settings):
         """Provider should accept command_prefix from transport settings."""
         settings = make_slack_settings()
         formatter = SlackBlockKitFormatter()
@@ -244,9 +232,7 @@ class TestRootCommandAutoRegistration:
 
         assert provider is not None
 
-    def test_should_apply_command_prefix_to_auto_registered_root_commands(
-        self, slack_provider
-    ):
+    def test_should_apply_command_prefix_to_auto_registered_root_commands(self, slack_provider):
         """Auto-registration should build slash command with prefix once."""
 
         class CapturingApp:

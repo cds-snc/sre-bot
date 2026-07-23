@@ -12,9 +12,7 @@ ORG_ROLE_ARN = settings.ORG_ROLE_ARN
 
 @handle_aws_api_errors
 def get_cost_and_usage(time_period, granularity, metrics, filter=None, group_by=None):
-    log = logger.bind(
-        operation="get_cost_and_usage", granularity=granularity, metrics=str(metrics)
-    )
+    log = logger.bind(operation="get_cost_and_usage", granularity=granularity, metrics=str(metrics))
     log.debug(
         "cost_explorer_get_cost_and_usage_started",
         filter_present=filter is not None,

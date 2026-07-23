@@ -1,4 +1,5 @@
 from unittest.mock import patch
+
 from integrations.aws import guard_duty
 
 
@@ -36,14 +37,10 @@ def test_get_findings_statistics_returns_statistics_when_success(
     mock_execute_aws_api_call,
 ):
     mock_execute_aws_api_call.return_value = {
-        "FindingStatistics": {
-            "CountBySeverity": {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
-        }
+        "FindingStatistics": {"CountBySeverity": {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}}
     }
     assert guard_duty.get_findings_statistics("test_detector_id") == {
-        "FindingStatistics": {
-            "CountBySeverity": {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
-        }
+        "FindingStatistics": {"CountBySeverity": {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}}
     }
     mock_execute_aws_api_call.assert_called_once_with(
         "guardduty",
@@ -76,16 +73,10 @@ def test_get_findings_statistics_parse_finding_criteria(
     mock_execute_aws_api_call,
 ):
     mock_execute_aws_api_call.return_value = {
-        "FindingStatistics": {
-            "CountBySeverity": {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
-        }
+        "FindingStatistics": {"CountBySeverity": {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}}
     }
-    assert guard_duty.get_findings_statistics(
-        "test_detector_id", finding_criteria={"Criterion": {"foo": "bar"}}
-    ) == {
-        "FindingStatistics": {
-            "CountBySeverity": {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}
-        }
+    assert guard_duty.get_findings_statistics("test_detector_id", finding_criteria={"Criterion": {"foo": "bar"}}) == {
+        "FindingStatistics": {"CountBySeverity": {"LOW": 1, "MEDIUM": 2, "HIGH": 3, "CRITICAL": 4}}
     }
     mock_execute_aws_api_call.assert_called_once_with(
         "guardduty",

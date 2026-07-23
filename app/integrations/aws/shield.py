@@ -17,7 +17,8 @@ cached for the lifetime of the shield instance.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, TypeVar
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import boto3
 from boto3.session import Session
@@ -50,7 +51,7 @@ class AWSShield:
 
     def __init__(self, settings: AWSSettings) -> None:
         self._settings = settings
-        retries: "_RetryDict" = {
+        retries: _RetryDict = {
             "max_attempts": settings.RETRY_MAX_ATTEMPTS,
             "mode": settings.RETRY_MODE,
         }
@@ -60,12 +61,10 @@ class AWSShield:
             read_timeout=settings.READ_TIMEOUT_SECONDS,
         )
         self._session: Session = boto3.session.Session()
-        self._clients: Dict[str, BaseClient] = {}
+        self._clients: dict[str, BaseClient] = {}
 
         self._not_found_codes: frozenset[str] = frozenset(settings.NOT_FOUND_CODES)
-        self._unauthorized_codes: frozenset[str] = frozenset(
-            settings.UNAUTHORIZED_CODES
-        )
+        self._unauthorized_codes: frozenset[str] = frozenset(settings.UNAUTHORIZED_CODES)
         self._transient_codes: frozenset[str] = frozenset(settings.TRANSIENT_CODES)
 
     def client(self, service_name: str) -> BaseClient:
@@ -103,9 +102,7 @@ class AWSShield:
     def _classify_client_error(self, exc: ClientError) -> OperationResult[Any]:
         """Map a `ClientError` to an `OperationResult` using its AWS error code."""
         response = getattr(exc, "response", None) or {}
-        error: Dict[str, Any] = (
-            response.get("Error", {}) if isinstance(response, dict) else {}
-        )
+        error: dict[str, Any] = response.get("Error", {}) if isinstance(response, dict) else {}
         code: str = error.get("Code") or ""
         message: str = error.get("Message") or str(exc)
 

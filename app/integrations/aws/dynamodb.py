@@ -13,9 +13,9 @@ logger = structlog.get_logger()
 settings = get_aws_settings()
 app_settings = get_app_settings()
 
-client_config = dict(
-    region_name=settings.AWS_REGION,
-)
+client_config = {
+    "region_name": settings.AWS_REGION,
+}
 
 if app_settings.ENVIRONMENT in ("local", "dev", "ci"):
     client_config["endpoint_url"] = "http://dynamodb-local:8000"
@@ -33,9 +33,7 @@ def query(
     }
     if params:
         params.update(kwargs)
-    response = execute_aws_api_call(
-        "dynamodb", "query", paginated=True, client_config=client_config, **params
-    )
+    response = execute_aws_api_call("dynamodb", "query", paginated=True, client_config=client_config, **params)
     log.debug(
         "dynamodb_query_completed",
         item_count=len(response) if response else 0,
@@ -77,9 +75,7 @@ def put_item(TableName, **kwargs):
     }
     if kwargs:
         params.update(kwargs)
-    response = execute_aws_api_call(
-        "dynamodb", "put_item", client_config=client_config, **params
-    )
+    response = execute_aws_api_call("dynamodb", "put_item", client_config=client_config, **params)
     log.debug("dynamodb_put_item_completed")
     return response
 
@@ -97,9 +93,7 @@ def get_item(TableName, **kwargs) -> dict:
     }
     if kwargs:
         params.update(kwargs)
-    response = execute_aws_api_call(
-        "dynamodb", "get_item", client_config=client_config, **params
-    )
+    response = execute_aws_api_call("dynamodb", "get_item", client_config=client_config, **params)
     if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
         log.debug(
             "dynamodb_get_item_completed",
@@ -133,9 +127,7 @@ def update_item(TableName, **kwargs):
     }
     if kwargs:
         params.update(kwargs)
-    response = execute_aws_api_call(
-        "dynamodb", "update_item", client_config=client_config, **params
-    )
+    response = execute_aws_api_call("dynamodb", "update_item", client_config=client_config, **params)
     if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
         log.debug("dynamodb_update_item_completed")
         return response
@@ -155,9 +147,7 @@ def delete_item(TableName, **kwargs):
     }
     if kwargs:
         params.update(kwargs)
-    response = execute_aws_api_call(
-        "dynamodb", "delete_item", client_config=client_config, **params
-    )
+    response = execute_aws_api_call("dynamodb", "delete_item", client_config=client_config, **params)
     log.debug("dynamodb_delete_item_completed")
     return response
 
@@ -166,9 +156,7 @@ def delete_item(TableName, **kwargs):
 def list_tables(**kwargs):
     log = logger.bind(operation="list_tables")
     log.debug("dynamodb_list_tables_started")
-    response = execute_aws_api_call(
-        "dynamodb", "list_tables", client_config=client_config, **kwargs
-    )
+    response = execute_aws_api_call("dynamodb", "list_tables", client_config=client_config, **kwargs)
     log.debug(
         "dynamodb_list_tables_completed",
         table_count=len(response.get("TableNames", [])),

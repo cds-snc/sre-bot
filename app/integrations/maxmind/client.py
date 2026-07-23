@@ -3,6 +3,7 @@
 import geoip2.database
 import structlog
 from geoip2.errors import AddressNotFoundError, GeoIP2Error
+
 from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
 
 logger = structlog.get_logger()
@@ -38,7 +39,7 @@ def geolocate(ip) -> tuple | str:
             raise
         finally:
             reader.close()
-    except (FileNotFoundError, IOError) as e:
+    except (OSError, FileNotFoundError) as e:
         log.error("maxmind_infrastructure_error", error=str(e))
         raise
 

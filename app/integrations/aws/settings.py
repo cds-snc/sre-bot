@@ -13,7 +13,7 @@ consuming feature per `docs/adr/configuration-ownership.md`.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,13 +31,11 @@ class AWSSettings(BaseSettings):
     )
 
     AWS_REGION: str = Field(default="ca-central-1")
-    AWS_ENDPOINT_URL: Optional[str] = Field(default=None)
+    AWS_ENDPOINT_URL: str | None = Field(default=None)
 
     RETRY_MAX_ATTEMPTS: int = Field(default=3, alias="AWS_RETRY_MAX_ATTEMPTS")
     RETRY_MODE: RetryMode = Field(default="standard", alias="AWS_RETRY_MODE")
-    CONNECT_TIMEOUT_SECONDS: int = Field(
-        default=10, alias="AWS_CONNECT_TIMEOUT_SECONDS"
-    )
+    CONNECT_TIMEOUT_SECONDS: int = Field(default=10, alias="AWS_CONNECT_TIMEOUT_SECONDS")
     READ_TIMEOUT_SECONDS: int = Field(default=10, alias="AWS_READ_TIMEOUT_SECONDS")
 
     NOT_FOUND_CODES: list[str] = Field(

@@ -16,9 +16,7 @@ def list_organization_accounts():
         list: A list of account objects.
     """
     params = {"role_arn": ORG_ROLE_ARN}
-    return execute_aws_api_call(
-        "organizations", "list_accounts", paginated=True, keys=["Accounts"], **params
-    )
+    return execute_aws_api_call("organizations", "list_accounts", paginated=True, keys=["Accounts"], **params)
 
 
 def get_active_account_names():
@@ -30,11 +28,7 @@ def get_active_account_names():
     response = list_organization_accounts()
 
     # Return a list of account names with 'Status' == 'ACTIVE'
-    return (
-        [account["Name"] for account in response if account.get("Status") == "ACTIVE"]
-        if response
-        else []
-    )
+    return [account["Name"] for account in response if account.get("Status") == "ACTIVE"] if response else []
 
 
 def get_account_id_by_name(account_name):
@@ -66,9 +60,7 @@ def get_account_details(account_id) -> dict:
         dict: The account details.
     """
     params = {"role_arn": ORG_ROLE_ARN, "AccountId": account_id}
-    return execute_aws_api_call("organizations", "describe_account", **params).get(
-        "Account", {}
-    )
+    return execute_aws_api_call("organizations", "describe_account", **params).get("Account", {})
 
 
 @handle_aws_api_errors
@@ -82,9 +74,7 @@ def get_account_tags(account_id) -> list:
         list: The account tags.
     """
     params = {"role_arn": ORG_ROLE_ARN, "ResourceId": account_id}
-    return execute_aws_api_call(
-        "organizations", "list_tags_for_resource", **params
-    ).get("Tags", [])
+    return execute_aws_api_call("organizations", "list_tags_for_resource", **params).get("Tags", [])
 
 
 def healthcheck():
@@ -96,7 +86,7 @@ def healthcheck():
     healthy = False
     try:
         response = list_organization_accounts()
-        healthy = True if response else False
+        healthy = bool(response)
         logger.info(
             "aws_organizations_healthcheck_success",
             status="healthy" if healthy else "unhealthy",

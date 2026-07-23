@@ -1,14 +1,12 @@
-from integrations import opsgenie
-
 from unittest.mock import patch
+
+from integrations import opsgenie
 
 
 @patch("integrations.opsgenie.client.api_get_request")
 @patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
 def test_get_on_call_users(api_get_request_mock):
-    api_get_request_mock.return_value = (
-        '{"data": {"onCallParticipants": [{"name": "test_user"}]}}'
-    )
+    api_get_request_mock.return_value = '{"data": {"onCallParticipants": [{"name": "test_user"}]}}'
     assert opsgenie.get_on_call_users("test_schedule") == ["test_user"]
     api_get_request_mock.assert_called_once_with(
         "https://api.opsgenie.com/v2/schedules/test_schedule/on-calls",
@@ -20,7 +18,9 @@ def test_get_on_call_users(api_get_request_mock):
 @patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
 def test_create_alert(api_post_request_mock):
     description = "test_description"
-    api_post_request_mock.return_value = '{"result": "Request will be processed", "took": 0.302, "requestId": "43a29c5c-3dbf-4fa4-9c26-f4f71023e120"}'
+    api_post_request_mock.return_value = (
+        '{"result": "Request will be processed", "took": 0.302, "requestId": "43a29c5c-3dbf-4fa4-9c26-f4f71023e120"}'
+    )
     assert opsgenie.create_alert(description) == "Request will be processed"
     api_post_request_mock.assert_called_once_with(
         "https://api.opsgenie.com/v2/alerts",
@@ -45,27 +45,23 @@ def test_create_alert_with_exception(api_post_request_mock):
 @patch("integrations.opsgenie.client.Request")
 @patch("integrations.opsgenie.client.urlopen")
 def test_api_get_request(urlopen_mock, request_mock):
-    urlopen_mock.return_value.read.return_value.decode.return_value = (
-        '{"data": {"onCallParticipants": [{"name": "test_user"}]}}'
-    )
+    urlopen_mock.return_value.read.return_value.decode.return_value = '{"data": {"onCallParticipants": [{"name": "test_user"}]}}'
     assert (
-        opsgenie.api_get_request(
-            "test_url", {"name": "GenieKey", "token": "OPSGENIE_KEY"}
-        )
+        opsgenie.api_get_request("test_url", {"name": "GenieKey", "token": "OPSGENIE_KEY"})
         == '{"data": {"onCallParticipants": [{"name": "test_user"}]}}'
     )
 
     request_mock.assert_called_once_with("test_url")
-    request_mock.return_value.add_header.assert_called_once_with(
-        "Authorization", "GenieKey OPSGENIE_KEY"
-    )
+    request_mock.return_value.add_header.assert_called_once_with("Authorization", "GenieKey OPSGENIE_KEY")
     urlopen_mock.assert_called_once_with(request_mock.return_value)
 
 
 @patch("integrations.opsgenie.client.Request")
 @patch("integrations.opsgenie.client.urlopen")
 def test_api_post_request(urlopen_mock, request_mock):
-    urlopen_mock.return_value.read.return_value.decode.return_value = '{"result": "Request will be processed", "took": 0.302, "requestId": "43a29c5c-3dbf-4fa4-9c26-f4f71023e120"}'
+    urlopen_mock.return_value.read.return_value.decode.return_value = (
+        '{"result": "Request will be processed", "took": 0.302, "requestId": "43a29c5c-3dbf-4fa4-9c26-f4f71023e120"}'
+    )
     assert (
         opsgenie.api_post_request(
             "test_url",
