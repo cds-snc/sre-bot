@@ -1,11 +1,11 @@
 ---
 id: TASK-15.1
 title: 'Ruff migration 01: scaffold parallel black/ruff CI + migrate app/api'
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-23 14:11'
-updated_date: '2026-07-23 15:41'
+updated_date: '2026-07-23 16:34'
 labels: []
 dependencies:
   - TASK-15
@@ -84,14 +84,14 @@ Notes:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Parallel CI is green: black --check . (legacy scope, migrated paths force-excluded) passes AND ruff format --check plus ruff check --select=E,F,W,I,B,UP,C4,SIM,S over RUFF_SCOPE (api tests/api) pass
-- [ ] #2 app/api and app/tests/api are byte-identical to feat/dev_env_setup_ruff: git diff feat/dev_env_setup_ruff -- app/api app/tests/api is empty
-- [ ] #3 pyproject gains [tool.black] force-exclude + tests per-file-ignores; global ruff select stays [E,F,W]; black still present in dev deps; Makefile has RUFF_SCOPE and dual black+ruff fmt-ci/lint-ci
+- [x] #1 Parallel CI is green: black --check . (legacy scope, migrated paths force-excluded) passes AND ruff format --check plus ruff check --select=E,F,W,I,B,UP,C4,SIM,S over RUFF_SCOPE (api tests/api) pass
+- [x] #2 app/api and app/tests/api are byte-identical to feat/dev_env_setup_ruff: git diff feat/dev_env_setup_ruff -- app/api app/tests/api is empty
+- [x] #3 pyproject gains [tool.black] force-exclude + tests per-file-ignores; global ruff select stays [E,F,W]; black still present in dev deps; Makefile has RUFF_SCOPE and dual black+ruff fmt-ci/lint-ci
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 make test passes; PR references decisions/toolchain.md and TASK-15
+- [x] #1 make test passes; PR references decisions/toolchain.md and TASK-15
 <!-- DOD:END -->
 
 ## Implementation Plan
