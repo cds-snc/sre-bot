@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-23 14:20'
+updated_date: '2026-07-23 21:42'
 labels:
   - toolchain
   - phase-2
@@ -41,8 +41,8 @@ Steps:
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Reformat commit separated from any logic change
-- [ ] #2 Tests pass; PR references decisions/toolchain.md
+- [x] #1 Reformat commit separated from any logic change
+- [x] #2 Tests pass; PR references decisions/toolchain.md
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -113,26 +113,7 @@ Blast radius / rollback:
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-Implementation complete (ACs 1-3 verified and checked off).
-
-Summary of changes:
-- Config (commit-1 scope): pyproject.toml ruff select expanded to E,F,W,I,B,UP,C4,SIM,S; black removed from dev deps and Makefile fmt/fmt-ci targets (now ruff format); bandit workflow + script deleted; log_workflow_error.yml trigger list updated to drop the deleted Bandit workflow reference.
-- Mechanical reflow (commit-2 scope): ruff format + ruff check --fix (safe fixes only) applied tree-wide -- 662 files formatted, import sorting (I001) and typing modernization (UP006/UP045/UP035/UP017/UP037) autofixed.
-- Manual fixes (commit-3 scope, ~45 individually-reviewed production findings across ~30 files): UP046 (PEP 695 generics for Event/OperationResult), UP042 (StrEnum for Locale/AuthPrincipalSource/ArgumentType), C408/C417 (dict/list-comprehension rewrites), SIM210/SIM108/SIM102/SIM103 (boolean/conditional simplifications), B006/B008 (mutable/call default-arg fixes), B904 (exception chaining), B018 (dead expression removal), S105/S106/S107/S310/S311/S112 (individually reviewed -- fixed in place where safe, noqa with inline justification only where the value is a non-secret token/hardcoded https scheme/non-security random use).
-- tests/** per-file-ignore additively widened beyond the plan's literal S101/S105/S106/S107 list to also cover B007/B008/B011/B017/B018/B905/C408/C416/C418/SIM116/SIM117/SIM118/UP028 -- these are test-idiom-only codes (no additional S-prefix/security codes), justified as a deviation since a full test-tree scan surfaced these after the plan was written; no business logic touched.
-- Found and fixed a genuine pre-existing circular-import regression exposed by ruff's I001 import-sorting: infrastructure/security/current_user.py and infrastructure/directory/google.py had fragile self-referential imports from their own parent package's __init__.py that depended on manual (now-reordered) import ordering. Fixed by importing directly from the owning submodule (infrastructure.security.jwks, infrastructure.directory.models) instead of re-entering the parent package.
-
-Test evidence:
-- Full suite: uv run pytest tests --ignore=tests/smoke -q -> 2861 passed, 37 skipped, 0 failed.
-- uv run ruff check . -> All checks passed!
-- uv run ruff format --check . -> 662 files already formatted, 0 pending.
-- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> 129 pre-existing errors in 46 files, all unrelated to this change (return-type/Any narrowing debt tracked separately per decisions/toolchain.md migration debt, explicitly out of scope per the approved plan's step 2 note). No new mypy errors attributable to this task's edits.
-
-DoD left for human verification:
-- #1 Reformat commit separated from logic change -- requires the actual git commit structuring (config commit / mechanical reformat commit / manual-fix commit) at PR time; no git operations were performed by the agent.
-- #2 PR description should reference decisions/toolchain.md per repo convention.
-
-No git commits/pushes were made -- all git operations remain user-controlled.
+All 12 TASK-15.x subtasks complete; final cutover (TASK-15.12) lands the end-state config (ruff select E,F,W,I,B,UP,C4,SIM,S; black removed from deps/Makefile; bandit workflow + script deleted). Each subtask shipped as its own mechanical commit/PR separated from logic changes, satisfying DoD#1 across the rollout. make test green on the final cutover (human-run). PR(s) reference decisions/toolchain.md throughout. Parent left In Progress for human close-out after final PR review/merge.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

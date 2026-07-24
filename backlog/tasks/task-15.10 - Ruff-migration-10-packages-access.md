@@ -1,11 +1,11 @@
 ---
 id: TASK-15.10
 title: 'Ruff migration 10: packages/access'
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-23 14:19'
-updated_date: '2026-07-23 21:09'
+updated_date: '2026-07-23 21:44'
 labels: []
 dependencies:
   - TASK-15.9

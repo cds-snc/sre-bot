@@ -3,7 +3,6 @@ name: Log Workflow error in PR
 on:
     workflow_run:
       workflows:
-        - Source code security scan using Bandit 
         - Build and Push to Container Registry
         - Lint, format and test code
         - Build containers CI

@@ -3,11 +3,11 @@ id: TASK-15.11
 title: >-
   Ruff migration 11: packages/geolocate + remaining tests (completes app/
   reflow)
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-23 14:19'
-updated_date: '2026-07-23 21:21'
+updated_date: '2026-07-23 21:44'
 labels: []
 dependencies:
   - TASK-15.10

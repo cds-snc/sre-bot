@@ -1,11 +1,11 @@
 ---
 id: TASK-15.7
 title: 'Ruff migration 07: modules incident + small (atip, secret, role)'
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-23 14:18'
-updated_date: '2026-07-23 19:07'
+updated_date: '2026-07-23 21:44'
 labels: []
 dependencies:
   - TASK-15.6

@@ -1,11 +1,11 @@
 ---
 id: TASK-15.5
 title: 'Ruff migration 05: integrations aws + small vendors'
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-23 14:17'
-updated_date: '2026-07-23 18:21'
+updated_date: '2026-07-23 21:44'
 labels: []
 dependencies:
   - TASK-15.4

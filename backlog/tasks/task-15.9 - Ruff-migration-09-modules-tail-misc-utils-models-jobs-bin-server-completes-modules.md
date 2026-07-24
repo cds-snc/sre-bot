@@ -3,11 +3,11 @@ id: TASK-15.9
 title: >-
   Ruff migration 09: modules tail + misc (utils, models, jobs, bin, server);
   completes modules/
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-23 14:18'
-updated_date: '2026-07-23 20:49'
+updated_date: '2026-07-23 21:44'
 labels: []
 dependencies:
   - TASK-15.8

@@ -1,11 +1,11 @@
 ---
 id: TASK-15.8
 title: 'Ruff migration 08: modules webhooks + aws'
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-23 14:18'
-updated_date: '2026-07-23 20:03'
+updated_date: '2026-07-23 21:44'
 labels: []
 dependencies:
   - TASK-15.7
