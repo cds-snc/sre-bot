@@ -1,11 +1,11 @@
 ---
 id: TASK-4
 title: 'Enforce JWT issuer, audience, and pinned asymmetric algorithms'
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-24 17:38'
+updated_date: '2026-07-24 17:39'
 labels:
   - security
   - phase-0
@@ -41,8 +41,8 @@ Steps in app/infrastructure/security/jwt.py:
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass, including the four cases above
-- [ ] #2 PR references SEC-3 and decisions/security.md
+- [x] #1 Tests pass, including the four cases above
+- [x] #2 PR references SEC-3 and decisions/security.md
 <!-- DOD:END -->
 
 ## Implementation Plan
