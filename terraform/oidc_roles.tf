@@ -3,7 +3,7 @@ locals {
 }
 
 module "gh_oidc_roles" {
-  source   = "github.com/cds-snc/terraform-modules//gh_oidc_role?ref=v11.3.2"
+  source   = "github.com/cds-snc/terraform-modules//gh_oidc_role?ref=v11.4.4"
   org_name = "cds-snc"
   roles = [
     {
