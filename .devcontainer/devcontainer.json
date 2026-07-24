@@ -23,7 +23,9 @@
 			"settings": {
 				"python.pythonPath": "/usr/local/bin/python",
 				"python.languageServer": "Pylance",
-				"ruff.cwd": "${workspaceFolder}/app",
+				"ruff.interpreter": [
+					"${workspaceFolder}/app/.venv/bin/python"
+				],
 				"ruff.organizeImports": true,
 				"editor.codeActionsOnSave": {
 					"source.fixAll.ruff": "explicit",
