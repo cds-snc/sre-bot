@@ -1,6 +1,6 @@
 ---
 status: Accepted
-date: 2026-07-22
+date: 2026-07-24
 applies: target
 scope: Settings ownership, environment identity, and secrets.
 ---
@@ -33,11 +33,13 @@ Settings are split across ~47 classes with two homes per vendor (`integrations/<
 
 **The god-settings aggregator is being removed, not grown.** `app/infrastructure/configuration/settings.py`'s `Settings` class (`settings_map`, `get_settings()`) is a legacy facade over the per-domain providers, not a home for new config; an open PR deletes it outright. New settings slices are never added to its `settings_map` or fields, and no new or open task may take a dependency on it, whether or not that removal has merged yet — this holds even where an older task description mentions wiring a slice into it.
 
+**Migration rides with whatever work already touches the domain — it does not wait for the consolidation sweep.** TASK-24 exists to close out whichever dual-home settings nothing else has touched by the time everything else is done; it is a shrinking backlog of stragglers, not a checkpoint other tasks block on. Any task that rewrites, fixes, or extends a domain's service — for any reason — migrates that domain's settings slice to its target home (`app/infrastructure/<service>/settings.py` or `app/packages/<feature>/settings.py`) in the same change, deleting the old `infrastructure/configuration/...` home rather than leaving both to be reconciled later. Genuinely blocked exceptions (the target slice doesn't exist yet and creating it is out of scope for the touching task) get an explicit interim-home comment on the owning task naming the future slice and the task that will create it — the pattern already used for `CORS_ALLOWED_ORIGINS`/`CORS_ALLOWED_METHODS`/`CORS_ALLOWED_HEADERS` landing on `AppSettings` pending TASK-24's `SecuritySettings` — but that is the tolerated fallback, not the default path.
+
 ## Consequences
 
 - "Where is this configured?" has one answer per domain; deleting a feature deletes its config.
 - The typed environment enum turns the current one-character-typo security hazard into an enum validation error at boot.
-- Migration is mechanical but wide (many import edits); do it per-domain alongside other work in each area.
+- Migration is mechanical but wide (many import edits); doing it per-domain alongside other work in each area means TASK-24 shrinks continuously instead of landing as one large, late, high-risk PR.
 
 ## Checks
 

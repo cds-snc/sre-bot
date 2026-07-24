@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 16:56'
+updated_date: '2026-07-24 17:58'
 labels:
   - security
   - phase-0
@@ -25,21 +25,17 @@ ordinal: 5000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Aligns with decisions/reliability.md (Idempotency) - the highest-priority correctness fix. Today app/infrastructure/idempotency/dynamodb.py does get() (get_item, line 47) then set() (plain put_item, lines 89-111) with no ConditionExpression - a TOCTOU race: two replicas both miss and both execute the mutation (SEC-4). key_builder.py:49 hashes the payload with sha256 truncated to 16 hex chars - payload hashes and truncation are both prohibited.
+Original single-PR framing under-scoped this rewrite's real blast radius. Decomposed on 2026-07-24 per the single-PR size gate (implementation-planning skill) into four subtasks, tracked here as the coordinator; this task's acceptance criteria are satisfied when all four are Done. Do not implement against this description directly - see the child tasks for the actual scoped plans.
 
-Build the capability-shaped Protocol (per claude-research-outcome.md):
+Rationale (see decisions/reliability.md's new 'Idempotency is not a general job-status store' clause and Consequences bullet, and decisions/configuration.md's new 'Migration rides with whatever work already touches the domain' clause): the original scope conflated three distinct capabilities behind one get-then-put rewrite - true redelivery dedup, a concurrency lock/lease, and job-status polling - each needing its own migration, plus an orphaned legacy settings home that must move in the same change rather than wait for TASK-24.
 
-    class IdempotencyStore(Protocol):
-        def claim(self, key: str, ttl: timedelta) -> ClaimResult: ...  # NEW / COMPLETED / IN_PROGRESS
-        def complete(self, key: str, outcome) -> None: ...
-        def release(self, key: str) -> None: ...
+Children (dependency order):
+- TASK-5.1 - Idempotency: atomic claim/complete/release primitive, in-memory fake, and dedicated settings slice (foundational; no dependency on the others)
+- TASK-5.2 - Idempotency: migrate Slack legacy_slack_listener dedup onto claim/complete/release (depends on TASK-5.1)
+- TASK-5.3 - Idempotency: rewrite Access Sync platform/user concurrency lock onto claim/complete/release; align with TASK-6 (depends on TASK-5.1)
+- TASK-5.4 - Access Sync: extract job-status polling into its own store; delete legacy IdempotencyService (depends on TASK-5.1; finishes the original 'delete the get-then-put path' once TASK-5.2/TASK-5.3 have moved their callers)
 
-Steps:
-1. Define the Protocol + ClaimResult in app/infrastructure/idempotency/protocol.py. No DynamoDB vocabulary (no ConditionExpression parameters) in the Protocol surface.
-2. DynamoDB implementation: claim = PutItem with ConditionExpression attribute_not_exists(pk), status IN_PROGRESS, bounded in-progress TTL. ConditionalCheckFailed branches: COMPLETED -> return recorded outcome; IN_PROGRESS unexpired -> concurrent duplicate; IN_PROGRESS expired -> take over and re-execute. complete() records the outcome; release() deletes so redelivery retries.
-3. Key format <feature>:<intent>:<idempotency_id> where idempotency_id is a sender-assigned id stable across redeliveries (Slack event_id, webhook delivery id). Never request_id, never payload hashes, no truncation.
-4. In-memory fake implementing the same Protocol, used by the integration tests (this is the standing second provider per decisions/cloud-portability.md contract 4).
-5. Migrate existing callers of the old store; delete the get-then-put path and the payload-hash key builder.
+TASK-6 has been re-pointed to depend on TASK-5.1 and TASK-5.3 instead of this task directly (see TASK-6 for the coordination note on shared lease-helper reuse).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -57,3 +53,16 @@ Steps:
 - [ ] #2 Tests pass including the shared Protocol conformance suite run against both implementations
 - [ ] #3 PR references SEC-4 and decisions/reliability.md
 <!-- DOD:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Decomposition rationale and slice sequence (per implementation-planning skill's single-PR size gate - trigger: mixes a mechanical rewrite with three unrelated behavior migrations, crosses subsystems app/infrastructure/idempotency, app/integrations/slack, and app/packages/access/sync, and cannot be reviewed or reverted as one PR):
+
+1. TASK-5.1 (expand): new IdempotencyStore Protocol + ClaimResult, DynamoDB claim/complete/release rewrite, in-memory fake, dedicated settings.py, deletion of dead key_builder.py. Old IdempotencyService stack stays in place untouched - callers are not migrated yet.
+2. TASK-5.2 (migrate - Slack dedup): app/integrations/slack/utils.py::legacy_slack_listener moves onto claim/complete/release; removes the prohibited payload-hash fallback key (flagged as an open product question, not resolved here).
+3. TASK-5.3 (migrate - Access Sync lock): app/packages/access/sync/platform_lock.py moves onto the same primitive as a lease; coordinates with TASK-6 so its Tier-2 job lease reuses this lease helper instead of a second implementation.
+4. TASK-5.4 (migrate + contract - job-status polling): extracts the job-runner/http/slack job-status reads and writes into their own small package-owned store (this was never idempotency), then deletes the legacy IdempotencyService/DynamoDBIdempotencyService/cache.py/service.py/factory.py once nothing references them - this is the final contract step that closes out the original 'delete the get-then-put path' DoD item.
+
+Each child subtask carries its own AC-to-step traceability, test matrix, and blast-radius notes; see the child task files. This task stops at To Do - it tracks completion of the four children and is not itself implemented.
+<!-- SECTION:PLAN:END -->

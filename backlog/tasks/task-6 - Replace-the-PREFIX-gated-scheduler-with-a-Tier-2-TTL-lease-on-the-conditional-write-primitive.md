@@ -6,14 +6,15 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 16:56'
+updated_date: '2026-07-24 17:58'
 labels:
   - reliability
   - phase-0
 milestone: m-0
 dependencies:
   - TASK-1
-  - TASK-5
+  - TASK-5.1
+  - TASK-5.3
 references:
   - decisions/reliability.md
   - claude-research-outcome.md
@@ -47,3 +48,12 @@ Steps:
 - [ ] #1 Tests pass; both replicas can boot with jobs enabled in a local two-process check
 - [ ] #2 PR references decisions/reliability.md (Background jobs)
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-07-24 17:58
+---
+TASK-5 was decomposed on 2026-07-24 (single-PR size gate) into TASK-5.1..TASK-5.4; see TASK-5 for the full rationale. This task's dependency has been re-pointed from TASK-5 directly onto TASK-5.1 (the IdempotencyStore claim/complete/release primitive this Tier-2 lease is built on) and TASK-5.3 (the Access Sync platform/user lock rewrite, which produces a lease helper on the same primitive). Consume TASK-5.3's lease helper for the Tier-2 job lease here rather than reimplementing a second lease on top of TASK-5.1 directly - avoid two competing lease implementations on the same conditional-write primitive.
+---
+<!-- COMMENTS:END -->
