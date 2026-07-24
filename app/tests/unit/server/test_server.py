@@ -1,7 +1,10 @@
 """Unit tests for server.server module."""
 
+import importlib
+
 import pytest
 
+from infrastructure.configuration.app import AppSettings
 from server import server
 
 
@@ -24,13 +27,47 @@ def test_server_app_exported_correctly():
 
 @pytest.mark.unit
 def test_cors_middleware_configured():
-    """Test that CORS middleware is present in the server."""
+    """CORS middleware should use explicit non-wildcard lists from settings."""
     # Arrange
     app = server.handler
 
     # Assert
-    middleware_classes = [m.cls.__name__ for m in app.user_middleware]
-    assert "CORSMiddleware" in middleware_classes
+    cors_middleware = next(
+        (m for m in app.user_middleware if m.cls.__name__ == "CORSMiddleware"),
+        None,
+    )
+    assert cors_middleware is not None
+    assert cors_middleware.kwargs["allow_credentials"] is True
+    assert cors_middleware.kwargs["allow_origins"] == server.app_settings.CORS_ALLOWED_ORIGINS
+    assert cors_middleware.kwargs["allow_methods"] == server.app_settings.CORS_ALLOWED_METHODS
+    assert cors_middleware.kwargs["allow_headers"] == server.app_settings.CORS_ALLOWED_HEADERS
+    assert "*" not in cors_middleware.kwargs["allow_origins"]
+    assert "*" not in cors_middleware.kwargs["allow_methods"]
+    assert "*" not in cors_middleware.kwargs["allow_headers"]
+
+
+@pytest.mark.unit
+def test_cors_middleware_uses_configured_origin_list_after_reload(monkeypatch):
+    """Reloaded server module should preserve the exact configured origin allow-list."""
+    configured_origins = ["https://frontend.example"]
+    monkeypatch.setattr(
+        "infrastructure.configuration.app.get_app_settings",
+        lambda: AppSettings(
+            ENVIRONMENT="production",
+            CORS_ALLOWED_ORIGINS=configured_origins,
+            CORS_ALLOWED_METHODS=["GET", "POST"],
+            CORS_ALLOWED_HEADERS=["Authorization", "Content-Type"],
+        ),
+    )
+
+    reloaded = importlib.reload(server)
+    cors_middleware = next(
+        (m for m in reloaded.handler.user_middleware if m.cls.__name__ == "CORSMiddleware"),
+        None,
+    )
+
+    assert cors_middleware is not None
+    assert cors_middleware.kwargs["allow_origins"] == configured_origins
 
 
 @pytest.mark.unit

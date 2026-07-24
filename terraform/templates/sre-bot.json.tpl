@@ -49,6 +49,10 @@
         "value": "production"
       },
       {
+        "name": "CORS_ALLOWED_ORIGINS",
+        "value": "${cors_allowed_origins}"
+      },
+      {
         "name": "SLACK__COMMAND_PREFIX",
         "value": ""
       }

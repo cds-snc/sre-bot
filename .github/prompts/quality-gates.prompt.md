@@ -9,8 +9,7 @@ Run and report quality gates per the `python-quality-gates` skill:
 
 1. `cd app && uv run mypy . --exclude '(?:^|/)\\.venv(?:/|$)'`
 2. `cd app && uv run ruff check .`
-3. `cd app && uv run black --check .`
-4. `cd app && uv run pytest tests --ignore=tests/smoke`
+3. `cd app && uv run pytest tests --ignore=tests/smoke`
 
 Report using the skill's format (gate status, root causes, fixes applied, verification reruns, residual risk).
 

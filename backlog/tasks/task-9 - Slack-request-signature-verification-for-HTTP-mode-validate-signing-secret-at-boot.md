@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 16:57'
+updated_date: '2026-07-24 14:00'
 labels:
   - security
   - phase-0
@@ -16,6 +16,7 @@ dependencies: []
 references:
   - decisions/transport-slack.md
   - 'https://github.com/cds-snc/sre-bot/issues/1263'
+  - decisions/security.md
 priority: medium
 ordinal: 9000
 ---
@@ -44,3 +45,12 @@ Steps:
 - [ ] #1 Tests pass
 - [ ] #2 PR references SEC-5 and decisions/transport-slack.md
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-07-24 14:00
+---
+Cross-reference (2026-07-24): decisions/security.md Webhooks clause was amended to a tiered trust model (provider-signed / shared-secret HMAC / hardened secret-URL). This task is the provider-signed tier for the Slack HTTP transport (Slack platform signing-secret HMAC over timestamp+body). It stays a distinct, correctly-scoped m-0 task and needs no restructuring; the generic-webhook HMAC tier is separate (TASK-47/TASK-48, m-4) and the Phase-1 origin observability that feeds it is TASK-46 (m-0).
+---
+<!-- COMMENTS:END -->

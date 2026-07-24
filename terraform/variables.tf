@@ -37,6 +37,12 @@ variable "slack_webhook_url" {
   sensitive   = true
 }
 
+variable "cors_allowed_origins" {
+  description = "List of allowed browser origins for CORS in production."
+  type        = list(string)
+  default     = []
+}
+
 variable "authorized_endpoints_with_constraints" {
   description = "List of authorized endpoints with their positional constraints"
   type = list(object({

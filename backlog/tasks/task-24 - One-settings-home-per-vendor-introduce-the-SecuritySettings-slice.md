@@ -4,7 +4,7 @@ title: One settings home per vendor; introduce the SecuritySettings slice
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 16:57'
+updated_date: '2026-07-24 13:35'
 labels:
   - clients
   - phase-3
@@ -43,3 +43,13 @@ Steps:
 - [ ] #1 Deployment env files updated for renamed variables (renames listed in PR description)
 - [ ] #2 PR references decisions/configuration.md
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: task-planner
+created: 2026-07-24 13:35
+---
+Cross-task note from TASK-2 planning (2026-07-24): TASK-2 lands CORS_ALLOWED_ORIGINS, CORS_ALLOWED_METHODS, CORS_ALLOWED_HEADERS plus a boot-time model_validator (rejects '*' with allow_credentials=True) on AppSettings (app/infrastructure/configuration/app.py) as an interim home, since this task (TASK-24 / SecuritySettings) had not landed yet. When this task is implemented, migrate those three fields and their boot validator from AppSettings into SecuritySettings (app/infrastructure/security/settings.py) rather than re-deriving the CORS policy/validator from scratch - this satisfies this task's existing AC #2 ('SecuritySettings owns issuers/JWKS, CORS, rate-limit, dev-bypass config...'). Update app/server/server.py's CORSMiddleware wiring and the corresponding tests (app/tests/unit/infrastructure/configuration/test_app_settings.py TestAppSettingsCors, app/tests/unit/server/test_server.py) to read from the new SecuritySettings location at that time.
+---
+<!-- COMMENTS:END -->

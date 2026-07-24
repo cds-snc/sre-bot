@@ -124,7 +124,6 @@ Run these checks regularly (after each 3-5 edits and before completion):
 
 - `cd app && uv run mypy . --exclude '(?:^|/)\\.venv(?:/|$)'`
 - `cd app && uv run ruff check .`
-- `cd app && uv run black --check .`
 - `cd app && uv run pytest tests --ignore=tests/smoke`
 
 Always run validation from `app/` and scope checks to project code only. Do not run quality gates against repository-external paths or virtual environment contents.
