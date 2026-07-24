@@ -4,10 +4,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from infrastructure.configuration.infrastructure.idempotency import IdempotencySettings
 from infrastructure.idempotency.cache import IdempotencyCache
 from infrastructure.idempotency.dynamodb import DynamoDBCache
 from infrastructure.idempotency.service import DynamoDBIdempotencyService
+from infrastructure.idempotency.settings import IdempotencySettings
 
 pytestmark = pytest.mark.unit
 

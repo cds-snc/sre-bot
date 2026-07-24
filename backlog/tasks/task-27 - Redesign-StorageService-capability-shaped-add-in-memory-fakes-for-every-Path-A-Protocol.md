@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 16:57'
+updated_date: '2026-07-24 17:59'
 labels:
   - infrastructure
   - phase-4
@@ -45,3 +45,12 @@ Steps:
 - [ ] #1 All consumers migrated; tests green
 - [ ] #2 PR references decisions/cloud-portability.md
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-07-24 17:59
+---
+TASK-5 was decomposed on 2026-07-24 (single-PR size gate) into TASK-5.1..TASK-5.4. The in-memory idempotency fake this task's description refers to ('idempotency - task-5 already delivered idempotency') now lands specifically in TASK-5.1 (Idempotency: atomic claim/complete/release primitive, in-memory fake, and dedicated settings slice). If this task ends up needing an explicit dependency on the idempotency fake, point it at TASK-5.1, not TASK-5.
+---
+<!-- COMMENTS:END -->

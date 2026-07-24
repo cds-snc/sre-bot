@@ -12,6 +12,7 @@ debug:
 	SLACK__COMMAND_PREFIX="dev-" LOG_LEVEL=DEBUG uv run uvicorn main:server_app --reload
 
 fmt:
+	uv run ruff check --fix . $(ARGS)
 	uv run ruff format . $(ARGS)
 
 install:

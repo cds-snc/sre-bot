@@ -21,7 +21,6 @@ from infrastructure.configuration.features.aws_ops import (
 )
 from infrastructure.configuration.infrastructure import (
     DevSettings,
-    IdempotencySettings,
     ServerSettings,
 )
 from infrastructure.configuration.infrastructure.retry import (
@@ -45,6 +44,7 @@ from infrastructure.configuration.integrations import (
 from infrastructure.configuration.integrations.google import (
     get_google_workspace_settings,
 )
+from infrastructure.idempotency.settings import IdempotencySettings
 
 
 class TestSettingsStructure:

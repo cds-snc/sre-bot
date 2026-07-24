@@ -7,10 +7,6 @@ from infrastructure.configuration.infrastructure.directory import (
     DirectorySettings,
     get_directory_settings,
 )
-from infrastructure.configuration.infrastructure.idempotency import (
-    IdempotencySettings,
-    get_idempotency_settings,
-)
 from infrastructure.configuration.infrastructure.platforms import (
     PlatformsSettings,
     get_platforms_settings,
@@ -57,22 +53,6 @@ class TestDevSettingsSingleton:
         monkeypatch.setenv("SLACK_DEV_MSG_CHANNEL", "C_TEST123")
         settings = DevSettings()
         assert settings.SLACK_DEV_MSG_CHANNEL == "C_TEST123"
-
-
-class TestIdempotencySettingsSingleton:
-    def test_singleton_returns_same_instance(self):
-        get_idempotency_settings.cache_clear()
-        assert get_idempotency_settings() is get_idempotency_settings()
-
-    def test_has_required_model_config(self):
-        config = IdempotencySettings.model_config
-        assert config.get("env_file") == ".env"
-        assert config.get("extra") == "ignore"
-
-    def test_reads_from_env(self, monkeypatch):
-        monkeypatch.setenv("IDEMPOTENCY_TTL_SECONDS", "7200")
-        settings = IdempotencySettings()
-        assert settings.IDEMPOTENCY_TTL_SECONDS == 7200
 
 
 class TestRetrySettingsSingleton:

@@ -169,5 +169,10 @@ exclude_lines = ["if __name__ == .__main__.:"]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[dependency-groups]
+dev = [
+    "moto[dynamodb]>=5.2.2",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["api", "core", "infrastructure", "integrations", "jobs", "models", "modules", "packages", "server", "utils"]

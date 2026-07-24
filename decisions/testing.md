@@ -18,10 +18,10 @@ The suite lives at `app/tests/` (~320 files) with `unit/`, `integration/`, `smok
 **Three layers:**
 
 - **Unit** (<50 ms): pure logic, Protocol fakes, no I/O. The bulk of the pyramid.
-- **Integration** (<500 ms): components wired together with in-memory fakes for out-of-process deps ([cloud-portability.md](cloud-portability.md) fakes double here); HTTP via `httpx.AsyncClient` + `ASGITransport` against the real app with `dependency_overrides`. DynamoDB-Local is permitted for store-semantics tests, marked `slow`.
+- **Integration** (<500 ms): components wired together with in-memory fakes for out-of-process deps ([cloud-portability.md](cloud-portability.md) fakes double here); HTTP via `httpx.AsyncClient` + `ASGITransport` against the real app with `dependency_overrides`. `moto` is the sanctioned in-process substitute for `boto3` calls that need real server-side semantics a stub can't reproduce (`ConditionExpression`, GSI queries, TTL); DynamoDB-Local remains permitted as a heavier alternative for store-semantics tests, marked `slow`.
 - **Smoke:** on-demand against real backends; never in the PR gate.
 
-**Doubles, in preference order:** Protocol-conformant fake → stub → `MagicMock` (last resort, never for the subject under test). Mock at the Protocol seam, not the SDK.
+**Doubles, in preference order:** Protocol-conformant fake → stub → `MagicMock` (last resort, never for the subject under test). Mock at the Protocol seam, not the SDK — the SDK is reached only through the concrete adapter, unit-tested separately with `moto` (`boto3`) or `respx`/`pytest-httpx` (`httpx`) at that adapter's seam when a Protocol fake can't stand in.
 
 **Substitution:** routes → `app.dependency_overrides`; direct-call consumers → the provider registry's clear-all autouse fixture + monkeypatch ([dependency-injection.md](dependency-injection.md)). Global env comes from per-test `monkeypatch.setenv`, not a pyproject env block that silently configures everything.
 
@@ -42,4 +42,4 @@ The suite lives at `app/tests/` (~320 files) with `unit/`, `integration/`, `smok
 
 ## Migration
 
-Ticket: toolchain convergence (gates land with [toolchain.md](toolchain.md)'s CI work). Tolerated until closed: the root-level `tests/architecture/` tree, unregistered `slow` marker, no `--strict-markers`, no `fail_under`, no provider-clearing fixture (blocked on [dependency-injection.md](dependency-injection.md)'s registry).
+Ticket: toolchain convergence (gates land with [toolchain.md](toolchain.md)'s CI work). Tolerated until closed: the root-level `tests/architecture/` tree, unregistered `slow` marker, no `--strict-markers`, no `fail_under`, no provider-clearing fixture (blocked on [dependency-injection.md](dependency-injection.md)'s registry), `moto`/`respx` named above but not yet added as dependencies (tracked by TASK-50).
