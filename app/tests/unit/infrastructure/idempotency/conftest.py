@@ -3,10 +3,10 @@
 from unittest.mock import MagicMock
 
 import pytest
-from infrastructure.idempotency.settings import IdempotencySettings
 
 from infrastructure.idempotency.dynamodb import DynamoDBCache
 from infrastructure.idempotency.factory import reset_cache
+from infrastructure.idempotency.settings import IdempotencySettings
 from infrastructure.operations.result import OperationResult, OperationStatus
 
 

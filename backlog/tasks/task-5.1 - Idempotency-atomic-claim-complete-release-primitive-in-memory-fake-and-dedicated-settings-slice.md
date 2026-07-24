@@ -3,11 +3,11 @@ id: TASK-5.1
 title: >-
   Idempotency: atomic claim/complete/release primitive, in-memory fake, and
   dedicated settings slice
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-24 17:57'
-updated_date: '2026-07-24 19:08'
+updated_date: '2026-07-24 19:15'
 labels:
   - security
   - phase-0
@@ -56,9 +56,9 @@ Explicit exclusion: do NOT touch callers yet. Old IdempotencyService/DynamoDBIde
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Shared Protocol-conformance suite passes against both the DynamoDB implementation (moto) and the in-memory fake
-- [ ] #2 No caller migrations included in this PR; existing callers of get_idempotency_service() continue to pass their current tests unmodified
-- [ ] #3 PR references decisions/reliability.md, decisions/cloud-portability.md, decisions/configuration.md
+- [x] #1 Shared Protocol-conformance suite passes against both the DynamoDB implementation (moto) and the in-memory fake
+- [x] #2 No caller migrations included in this PR; existing callers of get_idempotency_service() continue to pass their current tests unmodified
+- [x] #3 PR references decisions/reliability.md, decisions/cloud-portability.md, decisions/configuration.md
 <!-- DOD:END -->
 
 ## Implementation Plan
