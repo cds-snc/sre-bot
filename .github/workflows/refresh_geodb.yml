@@ -14,7 +14,7 @@ jobs:
     steps:
 
     - name: Configure aws credentials using OIDC
-      uses: aws-actions/configure-aws-credentials@master
+      uses: aws-actions/configure-aws-credentials@ffc08eae7350b1061d7de219e2135c75561fb680 # master
       with:
         role-to-assume: arn:aws:iam::283582579564:role/geodb_refresh_role
         role-session-name: SREBotGitHubActions
