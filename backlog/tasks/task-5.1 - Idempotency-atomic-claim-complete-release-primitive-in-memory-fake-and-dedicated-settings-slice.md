@@ -3,10 +3,11 @@ id: TASK-5.1
 title: >-
   Idempotency: atomic claim/complete/release primitive, in-memory fake, and
   dedicated settings slice
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-24 17:57'
-updated_date: '2026-07-24 18:31'
+updated_date: '2026-07-24 18:56'
 labels:
   - security
   - phase-0
