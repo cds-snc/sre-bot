@@ -4,7 +4,7 @@ dev:
 	SLACK__COMMAND_PREFIX="dev-" uv run uvicorn main:server_app --reload
 
 dev-setup: # Requires to be signed in to AWS
-	uv sync --extra dev
+	uv sync
 	sh ../.devcontainer/maxmind-create.sh
 	sh ../.devcontainer/dynamodb-create.sh
 
@@ -16,10 +16,10 @@ fmt:
 	uv run ruff format . $(ARGS)
 
 install:
-	uv sync
+	uv sync --no-dev
 
 install-dev:
-	uv sync --extra dev
+	uv sync
 
 lint:
 	uv run ruff check .

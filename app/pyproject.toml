@@ -1,7 +1,7 @@
 [project]
 name = "sre-bot"
 version = "0.1.0"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "arrow==1.4.0",
     "awscli==1.44.44",
@@ -34,22 +34,6 @@ dependencies = [
     "trello==0.9.7.3",
     "uvicorn==0.41.0",
     "email-validator==2.3.0",
-]
-
-[project.optional-dependencies]
-dev = [
-    "ruff>=0.11.0",
-    "mypy==1.19.1",
-    "pytest==8.4.2",
-    "pytest-asyncio==0.26.0",
-    "pytest-env==0.8.2",
-    "coverage==6.5.0",
-    "pytest-cov==4.1.0",
-    "freezegun==1.5.5",
-    "requests-mock==1.12.1",
-    "boto3_stubs==1.42.54",
-    "checkov",
-    "setuptools==78.1.1",
 ]
 
 [tool.ruff]
@@ -171,6 +155,18 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "ruff==0.15.7",
+    "mypy==1.19.1",
+    "pytest==8.4.2",
+    "pytest-asyncio==0.26.0",
+    "pytest-env==0.8.2",
+    "coverage==6.5.0",
+    "pytest-cov==4.1.0",
+    "freezegun==1.5.5",
+    "requests-mock==1.12.1",
+    "boto3_stubs==1.42.54",
+    "checkov",
+    "setuptools==78.1.1",
     "moto[dynamodb]>=5.2.2",
 ]
 
