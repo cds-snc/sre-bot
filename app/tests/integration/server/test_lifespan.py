@@ -86,8 +86,11 @@ def test_lifespan_list_configs_logs_settings(mock_settings):
 
     # Assert
     mock_logger.info.assert_called()
-    # First call should log "configuration_initialized"
-    assert mock_logger.info.call_count >= 1
+    first_call = mock_logger.info.call_args_list[0]
+    assert first_call.args[0] == "configuration_initialized"
+
+    base_settings = first_call.kwargs["base_settings"]
+    assert all("PREFIX" not in entry for entry in base_settings)
 
 
 @pytest.mark.integration
@@ -161,13 +164,13 @@ def test_lifespan_stop_scheduled_tasks_sets_event():
 
 
 @pytest.mark.integration
-def test_lifespan_start_scheduled_tasks_runs_when_environment_is_prod(mock_settings, mock_bot, monkeypatch):
+def test_lifespan_start_scheduled_tasks_runs_when_environment_is_prod(
+    mock_settings, mock_bot, monkeypatch
+):
     """Test that _start_scheduled_tasks starts when ENVIRONMENT is production."""
     # Arrange
     mock_logger = MagicMock()
     mock_settings.ENVIRONMENT = "production"
-    # Explicitly conflict with legacy PREFIX logic to ensure ENVIRONMENT is authoritative.
-    mock_settings.PREFIX = "non-empty-prefix"
     init_mock = MagicMock()
     stop_event = threading.Event()
     run_mock = MagicMock(return_value=stop_event)
@@ -185,13 +188,13 @@ def test_lifespan_start_scheduled_tasks_runs_when_environment_is_prod(mock_setti
 
 
 @pytest.mark.integration
-def test_lifespan_start_scheduled_tasks_skips_when_environment_is_not_production(mock_settings, mock_bot, monkeypatch):
+def test_lifespan_start_scheduled_tasks_skips_when_environment_is_not_production(
+    mock_settings, mock_bot, monkeypatch
+):
     """Test that _start_scheduled_tasks skips when ENVIRONMENT is non-production."""
     # Arrange
     mock_logger = MagicMock()
     mock_settings.ENVIRONMENT = "local"
-    # Explicitly conflict with legacy PREFIX logic to ensure ENVIRONMENT is authoritative.
-    mock_settings.PREFIX = ""
     init_mock = MagicMock()
     run_mock = MagicMock()
     monkeypatch.setattr("server.lifespan.scheduled_tasks.init", init_mock)
