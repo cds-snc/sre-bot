@@ -26,7 +26,7 @@ def _get_bot_client(request: Request) -> WebClient | None:
 
 @router.post("/hook/{webhook_id}")
 @limiter.limit(
-    "30/minute"
+    "300/minute"
 )  # since some slack channels use this for alerting, we want to be generous with the rate limiting on this one
 def handle_webhook(
     webhook_id: str,

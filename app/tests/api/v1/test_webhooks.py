@@ -427,12 +427,12 @@ async def test_webhooks_rate_limiting(
         # Return a proper WebhookPayload instance
         mock_webhook_payload = WebhookPayload(text="Test message")
         handle_webhook_payload_mock.return_value = WebhookResult(status="success", action="post", payload=mock_webhook_payload)
-        # Make 30 requests to the handle_webhook endpoint
-        for _ in range(30):
+        # Make 300 requests to the handle_webhook endpoint
+        for _ in range(300):
             response = await client.post("/hook/test-id", json=payload)
             assert response.status_code == 200
 
-        # The 31st request should be rate limited
+        # The 301st request should be rate limited
         response = await client.post("/hook/test-id", json=payload)
         assert response.status_code == 429
         assert response.json() == {"message": "Rate limit exceeded"}

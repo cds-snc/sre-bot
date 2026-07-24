@@ -4,6 +4,7 @@ title: Monitor-then-enforce migration of legacy unsigned webhook senders
 status: To Do
 assignee: []
 created_date: '2026-07-24 13:59'
+updated_date: '2026-07-24 16:14'
 labels:
   - security
   - webhooks
@@ -12,6 +13,7 @@ dependencies:
   - TASK-47
 references:
   - decisions/security.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1343'
 priority: medium
 ordinal: 72000
 ---
