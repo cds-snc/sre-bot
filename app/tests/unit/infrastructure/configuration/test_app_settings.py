@@ -13,9 +13,14 @@ class TestAppSettings:
         """AppSettings should provide stable defaults."""
         settings = AppSettings()
 
-        assert settings.PREFIX == ""
         assert settings.LOG_LEVEL == "INFO"
         assert settings.GIT_SHA == "Unknown"
+
+    def test_app_settings_no_legacy_prefix_attribute(self):
+        """Legacy command-prefix setting is no longer exposed on app settings."""
+        settings = AppSettings()
+
+        assert not hasattr(settings, "PREFIX")
 
     def test_app_settings_ignores_extra_env_vars(self, monkeypatch):
         """Unknown environment variables should be ignored during settings loading."""
@@ -23,7 +28,7 @@ class TestAppSettings:
 
         settings = AppSettings()
 
-        assert settings.PREFIX == ""
+        assert settings.LOG_LEVEL == "INFO"
 
     def test_app_settings_singleton_returns_same_instance(self):
         """Provider should return same cached singleton instance."""
@@ -33,14 +38,6 @@ class TestAppSettings:
         instance2 = get_app_settings()
 
         assert instance1 is instance2
-
-    def test_app_settings_reads_from_env(self, monkeypatch):
-        """Environment variables should override defaults."""
-        monkeypatch.setenv("PREFIX", "staging")
-
-        settings = AppSettings()
-
-        assert settings.PREFIX == "staging"
 
 
 class TestAppSettingsEnvironment:
