@@ -1,11 +1,11 @@
 ---
 id: TASK-3
 title: Remove the X-Sentinel-Source rate-limiter bypass
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-24 16:11'
+updated_date: '2026-07-24 16:13'
 labels:
   - security
   - phase-0
@@ -43,7 +43,7 @@ Steps:
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [x] #1 Tests pass
-- [ ] #2 PR references SEC-2 and decisions/security.md
+- [x] #2 PR references SEC-2 and decisions/security.md
 <!-- DOD:END -->
 
 ## Implementation Plan
