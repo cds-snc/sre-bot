@@ -1,10 +1,11 @@
 ---
 id: TASK-4
 title: 'Enforce JWT issuer, audience, and pinned asymmetric algorithms'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-24 17:19'
+updated_date: '2026-07-24 17:30'
 labels:
   - security
   - phase-0
