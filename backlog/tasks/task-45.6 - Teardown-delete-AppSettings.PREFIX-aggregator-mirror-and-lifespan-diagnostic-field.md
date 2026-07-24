@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-21 19:13'
-updated_date: '2026-07-24 13:01'
+updated_date: '2026-07-24 13:06'
 labels:
   - phase-0
   - security
@@ -144,5 +144,10 @@ Alignment (2026-07-22): teardown must not reintroduce or re-reference the dead i
 created: 2026-07-24 12:44
 ---
 Plan authored (2026-07-24): verified app/infrastructure/configuration/settings.py (the god-settings aggregator) no longer exists in this tree — already deleted by the separate consolidation PR that decisions/configuration.md's Migration section flags as open. AC#1's "aggregator mirror" clause is trivially satisfied as a result; only app.py's PREFIX field and lifespan.py's diagnostic entry remain to delete. Also verified: TASK-45.2/.3/.4/.5 have all landed their module-level code changes per their Implementation Notes (baseline file already down to 2 entries: infrastructure/configuration/app.py, server/lifespan.py), even though those tasks are still status "In Progress" pending human close-out — this task is unblocked at the code level regardless. Full plan written via --plan.
+---
+
+created: 2026-07-24 13:06
+---
+Final cleanup pass: removed deprecated legacy artifacts now that PREFIX teardown is complete — deleted app/bin/check_prefix_command_namespace.py, deleted app/bin/baselines/prefix_readers.txt, deleted app/tests/unit/infrastructure/configuration/test_prefix_guardrail_baseline.py, and removed the check-prefix-guardrail target from app/Makefile. Searched CI/docs references (README, app/README, docs/, .github/) and found no live references to remove; remaining hits are only cache files under app/.mypy_cache and app/.pytest_cache plus historical backlog task records.
 ---
 <!-- COMMENTS:END -->

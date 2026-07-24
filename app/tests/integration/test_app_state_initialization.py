@@ -47,7 +47,6 @@ def test_app_state_settings_is_valid(app_with_lifespan):
     settings = app_with_lifespan.app.state.settings
 
     assert settings is not None, "settings must not be None"
-    assert hasattr(settings, "PREFIX"), "settings missing PREFIX"
     assert hasattr(settings, "ENVIRONMENT"), "settings missing ENVIRONMENT"
     assert hasattr(settings, "LOG_LEVEL"), "settings missing LOG_LEVEL"
     assert hasattr(settings, "GIT_SHA"), "settings missing GIT_SHA"

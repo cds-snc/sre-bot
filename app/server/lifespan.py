@@ -69,7 +69,6 @@ def _list_configs_from_sections(
 ) -> None:
     config_settings: dict[str, tuple[object, ...]] = {
         "settings": (
-            {"PREFIX": app_settings.PREFIX},
             {"LOG_LEVEL": app_settings.LOG_LEVEL},
             {"GIT_SHA": app_settings.GIT_SHA},
         )

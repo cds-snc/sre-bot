@@ -1,7 +1,7 @@
-.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit backlog-board check-prefix-guardrail audit-client-usage-matrix
+.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit backlog-board audit-client-usage-matrix
 
 dev:
-	PREFIX="dev-" SLACK__COMMAND_PREFIX="dev-" uv run uvicorn main:server_app --reload
+	SLACK__COMMAND_PREFIX="dev-" uv run uvicorn main:server_app --reload
 
 dev-setup: # Requires to be signed in to AWS
 	uv sync --extra dev
@@ -9,7 +9,7 @@ dev-setup: # Requires to be signed in to AWS
 	sh ../.devcontainer/dynamodb-create.sh
 
 debug:
-	PREFIX="dev-" SLACK__COMMAND_PREFIX="dev-" LOG_LEVEL=DEBUG uv run uvicorn main:server_app --reload
+	SLACK__COMMAND_PREFIX="dev-" LOG_LEVEL=DEBUG uv run uvicorn main:server_app --reload
 
 fmt:
 	uv run ruff format . $(ARGS)
@@ -81,9 +81,6 @@ lint-ci:
 
 fmt-ci:
 	uv run ruff format --check .
-
-check-prefix-guardrail:
-	python bin/check_prefix_command_namespace.py
 
 audit-client-usage-matrix:
 	bash bin/generate_client_usage_matrix.sh
