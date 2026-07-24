@@ -24,13 +24,18 @@
 				"python.pythonPath": "/usr/local/bin/python",
 				"python.languageServer": "Pylance",
 				"ruff.cwd": "${workspaceFolder}/app",
+				"ruff.organizeImports": true,
+				"editor.codeActionsOnSave": {
+					"source.fixAll.ruff": "explicit",
+					"source.organizeImports.ruff": "explicit"
+				},
 				"mypy-type-checker.cwd": "${workspaceFolder}/app",
 				"python.analysis.extraPaths": [
 					"${workspaceFolder}/app"
 				],
 				"[python]": {
 					"editor.formatOnSave": true,
-					"editor.defaultFormatter": "ms-python.black-formatter"
+					"editor.defaultFormatter": "charliermarsh.ruff"
 				},
 				"[terraform]": {
 					"editor.formatOnSave": true
