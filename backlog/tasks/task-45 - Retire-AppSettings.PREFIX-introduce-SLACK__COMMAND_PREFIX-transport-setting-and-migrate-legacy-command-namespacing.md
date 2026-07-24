@@ -3,10 +3,10 @@ id: TASK-45
 title: >-
   Retire AppSettings.PREFIX: introduce SLACK__COMMAND_PREFIX transport setting
   and migrate legacy command namespacing
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-07-21 19:12'
-updated_date: '2026-07-22 17:13'
+updated_date: '2026-07-24 13:15'
 labels:
   - phase-0
   - security
@@ -32,17 +32,17 @@ Foundational cleanup that unblocks the settings-home consolidation. AppSettings.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 COMMAND_PREFIX exists as SLACK__COMMAND_PREFIX on the Slack transport settings in app/infrastructure/slack/settings.py with a cached provider, default '' (prod), and is set in every deployment manifest (terraform/, CI, local compose/env examples) to the SAME value as PREFIX per environment during coexistence
-- [ ] #2 Every legacy module (atip, aws, incident, role, secret, sre) reads COMMAND_PREFIX instead of AppSettings.PREFIX for slash-command naming; each cutover shipped as its own PR with pre/post command-name smoke tests proving the resulting command string is unchanged
-- [ ] #3 atip's channel-name prefixing (app/modules/atip/atip.py:428) no longer reads AppSettings.PREFIX; it derives from ENVIRONMENT or an atip feature setting, with a test proving dev vs prod channel naming is unchanged
-- [ ] #4 AppSettings.PREFIX and its aggregator mirror (app/infrastructure/configuration/settings.py) and the lifespan diagnostic field are deleted once the last module cuts over; TASK-1.3's prefix_readers.txt baseline is empty and the guardrail still passes
-- [ ] #5 grep -rn 'AppSettings().PREFIX|app_settings.PREFIX|get_app_settings().PREFIX' app/ --include=*.py returns no hits after teardown
+- [x] #1 COMMAND_PREFIX exists as SLACK__COMMAND_PREFIX on the Slack transport settings in app/infrastructure/slack/settings.py with a cached provider, default '' (prod), and is set in every deployment manifest (terraform/, CI, local compose/env examples) to the SAME value as PREFIX per environment during coexistence
+- [x] #2 Every legacy module (atip, aws, incident, role, secret, sre) reads COMMAND_PREFIX instead of AppSettings.PREFIX for slash-command naming; each cutover shipped as its own PR with pre/post command-name smoke tests proving the resulting command string is unchanged
+- [x] #3 atip's channel-name prefixing (app/modules/atip/atip.py:428) no longer reads AppSettings.PREFIX; it derives from ENVIRONMENT or an atip feature setting, with a test proving dev vs prod channel naming is unchanged
+- [x] #4 AppSettings.PREFIX and its aggregator mirror (app/infrastructure/configuration/settings.py) and the lifespan diagnostic field are deleted once the last module cuts over; TASK-1.3's prefix_readers.txt baseline is empty and the guardrail still passes
+- [x] #5 grep -rn 'AppSettings().PREFIX|app_settings.PREFIX|get_app_settings().PREFIX' app/ --include=*.py returns no hits after teardown
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 PR series references decisions/transport-slack.md and decisions/configuration.md
-- [ ] #2 Each per-module PR has green pre/post command-name smoke tests
+- [x] #1 PR series references decisions/transport-slack.md and decisions/configuration.md
+- [x] #2 Each per-module PR has green pre/post command-name smoke tests
 <!-- DOD:END -->
 
 ## Comments

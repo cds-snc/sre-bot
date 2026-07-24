@@ -3,11 +3,11 @@ id: TASK-45.6
 title: >-
   Teardown: delete AppSettings.PREFIX, aggregator mirror, and lifespan
   diagnostic field
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-21 19:13'
-updated_date: '2026-07-24 13:06'
+updated_date: '2026-07-24 13:15'
 labels:
   - phase-0
   - security
@@ -42,7 +42,7 @@ Contract slice — runs only after all module cutovers land. Delete AppSettings.
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 PR references decisions/configuration.md and decisions/transport-slack.md
+- [x] #1 PR references decisions/configuration.md and decisions/transport-slack.md
 <!-- DOD:END -->
 
 ## Implementation Plan
