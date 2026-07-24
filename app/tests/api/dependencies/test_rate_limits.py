@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
+from api.routes.system import limiter as system_limiter
 from api.routes.system import router as system_router
 from infrastructure.security import rate_limiter as rate_limits
 
@@ -34,7 +35,7 @@ async def test_rate_limit_handler():
 @pytest.mark.asyncio
 async def test_system_endpoint_rate_limiting():
     """Integration Test to ensure the rate limiting is enforced on the system endpoint, using the /version route as an example."""
-    rate_limits.get_limiter.cache_clear()
+    system_limiter.reset()
 
     app = FastAPI()
     rate_limits.setup_rate_limiter(app)
@@ -57,7 +58,7 @@ async def test_system_endpoint_rate_limiting():
 @pytest.mark.asyncio
 async def test_rate_limited_regardless_of_arbitrary_headers():
     """Integration test proving arbitrary client headers do not bypass the default rate limit."""
-    rate_limits.get_limiter.cache_clear()
+    system_limiter.reset()
 
     app = FastAPI()
     rate_limits.setup_rate_limiter(app)
