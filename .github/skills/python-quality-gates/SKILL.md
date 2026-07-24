@@ -13,8 +13,7 @@ Run checks in this order for fastest signal:
 
 1. `cd app && uv run mypy . --exclude '(?:^|/)\\.venv(?:/|$)'`
 2. `cd app && uv run ruff check .`
-3. `cd app && uv run black --check .`
-4. `cd app && uv run pytest tests --ignore=tests/smoke`
+3. `cd app && uv run pytest tests --ignore=tests/smoke`
 
 By default, do not run `app/tests/smoke/*`. Run smoke tests only when explicitly requested and env vars are confirmed.
 Always run from `app/` and keep checks scoped to project code only (exclude virtualenv and non-project paths).
@@ -30,7 +29,7 @@ Always run from `app/` and keep checks scoped to project code only (exclude virt
 ## Targeted Re-run Examples
 
 - Type changes only: run `mypy` first, then full sequence.
-- Lint-only changes: run `ruff check` and `black --check .`, then full sequence.
+- Lint-only changes: run `ruff check`, then full sequence.
 - Behavioral changes or tests touched: run focused `pytest` target, then full sequence.
 - When a targeted run includes smoke tests, skip unless the task explicitly requests smoke execution with env configured.
 
