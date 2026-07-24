@@ -1,4 +1,4 @@
-"""Unit tests for DynamoDBIdempotencyStore (TASK-5.1, AC#2).
+"""Unit tests for DynamoDBIdempotencyStore.
 
 Mocks infrastructure.idempotency.dynamodb.put_item/get_item/delete_item
 directly (fast, no I/O) to pin the conditional-write contract: claim()
@@ -9,10 +9,10 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
-from infrastructure.idempotency.settings import IdempotencySettings
 
 from infrastructure.idempotency.dynamodb import DynamoDBIdempotencyStore
 from infrastructure.idempotency.protocol import ClaimResult
+from infrastructure.idempotency.settings import IdempotencySettings
 from infrastructure.operations.result import OperationResult, OperationStatus
 
 pytestmark = pytest.mark.unit

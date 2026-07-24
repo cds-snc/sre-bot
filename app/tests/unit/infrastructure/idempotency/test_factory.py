@@ -53,11 +53,9 @@ class TestCacheFactory:
 
 
 class TestIdempotencyStoreFactory:
-    """Tests for the new get_idempotency_store()/reset_idempotency_store() provider (AC#8).
+    """Tests for get_idempotency_store()/reset_idempotency_store().
 
-    TASK-5.2/TASK-5.3 depend on being able to obtain a concrete
-    IdempotencyStore from this factory, mirroring the existing
-    get_cache()/reset_cache() singleton pattern.
+    Verifies singleton behavior mirrors get_cache()/reset_cache().
     """
 
     def teardown_method(self):

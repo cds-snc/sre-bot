@@ -1,4 +1,4 @@
-"""Unit tests for the dedicated idempotency settings slice (TASK-5.1).
+"""Unit tests for the dedicated idempotency settings slice.
 
 Covers the settings relocation from
 infrastructure.configuration.infrastructure.idempotency to
@@ -7,6 +7,7 @@ claim TTL field.
 """
 
 import pytest
+
 from infrastructure.idempotency.settings import (
     IdempotencySettings,
     get_idempotency_settings,
@@ -16,7 +17,7 @@ pytestmark = pytest.mark.unit
 
 
 class TestIdempotencySettingsSingleton:
-    """IdempotencySettings/get_idempotency_settings() now live in infrastructure.idempotency.settings."""
+    """Idempotency settings provider remains singleton-scoped."""
 
     def test_singleton_returns_same_instance(self):
         get_idempotency_settings.cache_clear()

@@ -25,25 +25,41 @@ Usage:
 """
 
 from infrastructure.idempotency.cache import IdempotencyCache
-from infrastructure.idempotency.dynamodb import DynamoDBCache
+from infrastructure.idempotency.dynamodb import DynamoDBCache, DynamoDBIdempotencyStore
 
 # Factory functions available via direct import to avoid circular deps
 from infrastructure.idempotency.factory import (
     get_cache,
     get_idempotency_service,
+    get_idempotency_store,
     reset_cache,
+    reset_idempotency_store,
 )
-from infrastructure.idempotency.key_builder import IdempotencyKeyBuilder
-from infrastructure.idempotency.protocol import IdempotencyService
+from infrastructure.idempotency.in_memory import InMemoryIdempotencyStore
+from infrastructure.idempotency.protocol import (
+    ClaimOutcome,
+    ClaimResult,
+    IdempotencyService,
+    IdempotencyStore,
+)
 from infrastructure.idempotency.service import DynamoDBIdempotencyService
+from infrastructure.idempotency.settings import IdempotencySettings, get_idempotency_settings
 
 __all__ = [
     "IdempotencyCache",
     "DynamoDBCache",
-    "IdempotencyKeyBuilder",
+    "DynamoDBIdempotencyStore",
+    "InMemoryIdempotencyStore",
+    "ClaimResult",
+    "ClaimOutcome",
+    "IdempotencyStore",
     "IdempotencyService",
     "DynamoDBIdempotencyService",
+    "IdempotencySettings",
+    "get_idempotency_settings",
     "get_cache",
     "reset_cache",
+    "get_idempotency_store",
+    "reset_idempotency_store",
     "get_idempotency_service",
 ]

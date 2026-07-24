@@ -1,30 +1,26 @@
-"""Unit tests for InMemoryIdempotencyStore (TASK-5.1, AC#4).
+"""Unit tests for InMemoryIdempotencyStore.
 
 Isolated, no I/O. Exercises the same claim/complete/release semantics
 required of every IdempotencyStore implementation.
 """
 
 import pytest
-from infrastructure.idempotency.in_memory import InMemoryIdempotencyStore
-from infrastructure.idempotency.settings import IdempotencySettings
 
+from infrastructure.idempotency.in_memory import InMemoryIdempotencyStore
 from infrastructure.idempotency.protocol import ClaimResult
+from infrastructure.idempotency.settings import IdempotencySettings
 
 pytestmark = pytest.mark.unit
 
 
 @pytest.fixture
 def settings():
-    return IdempotencySettings(
-        IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300
-    )
+    return IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
 
 
 @pytest.fixture
 def expiring_settings():
-    return IdempotencySettings(
-        IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=-1
-    )
+    return IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=-1)
 
 
 @pytest.fixture

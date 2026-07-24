@@ -1,4 +1,4 @@
-"""Tests for the IdempotencyStore Protocol contract (TASK-5.1, AC#1).
+"""Tests for the IdempotencyStore Protocol contract.
 
 Validates the claim/complete/release Protocol shape, the ClaimResult enum,
 the ClaimOutcome value object, and that no vendor (DynamoDB) vocabulary
@@ -108,7 +108,7 @@ class TestClaimOutcome:
 
 
 class TestKeyBuilderRemoved:
-    """AC#5: IdempotencyKeyBuilder is verified dead code and must be deleted."""
+    """Legacy key-builder module is removed from the package API."""
 
     def test_key_builder_module_no_longer_exists(self):
         with pytest.raises(ModuleNotFoundError):

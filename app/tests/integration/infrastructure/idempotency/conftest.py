@@ -5,10 +5,12 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from infrastructure.idempotency.in_memory import InMemoryIdempotencyStore
-from infrastructure.idempotency.settings import IdempotencySettings
 
 from infrastructure.idempotency.dynamodb import DynamoDBIdempotencyStore
+from infrastructure.idempotency.in_memory import InMemoryIdempotencyStore
+from infrastructure.idempotency.settings import IdempotencySettings
+from integrations.aws import client_next as aws_client_next
+from integrations.aws.dynamodb_next import AWS_REGION
 
 STORE_TEST_TABLE_NAME = "test-sre-bot-idempotency-store"
 
@@ -27,16 +29,15 @@ def _set_moto_aws_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
     monkeypatch.setenv("AWS_SECURITY_TOKEN", "testing")
     monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
-    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    monkeypatch.setenv("AWS_DEFAULT_REGION", AWS_REGION)
+    monkeypatch.setattr(aws_client_next.app_settings, "ENVIRONMENT", "test")
 
 
 def _create_store_table(client: Any) -> None:
     client.create_table(
         TableName=STORE_TEST_TABLE_NAME,
         KeySchema=[{"AttributeName": "idempotency_key", "KeyType": "HASH"}],
-        AttributeDefinitions=[
-            {"AttributeName": "idempotency_key", "AttributeType": "S"}
-        ],
+        AttributeDefinitions=[{"AttributeName": "idempotency_key", "AttributeType": "S"}],
         BillingMode="PAY_PER_REQUEST",
     )
 
@@ -44,9 +45,7 @@ def _create_store_table(client: Any) -> None:
 @pytest.fixture
 def idempotency_store_settings() -> IdempotencySettings:
     """Narrow IdempotencySettings slice for IdempotencyStore Protocol implementations."""
-    return IdempotencySettings(
-        IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300
-    )
+    return IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
 
 
 @pytest.fixture
@@ -57,9 +56,7 @@ def expiring_idempotency_store_settings() -> IdempotencySettings:
     real sleep: any claim made under this fixture immediately looks expired to
     a subsequent claim.
     """
-    return IdempotencySettings(
-        IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=-1
-    )
+    return IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=-1)
 
 
 @pytest.fixture
@@ -71,21 +68,17 @@ def in_memory_idempotency_store(idempotency_store_settings: IdempotencySettings)
 def expiring_in_memory_idempotency_store(
     expiring_idempotency_store_settings: IdempotencySettings,
 ) -> Any:
-    return InMemoryIdempotencyStore(
-        idempotency_settings=expiring_idempotency_store_settings
-    )
+    return InMemoryIdempotencyStore(idempotency_settings=expiring_idempotency_store_settings)
 
 
 @pytest.fixture
-def dynamodb_idempotency_store(
-    idempotency_store_settings: IdempotencySettings, monkeypatch: pytest.MonkeyPatch
-) -> Iterator[Any]:
+def dynamodb_idempotency_store(idempotency_store_settings: IdempotencySettings, monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     moto = pytest.importorskip("moto")
     boto3 = pytest.importorskip("boto3")
     _set_moto_aws_credentials(monkeypatch)
 
     with moto.mock_aws():
-        _create_store_table(boto3.client("dynamodb", region_name="us-east-1"))
+        _create_store_table(boto3.client("dynamodb", region_name=AWS_REGION))
 
         yield DynamoDBIdempotencyStore(
             idempotency_settings=idempotency_store_settings,
@@ -103,7 +96,7 @@ def expiring_dynamodb_idempotency_store(
     _set_moto_aws_credentials(monkeypatch)
 
     with moto.mock_aws():
-        _create_store_table(boto3.client("dynamodb", region_name="us-east-1"))
+        _create_store_table(boto3.client("dynamodb", region_name=AWS_REGION))
 
         yield DynamoDBIdempotencyStore(
             idempotency_settings=expiring_idempotency_store_settings,

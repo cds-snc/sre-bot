@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-24 17:57'
-updated_date: '2026-07-24 18:56'
+updated_date: '2026-07-24 19:08'
 labels:
   - security
   - phase-0
@@ -44,14 +44,14 @@ Explicit exclusion: do NOT touch callers yet. Old IdempotencyService/DynamoDBIde
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 IdempotencyStore Protocol exists in app/infrastructure/idempotency/protocol.py with claim/complete/release and ClaimResult (NEW/COMPLETED/IN_PROGRESS); no vendor types or vendor query syntax in its signatures
-- [ ] #2 DynamoDB implementation's claim() uses ConditionExpression attribute_not_exists(pk); grep shows no get-then-put pattern remains in app/infrastructure/idempotency/dynamodb.py
-- [ ] #3 Concurrency test: two concurrent identical claims yield exactly one NEW and one IN_PROGRESS/COMPLETED outcome, asserted via the conditional-write path, not timing
-- [ ] #4 In-memory fake implements the same Protocol and passes the shared conformance test suite alongside the DynamoDB implementation (moto)
-- [ ] #5 Keys follow {feature}:{intent}:{idempotency_id}; no payload hash, no truncation (key-format test); IdempotencyKeyBuilder and key_builder.py are deleted
-- [ ] #6 IdempotencySettings/get_idempotency_settings() live in app/infrastructure/idempotency/settings.py; app/infrastructure/configuration/infrastructure/idempotency.py and its exports are deleted
-- [ ] #7 Old IdempotencyService/DynamoDBIdempotencyService/cache.py/service.py/factory.py/get_idempotency_service() remain untouched and functional for existing callers (transitional exception, closed out by the job-status-extraction subtask)
-- [ ] #8 A get_idempotency_store() singleton provider (with a reset_idempotency_store() test helper) exists in app/infrastructure/idempotency/factory.py returning the DynamoDB-backed IdempotencyStore, matching the existing get_idempotency_service()/get_cache() pattern, so TASK-5.2/TASK-5.3 have something concrete to depend on
+- [x] #1 IdempotencyStore Protocol exists in app/infrastructure/idempotency/protocol.py with claim/complete/release and ClaimResult (NEW/COMPLETED/IN_PROGRESS); no vendor types or vendor query syntax in its signatures
+- [x] #2 DynamoDB implementation's claim() uses ConditionExpression attribute_not_exists(pk); grep shows no get-then-put pattern remains in app/infrastructure/idempotency/dynamodb.py
+- [x] #3 Concurrency test: two concurrent identical claims yield exactly one NEW and one IN_PROGRESS/COMPLETED outcome, asserted via the conditional-write path, not timing
+- [x] #4 In-memory fake implements the same Protocol and passes the shared conformance test suite alongside the DynamoDB implementation (moto)
+- [x] #5 Keys follow {feature}:{intent}:{idempotency_id}; no payload hash, no truncation (key-format test); IdempotencyKeyBuilder and key_builder.py are deleted
+- [x] #6 IdempotencySettings/get_idempotency_settings() live in app/infrastructure/idempotency/settings.py; app/infrastructure/configuration/infrastructure/idempotency.py and its exports are deleted
+- [x] #7 Old IdempotencyService/DynamoDBIdempotencyService/cache.py/service.py/factory.py/get_idempotency_service() remain untouched and functional for existing callers (transitional exception, closed out by the job-status-extraction subtask)
+- [x] #8 A get_idempotency_store() singleton provider (with a reset_idempotency_store() test helper) exists in app/infrastructure/idempotency/factory.py returning the DynamoDB-backed IdempotencyStore, matching the existing get_idempotency_service()/get_cache() pattern, so TASK-5.2/TASK-5.3 have something concrete to depend on
 <!-- AC:END -->
 
 ## Definition of Done
@@ -154,6 +154,12 @@ Blast radius and rollback
 
 Purely additive/expansive change: no existing import path is removed except the deleted configuration/infrastructure/idempotency.py (whose only consumers are being repointed in the same PR) and key_builder.py (verified zero real callers). No existing caller of get_idempotency_service()/IdempotencyService/DynamoDBCache is modified. A single git revert of this PR fully restores prior behavior with no follow-up cleanup required, since nothing outside app/infrastructure/idempotency/ and its own test tree depends on the new Protocol/classes yet. Worst-case risk if this ships wrong: the new, unused-by-callers store code has a latent bug that only surfaces once TASK-5.2/5.3/5.4 start consuming it - caught by those subtasks' own test suites before any production caller is migrated. No deployment ordering constraints (no new env vars required at runtime beyond the existing IDEMPOTENCY_TTL_SECONDS; the new IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS has a safe default).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented the idempotency primitive slice in app/infrastructure/idempotency with a new vendor-agnostic IdempotencyStore Protocol (claim/complete/release), ClaimResult enum, and frozen ClaimOutcome dataclass. Added DynamoDBIdempotencyStore with conditional PutItem claim semantics (attribute_not_exists(pk) OR stale IN_PROGRESS takeover), plus complete() and release(). Added InMemoryIdempotencyStore with matching claim/complete/release semantics and in-progress expiry takeover.\n\nMigrated settings ownership to infrastructure.idempotency.settings (IdempotencySettings + get_idempotency_settings with IDEMPOTENCY_TTL_SECONDS and IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS). Removed legacy infrastructure/configuration/infrastructure/idempotency.py and removed legacy exports from infrastructure/configuration/infrastructure/__init__.py.\n\nAdded get_idempotency_store()/reset_idempotency_store() singleton provider helpers in infrastructure/idempotency/factory.py while preserving get_cache()/reset_cache()/get_idempotency_service() behavior for existing callers. Deleted dead key_builder.py and removed IdempotencyKeyBuilder export from infrastructure/idempotency/__init__.py.\n\nTest evidence:\n- uv run pytest tests/unit/infrastructure/idempotency tests/integration/infrastructure/idempotency -q => 105 passed\n- uv run pytest tests --ignore=tests/smoke -q => 2924 passed, 37 skipped\n- uv run ruff check . => passed\n- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' => fails with pre-existing baseline errors outside idempotency scope (123 errors in 43 files), no errors reported in touched idempotency files.\n\nAdditional follow-on test updates were required so full-suite collection reflected the migrated settings location: tests/unit/infrastructure/configuration/test_settings_delegation.py and test_settings_structure.py now import idempotency settings from infrastructure.idempotency.settings.\n\nDoD items left for human verification:\n- Confirm PR references decisions/reliability.md, decisions/cloud-portability.md, decisions/configuration.md in review metadata.\n- Human final review of baseline mypy debt status and whether to accept existing non-task type-check failures.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
