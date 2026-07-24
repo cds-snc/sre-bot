@@ -27,7 +27,7 @@ dependencies = [
     "python-i18n==0.3.9",
     "pytz==2023.4",
     "requests==2.32.5",
-    "slowapi==0.1.9",
+    "slowapi==0.1.10",
     "schedule==1.2.2",
     "slack-bolt==1.27.0",
     "structlog==25.5.0",
