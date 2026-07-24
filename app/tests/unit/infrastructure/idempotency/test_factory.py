@@ -3,7 +3,11 @@
 import pytest
 
 from infrastructure.idempotency import get_cache, reset_cache
-from infrastructure.idempotency.dynamodb import DynamoDBCache
+from infrastructure.idempotency.dynamodb import DynamoDBCache, DynamoDBIdempotencyStore
+from infrastructure.idempotency.factory import (
+    get_idempotency_store,
+    reset_idempotency_store,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -46,3 +50,33 @@ class TestCacheFactory:
 
         assert cache1 is cache2
         assert cache2 is cache3
+
+
+class TestIdempotencyStoreFactory:
+    """Tests for the new get_idempotency_store()/reset_idempotency_store() provider (AC#8).
+
+    TASK-5.2/TASK-5.3 depend on being able to obtain a concrete
+    IdempotencyStore from this factory, mirroring the existing
+    get_cache()/reset_cache() singleton pattern.
+    """
+
+    def teardown_method(self):
+        reset_idempotency_store()
+
+    def test_get_idempotency_store_returns_dynamodb_backed_store(self):
+        store = get_idempotency_store()
+
+        assert isinstance(store, DynamoDBIdempotencyStore)
+
+    def test_get_idempotency_store_returns_singleton(self):
+        store1 = get_idempotency_store()
+        store2 = get_idempotency_store()
+
+        assert store1 is store2
+
+    def test_reset_idempotency_store_clears_singleton(self):
+        store1 = get_idempotency_store()
+        reset_idempotency_store()
+        store2 = get_idempotency_store()
+
+        assert store1 is not store2
