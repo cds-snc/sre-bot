@@ -1,11 +1,11 @@
 ---
 id: TASK-2
 title: 'Fix production CORS: explicit origin allow-list with boot-time validator'
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-24 14:04'
+updated_date: '2026-07-24 14:19'
 labels:
   - security
   - phase-0
@@ -33,17 +33,17 @@ Steps:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 CORSMiddleware receives an explicit origin list from settings; no wildcard logic remains in app/server/server.py
-- [ ] #2 Boot fails with a clear error when config contains "*" origins together with credentials (test exists)
-- [ ] #3 grep: allow_origins is never computed from ENVIRONMENT/PREFIX conditionals
-- [ ] #4 CORSMiddleware allow_methods and allow_headers are explicit lists (no "*"), matching allow_credentials=True per FastAPI/Starlette docs and docs/adr/api-security.md's stated method/header set
+- [x] #1 CORSMiddleware receives an explicit origin list from settings; no wildcard logic remains in app/server/server.py
+- [x] #2 Boot fails with a clear error when config contains "*" origins together with credentials (test exists)
+- [x] #3 grep: allow_origins is never computed from ENVIRONMENT/PREFIX conditionals
+- [x] #4 CORSMiddleware allow_methods and allow_headers are explicit lists (no "*"), matching allow_credentials=True per FastAPI/Starlette docs and docs/adr/api-security.md's stated method/header set
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass; new boot-validator test included
-- [ ] #2 Per-environment origin lists set in deployment config
-- [ ] #3 PR references SEC-1 and decisions/security.md
+- [x] #1 Tests pass; new boot-validator test included
+- [x] #2 Per-environment origin lists set in deployment config
+- [x] #3 PR references SEC-1 and decisions/security.md
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -110,3 +110,9 @@ Files touched: app/infrastructure/configuration/app.py, app/server/server.py, ap
 - Blast radius: server.py CORS middleware wiring and AppSettings only; no route/business-logic changes. Any consumer relying on the current wildcard-during-non-production behavior (e.g. local dev tooling hitting the API cross-origin from an arbitrary port) will need its origin added to CORS_ALLOWED_ORIGINS (default [] locks CORS down until configured) - expected per decisions/security.md, called out as a behavior change in the PR description.
 - Rollback: revert the single commit/PR; no data migration, no schema change, no irreversible deployment state.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Final DoD update per reviewer direction: DoD #2 accepted with current deployment posture (CORS allow-list defaults to empty list because no expected browser-origin traffic beyond current placeholder behavior). DoD #3 accepted as PR is being created with SEC-1 and decisions/security.md references.
+<!-- SECTION:NOTES:END -->
