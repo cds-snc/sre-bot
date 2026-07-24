@@ -38,18 +38,9 @@ def test_cors_middleware_configured():
     )
     assert cors_middleware is not None
     assert cors_middleware.kwargs["allow_credentials"] is True
-    assert (
-        cors_middleware.kwargs["allow_origins"]
-        == server.app_settings.CORS_ALLOWED_ORIGINS
-    )
-    assert (
-        cors_middleware.kwargs["allow_methods"]
-        == server.app_settings.CORS_ALLOWED_METHODS
-    )
-    assert (
-        cors_middleware.kwargs["allow_headers"]
-        == server.app_settings.CORS_ALLOWED_HEADERS
-    )
+    assert cors_middleware.kwargs["allow_origins"] == server.app_settings.CORS_ALLOWED_ORIGINS
+    assert cors_middleware.kwargs["allow_methods"] == server.app_settings.CORS_ALLOWED_METHODS
+    assert cors_middleware.kwargs["allow_headers"] == server.app_settings.CORS_ALLOWED_HEADERS
     assert "*" not in cors_middleware.kwargs["allow_origins"]
     assert "*" not in cors_middleware.kwargs["allow_methods"]
     assert "*" not in cors_middleware.kwargs["allow_headers"]
@@ -71,11 +62,7 @@ def test_cors_middleware_uses_configured_origin_list_after_reload(monkeypatch):
 
     reloaded = importlib.reload(server)
     cors_middleware = next(
-        (
-            m
-            for m in reloaded.handler.user_middleware
-            if m.cls.__name__ == "CORSMiddleware"
-        ),
+        (m for m in reloaded.handler.user_middleware if m.cls.__name__ == "CORSMiddleware"),
         None,
     )
 
