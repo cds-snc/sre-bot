@@ -4,7 +4,7 @@ title: Reconcile decisions/testing.md with moto for AWS SDK test substitution
 status: To Do
 assignee: []
 created_date: '2026-07-24 18:30'
-updated_date: '2026-07-24 18:32'
+updated_date: '2026-07-24 19:29'
 labels: []
 dependencies:
   - TASK-5.1
@@ -12,6 +12,7 @@ references:
   - decisions/testing.md
   - docs/adr/testing-standards.md
   - ADR-REVIEW-AND-MIGRATION-PLAN.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1352'
 priority: medium
 ordinal: 78000
 ---
