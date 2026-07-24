@@ -16,13 +16,6 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 
-def _sentinel_key_func(request: Request) -> str | None:
-    """Skip rate limiting for requests that include the X-Sentinel-Source header."""
-    if request.headers.get("X-Sentinel-Source"):
-        return None
-    return get_remote_address(request)
-
-
 async def _rate_limit_handler(_request: Request, exc: Exception) -> JSONResponse:
     if isinstance(exc, RateLimitExceeded):
         return JSONResponse(status_code=429, content={"message": "Rate limit exceeded"})
@@ -32,7 +25,7 @@ async def _rate_limit_handler(_request: Request, exc: Exception) -> JSONResponse
 @lru_cache(maxsize=1)
 def get_limiter() -> Limiter:
     """Return the application-scoped rate limiter singleton."""
-    return Limiter(key_func=_sentinel_key_func)
+    return Limiter(key_func=get_remote_address)
 
 
 def setup_rate_limiter(app: FastAPI) -> None:
