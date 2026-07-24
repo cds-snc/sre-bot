@@ -4,6 +4,7 @@ title: 'Webhook request-origin observability: fingerprint inbound senders'
 status: To Do
 assignee: []
 created_date: '2026-07-24 13:58'
+updated_date: '2026-07-24 16:14'
 labels:
   - security
   - phase-0
@@ -12,6 +13,7 @@ dependencies:
   - TASK-7
 references:
   - decisions/security.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1341'
 priority: high
 ordinal: 70000
 ---

@@ -4,6 +4,7 @@ title: Generic webhook HMAC verification and secure-by-default secret issuance
 status: To Do
 assignee: []
 created_date: '2026-07-24 13:59'
+updated_date: '2026-07-24 16:14'
 labels:
   - security
   - webhooks
@@ -13,6 +14,7 @@ dependencies:
   - TASK-24
 references:
   - decisions/security.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1342'
 priority: high
 ordinal: 71000
 ---
