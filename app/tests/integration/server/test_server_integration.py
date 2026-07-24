@@ -24,10 +24,18 @@ def test_server_app_initializes_with_handlers(integration_server_app):
 
 @pytest.mark.integration
 def test_server_has_cors_middleware_configured(integration_server_app):
-    """Test that server has CORS middleware configured."""
+    """CORS middleware should be configured with explicit non-wildcard lists."""
     # Assert
-    middleware_classes = [m.cls.__name__ for m in integration_server_app.user_middleware]
-    assert "CORSMiddleware" in middleware_classes
+    cors_middleware = next(
+        (m for m in integration_server_app.user_middleware if m.cls.__name__ == "CORSMiddleware"),
+        None,
+    )
+
+    assert cors_middleware is not None
+    assert cors_middleware.kwargs["allow_credentials"] is True
+    assert "*" not in cors_middleware.kwargs["allow_origins"]
+    assert "*" not in cors_middleware.kwargs["allow_methods"]
+    assert "*" not in cors_middleware.kwargs["allow_headers"]
 
 
 @pytest.mark.integration

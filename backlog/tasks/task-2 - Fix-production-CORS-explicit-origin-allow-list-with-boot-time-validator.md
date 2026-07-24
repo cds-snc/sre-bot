@@ -1,10 +1,11 @@
 ---
 id: TASK-2
 title: 'Fix production CORS: explicit origin allow-list with boot-time validator'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-24 13:34'
+updated_date: '2026-07-24 14:04'
 labels:
   - security
   - phase-0

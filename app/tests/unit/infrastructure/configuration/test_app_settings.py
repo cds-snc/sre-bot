@@ -84,3 +84,55 @@ class TestAppSettingsEnvironment:
         legacy_attr = "is" + "_production"
 
         assert not hasattr(settings, legacy_attr)
+
+
+class TestAppSettingsCors:
+    """Behavior tests for CORS settings defaults and wildcard rejection."""
+
+    def test_cors_defaults_are_explicit_and_non_wildcard(self):
+        """Defaults should not allow wildcard methods or headers and should start with no origins."""
+        settings = AppSettings()
+
+        assert settings.CORS_ALLOWED_ORIGINS == []
+        assert settings.CORS_ALLOWED_METHODS == [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "OPTIONS",
+        ]
+        assert settings.CORS_ALLOWED_HEADERS == [
+            "Authorization",
+            "Content-Type",
+            "X-Request-ID",
+            "traceparent",
+        ]
+        assert "*" not in settings.CORS_ALLOWED_METHODS
+        assert "*" not in settings.CORS_ALLOWED_HEADERS
+
+    def test_cors_explicit_lists_round_trip(self):
+        """Configured CORS lists should be preserved exactly."""
+        settings = AppSettings(
+            CORS_ALLOWED_ORIGINS=["https://frontend.example"],
+            CORS_ALLOWED_METHODS=["GET", "POST"],
+            CORS_ALLOWED_HEADERS=["Authorization", "Content-Type"],
+        )
+
+        assert settings.CORS_ALLOWED_ORIGINS == ["https://frontend.example"]
+        assert settings.CORS_ALLOWED_METHODS == ["GET", "POST"]
+        assert settings.CORS_ALLOWED_HEADERS == ["Authorization", "Content-Type"]
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {"CORS_ALLOWED_ORIGINS": ["*"]},
+            {"CORS_ALLOWED_ORIGINS": ["*", "https://frontend.example"]},
+            {"CORS_ALLOWED_METHODS": ["*"]},
+            {"CORS_ALLOWED_HEADERS": ["*"]},
+        ],
+    )
+    def test_cors_wildcards_raise_validation_error(self, payload):
+        """Any wildcard in configured CORS lists should fail settings construction."""
+        with pytest.raises(ValidationError):
+            AppSettings(**payload)
