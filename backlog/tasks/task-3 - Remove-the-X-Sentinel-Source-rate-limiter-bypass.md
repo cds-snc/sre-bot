@@ -1,10 +1,11 @@
 ---
 id: TASK-3
 title: Remove the X-Sentinel-Source rate-limiter bypass
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-24 15:20'
+updated_date: '2026-07-24 15:22'
 labels:
   - security
   - phase-0
