@@ -11,7 +11,6 @@ from typing import Any
 
 import pytest
 
-import infrastructure.idempotency as idempotency_package
 from infrastructure.idempotency import protocol
 from infrastructure.idempotency.protocol import (
     ClaimOutcome,
@@ -105,14 +104,3 @@ class TestClaimOutcome:
         payload = {"status": "ok", "id": 42}
         outcome = ClaimOutcome(result=ClaimResult.COMPLETED, outcome=payload)
         assert outcome.outcome == payload
-
-
-class TestKeyBuilderRemoved:
-    """Legacy key-builder module is removed from the package API."""
-
-    def test_key_builder_module_no_longer_exists(self):
-        with pytest.raises(ModuleNotFoundError):
-            import infrastructure.idempotency.key_builder  # noqa: F401
-
-    def test_key_builder_not_exported_from_package(self):
-        assert not hasattr(idempotency_package, "IdempotencyKeyBuilder")

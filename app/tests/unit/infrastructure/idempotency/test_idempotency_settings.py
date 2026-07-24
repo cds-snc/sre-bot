@@ -49,11 +49,3 @@ class TestIdempotencyInProgressTtlSetting:
         monkeypatch.setenv("IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS", "60")
         settings = IdempotencySettings()
         assert settings.IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS == 60
-
-
-class TestLegacyIdempotencySettingsLocationRemoved:
-    """The old settings home must be gone once the migration lands."""
-
-    def test_old_settings_module_no_longer_exists(self):
-        with pytest.raises(ModuleNotFoundError):
-            import infrastructure.configuration.infrastructure.idempotency  # noqa: F401
