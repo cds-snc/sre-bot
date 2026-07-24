@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-24 17:30'
+updated_date: '2026-07-24 17:38'
 labels:
   - security
   - phase-0
@@ -33,10 +33,10 @@ Steps in app/infrastructure/security/jwt.py:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Boot fails when an issuer config lacks an audience (test exists)
-- [ ] #2 decode() receives issuer= and audience=; a token with wrong iss or aud is rejected (tests exist)
-- [ ] #3 An HS256-signed token is rejected even if HS256 appears in configuration (test exists)
-- [ ] #4 A token with valid signature but expired exp, or future nbf, is rejected
+- [x] #1 Boot fails when an issuer config lacks an audience (test exists)
+- [x] #2 decode() receives issuer= and audience=; a token with wrong iss or aud is rejected (tests exist)
+- [x] #3 An HS256-signed token is rejected even if HS256 appears in configuration (test exists)
+- [x] #4 A token with valid signature but expired exp, or future nbf, is rejected
 <!-- AC:END -->
 
 ## Definition of Done

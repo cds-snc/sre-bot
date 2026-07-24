@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from infrastructure.configuration.base import InfrastructureSettings
 
@@ -58,6 +58,15 @@ class ServerSettings(InfrastructureSettings):
         if v is None or not isinstance(v, dict):
             return {}
         return v
+
+    @model_validator(mode="after")
+    def validate_issuer_config_requires_audience(self) -> ServerSettings:
+        """Reject issuer entries that do not define an audience."""
+        issuer_config = self.ISSUER_CONFIG or {}
+        for issuer, cfg in issuer_config.items():
+            if not isinstance(cfg, dict) or not cfg.get("audience"):
+                raise ValueError(f"ISSUER_CONFIG entry for issuer '{issuer}' is missing required 'audience'")
+        return self
 
 
 class DevSettings(InfrastructureSettings):
