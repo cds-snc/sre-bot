@@ -3,11 +3,11 @@ id: TASK-45.5
 title: >-
   Cut over atip: command namespace to COMMAND_PREFIX and channel-name prefix to
   ENVIRONMENT
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-21 19:13'
-updated_date: '2026-07-22 21:25'
+updated_date: '2026-07-24 12:51'
 labels:
   - phase-0
   - slack
@@ -40,7 +40,7 @@ Per-module cutover (freeze carve-out) — atip has TWO PREFIX uses that split to
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 PR references decisions/transport-slack.md and decisions/configuration.md
+- [x] #1 PR references decisions/transport-slack.md and decisions/configuration.md
 <!-- DOD:END -->
 
 ## Implementation Plan
