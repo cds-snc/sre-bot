@@ -4,9 +4,9 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
-from packages.access.sync.job_status_store import JobStatusStore
 
 from infrastructure.operations import OperationResult, OperationStatus
+from packages.access.sync.job_status_store import JobStatusStore
 
 
 @pytest.mark.unit
