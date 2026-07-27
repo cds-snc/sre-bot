@@ -32,7 +32,7 @@ def _make_coordinator(result: OperationResult) -> MagicMock:
 @pytest.mark.unit
 def test_run_user_sync_job_writes_completed_record_with_action_lists():
     """Completed user sync must write typed record with planned/applied lists."""
-    idempotency = MagicMock()
+    job_status_store = MagicMock()
     lock_store = MagicMock()
     coordinator = _make_coordinator(
         OperationResult.success(
@@ -46,7 +46,7 @@ def test_run_user_sync_job_writes_completed_record_with_action_lists():
 
     run_user_sync_job(
         coordinator=coordinator,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         lock_store=lock_store,
         job_id="job-completed-1",
         user_email="alice@example.com",
@@ -57,8 +57,8 @@ def test_run_user_sync_job_writes_completed_record_with_action_lists():
         job_ttl_seconds=86400,
     )
 
-    assert idempotency.set.call_count == 1
-    job_args, _ = idempotency.set.call_args_list[0]
+    assert job_status_store.put.call_count == 1
+    job_args, _ = job_status_store.put.call_args_list[0]
     record = job_args[1]
     assert record["status"] == JobStatus.COMPLETED
     assert record["actions_planned"] == ["provision_user", "apply_entitlement"]
@@ -70,7 +70,7 @@ def test_run_user_sync_job_writes_completed_record_with_action_lists():
 @pytest.mark.unit
 def test_run_user_sync_job_writes_failed_record_on_coordinator_failure():
     """Failed coordinator result must produce a typed failed record."""
-    idempotency = MagicMock()
+    job_status_store = MagicMock()
     lock_store = MagicMock()
     coordinator = _make_coordinator(
         OperationResult.error(
@@ -82,7 +82,7 @@ def test_run_user_sync_job_writes_failed_record_on_coordinator_failure():
 
     run_user_sync_job(
         coordinator=coordinator,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         lock_store=lock_store,
         job_id="job-fail-1",
         user_email="bob@example.com",
@@ -93,7 +93,7 @@ def test_run_user_sync_job_writes_failed_record_on_coordinator_failure():
         job_ttl_seconds=86400,
     )
 
-    job_args, _ = idempotency.set.call_args_list[0]
+    job_args, _ = job_status_store.put.call_args_list[0]
     record = job_args[1]
     assert record["status"] == JobStatus.FAILED
     assert "error" in record
@@ -103,14 +103,14 @@ def test_run_user_sync_job_writes_failed_record_on_coordinator_failure():
 @pytest.mark.unit
 def test_run_user_sync_job_sanitizes_exception_to_sync_failed():
     """Unhandled exceptions must be sanitized — internal detail must not appear in the record."""
-    idempotency = MagicMock()
+    job_status_store = MagicMock()
     lock_store = MagicMock()
     coordinator = MagicMock()
     coordinator.sync_user.side_effect = RuntimeError("internal database credential")
 
     run_user_sync_job(
         coordinator=coordinator,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         lock_store=lock_store,
         job_id="job-exc-1",
         user_email="carol@example.com",
@@ -121,7 +121,7 @@ def test_run_user_sync_job_sanitizes_exception_to_sync_failed():
         job_ttl_seconds=86400,
     )
 
-    job_args, _ = idempotency.set.call_args_list[0]
+    job_args, _ = job_status_store.put.call_args_list[0]
     record = job_args[1]
     assert record["status"] == JobStatus.FAILED
     assert record["error"] == SyncJobError.SYNC_FAILED
@@ -132,7 +132,7 @@ def test_run_user_sync_job_sanitizes_exception_to_sync_failed():
 @pytest.mark.unit
 def test_run_user_sync_job_releases_lock_after_completion():
     """After completion the user lock must be released through the lock store."""
-    idempotency = MagicMock()
+    job_status_store = MagicMock()
     lock_store = MagicMock()
     coordinator = _make_coordinator(
         OperationResult.success(
@@ -146,7 +146,7 @@ def test_run_user_sync_job_releases_lock_after_completion():
 
     run_user_sync_job(
         coordinator=coordinator,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         lock_store=lock_store,
         job_id="job-lock-1",
         user_email="dave@example.com",
@@ -168,7 +168,7 @@ def test_run_user_sync_job_releases_lock_after_completion():
 @pytest.mark.unit
 def test_run_platform_sync_job_writes_in_progress_sentinel_then_completed():
     """Platform sync must write in_progress first, then final completed record."""
-    idempotency = MagicMock()
+    job_status_store = MagicMock()
     lock_store = MagicMock()
     coordinator = _make_coordinator(
         OperationResult.success(
@@ -193,7 +193,7 @@ def test_run_platform_sync_job_writes_in_progress_sentinel_then_completed():
 
     run_platform_sync_job(
         coordinator=coordinator,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         lock_store=lock_store,
         job_id="plat-job-1",
         platform="aws",
@@ -204,12 +204,12 @@ def test_run_platform_sync_job_writes_in_progress_sentinel_then_completed():
     )
 
     # Calls: sentinel (in_progress), final record, lock release
-    assert idempotency.set.call_count == 2
+    assert job_status_store.put.call_count == 2
 
-    sentinel_args, _ = idempotency.set.call_args_list[0]
+    sentinel_args, _ = job_status_store.put.call_args_list[0]
     assert sentinel_args[1]["status"] == JobStatus.IN_PROGRESS
 
-    final_args, _ = idempotency.set.call_args_list[1]
+    final_args, _ = job_status_store.put.call_args_list[1]
     final = final_args[1]
     assert final["status"] == JobStatus.COMPLETED
     assert final["users_synced"] == 10
@@ -226,7 +226,7 @@ def test_run_platform_sync_job_writes_in_progress_sentinel_then_completed():
 @pytest.mark.unit
 def test_run_platform_sync_job_releases_platform_lock_on_failure():
     """Platform lock must be released even when the sync fails."""
-    idempotency = MagicMock()
+    job_status_store = MagicMock()
     lock_store = MagicMock()
     coordinator = _make_coordinator(
         OperationResult.error(
@@ -238,7 +238,7 @@ def test_run_platform_sync_job_releases_platform_lock_on_failure():
 
     run_platform_sync_job(
         coordinator=coordinator,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         lock_store=lock_store,
         job_id="plat-fail-1",
         platform="aws",
@@ -248,7 +248,7 @@ def test_run_platform_sync_job_releases_platform_lock_on_failure():
         job_ttl_seconds=86400,
     )
 
-    final_args, _ = idempotency.set.call_args_list[-1]
+    final_args, _ = job_status_store.put.call_args_list[-1]
     assert final_args[1]["status"] == JobStatus.FAILED
     lock_store.release.assert_called_once_with("access_sync:platform_lock:aws")
 
@@ -256,14 +256,14 @@ def test_run_platform_sync_job_releases_platform_lock_on_failure():
 @pytest.mark.unit
 def test_run_platform_sync_job_sanitizes_exception_to_sync_failed():
     """Unhandled exceptions in platform sync must be sanitized."""
-    idempotency = MagicMock()
+    job_status_store = MagicMock()
     lock_store = MagicMock()
     coordinator = MagicMock()
     coordinator.sync_platform.side_effect = ConnectionError("network down")
 
     run_platform_sync_job(
         coordinator=coordinator,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         lock_store=lock_store,
         job_id="plat-exc-1",
         platform="aws",
@@ -274,7 +274,7 @@ def test_run_platform_sync_job_sanitizes_exception_to_sync_failed():
     )
 
     # Find the final (non-sentinel) set call for the job record
-    final_args, _ = idempotency.set.call_args_list[-1]
+    final_args, _ = job_status_store.put.call_args_list[-1]
     record = final_args[1]
     assert record["status"] == JobStatus.FAILED
     assert record["error"] == SyncJobError.SYNC_FAILED
@@ -285,7 +285,7 @@ def test_run_platform_sync_job_sanitizes_exception_to_sync_failed():
 @pytest.mark.unit
 def test_run_user_sync_job_releases_via_lock_store_not_idempotency_set():
     """User job completion should release the lock through lock_store.release only."""
-    idempotency = MagicMock()
+    job_status_store = MagicMock()
     lock_store = MagicMock()
     coordinator = _make_coordinator(
         OperationResult.success(
@@ -299,7 +299,7 @@ def test_run_user_sync_job_releases_via_lock_store_not_idempotency_set():
 
     run_user_sync_job(
         coordinator=coordinator,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         lock_store=lock_store,
         job_id="job-lock-store-user-1",
         user_email="eve@example.com",
@@ -310,14 +310,14 @@ def test_run_user_sync_job_releases_via_lock_store_not_idempotency_set():
         job_ttl_seconds=86400,
     )
 
-    assert idempotency.set.call_count == 1
+    assert job_status_store.put.call_count == 1
     lock_store.release.assert_called_once_with("access_sync:user_lock:aws:eve@example.com")
 
 
 @pytest.mark.unit
 def test_run_platform_sync_job_releases_via_lock_store_not_idempotency_set():
     """Platform job completion should release the lock through lock_store.release only."""
-    idempotency = MagicMock()
+    job_status_store = MagicMock()
     lock_store = MagicMock()
     coordinator = _make_coordinator(
         OperationResult.success(
@@ -338,7 +338,7 @@ def test_run_platform_sync_job_releases_via_lock_store_not_idempotency_set():
 
     run_platform_sync_job(
         coordinator=coordinator,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         lock_store=lock_store,
         job_id="job-lock-store-platform-1",
         platform="aws",
@@ -348,5 +348,5 @@ def test_run_platform_sync_job_releases_via_lock_store_not_idempotency_set():
         job_ttl_seconds=86400,
     )
 
-    assert idempotency.set.call_count == 2
+    assert job_status_store.put.call_count == 2
     lock_store.release.assert_called_once_with("access_sync:platform_lock:aws")

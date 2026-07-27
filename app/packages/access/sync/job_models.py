@@ -6,7 +6,7 @@ the ``dict[str, Any]`` pattern that caused key-drift across HTTP and Slack
 transport modules.
 
 All models are frozen so they cross thread boundaries safely.  ``to_dict()``
-converts to the wire representation expected by ``IdempotencyService``.
+converts to the wire representation expected by ``JobStatusStore``.
 """
 
 import dataclasses
@@ -30,8 +30,8 @@ class SyncJobError:
     """Sanitized error strings exposed to external callers.
 
     Internal error details are never surfaced — the external payload always
-    uses ``SYNC_FAILED`` so implementation details do not leak through the
-    idempotency store or API responses.
+    uses ``SYNC_FAILED`` so implementation details do not leak through status
+    storage or API responses.
     """
 
     SYNC_FAILED = "sync_failed"
