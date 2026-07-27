@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-24 17:57'
+updated_date: '2026-07-24 19:29'
 labels:
   - security
   - phase-0
@@ -15,6 +16,7 @@ dependencies:
   - TASK-5.1
 references:
   - decisions/reliability.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1350'
 parent_task_id: TASK-5
 priority: high
 ordinal: 76000
