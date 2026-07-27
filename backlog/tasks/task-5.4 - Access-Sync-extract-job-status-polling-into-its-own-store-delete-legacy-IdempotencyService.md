@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-24 17:58'
-updated_date: '2026-07-24 19:29'
+updated_date: '2026-07-27 14:00'
 labels:
   - security
   - phase-0
@@ -14,6 +14,7 @@ labels:
 milestone: m-0
 dependencies:
   - TASK-5.1
+  - TASK-5.2
 references:
   - decisions/reliability.md
   - 'https://github.com/cds-snc/sre-bot/issues/1351'
@@ -49,3 +50,12 @@ Note: if TASK-5.2 and/or TASK-5.3 have not yet migrated their own call sites off
 - [ ] #1 Tests pass; dependency ordering with TASK-5.2/TASK-5.3 documented if legacy-file deletion must wait for all callers to move
 - [ ] #2 PR references decisions/reliability.md (job-status vs idempotency clause)
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-07-27 14:00
+---
+TASK-5.2 was re-scoped (2026-07-27) from migrating the dead legacy_slack_listener onto claim/complete/release to simply DELETING app/integrations/slack/utils.py (zero callers; wrong layer; obsoleted by the async-Bolt direction). That deletion removes the last app/integrations/ reference to the legacy get_idempotency_service, so it is now a prerequisite for this task's deletion of the legacy IdempotencyService stack - added TASK-5.2 to dependencies alongside TASK-5.1.
+---
+<!-- COMMENTS:END -->
