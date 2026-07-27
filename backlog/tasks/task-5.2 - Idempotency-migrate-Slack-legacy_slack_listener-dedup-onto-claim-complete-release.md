@@ -1,10 +1,11 @@
 ---
 id: TASK-5.2
 title: Delete the dead legacy_slack_listener Slack idempotency adapter
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-24 17:57'
-updated_date: '2026-07-27 14:07'
+updated_date: '2026-07-27 14:11'
 labels:
   - security
   - phase-0
