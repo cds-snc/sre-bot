@@ -126,3 +126,29 @@ def test_get_access_sync_lock_store_uses_lock_stale_seconds(monkeypatch: pytest.
     assert store is sentinel
     assert observed == [222]
     cache_clear()
+
+
+@pytest.mark.unit
+def test_get_access_sync_job_status_store_returns_singleton(monkeypatch: pytest.MonkeyPatch):
+    """Job status store provider should cache one instance for the process."""
+    get_job_status_store = getattr(providers, "get_access_sync_job_status_store", None)
+    assert callable(get_job_status_store), "packages.access.sync.providers.get_access_sync_job_status_store must exist"
+
+    cache_clear = getattr(get_job_status_store, "cache_clear", None)
+    assert callable(cache_clear)
+    cache_clear()
+
+    sentinel_storage = object()
+    built: list[object] = [object(), object()]
+
+    monkeypatch.setattr(providers, "get_storage_service", lambda: sentinel_storage)
+    monkeypatch.setattr(
+        "packages.access.sync.providers.JobStatusStore",
+        lambda storage: (built.pop(0), storage)[0],
+    )
+
+    first = get_job_status_store()
+    second = get_job_status_store()
+
+    assert first is second
+    cache_clear()

@@ -22,7 +22,7 @@ def _store() -> InMemoryIdempotencyStore:
 
 
 def test_acquire_lock_succeeds_once_and_persists_holder_payload() -> None:
-    idempotency = MagicMock()
+    job_status_store = MagicMock()
     lock_store = _store()
     payload = {
         "job_id": "job-123",
@@ -30,18 +30,18 @@ def test_acquire_lock_succeeds_once_and_persists_holder_payload() -> None:
         "started_at": "2026-07-27T12:00:00+00:00",
         "dry_run": False,
     }
-    idempotency.get.return_value = payload
+    job_status_store.get.return_value = payload
 
     acquired = platform_lock.acquire_lock(
         lock_key="access_sync:user_lock:aws:alice@example.com",
         payload=payload,
         lock_store=lock_store,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         ttl_seconds=14400,
     )
 
     assert acquired is True
-    idempotency.set.assert_called_once_with(
+    job_status_store.put.assert_called_once_with(
         "access_sync:user_lock:aws:alice@example.com:holder",
         payload,
         ttl_seconds=14400,
@@ -49,11 +49,11 @@ def test_acquire_lock_succeeds_once_and_persists_holder_payload() -> None:
 
     current_holder = getattr(platform_lock, "current_holder", None)
     assert callable(current_holder), "packages.access.sync.platform_lock.current_holder must exist"
-    assert current_holder("access_sync:user_lock:aws:alice@example.com", idempotency) == payload
+    assert current_holder("access_sync:user_lock:aws:alice@example.com", job_status_store) == payload
 
 
 def test_acquire_lock_rejects_second_claim_and_preserves_existing_holder() -> None:
-    idempotency = MagicMock()
+    job_status_store = MagicMock()
     lock_store = _store()
     payload = {
         "job_id": "job-111",
@@ -61,14 +61,14 @@ def test_acquire_lock_rejects_second_claim_and_preserves_existing_holder() -> No
         "started_at": "2026-07-27T12:00:00+00:00",
         "dry_run": False,
     }
-    idempotency.get.return_value = payload
+    job_status_store.get.return_value = payload
 
     assert (
         platform_lock.acquire_lock(
             lock_key="access_sync:platform_lock:aws",
             payload=payload,
             lock_store=lock_store,
-            idempotency=idempotency,
+            job_status_store=job_status_store,
             ttl_seconds=14400,
         )
         is True
@@ -78,16 +78,16 @@ def test_acquire_lock_rejects_second_claim_and_preserves_existing_holder() -> No
         lock_key="access_sync:platform_lock:aws",
         payload={"job_id": "job-222", "status": "running"},
         lock_store=lock_store,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         ttl_seconds=14400,
     )
 
     assert second is False
-    idempotency.set.assert_called_once()
+    job_status_store.put.assert_called_once()
 
 
 def test_release_lock_allows_future_claim() -> None:
-    idempotency = MagicMock()
+    job_status_store = MagicMock()
     lock_store = _store()
     key = "access_sync:platform_lock:aws"
 
@@ -95,7 +95,7 @@ def test_release_lock_allows_future_claim() -> None:
         lock_key=key,
         payload={"job_id": "job-1", "status": "running"},
         lock_store=lock_store,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         ttl_seconds=14400,
     )
 
@@ -105,7 +105,7 @@ def test_release_lock_allows_future_claim() -> None:
         lock_key=key,
         payload={"job_id": "job-2", "status": "running"},
         lock_store=lock_store,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         ttl_seconds=14400,
     )
 
