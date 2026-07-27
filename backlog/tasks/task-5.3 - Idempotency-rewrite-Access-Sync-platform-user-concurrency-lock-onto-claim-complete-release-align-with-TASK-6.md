@@ -3,11 +3,11 @@ id: TASK-5.3
 title: >-
   Idempotency: rewrite Access Sync platform/user concurrency lock onto
   claim/complete/release; align with TASK-6
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-24 17:57'
-updated_date: '2026-07-27 17:26'
+updated_date: '2026-07-27 17:37'
 labels:
   - security
   - phase-0
@@ -48,8 +48,8 @@ Update call sites in app/packages/access/sync/interactions/ingress.py and app/pa
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass, including a concurrency test proving the TOCTOU race is closed for the platform/user lock
-- [ ] #2 PR references decisions/reliability.md and cross-references TASK-6
+- [x] #1 Tests pass, including a concurrency test proving the TOCTOU race is closed for the platform/user lock
+- [x] #2 PR references decisions/reliability.md and cross-references TASK-6
 <!-- DOD:END -->
 
 ## Implementation Plan
