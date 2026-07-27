@@ -3,10 +3,11 @@ id: TASK-5.4.1
 title: >-
   Access Sync: introduce package-owned JobStatusStore; migrate job-status
   polling and lock holder-info off legacy IdempotencyService
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-27 18:43'
-updated_date: '2026-07-27 19:02'
+updated_date: '2026-07-27 19:10'
 labels:
   - security
   - phase-0
