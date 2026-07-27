@@ -7,17 +7,19 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
+from infrastructure.idempotency import IdempotencySettings, InMemoryIdempotencyStore
 from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.security import get_current_user
 from infrastructure.security.models import AuthPrincipalSource, User
 from packages.access.sync.domain import SyncOutcome
 from packages.access.sync.interactions.http import router, sync_endpoint
+from packages.access.sync.interactions.ingress import EnqueuedJob
 from packages.access.sync.job_runner import run_user_sync_job
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
     get_access_sync_settings,
 )
-from packages.access.sync.schemas import UserSyncRequest
+from packages.access.sync.schemas import UserSyncJobAcceptedResponse, UserSyncRequest
 
 
 def _get_route(path: str, method: str) -> APIRoute:
@@ -60,6 +62,15 @@ class _Settings:
         self.lock_stale_seconds = 14400
 
 
+def _lock_store() -> InMemoryIdempotencyStore:
+    return InMemoryIdempotencyStore(
+        idempotency_settings=IdempotencySettings(
+            IDEMPOTENCY_TTL_SECONDS=86400,
+            IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=14400,
+        )
+    )
+
+
 def _make_request() -> UserSyncRequest:
     """Create a valid user-sync request payload."""
     return UserSyncRequest(
@@ -99,6 +110,10 @@ def test_sync_endpoint_user_sync_enqueues_job_and_returns_202():
             return_value=fake_idempotency,
         ),
         patch(
+            "packages.access.sync.interactions.http.get_access_sync_lock_store",
+            return_value=_lock_store(),
+        ),
+        patch(
             "packages.access.sync.job_runner.threading",
         ) as mock_threading,
     ):
@@ -113,6 +128,7 @@ def test_sync_endpoint_user_sync_enqueues_job_and_returns_202():
         )
 
     assert response.status_code == 202
+    assert isinstance(result, UserSyncJobAcceptedResponse)
     assert result.success is True
     assert result.status == "in_progress"
     assert result.job_id != ""
@@ -139,7 +155,15 @@ def test_sync_endpoint_user_sync_returns_existing_job_when_lock_held():
             return_value=fake_idempotency,
         ),
         patch(
-            "packages.access.sync.interactions.ingress.check_lock",
+            "packages.access.sync.interactions.http.get_access_sync_lock_store",
+            return_value=_lock_store(),
+        ),
+        patch(
+            "packages.access.sync.interactions.ingress.acquire_lock",
+            return_value=False,
+        ),
+        patch(
+            "packages.access.sync.interactions.ingress.current_holder",
             return_value=fake_idempotency.get.return_value,
         ),
         patch(
@@ -244,6 +268,7 @@ def test_access_sync_routes_expose_explicit_openapi_metadata() -> None:
 def test_run_user_sync_job_stores_completed_outcome():
     """Background job should store completed status with action details."""
     fake_idempotency = MagicMock()
+    lock_store = MagicMock()
     coordinator = _FakeCoordinator(
         OperationResult.success(
             data=SyncOutcome(
@@ -257,6 +282,7 @@ def test_run_user_sync_job_stores_completed_outcome():
     run_user_sync_job(
         coordinator=coordinator,
         idempotency=fake_idempotency,
+        lock_store=lock_store,
         job_id="job-1",
         user_email="user@example.com",
         platform="aws",
@@ -266,8 +292,7 @@ def test_run_user_sync_job_stores_completed_outcome():
         job_ttl_seconds=86400,
     )
 
-    # Called twice: once for the job-id record and once for the lock key.
-    assert fake_idempotency.set.call_count == 2
+    assert fake_idempotency.set.call_count == 1
 
     # Check job outcome record
     args, _ = fake_idempotency.set.call_args_list[0]
@@ -277,16 +302,14 @@ def test_run_user_sync_job_stores_completed_outcome():
     assert stored["actions_applied"] == ["provision_user"]
     assert stored["user_email"] == "user@example.com"
 
-    # Check lock release record
-    args, _ = fake_idempotency.set.call_args_list[1]
-    assert args[0] == "access_sync:user_lock:aws:user@example.com"
-    assert args[1]["status"] == "completed"
+    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:user@example.com")
 
 
 @pytest.mark.unit
 def test_run_user_sync_job_stores_failed_outcome_on_coordinator_error():
     """Background job should store failed status when coordinator returns an error."""
     fake_idempotency = MagicMock()
+    lock_store = MagicMock()
     coordinator = _FakeCoordinator(
         OperationResult.error(
             OperationStatus.TRANSIENT_ERROR,
@@ -298,6 +321,7 @@ def test_run_user_sync_job_stores_failed_outcome_on_coordinator_error():
     run_user_sync_job(
         coordinator=coordinator,
         idempotency=fake_idempotency,
+        lock_store=lock_store,
         job_id="job-2",
         user_email="user@example.com",
         platform="aws",
@@ -307,7 +331,7 @@ def test_run_user_sync_job_stores_failed_outcome_on_coordinator_error():
         job_ttl_seconds=86400,
     )
 
-    assert fake_idempotency.set.call_count == 2
+    assert fake_idempotency.set.call_count == 1
 
     args, _ = fake_idempotency.set.call_args_list[0]
     assert args[0] == "job-2"
@@ -315,21 +339,61 @@ def test_run_user_sync_job_stores_failed_outcome_on_coordinator_error():
     assert stored["status"] == "failed"
     assert "error" in stored
 
-    args, _ = fake_idempotency.set.call_args_list[1]
-    assert args[0] == "access_sync:user_lock:aws:user@example.com"
-    assert args[1]["status"] == "failed"
+    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:user@example.com")
+
+
+@pytest.mark.unit
+def test_sync_endpoint_passes_lock_store_to_ingress_enqueue():
+    """HTTP sync endpoint should resolve lock_store once and pass it into ingress."""
+    fake_idempotency = MagicMock()
+    sentinel_lock_store = object()
+    enqueued = EnqueuedJob(
+        job_id="job-lock-store-wire-1",
+        platform="aws",
+        user_email="user@example.com",
+        dry_run=False,
+        started_at="2026-07-27T12:00:00+00:00",
+        already_running=False,
+    )
+
+    with (
+        patch(
+            "packages.access.sync.interactions.http.get_idempotency_service",
+            return_value=fake_idempotency,
+        ),
+        patch(
+            "packages.access.sync.interactions.http.get_access_sync_lock_store",
+            return_value=sentinel_lock_store,
+        ),
+        patch(
+            "packages.access.sync.interactions.http.enqueue_user_sync",
+            return_value=OperationResult.success(data=enqueued),
+        ) as mock_enqueue,
+    ):
+        result = sync_endpoint(
+            _make_request(),
+            response=Response(),
+            coordinator=_FakeCoordinator(OperationResult.success()),
+            settings=_Settings(enabled=True),
+            current_user=_make_user(),
+        )
+
+    assert result.job_id == "job-lock-store-wire-1"
+    assert mock_enqueue.call_args.kwargs["lock_store"] is sentinel_lock_store
 
 
 @pytest.mark.unit
 def test_run_user_sync_job_stores_failed_outcome_on_exception():
     """Background job should store failed status and not propagate exceptions."""
     fake_idempotency = MagicMock()
+    lock_store = MagicMock()
     coordinator = MagicMock()
     coordinator.sync_user.side_effect = RuntimeError("unexpected crash")
 
     run_user_sync_job(
         coordinator=coordinator,
         idempotency=fake_idempotency,
+        lock_store=lock_store,
         job_id="job-3",
         user_email="user@example.com",
         platform="aws",
@@ -339,7 +403,7 @@ def test_run_user_sync_job_stores_failed_outcome_on_exception():
         job_ttl_seconds=86400,
     )
 
-    assert fake_idempotency.set.call_count == 2
+    assert fake_idempotency.set.call_count == 1
     args, _ = fake_idempotency.set.call_args_list[0]
     assert args[0] == "job-3"
     assert args[1]["status"] == "failed"
@@ -350,12 +414,14 @@ def test_run_user_sync_job_stores_failed_outcome_on_exception():
 def test_run_user_sync_job_sanitizes_error_to_sync_failed_on_exception():
     """Exception details must never appear in the external error payload."""
     fake_idempotency = MagicMock()
+    lock_store = MagicMock()
     coordinator = MagicMock()
     coordinator.sync_user.side_effect = ValueError("secret internal detail")
 
     run_user_sync_job(
         coordinator=coordinator,
         idempotency=fake_idempotency,
+        lock_store=lock_store,
         job_id="job-4",
         user_email="user@example.com",
         platform="aws",

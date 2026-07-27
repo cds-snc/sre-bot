@@ -95,17 +95,10 @@ ddb_get() {
     --no-cli-pager 2>/dev/null
 }
 
-ddb_put() {
-  # $1 = key, $2 = response_json string, $3 = ttl timestamp
-  aws dynamodb put-item \
+ddb_delete() {
+  aws dynamodb delete-item \
     --table-name "$TABLE" \
-    --item "{
-      \"${HASH_KEY}\": {\"S\": \"$1\"},
-      \"response_json\": {\"S\": $2},
-      \"ttl\": {\"N\": \"$3\"},
-      \"created_at\": {\"N\": \"$(date +%s)\"},
-      \"operation_type\": {\"S\": \"api_response\"}
-    }" \
+    --key "{\"${HASH_KEY}\": {\"S\": \"$1\"}}" \
     ${ENDPOINT_FLAG} \
     --no-cli-pager
 }
@@ -126,20 +119,30 @@ if [[ -z "$ITEM" ]] || [[ "$(echo "$ITEM" | jq -r '.Item // empty')" == "" ]]; t
   exit 0
 fi
 
-# The record payload is JSON stored as a string inside response_json.S
-RESPONSE_JSON=$(echo "$ITEM" | jq -r '.Item.response_json.S')
-STATUS=$(echo "$RESPONSE_JSON" | jq -r '.status // "unknown"')
-JOB_ID=$(echo "$RESPONSE_JSON" | jq -r '.job_id // "unknown"')
-STARTED_AT=$(echo "$RESPONSE_JSON" | jq -r '.started_at // "unknown"')
+STATUS=$(echo "$ITEM" | jq -r '.Item.status.S // "unknown"')
+CLAIMED_AT_EPOCH=$(echo "$ITEM" | jq -r '.Item.claimed_at.N // ""')
+IN_PROGRESS_EXPIRES_AT=$(echo "$ITEM" | jq -r '.Item.in_progress_expires_at.N // ""')
+
+if [[ -n "$CLAIMED_AT_EPOCH" ]]; then
+  CLAIMED_AT=$(date -u -d "@${CLAIMED_AT_EPOCH}" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "${CLAIMED_AT_EPOCH}")
+else
+  CLAIMED_AT="unknown"
+fi
+
+if [[ -n "$IN_PROGRESS_EXPIRES_AT" ]]; then
+  EXPIRES_AT=$(date -u -d "@${IN_PROGRESS_EXPIRES_AT}" +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo "${IN_PROGRESS_EXPIRES_AT}")
+else
+  EXPIRES_AT="unknown"
+fi
 
 echo ""
 echo "Current lock:"
 echo "  status     = ${STATUS}"
-echo "  job_id     = ${JOB_ID}"
-echo "  started_at = ${STARTED_AT}"
+echo "  claimed_at = ${CLAIMED_AT}"
+echo "  expires_at = ${EXPIRES_AT}"
 echo ""
 echo "Full record:"
-echo "$RESPONSE_JSON" | jq .
+echo "$ITEM" | jq '.Item'
 
 if [[ "$DRY_RUN" == true ]]; then
   echo ""
@@ -147,24 +150,12 @@ if [[ "$DRY_RUN" == true ]]; then
   exit 0
 fi
 
-if [[ "$STATUS" != "running" ]]; then
-  echo "Lock status is '${STATUS}', not 'running' — already released or completed."
+if [[ "$STATUS" != "IN_PROGRESS" ]]; then
+  echo "Lock status is '${STATUS}', not 'IN_PROGRESS' — already released or completed."
   exit 0
 fi
 
-# Patch the status in the stored JSON and write it back.
-NOW_ISO=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-TTL=$(( $(date +%s) + 14400 ))  # default 4 h stale window
-
-UPDATED_JSON=$(echo "$RESPONSE_JSON" | jq \
-  --arg released_at "$NOW_ISO" \
-  '.status = "force_released" | .released_at = $released_at | .release_reason = "manual_unlock_script"')
-
-# jq outputs a plain JSON string; we need it shell-escaped for the DynamoDB
-# string attribute value.
-ESCAPED=$(echo "$UPDATED_JSON" | jq -Rs .)
-
-ddb_put "$LOCK_KEY" "$ESCAPED" "$TTL"
+ddb_delete "$LOCK_KEY"
 
 echo ""
 echo "Lock force-released. Future sync jobs can now acquire the lock."

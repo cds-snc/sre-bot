@@ -24,6 +24,7 @@ from packages.access.sync.interactions.ingress import (
 from packages.access.sync.presenters import to_slack_status_message
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
+    get_access_sync_lock_store,
     get_access_sync_settings,
 )
 from packages.access.sync.schemas import SyncJobStatusResponse
@@ -177,11 +178,13 @@ def handle_sync_user_command(
 
     coordinator = get_access_sync_coordinator()
     idempotency = get_idempotency_service()
+    lock_store = get_access_sync_lock_store()
     settings = get_access_sync_settings()
 
     result = enqueue_user_sync(
         coordinator=coordinator,
         idempotency=idempotency,
+        lock_store=lock_store,
         settings=settings,
         user_email=user_email,
         platform=platform,
@@ -269,11 +272,13 @@ def handle_sync_platform_command(
 
     coordinator = get_access_sync_coordinator()
     idempotency = get_idempotency_service()
+    lock_store = get_access_sync_lock_store()
     settings = get_access_sync_settings()
 
     result = enqueue_platform_sync(
         coordinator=coordinator,
         idempotency=idempotency,
+        lock_store=lock_store,
         settings=settings,
         platform=platform,
         dry_run=dry_run,

@@ -29,6 +29,7 @@ from infrastructure.idempotency.dynamodb import DynamoDBCache, DynamoDBIdempoten
 
 # Factory functions available via direct import to avoid circular deps
 from infrastructure.idempotency.factory import (
+    build_idempotency_store,
     get_cache,
     get_idempotency_service,
     get_idempotency_store,
@@ -36,6 +37,7 @@ from infrastructure.idempotency.factory import (
     reset_idempotency_store,
 )
 from infrastructure.idempotency.in_memory import InMemoryIdempotencyStore
+from infrastructure.idempotency.lease import acquire_lease, release_lease
 from infrastructure.idempotency.protocol import (
     ClaimOutcome,
     ClaimResult,
@@ -59,7 +61,10 @@ __all__ = [
     "get_idempotency_settings",
     "get_cache",
     "reset_cache",
+    "build_idempotency_store",
     "get_idempotency_store",
     "reset_idempotency_store",
     "get_idempotency_service",
+    "acquire_lease",
+    "release_lease",
 ]

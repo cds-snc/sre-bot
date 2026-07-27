@@ -14,7 +14,7 @@ from typing import Protocol
 
 import structlog
 
-from infrastructure.idempotency import IdempotencyService
+from infrastructure.idempotency import IdempotencyService, IdempotencyStore
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.sync.application import AccessSyncApplicationServicePort
 from packages.access.sync.job_runner import (
@@ -22,7 +22,8 @@ from packages.access.sync.job_runner import (
     spawn_user_sync_thread,
 )
 from packages.access.sync.platform_lock import (
-    check_lock,
+    acquire_lock,
+    current_holder,
     platform_lock_key,
     user_lock_key,
 )
@@ -35,7 +36,6 @@ class _IngressSettings(Protocol):
 
     enabled: bool
     job_ttl_seconds: int
-    lock_stale_seconds: int
 
 
 @dataclass(frozen=True)
@@ -53,6 +53,7 @@ class EnqueuedJob:
 def enqueue_user_sync(
     coordinator: AccessSyncApplicationServicePort,
     idempotency: IdempotencyService,
+    lock_store: IdempotencyStore,
     settings: _IngressSettings,
     user_email: str,
     platform: str,
@@ -75,8 +76,25 @@ def enqueue_user_sync(
         )
 
     lock_key = user_lock_key(platform, user_email)
-    running = check_lock(lock_key, idempotency, settings.lock_stale_seconds)
-    if running is not None:
+    lock_payload = {
+        "job_id": "",
+        "status": "running",
+        "started_at": "",
+        "dry_run": dry_run,
+    }
+    job_id = str(uuid.uuid4())
+    started_at = datetime.now(UTC).isoformat()
+    lock_payload["job_id"] = job_id
+    lock_payload["started_at"] = started_at
+
+    if not acquire_lock(
+        lock_key=lock_key,
+        payload=lock_payload,
+        lock_store=lock_store,
+        idempotency=idempotency,
+        ttl_seconds=settings.job_ttl_seconds,
+    ):
+        running = current_holder(lock_key, idempotency) or {}
         existing_job_id = running.get("job_id", "")
         logger.bind(platform=platform, user_email=user_email).info("user_sync_already_running", existing_job_id=existing_job_id)
         return OperationResult.success(
@@ -84,17 +102,16 @@ def enqueue_user_sync(
                 job_id=existing_job_id,
                 platform=platform,
                 user_email=user_email,
-                dry_run=running.get("dry_run", dry_run),
-                started_at=running.get("started_at", ""),
+                dry_run=(running or {}).get("dry_run", dry_run),
+                started_at=(running or {}).get("started_at", ""),
                 already_running=True,
             )
         )
 
-    job_id = str(uuid.uuid4())
-    started_at = datetime.now(UTC).isoformat()
     spawn_user_sync_thread(
         coordinator=coordinator,
         idempotency=idempotency,
+        lock_store=lock_store,
         job_id=job_id,
         user_email=user_email,
         platform=platform,
@@ -118,6 +135,7 @@ def enqueue_user_sync(
 def enqueue_platform_sync(
     coordinator: AccessSyncApplicationServicePort,
     idempotency: IdempotencyService,
+    lock_store: IdempotencyStore,
     settings: _IngressSettings,
     platform: str,
     dry_run: bool = False,
@@ -139,8 +157,25 @@ def enqueue_platform_sync(
         )
 
     lock_key = platform_lock_key(platform)
-    running = check_lock(lock_key, idempotency, settings.lock_stale_seconds)
-    if running is not None:
+    lock_payload = {
+        "job_id": "",
+        "status": "running",
+        "started_at": "",
+        "dry_run": dry_run,
+    }
+    job_id = str(uuid.uuid4())
+    started_at = datetime.now(UTC).isoformat()
+    lock_payload["job_id"] = job_id
+    lock_payload["started_at"] = started_at
+
+    if not acquire_lock(
+        lock_key=lock_key,
+        payload=lock_payload,
+        lock_store=lock_store,
+        idempotency=idempotency,
+        ttl_seconds=settings.job_ttl_seconds,
+    ):
+        running = current_holder(lock_key, idempotency) or {}
         existing_job_id = running.get("job_id", "")
         logger.bind(platform=platform).info("platform_sync_already_running", existing_job_id=existing_job_id)
         return OperationResult.success(
@@ -148,17 +183,16 @@ def enqueue_platform_sync(
                 job_id=existing_job_id,
                 platform=platform,
                 user_email="",
-                dry_run=running.get("dry_run", dry_run),
-                started_at=running.get("started_at", ""),
+                dry_run=(running or {}).get("dry_run", dry_run),
+                started_at=(running or {}).get("started_at", ""),
                 already_running=True,
             )
         )
 
-    job_id = str(uuid.uuid4())
-    started_at = datetime.now(UTC).isoformat()
     spawn_platform_sync_thread(
         coordinator=coordinator,
         idempotency=idempotency,
+        lock_store=lock_store,
         job_id=job_id,
         platform=platform,
         dry_run=dry_run,
