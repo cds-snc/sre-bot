@@ -3,10 +3,11 @@ id: TASK-5.3
 title: >-
   Idempotency: rewrite Access Sync platform/user concurrency lock onto
   claim/complete/release; align with TASK-6
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-24 17:57'
-updated_date: '2026-07-27 15:37'
+updated_date: '2026-07-27 17:13'
 labels:
   - security
   - phase-0
