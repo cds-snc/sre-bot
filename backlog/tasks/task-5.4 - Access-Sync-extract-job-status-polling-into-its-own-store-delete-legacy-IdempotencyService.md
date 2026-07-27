@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-24 17:58'
-updated_date: '2026-07-27 14:00'
+updated_date: '2026-07-27 18:53'
 labels:
   - security
   - phase-0
@@ -57,5 +57,14 @@ Note: if TASK-5.2 and/or TASK-5.3 have not yet migrated their own call sites off
 created: 2026-07-27 14:00
 ---
 TASK-5.2 was re-scoped (2026-07-27) from migrating the dead legacy_slack_listener onto claim/complete/release to simply DELETING app/integrations/slack/utils.py (zero callers; wrong layer; obsoleted by the async-Bolt direction). That deletion removes the last app/integrations/ reference to the legacy get_idempotency_service, so it is now a prerequisite for this task's deletion of the legacy IdempotencyService stack - added TASK-5.2 to dependencies alongside TASK-5.1.
+---
+
+created: 2026-07-27 18:53
+---
+Decomposed 2026-07-27 per the single-PR size gate (implementation-planning skill): the full scope (new JobStatusStore + 5 consumer rewires + deleting 4 legacy files/protocols + ~9 test files, ~13 production/test files touched) exceeds the ~10-file single-PR threshold. Split into:
+- TASK-5.4.1 (expand+migrate): new package-owned JobStatusStore built on infrastructure.storage.StorageService (DRY reuse of the same generic capability SyncRunRepository already uses; confirmed with the human citing 12factor.net "backing services as attached resources"), reusing the existing sre_bot_idempotency table (no terraform change). Migrates ALL 5 legacy get_idempotency_service()/IdempotencyService call sites in app/packages/access/sync, including platform_lock.py's holder-info reporting (added by TASK-5.3; not named in this task's original Scope paragraph but confirmed in scope with the human since it blocks 5.4.2's deletion step).
+- TASK-5.4.2 (contract, depends on 5.4.1): deletes infrastructure/idempotency/cache.py + service.py, removes DynamoDBCache from dynamodb.py and the IdempotencyService Protocol from protocol.py, prunes factory.py/__init__.py, and removes the now-obsolete tests. Closes this task's AC#3/DoD#1.
+
+This coordinator task's own ACs/DoD are unchanged - they remain the "all children done" bar. Do not implement against this task's description directly; see TASK-5.4.1 for the approved, fully-grounded implementation plan.
 ---
 <!-- COMMENTS:END -->
