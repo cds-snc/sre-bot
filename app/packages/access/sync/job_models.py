@@ -46,9 +46,9 @@ class SyncJobError:
 class UserRunningRecord:
     """Lock and initial in-progress state for a user sync job.
 
-    Written to both the lock key and the job-id key when a new user sync is
-    enqueued.  The lock key copy uses ``status=RUNNING`` so ``check_lock()``
-    can detect it; the job-id key copy uses ``status=IN_PROGRESS``.
+    Written to the holder metadata key and the job-id key when a new user sync
+    is enqueued. The holder copy keeps ``status=RUNNING`` while the job-id key
+    uses ``status=IN_PROGRESS``.
     """
 
     job_id: str

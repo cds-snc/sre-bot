@@ -27,6 +27,7 @@ from packages.access.sync.interactions.ingress import (
 from packages.access.sync.presenters import to_http_status_response
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
+    get_access_sync_lock_store,
     get_access_sync_settings,
 )
 from packages.access.sync.schemas import (
@@ -51,7 +52,6 @@ class _AccessSyncSettingsPort(Protocol):
 
     enabled: bool
     job_ttl_seconds: int
-    lock_stale_seconds: int
 
 
 class _AccessSyncApplicationServicePort(Protocol):
@@ -142,11 +142,13 @@ def sync_endpoint(
     coordinator_dep = _resolve_coordinator(coordinator)
 
     idempotency = get_idempotency_service()
+    lock_store = get_access_sync_lock_store()
 
     if isinstance(request, UserSyncRequest):
         result = enqueue_user_sync(
             coordinator=coordinator_dep,
             idempotency=idempotency,
+            lock_store=lock_store,
             settings=settings,
             user_email=str(request.user_email),
             platform=request.platform,
@@ -171,6 +173,7 @@ def sync_endpoint(
     result = enqueue_platform_sync(
         coordinator=coordinator_dep,
         idempotency=idempotency,
+        lock_store=lock_store,
         settings=settings,
         platform=request.platform,
         dry_run=request.dry_run,

@@ -3,6 +3,7 @@ import functools
 from infrastructure.clients.aws import get_aws_clients
 from infrastructure.directory import get_directory_provider
 from infrastructure.events import get_event_dispatcher
+from infrastructure.idempotency import IdempotencyStore, build_idempotency_store
 from infrastructure.storage import get_storage_service
 from packages.access.common.providers import get_access_runtime_config
 from packages.access.common.settings import AccessSyncSettings, get_access_settings
@@ -17,6 +18,12 @@ from packages.access.sync.store import SyncRunRepository
 def get_access_sync_settings() -> AccessSyncSettings:
     """Return the sync settings slice from the unified access settings."""
     return get_access_settings().sync
+
+
+@functools.lru_cache(maxsize=1)
+def get_access_sync_lock_store() -> IdempotencyStore:
+    """Return a singleton lock store with access-sync-specific claim TTL."""
+    return build_idempotency_store(in_progress_ttl_seconds=get_access_sync_settings().lock_stale_seconds)
 
 
 @functools.lru_cache(maxsize=1)

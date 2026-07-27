@@ -19,7 +19,7 @@ from packages.access.sync.providers import (
     get_access_sync_coordinator,
     get_access_sync_settings,
 )
-from packages.access.sync.schemas import UserSyncRequest
+from packages.access.sync.schemas import UserSyncJobAcceptedResponse, UserSyncRequest
 
 
 def _get_route(path: str, method: str) -> APIRoute:
@@ -128,6 +128,7 @@ def test_sync_endpoint_user_sync_enqueues_job_and_returns_202():
         )
 
     assert response.status_code == 202
+    assert isinstance(result, UserSyncJobAcceptedResponse)
     assert result.success is True
     assert result.status == "in_progress"
     assert result.job_id != ""

@@ -71,6 +71,12 @@ def get_idempotency_store() -> IdempotencyStore:
     return _idempotency_store_instance
 
 
+def build_idempotency_store(in_progress_ttl_seconds: int) -> IdempotencyStore:
+    """Build a non-singleton idempotency store with a custom in-progress TTL."""
+    settings = get_idempotency_settings().model_copy(update={"IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS": in_progress_ttl_seconds})
+    return DynamoDBIdempotencyStore(idempotency_settings=settings)
+
+
 def reset_idempotency_store() -> None:
     """Reset the idempotency store singleton (for tests)."""
     global _idempotency_store_instance

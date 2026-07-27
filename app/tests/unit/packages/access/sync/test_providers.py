@@ -111,10 +111,14 @@ def test_get_access_sync_lock_store_uses_lock_stale_seconds(monkeypatch: pytest.
     observed: list[int] = []
     sentinel = object()
 
+    def _build_store(in_progress_ttl_seconds: int) -> object:
+        observed.append(in_progress_ttl_seconds)
+        return sentinel
+
     monkeypatch.setattr(providers, "get_access_sync_settings", lambda: _Settings())
     monkeypatch.setattr(
         "packages.access.sync.providers.build_idempotency_store",
-        lambda in_progress_ttl_seconds: observed.append(in_progress_ttl_seconds) or sentinel,
+        _build_store,
     )
 
     store = get_lock_store()

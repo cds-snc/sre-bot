@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-24 17:57'
-updated_date: '2026-07-27 17:13'
+updated_date: '2026-07-27 17:26'
 labels:
   - security
   - phase-0
@@ -39,11 +39,11 @@ Update call sites in app/packages/access/sync/interactions/ingress.py and app/pa
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 check_lock/acquire_lock/release_lock in app/packages/access/sync/platform_lock.py use the atomic claim primitive from TASK-5.1 (via a shared infra lease helper) instead of get-then-set on IdempotencyService
-- [ ] #2 app/packages/access/sync/interactions/ingress.py and job_runner.py call sites and their tests are updated to the new lock API
-- [ ] #3 A generic, vendor-neutral lease helper (acquire_lease/release_lease) is added to app/infrastructure/idempotency/lease.py - not to the access/sync package - built on the TASK-5.1 claim/complete/release primitive; app/packages/access/sync/platform_lock.py becomes a thin wrapper over it (key naming + holder-info reporting only); TASK-6's dependency/comment is updated to point at this infra module, never at platform_lock.py or the access/sync package
-- [ ] #4 acquire_lock/release_lock is the sole atomic gate; the former two-step check_lock-then-acquire_lock is removed. A rejected duplicate request still reports the winning job's id via a best-effort, non-authoritative current_holder lookup, preserving existing HTTP/Slack already-running response behavior (test_sync_endpoint_user_sync_returns_existing_job_when_lock_held keeps passing).
-- [ ] #5 bin/unlock-sync-job.sh operates on the new lease's DynamoDB item schema (status/claimed_at/in_progress_expires_at) via delete-item, not the legacy response_json/put-item patch, and --dry-run output reflects the new fields.
+- [x] #1 check_lock/acquire_lock/release_lock in app/packages/access/sync/platform_lock.py use the atomic claim primitive from TASK-5.1 (via a shared infra lease helper) instead of get-then-set on IdempotencyService
+- [x] #2 app/packages/access/sync/interactions/ingress.py and job_runner.py call sites and their tests are updated to the new lock API
+- [x] #3 A generic, vendor-neutral lease helper (acquire_lease/release_lease) is added to app/infrastructure/idempotency/lease.py - not to the access/sync package - built on the TASK-5.1 claim/complete/release primitive; app/packages/access/sync/platform_lock.py becomes a thin wrapper over it (key naming + holder-info reporting only); TASK-6's dependency/comment is updated to point at this infra module, never at platform_lock.py or the access/sync package
+- [x] #4 acquire_lock/release_lock is the sole atomic gate; the former two-step check_lock-then-acquire_lock is removed. A rejected duplicate request still reports the winning job's id via a best-effort, non-authoritative current_holder lookup, preserving existing HTTP/Slack already-running response behavior (test_sync_endpoint_user_sync_returns_existing_job_when_lock_held keeps passing).
+- [x] #5 bin/unlock-sync-job.sh operates on the new lease's DynamoDB item schema (status/claimed_at/in_progress_expires_at) via delete-item, not the legacy response_json/put-item patch, and --dry-run output reflects the new fields.
 <!-- AC:END -->
 
 ## Definition of Done
@@ -151,6 +151,31 @@ Out of scope: no new direct unit tests for slack.py's two handlers (exercised tr
 - A single git revert fully restores prior behavior, since lease.py/build_idempotency_store are net-new and unused by anything else at revert time.
 - Worst-case risk if this ships wrong: the lease's in-progress TTL is misconfigured and a legitimately-still-running platform sync gets its lock silently reclaimed - the concurrency test and the TTL-sourcing test are the guardrails; a wrong-schema bug in the shell script fails loudly (delete-item/get-item errors surface directly to the operator).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented TASK-5.3 by moving generic lease semantics to infrastructure and rewriting access-sync lock flow to atomic claim/release.
+
+Code changes:
+- Added app/infrastructure/idempotency/lease.py with acquire_lease/release_lease over IdempotencyStore.claim/release.
+- Exported new APIs in infrastructure.idempotency.__init__ and added build_idempotency_store(in_progress_ttl_seconds) in infrastructure/idempotency/factory.py.
+- Added packages/access/sync/providers.py:get_access_sync_lock_store() singleton using AccessSyncSettings.lock_stale_seconds TTL.
+- Rewrote packages/access/sync/platform_lock.py as thin wrapper: acquire_lock(lock_store+holder write), current_holder(), release_lock(lock_store).
+- Updated ingress/job_runner/http/slack call paths to inject lock_store and make acquire_lock/release_lock the only atomic gate (removed check-then-acquire flow).
+- Updated app/bin/unlock-sync-job.sh to read lease schema fields (status/claimed_at/in_progress_expires_at) and release via delete-item.
+- Updated/validated related tests in idempotency and access sync modules.
+
+Validation evidence:
+- cd app && uv run ruff check . -> pass
+- cd app && uv run pytest tests --ignore=tests/smoke -> pass (2980 passed)
+- cd app && uv run pytest tests/unit/infrastructure/idempotency/test_lease.py tests/unit/infrastructure/idempotency/test_factory.py tests/unit/packages/access/sync/test_access_sync_routes.py tests/unit/packages/access/sync/test_job_runner.py tests/unit/packages/access/sync/test_platform_lock.py tests/unit/packages/access/sync/test_providers.py -> pass (39 passed)
+- Full mypy gate still reports pre-existing repository-wide failures outside this change set (legacy modules/integrations); touched tests pass targeted mypy.
+
+DoD remaining for human verification:
+- PR text should reference decisions/reliability.md and cross-reference TASK-6.
+- Optional manual dry-run of unlock script against target DynamoDB environment.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
