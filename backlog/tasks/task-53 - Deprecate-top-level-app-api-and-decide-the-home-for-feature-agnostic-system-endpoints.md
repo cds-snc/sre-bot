@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-27 16:07'
+updated_date: '2026-07-27 16:13'
 labels:
   - architecture
   - layers
@@ -14,6 +15,7 @@ dependencies: []
 references:
   - decisions/layers.md
   - decisions/feature-packages.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1357'
 priority: medium
 ordinal: 81000
 ---

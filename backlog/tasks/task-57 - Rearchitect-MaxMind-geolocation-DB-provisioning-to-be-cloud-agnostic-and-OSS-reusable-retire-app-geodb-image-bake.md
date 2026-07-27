@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-27 16:08'
+updated_date: '2026-07-27 16:13'
 labels:
   - architecture
   - layers
@@ -15,6 +16,7 @@ dependencies: []
 references:
   - decisions/layers.md
   - decisions/cloud-portability.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1361'
 priority: medium
 ordinal: 85000
 ---

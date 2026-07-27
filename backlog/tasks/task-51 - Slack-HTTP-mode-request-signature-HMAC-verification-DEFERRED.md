@@ -4,7 +4,7 @@ title: Slack HTTP-mode request-signature (HMAC) verification (DEFERRED)
 status: To Do
 assignee: []
 created_date: '2026-07-27 14:02'
-updated_date: '2026-07-27 14:03'
+updated_date: '2026-07-27 16:13'
 labels:
   - security
   - slack
@@ -17,6 +17,7 @@ references:
   - decisions/transport-slack.md
   - decisions/security.md
   - 'https://github.com/cds-snc/sre-bot/issues/1263'
+  - 'https://github.com/cds-snc/sre-bot/issues/1355'
 priority: low
 ordinal: 79000
 ---
