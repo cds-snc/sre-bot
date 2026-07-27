@@ -3,10 +3,11 @@ id: TASK-5.4.2
 title: >-
   Access Sync: delete legacy IdempotencyService/DynamoDBCache stack now
   unreferenced
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-27 18:43'
-updated_date: '2026-07-27 20:31'
+updated_date: '2026-07-27 20:39'
 labels:
   - security
   - phase-0
