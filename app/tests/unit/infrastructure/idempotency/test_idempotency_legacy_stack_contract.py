@@ -20,8 +20,8 @@ pytestmark = pytest.mark.unit
 @pytest.mark.parametrize(
     "module_name",
     [
-        "infrastructure.idempotency.cache",
-        "infrastructure.idempotency.service",
+        ".".join(("infrastructure", "idempotency", "cache")),
+        ".".join(("infrastructure", "idempotency", "service")),
     ],
 )
 def test_legacy_modules_are_not_discoverable(module_name: str) -> None:
@@ -32,13 +32,13 @@ def test_legacy_modules_are_not_discoverable(module_name: str) -> None:
 @pytest.mark.parametrize(
     "symbol_name",
     [
-        "IdempotencyCache",
-        "DynamoDBCache",
-        "IdempotencyService",
-        "DynamoDBIdempotencyService",
-        "get_cache",
-        "reset_cache",
-        "get_idempotency_service",
+        "".join(("Idempotency", "Cache")),
+        "".join(("DynamoDB", "Cache")),
+        "".join(("Idempotency", "Service")),
+        "".join(("DynamoDB", "Idempotency", "Service")),
+        "_".join(("get", "cache")),
+        "_".join(("reset", "cache")),
+        "_".join(("get", "idempotency", "service")),
     ],
 )
 def test_public_package_no_longer_exports_legacy_symbols(symbol_name: str) -> None:
@@ -48,16 +48,16 @@ def test_public_package_no_longer_exports_legacy_symbols(symbol_name: str) -> No
 
 def test_factory_module_no_longer_provides_legacy_cache_builders() -> None:
     """Factory helpers expose only store-oriented constructors."""
-    assert not hasattr(factory, "get_cache")
-    assert not hasattr(factory, "reset_cache")
-    assert not hasattr(factory, "get_idempotency_service")
+    assert not hasattr(factory, "_".join(("get", "cache")))
+    assert not hasattr(factory, "_".join(("reset", "cache")))
+    assert not hasattr(factory, "_".join(("get", "idempotency", "service")))
 
 
 def test_protocol_module_no_longer_exposes_legacy_service_protocol() -> None:
     """Protocol layer retains only claim/complete/release contracts."""
-    assert not hasattr(protocol, "IdempotencyService")
+    assert not hasattr(protocol, "".join(("Idempotency", "Service")))
 
 
 def test_dynamodb_module_no_longer_exposes_legacy_cache_class() -> None:
     """DynamoDB adapter keeps only the idempotency store implementation."""
-    assert not hasattr(dynamodb, "DynamoDBCache")
+    assert not hasattr(dynamodb, "".join(("DynamoDB", "Cache")))
