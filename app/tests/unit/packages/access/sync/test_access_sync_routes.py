@@ -12,6 +12,7 @@ from infrastructure.security import get_current_user
 from infrastructure.security.models import AuthPrincipalSource, User
 from packages.access.sync.domain import SyncOutcome
 from packages.access.sync.interactions.http import router, sync_endpoint
+from packages.access.sync.interactions.ingress import EnqueuedJob
 from packages.access.sync.job_runner import run_user_sync_job
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
@@ -318,6 +319,46 @@ def test_run_user_sync_job_stores_failed_outcome_on_coordinator_error():
     args, _ = fake_idempotency.set.call_args_list[1]
     assert args[0] == "access_sync:user_lock:aws:user@example.com"
     assert args[1]["status"] == "failed"
+
+
+@pytest.mark.unit
+def test_sync_endpoint_passes_lock_store_to_ingress_enqueue():
+    """HTTP sync endpoint should resolve lock_store once and pass it into ingress."""
+    fake_idempotency = MagicMock()
+    sentinel_lock_store = object()
+    enqueued = EnqueuedJob(
+        job_id="job-lock-store-wire-1",
+        platform="aws",
+        user_email="user@example.com",
+        dry_run=False,
+        started_at="2026-07-27T12:00:00+00:00",
+        already_running=False,
+    )
+
+    with (
+        patch(
+            "packages.access.sync.interactions.http.get_idempotency_service",
+            return_value=fake_idempotency,
+        ),
+        patch(
+            "packages.access.sync.interactions.http.get_access_sync_lock_store",
+            return_value=sentinel_lock_store,
+        ),
+        patch(
+            "packages.access.sync.interactions.http.enqueue_user_sync",
+            return_value=OperationResult.success(data=enqueued),
+        ) as mock_enqueue,
+    ):
+        result = sync_endpoint(
+            _make_request(),
+            response=Response(),
+            coordinator=_FakeCoordinator(OperationResult.success()),
+            settings=_Settings(enabled=True),
+            current_user=_make_user(),
+        )
+
+    assert result.job_id == "job-lock-store-wire-1"
+    assert mock_enqueue.call_args.kwargs["lock_store"] is sentinel_lock_store
 
 
 @pytest.mark.unit

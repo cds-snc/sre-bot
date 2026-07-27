@@ -262,3 +262,73 @@ def test_run_platform_sync_job_sanitizes_exception_to_sync_failed():
     assert record["status"] == JobStatus.FAILED
     assert record["error"] == SyncJobError.SYNC_FAILED
     assert "network down" not in record.get("error", "")
+
+
+@pytest.mark.unit
+def test_run_user_sync_job_releases_via_lock_store_not_idempotency_set():
+    """User job completion should release the lock through lock_store.release only."""
+    idempotency = MagicMock()
+    lock_store = MagicMock()
+    coordinator = _make_coordinator(
+        OperationResult.success(
+            data=SyncOutcome(
+                planned_actions=["provision_user"],
+                applied_actions=["provision_user"],
+                requires_manual_action=False,
+            )
+        )
+    )
+
+    run_user_sync_job(
+        coordinator=coordinator,
+        idempotency=idempotency,
+        lock_store=lock_store,
+        job_id="job-lock-store-user-1",
+        user_email="eve@example.com",
+        platform="aws",
+        dry_run=False,
+        request_id="req-lock-store-user-1",
+        started_at="2026-04-21T00:00:00+00:00",
+        job_ttl_seconds=86400,
+    )
+
+    assert idempotency.set.call_count == 1
+    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:eve@example.com")
+
+
+@pytest.mark.unit
+def test_run_platform_sync_job_releases_via_lock_store_not_idempotency_set():
+    """Platform job completion should release the lock through lock_store.release only."""
+    idempotency = MagicMock()
+    lock_store = MagicMock()
+    coordinator = _make_coordinator(
+        OperationResult.success(
+            data=ReconciliationOutcome(
+                platform="aws",
+                users_synced=1,
+                users_converged=1,
+                orphans_found=0,
+                requires_manual_action_count=0,
+                changed_user_count=0,
+                unchanged_user_count=1,
+                action_counts={},
+                lifecycle_actions={},
+                entitlements_by_action={},
+            )
+        )
+    )
+
+    run_platform_sync_job(
+        coordinator=coordinator,
+        idempotency=idempotency,
+        lock_store=lock_store,
+        job_id="job-lock-store-platform-1",
+        platform="aws",
+        dry_run=False,
+        request_id="req-lock-store-platform-1",
+        started_at="2026-04-21T00:00:00+00:00",
+        job_ttl_seconds=86400,
+    )
+
+    assert idempotency.set.call_count == 2
+    lock_store.release.assert_called_once_with("access_sync:platform_lock:aws")
