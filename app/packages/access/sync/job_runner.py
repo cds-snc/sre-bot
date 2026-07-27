@@ -24,7 +24,7 @@ from datetime import UTC, datetime
 
 import structlog
 
-from infrastructure.idempotency import IdempotencyService, IdempotencyStore
+from infrastructure.idempotency import IdempotencyStore
 from packages.access.sync.application import AccessSyncApplicationServicePort
 from packages.access.sync.domain import ReconciliationOutcome, SyncOutcome
 from packages.access.sync.job_models import (
@@ -37,6 +37,7 @@ from packages.access.sync.job_models import (
     SyncJobError,
     UserRunningRecord,
 )
+from packages.access.sync.job_status_store import JobStatusStore
 from packages.access.sync.platform_lock import (
     platform_lock_key,
     release_lock,
@@ -53,7 +54,7 @@ logger = structlog.get_logger()
 
 def run_user_sync_job(
     coordinator: AccessSyncApplicationServicePort,
-    idempotency: IdempotencyService,
+    job_status_store: JobStatusStore,
     lock_store: IdempotencyStore,
     job_id: str,
     user_email: str,
@@ -129,13 +130,13 @@ def run_user_sync_job(
         log.error("user_sync_job_error", error=str(exc), error_type=type(exc).__name__)
 
     payload = record.to_dict()
-    idempotency.set(job_id, payload, ttl_seconds=job_ttl_seconds)
+    job_status_store.put(job_id, payload, ttl_seconds=job_ttl_seconds)
     release_lock(user_lock_key(platform, user_email), lock_store)
 
 
 def run_platform_sync_job(
     coordinator: AccessSyncApplicationServicePort,
-    idempotency: IdempotencyService,
+    job_status_store: JobStatusStore,
     lock_store: IdempotencyStore,
     job_id: str,
     platform: str,
@@ -155,7 +156,7 @@ def run_platform_sync_job(
         correlation_id=request_id,
         poll_path=f"/api/v1/access/sync-runs/{job_id}",
     )
-    idempotency.set(
+    job_status_store.put(
         job_id,
         PlatformRunningRecord(
             job_id=job_id,
@@ -234,7 +235,7 @@ def run_platform_sync_job(
         )
 
     payload = record.to_dict()
-    idempotency.set(job_id, payload, ttl_seconds=job_ttl_seconds)
+    job_status_store.put(job_id, payload, ttl_seconds=job_ttl_seconds)
     release_lock(platform_lock_key(platform), lock_store)
 
 
@@ -245,7 +246,7 @@ def run_platform_sync_job(
 
 def spawn_user_sync_thread(
     coordinator: AccessSyncApplicationServicePort,
-    idempotency: IdempotencyService,
+    job_status_store: JobStatusStore,
     lock_store: IdempotencyStore,
     job_id: str,
     user_email: str,
@@ -268,12 +269,12 @@ def spawn_user_sync_thread(
         started_at=started_at,
     )
     job_record = {**lock_record.to_dict(), "status": JobStatus.IN_PROGRESS}
-    idempotency.set(job_id, job_record, ttl_seconds=job_ttl_seconds)
+    job_status_store.put(job_id, job_record, ttl_seconds=job_ttl_seconds)
     thread = threading.Thread(
         target=run_user_sync_job,
         kwargs={
             "coordinator": coordinator,
-            "idempotency": idempotency,
+            "job_status_store": job_status_store,
             "lock_store": lock_store,
             "job_id": job_id,
             "user_email": user_email,
@@ -291,7 +292,7 @@ def spawn_user_sync_thread(
 
 def spawn_platform_sync_thread(
     coordinator: AccessSyncApplicationServicePort,
-    idempotency: IdempotencyService,
+    job_status_store: JobStatusStore,
     lock_store: IdempotencyStore,
     job_id: str,
     platform: str,
@@ -308,12 +309,12 @@ def spawn_platform_sync_thread(
         started_at=started_at,
     )
     job_record = {**lock_record.to_dict(), "status": JobStatus.IN_PROGRESS}
-    idempotency.set(job_id, job_record, ttl_seconds=job_ttl_seconds)
+    job_status_store.put(job_id, job_record, ttl_seconds=job_ttl_seconds)
     thread = threading.Thread(
         target=run_platform_sync_job,
         kwargs={
             "coordinator": coordinator,
-            "idempotency": idempotency,
+            "job_status_store": job_status_store,
             "lock_store": lock_store,
             "job_id": job_id,
             "platform": platform,

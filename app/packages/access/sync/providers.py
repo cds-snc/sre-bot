@@ -12,6 +12,7 @@ from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterA
 from packages.access.sync.adapters.fake_platform import FakePlatformAdapter
 from packages.access.sync.application import AccessSyncApplicationService
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
+from packages.access.sync.job_status_store import JobStatusStore
 from packages.access.sync.store import SyncRunRepository
 
 
@@ -47,6 +48,12 @@ def get_access_sync_adapters() -> dict[str, AccessSyncAdapter]:
 def get_sync_run_repository() -> SyncRunRepository:
     """Return the singleton SyncRunRepository instance."""
     return SyncRunRepository(storage=get_storage_service())
+
+
+@functools.lru_cache(maxsize=1)
+def get_access_sync_job_status_store() -> JobStatusStore:
+    """Return the singleton JobStatusStore instance."""
+    return JobStatusStore(storage=get_storage_service())
 
 
 @functools.lru_cache(maxsize=1)

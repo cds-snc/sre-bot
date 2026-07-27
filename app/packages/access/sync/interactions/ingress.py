@@ -14,13 +14,14 @@ from typing import Protocol
 
 import structlog
 
-from infrastructure.idempotency import IdempotencyService, IdempotencyStore
+from infrastructure.idempotency import IdempotencyStore
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.sync.application import AccessSyncApplicationServicePort
 from packages.access.sync.job_runner import (
     spawn_platform_sync_thread,
     spawn_user_sync_thread,
 )
+from packages.access.sync.job_status_store import JobStatusStore
 from packages.access.sync.platform_lock import (
     acquire_lock,
     current_holder,
@@ -52,7 +53,7 @@ class EnqueuedJob:
 
 def enqueue_user_sync(
     coordinator: AccessSyncApplicationServicePort,
-    idempotency: IdempotencyService,
+    job_status_store: JobStatusStore,
     lock_store: IdempotencyStore,
     settings: _IngressSettings,
     user_email: str,
@@ -91,10 +92,10 @@ def enqueue_user_sync(
         lock_key=lock_key,
         payload=lock_payload,
         lock_store=lock_store,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         ttl_seconds=settings.job_ttl_seconds,
     ):
-        running = current_holder(lock_key, idempotency) or {}
+        running = current_holder(lock_key, job_status_store) or {}
         existing_job_id = running.get("job_id", "")
         logger.bind(platform=platform, user_email=user_email).info("user_sync_already_running", existing_job_id=existing_job_id)
         return OperationResult.success(
@@ -110,7 +111,7 @@ def enqueue_user_sync(
 
     spawn_user_sync_thread(
         coordinator=coordinator,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         lock_store=lock_store,
         job_id=job_id,
         user_email=user_email,
@@ -134,7 +135,7 @@ def enqueue_user_sync(
 
 def enqueue_platform_sync(
     coordinator: AccessSyncApplicationServicePort,
-    idempotency: IdempotencyService,
+    job_status_store: JobStatusStore,
     lock_store: IdempotencyStore,
     settings: _IngressSettings,
     platform: str,
@@ -172,10 +173,10 @@ def enqueue_platform_sync(
         lock_key=lock_key,
         payload=lock_payload,
         lock_store=lock_store,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         ttl_seconds=settings.job_ttl_seconds,
     ):
-        running = current_holder(lock_key, idempotency) or {}
+        running = current_holder(lock_key, job_status_store) or {}
         existing_job_id = running.get("job_id", "")
         logger.bind(platform=platform).info("platform_sync_already_running", existing_job_id=existing_job_id)
         return OperationResult.success(
@@ -191,7 +192,7 @@ def enqueue_platform_sync(
 
     spawn_platform_sync_thread(
         coordinator=coordinator,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         lock_store=lock_store,
         job_id=job_id,
         platform=platform,

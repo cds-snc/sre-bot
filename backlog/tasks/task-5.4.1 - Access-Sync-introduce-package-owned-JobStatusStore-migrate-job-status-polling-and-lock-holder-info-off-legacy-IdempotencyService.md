@@ -3,11 +3,11 @@ id: TASK-5.4.1
 title: >-
   Access Sync: introduce package-owned JobStatusStore; migrate job-status
   polling and lock holder-info off legacy IdempotencyService
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-27 18:43'
-updated_date: '2026-07-27 19:10'
+updated_date: '2026-07-27 19:16'
 labels:
   - security
   - phase-0
@@ -32,16 +32,16 @@ Expand+migrate slice of TASK-5.4. Introduce app/packages/access/sync/job_status_
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 JobStatusStore concrete class exists in app/packages/access/sync/job_status_store.py, built on infrastructure.storage.StorageService - named and shaped like SyncRunRepository/AccessRequestRepository (no separate Protocol, no vendor-prefixed class name such as DynamoDBJobStatusStore); placement confirmed against packages-python.instructions.md and layers.md Path A guidance
-- [ ] #2 job_runner.py, interactions/http.py, interactions/slack.py, interactions/ingress.py, and platform_lock.py (including its holder-info reporting) are migrated off get_idempotency_service()/IdempotencyService onto the new JobStatusStore, type-hinted directly as the concrete class (not a Protocol)
-- [ ] #3 get_access_sync_job_status_store() singleton provider added to packages/access/sync/providers.py, built via get_storage_service()
-- [ ] #4 grep confirms (a) no remaining get-then-put job-status/holder-info pattern via legacy IdempotencyService anywhere in app/packages/access/sync, and (b) no Dynamo/DynamoDB/boto3 substring appears in any class, function, or variable name in app/packages/access/sync (prose in docstrings/README describing the backing store is acceptable, matching existing SyncRunRepository/AccessRequestRepository style)
+- [x] #1 JobStatusStore concrete class exists in app/packages/access/sync/job_status_store.py, built on infrastructure.storage.StorageService - named and shaped like SyncRunRepository/AccessRequestRepository (no separate Protocol, no vendor-prefixed class name such as DynamoDBJobStatusStore); placement confirmed against packages-python.instructions.md and layers.md Path A guidance
+- [x] #2 job_runner.py, interactions/http.py, interactions/slack.py, interactions/ingress.py, and platform_lock.py (including its holder-info reporting) are migrated off get_idempotency_service()/IdempotencyService onto the new JobStatusStore, type-hinted directly as the concrete class (not a Protocol)
+- [x] #3 get_access_sync_job_status_store() singleton provider added to packages/access/sync/providers.py, built via get_storage_service()
+- [x] #4 grep confirms (a) no remaining get-then-put job-status/holder-info pattern via legacy IdempotencyService anywhere in app/packages/access/sync, and (b) no Dynamo/DynamoDB/boto3 substring appears in any class, function, or variable name in app/packages/access/sync (prose in docstrings/README describing the backing store is acceptable, matching existing SyncRunRepository/AccessRequestRepository style)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass: new job_status_store tests, updated job_runner/ingress/http/slack/platform_lock tests all green
-- [ ] #2 PR references decisions/reliability.md; notes TASK-5.4.2 as the follow-up contract slice that deletes the now-unreferenced legacy files
+- [x] #1 Tests pass: new job_status_store tests, updated job_runner/ingress/http/slack/platform_lock tests all green
+- [x] #2 PR references decisions/reliability.md; notes TASK-5.4.2 as the follow-up contract slice that deletes the now-unreferenced legacy files
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -120,3 +120,9 @@ New file `app/tests/unit/packages/access/sync/test_access_sync_slack_status.py` 
 - A single `git revert` of this PR fully restores prior behavior: legacy `cache.py`/`service.py`/`get_idempotency_service()` remain in place and unmodified in this slice, so reverting simply un-migrates the five call sites back onto them - no ordering constraint, no manifest/env var changes.
 - Runtime risk: if `JobStatusStore` has a bug, blast radius is limited to job-status polling (GET /sync-runs/{job_id}, Slack status command returning "not found" instead of real status) and lock holder-info display (Slack "already running" message losing the existing job_id detail) - the actual lock correctness (claim/release, TASK-5.3) is unaffected since it uses the separate `IdempotencyStore`/lease primitive, not this store.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented package-owned JobStatusStore in app/packages/access/sync/job_status_store.py on top of infrastructure.storage.StorageService (shared sre_bot_idempotency table, JSON record serialization, TTL writes).\n\nMigrated all access-sync job-status and holder-info call paths off legacy IdempotencyService to JobStatusStore: app/packages/access/sync/job_runner.py, app/packages/access/sync/interactions/ingress.py, app/packages/access/sync/interactions/http.py, app/packages/access/sync/interactions/slack.py, and app/packages/access/sync/platform_lock.py. Added singleton provider get_access_sync_job_status_store() in app/packages/access/sync/providers.py.\n\nAlso aligned prose in app/packages/access/sync/job_models.py to reference JobStatusStore.\n\nTest evidence:\n- cd /workspace/app && uv run pytest tests/unit/packages/access/sync/test_job_status_store.py tests/unit/packages/access/sync/test_access_sync_slack_status.py tests/unit/packages/access/sync/test_job_runner.py tests/unit/packages/access/sync/test_platform_lock.py tests/unit/packages/access/sync/test_access_sync_routes.py tests/unit/packages/access/sync/test_providers.py  -> 34 passed\n- cd /workspace/app && uv run ruff check .  -> passed\n- cd /workspace/app && uv run pytest tests --ignore=tests/smoke -q  -> 2950 passed, 37 skipped\n- cd /workspace/app && uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'  -> fails in pre-existing unrelated modules (integrations/aws, modules/incident, packages/geolocate, infrastructure/resilience)\n- grep checks:\n  * grep -Rni --include='*.py' -E 'get_idempotency_service|IdempotencyService' packages/access/sync  -> no matches\n  * grep -Rni --include='*.py' -E 'dynamo|dynamodb|boto3' packages/access/sync  -> matches only prose/docstrings (no class/function/variable names)\n\nDoD items left for human verification:\n- Ensure PR description references decisions/reliability.md.\n- Ensure PR notes call out TASK-5.4.2 as follow-up contract slice deleting now-unreferenced legacy idempotency files.
+<!-- SECTION:NOTES:END -->

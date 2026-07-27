@@ -15,7 +15,6 @@ from typing import Annotated, Protocol
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Response, Security
 
-from infrastructure.idempotency import get_idempotency_service
 from infrastructure.operations import OperationResult
 from infrastructure.security import get_current_user
 from infrastructure.security.models import User
@@ -27,6 +26,7 @@ from packages.access.sync.interactions.ingress import (
 from packages.access.sync.presenters import to_http_status_response
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
+    get_access_sync_job_status_store,
     get_access_sync_lock_store,
     get_access_sync_settings,
 )
@@ -141,13 +141,13 @@ def sync_endpoint(
 
     coordinator_dep = _resolve_coordinator(coordinator)
 
-    idempotency = get_idempotency_service()
+    job_status_store = get_access_sync_job_status_store()
     lock_store = get_access_sync_lock_store()
 
     if isinstance(request, UserSyncRequest):
         result = enqueue_user_sync(
             coordinator=coordinator_dep,
-            idempotency=idempotency,
+            job_status_store=job_status_store,
             lock_store=lock_store,
             settings=settings,
             user_email=str(request.user_email),
@@ -172,7 +172,7 @@ def sync_endpoint(
     # Platform sync
     result = enqueue_platform_sync(
         coordinator=coordinator_dep,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
         lock_store=lock_store,
         settings=settings,
         platform=request.platform,
@@ -213,8 +213,8 @@ def get_sync_job_status(
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-sync"])],
 ) -> SyncJobStatusResponse:
     """Return the current status and outcome of a sync job."""
-    idempotency = get_idempotency_service()
-    record = idempotency.get(job_id)
+    job_status_store = get_access_sync_job_status_store()
+    record = job_status_store.get(job_id)
     if record is None:
         raise HTTPException(status_code=404, detail="Sync job not found or has expired")
     return to_http_status_response(record)
