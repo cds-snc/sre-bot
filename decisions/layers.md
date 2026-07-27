@@ -41,6 +41,19 @@ app/integrations/     Outbound clients. Thin, vendor-specific, raise SDK excepti
 
 **The invariant:** feature domain and service code never names a concrete vendor type. Protocols in, adapters at the edge.
 
+**Non-tier top-level directories.** The only sanctioned top-level entries under `app/` are the three tiers above, the `server/` host process (composition root, lifespan, middleware), and `main.py` (the ASGI entrypoint). Every other current top-level directory is transitional and carries an explicit disposition and ticket — none is a new sanctioned home:
+
+| Directory | Disposition | Ticket |
+| --- | --- | --- |
+| `modules/` | Legacy Slack bot; strangled into feature packages, then deleted. | [migration.md](migration.md) |
+| `jobs/` | Scheduler registry — a vendor-neutral capability; relocate into `infrastructure/`. | TASK-52 |
+| `api/` | Legacy top-level HTTP surface; feature routes move to their owning packages, feature-agnostic system endpoints (health, version, landing) move to the host. | TASK-53 |
+| `bin/` | Operator/dev tooling — **not app runtime code**, exempt from the import rule; kept, but `entry.sh`'s boot-time secret fetch retires once a secret service exists. | TASK-54 |
+| `models/` | Shared boundary DTOs; relocate to owning packages/tiers (live non-module consumers exist), then delete the top-level bag. | TASK-55 |
+| `utils/` | Grab-bag helpers; relocate to the owning tier without introducing upward imports, then delete. | TASK-56 |
+| `locales/` | Legacy `python-i18n` catalogues; deleted at strangler completion, superseded by per-feature catalogues ([i18n.md](i18n.md)). | [migration.md](migration.md), TASK-41 |
+| `geodb/` | AWS/CI-coupled, image-baked MaxMind DB; rearchitect to a configurable, cloud-agnostic, OSS-reusable source. | TASK-57 |
+
 ## Consequences
 
 - Vendor swaps and SDK upgrades don't propagate into features; features are testable with Protocol stubs.
@@ -51,7 +64,8 @@ app/integrations/     Outbound clients. Thin, vendor-specific, raise SDK excepti
 
 - import-linter (see [toolchain.md](toolchain.md)): `packages → infrastructure → integrations` layer contract; `integrations` may import nothing from upper tiers except `infrastructure.operations`; `packages/**` may import `integrations` only inside `adapters/`.
 - No directory named `clients/` exists under `app/`.
+- Every top-level directory under `app/` other than `packages/`, `infrastructure/`, `integrations/`, `server/`, and `main.py` has a disposition row in the non-tier-directories table above (grep the tree against the table when adding one).
 
 ## Migration
 
-Ticket: architecture epic. Tolerated divergences until closed: `infrastructure/clients/` consumers (held by the deprecated-import guardrail baseline), `_next.py` twins, Slack content still in `integrations/slack/`, the upward imports from `integrations/` into `infrastructure/`.
+Ticket: architecture epic. Tolerated divergences until closed: `infrastructure/clients/` consumers (held by the deprecated-import guardrail baseline), `_next.py` twins, Slack content still in `integrations/slack/`, the upward imports from `integrations/` into `infrastructure/`, and the non-tier top-level directories listed above (each held by its own ticket).
