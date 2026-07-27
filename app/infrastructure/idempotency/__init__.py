@@ -1,39 +1,35 @@
-"""Infrastructure idempotency cache.
+"""Infrastructure idempotency primitives.
 
-Provides idempotency protection for API operations with DynamoDB backend for
-multi-instance ECS deployments.
+Provides the atomic claim/complete/release idempotency contract with concrete
+store implementations for multi-instance deployments.
 
-All instances share a common cache table (sre_bot_idempotency) to prevent
-duplicate operations when requests are retried across different ECS tasks.
+Instances can share a common table (sre_bot_idempotency) to prevent duplicate
+operation execution when requests are retried across different ECS tasks.
 
 Usage:
 
-    from infrastructure.idempotency import get_cache
+    from infrastructure.idempotency import ClaimResult, get_idempotency_store
 
-    cache = get_cache()
+    store = get_idempotency_store()
+    outcome = store.claim(idempotency_key)
 
-    # Check for cached response
-    cached = cache.get(idempotency_key)
-    if cached:
-        return cached
+    if outcome.result is ClaimResult.COMPLETED:
+        return outcome.outcome
 
-    # Execute operation
-    response = execute_operation(...)
+    if outcome.result is ClaimResult.IN_PROGRESS:
+        raise RuntimeError("request is already being processed")
 
-    # Cache the successful response
-    cache.set(idempotency_key, response.dict(), ttl_seconds=3600)
+    result = execute_operation(...)
+    store.complete(idempotency_key, result)
+    return result
 """
 
-from infrastructure.idempotency.cache import IdempotencyCache
-from infrastructure.idempotency.dynamodb import DynamoDBCache, DynamoDBIdempotencyStore
+from infrastructure.idempotency.dynamodb import DynamoDBIdempotencyStore
 
 # Factory functions available via direct import to avoid circular deps
 from infrastructure.idempotency.factory import (
     build_idempotency_store,
-    get_cache,
-    get_idempotency_service,
     get_idempotency_store,
-    reset_cache,
     reset_idempotency_store,
 )
 from infrastructure.idempotency.in_memory import InMemoryIdempotencyStore
@@ -41,30 +37,21 @@ from infrastructure.idempotency.lease import acquire_lease, release_lease
 from infrastructure.idempotency.protocol import (
     ClaimOutcome,
     ClaimResult,
-    IdempotencyService,
     IdempotencyStore,
 )
-from infrastructure.idempotency.service import DynamoDBIdempotencyService
 from infrastructure.idempotency.settings import IdempotencySettings, get_idempotency_settings
 
 __all__ = [
-    "IdempotencyCache",
-    "DynamoDBCache",
     "DynamoDBIdempotencyStore",
     "InMemoryIdempotencyStore",
     "ClaimResult",
     "ClaimOutcome",
     "IdempotencyStore",
-    "IdempotencyService",
-    "DynamoDBIdempotencyService",
     "IdempotencySettings",
     "get_idempotency_settings",
-    "get_cache",
-    "reset_cache",
     "build_idempotency_store",
     "get_idempotency_store",
     "reset_idempotency_store",
-    "get_idempotency_service",
     "acquire_lease",
     "release_lease",
 ]

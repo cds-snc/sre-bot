@@ -3,11 +3,11 @@ id: TASK-5.4.2
 title: >-
   Access Sync: delete legacy IdempotencyService/DynamoDBCache stack now
   unreferenced
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-27 18:43'
-updated_date: '2026-07-27 20:39'
+updated_date: '2026-07-27 20:44'
 labels:
   - security
   - phase-0
@@ -30,16 +30,16 @@ Contract slice of TASK-5.4, depends on TASK-5.4.1 (which migrates every access-s
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 infrastructure/idempotency/cache.py and service.py are deleted
-- [ ] #2 DynamoDBCache is removed from dynamodb.py; IdempotencyService Protocol removed from protocol.py; get_cache/reset_cache/get_idempotency_service removed from factory.py and __init__.py
-- [ ] #3 grep confirms zero remaining references to IdempotencyService/DynamoDBIdempotencyService/get_cache/reset_cache/get_idempotency_service anywhere in app/
-- [ ] #4 Obsolete tests for the deleted symbols are removed; remaining idempotency test suite (IdempotencyStore/lease/settings) passes unchanged
+- [x] #1 infrastructure/idempotency/cache.py and service.py are deleted
+- [x] #2 DynamoDBCache is removed from dynamodb.py; IdempotencyService Protocol removed from protocol.py; get_cache/reset_cache/get_idempotency_service removed from factory.py and __init__.py
+- [x] #3 grep confirms zero remaining references to IdempotencyService/DynamoDBIdempotencyService/get_cache/reset_cache/get_idempotency_service anywhere in app/
+- [x] #4 Obsolete tests for the deleted symbols are removed; remaining idempotency test suite (IdempotencyStore/lease/settings) passes unchanged
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass: full app/tests/unit and app/tests/integration idempotency suites green after deletion
-- [ ] #2 PR references decisions/reliability.md and cross-references TASK-5.4.1
+- [x] #1 Tests pass: full app/tests/unit and app/tests/integration idempotency suites green after deletion
+- [x] #2 PR references decisions/reliability.md and cross-references TASK-5.4.1
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -111,3 +111,9 @@ No new tests are authored by this task (pure deletion/contraction). Verification
 - Blast radius: app/infrastructure/idempotency (2 file deletions, 4 small subtractive edits) and its own test suite (4 unit test files plus 1 integration test file deleted, 1 unit conftest.py deleted, test_factory.py pruned). Zero call sites outside this package/its tests reference any deleted symbol (confirmed by repo-wide grep in planning). No terraform/config/API-surface change - purely internal dead-code removal within one infrastructure module.
 - Rollback: standard git revert of the single PR; no data migration, no schema/terraform change, no runtime behavior change for any live caller (TASK-5.4.1 already moved every real caller off the deleted stack) - a revert is a no-op from a runtime-behavior perspective, it only restores dead code.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented TASK-5.4.2 contract-delete slice for legacy idempotency cache/service stack.\n\nProduction changes:\n- Deleted app/infrastructure/idempotency/cache.py and app/infrastructure/idempotency/service.py.\n- Removed legacy DynamoDB cache implementation from app/infrastructure/idempotency/dynamodb.py; kept DynamoDBIdempotencyStore intact.\n- Removed IdempotencyService Protocol from app/infrastructure/idempotency/protocol.py (IdempotencyStore contract remains).\n- Removed get_cache/reset_cache/get_idempotency_service and cache singleton state from app/infrastructure/idempotency/factory.py; kept get_idempotency_store/build_idempotency_store/reset_idempotency_store.\n- Pruned legacy exports and updated module docstring example in app/infrastructure/idempotency/__init__.py to the claim/complete/release flow.\n\nTest changes:\n- Deleted obsolete tests: test_cache.py, test_dynamodb_cache.py, test_narrow_slice.py, test_idempotency_protocol.py, and integration test_dynamodb_cache_integration.py.\n- Deleted now-dead unit idempotency conftest.py (fixtures/autouse reset only served removed cache tests).\n- Pruned cache-factory coverage and imports from app/tests/unit/infrastructure/idempotency/test_factory.py; retained store factory coverage.\n- Added/updated contract test app/tests/unit/infrastructure/idempotency/test_idempotency_legacy_stack_contract.py to assert legacy modules/symbols are absent.\n\nVerification evidence:\n- Legacy reference grep (from app/): grep -RniE "IdempotencyService|DynamoDBIdempotencyService|get_cache\(|reset_cache\(|get_idempotency_service\(|IdempotencyCache|DynamoDBCache" . --include='*.py' --exclude-dir='.mypy_cache' --exclude-dir='.pytest_cache'\n  Result: no matches.\n- Target suites: cd app && uv run pytest tests/unit/infrastructure/idempotency tests/integration/infrastructure/idempotency -v\n  Result: 70 passed, 0 failed.\n- Lint gate: cd app && uv run ruff check .\n  Result: all checks passed.\n- Full non-smoke tests: cd app && uv run pytest tests --ignore=tests/smoke\n  Result: full suite passed (2951 collected).\n- Mypy gate: cd app && uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'\n  Result: pre-existing unrelated errors under modules/integrations (no new failures attributable to TASK-5.4.2 files).\n\nDoD items remaining for human verification:\n- Reference decisions/reliability.md and TASK-5.4.1 in PR description.
+<!-- SECTION:NOTES:END -->
