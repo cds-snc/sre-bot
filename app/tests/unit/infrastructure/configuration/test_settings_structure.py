@@ -4,6 +4,8 @@ Verifies the domain-based organization of settings modules after Phase 1
 refactoring (split by domain pattern).
 """
 
+from infrastructure.logging.settings import LoggingSettings
+
 from infrastructure.configuration.app import get_app_settings
 from infrastructure.configuration.base import (
     FeatureSettings,
@@ -175,6 +177,7 @@ class TestSettingsStructure:
             RetrySettings(),
             ServerSettings(),
             DevSettings(),
+            LoggingSettings(),
         ]
 
         # Verify they are all instances of InfrastructureSettings

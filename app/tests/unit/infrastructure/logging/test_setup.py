@@ -3,14 +3,18 @@
 Tests cover:
 - configure_logging function
 - Test logging suppression in test environment
+- Recursive redaction installed in the real processor chain (TASK-8)
 """
 
 import logging
 
 import pytest
 import structlog
+from infrastructure.logging.settings import LoggingSettings
+from structlog.testing import capture_logs
 
 from infrastructure.logging.setup import (
+    _build_base_processors,
     _is_test_environment,
     configure_logging,
 )
@@ -150,3 +154,42 @@ class TestLoggingBestPractices:
         except ValueError:
             # Should not raise
             logger.exception("An error occurred")
+
+
+@pytest.mark.unit
+class TestPipelineRedaction:
+    """Pipeline-level tests for the recursive redaction processor (TASK-8, SEC-7).
+
+    These exercise the real ordered processor chain built by
+    ``_build_base_processors`` (contextvars merge -> log level -> timestamp ->
+    callsite adder -> otel conventions -> exception formatting -> redaction),
+    not just ``mask_sensitive_data`` in isolation.
+    """
+
+    def test_pipeline_redacts_nested_sensitive_value(self):
+        """AC#1: {"config": {"api_token": "x"}} renders with the token redacted."""
+        processors = _build_base_processors(prod_mode=True, logging_settings=LoggingSettings())
+
+        with capture_logs(processors=processors) as entries:
+            logger = structlog.get_logger()
+            logger.info("config_loaded", config={"api_token": "x"})
+
+        assert len(entries) == 1
+        assert entries[0]["config"]["api_token"] == "***REDACTED***"
+
+    def test_pipeline_redaction_extra_keys_extend_defaults(self):
+        """AC#3: redaction_extra_keys extends the deny-list through the real chain."""
+        logging_settings = LoggingSettings(REDACTION_EXTRA_KEYS=("custom_secret",))
+        processors = _build_base_processors(prod_mode=True, logging_settings=logging_settings)
+
+        with capture_logs(processors=processors) as entries:
+            logger = structlog.get_logger()
+            logger.info(
+                "event_with_custom_field",
+                custom_secret="squirrel",
+                password="hunter2",
+            )
+
+        assert len(entries) == 1
+        assert entries[0]["custom_secret"] == "***REDACTED***"
+        assert entries[0]["password"] == "***REDACTED***"
