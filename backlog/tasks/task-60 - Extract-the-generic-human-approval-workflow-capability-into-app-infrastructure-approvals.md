@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-28 14:33'
+updated_date: '2026-07-28 14:40'
 labels:
   - infrastructure
   - phase-4
@@ -17,6 +18,7 @@ dependencies:
 references:
   - decisions/approvals.md
   - decisions/layers.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1368'
 priority: high
 ordinal: 90000
 ---

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-28 14:33'
+updated_date: '2026-07-28 14:40'
 labels:
   - packages
   - approvals
@@ -16,6 +17,7 @@ dependencies:
 references:
   - decisions/approvals.md
   - decisions/feature-packages.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1370'
 priority: medium
 ordinal: 92000
 ---

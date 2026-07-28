@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-28 14:33'
+updated_date: '2026-07-28 14:40'
 labels:
   - access
   - approvals
@@ -18,6 +19,7 @@ dependencies:
 references:
   - decisions/approvals.md
   - decisions/events.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1369'
 priority: high
 ordinal: 91000
 ---

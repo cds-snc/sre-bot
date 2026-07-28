@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-28 13:19'
-updated_date: '2026-07-28 13:32'
+updated_date: '2026-07-28 14:40'
 labels:
   - infrastructure
   - phase-4
@@ -17,6 +17,7 @@ dependencies:
 references:
   - decisions/reliability.md
   - decisions/cloud-portability.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1366'
 priority: medium
 ordinal: 88000
 ---
