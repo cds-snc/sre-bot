@@ -225,6 +225,9 @@ geodb
 
 credentials.json
 
+# Ruff lint cache (stale cache causes local lint to silently pass while CI fails)
+.ruff_cache/
+
 # Local scratch and temporary working notes
 tmp/
 tmp.json

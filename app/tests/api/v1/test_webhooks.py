@@ -3,13 +3,13 @@ from unittest.mock import ANY, MagicMock, PropertyMock, call, patch
 import httpx
 import pytest
 from fastapi.testclient import TestClient
-from server.body_size_middleware import MaxBodySizeMiddleware
 
 from api.v1.routes import webhooks
 from models.webhooks import (
     WebhookPayload,
     WebhookResult,
 )
+from server.body_size_middleware import MaxBodySizeMiddleware
 from utils.tests import create_test_app
 
 
