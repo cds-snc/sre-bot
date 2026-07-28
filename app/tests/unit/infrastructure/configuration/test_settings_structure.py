@@ -4,8 +4,6 @@ Verifies the domain-based organization of settings modules after Phase 1
 refactoring (split by domain pattern).
 """
 
-from infrastructure.logging.settings import LoggingSettings
-
 from infrastructure.configuration.app import get_app_settings
 from infrastructure.configuration.base import (
     FeatureSettings,
@@ -47,6 +45,7 @@ from infrastructure.configuration.integrations.google import (
     get_google_workspace_settings,
 )
 from infrastructure.idempotency.settings import IdempotencySettings
+from infrastructure.logging.settings import LoggingSettings
 
 
 class TestSettingsStructure:

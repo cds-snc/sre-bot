@@ -10,9 +10,9 @@ import logging
 
 import pytest
 import structlog
-from infrastructure.logging.settings import LoggingSettings
 from structlog.testing import capture_logs
 
+from infrastructure.logging.settings import LoggingSettings
 from infrastructure.logging.setup import (
     _build_base_processors,
     _is_test_environment,
@@ -168,7 +168,7 @@ class TestPipelineRedaction:
 
     def test_pipeline_redacts_nested_sensitive_value(self):
         """AC#1: {"config": {"api_token": "x"}} renders with the token redacted."""
-        processors = _build_base_processors(prod_mode=True, logging_settings=LoggingSettings())
+        processors = _build_base_processors(_prod_mode=True, logging_settings=LoggingSettings())
 
         with capture_logs(processors=processors) as entries:
             logger = structlog.get_logger()
@@ -180,7 +180,7 @@ class TestPipelineRedaction:
     def test_pipeline_redaction_extra_keys_extend_defaults(self):
         """AC#3: redaction_extra_keys extends the deny-list through the real chain."""
         logging_settings = LoggingSettings(REDACTION_EXTRA_KEYS=("custom_secret",))
-        processors = _build_base_processors(prod_mode=True, logging_settings=logging_settings)
+        processors = _build_base_processors(_prod_mode=True, logging_settings=logging_settings)
 
         with capture_logs(processors=processors) as entries:
             logger = structlog.get_logger()

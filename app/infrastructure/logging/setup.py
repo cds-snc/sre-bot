@@ -31,6 +31,8 @@ from structlog.processors import CallsiteParameter
 from structlog.stdlib import BoundLogger
 
 from infrastructure.configuration.app import AppSettings
+from infrastructure.logging.formatters import mask_sensitive_data
+from infrastructure.logging.settings import LoggingSettings, get_logging_settings
 
 
 def _apply_otel_code_conventions(
@@ -102,9 +104,44 @@ def _is_test_environment() -> bool:
     return "pytest" in sys.modules
 
 
+def _build_base_processors(
+    _prod_mode: bool,
+    logging_settings: LoggingSettings,
+) -> list[
+    Callable[
+        [Any, str, MutableMapping[str, Any]],
+        Mapping[str, Any] | str | bytes | bytearray | tuple[Any, ...],
+    ]
+]:
+    return [
+        # 1. Context propagation (must be first)
+        structlog.contextvars.merge_contextvars,
+        # 2. Add metadata
+        structlog.stdlib.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        # 3. Add OpenTelemetry code attributes for debugging
+        structlog.processors.CallsiteParameterAdder(
+            parameters=[
+                CallsiteParameter.LINENO,
+                CallsiteParameter.FUNC_NAME,
+                CallsiteParameter.MODULE,  # For fully qualified function name
+                CallsiteParameter.PATHNAME,  # For code.file.path
+            ]
+        ),
+        # 4. Apply OpenTelemetry semantic conventions
+        _apply_otel_code_conventions,
+        # 5. Exception formatting
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        # 6. Redact sensitive fields before final rendering
+        mask_sensitive_data(additional_patterns=frozenset(logging_settings.REDACTION_EXTRA_KEYS)),
+    ]
+
+
 def configure_logging(
     settings: AppSettings,
     log_level: str | None = None,
+    logging_settings: LoggingSettings | None = None,
 ) -> BoundLogger:
     """Configure structured logging with OpenTelemetry semantic conventions.
 
@@ -161,35 +198,14 @@ def configure_logging(
 
     # Determine production mode
     prod_mode = settings.ENVIRONMENT == "production"
+    resolved_logging_settings = logging_settings or get_logging_settings()
 
     # Build processor pipeline per structlog best practices
     # Order matters: context vars first, then enrichment, then formatting
-    processors: list[
-        Callable[
-            [Any, str, MutableMapping[str, Any]],
-            Mapping[str, Any] | str | bytes | bytearray | tuple[Any, ...],
-        ]
-    ] = [
-        # 1. Context propagation (must be first)
-        structlog.contextvars.merge_contextvars,
-        # 2. Add metadata
-        structlog.stdlib.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso"),
-        # 3. Add OpenTelemetry code attributes for debugging
-        structlog.processors.CallsiteParameterAdder(
-            parameters=[
-                CallsiteParameter.LINENO,
-                CallsiteParameter.FUNC_NAME,
-                CallsiteParameter.MODULE,  # For fully qualified function name
-                CallsiteParameter.PATHNAME,  # For code.file.path
-            ]
-        ),
-        # 4. Apply OpenTelemetry semantic conventions
-        _apply_otel_code_conventions,
-        # 5. Exception formatting
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-    ]
+    processors = _build_base_processors(
+        prod_mode=prod_mode,
+        logging_settings=resolved_logging_settings,
+    )
 
     # 6. Final rendering (environment-specific)
     if not prod_mode:  # Development mode

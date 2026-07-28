@@ -105,7 +105,11 @@ def test_lifespan_get_logger_configures_logging(mock_configure_logging, mock_set
     logger = _get_logger_from_app(mock_settings)
 
     # Assert
-    mock_configure_logging.assert_called_once_with(settings=mock_settings)
+    # _get_logger_from_app now passes both settings and logging_settings to configure_logging
+    assert mock_configure_logging.call_count == 1
+    call_kwargs = mock_configure_logging.call_args.kwargs
+    assert call_kwargs["settings"] == mock_settings
+    assert "logging_settings" in call_kwargs
     assert logger == mock_logger
 
 

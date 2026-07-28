@@ -61,6 +61,7 @@ from infrastructure.logging.formatters import (
     mask_sensitive_data,
     truncate_large_values,
 )
+from infrastructure.logging.settings import LoggingSettings, get_logging_settings
 from infrastructure.logging.setup import (
     configure_logging,
 )
@@ -79,4 +80,7 @@ __all__ = [
     "truncate_large_values",
     "add_environment_info",
     "SENSITIVE_PATTERNS",
+    # Settings
+    "LoggingSettings",
+    "get_logging_settings",
 ]
