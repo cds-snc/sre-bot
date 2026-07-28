@@ -3,6 +3,7 @@ from unittest.mock import ANY, MagicMock, PropertyMock, call, patch
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from server.body_size_middleware import MaxBodySizeMiddleware
 
 from api.v1.routes import webhooks
 from models.webhooks import (
@@ -76,6 +77,62 @@ def test_handle_webhook_malformed_json_string(test_client):
     response = test_client.post("/hook/id", json=payload)
     assert response.status_code == 400
     assert response.json() == {"detail": "Unterminated string starting at: line 1 column 18 (char 17)"}
+
+
+@patch("api.v1.routes.webhooks.webhooks.get_webhook")
+def test_handle_webhook_rejects_oversized_body(mock_get_webhook):
+    """An oversized webhook body is rejected before route processing runs."""
+    test_app = create_test_app(webhooks.router, middlewares=[(MaxBodySizeMiddleware, {"max_bytes": 10})])
+    with TestClient(test_app) as client:
+        response = client.post(
+            "/hook/id",
+            content=b'{"text": "this payload is definitely larger than ten bytes"}',
+            headers={"content-type": "application/json"},
+        )
+
+    assert response.status_code == 413
+    mock_get_webhook.assert_not_called()
+
+
+@patch("api.v1.routes.webhooks.map_emails_to_slack_users")
+@patch("api.v1.routes.webhooks.log_to_sentinel")
+@patch("api.v1.routes.webhooks.append_incident_buttons")
+@patch("api.v1.routes.webhooks.handle_webhook_payload")
+@patch("api.v1.routes.webhooks.webhooks.increment_invocation_count")
+@patch("api.v1.routes.webhooks.webhooks.get_webhook")
+def test_handle_webhook_under_body_size_cap_still_succeeds(
+    mock_get_webhook,
+    mock_increment_invocation,
+    mock_handle_webhook_payload,
+    mock_append_incident_buttons,
+    mock_log_to_sentinel,
+    mock_map_emails_to_slack_users,
+    bot_mock,
+):
+    """A legitimate small webhook body still succeeds with the size cap middleware wired in."""
+    payload = {"text": "some text"}
+    mock_get_webhook.return_value = {
+        "channel": {"S": "test-channel"},
+        "hook_type": {"S": "alert"},
+        "active": {"BOOL": True},
+    }
+    mock_handle_webhook_payload.return_value = WebhookResult(
+        status="success",
+        action="post",
+        payload=WebhookPayload(text="some text"),
+    )
+    mock_append_incident_buttons.return_value = WebhookPayload(
+        text="some text",
+        channel="test-channel",
+    )
+
+    test_app = create_test_app(webhooks.router, middlewares=[(MaxBodySizeMiddleware, {"max_bytes": 1_048_576})])
+    test_app.state.bot = bot_mock
+    with TestClient(test_app) as client:
+        response = client.post("/hook/id", json=payload)
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
 
 
 @patch("api.v1.routes.webhooks.webhooks.get_webhook")

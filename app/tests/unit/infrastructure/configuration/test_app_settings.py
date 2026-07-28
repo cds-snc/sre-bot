@@ -78,6 +78,24 @@ class TestAppSettingsEnvironment:
 
         assert settings.DEV_BYPASS_ENABLED is True
 
+
+class TestAppSettingsWebhookMaxBodyBytes:
+    """Behavior tests for the webhook body-size cap setting."""
+
+    def test_webhook_max_body_bytes_default(self):
+        """Default cap should match AWS SNS's own 256 KiB publish-size ceiling."""
+        settings = AppSettings()
+
+        assert settings.WEBHOOK_MAX_BODY_BYTES == 262_144
+
+    def test_webhook_max_body_bytes_configurable_via_env(self, monkeypatch):
+        """The cap should be overridable via the WEBHOOK_MAX_BODY_BYTES env var."""
+        monkeypatch.setenv("WEBHOOK_MAX_BODY_BYTES", "1024")
+
+        settings = AppSettings()
+
+        assert settings.WEBHOOK_MAX_BODY_BYTES == 1024
+
     def test_contract_app_settings_has_no_legacy_production_property(self):
         """Contract: AppSettings no longer exposes the legacy production shim."""
         settings = AppSettings(ENVIRONMENT="production")
