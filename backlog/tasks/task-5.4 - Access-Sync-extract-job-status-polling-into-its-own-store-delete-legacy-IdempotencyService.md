@@ -3,10 +3,10 @@ id: TASK-5.4
 title: >-
   Access Sync: extract job-status polling into its own store; delete legacy
   IdempotencyService
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-24 17:58'
-updated_date: '2026-07-27 18:53'
+updated_date: '2026-07-28 12:24'
 labels:
   - security
   - phase-0
@@ -39,16 +39,16 @@ Note: if TASK-5.2 and/or TASK-5.3 have not yet migrated their own call sites off
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A small, package-owned Protocol (e.g. JobStatusStore) exists under app/packages/access/sync/ for job-status records (running/completed/failed); placement confirmed against .github/instructions/packages-python.instructions.md
-- [ ] #2 app/packages/access/sync/interactions/http.py (~line 213), interactions/slack.py (~line 357), and job_runner.py's status writes are migrated off get_idempotency_service()/IdempotencyService onto the new store
-- [ ] #3 Once nothing references infrastructure/idempotency/{cache.py,service.py,factory.py}'s IdempotencyService/DynamoDBIdempotencyService/get_cache/get_idempotency_service, those files are deleted
-- [ ] #4 grep confirms no remaining get-then-put job-status pattern anywhere in app/packages/access/sync
+- [x] #1 A small, package-owned Protocol (e.g. JobStatusStore) exists under app/packages/access/sync/ for job-status records (running/completed/failed); placement confirmed against .github/instructions/packages-python.instructions.md
+- [x] #2 app/packages/access/sync/interactions/http.py (~line 213), interactions/slack.py (~line 357), and job_runner.py's status writes are migrated off get_idempotency_service()/IdempotencyService onto the new store
+- [x] #3 Once nothing references infrastructure/idempotency/{cache.py,service.py,factory.py}'s IdempotencyService/DynamoDBIdempotencyService/get_cache/get_idempotency_service, those files are deleted
+- [x] #4 grep confirms no remaining get-then-put job-status pattern anywhere in app/packages/access/sync
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass; dependency ordering with TASK-5.2/TASK-5.3 documented if legacy-file deletion must wait for all callers to move
-- [ ] #2 PR references decisions/reliability.md (job-status vs idempotency clause)
+- [x] #1 Tests pass; dependency ordering with TASK-5.2/TASK-5.3 documented if legacy-file deletion must wait for all callers to move
+- [x] #2 PR references decisions/reliability.md (job-status vs idempotency clause)
 <!-- DOD:END -->
 
 ## Comments
