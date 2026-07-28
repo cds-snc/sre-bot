@@ -6,6 +6,7 @@ and the singleton identity of the provider.
 """
 
 import pytest
+
 from jobs.settings import SchedulerSettings, get_scheduler_settings
 
 pytestmark = pytest.mark.unit
