@@ -4,6 +4,7 @@ Mirrors app/tests/unit/infrastructure/idempotency/test_idempotency_settings.py.
 """
 
 import pytest
+
 from infrastructure.logging.settings import LoggingSettings, get_logging_settings
 
 pytestmark = pytest.mark.unit
