@@ -1,12 +1,12 @@
 ---
 id: TASK-6
 title: >-
-  Replace the PREFIX-gated scheduler with a Tier-2 TTL lease on the
-  conditional-write primitive
+  Add Tier-2 TTL leases to singleton scheduled jobs (single shared default TTL;
+  no central per-job settings)
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-28 15:19'
+updated_date: '2026-07-28 16:57'
 labels:
   - reliability
   - phase-0
@@ -17,7 +17,7 @@ dependencies:
   - TASK-5.3
 references:
   - decisions/reliability.md
-  - claude-research-outcome.md
+  - decisions/plugins.md
   - 'https://github.com/cds-snc/sre-bot/issues/1260'
 priority: medium
 ordinal: 6000
@@ -26,45 +26,42 @@ ordinal: 6000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Aligns with decisions/reliability.md (Background jobs) and claude-research-outcome.md. Today singleton background jobs are prevented from double-firing across the 2 ECS tasks by an environment-shaped gate in _start_scheduled_tasks at app/server/lifespan.py:105 (if app_settings.PREFIX != "") - the not-yet-migrated state.
+Singleton (Tier-2) scheduled jobs must not double-fire across the 2 ECS replicas. Each Tier-2 job takes a TTL lease on the shared conditional-write primitive (app/infrastructure/idempotency) before running; a second replica skips while the lease is held; an expired lease is taken over by the next runner. The lease is a duplication optimization, never a correctness mechanism - every Tier-2 job body stays idempotent regardless (decisions/reliability.md, Background jobs).
 
-app/jobs/scheduled_tasks.py registers jobs across unrelated domains (modules.aws.identity_center/spending, modules.incident, integrations.maxmind/opsgenie/google_workspace, packages.access.sync) - the Tier-2 lease is a cross-cutting scheduler capability, not something owned by any one feature package.
+SCOPE CORRECTION (2026-07-28, per decisions/reliability.md and decisions/plugins.md - scheduler composed as a clock-driven transport) - supersedes the earlier plan:
+The earlier plan introduced a central app/jobs/settings.py SchedulerSettings with one long-named TTL field PER JOB (SCHEDULER_PROVISION_AWS_IDENTITY_CENTER_LEASE_TTL_SECONDS, SCHEDULER_NOTIFY_STALE_INCIDENT_CHANNELS_LEASE_TTL_SECONDS, SCHEDULER_SPENDING_GENERATE_SPENDING_DATA_LEASE_TTL_SECONDS). That central aggregator is an anti-pattern: the long names are the symptom of unrelated domains sharing one settings namespace, and the scheduler pull-hub (app/jobs/scheduled_tasks.py::init hand-importing each feature's job body) that forces it is the inverse of the register_routes / register_slack_listeners push model. This task is re-scoped to the MINIMAL reliability fix and must NOT bake in the central per-job aggregator:
+- Use ONE shared scheduler-owned DEFAULT Tier-2 lease TTL for the currently-registered, not-yet-migrated modules/ jobs (a single setting or module constant, e.g. DEFAULT_TIER2_LEASE_TTL_SECONDS). NO per-job SCHEDULER_<JOB>_LEASE_TTL_SECONDS fields.
+- Per-job / feature-owned TTLs and colocation into feature settings are DEFERRED to the scheduler-as-transport follow-up: TASK-64 (widen BackgroundJobRegistry + move lease/error-boundary enforcement into the registry) then TASK-65 (strangle the pull-hub as modules/ jobs migrate to packages, each job's schedule+TTL then living in its own feature settings).
 
-Reassessed 2026-07-28 against what TASK-5.1/TASK-5.3/TASK-5.4.1/TASK-5.4.2 actually shipped (all Done): the generic primitive this task needs already exists in full - app/infrastructure/idempotency/lease.py's acquire_lease(lock_store, name)/release_lease(lock_store, name) built on IdempotencyStore.claim/release, plus factory.build_idempotency_store(in_progress_ttl_seconds) for a lease-specific TTL distinct from the generic dedup store's short default. The legacy IdempotencyService/DynamoDBCache/get_idempotency_service stack this task's original research referenced no longer exists at all (deleted in TASK-5.4.2) - nothing legacy remains to import or accidentally reuse.
+Keep the lease helpers (get_lease_store, run_if_leased) ADDITIVE in app/infrastructure/idempotency/lease.py - reusable by TASK-64/TASK-65 and any future consumer.
 
-Firm decisions (supersede the original open questions):
-- No lease-renewal/heartbeat capability is needed. decisions/reliability.md is explicit that the lease is a duplication optimization, never a correctness mechanism, and over-run takeover is an accepted outcome given the idempotent-job-body mandate - so a fixed, per-job TTL (sized to that job's own expected max run duration) is sufficient, mirroring the sizing choice already made for the Access Sync platform/user lock (TASK-5.3, lock_stale_seconds=14400).
-- Do not reuse the generic get_idempotency_store() singleton's IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS (300s) default for any Tier-2 job lease without checking fit; call build_idempotency_store(ttl_seconds=...) with a TTL sized to each job (or job class).
-- If any Tier-2 job needs "who currently holds this" reporting for operator/observability purposes, that is a distinct, best-effort keyed-record capability (own small store over infrastructure.storage.StorageService, mirroring Access Sync's JobStatusStore) - never folded into the lease's own claim()/release() correctness gate, and never the deleted legacy idempotency cache.
+Keep the app/server/lifespan.py ENVIRONMENT-gated scheduler start UNCHANGED. It is a local/dev/CI suppression convention, not a duplicate-firing guard: both prod ECS replicas already satisfy ENVIRONMENT=="production" (terraform desired_count=2, one service), so the gate never guarded against duplicate execution (verified 2026-07-28 planning; TASK-1 was the unrelated PREFIX->ENVIRONMENT rename). Tier-2 TTL leases are the sole duplicate-prevention mechanism.
 
-Boilerplate-reduction addition in scope for this task (since it is the first consumer needing several differently-tiered leases across many unrelated jobs): add two small, generic, additive helpers to app/infrastructure/idempotency/lease.py (not scheduler-specific, reusable by any future consumer) -
-(a) a TTL-parameterized singleton factory (e.g. get_lease_store(ttl_seconds: int) -> IdempotencyStore, functools.lru_cache-memoized per ttl_seconds value) wrapping build_idempotency_store, so callers stop hand-rolling their own per-TTL module-level singleton cache (Access Sync's providers.py currently does this ad hoc for one fixed TTL);
-(b) an acquire+run+release convenience wrapper (e.g. run_if_leased(lock_store: IdempotencyStore, name: str, job: Callable[[], None]) -> None, or an equivalent context manager) that collapses the acquire-lease/skip-if-not-acquired/finally-release sequence into one call, so each Tier-2 job registration site needs about one line, not a hand-rolled try/finally.
+Job census (app/jobs/scheduled_tasks.py) to classify at registration:
+- scheduler_heartbeat (every 5 min) - Tier-1, host-owned (stateless log; safe on every replica; no lease).
+- integration_healthchecks (every 5 min) - Tier-1, host-owned (read-only checks; no lease).
+- provision_aws_identity_center (every 2 hours) - Tier-2 (mutates AWS IAM Identity Center); lease with the shared default TTL.
+- notify_stale_incident_channels (daily 16:00) - Tier-2 (avoid duplicate Slack notifications); lease with the shared default TTL; also wrap in safe_run (currently the one registration outside the error boundary - small same-line in-scope fix).
+- spending.generate_spending_data (daily 00:00) - Tier-2 (avoid duplicate spend-data writes); lease with the shared default TTL.
+- Any register_background_jobs hookspec registrant (e.g. access/sync) - leaves its own leasing to TASK-64's widened registry; NOT lease-wrapped by this task.
 
-Job census (app/jobs/scheduled_tasks.py, confirmed 2026-07-28) to classify at registration:
-- scheduler_heartbeat (every 5 min) - Tier-1 (stateless log line, safe on every replica).
-- integration_healthchecks (every 5 min) - Tier-1 (read-only checks, safe on every replica).
-- provision_aws_identity_center (every 2 hours) - Tier-2 (mutates AWS IAM Identity Center state).
-- notify_stale_incident_channels (daily 16:00) - Tier-2 (avoid duplicate Slack notifications).
-- spending.generate_spending_data (daily 00:00) - Tier-2 (avoid duplicate data generation/writes).
-- Any job registered via the register_background_jobs hookspec (_ScheduleBackgroundJobRegistry.register, e.g. Access Sync's coordinator job via get_access_sync_coordinator) - classify at its own registration site, each registrant owns its Tier-1/Tier-2 call and its own lease TTL if Tier-2.
+TESTS - introduced-now, DELETE + REWRITE. The failing TDD tests already written for the OLD central-per-job-settings plan must be deleted and rewritten:
+- app/tests/unit/jobs/test_settings.py currently asserts a 3-long-field SchedulerSettings - DELETE it, and REWRITE to assert only the single shared default TTL (default value + env override + singleton identity), OR remove the file entirely if a plain module constant is used instead of a settings class.
+- app/tests/unit/jobs/test_scheduled_tasks.py Tier-2 tests currently assume per-job TTL fields / get_scheduler_settings with multiple fields - REWRITE to assert Tier-2 jobs lease with the single shared default TTL and Tier-1 jobs are not lease-wrapped; drop per-job-field assertions.
+- app/tests/unit/infrastructure/idempotency/test_lease.py get_lease_store / run_if_leased tests are RETAINED (the lease mechanism is kept).
 
-Ordering note: TASK-52 (relocate the app/jobs scheduler registry into app/infrastructure) depends on this task and stays To Do until this one ships - implement in place under app/jobs/ as it exists today; if a shared default lease-TTL setting is needed, add it under app/jobs/ now (an orphaned-settings-home instance, same incremental-migration precedent TASK-5.1 used) rather than waiting on TASK-52 to relocate it first.
-
-Steps:
-1. Consume acquire_lease/release_lease (and the two new additive helpers above) directly from app/infrastructure/idempotency/lease.py. Do not import from app/packages/access/sync/ - that package's platform_lock.py is a feature-specific wrapper over the same shared helper, not the helper itself.
-2. Classify each registered job Tier-1 (safe to run on every replica - runs everywhere, no lease) or Tier-2 (singleton - takes the lease before each run, with a TTL sized to its own expected max duration).
-3. The lease is a duplication optimization, never a correctness mechanism: each Tier-2 job body must be idempotent regardless (document per job).
-4. Delete the PREFIX/environment gate in app/server/lifespan.py; keep desired_count=2 for HA.
+SEQUENCING (captured in task dependencies): TASK-6 (this) -> TASK-64 (scheduler-as-transport: widen BackgroundJobRegistry, move enforcement into the registry) -> TASK-52 (relocate the now-thinner scheduler capability into app/infrastructure/) -> TASK-65 (strangle the pull-hub as modules/ jobs migrate). TASK-52 is re-pointed to also depend on TASK-64 so it relocates the widened capability.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Tier-2 jobs acquire a TTL lease via conditional write before executing, using a TTL sized to that job's own expected max duration (not the generic 300s dedup default); a second replica skips while the lease is held (test with the in-memory fake)
+- [ ] #1 Tier-2 (singleton) jobs acquire a TTL lease via conditional write before executing; a second replica skips while the lease is held (tested with the in-memory fake)
 - [ ] #2 An expired lease is taken over by the next runner (test)
-- [ ] #3 The app/server/lifespan.py ENVIRONMENT-gated scheduler start is kept unchanged (local/dev/CI safety convention, not a dedup mechanism); Tier-2 leases alone prevent duplicate execution across the 2 production replicas
-- [ ] #4 Each Tier-2 job has a one-line idempotency note at its registration site
-- [ ] #5 A generic, TTL-parameterized lease-store singleton factory and an acquire+run+release convenience helper are added to app/infrastructure/idempotency/lease.py (additive, reusable by any future consumer beyond the scheduler)
+- [ ] #3 Tier-2 lease TTL comes from a SINGLE shared scheduler-owned default (one setting or module constant); NO central app/jobs/settings.py aggregator with one SCHEDULER_<JOB>_LEASE_TTL_SECONDS field per job is introduced (per decisions/configuration.md and decisions/reliability.md)
+- [ ] #4 The app/server/lifespan.py ENVIRONMENT-gated scheduler start is kept unchanged (local/dev/CI convention, not a dedup mechanism); Tier-2 leases alone prevent duplicate execution across the 2 production replicas
+- [ ] #5 Generic additive helpers get_lease_store (TTL-parameterized factory) and run_if_leased (acquire+run+release) are added to app/infrastructure/idempotency/lease.py, reusable by TASK-64/TASK-65 and beyond
+- [ ] #6 Each Tier-2 job has a one-line idempotency note at its registration site
+- [ ] #7 The introduced TDD tests written for the old central-per-job-settings plan are deleted and rewritten: app/tests/unit/jobs/test_settings.py is removed or reduced to the single shared default; the per-job-TTL Tier-2 assertions in test_scheduled_tasks.py are rewritten to the single-default behavior; test_lease.py get_lease_store/run_if_leased tests are retained
 <!-- AC:END -->
 
 ## Definition of Done
@@ -76,165 +73,46 @@ Steps:
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-## Scope adjustment (from 2026-07-28 planning session, human-confirmed)
+## Scope rewrite (2026-07-28, per decisions/reliability.md + decisions/plugins.md) - SUPERSEDES the prior plan
 
-AC#3 as originally written ("delete the PREFIX/environment gate") is WRONG and is dropped.
-Research: `app_settings.ENVIRONMENT != "production"` in `_start_scheduled_tasks`
-(app/server/lifespan.py) is NOT a duplicate-firing guard - both production ECS
-replicas already satisfy `ENVIRONMENT == "production"` (terraform desired_count=2,
-one service, no separate staging service), so it never prevented Tier-2 double-firing
-and doesn't need to change to fix it. It is the same established, pervasive
-`ENVIRONMENT`-gating convention used at 12+ other call sites app-wide, and is exactly
-the "legitimate environment-conditional behavior (...prod-only side effects)" case the
-`settings-singleton` skill sanctions. Deleting it would newly start the scheduler
-(real AWS/Slack calls) on every local dev run and in CI - an unrelated, larger
-behavior change with no decisions/ mandate. Decision (human-confirmed): **keep the
-gate unchanged**; Tier-2 leases are the sole duplicate-prevention mechanism.
+Two prior scope corrections still hold: (1) the ENVIRONMENT gate in _start_scheduled_tasks is KEPT (it never guarded duplicate firing - both prod replicas are ENVIRONMENT=="production"); (2) no lease-renewal/heartbeat (over-run takeover is acceptable per reliability.md). NEW correction: do NOT introduce a central app/jobs/settings.py with one long-named TTL field per job (the per-job-aggregator anti-pattern). Use ONE shared default Tier-2 lease TTL instead; defer per-job/feature-owned TTLs to TASK-64/TASK-65.
 
 ## Steps
 
-1. `app/infrastructure/idempotency/lease.py`: add two additive helpers (no change to
-   existing `acquire_lease`/`release_lease`):
-   - `get_lease_store(ttl_seconds: int) -> IdempotencyStore`, `@functools.lru_cache`-
-     memoized per distinct `ttl_seconds`, calling `build_idempotency_store(
-     in_progress_ttl_seconds=ttl_seconds)`. Generalizes the ad hoc pattern
-     `packages/access/sync/providers.py::get_access_sync_lock_store()` already
-     hand-rolls for one fixed TTL.
-   - `run_if_leased(lock_store: IdempotencyStore, name: str, job: Callable[[], None])
-     -> None`: `if not acquire_lease(lock_store, name): return`; else
-     `try: job() finally: release_lease(lock_store, name)`.
-   - Export both from `app/infrastructure/idempotency/__init__.py` (`__all__` +
-     import line, next to the existing `acquire_lease`/`release_lease` export).
+1. app/infrastructure/idempotency/lease.py (additive, unchanged from prior plan):
+   - get_lease_store(ttl_seconds: int) -> IdempotencyStore, @functools.lru_cache-memoized per ttl, wrapping build_idempotency_store(in_progress_ttl_seconds=ttl_seconds).
+   - run_if_leased(lock_store, name, job): if not acquire_lease(...): return; else try: job() finally: release_lease(...).
+   - Export both from app/infrastructure/idempotency/__init__.py.
 
-2. `app/jobs/settings.py` (new file): `SchedulerSettings(InfrastructureSettings)`
-   (orphaned-settings-home instance under app/jobs/, precedent: TASK-5.1; relocates
-   with the rest of app/jobs/ under TASK-52) with one TTL field per Tier-2 job in
-   this file's scope, each a clearly-flagged placeholder pending ops sign-off:
-   - `SCHEDULER_PROVISION_AWS_IDENTITY_CENTER_LEASE_TTL_SECONDS: int = 1800`
-   - `SCHEDULER_NOTIFY_STALE_INCIDENT_CHANNELS_LEASE_TTL_SECONDS: int = 600`
-   - `SCHEDULER_SPENDING_GENERATE_SPENDING_DATA_LEASE_TTL_SECONDS: int = 1800`
-   Plus `get_scheduler_settings()` singleton provider (`@lru_cache(maxsize=1)`),
-   mirroring `infrastructure/idempotency/settings.py::get_idempotency_settings`.
+2. Single shared DEFAULT Tier-2 lease TTL (NOT one per job):
+   - Introduce exactly ONE tunable value, DEFAULT_TIER2_LEASE_TTL_SECONDS (e.g. 1800s), sized conservatively and flagged in the PR as an ops-tunable placeholder.
+   - Preferred home: a minimal SchedulerSettings(InfrastructureSettings) holding this SINGLE field + get_scheduler_settings() singleton (orphaned-settings-home under app/jobs/, relocates with TASK-52). If a settings class feels premature given TASK-64 will restructure this, a plain typed module constant is acceptable - but keep it to ONE value regardless.
 
-3. `app/jobs/scheduled_tasks.py`:
-   - Import `get_lease_store`, `run_if_leased` from `infrastructure.idempotency`;
-     `get_scheduler_settings` from `jobs.settings`; add `import functools`.
-   - Add a private helper:
-     ```python
-     def _tier2(job_name: str, ttl_seconds: int, job: Callable[[], None]) -> Callable[[], None]:
-         """Wrap a Tier-2 job so only the lease holder executes it.
+3. app/jobs/scheduled_tasks.py:
+   - Import get_lease_store, run_if_leased from infrastructure.idempotency; the single default TTL from step 2; functools.
+   - Small private helper _tier2(name, job) that leases via run_if_leased(get_lease_store(DEFAULT_TIER2_LEASE_TTL_SECONDS), f"scheduler:{name}", job). (This helper becomes registry-internal under TASK-64 - keep it minimal here.)
+   - Rewrite init(): Tier-1 (heartbeat, integration_healthchecks) unchanged/no lease; the 3 Tier-2 jobs wrapped via _tier2 with a one-line idempotency note above each; bind client=/logger= via functools.partial before wrapping; add safe_run around notify_stale_incident_channels.
+   - reconcile_access_sync stays untouched (dead code, not in init()); hookspec dispatch line untouched.
 
-         The lease is a duplication optimization, not a correctness mechanism -
-         `job` must remain idempotent regardless (decisions/reliability.md).
-         """
-         lease_store = get_lease_store(ttl_seconds)
+4. app/server/lifespan.py: no functional change; add one clarifying comment on the ENVIRONMENT gate (local/dev/CI suppression, not the Tier-2 dedup mechanism).
 
-         def wrapper() -> None:
-             run_if_leased(lease_store, job_name, job)
+5. Delete + rewrite the introduced tests (see Description TESTS section): remove/reduce test_settings.py to the single default; rewrite the Tier-2 tests in test_scheduled_tasks.py to the single-default behavior; retain test_lease.py's get_lease_store/run_if_leased tests.
 
-         return wrapper
-     ```
-   - Rewrite `init()` classifying every locally-registered job:
-     - Tier-1 (unchanged, no lease): `scheduler_heartbeat`, `integration_healthchecks`.
-     - Tier-2 (leased, one-line idempotency note above each registration):
-       - `provision_aws_identity_center` - mutates AWS IAM Identity Center
-         membership; lease TTL 1800s (job runs every 2h).
-       - `notify_stale_incident_channels` (imported from
-         `modules.incident.notify_stale_incident_channels`) - avoids duplicate
-         Slack notifications; bind `client=bot.client` via `functools.partial`
-         before wrapping (also newly wrapped in `safe_run`, matching every other
-         job - it was the one registration not already inside the error
-         boundary; small, same-line, in-scope fix, not new scope).
-       - `spending.generate_spending_data` - avoids duplicate spend-data
-         writes; bind `logger=logger` via `functools.partial` before wrapping.
-     - Each registration becomes: fetch the job's TTL off `get_scheduler_settings()`,
-       call `schedule...do(safe_run(_tier2(name, ttl, job)))`. Lease keys:
-       `"scheduler:provision_aws_identity_center"`,
-       `"scheduler:notify_stale_incident_channels"`,
-       `"scheduler:spending_generate_spending_data"`.
-   - No change to `reconcile_access_sync` (dead code today - not wired into
-     `init()`/schedule - leave as is, out of this task's job census) or to the
-     hookspec dispatch line (`register_background_jobs`) - hookspec registrants
-     (e.g. Access Sync's own reconciliation job) classify and lease themselves at
-     their own registration site per the task's job census note; not touched here.
+## AC-to-test-to-step traceability
 
-4. `app/server/lifespan.py`: no functional change (see scope adjustment above).
-   Add one clarifying inline comment on the `ENVIRONMENT != "production"` check
-   noting it is a local/dev/CI suppression switch, not the Tier-2 dedup mechanism,
-   to prevent this exact misreading from recurring.
-
-## AC-to-step-to-test traceability
-
-- AC#1 (Tier-2 jobs lease before executing; second replica skips) -> step 3
-  (`_tier2`/`run_if_leased`) -> `test_lease.py::test_run_if_leased_skips_when_lease_held`
-  and `test_scheduled_tasks.py::test_tier2_skips_second_call_while_lease_held`.
-- AC#2 (expired lease taken over) -> step 1 (`run_if_leased` reuses
-  `acquire_lease`'s existing expiry-aware `claim()`) ->
-  `test_lease.py::test_run_if_leased_takes_over_expired_lease` (build the fake
-  store with a negative/zero TTL so `expires_at < now` deterministically, no
-  time-mocking needed, mirrors existing `test_lease.py` style).
-- AC#3 (rewritten - gate retained, not relied on for dedup) -> step 4 -> no new
-  test; existing `test_lifespan.py` gate tests are unchanged/still pass.
-- AC#4 (one-line idempotency note per Tier-2 job) -> step 3 registration comments
-  -> reviewed by inspection (comments are not independently testable).
-- AC#5 (generic TTL-parameterized factory + acquire+run+release helper, additive)
-  -> step 1 -> `test_lease.py::test_get_lease_store_returns_singleton_per_ttl` /
-  `test_get_lease_store_returns_distinct_instance_for_different_ttl`.
-
-## Test matrix
-
-- `app/tests/unit/infrastructure/idempotency/test_lease.py` (extend):
-  - `get_lease_store(ttl)` called twice with the same ttl returns the same
-    instance (`is`); called with a different ttl returns a different instance.
-    Teardown: `get_lease_store.cache_clear()`.
-  - `run_if_leased` executes `job` and releases the lease when acquired.
-  - `run_if_leased` does not execute `job` when the lease is already held.
-  - `run_if_leased` releases the lease even when `job` raises (exception still
-    propagates to the caller - `safe_run` remains the layer that swallows it).
-  - `run_if_leased` takes over an expired lease and executes `job`.
-- `app/tests/unit/jobs/test_scheduled_tasks.py` (extend): patch
-  `jobs.scheduled_tasks.get_lease_store` to return a shared
-  `InMemoryIdempotencyStore` fixture; test `_tier2(...)()`:
-  - first invocation runs the wrapped job.
-  - a second invocation while the first's lease is still held skips the job
-    (in-memory fake, per AC#1).
-  - an invocation after the lease has expired (fake built with a negative TTL)
-    re-runs the job (per AC#2).
-  - `init()` registers exactly the 4 locally-owned jobs (2 Tier-1 direct
-    `safe_run`, 2 Tier-2 via `_tier2`) plus dispatches
-    `register_background_jobs` once; Tier-1 jobs are not lease-wrapped.
-- `app/tests/unit/jobs/test_settings.py` (new): `SchedulerSettings` defaults;
-  env var overrides each TTL field; `get_scheduler_settings()` singleton identity.
-- `app/tests/integration/server/test_lifespan.py`: unchanged, must still pass
-  as-is (proves the gate truly wasn't touched).
-
-## Assumptions / doubts requiring verification before or during review
-
-1. TTL defaults (1800s for identity-center provisioning and spending generation,
-   600s for the incident notifier) are placeholder estimates sized only from each
-   job's schedule interval, not measured run duration - flag explicitly in the PR
-   description for an operator with real run-time data to confirm or adjust before
-   merge (same provisional-placeholder pattern used in TASK-5.2/TASK-5.3).
-2. `notify_stale_incident_channels`'s registration site is not currently wrapped in
-   `safe_run` - step 3 fixes this as an in-scope, same-line correction consistent
-   with decisions/reliability.md's error-boundary requirement; flagged here in case
-   a reviewer considers it out of this task's stated scope.
-3. `reconcile_access_sync` in `scheduled_tasks.py` is dead code (defined, never
-   registered in `init()`) - left untouched; out of this task's job census.
+- AC#1 (Tier-2 leases before executing; second replica skips) -> steps 1,3 -> test_lease.py::run_if_leased_skips_when_lease_held + test_scheduled_tasks.py::tier2_skips_while_lease_held (in-memory fake).
+- AC#2 (expired lease taken over) -> step 1 -> test_lease.py::run_if_leased_takes_over_expired_lease (fake built with 0/negative in-progress TTL, no time-mocking).
+- AC#3 (single shared default TTL; no per-job aggregator) -> step 2 -> test_settings.py rewritten to the single field (or deleted for a constant) + review by inspection that no SCHEDULER_<JOB>_LEASE_TTL_SECONDS fields exist.
+- AC#4 (gate kept) -> step 4 -> existing test_lifespan.py unchanged/still passes.
+- AC#5 (additive get_lease_store + run_if_leased) -> step 1 -> test_lease.py factory/singleton + helper tests.
+- AC#6 (one-line idempotency note per Tier-2 job) -> step 3 -> review by inspection.
+- AC#7 (introduced TDD tests deleted + rewritten) -> step 5 -> the rewritten test_settings.py / test_scheduled_tasks.py compile and pass against the single-default implementation; test_lease.py retained.
 
 ## Blast radius and rollback
 
-- Files touched: `app/infrastructure/idempotency/lease.py`,
-  `app/infrastructure/idempotency/__init__.py`, `app/jobs/settings.py` (new),
-  `app/jobs/scheduled_tasks.py`, `app/server/lifespan.py` (comment only), plus
-  the four test files above. One subsystem (scheduler + idempotency
-  infrastructure), no terraform/CI changes, no settings renames. Single-PR size
-  gate: fits comfortably (~5 production files, well under 400 LOC).
-- Runtime blast radius: changes `init()`'s job registration and adds a lease
-  check before 3 existing Tier-2 job bodies; job bodies themselves are
-  unchanged. Rollback is a plain revert - no data migration, no schema change
-  (reuses the existing `sre_bot_idempotency` table via the existing
-  `IdempotencyStore` primitive).
+- Files: app/infrastructure/idempotency/lease.py (+ __init__.py), the single-default TTL home (minimal app/jobs/settings.py OR a constant), app/jobs/scheduled_tasks.py, app/server/lifespan.py (comment only), plus the rewritten/deleted test files. One subsystem (scheduler + idempotency infra); no terraform/CI change; reuses the existing sre_bot_idempotency table via the existing IdempotencyStore primitive. Rollback is a plain revert. Fits one PR comfortably.
+
+## Still needs human plan approval before code (per single-PR size gate + backlog workflow). TTL default is an ops-tunable placeholder flagged for confirmation.
 <!-- SECTION:PLAN:END -->
 
 ## Comments
@@ -258,5 +136,15 @@ Reassessed 2026-07-28 (architecture mode) now that TASK-5.1/TASK-5.3/TASK-5.4.1/
 created: 2026-07-28 15:19
 ---
 Plan written 2026-07-28 (task-planner). Scope adjustment confirmed with human: AC#3 was wrong as originally written ("delete the PREFIX/environment gate"). The ENVIRONMENT != "production" check in _start_scheduled_tasks (app/server/lifespan.py) is NOT what prevents Tier-2 double-firing - both prod ECS replicas already satisfy ENVIRONMENT=="production" (desired_count=2, one service), so the gate never guarded against duplicate execution. It is the same established, pervasive ENVIRONMENT-gating convention used at 12+ other call sites app-wide (dev-bypass, notify client, webhooks, logging) to suppress side-effecting behavior outside production - exactly the settings-singleton skill's sanctioned "legitimate environment-conditional behavior (prod-only side effects)" case. Deleting it would newly start the real scheduler (AWS/Slack calls) on every local dev run and in CI, an unrelated and larger behavior change with no decisions/ mandate. Decision: the gate is KEPT unchanged; AC#3 rewritten to say so; Tier-2 TTL leases (this task's actual deliverable) are the sole duplicate-prevention mechanism. Full implementation plan (steps, AC-to-test traceability, test matrix, TTL-default assumptions flagged for ops sign-off, blast radius/rollback) written via --plan. Confirmed single-PR size: ~5 production files (infrastructure/idempotency/lease.py + __init__.py, new app/jobs/settings.py, app/jobs/scheduled_tasks.py, one-comment-only app/server/lifespan.py), well under the size gate - no decomposition needed. Ready for human plan review before implementation.
+---
+
+created: 2026-07-28 16:33
+---
+Rewritten 2026-07-28 per the scheduled job architecture review. Supersedes the prior plan's central app/jobs/settings.py with one long-named TTL field per job (SCHEDULER_<JOB>_LEASE_TTL_SECONDS) - that aggregator was the anti-pattern surfaced while writing these tests. Now: single shared DEFAULT Tier-2 lease TTL only; per-job/feature-owned TTLs deferred to TASK-64 (scheduler-as-transport registry widen) then TASK-65 (strangle pull-hub as modules migrate). The failing TDD tests written for the old plan (app/tests/unit/jobs/test_settings.py 3-field version + per-job-TTL Tier-2 tests in test_scheduled_tasks.py) are deleted and rewritten to the single-default behavior in the same task; test_lease.py get_lease_store/run_if_leased tests are retained. Sequencing captured in deps: TASK-6 -> TASK-64 -> TASK-52 -> TASK-65. Milestone unchanged (m-0, reliability hotfix); new follow-ups placed in m-4 (TASK-64) and m-5 (TASK-65) - no existing task needed a milestone reassignment. Still needs human plan approval before code.
+---
+
+created: 2026-07-28 16:57
+---
+HANDOVER (2026-07-28): task owner has reviewed this plan; TASK-6 is ready to hand to a fresh implementation session. Guardrails for the implementing agent: (1) scope this task ONLY - do NOT pull in TASK-52/TASK-64/TASK-65 (downstream, gated). (2) All three dependencies (TASK-1, TASK-5.1, TASK-5.3) are Done; branch is feat/scheduler_ttl_lease. (3) Starting state is intentionally RED: the introduced TDD tests (app/tests/unit/jobs/test_settings.py and the Tier-2/init tests in app/tests/unit/jobs/test_scheduled_tasks.py) have already been rewritten to the single-shared-default-TTL design and currently fail at collection because they import jobs.settings / _tier2 which do not exist yet - make them green per the plan; app/tests/unit/infrastructure/idempotency/test_lease.py get_lease_store/run_if_leased tests are retained. (4) Deliverable: one shared DEFAULT_TIER2_LEASE_TTL_SECONDS (single setting or module constant, NO per-job fields), additive get_lease_store/run_if_leased in app/infrastructure/idempotency/lease.py, and _tier2-wrapped Tier-2 jobs in app/jobs/scheduled_tasks.py; the ENVIRONMENT gate in app/server/lifespan.py stays unchanged. (5) The TTL default value is an ops-tunable placeholder - flag it in the PR for confirmation. (6) Validate mypy + ruff + pytest (unit) from app/ before completion; check ACs one-by-one and stop at In Progress for human closure - do not set Done.
 ---
 <!-- COMMENTS:END -->

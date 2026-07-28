@@ -46,7 +46,7 @@ app/integrations/     Outbound clients. Thin, vendor-specific, raise SDK excepti
 | Directory | Disposition | Ticket |
 | --- | --- | --- |
 | `modules/` | Legacy Slack bot; strangled into feature packages, then deleted. | [migration.md](migration.md) |
-| `jobs/` | Scheduler registry — a vendor-neutral capability; relocate into `infrastructure/`. | TASK-52 |
+| `jobs/` | Scheduler registry — a vendor-neutral, clock-driven host capability (composed like a transport); relocate into `infrastructure/` once its pull-hub is strangled to the `register_background_jobs` push model. | TASK-52 |
 | `api/` | Legacy top-level HTTP surface; feature routes move to their owning packages, feature-agnostic system endpoints (health, version, landing) move to the host. | TASK-53 |
 | `bin/` | Operator/dev tooling — **not app runtime code**, exempt from the import rule; kept, but `entry.sh`'s boot-time secret fetch retires once a secret service exists. | TASK-54 |
 | `models/` | Shared boundary DTOs; relocate to owning packages/tiers (live non-module consumers exist), then delete the top-level bag. | TASK-55 |
