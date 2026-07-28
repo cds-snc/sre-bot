@@ -4,6 +4,7 @@ title: 'Webhooks slice 5: multi-sink dispatch fan-out (event/enqueue targets)'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:40'
+updated_date: '2026-07-28 19:16'
 labels:
   - migration
   - webhooks
@@ -17,6 +18,7 @@ references:
   - decisions/events.md
   - decisions/reliability.md
   - decisions/feature-packages.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1380'
 parent_task_id: TASK-37
 priority: medium
 ordinal: 100000

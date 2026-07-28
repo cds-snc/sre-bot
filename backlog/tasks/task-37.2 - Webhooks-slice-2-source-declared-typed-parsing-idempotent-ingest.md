@@ -4,6 +4,7 @@ title: 'Webhooks slice 2: source-declared typed parsing + idempotent ingest'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:39'
+updated_date: '2026-07-28 19:16'
 labels:
   - migration
   - webhooks
@@ -16,6 +17,7 @@ references:
   - decisions/webhooks.md
   - decisions/plugins.md
   - decisions/reliability.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1377'
 parent_task_id: TASK-37
 priority: high
 ordinal: 97000

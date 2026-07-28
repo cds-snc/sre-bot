@@ -4,6 +4,7 @@ title: 'Webhooks slice 3: transport-neutral intent + Slack renderer'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:40'
+updated_date: '2026-07-28 19:16'
 labels:
   - migration
   - webhooks
@@ -15,6 +16,7 @@ references:
   - decisions/webhooks.md
   - decisions/platform-transports.md
   - decisions/transport-slack.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1378'
 parent_task_id: TASK-37
 priority: high
 ordinal: 98000
