@@ -4,7 +4,7 @@ title: Monitor-then-enforce migration of legacy unsigned webhook senders
 status: To Do
 assignee: []
 created_date: '2026-07-24 13:59'
-updated_date: '2026-07-24 16:14'
+updated_date: '2026-07-28 18:41'
 labels:
   - security
   - webhooks
@@ -12,6 +12,7 @@ milestone: m-4
 dependencies:
   - TASK-47
 references:
+  - decisions/webhooks.md
   - decisions/security.md
   - 'https://github.com/cds-snc/sre-bot/issues/1343'
 priority: medium
@@ -39,3 +40,12 @@ Out of scope: the HMAC verification/issuance mechanism itself (TASK-47); observa
 - [ ] #3 The GitHub Actions sender is migrated to a signed (HMAC and/or CIDR-pinned) tier as the reference migration (documented + test)
 - [ ] #4 A report/query enumerates the remaining auth_mode=none webhook population so the exception burn-down is measurable
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-07-28 18:41
+---
+Now operates on the packaged webhooks feature: the auth_mode field, service surface, and origin fingerprint all live in app/packages/webhooks after TASK-37. Monitor-then-enforce burn-down targets the packaged auth_mode=none legacy records; no legacy modules/slack CRUD involved. Depends on TASK-47 (HMAC tier in the package).
+---
+<!-- COMMENTS:END -->

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-28 17:58'
+updated_date: '2026-07-28 18:41'
 labels:
   - security
   - phase-0
@@ -14,8 +14,7 @@ milestone: m-0
 dependencies:
   - TASK-1
 references:
-  - decisions/security.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1261'
+  - decisions/webhooks.md
 priority: high
 ordinal: 7000
 ---
@@ -113,5 +112,10 @@ Blast radius and rollback:
 created: 2026-07-24 14:00
 ---
 Restructured per human direction (2026-07-24): the day-1-infeasible 'reject any generic webhook without a valid HMAC' requirement (former AC#2) removed from this Phase-0 task and re-homed to Phase 4 as TASK-47 (HMAC + secure-by-default issuance) and TASK-48 (monitor-then-enforce migration), with TASK-46 adding Phase-1 origin observability in m-0. decisions/security.md Webhooks clause amended to a tiered trust model; the generic-webhook gap is now risk-accepted in writing (m-0 exit) until TASK-48 closes it. This task remains a single manageable PR: SNS-everywhere + exception-leak removal + body-size cap on the webhook ingress path.
+---
+
+created: 2026-07-28 18:41
+---
+Stays on the legacy code at m-0. Its hardening carries forward into the package, not superseded by TASK-37: SNS signature verification in all environments and the exception-leak removal land in app/packages/webhooks/verification.py (TASK-37.2), and the body-size cap moves to the server/ingress boundary. TASK-37.4 verifies these are preserved on the new route.
 ---
 <!-- COMMENTS:END -->
