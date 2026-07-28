@@ -71,6 +71,21 @@ def test_cors_middleware_uses_configured_origin_list_after_reload(monkeypatch):
 
 
 @pytest.mark.unit
+def test_max_body_size_middleware_configured():
+    """Webhook ingress should be protected by a body-size cap middleware."""
+    # Arrange
+    app = server.handler
+
+    # Assert
+    max_body_middleware = next(
+        (m for m in app.user_middleware if m.cls.__name__ == "MaxBodySizeMiddleware"),
+        None,
+    )
+    assert max_body_middleware is not None
+    assert max_body_middleware.kwargs["max_bytes"] == server.app_settings.WEBHOOK_MAX_BODY_BYTES
+
+
+@pytest.mark.unit
 def test_api_router_included():
     """Test that API router is included in the handler."""
     # Arrange

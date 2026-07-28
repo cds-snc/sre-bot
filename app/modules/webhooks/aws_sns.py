@@ -81,10 +81,6 @@ def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
     Returns:
         AwsSnsPayload: The validated AWS SNS payload.
     """
-    # Approved deviation: local/dev/ci instances are not internet-reachable
-    # and never receive real SNS payloads; validation skipped for operational reasons.
-    if app_settings.ENVIRONMENT != "production":
-        return awsSnsPayload
     try:
         valid_payload = AwsSnsPayload.model_validate(awsSnsPayload)
         sns_message_validator.validate_message(message=valid_payload.model_dump())
@@ -95,7 +91,7 @@ def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
         InvalidCertURLException,
     ) as e:
         logger.exception("aws_sns_payload_validation_error", error=str(e))
-        log_message = f"Failed to validate AWS event message due to {e.__class__.__qualname__}: {e}"
+        log_message = "Failed to validate AWS event message"
         if isinstance(e, InvalidMessageTypeException):
             log_message = f"Invalid message type ```{awsSnsPayload.Type}``` in message: ```{awsSnsPayload}```"
         elif isinstance(e, InvalidSignatureVersionException):
@@ -107,7 +103,7 @@ def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
         log_ops_message(log_message)
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
+            detail="Failed to validate AWS event message",
         ) from e
     except Exception as e:
         logger.exception(
@@ -115,10 +111,10 @@ def validate_sns_payload(awsSnsPayload: AwsSnsPayload, client):
             error=str(e),
         )
         log_ops_message(
-            f"Error parsing AWS event due to {e.__class__.__qualname__}: ```{awsSnsPayload}```",
+            f"Error parsing AWS event message: ```{awsSnsPayload}```",
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to parse AWS event message due to {e.__class__.__qualname__}: {e}",
+            detail="Failed to parse AWS event message",
         ) from e
     return valid_payload

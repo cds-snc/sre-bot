@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-24 15:02'
-updated_date: '2026-07-24 16:14'
+updated_date: '2026-07-28 18:41'
 labels:
   - security
   - phase-4
@@ -16,7 +16,9 @@ dependencies:
   - TASK-47
   - TASK-3
 references:
+  - decisions/webhooks.md
   - decisions/security.md
+  - decisions/configuration.md
   - 'https://github.com/cds-snc/sre-bot/issues/1344'
 priority: medium
 ordinal: 73000
@@ -48,3 +50,12 @@ Steps:
 - [ ] #1 Tests pass
 - [ ] #2 PR references decisions/security.md (Webhooks and Rate limiting clauses), TASK-3, and TASK-47
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-07-28 18:41
+---
+Settings home is the package-partitioned WebhookSettings / Webhook record (decisions/webhooks.md, decisions/configuration.md), not a central SecuritySettings aggregator. The rate-limited route lives in app/packages/webhooks/interactions/http.py after the TASK-37.4 cutover. Deps unchanged: TASK-47 + TASK-3.
+---
+<!-- COMMENTS:END -->

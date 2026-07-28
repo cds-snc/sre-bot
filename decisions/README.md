@@ -36,6 +36,7 @@ The app is a modular monolith that started as a Slack bot and is becoming platfo
 | [feature-packages.md](feature-packages.md) | Feature layout and handler discipline | now |
 | [configuration.md](configuration.md) | Settings ownership, environments, secrets | target |
 | [security.md](security.md) | AuthN/Z, CORS, rate limiting, webhooks | target |
+| [webhooks.md](webhooks.md) | Webhooks ingress feature: pipeline, source-declared parsing, multi-transport dispatch | target |
 | [observability.md](observability.md) | Logging, redaction, correlation | target |
 | [reliability.md](reliability.md) | Idempotency, queuing, background jobs | target |
 | [approvals.md](approvals.md) | Generic human-approval workflow capability | target |

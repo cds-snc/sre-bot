@@ -5,6 +5,7 @@ from sns_message_validator import SNSMessageValidator  # type: ignore
 from api.router import api_router
 from infrastructure.configuration.app import get_app_settings
 from infrastructure.security import setup_rate_limiter
+from server.body_size_middleware import MaxBodySizeMiddleware
 from server.lifespan import lifespan
 
 sns_message_validator = SNSMessageValidator()
@@ -24,6 +25,10 @@ handler.add_middleware(
     allow_credentials=True,
     allow_methods=app_settings.CORS_ALLOWED_METHODS,
     allow_headers=app_settings.CORS_ALLOWED_HEADERS,
+)
+handler.add_middleware(
+    MaxBodySizeMiddleware,
+    max_bytes=app_settings.WEBHOOK_MAX_BODY_BYTES,
 )
 
 handler.include_router(api_router)

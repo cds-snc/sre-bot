@@ -25,6 +25,7 @@ class AppSettings(BaseSettings):
         default=["Authorization", "Content-Type", "X-Request-ID", "traceparent"],
         alias="CORS_ALLOWED_HEADERS",
     )
+    WEBHOOK_MAX_BODY_BYTES: int = Field(default=262_144, alias="WEBHOOK_MAX_BODY_BYTES")
 
     @model_validator(mode="after")
     def validate_cors_wildcards_with_credentials(self) -> AppSettings:

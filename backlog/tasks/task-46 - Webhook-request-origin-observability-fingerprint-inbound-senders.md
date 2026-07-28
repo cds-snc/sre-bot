@@ -4,7 +4,7 @@ title: 'Webhook request-origin observability: fingerprint inbound senders'
 status: To Do
 assignee: []
 created_date: '2026-07-24 13:58'
-updated_date: '2026-07-24 16:14'
+updated_date: '2026-07-28 18:41'
 labels:
   - security
   - phase-0
@@ -12,8 +12,7 @@ milestone: m-0
 dependencies:
   - TASK-7
 references:
-  - decisions/security.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1341'
+  - decisions/webhooks.md
 priority: high
 ordinal: 70000
 ---
@@ -41,3 +40,12 @@ Out of scope: any rejection, signature verification, or settings/schema change t
 - [ ] #3 Request bodies are never emitted to logs/metrics; only fingerprint metadata is (test/review)
 - [ ] #4 Fingerprint data is queryable/aggregatable per webhook_id + inferred source type (documented query or metric)
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-07-28 18:41
+---
+Feeds the webhooks rearchitecture interpret stage (decisions/webhooks.md): the origin fingerprint's inferred source type seeds each webhook record's declared source, which TASK-37.2 consumes to select the single typed parser. Stays on the legacy code at m-0; not superseded by TASK-37.
+---
+<!-- COMMENTS:END -->

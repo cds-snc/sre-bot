@@ -87,6 +87,7 @@ def test_webhook_handler_with_subscription_confirmation(
     sns_subscription_confirmation_payload,
     mock_webhook_lookup,
     mock_webhook_increment,
+    mock_sns_signature_validation_disabled,
 ):
     """Test SNS subscription confirmation (SubscriptionConfirmation type)."""
     response = app_with_lifespan.post(
