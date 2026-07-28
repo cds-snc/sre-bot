@@ -11,8 +11,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from infrastructure.configuration.app import AppSettings
-
 # ============================================================================
 # Test Payloads
 # ============================================================================
@@ -211,14 +209,10 @@ def mock_webhook_increment(monkeypatch):
 
 @pytest.fixture
 def mock_sns_signature_validation_disabled(monkeypatch):
-    """Disable SNS signature validation to allow test payloads.
-
-    In non-production environments, SNS signature validation is skipped.
-    This ensures test payloads with fake signatures work.
-
-    Monkeypatch app_settings with a non-production ENVIRONMENT in aws_sns.
-    """
+    """Disable SNS signature validation in tests to allow deterministic fake payloads."""
+    mock = MagicMock(return_value=None)
     monkeypatch.setattr(
-        "modules.webhooks.aws_sns.app_settings",
-        AppSettings(ENVIRONMENT="local"),
+        "modules.webhooks.aws_sns.sns_message_validator.validate_message",
+        mock,
     )
+    return mock

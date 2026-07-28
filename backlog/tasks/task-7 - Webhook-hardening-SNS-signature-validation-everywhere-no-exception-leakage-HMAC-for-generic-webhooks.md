@@ -3,10 +3,11 @@ id: TASK-7
 title: >-
   Webhook hardening (Phase 0): SNS signature validation everywhere, no exception
   leakage, body-size cap
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-28 18:41'
+updated_date: '2026-07-28 19:08'
 labels:
   - security
   - phase-0
