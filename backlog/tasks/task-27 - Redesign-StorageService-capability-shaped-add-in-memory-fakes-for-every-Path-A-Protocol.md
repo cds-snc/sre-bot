@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-24 17:59'
+updated_date: '2026-07-28 13:20'
 labels:
   - infrastructure
   - phase-4
@@ -52,5 +52,10 @@ Steps:
 created: 2026-07-24 17:59
 ---
 TASK-5 was decomposed on 2026-07-24 (single-PR size gate) into TASK-5.1..TASK-5.4. The in-memory idempotency fake this task's description refers to ('idempotency - task-5 already delivered idempotency') now lands specifically in TASK-5.1 (Idempotency: atomic claim/complete/release primitive, in-memory fake, and dedicated settings slice). If this task ends up needing an explicit dependency on the idempotency fake, point it at TASK-5.1, not TASK-5.
+---
+
+created: 2026-07-28 13:20
+---
+Scope confirmation from a 2026-07-28 architecture review: this task is the single HIGHEST-LEVERAGE portability fix - StorageService.query(key_condition: str) leaking KeyConditionExpression is the only 'high effort to reback' seam and it also poisons audit/ (which rides StorageService and has no own fake). Reinforcing the existing ACs: (a) the capability-shaped replacement should be a small vendor-neutral query spec (partition key + optional typed sort-key condition: eq/begins_with/between/gt/lt, limit, forward flag) that the audit time-range read can honor; (b) the Path-A fakes explicitly include directory/ (DirectoryProvider - currently has NO in-memory fake, a cloud-portability.md contract gap) and audit/ (after the query redesign), in addition to storage; (c) cloud-portability.md now states the 'every Path A Protocol has a fake' contract is CI-ENFORCED - wire that check as part of this task. Full-end-state: delete the raw-string query signature outright, no compat overload retained.
 ---
 <!-- COMMENTS:END -->

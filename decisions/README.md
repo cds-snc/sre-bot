@@ -38,6 +38,7 @@ The app is a modular monolith that started as a Slack bot and is becoming platfo
 | [security.md](security.md) | AuthN/Z, CORS, rate limiting, webhooks | target |
 | [observability.md](observability.md) | Logging, redaction, correlation | target |
 | [reliability.md](reliability.md) | Idempotency, queuing, background jobs | target |
+| [approvals.md](approvals.md) | Generic human-approval workflow capability | target |
 | [lifecycle.md](lifecycle.md) | Phased startup and shutdown | now |
 | [toolchain.md](toolchain.md) | uv, Python version, lint, types, CI gates | target |
 | [testing.md](testing.md) | Test layers, doubles, coverage | target |
