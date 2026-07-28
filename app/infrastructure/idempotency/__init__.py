@@ -33,7 +33,12 @@ from infrastructure.idempotency.factory import (
     reset_idempotency_store,
 )
 from infrastructure.idempotency.in_memory import InMemoryIdempotencyStore
-from infrastructure.idempotency.lease import acquire_lease, release_lease
+from infrastructure.idempotency.lease import (
+    acquire_lease,
+    get_lease_store,
+    release_lease,
+    run_if_leased,
+)
 from infrastructure.idempotency.protocol import (
     ClaimOutcome,
     ClaimResult,
@@ -54,4 +59,6 @@ __all__ = [
     "reset_idempotency_store",
     "acquire_lease",
     "release_lease",
+    "get_lease_store",
+    "run_if_leased",
 ]

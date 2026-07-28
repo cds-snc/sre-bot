@@ -33,7 +33,7 @@ This is why pytest — the canonical pluggy host — uses an explicit builtin li
 
 **Plugin granularity:** each package under `app/packages/` that ships hookimpls is a plugin and declares one entry-point line. A complex feature (like `access`) may register its subdomains as separate plugins, provided they live under the feature's directory and share its settings namespace — each subdomain plugin gets its own entry-point line.
 
-**Hookimpl signatures** may receive the platform's runtime context where the platform requires it (the FastAPI app for route mounting, the Bolt app for listener attachment). The purity rule is scoped honestly: *cross-platform* hookspecs (i18n, jobs) take Protocols and value types only.
+**Hookimpl signatures** may receive the platform's runtime context where the platform requires it (the FastAPI app for route mounting, the Bolt app for listener attachment). The purity rule is scoped honestly: *cross-platform* hookspecs (i18n, jobs) take Protocols and value types only. Recurring background jobs attach **only** through the `register_background_jobs` hookspec — carrying schedule, Tier classification, and lease TTL as value types — exactly as routes attach through `register_routes`; the host never hand-imports a feature's job body, and the legacy pull-hub that does is retired as `app/modules/` jobs migrate to packages ([reliability.md](reliability.md)).
 
 **Feature flags:** `pm.set_blocked(name)` before `load_setuptools_entrypoints`, driven by settings. A blocked feature registers nothing — no routes, no OpenAPI entries, no further settings reads.
 

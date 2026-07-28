@@ -6,11 +6,13 @@ from typing import Any
 import schedule
 from structlog import get_logger
 
+from infrastructure.idempotency import get_lease_store, run_if_leased
 from infrastructure.plugins.manager import get_plugin_manager
 from integrations import maxmind, opsgenie
 from integrations.aws import identity_store
 from integrations.google_workspace import google_drive
 from jobs.models import BackgroundJobRegistry
+from jobs.settings import get_scheduler_settings
 from modules.aws import identity_center, spending
 from modules.incident.notify_stale_incident_channels import (
     notify_stale_incident_channels,
@@ -59,15 +61,36 @@ def safe_run(job: Callable[..., Any]) -> Callable[..., None]:
     return wrapper
 
 
+def _tier2(name: str, job: Callable[..., None]) -> Callable[..., None]:
+    """Wrap a singleton Tier-2 job with lease acquisition/release."""
+    ttl_seconds = get_scheduler_settings().DEFAULT_TIER2_LEASE_TTL_SECONDS
+    lock_store = get_lease_store(ttl_seconds)
+
+    def wrapped(*args: Any, **kwargs: Any) -> None:
+        run_if_leased(lock_store, name, lambda: job(*args, **kwargs))
+
+    return wrapped
+
+
 def init(bot):
     """Initialize the scheduled tasks."""
     logger.info("initializing_scheduled_tasks", module="scheduled_tasks", function="init")
 
-    schedule.every().day.at("16:00").do(notify_stale_incident_channels, client=bot.client)
     schedule.every(5).minutes.do(safe_run(scheduler_heartbeat))
     schedule.every(5).minutes.do(safe_run(integration_healthchecks))
-    schedule.every(2).hours.do(safe_run(provision_aws_identity_center))
-    schedule.every().day.at("00:00").do(safe_run(spending.generate_spending_data), logger=logger)
+
+    # Tier-2 job body is idempotent; lease only avoids duplicate cross-replica runs.
+    schedule.every(2).hours.do(safe_run(_tier2("scheduler:provision_aws_identity_center", provision_aws_identity_center)))
+    # Tier-2 job body is idempotent; lease only avoids duplicate cross-replica runs.
+    schedule.every().day.at("16:00").do(
+        safe_run(_tier2("scheduler:notify_stale_incident_channels", notify_stale_incident_channels)),
+        client=bot.client,
+    )
+    # Tier-2 job body is idempotent; lease only avoids duplicate cross-replica runs.
+    schedule.every().day.at("00:00").do(
+        safe_run(_tier2("scheduler:spending_generate_spending_data", spending.generate_spending_data)),
+        logger=logger,
+    )
 
     registry = _ScheduleBackgroundJobRegistry()
     get_plugin_manager().hook.register_background_jobs(registry=registry)

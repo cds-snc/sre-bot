@@ -17,7 +17,7 @@ Settings are split across ~47 classes with two homes per vendor (`integrations/<
 
 - Vendor credentials → `app/integrations/<vendor>/settings.py` (single home; the `infrastructure/configuration/integrations/` twins are deleted). A system reached in more than one role holds **one least-privilege credential per role**, not one shared login: e.g. Slack's inbound bot token + Socket Mode app token (transport) are distinct from an admin/`usergroups:write` token used by a feature that mutates Slack (per [platform-transports.md](platform-transports.md); OWASP API5 BFLA).
 - Transport settings → `app/infrastructure/<platform>/settings.py`.
-- Capability/service settings → with the service; feature settings → in the feature package.
+- Capability/service settings → with the service; feature settings → in the feature package. A recurring job's schedule and lease TTL are **feature-partitioned** settings owned by the job's feature (short, domain-namespaced names), not a central scheduler aggregator with one field per job; the scheduler capability owns only a single shared **default** lease TTL for not-yet-migrated jobs ([reliability.md](reliability.md)).
 - The security domain owns a `SecuritySettings` slice covering its own config — allowed issuers/JWKS, CORS allow-list, rate-limit storage backend, and the dev-bypass flag — rather than borrowing fields from a shared server-settings object.
 - One env var has exactly one owning class. Namespaced env names (`SLACK__…`, `AWS__…`) via `env_nested_delimiter`.
 

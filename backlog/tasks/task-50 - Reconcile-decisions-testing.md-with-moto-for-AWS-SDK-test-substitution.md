@@ -4,8 +4,9 @@ title: Reconcile decisions/testing.md with moto for AWS SDK test substitution
 status: To Do
 assignee: []
 created_date: '2026-07-24 18:30'
-updated_date: '2026-07-24 19:29'
+updated_date: '2026-07-28 14:54'
 labels: []
+milestone: m-1
 dependencies:
   - TASK-5.1
 references:
