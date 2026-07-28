@@ -200,22 +200,21 @@ class TestTier2Wrapper:
 
     @pytest.mark.unit
     @patch("jobs.scheduled_tasks.get_lease_store")
-    def test_tier2_wrapper_skips_job_while_lease_held(self, mock_get_lease_store) -> None:
-        """_tier2(...)() skips the job on a second invocation while the lease is held."""
+    def test_tier2_wrapper_skips_job_when_lease_already_held(self, mock_get_lease_store) -> None:
+        """_tier2(...)() skips execution when another runner already holds the lease."""
         settings = IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
         real_store = InMemoryIdempotencyStore(idempotency_settings=settings)
         mock_get_lease_store.return_value = real_store
 
+        # Simulate another replica already holding the lease.
+        assert real_store.claim("scheduler:test_job").result.name == "NEW"
+
         job = MagicMock()
         wrapped_job = _tier2("scheduler:test_job", job)
 
-        # First call: job should execute
+        # The wrapped call should skip because lease is already held.
         wrapped_job()
-        assert job.call_count == 1
-
-        # Second call: job should NOT execute (lease is held)
-        wrapped_job()
-        assert job.call_count == 1  # Still 1, not 2
+        job.assert_not_called()
 
     @pytest.mark.unit
     @patch("jobs.scheduled_tasks.get_lease_store")

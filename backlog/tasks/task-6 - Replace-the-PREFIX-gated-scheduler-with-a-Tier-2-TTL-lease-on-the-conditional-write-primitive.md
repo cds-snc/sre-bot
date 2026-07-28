@@ -3,10 +3,11 @@ id: TASK-6
 title: >-
   Add Tier-2 TTL leases to singleton scheduled jobs (single shared default TTL;
   no central per-job settings)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-28 16:57'
+updated_date: '2026-07-28 17:05'
 labels:
   - reliability
   - phase-0

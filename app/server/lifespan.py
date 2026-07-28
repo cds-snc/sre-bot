@@ -102,6 +102,8 @@ def _start_scheduled_tasks(
     app_settings: AppSettings,
     logger: BoundLogger,
 ) -> threading.Event | None:
+    # This gate suppresses side-effecting jobs outside production; Tier-2 leases
+    # are the duplicate-prevention mechanism across production replicas.
     if app_settings.ENVIRONMENT != "production":
         logger.info("scheduled_tasks_skipped", reason="environment_is_not_production")
         return None
