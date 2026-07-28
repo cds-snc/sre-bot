@@ -3,10 +3,10 @@ id: TASK-5
 title: >-
   Rewrite idempotency store as atomic conditional claim behind an
   IdempotencyStore Protocol with in-memory fake
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-24 17:58'
+updated_date: '2026-07-28 12:24'
 labels:
   - security
   - phase-0
@@ -40,18 +40,18 @@ TASK-6 has been re-pointed to depend on TASK-5.1 and TASK-5.3 instead of this ta
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 IdempotencyStore Protocol exists with claim/complete/release; no vendor types or vendor query syntax in its signatures
-- [ ] #2 DynamoDB implementation uses ConditionExpression attribute_not_exists on claim; grep shows no get-then-put pattern remains in app/infrastructure/idempotency/
-- [ ] #3 Concurrency test: two concurrent identical claims yield exactly one NEW and one IN_PROGRESS/COMPLETED outcome (asserted via the conditional-write path, not timing)
-- [ ] #4 In-memory fake passes the same Protocol test suite as the DynamoDB implementation
-- [ ] #5 Keys follow <feature>:<intent>:<idempotency_id>; no payload hash, no truncation (test on key builder)
+- [x] #1 IdempotencyStore Protocol exists with claim/complete/release; no vendor types or vendor query syntax in its signatures
+- [x] #2 DynamoDB implementation uses ConditionExpression attribute_not_exists on claim; grep shows no get-then-put pattern remains in app/infrastructure/idempotency/
+- [x] #3 Concurrency test: two concurrent identical claims yield exactly one NEW and one IN_PROGRESS/COMPLETED outcome (asserted via the conditional-write path, not timing)
+- [x] #4 In-memory fake passes the same Protocol test suite as the DynamoDB implementation
+- [x] #5 Keys follow <feature>:<intent>:<idempotency_id>; no payload hash, no truncation (test on key builder)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 All callers migrated; old key builder and racy store deleted
-- [ ] #2 Tests pass including the shared Protocol conformance suite run against both implementations
-- [ ] #3 PR references SEC-4 and decisions/reliability.md
+- [x] #1 All callers migrated; old key builder and racy store deleted
+- [x] #2 Tests pass including the shared Protocol conformance suite run against both implementations
+- [x] #3 PR references SEC-4 and decisions/reliability.md
 <!-- DOD:END -->
 
 ## Implementation Plan
