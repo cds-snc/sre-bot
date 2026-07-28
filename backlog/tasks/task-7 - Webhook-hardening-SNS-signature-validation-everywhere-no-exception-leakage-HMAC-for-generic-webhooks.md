@@ -3,11 +3,11 @@ id: TASK-7
 title: >-
   Webhook hardening (Phase 0): SNS signature validation everywhere, no exception
   leakage, body-size cap
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-28 19:08'
+updated_date: '2026-07-28 19:15'
 labels:
   - security
   - phase-0
@@ -37,15 +37,15 @@ Deferred to Phase 4 (m-4): per-webhook HMAC signature requirement, secure-by-def
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 SNS signature validation runs unconditionally; a test covers an invalid-signature rejection
-- [ ] #2 grep -rn "e.__class__" and f-string exception interpolation in webhook 5xx paths return zero hits; a forced exception yields a generic 500 body (test)
-- [ ] #3 Oversized webhook bodies are rejected (test)
+- [x] #1 SNS signature validation runs unconditionally; a test covers an invalid-signature rejection
+- [x] #2 grep -rn "e.__class__" and f-string exception interpolation in webhook 5xx paths return zero hits; a forced exception yields a generic 500 body (test)
+- [x] #3 Oversized webhook bodies are rejected (test)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Tests pass; existing legitimate webhook flows still succeed against the new auth (documented manual check or smoke test)
-- [ ] #2 PR references SEC-6 and decisions/security.md
+- [x] #1 Tests pass; existing legitimate webhook flows still succeed against the new auth (documented manual check or smoke test)
+- [x] #2 PR references SEC-6 and decisions/security.md
 <!-- DOD:END -->
 
 ## Implementation Plan
