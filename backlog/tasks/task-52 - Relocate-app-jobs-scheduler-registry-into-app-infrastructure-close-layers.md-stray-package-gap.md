@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-27 15:48'
-updated_date: '2026-07-27 16:13'
+updated_date: '2026-07-28 16:33'
 labels:
   - architecture
   - layers
@@ -14,6 +14,7 @@ labels:
 milestone: m-4
 dependencies:
   - TASK-6
+  - TASK-64
 references:
   - decisions/layers.md
   - decisions/reliability.md
@@ -52,3 +53,12 @@ This task itself needs a human-approved implementation plan (backlog task edit T
 - [ ] #1 Tests pass; PR references decisions/layers.md and cross-references TASK-6
 - [ ] #2 A human-approved implementation plan exists on this task (via task-planner) before any implementation PR opens
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-07-28 16:33
+---
+Re-sequenced 2026-07-28 (per the scheduled job architecture review): now also depends on TASK-64 (widen BackgroundJobRegistry + move lease/error-boundary enforcement into the scheduler registry). Order is TASK-6 -> TASK-64 -> TASK-52 so this task relocates the WIDENED, thinner scheduler capability into app/infrastructure/ rather than the narrow registry that would immediately be rewritten. The pull-hub strangle (TASK-65) proceeds after, gated on the m-5 modules->packages migration; TASK-52 does not block on it.
+---
+<!-- COMMENTS:END -->
