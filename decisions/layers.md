@@ -29,7 +29,7 @@ app/integrations/     Outbound clients. Thin, vendor-specific, raise SDK excepti
 
 **`app/infrastructure/` holds two kinds of services**, both exposed as `typing.Protocol` + provider function:
 
-- *Portable capabilities* (storage, queue, idempotency, directory, events…): the Protocol is capability-shaped and vendor-neutral; the implementation uses an integrations client and is swappable per deployment. This is the cloud-portability mechanism.
+- *Portable capabilities* (storage, queue, idempotency, directory, events, approvals…): the Protocol is capability-shaped and vendor-neutral; the implementation uses an integrations client and is swappable per deployment. This is the cloud-portability mechanism.
 - *Platform transports* (`infrastructure/slack/`, later `infrastructure/teams/`): first-class, in-process services that own the platform's **inbound runtime** — SDK runtime (Bolt), Socket Mode connection, verification, dispatch — plus the formatting/parsing helpers and the outbound Protocol (`SlackService`) inbound handlers use to reply. A transport is not an "integration we sometimes call"; it is part of the host. The platform's authenticated **Web API client** is a separate connectivity primitive in `integrations/<platform>/` that both the transport and any outbound feature share. See [platform-transports.md](platform-transports.md).
 
 **Shared kernel.** `infrastructure/operations/` (`OperationResult`, `OperationStatus`) is a declared leaf: any tier may import it. Nothing else in `infrastructure/` is importable from `integrations/`. This legalizes the one upward import every layer genuinely needs and forbids the rest.

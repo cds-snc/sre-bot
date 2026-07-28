@@ -37,7 +37,7 @@ A handler (any platform) does five things and nothing else: receive the platform
 ### Dependency rules
 
 - Services depend on Protocols (constructor-injected via `providers.py`); domain code depends on nothing outside the feature and the stdlib.
-- Features never import other features. Cross-feature reactions go through domain events ([events.md](events.md)); shared needs get promoted to infrastructure on the second consumer ([layers.md](layers.md)).
+- Features never import other features. Cross-feature reactions go through domain events ([events.md](events.md)); shared needs get promoted to infrastructure on the second consumer ([layers.md](layers.md)). Worked example: the approval-workflow engine inside `access/request` graduates to `infrastructure/approvals/` now that SaaS-subscription and AI-key approvals need it ([approvals.md](approvals.md)); the access-specific policy and IDP/sync effect stay in the package as injected strategies.
 - `app/integrations/` imports appear only under `adapters/`. Platform helpers (parser, renderer, models) come from the transport service, not the platform SDK.
 
 ## Consequences
