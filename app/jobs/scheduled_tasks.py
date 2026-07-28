@@ -80,9 +80,7 @@ def init(bot):
     schedule.every(5).minutes.do(safe_run(integration_healthchecks))
 
     # Tier-2 job body is idempotent; lease only avoids duplicate cross-replica runs.
-    schedule.every(2).hours.do(
-        safe_run(_tier2("scheduler:provision_aws_identity_center", provision_aws_identity_center))
-    )
+    schedule.every(2).hours.do(safe_run(_tier2("scheduler:provision_aws_identity_center", provision_aws_identity_center)))
     # Tier-2 job body is idempotent; lease only avoids duplicate cross-replica runs.
     schedule.every().day.at("16:00").do(
         safe_run(_tier2("scheduler:notify_stale_incident_channels", notify_stale_incident_channels)),
