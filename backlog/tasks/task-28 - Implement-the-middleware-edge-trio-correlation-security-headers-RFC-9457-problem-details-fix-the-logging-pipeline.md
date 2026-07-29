@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 16:57'
+updated_date: '2026-07-29 20:03'
 labels:
   - infrastructure
   - phase-4
@@ -49,3 +49,12 @@ Steps:
 - [ ] #1 Tests green; new routes documented to use the helper from day one
 - [ ] #2 PR references decisions/observability.md and decisions/errors-and-http.md
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-07-29 20:03
+---
+decisions/observability.md now documents a health-check log classification nuance relevant to this ticket's step 4 (uvicorn->pipeline unification): per OWASP, health-check/monitoring traffic (ALB + Route53 hits on /version, /health) must be classified (event_type=healthcheck or downgraded to DEBUG), never dropped from access logs. Only exact liveness-check matches (GET, path, 200, no query string) qualify; anything else on those routes stays at INFO+ so probing/fuzzing remains visible. See decisions/health-checks.md for the infra-side layering this traffic comes from.
+---
+<!-- COMMENTS:END -->
