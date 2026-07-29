@@ -115,6 +115,14 @@ This project uses [Visual Studio Code Remote - Containers](https://code.visualst
 
 ---
 
+## Architecture & Decision Records
+
+The authoritative architecture records live in [`decisions/`](decisions/README.md). Start with [`decisions/README.md`](decisions/README.md) for the reading order and record index.
+
+The legacy `docs/adr/` folder has been removed; its historical content is available in git history.
+
+---
+
 ## Security & Privacy
 
 SRE Bot handles sensitive data such as secrets and user/group assignments. Please review our [security guidelines](./SECURITY.md) and ensure you follow best practices for environment configuration and access control.

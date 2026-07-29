@@ -42,11 +42,11 @@ _PROVIDER = "aws"
 class AWSShield:
     """Resilience boundary around boto3.
 
-    Owns SDK construction with native retry configured per
-    `docs/adr/outbound-retry-policy.md`, caches one client per service
-    name, and converts SDK exceptions raised by callables passed to
-    `execute()` into `OperationResult` envelopes using the error-code
-    catalogues carried on `AWSSettings`.
+    Owns SDK construction with SDK-native retry (max attempts and mode
+    from `AWSSettings`), caches one client per service name, and converts
+    SDK exceptions raised by callables passed to `execute()` into
+    `OperationResult` envelopes using the error-code catalogues carried
+    on `AWSSettings`.
     """
 
     def __init__(self, settings: AWSSettings) -> None:
