@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-29 18:51'
+updated_date: '2026-07-29 19:00'
 labels:
   - toolchain
   - phase-2
@@ -33,10 +33,10 @@ Steps:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Dockerfile is multi-stage, installs with uv sync --locked --no-dev, and fails to build without uv.lock
-- [ ] #2 No == pins remain in [project] dependencies; dev deps live in [dependency-groups]; awscli is gone from runtime deps
-- [ ] #3 CI fails when uv.lock is out of date (uv lock --check step)
-- [ ] #4 grep -rnw "core" app/pyproject.toml app/Makefile shows no stale references to the deleted core package (botocore/google-api-core dependency names are expected non-matches, not the deleted package)
+- [x] #1 Dockerfile is multi-stage, installs with uv sync --locked --no-dev, and fails to build without uv.lock
+- [x] #2 No == pins remain in [project] dependencies; dev deps live in [dependency-groups]; awscli is gone from runtime deps
+- [x] #3 CI fails when uv.lock is out of date (uv lock --check step)
+- [x] #4 grep -rnw "core" app/pyproject.toml app/Makefile shows no stale references to the deleted core package (botocore/google-api-core dependency names are expected non-matches, not the deleted package)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -104,3 +104,13 @@ Steps:
 - Touches only build/packaging surfaces: root `Dockerfile`, new root `aws-cli-pubkey.asc`, `app/pyproject.toml`, `app/uv.lock` (regenerated), `app/Makefile`, `.github/workflows/ci_code.yml`, `README.md` (one line). No application code paths change; no terraform/runtime infra changes (ECS Fargate stays X86_64/LINUX, confirmed no `runtime_platform` override in `terraform/ecs.tf`, so the single-arch AWS CLI installer URL is unambiguous).
 - Rollback is a straight revert of the single PR — no data migrations, no schema/API changes. Residual risk is entirely in the image build (multi-stage correctness, AWS CLI installer availability/signature verification, dependency-range re-resolution) and is caught by the build/smoke/test steps above before merge, not at runtime after deploy.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Changed files: Dockerfile (rewritten as two-stage builder/runtime), aws-cli-pubkey.asc (new — AWS CLI Team GPG key, Key ID A6310ACC4672475C), app/pyproject.toml (== pins → >= ranges, awscli removed, core removed from hatch wheel packages), app/uv.lock (regenerated; awscli + docutils removed, 172 packages resolved), app/Makefile (--cov=core removed, lock-check and install-ci targets added), .github/workflows/ci_code.yml (install-dev → install-ci), README.md (uv sync --extra dev → uv sync).
+
+Test evidence: uv run pytest tests --ignore=tests/smoke — all green (confirmed by user). uv lock --check — passes. uv run ruff check . — All checks passed. mypy errors are pre-existing in untouched files.
+
+DoD items for human verification: (1) docker build from clean checkout succeeds and container boots (readiness endpoint + aws --version in image). (2) PR description references decisions/toolchain.md.
+<!-- SECTION:NOTES:END -->

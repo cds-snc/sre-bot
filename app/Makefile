@@ -62,8 +62,14 @@ test-all:
 	uv run coverage report -m
 
 # Coverage reports with focus on new structure
+lock-check:
+	uv lock --check
+
+install-ci: lock-check
+	uv sync --locked
+
 test-coverage-unit:
-	uv run coverage run -m pytest tests/unit --cov=modules --cov=core --cov=api --show-capture=log --log-level=INFO -r fE && \
+	uv run coverage run -m pytest tests/unit --cov=modules --cov=api --show-capture=log --log-level=INFO -r fE && \
 	uv run coverage report -m && \
 	uv run coverage html
 

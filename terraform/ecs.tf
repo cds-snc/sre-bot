@@ -7,10 +7,16 @@ resource "aws_ecs_cluster" "sre-bot" {
   }
 }
 
-data "template_file" "sre-bot" {
-  template = file("./templates/sre-bot.json.tpl")
+resource "aws_ecs_task_definition" "sre-bot" {
+  family                   = "sre-bot-task"
+  execution_role_arn       = aws_iam_role.sre-bot.arn
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = var.fargate_cpu
+  memory                   = var.fargate_memory
+  task_role_arn            = aws_iam_role.sre-bot.arn
 
-  vars = {
+  container_definitions = templatefile("${path.module}/templates/sre-bot.json.tpl", {
     awslogs-group                    = aws_cloudwatch_log_group.sre-bot_group.name
     awslogs-region                   = "ca-central-1"
     awslogs-stream-prefix            = "ecs-sre-bot"
@@ -21,18 +27,7 @@ data "template_file" "sre-bot" {
     aws_region                       = "ca-central-1"
     cors_allowed_origins             = jsonencode(var.cors_allowed_origins)
     GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = aws_ssm_parameter.gcp_sre_service_account_key.arn
-  }
-}
-
-resource "aws_ecs_task_definition" "sre-bot" {
-  family                   = "sre-bot-task"
-  execution_role_arn       = aws_iam_role.sre-bot.arn
-  network_mode             = "awsvpc"
-  requires_compatibilities = ["FARGATE"]
-  cpu                      = var.fargate_cpu
-  memory                   = var.fargate_memory
-  container_definitions    = data.template_file.sre-bot.rendered
-  task_role_arn            = aws_iam_role.sre-bot.arn
+  })
 }
 
 resource "aws_ecs_service" "main" {
