@@ -81,7 +81,11 @@ def handle_webhook_payload(
         payload_type, validated_payload = payload_validation_result
     else:
         error_message = "No matching model found for payload"
-        return WebhookResult(status="error", message=error_message)
+        return WebhookResult(
+            status="error",
+            message=error_message,
+            matched_payload_type=None,
+        )
 
     match payload_type.__name__:
         case "WebhookPayload":
@@ -90,12 +94,13 @@ def handle_webhook_payload(
             aws_sns_payload_instance = cast(AwsSnsPayload, validated_payload)
             bot_client = _get_bot_client(request)
             if bot_client is None:
-                return WebhookResult(
+                webhook_result = WebhookResult(
                     status="error",
                     action="none",
                     message="Slack bot not initialized",
                 )
-            webhook_result = process_aws_sns_payload(aws_sns_payload_instance, bot_client)
+            else:
+                webhook_result = process_aws_sns_payload(aws_sns_payload_instance, bot_client)
 
         case "AccessRequest":
             message = str(cast(AccessRequest, validated_payload).model_dump())
@@ -114,5 +119,7 @@ def handle_webhook_payload(
                 status="error",
                 message="No matching model found for payload",
             )
+
+    webhook_result.matched_payload_type = payload_type.__name__
 
     return webhook_result

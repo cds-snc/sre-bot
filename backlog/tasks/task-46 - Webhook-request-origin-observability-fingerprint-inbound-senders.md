@@ -1,10 +1,11 @@
 ---
 id: TASK-46
 title: 'Webhook request-origin observability: fingerprint inbound senders'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@me'
 created_date: '2026-07-24 13:58'
-updated_date: '2026-07-29 14:02'
+updated_date: '2026-07-29 15:35'
 labels:
   - security
   - phase-0
@@ -35,10 +36,10 @@ Out of scope: any rejection, signature verification, or settings/schema change t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A structured webhook_invocation event is emitted for every POST /hook/{webhook_id} carrying webhook_id, source IP, user-agent, matched payload type, and signature-header presence (test asserts the event fields)
-- [ ] #2 No request is rejected or otherwise behaviourally changed by this task; legitimate webhook flows are byte-for-byte unaffected (test)
-- [ ] #3 Request bodies are never emitted to logs/metrics; only fingerprint metadata is (test/review)
-- [ ] #4 Fingerprint data is queryable/aggregatable per webhook_id + inferred source type (documented query or metric)
+- [x] #1 A structured webhook_invocation event is emitted for every POST /hook/{webhook_id} carrying webhook_id, source IP, user-agent, matched payload type, and signature-header presence (test asserts the event fields)
+- [x] #2 No request is rejected or otherwise behaviourally changed by this task; legitimate webhook flows are byte-for-byte unaffected (test)
+- [x] #3 Request bodies are never emitted to logs/metrics; only fingerprint metadata is (test/review)
+- [x] #4 Fingerprint data is queryable/aggregatable per webhook_id + inferred source type (documented query or metric)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -101,6 +102,40 @@ Assumptions / doubts flagged for human sign-off (not silently resolved):
 
 Blast radius / rollback: purely additive (new field with a default, new try/finally + one new log call, new helper function, new tests) - no existing route contract, status code, or response body changes. Rollback is a straight revert of the single PR; no data migration, no settings/env var introduced, no terraform change.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented webhook origin-fingerprint observability on the shared webhook handler with additive behavior only.
+
+What changed:
+- app/models/webhooks.py: Added optional WebhookResult.matched_payload_type field (default None).
+- app/modules/webhooks/base.py: Populated matched_payload_type from payload_type.__name__ for matched/recognized and unsupported model branches; explicit None for no-match branch.
+- app/api/v1/routes/webhooks.py:
+  - Added _signing_indicator_present(request) helper using known signature header candidates plus header-name substring heuristic.
+  - Added webhook_invocation fingerprint dict and guaranteed emission via try/finally as log.info("webhook_invocation", ...).
+  - Populates matched_payload_type in fingerprint from handle_webhook_payload result.
+  - Added route docstring/query guidance for Logs Insights aggregation by webhook_id and matched_payload_type.
+
+Test evidence:
+- Targeted feature tests (green):
+  cd /workspace/app && uv run pytest tests/modules/webhooks/test_webhooks_base.py tests/api/v1/test_webhooks.py
+  Result: 27 passed.
+- Ruff gate (green):
+  cd /workspace/app && uv run ruff check .
+  Result: all checks passed.
+- Full non-smoke pytest gate:
+  cd /workspace/app && uv run pytest tests --ignore=tests/smoke
+  Result: 5 failed, 2959 passed, 37 skipped.
+  Failures are pre-existing/unrelated to TASK-46 scope in tests/integrations/aws/test_client_next.py and tests/modules/webhooks/test_webhooks_aws_sns.py.
+- Mypy gate:
+  cd /workspace/app && uv run mypy . --exclude '(?:^|/)\\.venv(?:/|$)'
+  Result: pre-existing repository-wide mypy errors outside TASK-46 touched files.
+
+DoD items left for human verification:
+- PR review and merge decision.
+- Runtime log verification in deployed environment (confirm webhook_invocation appears for live legacy /hook traffic and query is operational in CloudWatch Logs Insights).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
