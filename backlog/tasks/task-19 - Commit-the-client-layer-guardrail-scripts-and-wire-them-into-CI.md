@@ -4,7 +4,7 @@ title: Commit the client-layer guardrail scripts and wire them into CI
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 16:57'
+updated_date: '2026-07-29 21:12'
 labels:
   - toolchain
   - phase-2
@@ -43,3 +43,12 @@ Steps:
 - [ ] #1 CI blocking step live
 - [ ] #2 PR references decisions/migration.md coexistence rules
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-07-29 21:12
+---
+Planning note from TASK-22 decomposition: as of 2026-07-29, app/bin/check_deprecated_infra_client_imports.py and app/bin/baselines/ do NOT yet exist in the repo — only app/bin/generate_client_usage_matrix.sh (exposed via 'make audit-client-usage-matrix') is committed. TASK-22's Step 1/AC and its subtasks assume the freeze-check + baseline from this task. If TASK-19 lands before the TASK-22 sprint, the baseline ratchet enforces monotonic shrinkage per-slice; if it does not, TASK-22.5's baseline-empty step is a no-op and the deletion is guarded only by the usage-matrix + import-linter (TASK-18). No blocker either way, but sequencing TASK-19 ahead of the TASK-22 sprint is preferable.
+---
+<!-- COMMENTS:END -->
