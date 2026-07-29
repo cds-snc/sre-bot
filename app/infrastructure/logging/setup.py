@@ -105,7 +105,6 @@ def _is_test_environment() -> bool:
 
 
 def _build_base_processors(
-    _prod_mode: bool,
     logging_settings: LoggingSettings,
 ) -> list[
     Callable[
@@ -202,10 +201,7 @@ def configure_logging(
 
     # Build processor pipeline per structlog best practices
     # Order matters: context vars first, then enrichment, then formatting
-    processors = _build_base_processors(
-        prod_mode=prod_mode,
-        logging_settings=resolved_logging_settings,
-    )
+    processors = _build_base_processors(logging_settings=resolved_logging_settings)
 
     # 6. Final rendering (environment-specific)
     if not prod_mode:  # Development mode
