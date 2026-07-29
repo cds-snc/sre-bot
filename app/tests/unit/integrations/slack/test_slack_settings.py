@@ -8,6 +8,7 @@ the `@lru_cache` singleton contract, and the absence of domain fields.
 from __future__ import annotations
 
 import pytest
+from structlog.testing import capture_logs
 
 from integrations.slack.settings import SlackSettings, get_slack_settings
 
@@ -126,6 +127,46 @@ class TestSlackSettingsFailFast:
         settings = SlackSettings()
 
         assert settings.SOCKET_MODE is False
+
+
+class TestSlackSettingsSocketModeSigningSecretNotice:
+    """Socket Mode surfaces missing signing-secret readiness as an info notice."""
+
+    def test_enabled_socket_mode_without_signing_secret_logs_info_notice(self, monkeypatch):
+        monkeypatch.setenv("SLACK_ENABLED", "true")
+        monkeypatch.setenv("SLACK_SOCKET_MODE", "true")
+        monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-token")
+
+        with capture_logs() as entries:
+            settings = SlackSettings()
+
+        assert settings.ENABLED is True
+        assert settings.SOCKET_MODE is True
+        notice_entries = [entry for entry in entries if entry.get("event") == "slack_signing_secret_not_set_in_socket_mode"]
+        assert notice_entries
+        assert notice_entries[0].get("log_level") == "info"
+
+    def test_enabled_socket_mode_with_signing_secret_logs_no_notice(self, monkeypatch):
+        monkeypatch.setenv("SLACK_ENABLED", "true")
+        monkeypatch.setenv("SLACK_SOCKET_MODE", "true")
+        monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-token")
+        monkeypatch.setenv("SLACK_SIGNING_SECRET", "secret")
+
+        with capture_logs() as entries:
+            settings = SlackSettings()
+
+        assert settings.ENABLED is True
+        assert settings.SOCKET_MODE is True
+        notice_entries = [entry for entry in entries if entry.get("event") == "slack_signing_secret_not_set_in_socket_mode"]
+        assert notice_entries == []
+
+    def test_disabled_socket_mode_without_signing_secret_logs_no_notice(self):
+        with capture_logs() as entries:
+            settings = SlackSettings(SLACK_ENABLED=False)
+
+        assert settings.ENABLED is False
+        notice_entries = [entry for entry in entries if entry.get("event") == "slack_signing_secret_not_set_in_socket_mode"]
+        assert notice_entries == []
 
 
 class TestSlackSettingsScope:
