@@ -10,3 +10,15 @@ __pycache__
 *.md
 .env*
 !.env.example
+
+# Non-image directories: not COPYed into any build stage, but excluding them
+# keeps the build context small and the daemon upload fast (Docker build
+# best practices: "Exclude with .dockerignore").
+.devcontainer
+.vscode
+node_modules
+backlog
+terraform
+tmp
+app/coverage_html_report
+package-lock.json

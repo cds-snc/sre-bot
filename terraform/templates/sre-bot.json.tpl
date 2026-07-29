@@ -17,6 +17,16 @@
         "awslogs-stream-prefix": "${awslogs-stream-prefix}"
       }
     },
+    "healthCheck": {
+      "command": [
+        "CMD-SHELL",
+        "python -c \"import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).status == 200 else 1)\""
+      ],
+      "interval": 30,
+      "timeout": 5,
+      "retries": 3,
+      "startPeriod": 10
+    },
     "name": "sre-bot",
     "portMappings": [
       {

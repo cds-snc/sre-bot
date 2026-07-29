@@ -33,7 +33,7 @@ jobs:
 
       - name: Install dev dependencies
         working-directory: ./app
-        run: make install-dev
+        run: make install-ci
 
       - name: Lint
         working-directory: ./app
