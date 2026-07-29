@@ -30,6 +30,7 @@ from infrastructure.i18n import (
     TranslationService,
     get_translation_service,
 )
+from infrastructure.logging.settings import LoggingSettings, get_logging_settings
 from infrastructure.logging.setup import configure_logging
 from infrastructure.plugins import (
     auto_discover_plugins,
@@ -56,8 +57,15 @@ def _is_test_environment() -> bool:
     return "pytest" in sys.modules
 
 
-def _get_logger_from_app(app_settings: AppSettings) -> BoundLogger:
-    return configure_logging(settings=app_settings)
+def _get_logger_from_app(
+    app_settings: AppSettings,
+    logging_settings: LoggingSettings | None = None,
+) -> BoundLogger:
+    resolved_logging_settings = logging_settings or get_logging_settings()
+    return configure_logging(
+        settings=app_settings,
+        logging_settings=resolved_logging_settings,
+    )
 
 
 def _list_configs_from_sections(
@@ -224,7 +232,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     server_settings = get_server_settings()
     directory_settings = get_directory_settings()
     sre_ops_settings = get_sre_ops_settings()
-    logger = _get_logger_from_app(app_settings)
+    logging_settings = get_logging_settings()
+    logger = _get_logger_from_app(app_settings, logging_settings)
 
     app.state.settings = app_settings
     app.state.logger = logger

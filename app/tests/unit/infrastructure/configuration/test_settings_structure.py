@@ -45,6 +45,7 @@ from infrastructure.configuration.integrations.google import (
     get_google_workspace_settings,
 )
 from infrastructure.idempotency.settings import IdempotencySettings
+from infrastructure.logging.settings import LoggingSettings
 
 
 class TestSettingsStructure:
@@ -175,6 +176,7 @@ class TestSettingsStructure:
             RetrySettings(),
             ServerSettings(),
             DevSettings(),
+            LoggingSettings(),
         ]
 
         # Verify they are all instances of InfrastructureSettings
