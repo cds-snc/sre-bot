@@ -1,11 +1,11 @@
 ---
 id: TASK-9
 title: Validate the Slack signing secret at boot (both delivery modes)
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-29 13:18'
+updated_date: '2026-07-29 13:25'
 labels:
   - security
   - phase-0
@@ -39,15 +39,15 @@ Out of scope (moved to the deferred HTTP-mode task): computing/verifying the v0=
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Boot fails fast when HTTP Events mode is selected (SLACK__SOCKET_MODE=false) and no signing secret is configured
-- [ ] #2 In Socket Mode, a missing signing secret is detected at boot and surfaced via a clear, informational log entry (not a warning/error, since Socket Mode does not require it to function) so operators have visibility before a later switch to HTTP mode
-- [ ] #3 The Slack transport module docstring documents that Socket Mode relies on the connection handshake and that HTTP-mode per-request HMAC verification is deferred to a separate task and not yet implemented
+- [x] #1 Boot fails fast when HTTP Events mode is selected (SLACK__SOCKET_MODE=false) and no signing secret is configured
+- [x] #2 In Socket Mode, a missing signing secret is detected at boot and surfaced via a clear, informational log entry (not a warning/error, since Socket Mode does not require it to function) so operators have visibility before a later switch to HTTP mode
+- [x] #3 The Slack transport module docstring documents that Socket Mode relies on the connection handshake and that HTTP-mode per-request HMAC verification is deferred to a separate task and not yet implemented
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Boot-validation tests pass: HTTP mode without a secret fails fast; Socket Mode without a secret is flagged; with a secret the app boots in both modes
-- [ ] #2 PR references decisions/transport-slack.md and decisions/configuration.md and links the deferred HTTP-mode HMAC verification follow-up task
+- [x] #1 Boot-validation tests pass: HTTP mode without a secret fails fast; Socket Mode without a secret is flagged; with a secret the app boots in both modes
+- [x] #2 PR references decisions/transport-slack.md and decisions/configuration.md and links the deferred HTTP-mode HMAC verification follow-up task
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -223,6 +223,32 @@ at the moment someone actually flips to HTTP mode remains the real safety net.
 Fits comfortably in one reviewable PR (single settings module logic change +
 docstring + tests, ~20 production LOC, one subsystem). No decomposition needed.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented TASK-9 boot-time Slack signing-secret validation behavior and docs.
+
+Code changes:
+- app/integrations/slack/settings.py
+  - Added structlog logger.
+  - Kept existing fail-fast HTTP-mode validation (SLACK_SOCKET_MODE=false + missing SLACK_SIGNING_SECRET raises ValueError).
+  - Added Socket Mode informational notice event when ENABLED=true, SOCKET_MODE=true, and SIGNING_SECRET missing: slack_signing_secret_not_set_in_socket_mode (info level).
+- app/integrations/slack/bootstrap.py
+  - Updated module docstring to document delivery-mode verification behavior (Socket Mode handshake authenticity; HTTP mode enables request verification; extra HTTP HMAC details deferred/not implemented here).
+
+Test evidence:
+- Automated (agent):
+  - cd /workspace/app && uv run pytest tests/unit/integrations/slack/test_slack_settings.py -q -> 26 passed
+  - cd /workspace/app && uv run pytest tests/unit/integrations/slack/test_slack_bootstrap.py -q -> 10 passed
+  - cd /workspace/app && uv run ruff check . -> All checks passed
+- Human verification:
+  - User reported full manual test run green (make test).
+
+DoD/human checkpoint items remaining:
+- Human final review, PR metadata, and transition out of In Progress per team workflow.
+- Ensure PR body references decisions/transport-slack.md and decisions/configuration.md and links deferred HTTP-mode HMAC follow-up task.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
