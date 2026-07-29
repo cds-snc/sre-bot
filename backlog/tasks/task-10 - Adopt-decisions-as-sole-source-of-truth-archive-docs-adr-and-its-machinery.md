@@ -1,7 +1,7 @@
 ---
 id: TASK-10
 title: Adopt decisions/ as sole source of truth; delete docs/adr/ and its machinery
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-07 19:56'
