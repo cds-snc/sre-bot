@@ -4,7 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
     "arrow==1.4.0",
-    "awscli==1.44.44",
+    "awscli==1.44.78",
     "Authlib==1.6.8",
     "aws-sns-message-validator==0.0.5",
     "blinker==1.9.0",
