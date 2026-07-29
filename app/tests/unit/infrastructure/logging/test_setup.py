@@ -4,6 +4,9 @@ Tests cover:
 - configure_logging function
 - Test logging suppression in test environment
 - Recursive redaction installed in the real processor chain (TASK-8)
+- The real (non-test-environment) processor-build code path (regression for
+  a prod_mode/_prod_mode call-site vs. signature mismatch that only
+  surfaced in production, see decisions/observability.md)
 """
 
 import logging
@@ -168,7 +171,7 @@ class TestPipelineRedaction:
 
     def test_pipeline_redacts_nested_sensitive_value(self):
         """AC#1: {"config": {"api_token": "x"}} renders with the token redacted."""
-        processors = _build_base_processors(_prod_mode=True, logging_settings=LoggingSettings())
+        processors = _build_base_processors(logging_settings=LoggingSettings())
 
         with capture_logs(processors=processors) as entries:
             logger = structlog.get_logger()
@@ -180,7 +183,7 @@ class TestPipelineRedaction:
     def test_pipeline_redaction_extra_keys_extend_defaults(self):
         """AC#3: redaction_extra_keys extends the deny-list through the real chain."""
         logging_settings = LoggingSettings(REDACTION_EXTRA_KEYS=("custom_secret",))
-        processors = _build_base_processors(_prod_mode=True, logging_settings=logging_settings)
+        processors = _build_base_processors(logging_settings=logging_settings)
 
         with capture_logs(processors=processors) as entries:
             logger = structlog.get_logger()
@@ -192,4 +195,61 @@ class TestPipelineRedaction:
 
         assert len(entries) == 1
         assert entries[0]["custom_secret"] == "***REDACTED***"
+        assert entries[0]["password"] == "***REDACTED***"
+
+
+@pytest.mark.unit
+class TestConfigureLoggingRealCodePath:
+    """Exercises configure_logging's non-test-environment branch.
+
+    ``configure_logging`` short-circuits to a minimal suppressed pipeline
+    whenever pytest is detected in sys.modules, which means the call to
+    ``_build_base_processors`` is never reached by any test running under
+    ``make test``. That let a call-site/signature mismatch (calling with
+    ``prod_mode=`` a function defined with ``_prod_mode``) reach production
+    while the full suite stayed green. These tests patch ``_is_test_environment``
+    to force the real branch, so the same class of bug fails CI immediately.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _reset_structlog(self):
+        yield
+        structlog.reset_defaults()
+
+    def test_production_mode_builds_processors_without_error(self, mock_settings, monkeypatch):
+        """The real code path builds the pipeline in production mode without raising."""
+        monkeypatch.setattr("infrastructure.logging.setup._is_test_environment", lambda: False)
+        mock_settings.ENVIRONMENT = "production"
+
+        logger = configure_logging(settings=mock_settings)
+
+        assert logger is not None
+        config = structlog.get_config()
+        assert isinstance(config["processors"][-1], structlog.processors.JSONRenderer)
+
+    def test_development_mode_builds_processors_without_error(self, mock_settings, monkeypatch):
+        """The real code path builds the pipeline in development mode without raising."""
+        monkeypatch.setattr("infrastructure.logging.setup._is_test_environment", lambda: False)
+        mock_settings.ENVIRONMENT = "local"
+
+        logger = configure_logging(settings=mock_settings)
+
+        assert logger is not None
+        config = structlog.get_config()
+        assert isinstance(config["processors"][-1], structlog.dev.ConsoleRenderer)
+
+    def test_production_mode_redacts_through_full_pipeline(self, mock_settings, monkeypatch):
+        """Secrets are redacted end-to-end when the production pipeline is built for real."""
+        monkeypatch.setattr("infrastructure.logging.setup._is_test_environment", lambda: False)
+        mock_settings.ENVIRONMENT = "production"
+
+        configure_logging(settings=mock_settings)
+        config = structlog.get_config()
+        # Drop the JSONRenderer so capture_logs can inspect the event dict directly.
+        processors = config["processors"][:-1]
+
+        with capture_logs(processors=processors) as entries:
+            logger = structlog.get_logger()
+            logger.info("login_attempt", password="hunter2")
+
         assert entries[0]["password"] == "***REDACTED***"
