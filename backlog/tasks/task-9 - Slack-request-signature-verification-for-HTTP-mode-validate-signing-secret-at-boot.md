@@ -1,10 +1,11 @@
 ---
 id: TASK-9
 title: Validate the Slack signing secret at boot (both delivery modes)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-29 13:14'
+updated_date: '2026-07-29 13:18'
 labels:
   - security
   - phase-0
