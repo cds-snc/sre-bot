@@ -6,8 +6,8 @@ error-classification surface consumed by `AWSShield` — and the cached
 
 Only AWS-transport concerns belong here (region, endpoint, retry policy,
 timeouts, boto3 error-code catalogues). Feature-domain configuration
-(SSO permission sets, instance ARNs, role mappings) lives with the
-consuming feature per `docs/adr/configuration-ownership.md`.
+(SSO permission sets, instance ARNs, role mappings) belongs in the
+Settings module of the feature package that owns that configuration.
 """
 
 from __future__ import annotations
