@@ -64,6 +64,8 @@ def test_handle_webhook_payload_empty(mock_validate_payload):
     response = base.handle_webhook_payload(payload, request)
     assert response.status == "error"
     assert response.message == "No matching model found for payload"
+    assert "matched_payload_type" in response.model_dump()
+    assert response.model_dump()["matched_payload_type"] is None
 
 
 @patch("modules.webhooks.base.validate_payload")
@@ -82,6 +84,7 @@ def test_handle_webhook_payload_webhook_payload(validate_payload_mock):
     assert result.payload.channel is None
     assert result.payload.attachments == []
     assert result.payload.blocks == []
+    assert result.matched_payload_type == "WebhookPayload"
 
 
 @patch("modules.webhooks.base.process_aws_sns_payload")
@@ -121,6 +124,7 @@ def test_handle_webhook_payload_with_sns_payload(
     assert response.action == "post"
     assert isinstance(response.payload, WebhookPayload)
     assert response.payload.text == "Processed SNS message"
+    assert response.matched_payload_type == "AwsSnsPayload"
     process_aws_sns_payload_mock.assert_called_once_with(ANY, request.app.state.bot.client)  # Ensure the client is passed
 
 
@@ -150,6 +154,7 @@ def test_handle_webhook_payload_with_access_request(validate_payload_mock):
     assert "'reason': 'reason1'" in payload_text
     assert "2025, 9, 25" in payload_text
     assert "2025, 9, 26" in payload_text
+    assert response.matched_payload_type == "AccessRequest"
 
 
 @patch("modules.webhooks.base.process_simple_text_payload")
@@ -209,6 +214,7 @@ def test_handle_webhook_payload_upptime(validate_payload_mock, process_simple_te
             "type": "section",
         },
     ]
+    assert response.matched_payload_type == "SimpleTextPayload"
 
 
 @patch("modules.webhooks.base.validate_payload")
@@ -232,3 +238,5 @@ def test_handle_webhook_payload_with_invalid_payload_type(
     response = base.handle_webhook_payload(payload, request)
     assert response.status == "error"
     assert response.message == "No matching model found for payload"
+    assert "matched_payload_type" in response.model_dump()
+    assert response.model_dump()["matched_payload_type"] == "UnknownPayload"
