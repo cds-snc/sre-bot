@@ -1,7 +1,16 @@
 """Slack Bot bootstrap module.
 
-Contains Slack integration bootstrap code, including Bolt app factories
-and setup helpers.
+Contains Slack integration bootstrap code, including Bolt app factories and
+setup helpers.
+
+The app selects exactly one delivery mode at startup:
+- Socket Mode (WebSocket): request authenticity is handled by the connection
+    handshake and Bolt request-signature verification is disabled.
+- HTTP Events mode: Bolt request-signature verification is enabled for inbound
+    HTTP requests.
+
+HTTP-mode per-request HMAC verification details beyond Bolt's built-in
+request-verification flow are handled separately and are not implemented here.
 """
 
 from slack_bolt import App

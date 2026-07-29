@@ -1,8 +1,13 @@
-"""Vendor settings for the Slack shield.
+"""Vendor settings for Slack runtime credentials and delivery mode.
 
-Exposes `SlackSettings` — the vendor-credential, transport, delivery-mode,
-and error-classification surface consumed by `SlackShield` — and the
-cached `get_slack_settings()` provider.
+Exposes `SlackSettings` and the cached `get_slack_settings()` provider.
+
+Validation behavior mirrors Slack delivery mode requirements:
+- HTTP Events mode (`SLACK_SOCKET_MODE=false`) fails fast at boot when
+    `SLACK_SIGNING_SECRET` is missing.
+- Socket Mode logs an informational notice when `SLACK_SIGNING_SECRET` is not
+    set, because Socket Mode request authenticity is handled by the connection
+    handshake rather than HTTP request-signature verification.
 
 Vendor credentials and transport settings only (tokens, secrets, per-call
 timeout, retry budget, delivery mode, error-code catalogues). Feature-domain
@@ -13,8 +18,11 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+import structlog
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = structlog.get_logger(__name__)
 
 
 class SlackSettings(BaseSettings):
@@ -44,6 +52,15 @@ class SlackSettings(BaseSettings):
             raise ValueError("SLACK_APP_TOKEN is required when SLACK_SOCKET_MODE=true and SLACK_ENABLED=true")
         if not self.SOCKET_MODE and not self.SIGNING_SECRET:
             raise ValueError("SLACK_SIGNING_SECRET is required when SLACK_SOCKET_MODE=false and SLACK_ENABLED=true")
+        if self.SOCKET_MODE and not self.SIGNING_SECRET:
+            logger.info(
+                "slack_signing_secret_not_set_in_socket_mode",
+                detail=(
+                    "SLACK_SIGNING_SECRET is not set. Socket Mode does not need it for request authenticity "
+                    "(the connection handshake carries that), but it must be configured before switching to "
+                    "HTTP Events mode (SLACK_SOCKET_MODE=false), which fails boot without it."
+                ),
+            )
         return self
 
 
