@@ -38,6 +38,7 @@ The app is a modular monolith that started as a Slack bot and is becoming platfo
 | [hookspec-deprecation.md](hookspec-deprecation.md) | How a hookspec is deprecated and removed | target |
 | [webhooks.md](webhooks.md) | Webhooks ingress feature: pipeline, source-declared parsing, multi-transport dispatch | target |
 | [observability.md](observability.md) | Logging, redaction, correlation | target |
+| [health-checks.md](health-checks.md) | Container, ECS, ALB, and Route53 health-check layering | target |
 | [reliability.md](reliability.md) | Idempotency, queuing, background jobs | target |
 | [approvals.md](approvals.md) | Generic human-approval workflow capability | target |
 | [lifecycle.md](lifecycle.md) | Phased startup and shutdown | now |
