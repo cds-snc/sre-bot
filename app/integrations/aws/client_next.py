@@ -57,6 +57,13 @@ ERROR_CONFIG = {
         "describe_group": ["not found", "group not found"],
         "get_role": ["not found", "role not found"],
         "describe_role": ["not found", "role not found"],
+        # ConditionalCheckFailedException on conditional writes is the expected
+        # contention signal for atomic claim/lease/dedup primitives (idempotency
+        # store, Tier-2 scheduler leases, retry store, storage put_if_not_exists)
+        # -- callers already branch on error_code for this case, so it must not
+        # be logged (or alarmed on) as a real error.
+        "dynamodb_put_item": ["conditionalcheckfailedexception"],
+        "dynamodb_update_item": ["conditionalcheckfailedexception"],
     },
     "retry_errors": [
         "Throttling",

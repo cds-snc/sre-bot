@@ -3,6 +3,7 @@ import time as _time
 from types import SimpleNamespace
 
 import pytest
+import structlog
 from botocore.exceptions import ClientError
 
 from infrastructure.operations import OperationResult
@@ -211,6 +212,41 @@ def test_handle_final_error_logs_non_critical_and_critical(monkeypatch, caplog):
     resp2 = client_next._handle_final_error(Exception("unexpected failure"), "svc_user")
     assert resp2.is_success is False
     assert any("aws_api_error_final" in rec.message for rec in caplog.records)
+
+
+def test_handle_final_error_conditional_check_failed_is_non_critical():
+    # ConditionalCheckFailedException is the expected contention signal for
+    # atomic claim/lease primitives (idempotency store, Tier-2 scheduler
+    # leases, retry store, storage put_if_not_exists) and must not log/alarm
+    # as a real error.
+    err = ClientError(
+        {"Error": {"Code": "ConditionalCheckFailedException", "Message": "The conditional request failed"}},
+        "PutItem",
+    )
+
+    with structlog.testing.capture_logs() as cap_logs:
+        resp = client_next._handle_final_error(err, "dynamodb_put_item")
+
+    assert resp.is_success is False
+    assert resp.error_code == "ConditionalCheckFailedException"
+    events = [entry["event"] for entry in cap_logs]
+    assert "aws_api_non_critical_error" in events
+    assert "aws_api_error_final" not in events
+
+
+def test_handle_final_error_dynamodb_put_item_other_errors_stay_critical():
+    # Non-conditional-check errors on put_item must still log/alarm as errors.
+    err = ClientError(
+        {"Error": {"Code": "ValidationException", "Message": "Some other failure"}},
+        "PutItem",
+    )
+
+    with structlog.testing.capture_logs() as cap_logs:
+        resp = client_next._handle_final_error(err, "dynamodb_put_item")
+
+    assert resp.is_success is False
+    events = [entry["event"] for entry in cap_logs]
+    assert "aws_api_error_final" in events
 
 
 def test_execute_aws_api_call_force_paginate_even_if_client_cant_paginate(monkeypatch):
