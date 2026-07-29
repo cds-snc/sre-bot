@@ -4,7 +4,7 @@ title: 'Enforce test gates: strict markers, coverage ratchet, single test tree'
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 16:57'
+updated_date: '2026-07-29 17:44'
 labels:
   - toolchain
   - phase-2
@@ -27,7 +27,7 @@ Aligns with decisions/testing.md (Gates, One tree). Today: no --strict-markers, 
 Steps:
 1. pyproject addopts: --strict-markers; register unit/integration/smoke/slow/legacy markers.
 2. Measure current coverage; set fail_under to that value (never lower it; raise as it climbs).
-3. Move root tests/architecture/ into app/tests/ (or delete tests made redundant by task-18 import-linter contracts - most of it is superseded); update any that assert the OLD client contract to assert the decided one (clients raise; adapters classify).
+3. Move root tests/architecture/ into app/tests/ (or delete tests made redundant by task-18 import-linter contracts - most of it is superseded); update any that assert the OLD client contract to assert the decided one (clients raise; adapters classify). UPDATE: delete redundant tests
 4. Ensure the smoke layer stays out of the PR gate; slow marker excludes DynamoDB-Local tests from the default run.
 <!-- SECTION:DESCRIPTION:END -->
 

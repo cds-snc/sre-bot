@@ -1,7 +1,5 @@
 # Decisions
 
-This folder is the architectural source of truth. It supersedes `docs/adr/` (kept temporarily for history; do not update it).
-
 **Reading order for a new contributor** (~30 minutes):
 
 1. [layers.md](layers.md) — the three-tier model and the one import rule.
@@ -36,6 +34,8 @@ The app is a modular monolith that started as a Slack bot and is becoming platfo
 | [feature-packages.md](feature-packages.md) | Feature layout and handler discipline | now |
 | [configuration.md](configuration.md) | Settings ownership, environments, secrets | target |
 | [security.md](security.md) | AuthN/Z, CORS, rate limiting, webhooks | target |
+| [dependency-scanning.md](dependency-scanning.md) | Dependency-vulnerability CI gate ownership and enforcement | target |
+| [hookspec-deprecation.md](hookspec-deprecation.md) | How a hookspec is deprecated and removed | target |
 | [webhooks.md](webhooks.md) | Webhooks ingress feature: pipeline, source-declared parsing, multi-transport dispatch | target |
 | [observability.md](observability.md) | Logging, redaction, correlation | target |
 | [reliability.md](reliability.md) | Idempotency, queuing, background jobs | target |
