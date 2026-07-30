@@ -3,6 +3,8 @@ set -euo pipefail
 
 # Rebuilds client usage audit artifacts used by Wave 0 migration tracking.
 # Output files are written under <repo>/tmp/.
+# Retirement: delete alongside the deprecated-import baseline once client-layer migration completes
+# (see decisions/migration.md "Done means" criteria).
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo_root"
