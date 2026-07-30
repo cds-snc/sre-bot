@@ -1,10 +1,11 @@
 ---
 id: TASK-22.1
 title: Migrate geolocate off infrastructure/clients/maxmind onto integrations/maxmind
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-29 21:10'
-updated_date: '2026-07-30 19:04'
+updated_date: '2026-07-30 19:10'
 labels:
   - clients
   - phase-3
