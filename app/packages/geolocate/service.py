@@ -9,8 +9,8 @@ import ipaddress
 
 import structlog
 
-from infrastructure.clients.maxmind import get_maxmind_client
 from infrastructure.operations import OperationResult
+from packages.geolocate.adapters.maxmind import get_maxmind_client
 
 logger = structlog.get_logger()
 
@@ -38,7 +38,7 @@ def geolocate_ip(ip_address: str) -> OperationResult:
             error_code="INVALID_IP_FORMAT",
         )
 
-    # Use MaxMind client (infrastructure layer)
+    # Use MaxMind client through the feature adapter.
     maxmind = get_maxmind_client()
     result = maxmind.geolocate(ip_address=ip_address)
 
