@@ -28,6 +28,8 @@ Clients **raise typed SDK exceptions**. They do not return `OperationResult`, do
 
 **Pure-data SDK model imports** (typed request/response shapes with no I/O) are permitted anywhere payload construction happens — forbidding them would force features back to dict literals.
 
+**How to *type* the SDK handle without wrapping it** — boto3 stubs vs. Google discovery, and the retired dispatcher/facade anti-patterns — is the companion decision [sdk-typing.md](sdk-typing.md).
+
 ## Consequences
 
 - One place per vendor answers "how are errors of this vendor interpreted"; adding a call site means adding a `try/except classify` in an adapter, not learning a wrapper API.
