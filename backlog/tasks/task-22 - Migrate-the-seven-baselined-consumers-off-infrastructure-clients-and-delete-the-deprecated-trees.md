@@ -6,16 +6,18 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-29 21:13'
+updated_date: '2026-07-31 17:08'
 labels:
   - clients
   - phase-3
 milestone: m-3
 dependencies:
   - TASK-19
+  - TASK-70
 references:
   - decisions/layers.md
   - decisions/outbound-clients.md
+  - decisions/sdk-typing.md
   - 'https://github.com/cds-snc/sre-bot/issues/1276'
 priority: high
 ordinal: 22000
@@ -75,3 +77,18 @@ ASSUMPTIONS / DOUBTS TO VERIFY IN IMPLEMENTATION:
 
 BLAST RADIUS / ROLLBACK: each slice is a single PR touching one vendor subsystem; revert = revert that PR (no cross-slice coupling until 22.5 deletion). 22.5 is the only irreversible-ish step (tree deletion) and is gated on 22.1-22.4 all green + a zero-consumer usage-matrix check. import-linter (TASK-18) and the deprecated-import freeze (TASK-19, if landed) provide net-new-import protection during the sprint.
 <!-- SECTION:PLAN:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-07-31 17:08
+---
+RESEQUENCED (2026-07-31) after the SDK-typing research (new decisions/sdk-typing.md, companion to outbound-clients.md). This SUPERSEDES the "SCOPE BOUNDARY" paragraph in the Implementation Plan above ("wire consumers to the integrations/ modules AS THEY EXIST TODAY, including _next twins ... do NOT apply the clients-raise/adapters-classify contract").
+
+Why: the old chain migrated each consumer onto the _next dispatcher generation, then TASK-23 renamed it, then TASK-25 rewrote it to raise/classify - two-to-three touches per consumer, and TASK-22.2 even added a throwaway _DynamoDBNextBackend micro-wrapper in a sprint whose thesis is REMOVING wrappers. The root cause (a generic stringly-typed execute_*_api_call dispatcher + per-method wrappers + docstring param-scraping, built to regain IDE/type resolution) is now addressed head-on: boto3 gets typed via types-boto3 stubs; Google's untyped discovery Resource is typed at the adapter via domain dataclasses.
+
+New chain: TASK-19 (done) + TASK-70 (adopt types-boto3 + sdk-typing guardrails) -> 22.1 (done) -> 22.2 (AWS DynamoDB/storage: build get_aws_client + classify_aws_error, migrate storage DIRECTLY to it) -> 22.3 (IdentityStore/access-sync: reuse the AWS primitive) -> 22.4 (Google directory: factory-built Resource + classify_google_error, delete the dispatcher/scraper on that path) -> 22.5 (delete the facade tree) and TASK-23 (delete the _next dispatcher generation + converge idempotency/resilience). TASK-25 shrinks to: MaxMind unification, Slack, the remaining AWS services, AWSShield/executor deletion, and the final sweep.
+
+Effect on parent ACs: unchanged in intent (AC#1 usage-matrix zero, AC#2 dirs gone, AC#5 tests only shrink) but each slice now lands directly on the target contract, so "behavior-neutral" is asserted at each Protocol boundary via classify (identical OperationResult outcomes) rather than as a zero-diff wiring change. Dependency added: TASK-70.
+---
+<!-- COMMENTS:END -->

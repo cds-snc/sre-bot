@@ -8,7 +8,8 @@
 4. [dependency-injection.md](dependency-injection.md) — how you get your dependencies.
 5. [transport-slack.md](transport-slack.md) — if your feature talks to Slack.
 6. [outbound-clients.md](outbound-clients.md) — if your feature calls an external service.
-7. [testing.md](testing.md) — before you open a PR.
+7. [sdk-typing.md](sdk-typing.md) — how to type a rich vendor SDK without wrapping it (companion to the above).
+8. [testing.md](testing.md) — before you open a PR.
 
 Everything else is reference: read it when the topic comes up.
 
@@ -26,6 +27,7 @@ The app is a modular monolith that started as a Slack bot and is becoming platfo
 | [platform-transports.md](platform-transports.md) | How a chat platform composes into the host | target |
 | [transport-slack.md](transport-slack.md) | Slack: verification, delivery mode, handlers, errors | target |
 | [outbound-clients.md](outbound-clients.md) | Gateway pattern, retry, exception classification | target |
+| [sdk-typing.md](sdk-typing.md) | Typing rich vendor SDKs without a wrapper tier (boto3 stubs, Google discovery) | target |
 | [operation-result.md](operation-result.md) | The boundary return envelope | target |
 | [errors-and-http.md](errors-and-http.md) | RFC 9457 mapping at the HTTP edge | target |
 | [dependency-injection.md](dependency-injection.md) | Providers, Depends, composition at startup | target |
