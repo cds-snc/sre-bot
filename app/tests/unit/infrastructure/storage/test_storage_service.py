@@ -5,9 +5,11 @@ mocked DynamoDBClient — no real AWS calls are made.
 """
 
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from botocore.exceptions import ClientError
 
 from infrastructure.operations.result import OperationResult
 from infrastructure.storage.service import DynamoDBStorageService
@@ -191,19 +193,37 @@ class TestStorageServiceQuery:
         kwargs = dynamo.query.call_args[1]
         assert kwargs["ExpressionAttributeValues"][":pk"] == {"S": "abc"}
 
-    def test_query_passes_pagination_flags(self):
+    def test_query_uses_paginator_and_aggregates_items(self):
         service, dynamo = _make_service()
         dynamo.query.return_value = OperationResult.success(data=[])
+        paginator = MagicMock()
+        paginator.paginate.return_value = [
+            {
+                "Items": [
+                    {"pk": {"S": "abc"}, "action": {"S": "created"}},
+                ]
+            },
+            {
+                "Items": [
+                    {"pk": {"S": "abc"}, "action": {"S": "updated"}},
+                ]
+            },
+        ]
+        dynamo.get_paginator.return_value = paginator
 
-        service.query(
+        result = service.query(
             "my_table",
             key_condition="pk = :pk",
             expression_values={":pk": "abc"},
         )
 
-        kwargs = dynamo.query.call_args[1]
-        assert kwargs.get("force_paginate") is True
-        assert kwargs.get("keys") == ["Items"]
+        dynamo.get_paginator.assert_called_once_with("query")
+        assert paginator.paginate.called
+        assert result.is_success
+        assert result.data == [
+            {"pk": "abc", "action": "created"},
+            {"pk": "abc", "action": "updated"},
+        ]
 
     def test_query_passes_through_extra_kwargs(self):
         """IndexName, Limit, ScanIndexForward, etc. pass through to DynamoDBClient."""
@@ -265,3 +285,43 @@ class TestStorageServiceDelete:
         result = service.delete("my_table", {"pk": "abc"})
 
         assert not result.is_success
+
+
+@pytest.mark.unit
+class TestStorageServiceProviderAndSdkExceptions:
+    """Contract tests for provider wiring and SDK exception mapping."""
+
+    def test_get_storage_service_uses_integrations_get_aws_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import infrastructure.storage.service as service_module
+
+        service_module.get_storage_service.cache_clear()
+
+        dynamodb_client = MagicMock()
+        get_aws_client = MagicMock(return_value=dynamodb_client)
+        monkeypatch.setattr(service_module, "get_aws_client", get_aws_client, raising=False)
+        monkeypatch.setattr(service_module, "get_aws_clients", lambda: SimpleNamespace(dynamodb=MagicMock()), raising=False)
+
+        try:
+            service = service_module.get_storage_service()
+        finally:
+            service_module.get_storage_service.cache_clear()
+
+        get_aws_client.assert_called_once_with("dynamodb")
+        assert isinstance(service, DynamoDBStorageService)
+
+    def test_put_if_not_exists_conditional_client_error_returns_false(self) -> None:
+        service, dynamo = _make_service()
+        dynamo.put_item.side_effect = ClientError(
+            error_response={
+                "Error": {
+                    "Code": "ConditionalCheckFailedException",
+                    "Message": "condition failed",
+                }
+            },
+            operation_name="PutItem",
+        )
+
+        result = service.put_if_not_exists("my_table", {"pk": "abc"}, pk_attribute="pk")
+
+        assert result.is_success
+        assert result.data is False

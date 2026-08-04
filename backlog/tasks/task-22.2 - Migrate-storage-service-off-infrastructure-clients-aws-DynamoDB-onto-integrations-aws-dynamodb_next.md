@@ -3,10 +3,11 @@ id: TASK-22.2
 title: >-
   Migrate storage service off infrastructure/clients/aws DynamoDB onto
   integrations/aws/dynamodb_next
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-29 21:10'
-updated_date: '2026-07-31 16:58'
+updated_date: '2026-08-04 17:30'
 labels:
   - clients
   - phase-3
