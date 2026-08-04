@@ -163,10 +163,11 @@ dev = [
     "pytest-cov==4.1.0",
     "freezegun==1.5.5",
     "requests-mock==1.12.1",
-    "boto3_stubs==1.42.54",
     "checkov",
     "setuptools==78.1.1",
     "moto[dynamodb]>=5.2.2",
+    "types-boto3[ce,config,dynamodb,guardduty,identitystore,lambda,organizations,securityhub,sqs,sso-admin]>=1.43.63",
+    "google-api-python-client-stubs>=1.39.0",
 ]
 
 [tool.hatch.build.targets.wheel]

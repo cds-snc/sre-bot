@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-31 16:54'
-updated_date: '2026-08-04 15:33'
+updated_date: '2026-08-04 16:10'
 labels:
   - clients
   - phase-3
@@ -34,15 +34,15 @@ Scope: (1) add types-boto3 as a DEV-ONLY dependency scoped to the AWS services t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 types-boto3 is a dev-only dependency scoped to the AWS services in use (dynamodb, identitystore, organizations, sso-admin, ce, guardduty, config, sqs, lambda, securityhub); mypy resolves a session.client("dynamodb") handle's method signatures (e.g. get_item, query) with no wrapper and no new runtime dependency
-- [ ] #2 google-api-python-client-stubs is a dev-only dependency (single unscoped package, no per-service extras); mypy resolves discovery.build("admin", "directory_v1") (and gmail_v1/drive_v3/docs_v1/sheets_v4/calendar_v3/meet_v2) to a typed Resource with real method/parameter/return signatures, with no wrapper and no new runtime dependency
-- [ ] #3 A CI guardrail (baseline that only ratchets down, mirroring TASK-19) fails on net-new execute_aws_api_call/execute_google_api_call string-dispatch or __doc__-based parameter discovery in app/integrations/
-- [ ] #4 decisions/sdk-typing.md Checks that are enforceable today pass (types-boto3 present; google-api-python-client-stubs present; dispatcher/scraper guardrail live); the find "*_next.py"==0 and no-facade checks remain listed as tolerated divergences until TASK-23/TASK-22.5
+- [x] #1 types-boto3 is a dev-only dependency scoped to the AWS services in use (dynamodb, identitystore, organizations, sso-admin, ce, guardduty, config, sqs, lambda, securityhub); mypy resolves a session.client("dynamodb") handle's method signatures (e.g. get_item, query) with no wrapper and no new runtime dependency
+- [x] #2 google-api-python-client-stubs is a dev-only dependency (single unscoped package, no per-service extras); mypy resolves discovery.build("admin", "directory_v1") (and gmail_v1/drive_v3/docs_v1/sheets_v4/calendar_v3/meet_v2) to a typed Resource with real method/parameter/return signatures, with no wrapper and no new runtime dependency
+- [x] #3 A CI guardrail (baseline that only ratchets down, mirroring TASK-19) fails on net-new execute_aws_api_call/execute_google_api_call string-dispatch or __doc__-based parameter discovery in app/integrations/
+- [x] #4 decisions/sdk-typing.md Checks that are enforceable today pass (types-boto3 present; google-api-python-client-stubs present; dispatcher/scraper guardrail live); the find "*_next.py"==0 and no-facade checks remain listed as tolerated divergences until TASK-23/TASK-22.5
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 No runtime dependency added (both types-boto3 and google-api-python-client-stubs are dev-only / TYPE_CHECKING); PR references decisions/sdk-typing.md
+- [x] #1 No runtime dependency added (both types-boto3 and google-api-python-client-stubs are dev-only / TYPE_CHECKING); PR references decisions/sdk-typing.md
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -85,6 +85,20 @@ SIZE GATE: ~1 pyproject block (two dev deps) + ~90 LOC checker (unchanged from o
 
 DOUBTS (verify at implementation): whether the repo's dev deps live in [dependency-groups] vs [tool.uv.dev-dependencies] (grep pyproject before editing - already confirmed [dependency-groups] at planning time, re-confirmed 2026-08-04); whether Pylance in-editor needs each stub installed in the active venv (it does for both - note in PR that `uv sync` including the dev group is required for editor resolution); whether `boto3_stubs==1.42.54` already in app/pyproject.toml should be renamed to `types-boto3` or left as-is (verify current PyPI relationship between the two names before editing - do not add a duplicate/conflicting pin); whether the stub package's namespace actually contains typed Resources for calendar_v3 and meet_v2 (both newly found 2026-08-04; the package's own docs claim full Discovery-bundled coverage but this is unproven for these two specific services until STEP 1B's mypy proof runs - if either is genuinely absent from the installed stub's namespace, fall back to importing it under TYPE_CHECKING with an explicit `# type: ignore[...]`-free `Any`-typed local Protocol for that one service only, and flag it as a stub-package gap in the PR rather than silently blocking on it).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+STEP 1 (AC#1): Replaced boto3_stubs==1.42.54 with types-boto3[ce,config,dynamodb,guardduty,identitystore,lambda,organizations,securityhub,sqs,sso-admin]>=1.43.63 in [dependency-groups] dev. mypy resolves DynamoDBClient.get_item() with no wrapper (proof: /tmp/test_boto3_stub.py, uv run mypy exits 0). Removed old boto3-stubs pin to avoid dual-package conflict. Bonus: boto3.dynamodb.types errors in modules/ resolved (186→181 mypy errors).
+
+STEP 1B (AC#2): Added google-api-python-client-stubs>=1.39.0 to dev deps. mypy resolves AdminDirectoryResource (admin/directory_v1), CalendarResource (calendar_v3), and MeetResource (meet_v2) from googleapiclient._apis.* under TYPE_CHECKING (proof: /tmp/test_google_stub.py, uv run mypy exits 0). Both stubs are dev-only; no runtime dependency added.
+
+STEP 2 (AC#3): Created app/bin/check_sdk_typing.py scanning integrations/ for execute_aws_api_call / execute_google_api_call / __doc__ anti-patterns. Created app/bin/baselines/sdk_typing_antipatterns.txt with 25 grandfathered files. Added check-sdk-typing: Make target. Wired step in .github/workflows/ci_code.yml next to check-deprecated-client-imports. Verified: make check-sdk-typing exits 0 against baseline; exits 1 on a scratch net-new file. All 5 test_check_sdk_typing.py tests pass.
+
+STEP 3 (AC#4): decisions/sdk-typing.md remains applies:target; Migration section already lists tolerated divergences (*_next.py, no-facade) for TASK-23/TASK-22.5. No edit needed.
+
+DoD#1: both stub packages are dev-group only; [project].dependencies unchanged. Full test suite: 202 passed, 1 flaky pre-existing failure (test_handle_final_error_conditional_check_failed_is_non_critical passes in isolation). ruff: clean. mypy: 181 errors, all pre-existing.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
