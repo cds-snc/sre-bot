@@ -3,11 +3,11 @@ id: TASK-22.2
 title: >-
   Migrate storage service off infrastructure/clients/aws DynamoDB onto
   integrations/aws/dynamodb_next
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-29 21:10'
-updated_date: '2026-08-04 17:46'
+updated_date: '2026-08-04 19:25'
 labels:
   - clients
   - phase-3
@@ -45,7 +45,7 @@ Test migration: keep storage tests in tests/unit/infrastructure/storage/ (alread
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Behavior-neutral at the StorageService Protocol boundary: OperationResult outcomes identical; PR references decisions/layers.md, decisions/outbound-clients.md, and decisions/sdk-typing.md
+- [x] #1 Behavior-neutral at the StorageService Protocol boundary: OperationResult outcomes identical; PR references decisions/layers.md, decisions/outbound-clients.md, and decisions/sdk-typing.md
 <!-- DOD:END -->
 
 ## Implementation Plan

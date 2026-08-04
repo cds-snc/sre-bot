@@ -3,11 +3,11 @@ id: TASK-70
 title: >-
   Adopt types-boto3 and google-api-python-client-stubs SDK stubs; wire the
   sdk-typing guardrails
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-31 16:54'
-updated_date: '2026-08-04 16:10'
+updated_date: '2026-08-04 19:25'
 labels:
   - clients
   - phase-3
