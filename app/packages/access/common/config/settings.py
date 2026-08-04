@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from packages.access.common.naming import AccessGroupNaming
-
 
 EntitlementMode = Literal["sync_managed", "ephemeral", "deactivated"]
 
@@ -26,25 +25,25 @@ class EntitlementRule:
 class PlatformPolicy:
     """Per-platform policy loaded from runtime configuration."""
 
-    authn_token: str = "authn"
+    authn_token: str = "authn"  # noqa: S105 -- default group-slug token, not a credential
     authn_removal_mode: str = "delete"  # disable | delete | entitlement_only
     adapter_type: str = "fake"  # aws_identity_center | fake
-    mode_overrides: Dict[str, EntitlementMode] = field(default_factory=dict)
+    mode_overrides: dict[str, EntitlementMode] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class CatalogParserConfig:
     """Runtime configuration for a platform's catalog token parser."""
 
-    known_envs: List[str] = field(default_factory=list)
+    known_envs: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
 class CatalogExtensions:
     """Typed runtime extensions for the catalog sub-feature."""
 
-    parsers: Dict[str, CatalogParserConfig] = field(default_factory=dict)
-    platform_display_names: Dict[str, str] = field(default_factory=dict)
+    parsers: dict[str, CatalogParserConfig] = field(default_factory=dict)
+    platform_display_names: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -54,9 +53,9 @@ class EntitlementModeOverride:
     platform: str
     group_slug: str
     mode: EntitlementMode
-    reason: Optional[str] = None
-    requested_by: Optional[str] = None
-    expires_at: Optional[datetime] = None
+    reason: str | None = None
+    requested_by: str | None = None
+    expires_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -65,13 +64,11 @@ class AccessRuntimeConfig:
 
     dir_prefix: str
     dir_separator: str = "-"
-    platforms: Dict[str, PlatformPolicy] = field(default_factory=dict)
-    entitlement_mode_overrides: List[EntitlementModeOverride] = field(
-        default_factory=list
-    )
+    platforms: dict[str, PlatformPolicy] = field(default_factory=dict)
+    entitlement_mode_overrides: list[EntitlementModeOverride] = field(default_factory=list)
     # Typed extensions for catalog feature; empty dict when not present.
-    extensions: Dict[str, Any] = field(default_factory=dict)
-    catalog_extensions: Optional[CatalogExtensions] = None
+    extensions: dict[str, Any] = field(default_factory=dict)
+    catalog_extensions: CatalogExtensions | None = None
 
     def group_prefix(self, platform: str) -> str:
         """Return the IDP group slug prefix for a given platform."""
@@ -91,7 +88,7 @@ class AccessRuntimeConfig:
         )
 
     @property
-    def catalog(self) -> Optional[CatalogExtensions]:
+    def catalog(self) -> CatalogExtensions | None:
         """Return typed catalog extension configuration."""
         return self.catalog_extensions
 

@@ -5,14 +5,12 @@ Provides generic Event base class and protocol for event handlers.
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Any, Dict, Generic, Optional, TypeVar
+from typing import Any
 from uuid import UUID, uuid4
-
-T = TypeVar("T")
 
 
 @dataclass
-class Event(Generic[T]):
+class Event[T]:
     """Base class for all events in the system.
 
     Events are immutable records of something that happened, used for
@@ -33,10 +31,10 @@ class Event(Generic[T]):
     user_email: str = ""
     """User who triggered the event."""
 
-    metadata: Optional[T] = None
+    metadata: T | None = None
     """Typed payload for this event."""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize event to dictionary.
 
         Typed payloads (dataclasses) are converted recursively via ``asdict``.
@@ -58,7 +56,7 @@ class Event(Generic[T]):
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Event[Dict[str, Any]]":
+    def from_dict(cls, data: dict[str, Any]) -> Event[dict[str, Any]]:
         """Deserialize event from a dictionary (always produces dict metadata).
 
         Args:
@@ -92,7 +90,7 @@ class Event(Generic[T]):
                 metadata=data.get("metadata"),
             )
         except (KeyError, ValueError) as e:
-            raise ValueError(f"Invalid event data: {e}")
+            raise ValueError(f"Invalid event data: {e}") from e
 
     def __hash__(self) -> int:
         """Hash based on correlation_id and timestamp."""

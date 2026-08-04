@@ -104,9 +104,7 @@ class TestExecuteBatchRequest:
         assert result.data["summary"]["failed"] == 1
         assert result.data["summary"]["success_rate"] == pytest.approx(2 / 3)
 
-    def test_batch_request_with_operation_result_response_success(
-        self, mock_google_service
-    ):
+    def test_batch_request_with_operation_result_response_success(self, mock_google_service):
         """Test batch request when callback receives OperationResult responses (success)."""
         # Arrange
         requests = [
@@ -149,9 +147,7 @@ class TestExecuteBatchRequest:
         assert result.data["results"]["req2"] == {"user": "user2@example.com"}
         assert len(result.data["errors"]) == 0
 
-    def test_batch_request_with_operation_result_response_failure(
-        self, mock_google_service
-    ):
+    def test_batch_request_with_operation_result_response_failure(self, mock_google_service):
         """Test batch request when callback receives OperationResult responses (failure)."""
         # Arrange
         requests = [
@@ -176,9 +172,7 @@ class TestExecuteBatchRequest:
             # Second fails (OperationResult with error)
             cb(
                 "req2",
-                OperationResult.permanent_error(
-                    message="User not found", error_code="NOT_FOUND"
-                ),
+                OperationResult.permanent_error(message="User not found", error_code="NOT_FOUND"),
                 None,
             )
 
@@ -200,9 +194,7 @@ class TestExecuteBatchRequest:
         assert result.data["errors"]["req2"]["message"] == "User not found"
         assert result.data["errors"]["req2"]["error_code"] == "NOT_FOUND"
 
-    def test_batch_request_with_exception_without_code_attribute(
-        self, mock_google_service
-    ):
+    def test_batch_request_with_exception_without_code_attribute(self, mock_google_service):
         """Test batch request when exception doesn't have a code attribute."""
         # Arrange
         requests = [("req1", Mock())]
@@ -262,9 +254,7 @@ class TestExecuteBatchRequest:
         custom_callback_calls = []
 
         def custom_callback(request_id, response, exception):
-            custom_callback_calls.append(
-                {"request_id": request_id, "response": response, "exception": exception}
-            )
+            custom_callback_calls.append({"request_id": request_id, "response": response, "exception": exception})
 
         callback_holder = {}
 

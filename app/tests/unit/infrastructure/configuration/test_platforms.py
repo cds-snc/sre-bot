@@ -3,11 +3,9 @@
 import pytest
 
 from infrastructure.configuration.infrastructure.platforms import (
-    SlackPlatformSettings,
     PlatformsSettings,
+    SlackPlatformSettings,
 )
-from infrastructure.configuration.settings import Settings, get_settings
-from infrastructure.configuration.infrastructure import get_platforms_settings
 
 
 @pytest.mark.unit
@@ -93,38 +91,3 @@ class TestPlatformsSettings:
         settings = PlatformsSettings()
 
         assert settings.slack.BOT_TOKEN == "xoxb-test"
-
-
-@pytest.mark.unit
-class TestMainSettingsIntegration:
-    """Test PlatformsSettings integration with main Settings class."""
-
-    def test_platforms_in_main_settings(self, monkeypatch):
-        """Test that platforms settings are accessible from main Settings."""
-        # Clear any cached settings (including the domain singleton)
-        get_settings.cache_clear()
-        get_platforms_settings.cache_clear()
-
-        monkeypatch.setenv("SLACK_ENABLED", "true")
-        monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-main-test")
-
-        settings = Settings()
-
-        assert hasattr(settings, "platforms")
-        assert settings.platforms.slack.ENABLED is True
-        assert settings.platforms.slack.BOT_TOKEN == "xoxb-main-test"
-
-        # Clean up
-        get_settings.cache_clear()
-        get_platforms_settings.cache_clear()
-
-    def test_all_platforms_accessible_from_main(self, monkeypatch):
-        """Test all platform settings accessible from main Settings."""
-        get_settings.cache_clear()
-
-        settings = Settings()
-
-        # All platform sub-settings should exist
-        assert hasattr(settings.platforms, "slack")
-
-        get_settings.cache_clear()

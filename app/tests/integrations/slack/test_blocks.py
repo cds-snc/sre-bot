@@ -18,9 +18,7 @@ def test_validate_blocks():
         {"type": "header", "text": {"type": "plain_text", "text": "Header"}},
         {
             "type": "actions",
-            "elements": [
-                {"type": "button", "text": {"type": "plain_text", "text": "Click"}}
-            ],
+            "elements": [{"type": "button", "text": {"type": "plain_text", "text": "Click"}}],
         },
         {"type": "context", "elements": [{"type": "mrkdwn", "text": "Context text"}]},
     ]

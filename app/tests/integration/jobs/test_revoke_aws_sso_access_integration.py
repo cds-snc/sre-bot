@@ -4,8 +4,10 @@ Tests the complete revocation workflow with real app initialization,
 database interactions, and external service calls.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from jobs.revoke_aws_sso_access import revoke_aws_sso_access
 
 
@@ -73,9 +75,7 @@ class TestRevokeAWSAccessWorkflow:
             "engineer@company.com": "aws-user-prod-123",
             "dev@company.com": "aws-user-dev-456",
         }
-        mock_identity_store.get_user_id.side_effect = lambda email: identity_lookups[
-            email
-        ]
+        mock_identity_store.get_user_id.side_effect = lambda email: identity_lookups[email]
 
         revoke_aws_sso_access(mock_slack_client_with_validation)
 

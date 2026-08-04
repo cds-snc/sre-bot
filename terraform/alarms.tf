@@ -1,7 +1,7 @@
 resource "aws_cloudwatch_log_metric_filter" "sre_bot_error" {
   provider       = aws.core_services
   name           = local.error_logged
-  pattern        = "?ERROR ?Exception"
+  pattern        = local.error_logged_pattern
   log_group_name = local.api_cloudwatch_log_group
 
   metric_transformation {
@@ -32,7 +32,7 @@ resource "aws_cloudwatch_metric_alarm" "sre_bot_error" {
 resource "aws_cloudwatch_log_metric_filter" "sre_bot_warning" {
   provider       = aws.core_services
   name           = local.warning_logged
-  pattern        = "WARNING"
+  pattern        = local.warning_logged_pattern
   log_group_name = local.api_cloudwatch_log_group
 
   metric_transformation {

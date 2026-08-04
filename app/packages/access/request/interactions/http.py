@@ -12,14 +12,14 @@ Handlers validate the incoming body, delegate to the service via
 No business logic lives here.
 """
 
-from typing import Annotated, List, Protocol
+from typing import Annotated, Protocol
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Security
 
-from infrastructure.security.models import User
 from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.security import get_current_user
+from infrastructure.security.models import User
 from packages.access.request.domain import AccessRequest, ApprovalDecision
 from packages.access.request.providers import (
     get_access_request_service,
@@ -67,33 +67,33 @@ class _AccessRequestServicePort(Protocol):
         request_id: str,
         approver_email: str,
         comment: str = "",
-    ) -> OperationResult[tuple[AccessRequest, List[ApprovalDecision]]]: ...
+    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]: ...
 
     def reject_request(
         self,
         request_id: str,
         approver_email: str,
         comment: str,
-    ) -> OperationResult[tuple[AccessRequest, List[ApprovalDecision]]]: ...
+    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]: ...
 
     def cancel_request(
         self,
         request_id: str,
         actor_email: str,
         comment: str = "",
-    ) -> OperationResult[tuple[AccessRequest, List[ApprovalDecision]]]: ...
+    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]: ...
 
     def retry_request(
         self,
         request_id: str,
         actor_email: str,
         comment: str = "",
-    ) -> OperationResult[tuple[AccessRequest, List[ApprovalDecision]]]: ...
+    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]: ...
 
     def get_request_status(
         self,
         request_id: str,
-    ) -> OperationResult[tuple[AccessRequest, List[ApprovalDecision]]]: ...
+    ) -> OperationResult[tuple[AccessRequest, list[ApprovalDecision]]]: ...
 
 
 # ---------------------------------------------------------------------------
@@ -126,7 +126,7 @@ def _build_decision_response(decision: ApprovalDecision) -> ApprovalDecisionResp
 
 def _build_request_response(
     request: AccessRequest,
-    decisions: List[ApprovalDecision],
+    decisions: list[ApprovalDecision],
 ) -> AccessRequestStatusResponse:
     return AccessRequestStatusResponse(
         request_id=request.request_id,
@@ -171,10 +171,7 @@ def _noop_request_service() -> _AccessRequestServicePort | None:
     "",
     response_model=SubmitAccessRequestResponse,
     summary="Submit an access request",
-    description=(
-        "Submit a new access request for the authenticated user or, "
-        "for delegated requests, on behalf of another user."
-    ),
+    description=("Submit a new access request for the authenticated user or, for delegated requests, on behalf of another user."),
     status_code=202,
     responses={
         400: {"description": "Invalid request payload or policy violation."},
@@ -184,21 +181,13 @@ def _noop_request_service() -> _AccessRequestServicePort | None:
 )
 def submit_request(
     body: SubmitAccessRequestBody,
-    settings: Annotated[
-        _AccessRequestSettingsPort, Depends(get_access_request_settings)
-    ],
-    current_user: Annotated[
-        User, Security(get_current_user, scopes=["sre-bot:access-requests"])
-    ],
-    service: Annotated[
-        _AccessRequestServicePort | None, Depends(_noop_request_service)
-    ] = None,
+    settings: Annotated[_AccessRequestSettingsPort, Depends(get_access_request_settings)],
+    current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
+    service: Annotated[_AccessRequestServicePort | None, Depends(_noop_request_service)] = None,
 ) -> SubmitAccessRequestResponse:
     """Submit a new access request."""
     if not settings.enabled:
-        raise HTTPException(
-            status_code=503, detail="Access Requests feature is disabled."
-        )
+        raise HTTPException(status_code=503, detail="Access Requests feature is disabled.")
     service_dep = _resolve_service(service)
 
     user_email = body.user_email or current_user.email
@@ -257,21 +246,13 @@ def submit_request(
 def approve_request(
     request_id: str,
     body: ApproveRequestBody,
-    settings: Annotated[
-        _AccessRequestSettingsPort, Depends(get_access_request_settings)
-    ],
-    current_user: Annotated[
-        User, Security(get_current_user, scopes=["sre-bot:access-requests"])
-    ],
-    service: Annotated[
-        _AccessRequestServicePort | None, Depends(_noop_request_service)
-    ] = None,
+    settings: Annotated[_AccessRequestSettingsPort, Depends(get_access_request_settings)],
+    current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
+    service: Annotated[_AccessRequestServicePort | None, Depends(_noop_request_service)] = None,
 ) -> AccessRequestStatusResponse:
     """Submit an approval decision for a pending access request."""
     if not settings.enabled:
-        raise HTTPException(
-            status_code=503, detail="Access Requests feature is disabled."
-        )
+        raise HTTPException(status_code=503, detail="Access Requests feature is disabled.")
     service_dep = _resolve_service(service)
 
     log = logger.bind(
@@ -315,21 +296,13 @@ def approve_request(
 def reject_request(
     request_id: str,
     body: RejectRequestBody,
-    settings: Annotated[
-        _AccessRequestSettingsPort, Depends(get_access_request_settings)
-    ],
-    current_user: Annotated[
-        User, Security(get_current_user, scopes=["sre-bot:access-requests"])
-    ],
-    service: Annotated[
-        _AccessRequestServicePort | None, Depends(_noop_request_service)
-    ] = None,
+    settings: Annotated[_AccessRequestSettingsPort, Depends(get_access_request_settings)],
+    current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
+    service: Annotated[_AccessRequestServicePort | None, Depends(_noop_request_service)] = None,
 ) -> AccessRequestStatusResponse:
     """Submit a rejection decision for a pending access request."""
     if not settings.enabled:
-        raise HTTPException(
-            status_code=503, detail="Access Requests feature is disabled."
-        )
+        raise HTTPException(status_code=503, detail="Access Requests feature is disabled.")
     service_dep = _resolve_service(service)
 
     log = logger.bind(
@@ -373,21 +346,13 @@ def reject_request(
 def cancel_request(
     request_id: str,
     body: CancelRequestBody,
-    settings: Annotated[
-        _AccessRequestSettingsPort, Depends(get_access_request_settings)
-    ],
-    current_user: Annotated[
-        User, Security(get_current_user, scopes=["sre-bot:access-requests"])
-    ],
-    service: Annotated[
-        _AccessRequestServicePort | None, Depends(_noop_request_service)
-    ] = None,
+    settings: Annotated[_AccessRequestSettingsPort, Depends(get_access_request_settings)],
+    current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
+    service: Annotated[_AccessRequestServicePort | None, Depends(_noop_request_service)] = None,
 ) -> AccessRequestStatusResponse:
     """Cancel a pending access request (requester only)."""
     if not settings.enabled:
-        raise HTTPException(
-            status_code=503, detail="Access Requests feature is disabled."
-        )
+        raise HTTPException(status_code=503, detail="Access Requests feature is disabled.")
     service_dep = _resolve_service(service)
 
     log = logger.bind(
@@ -436,21 +401,13 @@ def cancel_request(
 def retry_request(
     request_id: str,
     body: RetryRequestBody,
-    settings: Annotated[
-        _AccessRequestSettingsPort, Depends(get_access_request_settings)
-    ],
-    current_user: Annotated[
-        User, Security(get_current_user, scopes=["sre-bot:access-requests"])
-    ],
-    service: Annotated[
-        _AccessRequestServicePort | None, Depends(_noop_request_service)
-    ] = None,
+    settings: Annotated[_AccessRequestSettingsPort, Depends(get_access_request_settings)],
+    current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
+    service: Annotated[_AccessRequestServicePort | None, Depends(_noop_request_service)] = None,
 ) -> AccessRequestStatusResponse:
     """Retry IDP provisioning for a failed access request."""
     if not settings.enabled:
-        raise HTTPException(
-            status_code=503, detail="Access Requests feature is disabled."
-        )
+        raise HTTPException(status_code=503, detail="Access Requests feature is disabled.")
     service_dep = _resolve_service(service)
 
     log = logger.bind(
@@ -491,21 +448,13 @@ def retry_request(
 )
 def get_request_status(
     request_id: str,
-    settings: Annotated[
-        _AccessRequestSettingsPort, Depends(get_access_request_settings)
-    ],
-    current_user: Annotated[
-        User, Security(get_current_user, scopes=["sre-bot:access-requests"])
-    ],
-    service: Annotated[
-        _AccessRequestServicePort | None, Depends(_noop_request_service)
-    ] = None,
+    settings: Annotated[_AccessRequestSettingsPort, Depends(get_access_request_settings)],
+    current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
+    service: Annotated[_AccessRequestServicePort | None, Depends(_noop_request_service)] = None,
 ) -> AccessRequestStatusResponse:
     """Fetch request status, resolved approvers, and decision history."""
     if not settings.enabled:
-        raise HTTPException(
-            status_code=503, detail="Access Requests feature is disabled."
-        )
+        raise HTTPException(status_code=503, detail="Access Requests feature is disabled.")
     service_dep = _resolve_service(service)
 
     log = logger.bind(

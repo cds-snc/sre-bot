@@ -1,8 +1,10 @@
 # --- SimpleTextPattern and related function tests ---
 import re
 import types
+
 import pytest
 from pydantic import ValidationError
+
 from models.webhooks import SimpleTextPayload, WebhookPayload, WebhookResult
 from modules.webhooks.simple_text import (
     PATTERN_HANDLERS,
@@ -124,7 +126,7 @@ def test_simple_text_pattern_get_handler_function(monkeypatch):
     def dummy_handler(text):
         return WebhookPayload(text=f"handled: {text}")
 
-    setattr(dummy_module, "dummy_handler", dummy_handler)
+    dummy_module.dummy_handler = dummy_handler
     monkeypatch.setitem(__import__("sys").modules, "dummy_handler_module", dummy_module)
     pattern = SimpleTextPattern(
         name="handler",
@@ -204,7 +206,7 @@ def test_register_pattern_and_find_matching_handler(monkeypatch):
     def dummy_func(text):
         return text == "callme"
 
-    setattr(dummy_module, "dummy_func", dummy_func)
+    dummy_module.dummy_func = dummy_func
     monkeypatch.setitem(__import__("sys").modules, "dummy_module", dummy_module)
     pattern3 = SimpleTextPattern(
         name="callable",
@@ -234,7 +236,7 @@ def test_process_simple_text_payload(monkeypatch):
     def dummy_handler(text):
         return WebhookPayload(text=f"handled: {text}")
 
-    setattr(dummy_module, "dummy_handler", dummy_handler)
+    dummy_module.dummy_handler = dummy_handler
     monkeypatch.setitem(__import__("sys").modules, "dummy_handler_module", dummy_module)
     pattern = SimpleTextPattern(
         name="contains",
@@ -307,7 +309,7 @@ def test_simple_text_pattern_get_compiled_pattern_callable(monkeypatch):
     def dummy_func(text):
         return text == "match"
 
-    setattr(dummy_module, "dummy_func", dummy_func)
+    dummy_module.dummy_func = dummy_func
     monkeypatch.setitem(__import__("sys").modules, "dummy_module", dummy_module)
     pattern = SimpleTextPattern(
         name="callable",

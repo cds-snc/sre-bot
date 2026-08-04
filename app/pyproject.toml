@@ -1,60 +1,42 @@
 [project]
 name = "sre-bot"
 version = "0.1.0"
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = [
-    "arrow==1.4.0",
-    "awscli==1.44.44",
-    "Authlib==1.6.8",
-    "aws-sns-message-validator==0.0.5",
-    "blinker==1.9.0",
-    "boto3==1.42.54",
-    "botocore==1.42.54",
-    "fastapi==0.133.1",
-    "geoip2==4.8.1",
-    "google-api-python-client==2.190.0",
-    "google-auth-httplib2==0.3.0",
-    "google-auth-oauthlib==0.8.0",
-    "google-api-core==2.30.0",
-    "google-auth==2.48.0",
-    "httpx==0.28.1",
-    "pandas==2.3.3",
-    "pluggy==1.6.0",
-    "pydantic-settings==2.13.1",
-    "PyJWT==2.12.0",
+    "arrow>=1.4.0",
+    "Authlib>=1.6.8",
+    "aws-sns-message-validator>=0.0.5",
+    "blinker>=1.9.0",
+    "boto3>=1.42.54",
+    "botocore>=1.42.54",
+    "fastapi>=0.133.1",
+    "geoip2>=4.8.1",
+    "google-api-python-client>=2.190.0",
+    "google-auth-httplib2>=0.3.0",
+    "google-auth-oauthlib>=0.8.0",
+    "google-api-core>=2.30.0",
+    "google-auth>=2.48.0",
+    "httpx>=0.28.1",
+    "pandas>=2.3.3",
+    "pluggy>=1.6.0",
+    "pydantic-settings>=2.13.1",
+    "PyJWT>=2.12.0",
     "PyYAML!=6.0.0,!=5.4.0,!=5.4.1",
-    "python-dotenv==1.2.2",
-    "python-i18n==0.3.9",
-    "pytz==2023.4",
-    "requests==2.32.5",
-    "slowapi==0.1.9",
-    "schedule==1.2.2",
-    "slack-bolt==1.27.0",
-    "structlog==25.5.0",
-    "trello==0.9.7.3",
-    "uvicorn==0.41.0",
-    "email-validator==2.3.0",
-]
-
-[project.optional-dependencies]
-dev = [
-    "ruff>=0.11.0",
-    "black==24.10.0",
-    "mypy==1.19.1",
-    "pytest==8.4.2",
-    "pytest-asyncio==0.26.0",
-    "pytest-env==0.8.2",
-    "coverage==6.5.0",
-    "pytest-cov==4.1.0",
-    "freezegun==1.5.5",
-    "requests-mock==1.12.1",
-    "boto3_stubs==1.42.54",
-    "checkov",
-    "setuptools==78.1.1",
+    "python-dotenv>=1.2.2",
+    "python-i18n>=0.3.9",
+    "pytz>=2023.4",
+    "requests>=2.32.5",
+    "slowapi>=0.1.9",
+    "schedule>=1.2.2",
+    "slack-bolt>=1.27.0",
+    "structlog>=25.5.0",
+    "trello>=0.9.7.3",
+    "uvicorn>=0.41.0",
+    "email-validator>=2.3.0",
 ]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py314"
 line-length = 130
 exclude = [
     "venv*",
@@ -66,12 +48,16 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E", "F", "W"]
+select = ["E", "F", "W", "I", "B", "UP", "C4", "SIM", "S"]
 ignore = ["E501"]
 mccabe.max-complexity = 16
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "S107", "B007", "B008", "B011", "B017", "B018", "B905", "C408", "C416", "C418", "SIM116", "SIM117", "SIM118", "UP028"]
+"utils/tests.py" = ["S101"]
+
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.14"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
@@ -120,6 +106,7 @@ env = [
     "NOTIFY_SRE_USER_NAME=NOTIFY_SRE_USER_NAME",
     "NOTIFY_SRE_CLIENT_SECRET=NOTIFY_SRE_CLIENT_SECRET",
     "SLACK_SECURITY_USER_GROUP_ID=SLACK_SECURITY_USER_GROUP_ID",
+    "SLACK_NOTIFY_MGMT_USER_GROUP_ID=SLACK_NOTIFY_MGMT_USER_GROUP_ID",
     "INCIDENT_HANDBOOK_URL=INCIDENT_HANDBOOK_URL",
     "AWS_ORG_ACCOUNT_ROLE_ARN=AWS_ORG_ACCOUNT_ROLE_ARN",
     "AWS_LOGGING_ACCOUNT_ROLE_ARN=AWS_LOGGING_ACCOUNT_ROLE_ARN",
@@ -165,5 +152,23 @@ exclude_lines = ["if __name__ == .__main__.:"]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[dependency-groups]
+dev = [
+    "ruff==0.15.7",
+    "mypy==1.19.1",
+    "pytest==8.4.2",
+    "pytest-asyncio==0.26.0",
+    "pytest-env==0.8.2",
+    "coverage==6.5.0",
+    "pytest-cov==4.1.0",
+    "freezegun==1.5.5",
+    "requests-mock==1.12.1",
+    "checkov",
+    "setuptools==78.1.1",
+    "moto[dynamodb]>=5.2.2",
+    "types-boto3[ce,config,dynamodb,guardduty,identitystore,lambda,organizations,securityhub,sqs,sso-admin]>=1.43.63",
+    "google-api-python-client-stubs>=1.39.0",
+]
+
 [tool.hatch.build.targets.wheel]
-packages = ["api", "core", "infrastructure", "integrations", "jobs", "models", "modules", "packages", "server", "utils"]
+packages = ["api", "infrastructure", "integrations", "jobs", "models", "modules", "packages", "server", "utils"]

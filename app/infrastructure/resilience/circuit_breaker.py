@@ -13,9 +13,10 @@ State transitions:
 """
 
 import threading
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from enum import Enum
-from datetime import datetime, timedelta, timezone
-from typing import Callable, Any, Optional, Dict
+from typing import Any
 
 import structlog
 
@@ -62,7 +63,7 @@ class CircuitBreaker:
         self._state = CircuitState.CLOSED
         self._failure_count = 0
         self._success_count = 0
-        self._last_failure_time: Optional[datetime] = None
+        self._last_failure_time: datetime | None = None
         self._half_open_calls = 0
 
         # Thread safety
@@ -95,9 +96,7 @@ class CircuitBreaker:
                 if self._should_attempt_reset():
                     self._transition_to_half_open()
                 else:
-                    elapsed = (
-                        datetime.now(timezone.utc) - self._last_failure_time
-                    ).total_seconds()
+                    elapsed = (datetime.now(UTC) - self._last_failure_time).total_seconds()
                     remaining = self.timeout_seconds - elapsed
                     logger.warning(
                         "circuit_breaker_open",
@@ -105,10 +104,7 @@ class CircuitBreaker:
                         failure_count=self._failure_count,
                         retry_in_seconds=int(remaining),
                     )
-                    raise CircuitBreakerOpenError(
-                        f"Circuit breaker '{self.name}' is OPEN. "
-                        f"Retry in {int(remaining)} seconds."
-                    )
+                    raise CircuitBreakerOpenError(f"Circuit breaker '{self.name}' is OPEN. Retry in {int(remaining)} seconds.")
 
             if self._state == CircuitState.HALF_OPEN:
                 # Limit concurrent requests in HALF_OPEN state
@@ -118,10 +114,7 @@ class CircuitBreaker:
                         name=self.name,
                         calls=self._half_open_calls,
                     )
-                    raise CircuitBreakerOpenError(
-                        f"Circuit breaker '{self.name}' is HALF_OPEN "
-                        f"(max concurrent calls reached)."
-                    )
+                    raise CircuitBreakerOpenError(f"Circuit breaker '{self.name}' is HALF_OPEN (max concurrent calls reached).")
                 self._half_open_calls += 1
 
         # Execute the function
@@ -164,7 +157,7 @@ class CircuitBreaker:
         """Handle failed request."""
         with self._lock:
             self._failure_count += 1
-            self._last_failure_time = datetime.now(timezone.utc)
+            self._last_failure_time = datetime.now(UTC)
 
             if self._state == CircuitState.HALF_OPEN:
                 # Failed during recovery test, go back to OPEN
@@ -198,7 +191,7 @@ class CircuitBreaker:
         """Check if enough time has passed to attempt recovery."""
         if self._last_failure_time is None:
             return True
-        elapsed = datetime.now(timezone.utc) - self._last_failure_time
+        elapsed = datetime.now(UTC) - self._last_failure_time
         return elapsed >= timedelta(seconds=self.timeout_seconds)
 
     def _transition_to_closed(self):
@@ -235,11 +228,7 @@ class CircuitBreaker:
                 "state": self._state.value,
                 "failure_count": self._failure_count,
                 "success_count": self._success_count,
-                "last_failure_time": (
-                    self._last_failure_time.isoformat()
-                    if self._last_failure_time
-                    else None
-                ),
+                "last_failure_time": (self._last_failure_time.isoformat() if self._last_failure_time else None),
                 "half_open_calls": self._half_open_calls,
             }
 
@@ -251,7 +240,7 @@ class CircuitBreaker:
 
 
 # Global registry for monitoring
-_circuit_breaker_registry: Dict[str, CircuitBreaker] = {}
+_circuit_breaker_registry: dict[str, CircuitBreaker] = {}
 
 
 def register_circuit_breaker(cb: CircuitBreaker) -> None:
@@ -266,13 +255,9 @@ def get_all_circuit_breaker_stats() -> dict:
 
 def get_open_circuit_breakers() -> list:
     """Get list of circuit breakers that are currently OPEN."""
-    return [
-        name
-        for name, cb in _circuit_breaker_registry.items()
-        if cb.state == CircuitState.OPEN
-    ]
+    return [name for name, cb in _circuit_breaker_registry.items() if cb.state == CircuitState.OPEN]
 
 
-def get_circuit_breaker(name: str) -> Optional[CircuitBreaker]:
+def get_circuit_breaker(name: str) -> CircuitBreaker | None:
     """Get a circuit breaker by name."""
     return _circuit_breaker_registry.get(name)

@@ -26,27 +26,27 @@ Usage in route handlers:
 Development bypass:
     Set DEV_BYPASS_TOKEN=<random-string> in your .env (non-production only).
     Pass that value as the Bearer token to skip JWKS validation entirely.
-    A synthetic User is returned. Blocked when PREFIX="" (production).
+    A synthetic User is returned. Blocked when ENVIRONMENT == "production"
+    or DEV_BYPASS_ENABLED is False.
 
 Slack transport: authentication is handled at the platform layer via Slack signing
 secret verification before command handlers are invoked. The CommandPayload.user_id
 carries the verified Slack user identity — no JWT dependency needed in Slack handlers.
 """
 
-from typing import Annotated, Any, List, Optional
+from typing import Annotated, Any
 
 import structlog
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, SecurityScopes
 
-from infrastructure.security.jwks import JWKSManager
-from infrastructure.security.jwt import validate_jwt_token
-from infrastructure.security.models import AuthPrincipalSource, User
+from infrastructure.configuration import get_app_settings
 from infrastructure.configuration.infrastructure.server import (
     get_server_settings,
 )
-from infrastructure.configuration import get_app_settings
-from infrastructure.security import get_jwks_manager
+from infrastructure.security.jwks import JWKSManager, get_jwks_manager
+from infrastructure.security.jwt import validate_jwt_token
+from infrastructure.security.models import AuthPrincipalSource, User
 
 logger = structlog.get_logger()
 
@@ -56,7 +56,7 @@ _bearer = HTTPBearer(auto_error=False)
 
 def get_current_user(
     security_scopes: SecurityScopes,
-    credentials: Annotated[Optional[HTTPAuthorizationCredentials], Depends(_bearer)],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     jwks_manager: Annotated[JWKSManager, Depends(get_jwks_manager)],
 ) -> User:
     """Validate a JWT Bearer token and return the authenticated principal.
@@ -65,10 +65,10 @@ def get_current_user(
     It performs token validation, scope enforcement, and identity resolution
     in a single, composable step.
 
-    In non-production environments, if DEV_BYPASS_TOKEN is set in ServerSettings
-    and the incoming bearer token matches it exactly, JWKS validation is skipped
-    and a synthetic developer User is returned. This bypass is inert in production
-    (PREFIX="" disables it).
+    In non-production environments, if DEV_BYPASS_ENABLED is true, and
+    DEV_BYPASS_TOKEN is set in ServerSettings, and the incoming bearer token
+    matches it exactly, JWKS validation is skipped and a synthetic developer User
+    is returned. This bypass is inert in production.
 
     JWT scope claims are read from either:
     - ``scope`` (space-separated string, RFC 6749 / OAuth 2.0 style)
@@ -86,11 +86,7 @@ def get_current_user(
         HTTPException: 401 if the token is absent, invalid, or expired.
         HTTPException: 403 if the token lacks one or more required scopes.
     """
-    authenticate_value = (
-        f'Bearer scope="{security_scopes.scope_str}"'
-        if security_scopes.scopes
-        else "Bearer"
-    )
+    authenticate_value = f'Bearer scope="{security_scopes.scope_str}"' if security_scopes.scopes else "Bearer"
 
     if credentials is None:
         raise HTTPException(
@@ -102,18 +98,22 @@ def get_current_user(
     # Non-production static bypass — allows local smoke testing without Backstage.
     server_settings = get_server_settings()
     app_settings = get_app_settings()
-    if not app_settings.is_production and server_settings.DEV_BYPASS_TOKEN:
-        if credentials.credentials == server_settings.DEV_BYPASS_TOKEN:
-            log = logger.bind(bypass="dev_token")
-            log.warning("dev_bypass_token_used")
-            return User(
-                user_id="dev@local",
-                email="dev@local",
-                display_name="Dev Bypass User",
-                source=AuthPrincipalSource.API_JWT,
-                platform_id="dev-bypass",
-                permissions=list(security_scopes.scopes),
-            )
+    if (
+        app_settings.ENVIRONMENT != "production"
+        and app_settings.DEV_BYPASS_ENABLED
+        and server_settings.DEV_BYPASS_TOKEN
+        and credentials.credentials == server_settings.DEV_BYPASS_TOKEN
+    ):
+        log = logger.bind(bypass="dev_token")
+        log.warning("dev_bypass_token_used")
+        return User(
+            user_id="dev@local",
+            email="dev@local",
+            display_name="Dev Bypass User",
+            source=AuthPrincipalSource.API_JWT,
+            platform_id="dev-bypass",
+            permissions=list(security_scopes.scopes),
+        )
 
     payload = validate_jwt_token(jwks_manager=jwks_manager, credentials=credentials)
 
@@ -151,7 +151,7 @@ def _build_user_from_jwt_payload(payload: dict[str, Any]) -> User:
     )
 
 
-def _extract_token_scopes(payload: dict) -> List[str]:
+def _extract_token_scopes(payload: dict) -> list[str]:
     """Extract scope strings from a verified JWT payload.
 
     Handles both RFC 6749 space-separated ``scope`` strings and

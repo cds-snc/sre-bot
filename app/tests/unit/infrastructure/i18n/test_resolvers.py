@@ -2,7 +2,7 @@
 
 import pytest
 
-from infrastructure.i18n import Locale, LocaleResolver, LanguageNegotiator
+from infrastructure.i18n import LanguageNegotiator, Locale, LocaleResolver
 
 
 class TestLocaleResolver:
@@ -74,9 +74,7 @@ class TestLocaleResolver:
         """resolve_from_header() filters by supported locales."""
         resolver = LocaleResolver()
         supported = [Locale.FR_FR]  # Only French supported
-        result = resolver.resolve_from_header(
-            "en-US,fr-FR", supported_locales=supported
-        )
+        result = resolver.resolve_from_header("en-US,fr-FR", supported_locales=supported)
         assert result == Locale.FR_FR
 
     def test_resolve_from_string_valid(self):
@@ -150,9 +148,7 @@ class TestLanguageNegotiator:
         """find_best_match() returns default if no match."""
         requested = ["de-DE"]
         available = ["en-US", "fr-FR"]
-        result = LanguageNegotiator.find_best_match(
-            requested, available, default="en-US"
-        )
+        result = LanguageNegotiator.find_best_match(requested, available, default="en-US")
         assert result == "en-US"
 
     def test_find_best_match_empty_requested(self):

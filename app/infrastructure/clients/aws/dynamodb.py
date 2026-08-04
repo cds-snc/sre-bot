@@ -4,7 +4,7 @@ Provides type-safe access to DynamoDB operations (get_item, put_item, query, sca
 with consistent error handling and OperationResult return types.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import structlog
 
@@ -28,7 +28,7 @@ class DynamoDBClient:
     def __init__(
         self,
         session_provider: SessionProvider,
-        default_role_arn: Optional[str] = None,
+        default_role_arn: str | None = None,
     ) -> None:
         self._session_provider = session_provider
         self._default_role_arn = default_role_arn
@@ -38,8 +38,8 @@ class DynamoDBClient:
     def get_item(
         self,
         table_name: str,
-        Key: Dict[str, Any],
-        role_arn: Optional[str] = None,
+        Key: dict[str, Any],
+        role_arn: str | None = None,
         **kwargs,
     ) -> OperationResult:
         """Get an item from DynamoDB.
@@ -54,9 +54,7 @@ class DynamoDBClient:
             OperationResult with item data or error
         """
         effective_role = role_arn or self._default_role_arn
-        client_kwargs = self._session_provider.build_client_kwargs(
-            service_name=self._service_name, role_arn=effective_role
-        )
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=effective_role)
         return execute_aws_api_call(
             "dynamodb",
             "get_item",
@@ -69,8 +67,8 @@ class DynamoDBClient:
     def put_item(
         self,
         table_name: str,
-        Item: Dict[str, Any],
-        role_arn: Optional[str] = None,
+        Item: dict[str, Any],
+        role_arn: str | None = None,
         **kwargs,
     ) -> OperationResult:
         """Put an item into DynamoDB.
@@ -85,9 +83,7 @@ class DynamoDBClient:
             OperationResult with status
         """
         effective_role = role_arn or self._default_role_arn
-        client_kwargs = self._session_provider.build_client_kwargs(
-            service_name=self._service_name, role_arn=effective_role
-        )
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=effective_role)
         return execute_aws_api_call(
             "dynamodb",
             "put_item",
@@ -100,8 +96,8 @@ class DynamoDBClient:
     def update_item(
         self,
         table_name: str,
-        Key: Dict[str, Any],
-        role_arn: Optional[str] = None,
+        Key: dict[str, Any],
+        role_arn: str | None = None,
         **kwargs,
     ) -> OperationResult:
         """Update an item in DynamoDB.
@@ -116,9 +112,7 @@ class DynamoDBClient:
             OperationResult with updated item data or error
         """
         effective_role = role_arn or self._default_role_arn
-        client_kwargs = self._session_provider.build_client_kwargs(
-            service_name=self._service_name, role_arn=effective_role
-        )
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=effective_role)
         return execute_aws_api_call(
             "dynamodb",
             "update_item",
@@ -131,8 +125,8 @@ class DynamoDBClient:
     def delete_item(
         self,
         table_name: str,
-        Key: Dict[str, Any],
-        role_arn: Optional[str] = None,
+        Key: dict[str, Any],
+        role_arn: str | None = None,
         **kwargs,
     ) -> OperationResult:
         """Delete an item from DynamoDB.
@@ -147,9 +141,7 @@ class DynamoDBClient:
             OperationResult with status
         """
         effective_role = role_arn or self._default_role_arn
-        client_kwargs = self._session_provider.build_client_kwargs(
-            service_name=self._service_name, role_arn=effective_role
-        )
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=effective_role)
         return execute_aws_api_call(
             "dynamodb",
             "delete_item",
@@ -163,7 +155,7 @@ class DynamoDBClient:
         self,
         table_name: str,
         KeyConditionExpression: Any,
-        role_arn: Optional[str] = None,
+        role_arn: str | None = None,
         **kwargs,
     ) -> OperationResult:
         """Query items from DynamoDB using key condition.
@@ -178,9 +170,7 @@ class DynamoDBClient:
             OperationResult with items list or error
         """
         effective_role = role_arn or self._default_role_arn
-        client_kwargs = self._session_provider.build_client_kwargs(
-            service_name=self._service_name, role_arn=effective_role
-        )
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=effective_role)
         return execute_aws_api_call(
             "dynamodb",
             "query",
@@ -193,7 +183,7 @@ class DynamoDBClient:
     def scan(
         self,
         table_name: str,
-        role_arn: Optional[str] = None,
+        role_arn: str | None = None,
         **kwargs,
     ) -> OperationResult:
         """Scan all items from a DynamoDB table.
@@ -207,9 +197,7 @@ class DynamoDBClient:
             OperationResult with items list or error
         """
         effective_role = role_arn or self._default_role_arn
-        client_kwargs = self._session_provider.build_client_kwargs(
-            service_name=self._service_name, role_arn=effective_role
-        )
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=effective_role)
         return execute_aws_api_call(
             "dynamodb",
             "scan",
@@ -218,7 +206,7 @@ class DynamoDBClient:
             **kwargs,
         )
 
-    def healthcheck(self, role_arn: Optional[str] = None) -> OperationResult:
+    def healthcheck(self, role_arn: str | None = None) -> OperationResult:
         """Lightweight health check for DynamoDB.
 
         Performs a cheap `list_tables` call to verify the service is reachable.

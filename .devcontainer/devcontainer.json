@@ -23,14 +23,21 @@
 			"settings": {
 				"python.pythonPath": "/usr/local/bin/python",
 				"python.languageServer": "Pylance",
-				"ruff.cwd": "${workspaceFolder}/app",
+				"ruff.interpreter": [
+					"${workspaceFolder}/app/.venv/bin/python"
+				],
+				"ruff.organizeImports": true,
+				"editor.codeActionsOnSave": {
+					"source.fixAll.ruff": "explicit",
+					"source.organizeImports.ruff": "explicit"
+				},
 				"mypy-type-checker.cwd": "${workspaceFolder}/app",
 				"python.analysis.extraPaths": [
 					"${workspaceFolder}/app"
 				],
 				"[python]": {
 					"editor.formatOnSave": true,
-					"editor.defaultFormatter": "ms-python.black-formatter"
+					"editor.defaultFormatter": "charliermarsh.ruff"
 				},
 				"[terraform]": {
 					"editor.formatOnSave": true
@@ -44,19 +51,23 @@
 		},
 		"ghcr.io/devcontainers/features/docker-in-docker:2": {
 			"version": "latest",
-			"moby": true
+			"moby": true,
+			"dockerBuildxVersion": "0.14.1",
+			"installDockerBuildx": false
 		},
 		"ghcr.io/devcontainers/features/terraform:1": {
 			"version": "1.5.3",
 			"terragrunt": "0.48.0"
 		},
 		"ghcr.io/devcontainers/features/node:1": {
-			"version": "20"
-		}
+			"version": "22"
+		},
+		"ghcr.io/devcontainers/features/github-cli:1.1.0": {},
+		"ghcr.io/cds-snc/devcontainer-features/uv:1": {}
 	},
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
 	// "forwardPorts": [],
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "sudo chown vscode app/.venv && .devcontainer/uv-install.sh",
+	"postCreateCommand": "sudo chown vscode app/.venv",
 	"remoteUser": "vscode"
 }

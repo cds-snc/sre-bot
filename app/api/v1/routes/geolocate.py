@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
-from integrations import maxmind
+
 from infrastructure.security import get_limiter
+from integrations import maxmind
 from packages.geolocate.schemas import build_open_source_map_links
 
 router = APIRouter(tags=["Geolocation"])

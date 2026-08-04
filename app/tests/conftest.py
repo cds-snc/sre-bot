@@ -1,23 +1,26 @@
-import sys
 import logging
+import sys
+from unittest.mock import MagicMock
+
 import pytest
+import slack_bolt
 
 # Ensure project root is on path BEFORE importing test factories.
 project_root = "/workspace/app"
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from tests.factories.google import (  # noqa: E402
-    make_google_groups,
-    make_google_members,
-    make_google_users,
-)
 from tests.factories.aws import (  # noqa: E402
-    make_aws_users,
     make_aws_groups,
     make_aws_groups_memberships,
     make_aws_groups_w_users,
     make_aws_groups_w_users_with_legacy,
+    make_aws_users,
+)
+from tests.factories.google import (  # noqa: E402
+    make_google_groups,
+    make_google_members,
+    make_google_users,
 )
 
 # Ensure the application package root is on sys.path so importing application
@@ -34,7 +37,6 @@ def pytest_configure(config):
     auth errors during test collection when main.py is imported and tries to
     instantiate the Slack App at module load time.
     """
-    from unittest.mock import MagicMock
 
     # Create a mock that allows all attribute access and method calls
     def mock_app_init(self, *args, **kwargs):
@@ -42,9 +44,7 @@ def pytest_configure(config):
         # Initialize minimal required attributes without calling auth_test
         self._token = kwargs.get("token")
         self._client = MagicMock()
-        self._client.auth_test = MagicMock(
-            return_value={"ok": True, "user_id": "U12345"}
-        )
+        self._client.auth_test = MagicMock(return_value={"ok": True, "user_id": "U12345"})
         self.command = MagicMock()
         self.view = MagicMock()
         self.action = MagicMock()
@@ -54,7 +54,6 @@ def pytest_configure(config):
         self.add_event_handler = MagicMock()
 
     # Patch before any imports
-    import slack_bolt
 
     slack_bolt.App.__init__ = mock_app_init
 
@@ -91,10 +90,10 @@ def google_groups():
     def _google_groups(n=3, prefix="", domain="test.com"):
         return [
             {
-                "id": f"{prefix}google_group_id{i+1}",
-                "name": f"{prefix}group-name{i+1}",
-                "email": f"{prefix}group-name{i+1}@{domain}",
-                "description": f"{prefix}description{i+1}",
+                "id": f"{prefix}google_group_id{i + 1}",
+                "name": f"{prefix}group-name{i + 1}",
+                "email": f"{prefix}group-name{i + 1}@{domain}",
+                "description": f"{prefix}description{i + 1}",
                 "directMembersCount": i + 1,
             }
             for i in range(n)
@@ -109,21 +108,21 @@ def google_users():
         users = []
         for i in range(n):
             user = {
-                "id": f"{prefix}user_id{i+1}",
-                "primaryEmail": f"{prefix}user-email{i+1}@{domain}",
+                "id": f"{prefix}user_id{i + 1}",
+                "primaryEmail": f"{prefix}user-email{i + 1}@{domain}",
                 "emails": [
                     {
-                        "address": f"{prefix}user-email{i+1}@{domain}",
+                        "address": f"{prefix}user-email{i + 1}@{domain}",
                         "primary": True,
                         "type": "work",
                     }
                 ],
                 "suspended": False,
                 "name": {
-                    "fullName": f"Given_name_{i+1} Family_name_{i+1}",
-                    "familyName": f"Family_name_{i+1}",
-                    "givenName": f"Given_name_{i+1}",
-                    "displayName": f"Given_name_{i+1} Family_name_{i+1}",
+                    "fullName": f"Given_name_{i + 1} Family_name_{i + 1}",
+                    "familyName": f"Family_name_{i + 1}",
+                    "givenName": f"Given_name_{i + 1}",
+                    "displayName": f"Given_name_{i + 1} Family_name_{i + 1}",
                 },
             }
             users.append(user)
@@ -154,9 +153,7 @@ def google_group_members(google_users):
 # Fixture with users
 @pytest.fixture
 def google_groups_w_users(google_groups, google_group_members, google_users):
-    def _google_groups_w_users(
-        n_groups=1, n_users=3, group_prefix="", user_prefix="", domain="test.com"
-    ):
+    def _google_groups_w_users(n_groups=1, n_users=3, group_prefix="", user_prefix="", domain="test.com"):
         groups = google_groups(n_groups, prefix=group_prefix, domain=domain)
         members = google_group_members(n_users, prefix=user_prefix, domain=domain)
         users = google_users(n_users, prefix=user_prefix, domain=domain)
@@ -175,9 +172,7 @@ def google_groups_w_users(google_groups, google_group_members, google_users):
 
 # Additional fixtures for comprehensive testing
 @pytest.fixture
-def google_groups_with_legacy_structure(
-    google_group_factory, google_member_factory, google_user_factory
-):
+def google_groups_with_legacy_structure(google_group_factory, google_member_factory, google_user_factory):
     """Factory to create groups with legacy-compatible member structure."""
 
     def _factory(n_groups=1, n_members_per_group=2, domain="test.com"):
@@ -186,12 +181,8 @@ def google_groups_with_legacy_structure(
 
         for i, group in enumerate(groups):
             # Create members for this group
-            members = google_member_factory(
-                n_members_per_group, prefix=f"g{i}-", domain=domain
-            )
-            users = google_user_factory(
-                n_members_per_group, prefix=f"g{i}-", domain=domain
-            )
+            members = google_member_factory(n_members_per_group, prefix=f"g{i}-", domain=domain)
+            users = google_user_factory(n_members_per_group, prefix=f"g{i}-", domain=domain)
 
             # Create legacy-compatible members with flattened user details
             legacy_members = []
@@ -316,9 +307,7 @@ def aws_groups():
 @pytest.fixture
 def aws_groups_memberships():
     def _wrapper(n=3, prefix="", group_id=1, store_id="d-123412341234"):
-        return make_aws_groups_memberships(
-            n=n, prefix=prefix, group_id=group_id, store_id=store_id
-        )
+        return make_aws_groups_memberships(n=n, prefix=prefix, group_id=group_id, store_id=store_id)
 
     return _wrapper
 
@@ -390,7 +379,6 @@ def make_mock_settings():
     Returns:
         Callable: Factory function that accepts **overrides kwargs
     """
-    from unittest.mock import MagicMock
 
     def _factory(**overrides):
         """Create mock settings with provided overrides."""

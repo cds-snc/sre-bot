@@ -5,7 +5,7 @@ including document creation, updates, and retrieval operations.
 """
 
 import re
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
@@ -46,7 +46,7 @@ class DocsClient:
     def get_document(
         self,
         document_id: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Get a document from Google Docs.
 
@@ -84,7 +84,7 @@ class DocsClient:
     def create(
         self,
         title: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Create a new document in Google Docs.
 
@@ -123,7 +123,7 @@ class DocsClient:
         self,
         document_id: str,
         requests: list[dict[str, Any]],
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Apply a list of updates to a document in Google Docs.
 
@@ -164,11 +164,7 @@ class DocsClient:
         )
 
         def api_call() -> Any:
-            return (
-                service.documents()
-                .batchUpdate(documentId=document_id, body={"requests": requests})
-                .execute()
-            )
+            return service.documents().batchUpdate(documentId=document_id, body={"requests": requests}).execute()
 
         return execute_google_api_call(
             operation_name="docs.documents.batchUpdate",
@@ -180,7 +176,7 @@ class DocsClient:
     # ========================================================================
 
     @staticmethod
-    def extract_google_doc_id(url: str) -> Optional[str]:
+    def extract_google_doc_id(url: str) -> str | None:
         """Extract the Google Docs ID from a Google Docs URL.
 
         Args:

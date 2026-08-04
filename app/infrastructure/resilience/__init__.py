@@ -8,10 +8,10 @@ from infrastructure.resilience.circuit_breaker import (
     CircuitBreaker,
     CircuitBreakerOpenError,
     CircuitState,
-    register_circuit_breaker,
-    get_circuit_breaker,
     get_all_circuit_breaker_stats,
+    get_circuit_breaker,
     get_open_circuit_breakers,
+    register_circuit_breaker,
 )
 from infrastructure.resilience.retry import (
     InMemoryRetryStore,

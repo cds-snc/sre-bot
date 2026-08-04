@@ -2,12 +2,12 @@
 
 from pathlib import Path
 
-from infrastructure.plugins import hookimpl
 from infrastructure.i18n.resources import I18nResourceSpec
+from infrastructure.plugins import hookimpl
+from packages.geolocate.platforms import slack
 from packages.geolocate.routes import router as geolocate_router
 from packages.geolocate.schemas import GeolocateRequest, GeolocateResponse
 from packages.geolocate.service import geolocate_ip
-from packages.geolocate.platforms import slack
 
 
 @hookimpl

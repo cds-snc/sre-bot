@@ -2,6 +2,7 @@
 
 import pandas as pd
 import structlog
+
 from integrations.google_workspace import google_service
 from integrations.utils.api import convert_string_to_camel_case, retry_request
 from utils import filters
@@ -183,12 +184,8 @@ def list_groups_with_members(
     Returns:
         list: A list of group objects with members. Any group without members will not be included.
     """
-    logger.info(
-        "listing_groups_with_members", query=query, groups_filters=groups_filters
-    )
-    groups = list_groups(
-        query=query, fields="groups(email, name, directMembersCount, description)"
-    )
+    logger.info("listing_groups_with_members", query=query, groups_filters=groups_filters)
+    groups = list_groups(query=query, fields="groups(email, name, directMembersCount, description)")
     logger.info("groups_found", count=len(groups), query=query)
 
     if not groups:
@@ -201,12 +198,7 @@ def list_groups_with_members(
 
     users = list_users()
     filtered_groups = [
-        {
-            k: v
-            for k, v in group.items()
-            if k in ["id", "email", "name", "directMembersCount", "description"]
-        }
-        for group in groups
+        {k: v for k, v in group.items() if k in ["id", "email", "name", "directMembersCount", "description"]} for group in groups
     ]
 
     groups_with_members = []

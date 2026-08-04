@@ -10,3 +10,4 @@ applyTo: app/tests/**/*.py
 - Use dependency overrides and fakes where possible for deterministic tests.
 - Prefer minimal, behavior-focused assertions over implementation-detail assertions.
 - Do not run `app/tests/smoke/*` by default; run smoke tests only when explicitly requested and required env vars are configured.
+- Docstrings in test files must describe observable behavior, stub strategy, and assertion rationale only. Never reference external documents, task/ticket identifiers, sprint labels, plan step numbers, implementation phases, or transitory states (e.g. "before implementation", "AC#2 of TASK-X"). Docstrings must remain accurate regardless of project state.

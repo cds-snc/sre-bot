@@ -93,7 +93,7 @@ This project uses [Visual Studio Code Remote - Containers](https://code.visualst
 3. Install Python dependencies:
 
   ```sh
-  cd app && uv sync --extra dev
+  cd app && uv sync
   ```
 
 4. Add a `.env` file to the `/workspace/app` folder (Contact SRE team for the project-specific .env setup)
@@ -112,6 +112,14 @@ This project uses [Visual Studio Code Remote - Containers](https://code.visualst
 - `app/integrations/` — Integrations with external services (Google Workspace, Slack, AWS, etc.)
 - `app/modules/` — Bot features and user-facing commands
 - `app/jobs/` — Scheduled jobs (e.g., reminders, status checks)
+
+---
+
+## Architecture & Decision Records
+
+The authoritative architecture records live in [`decisions/`](decisions/README.md). Start with [`decisions/README.md`](decisions/README.md) for the reading order and record index.
+
+The legacy `docs/adr/` folder has been removed; its historical content is available in git history.
 
 ---
 

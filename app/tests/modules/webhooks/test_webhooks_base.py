@@ -1,13 +1,15 @@
-from unittest.mock import patch, ANY, MagicMock
-from modules.webhooks import base
+from unittest.mock import ANY, MagicMock, patch
+
 from pydantic import BaseModel
+
 from models.webhooks import (
-    WebhookPayload,
-    AwsSnsPayload,
     AccessRequest,
+    AwsSnsPayload,
     SimpleTextPayload,
+    WebhookPayload,
     WebhookResult,
 )
+from modules.webhooks import base
 
 
 @patch("modules.webhooks.base.logger")
@@ -62,6 +64,8 @@ def test_handle_webhook_payload_empty(mock_validate_payload):
     response = base.handle_webhook_payload(payload, request)
     assert response.status == "error"
     assert response.message == "No matching model found for payload"
+    assert "matched_payload_type" in response.model_dump()
+    assert response.model_dump()["matched_payload_type"] is None
 
 
 @patch("modules.webhooks.base.validate_payload")
@@ -80,6 +84,7 @@ def test_handle_webhook_payload_webhook_payload(validate_payload_mock):
     assert result.payload.channel is None
     assert result.payload.attachments == []
     assert result.payload.blocks == []
+    assert result.matched_payload_type == "WebhookPayload"
 
 
 @patch("modules.webhooks.base.process_aws_sns_payload")
@@ -119,9 +124,8 @@ def test_handle_webhook_payload_with_sns_payload(
     assert response.action == "post"
     assert isinstance(response.payload, WebhookPayload)
     assert response.payload.text == "Processed SNS message"
-    process_aws_sns_payload_mock.assert_called_once_with(
-        ANY, request.app.state.bot.client
-    )  # Ensure the client is passed
+    assert response.matched_payload_type == "AwsSnsPayload"
+    process_aws_sns_payload_mock.assert_called_once_with(ANY, request.app.state.bot.client)  # Ensure the client is passed
 
 
 @patch("modules.webhooks.base.validate_payload")
@@ -150,13 +154,12 @@ def test_handle_webhook_payload_with_access_request(validate_payload_mock):
     assert "'reason': 'reason1'" in payload_text
     assert "2025, 9, 25" in payload_text
     assert "2025, 9, 26" in payload_text
+    assert response.matched_payload_type == "AccessRequest"
 
 
 @patch("modules.webhooks.base.process_simple_text_payload")
 @patch("modules.webhooks.base.validate_payload")
-def test_handle_webhook_payload_upptime(
-    validate_payload_mock, process_simple_text_payload_mock
-):
+def test_handle_webhook_payload_upptime(validate_payload_mock, process_simple_text_payload_mock):
     request = MagicMock()
     payload = {
         "text": "🟥 Payload Test (https://not-valid.cdssandbox.xyz/) is **down** : https://github.com/cds-snc/status-statut/issues/222"
@@ -211,6 +214,7 @@ def test_handle_webhook_payload_upptime(
             "type": "section",
         },
     ]
+    assert response.matched_payload_type == "SimpleTextPayload"
 
 
 @patch("modules.webhooks.base.validate_payload")
@@ -234,3 +238,5 @@ def test_handle_webhook_payload_with_invalid_payload_type(
     response = base.handle_webhook_payload(payload, request)
     assert response.status == "error"
     assert response.message == "No matching model found for payload"
+    assert "matched_payload_type" in response.model_dump()
+    assert response.model_dump()["matched_payload_type"] == "UnknownPayload"

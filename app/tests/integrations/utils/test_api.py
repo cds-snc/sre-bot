@@ -1,13 +1,15 @@
-from unittest.mock import MagicMock, call, patch
-import pytest
 import string
+from unittest.mock import MagicMock, call, patch
+
+import pytest
+
 from integrations.utils.api import (
-    convert_string_to_camel_case,
     convert_dict_to_camel_case,
-    convert_kwargs_to_camel_case,
-    convert_string_to_pascal_case,
     convert_dict_to_pascale_case,
+    convert_kwargs_to_camel_case,
     convert_kwargs_to_pascal_case,
+    convert_string_to_camel_case,
+    convert_string_to_pascal_case,
     generate_unique_id,
     retry_request,
 )
@@ -40,10 +42,7 @@ def kwargs():
 
 def test_convert_string_to_camel_case():
     assert convert_string_to_camel_case("snake_case") == "snakeCase"
-    assert (
-        convert_string_to_camel_case("longer_snake_case_string")
-        == "longerSnakeCaseString"
-    )
+    assert convert_string_to_camel_case("longer_snake_case_string") == "longerSnakeCaseString"
     assert convert_string_to_camel_case("alreadyCamelCase") == "alreadyCamelCase"
     assert convert_string_to_camel_case("singleword") == "singleword"
     assert convert_string_to_camel_case("with_numbers_123") == "withNumbers123"
@@ -129,10 +128,7 @@ def test_convert_kwargs_to_camel_case_with_nested_list():
 
 def test_convert_string_to_pascal_case():
     assert convert_string_to_pascal_case("snake_case") == "SnakeCase"
-    assert (
-        convert_string_to_pascal_case("longer_snake_case_string")
-        == "LongerSnakeCaseString"
-    )
+    assert convert_string_to_pascal_case("longer_snake_case_string") == "LongerSnakeCaseString"
     assert convert_string_to_pascal_case("alreadyPascalCase") == "AlreadyPascalCase"
     assert convert_string_to_pascal_case("singleword") == "Singleword"
     assert convert_string_to_pascal_case("with_numbers_123") == "WithNumbers123"
@@ -223,18 +219,14 @@ def test_unique_id_format():
     assert isinstance(unique_id, str), "Unique ID should be a string"
     parts = unique_id.split("-")
     assert len(parts) == 3, "Unique ID should have three parts separated by hyphens"
-    assert all(
-        len(part) == 3 for part in parts
-    ), "Each segment should be exactly 3 characters long"
+    assert all(len(part) == 3 for part in parts), "Each segment should be exactly 3 characters long"
 
 
 def test_unique_id_characters():
     """Test that the unique ID contains only uppercase letters and digits."""
     unique_id = generate_unique_id()
     allowed_chars = set(string.ascii_lowercase + string.digits)
-    assert all(
-        char in allowed_chars for char in unique_id.replace("-", "")
-    ), "All characters should be alphanumeric"
+    assert all(char in allowed_chars for char in unique_id.replace("-", "")), "All characters should be alphanumeric"
 
 
 def test_unique_id_uniqueness():
@@ -248,9 +240,9 @@ def test_no_illegal_characters():
     """Ensure no lowecase or special characters are in the ID"""
     unique_id = generate_unique_id()
     illegal_chars = set(string.ascii_uppercase + string.punctuation)
-    assert not any(
-        char in illegal_chars for char in unique_id.replace("-", "")
-    ), "ID should not have uppercase or special characters"
+    assert not any(char in illegal_chars for char in unique_id.replace("-", "")), (
+        "ID should not have uppercase or special characters"
+    )
 
 
 def test_retry_request_success():

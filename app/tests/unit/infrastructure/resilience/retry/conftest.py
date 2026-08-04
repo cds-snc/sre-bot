@@ -1,18 +1,19 @@
 """Shared fixtures for retry system tests."""
 
-import pytest
-from typing import Dict, Any
+from typing import Any
 from unittest.mock import MagicMock
+
+import pytest
 
 from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.operations import OperationResult
-from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
 from infrastructure.resilience.retry import (
+    InMemoryRetryStore,
     RetryConfig,
     RetryRecord,
     RetryResult,
-    InMemoryRetryStore,
 )
+from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
 
 
 @pytest.fixture
@@ -43,7 +44,7 @@ def retry_record_factory():
 
     def _factory(
         operation_type: str = "test.operation",
-        payload: Dict[str, Any] | None = None,
+        payload: dict[str, Any] | None = None,
         id: str | None = None,
         attempts: int = 0,
         last_error: str | None = None,

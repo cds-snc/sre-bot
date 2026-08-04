@@ -1,11 +1,13 @@
 import logging
-import pytest
+import time as _time
 from types import SimpleNamespace
 
+import pytest
+import structlog
 from botocore.exceptions import ClientError
 
-from integrations.aws import client_next
 from infrastructure.operations import OperationResult
+from integrations.aws import client_next
 from tests.fixtures.aws_clients import FakeClient
 
 
@@ -27,9 +29,7 @@ def test__paginate_all_results_respects_keys():
     # Provide a client that has paginator pages and also exposes the API method
     # name so getattr(client, method) doesn't raise when execute_aws_api_call
     # constructs api_method before deciding to paginate.
-    client = FakeClient(
-        paginated_pages=pages, api_responses={"list_items": lambda **kw: {}}
-    )
+    client = FakeClient(paginated_pages=pages, api_responses={"list_items": lambda **kw: {}})
 
     results = client_next._paginate_all_results(client, "list_items", keys=["Items"])
     assert results == [{"id": 1}, {"id": 2}]
@@ -118,9 +118,7 @@ def test_paginate_all_results_aggregates_pages():
     # Provide a client that has paginator pages and exposes the API method name so
     # getattr(client, method) doesn't raise when execute_aws_api_call constructs
     # api_method before deciding to paginate.
-    client = FakeClient(
-        paginated_pages=pages, api_responses={"list_items": lambda **kw: {}}
-    )
+    client = FakeClient(paginated_pages=pages, api_responses={"list_items": lambda **kw: {}})
 
     # Monkeypatch get_aws_client to return our fake client so execute_aws_api_call
     # follows the paginated branch and uses _paginate_all_results internally.
@@ -151,14 +149,10 @@ def test_execute_api_call_retries_on_retryable_error(monkeypatch, caplog):
     def api_call() -> dict:
         if attempts["count"] < 2:
             attempts["count"] += 1
-            raise ClientError(
-                {"Error": {"Code": "Throttling", "Message": "throttle"}}, "Op"
-            )
+            raise ClientError({"Error": {"Code": "Throttling", "Message": "throttle"}}, "Op")
         return {"ok": True}
 
     sleeps: list[float] = []
-
-    import time as _time
 
     def fake_sleep(seconds: float) -> None:
         sleeps.append(float(seconds))
@@ -220,6 +214,41 @@ def test_handle_final_error_logs_non_critical_and_critical(monkeypatch, caplog):
     assert any("aws_api_error_final" in rec.message for rec in caplog.records)
 
 
+def test_handle_final_error_conditional_check_failed_is_non_critical():
+    # ConditionalCheckFailedException is the expected contention signal for
+    # atomic claim/lease primitives (idempotency store, Tier-2 scheduler
+    # leases, retry store, storage put_if_not_exists) and must not log/alarm
+    # as a real error.
+    err = ClientError(
+        {"Error": {"Code": "ConditionalCheckFailedException", "Message": "The conditional request failed"}},
+        "PutItem",
+    )
+
+    with structlog.testing.capture_logs() as cap_logs:
+        resp = client_next._handle_final_error(err, "dynamodb_put_item")
+
+    assert resp.is_success is False
+    assert resp.error_code == "ConditionalCheckFailedException"
+    events = [entry["event"] for entry in cap_logs]
+    assert "aws_api_non_critical_error" in events
+    assert "aws_api_error_final" not in events
+
+
+def test_handle_final_error_dynamodb_put_item_other_errors_stay_critical():
+    # Non-conditional-check errors on put_item must still log/alarm as errors.
+    err = ClientError(
+        {"Error": {"Code": "ValidationException", "Message": "Some other failure"}},
+        "PutItem",
+    )
+
+    with structlog.testing.capture_logs() as cap_logs:
+        resp = client_next._handle_final_error(err, "dynamodb_put_item")
+
+    assert resp.is_success is False
+    events = [entry["event"] for entry in cap_logs]
+    assert "aws_api_error_final" in events
+
+
 def test_execute_aws_api_call_force_paginate_even_if_client_cant_paginate(monkeypatch):
     # Create a client that reports can_paginate False but has a paginator
     pages = [{"Items": [{"id": 10}]}, {"Items": [{"id": 11}]}]
@@ -233,9 +262,7 @@ def test_execute_aws_api_call_force_paginate_even_if_client_cant_paginate(monkey
 
     monkeypatch.setattr(client_next, "get_aws_client", fake_get_aws_client)
 
-    resp = client_next.execute_aws_api_call(
-        service_name="svc", method="list_items", keys=["Items"], force_paginate=True
-    )
+    resp = client_next.execute_aws_api_call(service_name="svc", method="list_items", keys=["Items"], force_paginate=True)
 
     assert isinstance(resp, OperationResult)
     assert resp.is_success is True
@@ -284,8 +311,6 @@ def test_default_max_retries_honored(monkeypatch):
             raise client_next.ClientError({"Error": {"Code": "Throttling"}}, "Op")
         return {"ok": True}
 
-    import time as _time
-
     def fake_sleep(s):
         sleeps.append(s)
 
@@ -297,9 +322,7 @@ def test_default_max_retries_honored(monkeypatch):
 
 
 def test_calculate_retry_delay_fallback_on_invalid_backoff(monkeypatch):
-    monkeypatch.setitem(
-        client_next.ERROR_CONFIG, "default_backoff_factor", "not-a-number"
-    )
+    monkeypatch.setitem(client_next.ERROR_CONFIG, "default_backoff_factor", "not-a-number")
     # attempt 1 => backoff fallback 0.5 * 2**1 = 1.0
     val = client_next._calculate_retry_delay(1)
     assert pytest.approx(val, rel=1e-6) == 1.0

@@ -1,20 +1,17 @@
-from integrations import opsgenie
-
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
 
+from integrations import opsgenie
 from integrations.opsgenie import OpsGenieAPIError
 
 
 @patch("integrations.opsgenie.client.api_get_request")
 @patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
 def test_get_on_call_users(api_get_request_mock):
-    api_get_request_mock.return_value = (
-        '{"data": {"onCallParticipants": [{"name": "test_user"}]}}'
-    )
+    api_get_request_mock.return_value = '{"data": {"onCallParticipants": [{"name": "test_user"}]}}'
     assert opsgenie.get_on_call_users("test_schedule") == ["test_user"]
     api_get_request_mock.assert_called_once_with(
         "https://api.opsgenie.com/v2/schedules/test_schedule/on-calls",
@@ -26,7 +23,9 @@ def test_get_on_call_users(api_get_request_mock):
 @patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
 def test_create_alert(api_post_request_mock):
     description = "test_description"
-    api_post_request_mock.return_value = '{"result": "Request will be processed", "took": 0.302, "requestId": "43a29c5c-3dbf-4fa4-9c26-f4f71023e120"}'
+    api_post_request_mock.return_value = (
+        '{"result": "Request will be processed", "took": 0.302, "requestId": "43a29c5c-3dbf-4fa4-9c26-f4f71023e120"}'
+    )
     assert opsgenie.create_alert(description) == "Request will be processed"
     api_post_request_mock.assert_called_once_with(
         "https://api.opsgenie.com/v2/alerts",
@@ -51,27 +50,23 @@ def test_create_alert_with_exception(api_post_request_mock):
 @patch("integrations.opsgenie.client.Request")
 @patch("integrations.opsgenie.client.urlopen")
 def test_api_get_request(urlopen_mock, request_mock):
-    urlopen_mock.return_value.read.return_value.decode.return_value = (
-        '{"data": {"onCallParticipants": [{"name": "test_user"}]}}'
-    )
+    urlopen_mock.return_value.read.return_value.decode.return_value = '{"data": {"onCallParticipants": [{"name": "test_user"}]}}'
     assert (
-        opsgenie.api_get_request(
-            "test_url", {"name": "GenieKey", "token": "OPSGENIE_KEY"}
-        )
+        opsgenie.api_get_request("test_url", {"name": "GenieKey", "token": "OPSGENIE_KEY"})
         == '{"data": {"onCallParticipants": [{"name": "test_user"}]}}'
     )
 
     request_mock.assert_called_once_with("test_url")
-    request_mock.return_value.add_header.assert_called_once_with(
-        "Authorization", "GenieKey OPSGENIE_KEY"
-    )
+    request_mock.return_value.add_header.assert_called_once_with("Authorization", "GenieKey OPSGENIE_KEY")
     urlopen_mock.assert_called_once_with(request_mock.return_value)
 
 
 @patch("integrations.opsgenie.client.Request")
 @patch("integrations.opsgenie.client.urlopen")
 def test_api_post_request(urlopen_mock, request_mock):
-    urlopen_mock.return_value.read.return_value.decode.return_value = '{"result": "Request will be processed", "took": 0.302, "requestId": "43a29c5c-3dbf-4fa4-9c26-f4f71023e120"}'
+    urlopen_mock.return_value.read.return_value.decode.return_value = (
+        '{"result": "Request will be processed", "took": 0.302, "requestId": "43a29c5c-3dbf-4fa4-9c26-f4f71023e120"}'
+    )
     assert (
         opsgenie.api_post_request(
             "test_url",
@@ -118,7 +113,7 @@ def _timeline_response(rotations):
 
 def _iso(dt: datetime) -> str:
     """Render an aware UTC datetime in OpsGenie's response format."""
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _window_around_now(
@@ -126,7 +121,7 @@ def _window_around_now(
     before: timedelta = timedelta(minutes=30),
     after: timedelta = timedelta(minutes=30),
 ) -> tuple[str, str]:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return _iso(now - before), _iso(now + after)
 
 
@@ -188,9 +183,7 @@ def test_get_on_call_user_for_rotation_returns_none_when_rotation_absent(
 def test_get_on_call_user_for_rotation_returns_none_when_no_user_period(
     api_get_request_mock,
 ):
-    api_get_request_mock.return_value = _timeline_response(
-        [{"name": "PSO_rotation", "periods": []}]
-    )
+    api_get_request_mock.return_value = _timeline_response([{"name": "PSO_rotation", "periods": []}])
 
     assert opsgenie.get_on_call_user_for_rotation("sched-1", "PSO_rotation") is None
 
@@ -226,8 +219,8 @@ def test_get_on_call_user_for_rotation_returns_none_when_first_period_in_future(
     api_get_request_mock,
 ):
     """A first period starting after 'now' signals a coverage gap."""
-    future_start = _iso(datetime.now(timezone.utc) + timedelta(hours=6))
-    future_end = _iso(datetime.now(timezone.utc) + timedelta(hours=12))
+    future_start = _iso(datetime.now(UTC) + timedelta(hours=6))
+    future_end = _iso(datetime.now(UTC) + timedelta(hours=12))
     api_get_request_mock.return_value = _timeline_response(
         [
             {

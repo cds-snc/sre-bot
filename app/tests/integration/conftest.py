@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
+
 from server.server import handler
 
 

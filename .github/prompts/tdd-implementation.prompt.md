@@ -1,26 +1,14 @@
 ---
 name: tdd-implementation
-description: Implement approved design from existing failing tests with minimal code and quality gate verification.
+description: Implement approved design from existing failing tests with minimal code and quality-gate verification; supports backlog task ids as input.
 agent: implementation
 model: Auto (copilot)
 ---
 
-Implement the approved architecture using this workflow:
+Implement the approved work following the agent's full workflow and output contract.
 
-1. Restate acceptance criteria.
-2. Review existing failing tests as the implementation contract.
-3. Implement minimal code to pass tests.
-4. Refactor safely.
-5. Run quality gates and report outcomes.
+Invocation notes:
 
-Quality gates:
-- mypy
-- flake8
-- black --check .
-- pytest app/tests --ignore=app/tests/smoke
-
-Constraints:
-- Keep business logic in app/packages.
-- Avoid new business logic in app/infrastructure.
-- Do not rewrite tests unless architecture changed or tests are incorrect.
-- Respect type boundary rules and settings partitioning.
+- If the input is a backlog task id (for example `TASK-1`), read the task and its approved plan first (`backlog task view <id> --plain`); a task without an approved plan goes back to `/plan-task`.
+- Existing failing tests are the contract; implement the minimal code to satisfy them, then refactor safely.
+- Run the quality gates per the `python-quality-gates` skill before completion.

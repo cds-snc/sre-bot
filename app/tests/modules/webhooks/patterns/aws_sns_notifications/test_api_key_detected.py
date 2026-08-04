@@ -1,5 +1,6 @@
 import os
 from unittest.mock import MagicMock, patch
+
 from modules.webhooks.patterns.aws_sns_notification import api_key_detected
 
 
@@ -25,9 +26,7 @@ def test_api_key_detected_handler_success(revoke_api_key_mock):
     revoke_api_key_mock.return_value = "revoked"
     payload = mock_api_key_detected()
     blocks = api_key_detected.handle_api_key_detected(payload, client)
-    assert any(
-        "successfully revoked" in b["text"]["text"] for b in blocks if "text" in b
-    )
+    assert any("successfully revoked" in b["text"]["text"] for b in blocks if "text" in b)
 
 
 @patch("integrations.notify.revoke_api_key")
@@ -45,9 +44,7 @@ def test_api_key_detected_handler_failure(revoke_api_key_mock):
     revoke_api_key_mock.return_value = "error"
     payload = mock_api_key_detected()
     blocks = api_key_detected.handle_api_key_detected(payload, client)
-    assert any(
-        "could not be revoked" in b["text"]["text"] for b in blocks if "text" in b
-    )
+    assert any("could not be revoked" in b["text"]["text"] for b in blocks if "text" in b)
 
 
 def test_api_key_detected_matcher():
@@ -56,9 +53,7 @@ def test_api_key_detected_matcher():
     assert api_key_detected.is_api_key_detected(payload, None)
 
 
-@patch(
-    "modules.webhooks.patterns.aws_sns_notification.api_key_detected.send_message_to_notify_channel"
-)
+@patch("modules.webhooks.patterns.aws_sns_notification.api_key_detected.send_message_to_notify_channel")
 @patch("integrations.notify.revoke_api_key")
 def test_api_key_detected_handler_sends_message(mock_revoke, mock_send):
     client = MagicMock()

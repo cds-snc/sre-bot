@@ -22,7 +22,7 @@ class AccessGroupNaming:
         """
         return f"{self.dir_prefix}{self.dir_separator}{platform}{self.dir_separator}"
 
-    def authn_group_slug(self, platform: str, authn_token: str = "authn") -> str:
+    def authn_group_slug(self, platform: str, authn_token: str = "authn") -> str:  # noqa: S107 -- default group-slug token, not a credential
         """Return the authn lifecycle group slug for a platform.
 
         Example: ``sg-aws-authn``.

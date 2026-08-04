@@ -1,4 +1,5 @@
-from typing import Any, Iterable, List
+from collections.abc import Iterable
+from typing import Any
 
 
 class FakePaginator:
@@ -13,7 +14,7 @@ class FakePaginator:
 class FakeClient:
     def __init__(
         self,
-        paginated_pages: List[dict] | None = None,
+        paginated_pages: list[dict] | None = None,
         api_responses: dict | None = None,
         can_paginate: Any = None,
     ):

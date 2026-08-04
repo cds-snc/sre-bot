@@ -4,14 +4,14 @@ Provides a class-based interface to the i18n system for easier DI and testing.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
+
+import structlog
 
 from infrastructure.i18n.loader import YAMLTranslationLoader
 from infrastructure.i18n.models import Locale, TranslationKey
 from infrastructure.i18n.translator import Translator
 from infrastructure.operations import OperationResult, OperationStatus
-
-import structlog
 
 
 class TranslationService:
@@ -52,7 +52,7 @@ class TranslationService:
             raise RuntimeError(f"i18n initialization failed: {result.error}")
     """
 
-    def __init__(self, translator: Optional[Translator] = None):
+    def __init__(self, translator: Translator | None = None):
         """Initialize translation service side-effect safe.
 
         Args:
@@ -61,9 +61,7 @@ class TranslationService:
         self._translator = translator
         self._is_initialized = False
 
-    def initialize(
-        self, resources: List[Any], strict: bool = True
-    ) -> OperationResult[None]:
+    def initialize(self, resources: list[Any], strict: bool = True) -> OperationResult[None]:
         """Initialize translation service with registered resources.
 
         Must be called during startup before translating messages.
@@ -77,12 +75,10 @@ class TranslationService:
             OperationResult.error() if any required resource failed to load.
         """
         logger = structlog.get_logger()
-        log = logger.bind(
-            resource_count=len(resources), strict=strict, phase="i18n_init"
-        )
+        log = logger.bind(resource_count=len(resources), strict=strict, phase="i18n_init")
         log.info("i18n_initialization_started")
 
-        paths_to_load: List[Path] = []
+        paths_to_load: list[Path] = []
         for resource in resources:
             # Extract path from I18nResourceSpec
             if hasattr(resource, "path"):
@@ -107,23 +103,17 @@ class TranslationService:
         try:
             for path in paths_to_load:
                 try:
-                    path_loader = YAMLTranslationLoader(
-                        translations_dir=path, use_cache=False
-                    )
+                    path_loader = YAMLTranslationLoader(translations_dir=path, use_cache=False)
                     new_catalogs = path_loader.load_all()
                     for locale, catalog in new_catalogs.items():
                         if locale in self._translator.catalogs:
                             # Merge namespaces into the existing catalog
                             for namespace, messages in catalog.messages.items():
-                                self._translator.catalogs[locale].messages.setdefault(
-                                    namespace, {}
-                                ).update(messages)
+                                self._translator.catalogs[locale].messages.setdefault(namespace, {}).update(messages)
                         else:
                             self._translator.catalogs[locale] = catalog
                 except (FileNotFoundError, ValueError) as path_error:
-                    logger.bind(path=str(path), error=str(path_error)).warning(
-                        "i18n_path_load_skipped"
-                    )
+                    logger.bind(path=str(path), error=str(path_error)).warning("i18n_path_load_skipped")
 
             self._is_initialized = True
 
@@ -178,7 +168,7 @@ class TranslationService:
         self,
         key: TranslationKey,
         locale: Locale,
-        variables: Optional[Dict[str, Any]] = None,
+        variables: dict[str, Any] | None = None,
     ) -> str:
         """Retrieve and interpolate a translated message.
 

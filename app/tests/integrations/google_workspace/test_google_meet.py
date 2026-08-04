@@ -1,6 +1,7 @@
 """Test google_meet.py functions."""
 
 from unittest.mock import patch
+
 from integrations.google_workspace import google_meet
 
 
@@ -21,13 +22,8 @@ def test_create_google_meet_without_title(date_time_mock):
 
 def test_create_google_meet_with_title_too_long():
     """Test create_google_meet with a title that is too long."""
-    title = (
-        "Testing-title-that-is-much-too-long-for-google-meet-and"
-        "-it-should-be-truncated"
-    )
-    expected = (
-        "https://g.co/meet/Testing-title-that-is-much-too-long-for-google-meet-and-it-s"
-    )
+    title = "Testing-title-that-is-much-too-long-for-google-meet-and-it-should-be-truncated"
+    expected = "https://g.co/meet/Testing-title-that-is-much-too-long-for-google-meet-and-it-s"
     assert google_meet.create_google_meet(title) == expected
 
 
@@ -40,14 +36,8 @@ def test_create_google_meet_with_title_with_spaces():
 
 def test_create_google_meet_with_title_too_long_and_spaces():
     """Test create_google_meet with a title that is too long and has spaces."""
-    title = (
-        "Testing title that is much too long for google"
-        " meet and it should be truncated"
-    )
-    expected = (
-        "https://g.co/meet/Testing-title-that-is-much-too-"
-        "long-for-google-meet-and-it-s"
-    )
+    title = "Testing title that is much too long for google meet and it should be truncated"
+    expected = "https://g.co/meet/Testing-title-that-is-much-too-long-for-google-meet-and-it-s"
     assert google_meet.create_google_meet(title) == expected
     assert len(google_meet.create_google_meet(title)) == 78
 
@@ -62,13 +52,7 @@ def test_create_google_meet_with_title_special_characters():
 def test_create_google_meet_with_title_too_long_and_special_characters():
     """Test create_google_meet with a title that is too long
     and has special characters."""
-    title = (
-        "Testing title that is much too long for google"
-        " meet and it should be truncated !@#$%^&*()"
-    )
-    expected = (
-        "https://g.co/meet/Testing-title-that-is-much-too-"
-        "long-for-google-meet-and-it-s"
-    )
+    title = "Testing title that is much too long for google meet and it should be truncated !@#$%^&*()"
+    expected = "https://g.co/meet/Testing-title-that-is-much-too-long-for-google-meet-and-it-s"
     assert google_meet.create_google_meet(title) == expected
     assert len(google_meet.create_google_meet(title)) == 78

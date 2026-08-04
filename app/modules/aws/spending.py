@@ -2,20 +2,22 @@
 
 from datetime import datetime
 
-import structlog
 import pandas as pd
+import structlog
 from pandas.core.frame import DataFrame
 
-from integrations.aws import organizations, cost_explorer
+from infrastructure.configuration.integrations.google import (
+    get_google_resources_config,
+)
+from integrations.aws import cost_explorer, organizations
 from integrations.google_workspace import sheets
-from infrastructure.configuration import get_settings
 
 logger = structlog.get_logger()
 
 
 def _get_spending_sheet_id():
-    settings = get_settings()
-    return settings.google_resources.spending_sheet_id
+    google_resources = get_google_resources_config()
+    return google_resources.spending_sheet_id
 
 
 SPENDING_SHEET_ID = _get_spending_sheet_id()
@@ -42,9 +44,7 @@ def generate_spending_data():
     year, month = datetime.now().strftime("%Y"), datetime.now().strftime("%m")
     log = logger.bind(year=year, month=month)
     log.info("generating_aws_spending_data")
-    account_ids = list(
-        map(lambda account: account["Id"], organizations.list_organization_accounts())
-    )
+    account_ids = [account["Id"] for account in organizations.list_organization_accounts()]
     log.info("aws_accounts_listed", count=len(account_ids))
     accounts = get_accounts_details(account_ids)
     accounts_df = pd.DataFrame(accounts)
@@ -122,7 +122,7 @@ def format_account_details(account):
 
 
 def spending_to_df(spending: list):
-    """Converts the spending data to a pandas DataFrame with flattened structure"""
+    """Converts the spending data to a pandas DataFrame with flattened structure."""
     log = logger.bind()
     if not spending:
         log.warning("spending_to_df", error="No spending data provided")

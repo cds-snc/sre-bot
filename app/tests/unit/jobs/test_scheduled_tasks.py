@@ -4,13 +4,18 @@ Tests the scheduling logic, error handling, and task integration without
 executing the actual scheduled work.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
+from infrastructure.idempotency import IdempotencySettings, InMemoryIdempotencyStore
 from jobs.scheduled_tasks import (
     _ScheduleBackgroundJobRegistry,
+    _tier2,
+    init,
+    reconcile_access_sync,
     safe_run,
     scheduler_heartbeat,
-    reconcile_access_sync,
 )
 
 
@@ -90,9 +95,7 @@ class TestSchedulerHeartbeat:
     @pytest.mark.unit
     @patch("jobs.scheduled_tasks.time")
     @patch("jobs.scheduled_tasks.logger")
-    def test_scheduler_heartbeat_logs_current_time(
-        self, mock_logger, mock_time
-    ) -> None:
+    def test_scheduler_heartbeat_logs_current_time(self, mock_logger, mock_time) -> None:
         """Test that scheduler_heartbeat logs the current time."""
         mock_time.ctime.return_value = "Thu Feb  6 10:30:00 2026"
 
@@ -121,9 +124,7 @@ class TestReconcileAccessSync:
     @patch("jobs.scheduled_tasks.get_access_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
-    def test_reconcile_syncs_each_registered_platform(
-        self, mock_logger, mock_get_coordinator, mock_get_runtime_config
-    ) -> None:
+    def test_reconcile_syncs_each_registered_platform(self, mock_logger, mock_get_coordinator, mock_get_runtime_config) -> None:
         """reconcile_access_sync calls sync_platform once per platform in config."""
         mock_coordinator = MagicMock()
         mock_get_coordinator.return_value = mock_coordinator
@@ -134,19 +135,14 @@ class TestReconcileAccessSync:
         reconcile_access_sync()
 
         assert mock_coordinator.sync_platform.call_count == 2
-        called_platforms = {
-            call.kwargs["platform"]
-            for call in mock_coordinator.sync_platform.call_args_list
-        }
+        called_platforms = {call.kwargs["platform"] for call in mock_coordinator.sync_platform.call_args_list}
         assert called_platforms == {"aws", "fake"}
 
     @pytest.mark.unit
     @patch("jobs.scheduled_tasks.get_access_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
-    def test_reconcile_runs_with_dry_run_false(
-        self, mock_logger, mock_get_coordinator, mock_get_runtime_config
-    ) -> None:
+    def test_reconcile_runs_with_dry_run_false(self, mock_logger, mock_get_coordinator, mock_get_runtime_config) -> None:
         """reconcile_access_sync always executes with dry_run=False."""
         mock_coordinator = MagicMock()
         mock_get_coordinator.return_value = mock_coordinator
@@ -156,17 +152,13 @@ class TestReconcileAccessSync:
 
         reconcile_access_sync()
 
-        mock_coordinator.sync_platform.assert_called_once_with(
-            platform="aws", dry_run=False
-        )
+        mock_coordinator.sync_platform.assert_called_once_with(platform="aws", dry_run=False)
 
     @pytest.mark.unit
     @patch("jobs.scheduled_tasks.get_access_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
-    def test_reconcile_no_platforms_does_nothing(
-        self, mock_logger, mock_get_coordinator, mock_get_runtime_config
-    ) -> None:
+    def test_reconcile_no_platforms_does_nothing(self, mock_logger, mock_get_coordinator, mock_get_runtime_config) -> None:
         """reconcile_access_sync with an empty platforms map calls sync_platform zero times."""
         mock_coordinator = MagicMock()
         mock_get_coordinator.return_value = mock_coordinator
@@ -182,9 +174,7 @@ class TestReconcileAccessSync:
     @patch("jobs.scheduled_tasks.get_access_runtime_config")
     @patch("jobs.scheduled_tasks.get_access_sync_coordinator")
     @patch("jobs.scheduled_tasks.logger")
-    def test_reconcile_logs_started(
-        self, mock_logger, mock_get_coordinator, mock_get_runtime_config
-    ) -> None:
+    def test_reconcile_logs_started(self, mock_logger, mock_get_coordinator, mock_get_runtime_config) -> None:
         """reconcile_access_sync emits a start log entry."""
         mock_get_coordinator.return_value = MagicMock()
         mock_runtime_config = MagicMock()
@@ -193,9 +183,7 @@ class TestReconcileAccessSync:
 
         reconcile_access_sync()
 
-        mock_logger.info.assert_called_once_with(
-            "reconcile_access_sync_started", module="scheduled_tasks"
-        )
+        mock_logger.info.assert_called_once_with("reconcile_access_sync_started", module="scheduled_tasks")
 
 
 class TestScheduleBackgroundJobRegistry:
@@ -221,9 +209,7 @@ class TestScheduleBackgroundJobRegistry:
         registry = _ScheduleBackgroundJobRegistry()
         job = MagicMock()
 
-        registry.register_interval(
-            job_name="minute_job", every=timedelta(minutes=5), job=job
-        )
+        registry.register_interval(job_name="minute_job", every=timedelta(minutes=5), job=job)
 
         mock_schedule_lib.every.assert_called_once_with(300)
         mock_schedule_lib.every.return_value.seconds.do.assert_called_once()
@@ -236,9 +222,140 @@ class TestScheduleBackgroundJobRegistry:
         registry = _ScheduleBackgroundJobRegistry()
         job = MagicMock()
 
-        registry.register_interval(
-            job_name="hourly_job", every=timedelta(hours=2), job=job
-        )
+        registry.register_interval(job_name="hourly_job", every=timedelta(hours=2), job=job)
 
         mock_schedule_lib.every.assert_called_once_with(7200)
         mock_schedule_lib.every.return_value.seconds.do.assert_called_once()
+
+
+class TestTier2Wrapper:
+    """Tests for the Tier-2 job lease wrapper."""
+
+    @pytest.mark.unit
+    @patch("jobs.scheduled_tasks.get_lease_store")
+    def test_tier2_wrapper_executes_job_on_first_call(self, mock_get_lease_store) -> None:
+        """_tier2(...)() executes the wrapped job on the first invocation."""
+        # Provide a real in-memory store via the mock
+        settings = IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
+        real_store = InMemoryIdempotencyStore(idempotency_settings=settings)
+        mock_get_lease_store.return_value = real_store
+
+        job = MagicMock()
+        wrapped_job = _tier2("scheduler:test_job", job)
+
+        wrapped_job()
+
+        job.assert_called_once()
+
+    @pytest.mark.unit
+    @patch("jobs.scheduled_tasks.get_lease_store")
+    def test_tier2_wrapper_skips_job_when_lease_already_held(self, mock_get_lease_store) -> None:
+        """_tier2(...)() skips execution when another runner already holds the lease."""
+        settings = IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
+        real_store = InMemoryIdempotencyStore(idempotency_settings=settings)
+        mock_get_lease_store.return_value = real_store
+
+        # Simulate another replica already holding the lease.
+        assert real_store.claim("scheduler:test_job").result.name == "NEW"
+
+        job = MagicMock()
+        wrapped_job = _tier2("scheduler:test_job", job)
+
+        # The wrapped call should skip because lease is already held.
+        wrapped_job()
+        job.assert_not_called()
+
+    @pytest.mark.unit
+    @patch("jobs.scheduled_tasks.get_lease_store")
+    def test_tier2_wrapper_retries_after_lease_expires(self, mock_get_lease_store) -> None:
+        """_tier2(...)() re-executes the job after the lease expires."""
+        # Build a store with zero TTL so the lease expires immediately
+        settings = IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=0)
+        real_store = InMemoryIdempotencyStore(idempotency_settings=settings)
+        mock_get_lease_store.return_value = real_store
+
+        job = MagicMock()
+        wrapped_job = _tier2("scheduler:test_job", job)
+
+        # First call: job executes
+        wrapped_job()
+        assert job.call_count == 1
+
+        # Second call: lease has expired, job should re-execute
+        wrapped_job()
+        assert job.call_count == 2
+
+
+class TestInitJobRegistration:
+    """Tests for the scheduler init() job registration."""
+
+    @pytest.mark.unit
+    @patch("jobs.scheduled_tasks._tier2")
+    @patch("jobs.scheduled_tasks.get_plugin_manager")
+    @patch("jobs.scheduled_tasks.schedule.every")
+    @patch("jobs.scheduled_tasks.get_scheduler_settings")
+    def test_init_registers_tier1_jobs_without_lease(
+        self, mock_get_settings, mock_schedule_every, mock_get_pm, mock_tier2
+    ) -> None:
+        """init() registers Tier-1 jobs (scheduler_heartbeat, integration_healthchecks) without lease wrapping."""
+        # Single shared default Tier-2 lease TTL (no per-job aggregator).
+        mock_settings = MagicMock()
+        mock_settings.DEFAULT_TIER2_LEASE_TTL_SECONDS = 1800
+        mock_get_settings.return_value = mock_settings
+
+        # Mock plugin manager
+        mock_pm = MagicMock()
+        mock_get_pm.return_value = mock_pm
+
+        # Mock schedule builder
+        mock_schedule = MagicMock()
+        mock_schedule_every.return_value = mock_schedule
+
+        # Mock bot
+        mock_bot = MagicMock()
+
+        init(mock_bot)
+
+        # Only the 3 Tier-2 jobs go through the lease wrapper; the 2 Tier-1 jobs
+        # (scheduler_heartbeat, integration_healthchecks) must be scheduled directly.
+        assert mock_tier2.call_count == 3
+        mock_pm.hook.register_background_jobs.assert_called_once()
+
+    @pytest.mark.unit
+    @patch("jobs.scheduled_tasks.get_plugin_manager")
+    @patch("jobs.scheduled_tasks.schedule.every")
+    @patch("jobs.scheduled_tasks.get_scheduler_settings")
+    @patch("jobs.scheduled_tasks._tier2")
+    def test_init_registers_tier2_jobs_with_lease(self, mock_tier2, mock_get_settings, mock_schedule_every, mock_get_pm) -> None:
+        """init() registers Tier-2 jobs (provision_aws_identity_center, etc.) with lease wrapping via _tier2."""
+        # Single shared default Tier-2 lease TTL (no per-job aggregator).
+        mock_settings = MagicMock()
+        mock_settings.DEFAULT_TIER2_LEASE_TTL_SECONDS = 1800
+        mock_get_settings.return_value = mock_settings
+
+        # Mock plugin manager
+        mock_pm = MagicMock()
+        mock_get_pm.return_value = mock_pm
+
+        # Mock schedule builder
+        mock_schedule = MagicMock()
+        mock_schedule_every.return_value = mock_schedule
+
+        # _tier2 returns a wrapped job
+        mock_tier2.return_value = MagicMock()
+
+        # Mock bot
+        mock_bot = MagicMock()
+
+        init(mock_bot)
+
+        # Each Tier-2 job goes through _tier2 with its own lease key. The TTL is
+        # NOT passed per call: _tier2 reads the single shared default internally,
+        # so there is no per-job TTL argument.
+        called_lease_keys = {call.args[0] for call in mock_tier2.call_args_list}
+        assert called_lease_keys == {
+            "scheduler:provision_aws_identity_center",
+            "scheduler:notify_stale_incident_channels",
+            "scheduler:spending_generate_spending_data",
+        }
+        assert mock_tier2.call_count == 3

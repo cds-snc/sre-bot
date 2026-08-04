@@ -5,8 +5,8 @@ from typing import get_args, get_origin, get_type_hints
 
 import pytest
 
-from infrastructure.operations import OperationResult
 from infrastructure.events import get_event_dispatcher
+from infrastructure.operations import OperationResult
 from packages.access.common.events import SYNC_COMPLETED, SYNC_FAILED
 from packages.access.request.domain import AccessRequest, ApprovalDecision
 from packages.access.request.service import AccessRequestServicePort
@@ -55,9 +55,7 @@ def test_request_startup_warmup_registers_handlers_and_warms_runtime_config(
         provider_warm_called = True
         return object()
 
-    monkeypatch.setattr(
-        request_pkg, "get_access_runtime_config", _runtime_config, raising=False
-    )
+    monkeypatch.setattr(request_pkg, "get_access_runtime_config", _runtime_config, raising=False)
     monkeypatch.setattr(request_pkg, "get_access_request_settings", lambda: _Settings())
     monkeypatch.setattr(request_pkg, "get_access_request_service", _warm_provider)
 
@@ -112,17 +110,13 @@ def test_request_startup_warmup_registers_handlers_via_event_dispatcher(monkeypa
     monkeypatch.setattr(
         request_pkg,
         "register_event_handler",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("direct register_event_handler usage is forbidden")
-        ),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("direct register_event_handler usage is forbidden")),
         raising=False,
     )
     monkeypatch.setattr(
         request_pkg,
         "get_handlers_for_event",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            AssertionError("direct get_handlers_for_event usage is forbidden")
-        ),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("direct get_handlers_for_event usage is forbidden")),
         raising=False,
     )
 
@@ -146,15 +140,11 @@ def test_request_startup_warmup_registers_handlers_via_event_dispatcher(monkeypa
 def test_access_request_service_port_uses_parameterized_operation_result_returns():
     expected_returns = {
         "submit_request": OperationResult[AccessRequest],
-        "approve_request": OperationResult[
-            tuple[AccessRequest, list[ApprovalDecision]]
-        ],
+        "approve_request": OperationResult[tuple[AccessRequest, list[ApprovalDecision]]],
         "reject_request": OperationResult[tuple[AccessRequest, list[ApprovalDecision]]],
         "cancel_request": OperationResult[tuple[AccessRequest, list[ApprovalDecision]]],
         "retry_request": OperationResult[tuple[AccessRequest, list[ApprovalDecision]]],
-        "get_request_status": OperationResult[
-            tuple[AccessRequest, list[ApprovalDecision]]
-        ],
+        "get_request_status": OperationResult[tuple[AccessRequest, list[ApprovalDecision]]],
     }
 
     for method_name, expected in expected_returns.items():

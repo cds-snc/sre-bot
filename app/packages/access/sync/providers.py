@@ -1,9 +1,9 @@
 import functools
-from typing import Dict
 
 from infrastructure.clients.aws import get_aws_clients
 from infrastructure.directory import get_directory_provider
 from infrastructure.events import get_event_dispatcher
+from infrastructure.idempotency import IdempotencyStore, build_idempotency_store
 from infrastructure.storage import get_storage_service
 from packages.access.common.providers import get_access_runtime_config
 from packages.access.common.settings import AccessSyncSettings, get_access_settings
@@ -12,6 +12,7 @@ from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterA
 from packages.access.sync.adapters.fake_platform import FakePlatformAdapter
 from packages.access.sync.application import AccessSyncApplicationService
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
+from packages.access.sync.job_status_store import JobStatusStore
 from packages.access.sync.store import SyncRunRepository
 
 
@@ -21,10 +22,16 @@ def get_access_sync_settings() -> AccessSyncSettings:
 
 
 @functools.lru_cache(maxsize=1)
-def get_access_sync_adapters() -> Dict[str, AccessSyncAdapter]:
+def get_access_sync_lock_store() -> IdempotencyStore:
+    """Return a singleton lock store with access-sync-specific claim TTL."""
+    return build_idempotency_store(in_progress_ttl_seconds=get_access_sync_settings().lock_stale_seconds)
+
+
+@functools.lru_cache(maxsize=1)
+def get_access_sync_adapters() -> dict[str, AccessSyncAdapter]:
     """Provide a map of available platform adapters."""
     config = get_access_runtime_config()
-    adapters: Dict[str, AccessSyncAdapter] = {}
+    adapters: dict[str, AccessSyncAdapter] = {}
 
     for platform_name, policy in config.platforms.items():
         if policy.adapter_type == "aws_identity_center":
@@ -32,9 +39,7 @@ def get_access_sync_adapters() -> Dict[str, AccessSyncAdapter]:
         elif policy.adapter_type == "fake":
             adapters[platform_name] = FakePlatformAdapter()
         else:
-            raise ValueError(
-                f"unknown adapter_type '{policy.adapter_type}' for platform '{platform_name}'"
-            )
+            raise ValueError(f"unknown adapter_type '{policy.adapter_type}' for platform '{platform_name}'")
 
     return adapters
 
@@ -46,14 +51,18 @@ def get_sync_run_repository() -> SyncRunRepository:
 
 
 @functools.lru_cache(maxsize=1)
+def get_access_sync_job_status_store() -> JobStatusStore:
+    """Return the singleton JobStatusStore instance."""
+    return JobStatusStore(storage=get_storage_service())
+
+
+@functools.lru_cache(maxsize=1)
 def get_access_sync_coordinator() -> AccessSyncApplicationService:
     """Return the singleton AccessSyncApplicationService instance."""
     return AccessSyncApplicationService(
         adapters=get_access_sync_adapters(),
         config=get_access_runtime_config(),
-        membership_builder=DirectoryMembershipBuilder(
-            directory=get_directory_provider()
-        ),
+        membership_builder=DirectoryMembershipBuilder(directory=get_directory_provider()),
         repository=get_sync_run_repository(),
         dispatcher=get_event_dispatcher(),
     )

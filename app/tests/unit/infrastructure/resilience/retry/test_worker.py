@@ -1,9 +1,9 @@
 """Unit tests for retry worker."""
 
 from infrastructure.resilience.retry import (
+    InMemoryRetryStore,
     RetryResult,
     RetryWorker,
-    InMemoryRetryStore,
 )
 
 
@@ -22,9 +22,7 @@ class TestRetryWorker:
         assert stats["permanent_failures"] == 0
         assert stats["skipped"] == 0
 
-    def test_process_batch_with_successful_record(
-        self, retry_store, mock_processor, retry_record_factory
-    ):
+    def test_process_batch_with_successful_record(self, retry_store, mock_processor, retry_record_factory):
         """Test process_batch with a record that succeeds."""
         record = retry_record_factory()
         retry_store.save(record)
@@ -43,9 +41,7 @@ class TestRetryWorker:
         store_stats = retry_store.get_stats()
         assert store_stats["active_records"] == 0
 
-    def test_process_batch_with_retry_record(
-        self, retry_store, mock_processor, retry_record_factory
-    ):
+    def test_process_batch_with_retry_record(self, retry_store, mock_processor, retry_record_factory):
         """Test process_batch with a record that needs retry."""
         record = retry_record_factory()
         retry_store.save(record)
@@ -64,9 +60,7 @@ class TestRetryWorker:
         store_stats = retry_store.get_stats()
         assert store_stats["active_records"] == 1
 
-    def test_process_batch_with_permanent_failure(
-        self, retry_store, mock_processor, retry_record_factory
-    ):
+    def test_process_batch_with_permanent_failure(self, retry_store, mock_processor, retry_record_factory):
         """Test process_batch with a permanent failure."""
         record = retry_record_factory()
         retry_store.save(record)
@@ -86,9 +80,7 @@ class TestRetryWorker:
         assert store_stats["active_records"] == 0
         assert store_stats["dlq_records"] == 1
 
-    def test_process_batch_with_multiple_records(
-        self, retry_store, mock_processor, retry_record_factory
-    ):
+    def test_process_batch_with_multiple_records(self, retry_store, mock_processor, retry_record_factory):
         """Test process_batch with multiple records."""
         for i in range(5):
             record = retry_record_factory(payload={"task_id": f"task-{i}"})
@@ -103,9 +95,7 @@ class TestRetryWorker:
         assert stats["successful"] == 5
         assert len(mock_processor.processed_records) == 5
 
-    def test_process_batch_respects_batch_size(
-        self, retry_config_factory, mock_processor, retry_record_factory
-    ):
+    def test_process_batch_respects_batch_size(self, retry_config_factory, mock_processor, retry_record_factory):
         """Test process_batch respects batch_size configuration."""
         config = retry_config_factory(batch_size=3)
         store = InMemoryRetryStore(config)
@@ -123,9 +113,7 @@ class TestRetryWorker:
         # Should only process 3 (batch_size)
         assert stats["processed"] == 3
 
-    def test_process_batch_skips_already_claimed_records(
-        self, retry_store, mock_processor, retry_record_factory
-    ):
+    def test_process_batch_skips_already_claimed_records(self, retry_store, mock_processor, retry_record_factory):
         """Test process_batch doesn't fetch records claimed by other workers."""
         record = retry_record_factory()
         record_id = retry_store.save(record)
@@ -140,9 +128,7 @@ class TestRetryWorker:
         assert stats["processed"] == 0
         assert stats["skipped"] == 0  # Not in batch to skip
 
-    def test_process_batch_skips_on_claim_race_condition(
-        self, retry_config_factory, mock_processor, retry_record_factory
-    ):
+    def test_process_batch_skips_on_claim_race_condition(self, retry_config_factory, mock_processor, retry_record_factory):
         """Test worker skips record when claim fails due to race (claimed between fetch and claim)."""
 
         class RacyStore(InMemoryRetryStore):
@@ -172,9 +158,7 @@ class TestRetryWorker:
         assert stats["skipped"] == 1
         assert stats["processed"] == 0
 
-    def test_process_batch_handles_processor_exception(
-        self, retry_store, retry_record_factory
-    ):
+    def test_process_batch_handles_processor_exception(self, retry_store, retry_record_factory):
         """Test process_batch handles exceptions from processor."""
 
         class FailingProcessor:
@@ -194,9 +178,7 @@ class TestRetryWorker:
         store_stats = retry_store.get_stats()
         assert store_stats["active_records"] == 1
 
-    def test_worker_uses_custom_worker_id(
-        self, retry_store, mock_processor, retry_record_factory
-    ):
+    def test_worker_uses_custom_worker_id(self, retry_store, mock_processor, retry_record_factory):
         """Test worker uses custom worker_id for claims."""
         record = retry_record_factory()
         record_id = retry_store.save(record)
@@ -211,9 +193,7 @@ class TestRetryWorker:
         due = retry_store.fetch_due()
         assert len(due) == 0
 
-    def test_worker_uses_custom_config(
-        self, retry_config_factory, mock_processor, retry_record_factory
-    ):
+    def test_worker_uses_custom_config(self, retry_config_factory, mock_processor, retry_record_factory):
         """Test worker uses custom configuration."""
         config = retry_config_factory(
             max_attempts=3,
@@ -234,9 +214,7 @@ class TestRetryWorker:
         # Should respect batch_size
         assert stats["processed"] == 2
 
-    def test_processor_receives_correct_record(
-        self, retry_store, mock_processor, retry_record_factory
-    ):
+    def test_processor_receives_correct_record(self, retry_store, mock_processor, retry_record_factory):
         """Test that processor receives the correct record."""
         payload = {"task_id": "special-task", "data": "special data"}
         record = retry_record_factory(
@@ -255,9 +233,7 @@ class TestRetryWorker:
         assert processed.operation_type == "test.special"
         assert processed.payload == payload
 
-    def test_worker_processes_records_in_order(
-        self, retry_store, mock_processor, retry_record_factory
-    ):
+    def test_worker_processes_records_in_order(self, retry_store, mock_processor, retry_record_factory):
         """Test that worker processes records in order they were saved."""
         task_ids = []
 
@@ -274,9 +250,7 @@ class TestRetryWorker:
         processed_ids = [r.payload["task_id"] for r in mock_processor.processed_records]
         assert processed_ids == task_ids
 
-    def test_worker_increments_attempts_on_retry(
-        self, retry_store, mock_processor, retry_record_factory
-    ):
+    def test_worker_increments_attempts_on_retry(self, retry_store, mock_processor, retry_record_factory):
         """Test that worker increments attempts when retrying."""
         record = retry_record_factory()
         retry_store.save(record)

@@ -4,6 +4,7 @@ Tests ATIP command handling, modal view interactions, and channel creation
 without external dependencies.
 """
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -113,9 +114,7 @@ def make_view_submission_payload():
                 ],
                 "state": {
                     "values": {
-                        "ati_id": {
-                            "ati_id": {"type": "plain_text_input", "value": "number"}
-                        },
+                        "ati_id": {"ati_id": {"type": "plain_text_input", "value": "number"}},
                         "ati_content": {
                             "ati_content": {
                                 "type": "plain_text_input",
@@ -186,13 +185,9 @@ def make_view_submission_payload():
 # atip_command Tests
 @pytest.mark.unit
 @patch("modules.atip.atip.slack_users.get_user_locale")
-@patch("modules.atip.atip.get_settings")
-def test_should_respond_with_help_when_atip_command_empty_english(
-    mock_settings, mock_get_locale, make_command, make_client
-):
+def test_should_respond_with_help_when_atip_command_empty_english(mock_get_locale, make_command, make_client):
     """Test that empty atip command responds with English help text."""
     # Arrange
-    mock_settings.return_value.PREFIX = ""
     mock_get_locale.return_value = "en-US"
     ack = MagicMock()
     respond = MagicMock()
@@ -206,24 +201,16 @@ def test_should_respond_with_help_when_atip_command_empty_english(
     # Assert
     ack.assert_called_once()
     respond.assert_called_once()
-    call_arg = (
-        respond.call_args[1]["text"]
-        if respond.call_args[1]
-        else respond.call_args[0][0]
-    )
+    call_arg = respond.call_args[1]["text"] if respond.call_args[1] else respond.call_args[0][0]
     # Just check that help text was provided (exact text may vary due to i18n)
     assert "help" in str(call_arg).lower() or "/atip" in str(call_arg)
 
 
 @pytest.mark.unit
 @patch("modules.atip.atip.slack_users.get_user_locale")
-@patch("modules.atip.atip.get_settings")
-def test_should_respond_with_help_when_atip_command_empty_french(
-    mock_settings, mock_get_locale, make_command, make_client
-):
+def test_should_respond_with_help_when_atip_command_empty_french(mock_get_locale, make_command, make_client):
     """Test that empty atip command responds with French help text for French users."""
     # Arrange
-    mock_settings.return_value.PREFIX = ""
     mock_get_locale.return_value = "fr-FR"
     ack = MagicMock()
     respond = MagicMock()
@@ -241,14 +228,10 @@ def test_should_respond_with_help_when_atip_command_empty_french(
 
 @pytest.mark.unit
 @patch("modules.atip.atip.slack_users.get_user_locale")
-@patch("modules.atip.atip.get_settings")
 @pytest.mark.parametrize("action,locale", [("help", "en-US"), ("aide", "fr-FR")])
-def test_should_respond_with_help_when_action_is_help(
-    mock_settings, mock_get_locale, action, locale, make_command, make_client
-):
+def test_should_respond_with_help_when_action_is_help(mock_get_locale, action, locale, make_command, make_client):
     """Test that 'help' and 'aide' commands respond with appropriate help text."""
     # Arrange
-    mock_settings.return_value.PREFIX = ""
     mock_get_locale.return_value = locale
     ack = MagicMock()
     respond = MagicMock()
@@ -266,17 +249,13 @@ def test_should_respond_with_help_when_action_is_help(
 
 @pytest.mark.unit
 @patch("modules.atip.atip.slack_users.get_user_locale")
-@patch("modules.atip.atip.get_settings")
 @pytest.mark.parametrize(
     "unknown_action",
     ["foo", "bar", "invalid_command"],
 )
-def test_should_respond_with_unknown_command_error(
-    mock_settings, mock_get_locale, unknown_action, make_command, make_client
-):
+def test_should_respond_with_unknown_command_error(mock_get_locale, unknown_action, make_command, make_client):
     """Test that unknown commands trigger unknown command response."""
     # Arrange
-    mock_settings.return_value.PREFIX = ""
     mock_get_locale.return_value = "en-US"
     ack = MagicMock()
     respond = MagicMock()
@@ -290,24 +269,16 @@ def test_should_respond_with_unknown_command_error(
     # Assert
     ack.assert_called_once()
     respond.assert_called_once()
-    call_arg = (
-        respond.call_args[1]["text"]
-        if respond.call_args[1]
-        else respond.call_args[0][0]
-    )
+    call_arg = respond.call_args[1]["text"] if respond.call_args[1] else respond.call_args[0][0]
     assert "unknown" in str(call_arg).lower() or unknown_action in str(call_arg)
 
 
 @pytest.mark.unit
 @patch("modules.atip.atip.request_start_modal")
 @patch("modules.atip.atip.slack_users.get_user_locale")
-@patch("modules.atip.atip.get_settings")
-def test_should_open_modal_when_start_command_given(
-    mock_settings, mock_get_locale, mock_request_start, make_command, make_client
-):
+def test_should_open_modal_when_start_command_given(mock_get_locale, mock_request_start, make_command, make_client):
     """Test that 'start' command opens the ATIP modal."""
     # Arrange
-    mock_settings.return_value.PREFIX = ""
     mock_get_locale.return_value = "en-US"
     ack = MagicMock()
     respond = MagicMock()
@@ -326,13 +297,9 @@ def test_should_open_modal_when_start_command_given(
 @pytest.mark.unit
 @patch("modules.atip.atip.request_start_modal")
 @patch("modules.atip.atip.slack_users.get_user_locale")
-@patch("modules.atip.atip.get_settings")
-def test_should_open_modal_when_lancer_command_given(
-    mock_settings, mock_get_locale, mock_request_start, make_command, make_client
-):
+def test_should_open_modal_when_lancer_command_given(mock_get_locale, mock_request_start, make_command, make_client):
     """Test that 'lancer' command opens the ATIP modal in French."""
     # Arrange
-    mock_settings.return_value.PREFIX = ""
     mock_get_locale.return_value = "fr-FR"
     ack = MagicMock()
     respond = MagicMock()
@@ -409,19 +376,14 @@ def test_should_update_view_with_new_locale(mock_atip_modal_view, make_body):
 
 # atip_view_handler Tests
 @pytest.mark.unit
-@patch("modules.atip.atip.get_settings")
 def test_should_return_error_when_no_search_width_selected_english(
-    mock_settings, make_view_submission_payload
+    make_view_submission_payload,
 ):
     """Test that view submission fails when no search width is selected."""
     # Arrange
-    mock_settings.return_value.ATIP_ANNOUNCE_CHANNEL = "C033L7RGCT0"
-    mock_settings.return_value.PREFIX = ""
     ack = MagicMock()
     body = make_view_submission_payload(locale="en-US")
-    body["view"]["state"]["values"]["ati_search_width"]["ati_search_width"][
-        "selected_options"
-    ] = []
+    body["view"]["state"]["values"]["ati_search_width"]["ati_search_width"]["selected_options"] = []
     say = MagicMock()
     client = MagicMock()
 
@@ -436,23 +398,14 @@ def test_should_return_error_when_no_search_width_selected_english(
 
 
 @pytest.mark.unit
-@patch("modules.atip.atip.get_settings")
 def test_should_return_error_when_no_search_width_selected_french(
-    mock_settings, make_view_submission_payload
+    make_view_submission_payload,
 ):
     """Test that view submission fails with French error message when no search width selected."""
     # Arrange
-    settings_mock = MagicMock()
-    settings_mock.ATIP_ANNOUNCE_CHANNEL = "C033L7RGCT0"
-    settings_mock.atip.ATIP_ANNOUNCE_CHANNEL = "C033L7RGCT0"
-    settings_mock.PREFIX = ""
-    mock_settings.return_value = settings_mock
-
     ack = MagicMock()
     body = make_view_submission_payload(locale="fr-FR")
-    body["view"]["state"]["values"]["ati_search_width"]["ati_search_width"][
-        "selected_options"
-    ] = []
+    body["view"]["state"]["values"]["ati_search_width"]["ati_search_width"]["selected_options"] = []
     say = MagicMock()
     client = MagicMock()
 
@@ -468,24 +421,14 @@ def test_should_return_error_when_no_search_width_selected_french(
 
 @pytest.mark.unit
 @patch("integrations.trello.add_atip_card_to_trello")
-@patch("modules.atip.atip.get_settings")
-def test_should_successfully_create_atip_channel(
-    mock_settings, mock_trello, make_view_submission_payload
-):
+def test_should_successfully_create_atip_channel(mock_trello, make_view_submission_payload):
     """Test successful ATIP channel creation and notifications."""
     # Arrange
-    settings_mock = MagicMock()
-    settings_mock.atip.ATIP_ANNOUNCE_CHANNEL = "C033L7RGCT0"
-    settings_mock.PREFIX = ""
-    mock_settings.return_value = settings_mock
-
     ack = MagicMock()
     body = make_view_submission_payload(locale="en-US")
     say = MagicMock()
     client = MagicMock()
-    client.conversations_create.return_value = {
-        "channel": {"id": "C123", "name": "tmp-atip-number"}
-    }
+    client.conversations_create.return_value = {"channel": {"id": "C123", "name": "tmp-atip-number"}}
 
     # Act
     atip.atip_view_handler(ack, body, say, client)
@@ -498,6 +441,46 @@ def test_should_successfully_create_atip_channel(
     client.conversations_create.assert_called_once()
     client.conversations_setTopic.assert_called_once()
     assert say.call_count >= 2  # At least two say calls (announcement and channel)
+    assert mock_trello.call_count == 1
+
+
+@pytest.mark.unit
+@patch("integrations.trello.add_atip_card_to_trello")
+@pytest.mark.parametrize(
+    "environment,legacy_prefix,expected_channel_name",
+    [
+        ("production", "dev-", "tmp-atip-number"),
+        ("dev", "", "dev--tmp-atip-number"),
+    ],
+    ids=[
+        "production-channel-name-is-unprefixed",
+        "dev-channel-name-uses-dev-prefix",
+    ],
+)
+def test_should_derive_channel_name_prefix_from_environment(
+    mock_trello,
+    make_view_submission_payload,
+    monkeypatch,
+    environment,
+    legacy_prefix,
+    expected_channel_name,
+):
+    """Channel names should depend on ENVIRONMENT instead of legacy PREFIX."""
+    monkeypatch.setattr(
+        atip,
+        "get_app_settings",
+        lambda: SimpleNamespace(ENVIRONMENT=environment, PREFIX=legacy_prefix),
+    )
+
+    ack = MagicMock()
+    body = make_view_submission_payload(locale="en-US")
+    say = MagicMock()
+    client = MagicMock()
+    client.conversations_create.return_value = {"channel": {"id": "C123", "name": expected_channel_name}}
+
+    atip.atip_view_handler(ack, body, say, client)
+
+    client.conversations_create.assert_called_once_with(name=expected_channel_name)
     assert mock_trello.call_count == 1
 
 
@@ -517,11 +500,9 @@ def test_should_acknowledge_width_action():
 
 # request_start_modal Tests
 @pytest.mark.unit
-@patch("modules.atip.atip.get_settings")
-def test_should_open_modal_view(mock_settings):
+def test_should_open_modal_view():
     """Test that request_start_modal opens a Slack modal."""
     # Arrange
-    mock_settings.return_value.PREFIX = ""
     client = MagicMock()
     body = {
         "trigger_id": "trigger_id",
@@ -539,11 +520,9 @@ def test_should_open_modal_view(mock_settings):
 
 
 @pytest.mark.unit
-@patch("modules.atip.atip.get_settings")
-def test_should_pass_ati_id_to_modal_view(mock_settings):
+def test_should_pass_ati_id_to_modal_view():
     """Test that ATI ID is passed through request_start_modal."""
     # Arrange
-    mock_settings.return_value.PREFIX = ""
     client = MagicMock()
     body = {
         "trigger_id": "trigger_id",

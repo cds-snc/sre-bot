@@ -9,10 +9,8 @@ import i18n  # type: ignore
 import requests  # type: ignore
 from structlog import get_logger
 
-from infrastructure.configuration.app import get_app_settings
+from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.slack import users as slack_users
-
-PREFIX = get_app_settings().PREFIX
 
 i18n.load_path.append("./locales/")
 i18n.set("locale", "en-US")
@@ -22,7 +20,8 @@ logger = get_logger()
 
 
 def register(bot):
-    bot.command(f"/{PREFIX}secret")(secret_command)
+    transport_settings = get_slack_transport_settings()
+    bot.command(f"/{transport_settings.COMMAND_PREFIX}secret")(secret_command)
     bot.action("secret_change_locale")(handle_change_locale_button)
     bot.view("secret_view")(secret_view_handler)
 
@@ -41,10 +40,7 @@ def secret_command(client, ack, command, body):
     log.info(
         "secret_command_received",
     )
-    if "user" in body:
-        user_id = body["user"]["id"]
-    else:
-        user_id = body["user_id"]
+    user_id = body["user"]["id"] if "user" in body else body["user_id"]
     locale = slack_users.get_user_locale(client, user_id)
     i18n.set("locale", locale)
     view = generate_secret_command_modal_view(command, user_id, locale)
@@ -61,9 +57,7 @@ def secret_view_handler(ack, client, view):
     # Encrypted message API
     endpoint = "https://encrypted-message.cdssandbox.xyz/encrypt"
     json = {"body": secret, "ttl": int(ttl) + int(time.time())}
-    response = requests.post(
-        endpoint, json=json, timeout=10, headers={"Content-Type": "application/json"}
-    )
+    response = requests.post(endpoint, json=json, timeout=10, headers={"Content-Type": "application/json"})
 
     try:
         id = response.json()["id"]
@@ -89,21 +83,11 @@ def secret_view_handler(ack, client, view):
 
 def handle_change_locale_button(ack, client, body):
     ack()
-    if "user" in body:
-        user_id = body["user"]["id"]
-    else:
-        user_id = body["user_id"]
+    user_id = body["user"]["id"] if "user" in body else body["user_id"]
     locale = body["actions"][0]["value"]
-    if locale == "en-US":
-        locale = "fr-FR"
-    else:
-        locale = "en-US"
+    locale = "fr-FR" if locale == "en-US" else "en-US"
     i18n.set("locale", locale)
-    command = {
-        "text": body["view"]["state"]["values"]["secret_input"]["secret_submission"][
-            "value"
-        ]
-    }
+    command = {"text": body["view"]["state"]["values"]["secret_input"]["secret_submission"]["value"]}
     if command["text"] is None:
         command["text"] = ""
     view = generate_secret_command_modal_view(command, user_id, locale)

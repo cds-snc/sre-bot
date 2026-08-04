@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple, Type, cast
+from typing import Any, cast
 
 from fastapi import Request
 from pydantic import BaseModel
@@ -19,7 +19,7 @@ from utils.models import select_best_model
 logger = get_logger()
 
 
-def _get_bot_client(request: Request) -> Optional[WebClient]:
+def _get_bot_client(request: Request) -> WebClient | None:
     bot = getattr(request.app.state, "bot", None)
     if bot is None:
         return None
@@ -28,8 +28,8 @@ def _get_bot_client(request: Request) -> Optional[WebClient]:
 
 def validate_payload(
     payload_dict: dict,
-    priorities: Optional[Dict[Type[BaseModel], int]] = None,
-) -> Optional[Tuple[Type[BaseModel], Any]]:
+    priorities: dict[type[BaseModel], int] | None = None,
+) -> tuple[type[BaseModel], Any] | None:
     """
     Wrapper around select_best_model to validate incoming webhook payloads.
 
@@ -40,7 +40,7 @@ def validate_payload(
     Returns:
         Optional[BaseModel]: The validated payload as a Pydantic model, or None if validation fails.
     """
-    models: List[Type[BaseModel]] = [
+    models: list[type[BaseModel]] = [
         WebhookPayload,
         AwsSnsPayload,
         AccessRequest,
@@ -76,32 +76,31 @@ def handle_webhook_payload(
     logger.debug("processing_webhook_payload", payload=payload_dict)
     payload_validation_result = validate_payload(payload_dict)
 
-    webhook_result = WebhookResult(
-        status="error", message="Failed to process payload for unknown reasons"
-    )
+    webhook_result = WebhookResult(status="error", message="Failed to process payload for unknown reasons")
     if payload_validation_result is not None:
         payload_type, validated_payload = payload_validation_result
     else:
         error_message = "No matching model found for payload"
-        return WebhookResult(status="error", message=error_message)
+        return WebhookResult(
+            status="error",
+            message=error_message,
+            matched_payload_type=None,
+        )
 
     match payload_type.__name__:
         case "WebhookPayload":
-            webhook_result = WebhookResult(
-                status="success", action="post", payload=validated_payload
-            )
+            webhook_result = WebhookResult(status="success", action="post", payload=validated_payload)
         case "AwsSnsPayload":
             aws_sns_payload_instance = cast(AwsSnsPayload, validated_payload)
             bot_client = _get_bot_client(request)
             if bot_client is None:
-                return WebhookResult(
+                webhook_result = WebhookResult(
                     status="error",
                     action="none",
                     message="Slack bot not initialized",
                 )
-            webhook_result = process_aws_sns_payload(
-                aws_sns_payload_instance, bot_client
-            )
+            else:
+                webhook_result = process_aws_sns_payload(aws_sns_payload_instance, bot_client)
 
         case "AccessRequest":
             message = str(cast(AccessRequest, validated_payload).model_dump())
@@ -120,5 +119,7 @@ def handle_webhook_payload(
                 status="error",
                 message="No matching model found for payload",
             )
+
+    webhook_result.matched_payload_type = payload_type.__name__
 
     return webhook_result

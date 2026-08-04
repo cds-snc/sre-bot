@@ -1,0 +1,30 @@
+# SDK typing anti-pattern baseline — only ratchets down (see decisions/sdk-typing.md).
+# Files listed here contain execute_aws_api_call / execute_google_api_call string-dispatch
+# or __doc__-based parameter discovery. Each migration to the typed SDK handle shape
+# (TASK-22.x / TASK-25.x) removes the entry. Removing a file from this list is always safe.
+# Do NOT add new entries; net-new occurrences fail CI.
+integrations/aws/client.py
+integrations/aws/client_next.py
+integrations/aws/config.py
+integrations/aws/cost_explorer.py
+integrations/aws/dynamodb.py
+integrations/aws/dynamodb_next.py
+integrations/aws/guard_duty.py
+integrations/aws/identity_store.py
+integrations/aws/identity_store_next.py
+integrations/aws/lambdas.py
+integrations/aws/organizations.py
+integrations/aws/security_hub.py
+integrations/aws/sqs.py
+integrations/aws/sso_admin.py
+integrations/google_workspace/gmail.py
+integrations/google_workspace/gmail_next.py
+integrations/google_workspace/google_calendar.py
+integrations/google_workspace/google_directory.py
+integrations/google_workspace/google_directory_next.py
+integrations/google_workspace/google_docs.py
+integrations/google_workspace/google_drive.py
+integrations/google_workspace/google_service.py
+integrations/google_workspace/google_service_next.py
+integrations/google_workspace/meet.py
+integrations/google_workspace/sheets.py

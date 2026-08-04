@@ -10,8 +10,8 @@ and never produce a ``SyncOutcome``.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Dict, List, Literal, Optional, Set
+from datetime import UTC, datetime
+from typing import Literal
 
 from packages.access.sync.policies import EntitlementRule
 
@@ -35,7 +35,7 @@ class AdapterAssessment:
     """
 
     platform_user_exists: bool
-    current_entitlement_ids: Set[str] = field(default_factory=set)
+    current_entitlement_ids: set[str] = field(default_factory=set)
 
 
 @dataclass(frozen=True)
@@ -48,24 +48,24 @@ class DesiredUserState:
     """
 
     user_should_exist: bool
-    required_entitlements: List[EntitlementRule] = field(default_factory=list)
+    required_entitlements: list[EntitlementRule] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
 class DesiredPlatformState:
     """Resolved desired state for a full platform reconciliation run."""
 
-    desired_users: Set[str] = field(default_factory=set)
-    desired_members_by_entitlement: Dict[str, Set[str]] = field(default_factory=dict)
-    entitlement_slug_by_id: Dict[str, str] = field(default_factory=dict)
+    desired_users: set[str] = field(default_factory=set)
+    desired_members_by_entitlement: dict[str, set[str]] = field(default_factory=dict)
+    entitlement_slug_by_id: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class CurrentPlatformState:
     """Current platform state for a full platform reconciliation run."""
 
-    current_users: Set[str] = field(default_factory=set)
-    current_members_by_entitlement: Dict[str, Set[str]] = field(default_factory=dict)
+    current_users: set[str] = field(default_factory=set)
+    current_members_by_entitlement: dict[str, set[str]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -82,8 +82,8 @@ class SyncOutcome:
             sync still succeeded for the actions that were automatable.
     """
 
-    planned_actions: List[str] = field(default_factory=list)
-    applied_actions: List[str] = field(default_factory=list)
+    planned_actions: list[str] = field(default_factory=list)
+    applied_actions: list[str] = field(default_factory=list)
     requires_manual_action: bool = False
 
 
@@ -94,12 +94,12 @@ class SyncRunRecord:
     run_id: str
     user_email: str
     platform: str
-    actions_applied: List[str]
+    actions_applied: list[str]
     status: Literal["success", "partial", "failed", "manual_action_required"]
     dry_run: bool = False
-    request_id: Optional[str] = None
-    error_message: Optional[str] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    request_id: str | None = None
+    error_message: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass(frozen=True)
@@ -122,11 +122,9 @@ class ReconciliationOutcome:
     orphans_found: int
     requires_manual_action_count: int
     dry_run: bool = False
-    per_user: Dict[str, SyncOutcome] = field(default_factory=dict)
+    per_user: dict[str, SyncOutcome] = field(default_factory=dict)
     changed_user_count: int = 0
     unchanged_user_count: int = 0
-    action_counts: Dict[str, int] = field(default_factory=dict)
-    lifecycle_actions: Dict[str, List[str]] = field(default_factory=dict)
-    entitlements_by_action: Dict[str, Dict[str, List[str]]] = field(
-        default_factory=dict
-    )
+    action_counts: dict[str, int] = field(default_factory=dict)
+    lifecycle_actions: dict[str, list[str]] = field(default_factory=dict)
+    entitlements_by_action: dict[str, dict[str, list[str]]] = field(default_factory=dict)

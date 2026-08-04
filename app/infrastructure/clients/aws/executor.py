@@ -6,12 +6,13 @@ settings at import time and accepts configuration via parameters.
 """
 
 import time
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 import boto3  # type: ignore
+import structlog
 from botocore.client import BaseClient  # type: ignore
 from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
-import structlog
 
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
@@ -21,9 +22,9 @@ logger = structlog.get_logger()
 
 def get_boto3_client(
     service_name: str,
-    session_config: Optional[Dict[str, Any]] = None,
-    client_config: Optional[Dict[str, Any]] = None,
-    role_arn: Optional[str] = None,
+    session_config: dict[str, Any] | None = None,
+    client_config: dict[str, Any] | None = None,
+    role_arn: str | None = None,
     session_name: str = "InfraClientSession",
 ) -> BaseClient:
     """Create a boto3 client for the given service.
@@ -86,9 +87,9 @@ def _determine_pagination_strategy(
 
 
 def _aggregate_page_items(
-    page: Dict[str, Any],
-    keys: Optional[List[str]],
-) -> List[Any]:
+    page: dict[str, Any],
+    keys: list[str] | None,
+) -> list[Any]:
     """Extract and aggregate items from a paginated response page.
 
     Args:
@@ -98,7 +99,7 @@ def _aggregate_page_items(
     Returns:
         List of aggregated items from this page
     """
-    items: List[Any] = []
+    items: list[Any] = []
 
     if keys:
         # Extract only specified keys
@@ -135,9 +136,9 @@ def _aggregate_page_items(
 def _call_with_paginator(
     client: BaseClient,
     method: str,
-    keys: Optional[List[str]],
-    api_kwargs: Dict[str, Any],
-) -> Optional[List[Any]]:
+    keys: list[str] | None,
+    api_kwargs: dict[str, Any],
+) -> list[Any] | None:
     """Execute a paginated API call and aggregate results.
 
     Args:
@@ -155,7 +156,7 @@ def _call_with_paginator(
         # Paginator not available; caller should fallback to direct call
         return None
 
-    results: List[Any] = []
+    results: list[Any] = []
     for page in paginator.paginate(**api_kwargs):
         page_items = _aggregate_page_items(page, keys)
         results.extend(page_items)
@@ -166,12 +167,12 @@ def _call_with_paginator(
 def _call_api_once(
     service_name: str,
     method: str,
-    keys: Optional[List[str]],
-    role_arn: Optional[str],
-    session_config: Optional[Dict[str, Any]],
-    client_config: Optional[Dict[str, Any]],
+    keys: list[str] | None,
+    role_arn: str | None,
+    session_config: dict[str, Any] | None,
+    client_config: dict[str, Any] | None,
     force_paginate: bool,
-    kwargs: Dict[str, Any],
+    kwargs: dict[str, Any],
 ) -> Any:
     """Execute a single AWS API call with optional pagination.
 
@@ -214,7 +215,7 @@ def _map_client_error(
     service_name: str,
     method: str,
     treat_conflict_as_success: bool,
-    conflict_callback: Optional[Callable[[Exception], None]],
+    conflict_callback: Callable[[Exception], None] | None,
 ) -> OperationResult:
     error_code = e.response.get("Error", {}).get("Code")
     error_message = e.response.get("Error", {}).get("Message", str(e))
@@ -240,9 +241,7 @@ def _map_client_error(
         if treat_conflict_as_success:
             return OperationResult.success(data=None, message=error_message)
 
-        return OperationResult.permanent_error(
-            message=error_message, error_code=error_code
-        )
+        return OperationResult.permanent_error(message=error_message, error_code=error_code)
 
     if error_code in ("ThrottlingException", "RequestLimitExceeded"):
         retry_after = None
@@ -250,14 +249,10 @@ def _map_client_error(
             retry_after = int(e.response.get("RetryAfter", 0))
         except Exception:
             retry_after = None
-        return OperationResult.transient_error(
-            message=error_message, error_code=error_code, retry_after=retry_after
-        )
+        return OperationResult.transient_error(message=error_message, error_code=error_code, retry_after=retry_after)
 
     if error_code in ("AccessDeniedException", "UnauthorizedOperation"):
-        return OperationResult.error(
-            OperationStatus.UNAUTHORIZED, message=error_message
-        )
+        return OperationResult.error(OperationStatus.UNAUTHORIZED, message=error_message)
 
     return OperationResult.permanent_error(message=error_message, error_code=error_code)
 
@@ -265,15 +260,15 @@ def _map_client_error(
 def execute_aws_api_call(
     service_name: str,
     method: str,
-    keys: Optional[List[str]] = None,
-    role_arn: Optional[str] = None,
-    session_config: Optional[Dict[str, Any]] = None,
-    client_config: Optional[Dict[str, Any]] = None,
+    keys: list[str] | None = None,
+    role_arn: str | None = None,
+    session_config: dict[str, Any] | None = None,
+    client_config: dict[str, Any] | None = None,
     max_retries: int = 3,
     force_paginate: bool = False,
     backoff_factor: float = 0.5,
     treat_conflict_as_success: bool = False,
-    conflict_callback: Optional[Callable[[Exception], None]] = None,
+    conflict_callback: Callable[[Exception], None] | None = None,
     **kwargs,
 ) -> OperationResult:
     """Execute an AWS API call with retries and standardized results.
@@ -282,7 +277,7 @@ def execute_aws_api_call(
     `OperationResult` object for consistent downstream handling.
     """
 
-    last_exc: Optional[Exception] = None
+    last_exc: Exception | None = None
 
     for attempt in range(max_retries + 1):
         try:
@@ -296,25 +291,18 @@ def execute_aws_api_call(
                 force_paginate,
                 kwargs,
             )
-            return OperationResult.success(
-                data=result, message=f"{service_name}.{method} succeeded"
-            )
+            return OperationResult.success(data=result, message=f"{service_name}.{method} succeeded")
 
         except ClientError as e:
             last_exc = e
-            mapped = _map_client_error(
-                e, service_name, method, treat_conflict_as_success, conflict_callback
-            )
+            mapped = _map_client_error(e, service_name, method, treat_conflict_as_success, conflict_callback)
 
             # If conflict was treated as success, return success result immediately
             if mapped.is_success:
                 return mapped
 
             # Retry on transient errors if attempts remain
-            if (
-                mapped.status == OperationStatus.TRANSIENT_ERROR
-                and attempt < max_retries
-            ):
+            if mapped.status == OperationStatus.TRANSIENT_ERROR and attempt < max_retries:
                 delay = _calculate_retry_delay(attempt, backoff_factor)
                 logger.warning(
                     "aws_api_retry",
@@ -327,9 +315,7 @@ def execute_aws_api_call(
                 time.sleep(delay)
                 continue
 
-            logger.error(
-                "aws_api_error_final", service=service_name, method=method, error=str(e)
-            )
+            logger.error("aws_api_error_final", service=service_name, method=method, error=str(e))
             return mapped
 
         except (BotoCoreError, Exception) as e:  # pylint: disable=broad-except
@@ -342,6 +328,4 @@ def execute_aws_api_call(
             )
             return OperationResult.permanent_error(message=str(e))
 
-    return OperationResult.permanent_error(
-        message=str(last_exc) if last_exc else "unknown_error"
-    )
+    return OperationResult.permanent_error(message=str(last_exc) if last_exc else "unknown_error")

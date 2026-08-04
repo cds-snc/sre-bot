@@ -1,20 +1,28 @@
 import sys
 import threading
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, AsyncIterator, Optional, cast
+from typing import cast
 
 from fastapi import FastAPI
 from pluggy import PluginManager
 from slack_bolt import App
 from structlog.stdlib import BoundLogger
 
-from infrastructure.configuration import get_settings
+from infrastructure.configuration.app import AppSettings, get_app_settings
+from infrastructure.configuration.features.sre_ops import (
+    SreOpsSettings,
+    get_sre_ops_settings,
+)
+from infrastructure.configuration.infrastructure.directory import (
+    DirectorySettings,
+    get_directory_settings,
+)
 from infrastructure.configuration.infrastructure.server import (
     ServerSettings,
     get_server_settings,
 )
-from infrastructure.configuration.features.sre_ops import get_sre_ops_settings
 from infrastructure.directory import get_directory_provider
 from infrastructure.i18n import (
     I18nResourceRegistry,
@@ -22,6 +30,7 @@ from infrastructure.i18n import (
     TranslationService,
     get_translation_service,
 )
+from infrastructure.logging.settings import LoggingSettings, get_logging_settings
 from infrastructure.logging.setup import configure_logging
 from infrastructure.plugins import (
     auto_discover_plugins,
@@ -42,27 +51,41 @@ from modules import (
     webhook_helper,
 )
 
-if TYPE_CHECKING:
-    from infrastructure.configuration import Settings
-
 
 def _is_test_environment() -> bool:
     """Detect if running in a test environment."""
     return "pytest" in sys.modules
 
 
-def _get_logger(settings: "Settings") -> BoundLogger:
-    return configure_logging(settings=settings)
+def _get_logger_from_app(
+    app_settings: AppSettings,
+    logging_settings: LoggingSettings | None = None,
+) -> BoundLogger:
+    resolved_logging_settings = logging_settings or get_logging_settings()
+    return configure_logging(
+        settings=app_settings,
+        logging_settings=resolved_logging_settings,
+    )
 
 
-def _list_configs(settings: "Settings", logger: BoundLogger) -> None:
-    config_settings: dict[str, list[object]] = {"settings": []}
+def _list_configs_from_sections(
+    app_settings: AppSettings,
+    server_settings: ServerSettings,
+    directory_settings: DirectorySettings,
+    sre_ops_settings: SreOpsSettings,
+    logger: BoundLogger,
+) -> None:
+    config_settings: dict[str, tuple[object, ...]] = {
+        "settings": (
+            {"LOG_LEVEL": app_settings.LOG_LEVEL},
+            {"GIT_SHA": app_settings.GIT_SHA},
+        )
+    }
 
-    for key, value in settings.model_dump().items():
-        if isinstance(value, dict):
-            config_settings[key] = list(value.keys())
-        else:
-            config_settings["settings"].append({key: value})
+    config_settings["app"] = tuple(app_settings.model_dump().keys())
+    config_settings["server"] = tuple(server_settings.model_dump().keys())
+    config_settings["directory"] = tuple(directory_settings.model_dump().keys())
+    config_settings["sre_ops"] = tuple(sre_ops_settings.model_dump().keys())
 
     logger.info("configuration_initialized", base_settings=config_settings["settings"])
     for key, value in config_settings.items():
@@ -84,20 +107,22 @@ def _register_legacy_handlers(bot: App, logger: BoundLogger) -> None:
 
 def _start_scheduled_tasks(
     bot: App,
-    settings: "Settings",
+    app_settings: AppSettings,
     logger: BoundLogger,
-) -> Optional[threading.Event]:
-    if settings.PREFIX != "":
-        logger.info("scheduled_tasks_skipped", reason="prefix_not_empty")
+) -> threading.Event | None:
+    # This gate suppresses side-effecting jobs outside production; Tier-2 leases
+    # are the duplicate-prevention mechanism across production replicas.
+    if app_settings.ENVIRONMENT != "production":
+        logger.info("scheduled_tasks_skipped", reason="environment_is_not_production")
         return None
 
     scheduled_tasks.init(bot)
-    stop_event = cast(Optional[threading.Event], scheduled_tasks.run_continuously())
+    stop_event = cast(threading.Event | None, scheduled_tasks.run_continuously())
     logger.info("scheduled_tasks_started")
     return stop_event
 
 
-def _stop_scheduled_tasks(stop_event: Optional[threading.Event]) -> None:
+def _stop_scheduled_tasks(stop_event: threading.Event | None) -> None:
     if stop_event is None:
         return
     stop_event.set()
@@ -105,7 +130,7 @@ def _stop_scheduled_tasks(stop_event: Optional[threading.Event]) -> None:
 
 def _initialize_security_services(
     app: FastAPI,
-    settings: "ServerSettings",
+    settings: ServerSettings,
     logger: BoundLogger,
 ) -> None:
     """Pre-initialize JWT/JWKS security infrastructure at startup.
@@ -134,7 +159,7 @@ def _initialize_security_services(
 
 def _initialize_directory_provider(
     app: FastAPI,
-    settings: "Settings",
+    directory_settings: DirectorySettings,
     logger: BoundLogger,
 ) -> None:
     """Build, warm up, and store the directory provider on app.state."""
@@ -143,7 +168,7 @@ def _initialize_directory_provider(
 
     directory_provider = get_directory_provider()
 
-    if settings.directory.require_startup_warmup:
+    if directory_settings.require_startup_warmup:
         warmup = directory_provider.warmup()
         if not warmup.is_success:
             log.error("directory_provider_initialization_failed", error=warmup.message)
@@ -155,9 +180,7 @@ def _initialize_directory_provider(
     log.info("directory_provider_initialization_completed")
 
 
-def _initialize_translation_service(
-    pm: PluginManager, logger: BoundLogger
-) -> TranslationService:
+def _initialize_translation_service(pm: PluginManager, logger: BoundLogger) -> TranslationService:
     """"""
     # Phase 1: Discover feature plugins and collect i18n resource registrations.
     log = logger.bind(phase="i18n_resource_collection")
@@ -167,9 +190,7 @@ def _initialize_translation_service(
 
     i18n_registry = I18nResourceRegistry()
     pm.hook.register_i18n_resources(registry=i18n_registry)
-    logger.info(
-        "i18n_resources_collected", resource_count=i18n_registry.get_resource_count()
-    )
+    logger.info("i18n_resources_collected", resource_count=i18n_registry.get_resource_count())
 
     # Phase 2: Initialize translation service with all registered resources.
     log = logger.bind(phase="i18n_initialization")
@@ -207,19 +228,27 @@ def _initialize_translation_service(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    settings = get_settings()
+    app_settings = get_app_settings()
     server_settings = get_server_settings()
+    directory_settings = get_directory_settings()
     sre_ops_settings = get_sre_ops_settings()
-    logger = _get_logger(settings)
+    logging_settings = get_logging_settings()
+    logger = _get_logger_from_app(app_settings, logging_settings)
 
-    app.state.settings = settings
+    app.state.settings = app_settings
     app.state.logger = logger
 
     logger.info("application_startup")
-    _list_configs(settings, logger)
+    _list_configs_from_sections(
+        app_settings,
+        server_settings,
+        directory_settings,
+        sre_ops_settings,
+        logger,
+    )
 
     _initialize_security_services(app, server_settings, logger)
-    _initialize_directory_provider(app, settings, logger)
+    _initialize_directory_provider(app, directory_settings, logger)
 
     app.state.slack_provider = get_slack_provider()
 
@@ -257,10 +286,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 channel=server_settings.SRE_TEST_CHANNEL_ID,
                 text="SRE Bot has started up in test mode.",
             )
-        if not _is_test_environment():
-            scheduled_stop_event = _start_scheduled_tasks(slack_app, settings, logger)
-        else:
-            scheduled_stop_event = None
+        scheduled_stop_event = (
+            _start_scheduled_tasks(
+                slack_app,
+                app_settings,
+                logger,
+            )
+            if not _is_test_environment()
+            else None
+        )
 
     else:
         logger.warning("slack_provider_app_unavailable", reason="initialization_failed")

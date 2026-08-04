@@ -83,6 +83,7 @@ ipython_config.py
 
 # pyenv
 .python-version
+!app/.python-version
 
 # pipenv
 #   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
@@ -223,6 +224,9 @@ geodb
 
 
 credentials.json
+
+# Ruff lint cache (stale cache causes local lint to silently pass while CI fails)
+.ruff_cache/
 
 # Local scratch and temporary working notes
 tmp/

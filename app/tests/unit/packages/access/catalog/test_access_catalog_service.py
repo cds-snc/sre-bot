@@ -2,7 +2,6 @@
 
 import json
 from dataclasses import dataclass, field
-from typing import Dict, Optional
 
 from infrastructure.directory.models import DirectoryGroup, MembershipCheckResult
 from infrastructure.operations import OperationResult, OperationStatus
@@ -11,10 +10,11 @@ from packages.access.catalog.domain import ParsedEntitlementToken
 from packages.access.catalog.service import CatalogService
 from packages.access.common.config import (
     AccessRuntimeConfig as AccessSyncRuntimeConfig,
+)
+from packages.access.common.config import (
     InlineJsonConfigLoader,
     PlatformPolicy,
 )
-
 
 # ---------------------------------------------------------------------------
 # Stub helpers
@@ -25,8 +25,8 @@ from packages.access.common.config import (
 class _FakeDirectory:
     """Stub that lets each test declare its own IDP responses."""
 
-    groups_by_prefix: Dict[str, OperationResult] = field(default_factory=dict)
-    memberships: Dict[str, OperationResult] = field(default_factory=dict)
+    groups_by_prefix: dict[str, OperationResult] = field(default_factory=dict)
+    memberships: dict[str, OperationResult] = field(default_factory=dict)
 
     def list_groups(self, query: str) -> OperationResult:
         return self.groups_by_prefix.get(
@@ -53,15 +53,13 @@ class _AlwaysParsedParser:
     """Stub that returns a fixed ParsedEntitlementToken with parsed=True."""
 
     def parse(self, token: str) -> ParsedEntitlementToken:
-        return ParsedEntitlementToken(
-            raw=token, product=token, role="role", parsed=True
-        )
+        return ParsedEntitlementToken(raw=token, product=token, role="role", parsed=True)
 
 
 def make_runtime_config(
     platform: str = "aws",
     authn_token: str = "authn",
-    mode_overrides: Optional[Dict] = None,
+    mode_overrides: dict | None = None,
     dir_prefix: str = "sg",
     dir_separator: str = "-",
 ) -> AccessSyncRuntimeConfig:
@@ -171,9 +169,7 @@ def test_list_platforms_should_use_display_name_from_runtime_extensions_via_prov
                 "mode_overrides": {},
             }
         },
-        "extensions": {
-            "catalog": {"platform_display_names": {"aws": "Amazon Web Services"}}
-        },
+        "extensions": {"catalog": {"platform_display_names": {"aws": "Amazon Web Services"}}},
     }
     result = InlineJsonConfigLoader().load(json.dumps(payload))
     assert result.is_success
@@ -245,9 +241,7 @@ def test_list_entitlements_should_return_not_found_for_unknown_platform():
 
 def test_list_entitlements_should_normalize_platform_key_to_lowercase():
     # Arrange
-    directory = _FakeDirectory(
-        groups_by_prefix={"sg-aws-": OperationResult.success(data=[])}
-    )
+    directory = _FakeDirectory(groups_by_prefix={"sg-aws-": OperationResult.success(data=[])})
     service = make_service(directory=directory)
 
     # Act — mixed case
@@ -379,11 +373,7 @@ def test_list_entitlements_should_set_membership_to_none_when_check_fails():
     groups = [make_group(slug="sg-aws-admin", email="sg-aws-admin@example.com")]
     directory = _FakeDirectory(
         groups_by_prefix={"sg-aws-": OperationResult.success(data=groups)},
-        memberships={
-            "sg-aws-admin@example.com": OperationResult.error(
-                OperationStatus.PERMANENT_ERROR, message="IDP hiccup"
-            )
-        },
+        memberships={"sg-aws-admin@example.com": OperationResult.error(OperationStatus.PERMANENT_ERROR, message="IDP hiccup")},
     )
     service = make_service(directory=directory)
 

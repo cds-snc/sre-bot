@@ -2,7 +2,7 @@ from slack_sdk.errors import SlackApiError
 from structlog import get_logger
 
 from infrastructure.configuration.features.sre_ops import get_sre_ops_settings
-from integrations.slack.client import SlackClientManager
+from integrations.slack.bootstrap import LegacySlackBootstrap
 
 logger = get_logger()
 
@@ -17,7 +17,8 @@ def log_ops_message(message: str):
     """
     log = logger.bind(ops_message=message)
     ops_channel_id = get_sre_ops_settings().SRE_OPS_CHANNEL_ID
-    client = SlackClientManager.get_client()
+    app = LegacySlackBootstrap().create_app()
+    client = app.client
     if not client:
         log.error(
             "slack_client_not_initialized",

@@ -46,9 +46,7 @@ class AccessConfigSettings(BaseModel):
     def _validate_source(cls, value: object) -> object:
         allowed = {"bundle", "inline_json", "file_json", "env"}
         if isinstance(value, str) and value not in allowed:
-            raise ValueError(
-                "ACCESS_CONFIG_SOURCE must be one of: bundle, inline_json, file_json, env"
-            )
+            raise ValueError("ACCESS_CONFIG_SOURCE must be one of: bundle, inline_json, file_json, env")
         return value
 
 

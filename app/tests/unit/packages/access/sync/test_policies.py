@@ -4,6 +4,8 @@ import pytest
 
 from packages.access.common.config import (
     AccessRuntimeConfig as AccessSyncRuntimeConfig,
+)
+from packages.access.common.config import (
     PlatformPolicy,
 )
 from packages.access.sync.policies import (
@@ -14,7 +16,6 @@ from packages.access.sync.policies import (
     PolicyEngine,
     resolve_effective_policy,
 )
-
 
 # ---------------------------------------------------------------------------
 # Local helpers (policies-specific)
@@ -237,9 +238,7 @@ def test_plan_actions_user_should_exist_with_entitlements():
     )
 
     assert any(a.action == "provision_user" for a in actions)
-    assert any(
-        a.action == "apply_entitlement" and a.entitlement_id == "admin" for a in actions
-    )
+    assert any(a.action == "apply_entitlement" and a.entitlement_id == "admin" for a in actions)
 
 
 @pytest.mark.unit
@@ -325,10 +324,7 @@ def test_plan_actions_removes_stale_entitlements():
         current_entitlement_ids={"admin"},
         platform_user_exists=True,
     )
-    assert any(
-        a.action == "remove_entitlement" and a.entitlement_id == "admin"
-        for a in actions
-    )
+    assert any(a.action == "remove_entitlement" and a.entitlement_id == "admin" for a in actions)
 
 
 @pytest.mark.unit
@@ -370,7 +366,5 @@ def test_plan_actions_entitlement_only_removal_mode_no_lifecycle():
         user_should_exist=False,
         required_entitlements=[],
     )
-    lifecycle = [
-        a.action for a in actions if a.action in {"disable_user", "remove_user"}
-    ]
+    lifecycle = [a.action for a in actions if a.action in {"disable_user", "remove_user"}]
     assert lifecycle == []

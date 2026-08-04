@@ -1,5 +1,4 @@
 import re
-from typing import Dict, List, Union
 
 from slack_sdk import WebClient
 
@@ -7,7 +6,7 @@ from models.webhooks import AwsSnsPayload
 from modules.webhooks.aws_sns_notification import AwsNotificationPattern
 
 
-def handle_budget_notification(payload: AwsSnsPayload, client: WebClient) -> List[Dict]:
+def handle_budget_notification(payload: AwsSnsPayload, client: WebClient) -> list[dict]:
     """
     Handle AWS Budget notifications from AWS SNS.
 
@@ -48,9 +47,7 @@ def handle_budget_notification(payload: AwsSnsPayload, client: WebClient) -> Lis
     return blocks
 
 
-def is_budget_notification(
-    payload: AwsSnsPayload, parsed_message: Union[str, dict]
-) -> bool:
+def is_budget_notification(payload: AwsSnsPayload, parsed_message: str | dict) -> bool:
     """
     Check if the AWS SNS message is a budget notification.
 

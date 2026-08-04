@@ -5,7 +5,7 @@ Concrete implementations can vary by backing store (DynamoDB, CloudWatch Logs, e
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from infrastructure.audit.models import AuditEvent
 
@@ -33,10 +33,10 @@ class AuditTrailService(Protocol):
     def get_audit_trail(
         self,
         resource_id: str,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get audit trail for a resource.
 
         Args:
@@ -53,10 +53,10 @@ class AuditTrailService(Protocol):
     def get_user_audit_trail(
         self,
         user_email: str,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get audit trail for a user via GSI (user_email-timestamp-index).
 
         Args:
@@ -73,7 +73,7 @@ class AuditTrailService(Protocol):
     def get_by_correlation_id(
         self,
         correlation_id: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Lookup one audit event by correlation ID via GSI (correlation_id-index).
 
         Args:

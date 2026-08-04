@@ -1,11 +1,13 @@
 """AWS GuardDuty integration module."""
 
 import structlog
-from core.config import settings
+
+from infrastructure.configuration.integrations.aws import get_aws_settings
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 
 logger = structlog.get_logger()
-LOGGING_ROLE_ARN = settings.aws.LOGGING_ROLE_ARN
+settings = get_aws_settings()
+LOGGING_ROLE_ARN = settings.LOGGING_ROLE_ARN
 
 
 @handle_aws_api_errors
@@ -60,9 +62,7 @@ def get_findings_statistics(detector_id, finding_criteria=None):
         **params,
     )
 
-    has_findings = bool(
-        response.get("FindingStatistics", {}).get("CountBySeverity", {})
-    )
+    has_findings = bool(response.get("FindingStatistics", {}).get("CountBySeverity", {}))
     log.debug(
         "guard_duty_get_findings_statistics_completed",
         has_findings=has_findings,

@@ -4,8 +4,6 @@ Provides deterministic responses for a non-AWS platform to validate
 orchestration paths without external API dependencies.
 """
 
-from typing import Dict, List, Set
-
 import structlog
 
 from infrastructure.operations import OperationResult, OperationStatus
@@ -32,13 +30,13 @@ class FakePlatformAdapter:
     """In-memory fake platform adapter with sample users and group memberships."""
 
     def __init__(self) -> None:
-        self._users: Set[str] = {
+        self._users: set[str] = {
             "alice@example.com",
             "bob@example.com",
             "carol@example.com",
         }
-        self._disabled: Set[str] = set()
-        self._members_by_group: Dict[str, Set[str]] = {
+        self._disabled: set[str] = set()
+        self._members_by_group: dict[str, set[str]] = {
             "fake-group-admin": {"alice@example.com", "carol@example.com"},
             "fake-group-read": {"bob@example.com"},
         }
@@ -120,11 +118,7 @@ class FakePlatformAdapter:
                 platform_user_exists=False,
                 current_entitlement_ids=set(),
             )
-        group_ids: Set[str] = {
-            gid
-            for gid, members in self._members_by_group.items()
-            if normalized in members
-        }
+        group_ids: set[str] = {gid for gid, members in self._members_by_group.items() if normalized in members}
         return AdapterAssessment(
             platform_user_exists=True,
             current_entitlement_ids=group_ids,
@@ -133,9 +127,9 @@ class FakePlatformAdapter:
     def _execute_planned_actions(
         self,
         user_email: str,
-        planned: List[PlannedAction],
+        planned: list[PlannedAction],
     ) -> OperationResult:
-        applied: List[str] = []
+        applied: list[str] = []
         requires_manual_action = False
         for action in planned:
             if action.action == "provision_user":
@@ -152,13 +146,9 @@ class FakePlatformAdapter:
                         error_code="INVALID_PLANNED_ACTION",
                     )
                 if action.action == "apply_entitlement":
-                    result = self.apply_entitlement(
-                        user_email, action.entitlement_type, action.entitlement_id
-                    )
+                    result = self.apply_entitlement(user_email, action.entitlement_type, action.entitlement_id)
                 else:
-                    result = self.remove_entitlement(
-                        user_email, action.entitlement_type, action.entitlement_id
-                    )
+                    result = self.remove_entitlement(user_email, action.entitlement_type, action.entitlement_id)
             else:
                 return OperationResult.error(
                     OperationStatus.PERMANENT_ERROR,
@@ -170,9 +160,7 @@ class FakePlatformAdapter:
             elif result.error_code == "UNSUPPORTED_OPERATION":
                 requires_manual_action = True
             else:
-                return OperationResult.error(
-                    result.status, message=result.message, error_code=result.error_code
-                )
+                return OperationResult.error(result.status, message=result.message, error_code=result.error_code)
         return OperationResult.success(
             data=SyncOutcome(
                 planned_actions=[a.action for a in planned],
@@ -223,8 +211,7 @@ class FakePlatformAdapter:
         current_state = CurrentPlatformState(
             current_users=set(self._users),
             current_members_by_entitlement={
-                entitlement_id: set(members)
-                for entitlement_id, members in self._members_by_group.items()
+                entitlement_id: set(members) for entitlement_id, members in self._members_by_group.items()
             },
         )
         plan = planner.plan_platform_actions(
@@ -234,12 +221,10 @@ class FakePlatformAdapter:
             current_members_by_entitlement=current_state.current_members_by_entitlement,
             authn_removal_mode=context.authn_removal_mode,
         )
-        actions_by_user: Dict[str, List[PlannedAction]] = {}
+        actions_by_user: dict[str, list[PlannedAction]] = {}
 
         for email in sorted(plan.users_to_provision):
-            actions_by_user.setdefault(email, []).append(
-                PlannedAction(action="provision_user")
-            )
+            actions_by_user.setdefault(email, []).append(PlannedAction(action="provision_user"))
         for entitlement_id, members in sorted(plan.entitlement_adds_by_id.items()):
             for email in sorted(members):
                 actions_by_user.setdefault(email, []).append(
@@ -259,18 +244,14 @@ class FakePlatformAdapter:
                     )
                 )
         for email in sorted(plan.users_to_disable):
-            actions_by_user.setdefault(email, []).append(
-                PlannedAction(action="disable_user")
-            )
+            actions_by_user.setdefault(email, []).append(PlannedAction(action="disable_user"))
         for email in sorted(plan.users_to_remove):
-            actions_by_user.setdefault(email, []).append(
-                PlannedAction(action="remove_user")
-            )
+            actions_by_user.setdefault(email, []).append(PlannedAction(action="remove_user"))
 
         users_synced = len(desired_state.desired_users | current_state.current_users)
         users_converged = 0
         requires_manual_action_count = 0
-        per_user: Dict[str, SyncOutcome] = {}
+        per_user: dict[str, SyncOutcome] = {}
         for email in sorted(actions_by_user):
             planned = actions_by_user[email]
             if dry_run:
@@ -280,9 +261,7 @@ class FakePlatformAdapter:
                 )
             else:
                 exec_result = self._execute_planned_actions(email, planned)
-                if not exec_result.is_success or not isinstance(
-                    exec_result.data, SyncOutcome
-                ):
+                if not exec_result.is_success or not isinstance(exec_result.data, SyncOutcome):
                     return exec_result
                 outcome = exec_result.data
             per_user[email] = outcome
@@ -296,9 +275,7 @@ class FakePlatformAdapter:
                 platform=context.platform,
                 users_synced=users_synced,
                 users_converged=users_converged,
-                orphans_found=len(
-                    current_state.current_users - desired_state.desired_users
-                ),
+                orphans_found=len(current_state.current_users - desired_state.desired_users),
                 requires_manual_action_count=requires_manual_action_count,
                 dry_run=dry_run,
                 per_user=per_user,

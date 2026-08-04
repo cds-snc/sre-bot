@@ -4,6 +4,7 @@ Validates DynamoDB operations with default role fallback and service_name resolu
 """
 
 import pytest
+
 from infrastructure.clients.aws import executor as aws_client
 from infrastructure.clients.aws.dynamodb import DynamoDBClient
 from infrastructure.clients.aws.session_provider import SessionProvider
@@ -39,13 +40,9 @@ class TestDynamoDBClient:
             default_role_arn="arn:aws:iam::123456789012:role/DefaultRole",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             assert role_arn == "arn:aws:iam::123456789012:role/DefaultRole"
-            return make_fake_client(
-                api_responses={"get_item": {"Item": {"id": {"S": "123"}}}}
-            )
+            return make_fake_client(api_responses={"get_item": {"Item": {"id": {"S": "123"}}}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
@@ -53,9 +50,7 @@ class TestDynamoDBClient:
         assert result.is_success
         assert result.data == {"Item": {"id": {"S": "123"}}}
 
-    def test_get_item_explicit_role_overrides_default(
-        self, monkeypatch, make_fake_client
-    ):
+    def test_get_item_explicit_role_overrides_default(self, monkeypatch, make_fake_client):
         """Test get_item explicit role_arn overrides default."""
 
         session_provider = SessionProvider(region="us-east-1")
@@ -64,9 +59,7 @@ class TestDynamoDBClient:
             default_role_arn="arn:aws:iam::123456789012:role/DefaultRole",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             assert role_arn == "arn:aws:iam::999999999999:role/OverrideRole"
             return make_fake_client(api_responses={"get_item": {"Item": {}}})
 
@@ -85,16 +78,12 @@ class TestDynamoDBClient:
         session_provider = SessionProvider(region="us-east-1")
         client = DynamoDBClient(session_provider=session_provider)
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             return make_fake_client(api_responses={"put_item": {}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
-        result = client.put_item(
-            "my_table", {"id": {"S": "123"}, "data": {"S": "test"}}
-        )
+        result = client.put_item("my_table", {"id": {"S": "123"}, "data": {"S": "test"}})
         assert result.is_success
 
     def test_scan_with_pagination(self, monkeypatch, make_fake_client):
@@ -108,9 +97,7 @@ class TestDynamoDBClient:
             {"Items": [{"id": {"S": "2"}}], "Count": 1},
         ]
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             return make_fake_client(paginated_pages=pages)
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
@@ -124,9 +111,7 @@ class TestDynamoDBClient:
         session_provider = SessionProvider(region="us-east-1")
         client = DynamoDBClient(session_provider=session_provider)
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             return make_fake_client(api_responses={"list_tables": {"TableNames": []}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)

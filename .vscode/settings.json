@@ -1,0 +1,19 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "backlog": true
+    },
+    "python.defaultInterpreterPath": "${workspaceFolder}/app/.venv/bin/python",
+    "python-envs.defaultEnvManager": "ms-python.python:system",
+    "ruff.interpreter": [
+        "${workspaceFolder}/app/.venv/bin/python"
+    ],
+    "ruff.organizeImports": true,
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+        }
+    }
+}

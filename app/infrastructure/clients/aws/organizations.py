@@ -4,8 +4,6 @@ Provides type-safe access to AWS Organizations operations (list_accounts, descri
 with consistent error handling and OperationResult return types.
 """
 
-from typing import Optional
-
 import structlog
 
 from infrastructure.clients.aws.executor import execute_aws_api_call
@@ -28,7 +26,7 @@ class OrganizationsClient:
     def __init__(
         self,
         session_provider: SessionProvider,
-        default_role_arn: Optional[str] = None,
+        default_role_arn: str | None = None,
     ) -> None:
         self._service_name = "organizations"
         self._session_provider = session_provider
@@ -37,7 +35,7 @@ class OrganizationsClient:
 
     def list_accounts(
         self,
-        role_arn: Optional[str] = None,
+        role_arn: str | None = None,
         **kwargs,
     ) -> OperationResult:
         """List all accounts in the AWS Organization.
@@ -51,9 +49,7 @@ class OrganizationsClient:
         """
 
         effective_role = role_arn or self._default_role_arn
-        client_kwargs = self._session_provider.build_client_kwargs(
-            service_name=self._service_name, role_arn=effective_role
-        )
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=effective_role)
         self._logger.info("listing_accounts", client_kwargs=client_kwargs)
         return execute_aws_api_call(
             self._service_name,
@@ -65,7 +61,7 @@ class OrganizationsClient:
     def describe_account(
         self,
         account_id: str,
-        role_arn: Optional[str] = None,
+        role_arn: str | None = None,
         **kwargs,
     ) -> OperationResult:
         """Get details for a specific AWS account.
@@ -79,9 +75,7 @@ class OrganizationsClient:
             OperationResult with account details or error
         """
         effective_role = role_arn or self._default_role_arn
-        client_kwargs = self._session_provider.build_client_kwargs(
-            service_name=self._service_name, role_arn=effective_role
-        )
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=effective_role)
         return execute_aws_api_call(
             "organizations",
             "describe_account",
@@ -93,7 +87,7 @@ class OrganizationsClient:
     def get_account_id_by_name(
         self,
         account_name: str,
-        role_arn: Optional[str] = None,
+        role_arn: str | None = None,
         **kwargs,
     ) -> OperationResult:
         """Find an account ID by account name.
@@ -106,15 +100,11 @@ class OrganizationsClient:
         Returns:
             OperationResult with account ID or error
         """
-        log = self._logger.bind(
-            method="get_account_id_by_name", account_name=account_name
-        )
+        log = self._logger.bind(method="get_account_id_by_name", account_name=account_name)
         log.info("fetching_accounts")
 
         # List all accounts and search by name
-        result = self.list_accounts(
-            role_arn=role_arn or self._default_role_arn, **kwargs
-        )
+        result = self.list_accounts(role_arn=role_arn or self._default_role_arn, **kwargs)
         if not result.is_success:
             return result
 
@@ -133,15 +123,13 @@ class OrganizationsClient:
             error_code="ACCOUNT_NOT_FOUND",
         )
 
-    def healthcheck(self, role_arn: Optional[str] = None) -> OperationResult:
+    def healthcheck(self, role_arn: str | None = None) -> OperationResult:
         """Lightweight health check for Organizations.
 
         Calls `list_accounts` with minimal retries to validate access to Organizations API.
         """
         effective_role = role_arn or self._default_role_arn
-        client_kwargs = self._session_provider.build_client_kwargs(
-            service_name=self._service_name, role_arn=effective_role
-        )
+        client_kwargs = self._session_provider.build_client_kwargs(service_name=self._service_name, role_arn=effective_role)
         return execute_aws_api_call(
             "organizations",
             "list_accounts",

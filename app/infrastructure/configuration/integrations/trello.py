@@ -17,12 +17,12 @@ class TrelloSettings(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.integrations.trello import get_trello_settings
 
-        settings = get_settings()
+        settings = get_trello_settings()
 
-        app_key = settings.trello.TRELLO_APP_KEY
-        token = settings.trello.TRELLO_TOKEN
+        app_key = settings.TRELLO_APP_KEY
+        token = settings.TRELLO_TOKEN
         ```
     """
 

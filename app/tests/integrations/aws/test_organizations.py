@@ -1,11 +1,12 @@
 from unittest.mock import patch
+
 from integrations.aws.organizations import (
-    list_organization_accounts,
-    get_active_account_names,
-    get_account_id_by_name,
     get_account_details,
+    get_account_id_by_name,
     get_account_tags,
+    get_active_account_names,
     healthcheck,
+    list_organization_accounts,
 )
 
 # Mock the ORG_ROLE_ARN since it's used in the function

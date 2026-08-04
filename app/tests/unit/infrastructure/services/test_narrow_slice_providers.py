@@ -47,9 +47,7 @@ class TestResilienceServiceNarrowSlice:
         """ResilienceService constructs with retry_settings + injected store."""
         mock_settings = MagicMock(spec=RetrySettings)
         mock_store = MagicMock()
-        service = ResilienceService(
-            retry_settings=mock_settings, retry_store=mock_store
-        )
+        service = ResilienceService(retry_settings=mock_settings, retry_store=mock_store)
         assert service is not None
 
     def test_rejects_full_settings_kwarg(self):

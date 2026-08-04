@@ -1,7 +1,8 @@
 """Unit tests for retry models."""
 
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, timezone
 
 from infrastructure.resilience.retry.models import RetryRecord, RetryResult
 
@@ -42,7 +43,7 @@ class TestRetryRecord:
 
     def test_create_retry_record_with_all_fields(self, retry_record_factory):
         """Test creating RetryRecord with all fields."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         record = retry_record_factory(
             operation_type="test.operation",
             payload={"task_id": "123"},
@@ -104,8 +105,8 @@ class TestRetryRecord:
 
         assert record.created_at.tzinfo is not None
         assert record.updated_at.tzinfo is not None
-        assert record.created_at.tzinfo == timezone.utc
-        assert record.updated_at.tzinfo == timezone.utc
+        assert record.created_at.tzinfo == UTC
+        assert record.updated_at.tzinfo == UTC
 
     def test_retry_record_immutable_after_creation(self, retry_record_factory):
         """Test that RetryRecord fields can be modified (it's a dataclass)."""

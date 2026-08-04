@@ -7,13 +7,13 @@ import pytest
 
 from infrastructure.clients.aws import (
     AWSClients,
+    ConfigClient,
+    CostExplorerClient,
     DynamoDBClient,
+    GuardDutyClient,
     IdentityStoreClient,
     OrganizationsClient,
     SsoAdminClient,
-    ConfigClient,
-    GuardDutyClient,
-    CostExplorerClient,
 )
 
 
@@ -48,14 +48,9 @@ class TestAWSClientsFacade:
 
         clients = AWSClients(aws_settings=mock_aws_settings)
 
-        assert (
-            clients.dynamodb._default_role_arn
-            == "arn:aws:iam::123456789012:role/DynamoDBRole"
-        )
+        assert clients.dynamodb._default_role_arn == "arn:aws:iam::123456789012:role/DynamoDBRole"
 
-    def test_facade_passes_default_role_arn_to_organizations_client(
-        self, mock_aws_settings
-    ):
+    def test_facade_passes_default_role_arn_to_organizations_client(self, mock_aws_settings):
         """Test AWSClients passes correct default_role_arn to OrganizationsClient."""
         mock_aws_settings.SERVICE_ROLE_MAP = {
             "organizations": "arn:aws:iam::123456789012:role/OrganizationsRole",
@@ -63,23 +58,15 @@ class TestAWSClientsFacade:
 
         clients = AWSClients(aws_settings=mock_aws_settings)
 
-        assert (
-            clients.organizations._default_role_arn
-            == "arn:aws:iam::123456789012:role/OrganizationsRole"
-        )
+        assert clients.organizations._default_role_arn == "arn:aws:iam::123456789012:role/OrganizationsRole"
 
-    def test_facade_passes_default_sso_instance_arn_to_sso_admin(
-        self, mock_aws_settings
-    ):
+    def test_facade_passes_default_sso_instance_arn_to_sso_admin(self, mock_aws_settings):
         """Test AWSClients passes INSTANCE_ARN to SsoAdminClient."""
         mock_aws_settings.INSTANCE_ARN = "arn:aws:sso:::instance/sso-1234567890"
 
         clients = AWSClients(aws_settings=mock_aws_settings)
 
-        assert (
-            clients.sso_admin._default_sso_instance_arn
-            == "arn:aws:sso:::instance/sso-1234567890"
-        )
+        assert clients.sso_admin._default_sso_instance_arn == "arn:aws:sso:::instance/sso-1234567890"
 
     def test_facade_passes_identity_store_id_to_identity_store(self, mock_aws_settings):
         """Test AWSClients passes INSTANCE_ID to IdentityStoreClient."""
@@ -131,12 +118,8 @@ class TestAWSClientsFacade:
 
         clients = AWSClients(aws_settings=mock_aws_settings)
 
-        dynamodb_kwargs = clients._session_provider.build_client_kwargs(
-            service_name="dynamodb"
-        )
-        identitystore_kwargs = clients._session_provider.build_client_kwargs(
-            service_name="identitystore"
-        )
+        dynamodb_kwargs = clients._session_provider.build_client_kwargs(service_name="dynamodb")
+        identitystore_kwargs = clients._session_provider.build_client_kwargs(service_name="identitystore")
 
         assert clients._session_provider.endpoint_url == "https://dynamodb.example.com"
         assert dynamodb_kwargs["client_config"] == {

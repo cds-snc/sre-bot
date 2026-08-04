@@ -68,10 +68,7 @@ class FakeStorageService:
         prefix_value = expression_values.get(":prefix")
         if prefix_value is not None:
             records = [
-                item
-                for item in records
-                if isinstance(item.get("SK"), str)
-                and str(item.get("SK")).startswith(str(prefix_value))
+                item for item in records if isinstance(item.get("SK"), str) and str(item.get("SK")).startswith(str(prefix_value))
             ]
 
         scan_forward = kwargs.get("ScanIndexForward", True)

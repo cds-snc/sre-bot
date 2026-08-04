@@ -15,13 +15,9 @@ def get_webhooks(all_hooks, type):
     """Filter the webhooks based on the type (active or disabled) and format them for display"""
     # based on type, return the list of webhooks
     if type == "active":
-        hooks = [
-            webhook_list_item(hook) for hook in all_hooks if hook["active"]["BOOL"]
-        ]
+        hooks = [webhook_list_item(hook) for hook in all_hooks if hook["active"]["BOOL"]]
     elif type == "disabled":
-        hooks = [
-            webhook_list_item(hook) for hook in all_hooks if not hook["active"]["BOOL"]
-        ]
+        hooks = [webhook_list_item(hook) for hook in all_hooks if not hook["active"]["BOOL"]]
     else:
         hooks = []
     return hooks
@@ -91,9 +87,7 @@ def get_webhooks_button_block(type, hooks_list, end):
                         "type": "button",
                         "text": {
                             "type": "plain_text",
-                            "text": (
-                                "Next page" if end < len(hooks_list) else "First page"
-                            ),
+                            "text": ("Next page" if end < len(hooks_list) else "First page"),
                             "emoji": True,
                         },
                         "value": f"{end},{type}",
@@ -109,9 +103,7 @@ def get_webhooks_button_block(type, hooks_list, end):
 
 # Get and return all webhooks. Start is the index of the first webhook to show, end is the index of the last webhook to show.
 # Type is the type of webhooks to show (active, disabled, or all)
-def list_all_webhooks(
-    client, body, start, end, type, all_hooks, channel=None, update=False
-):
+def list_all_webhooks(client, body, start, end, type, all_hooks, channel=None, update=False):
     # each webhook consumes four blocks. max block size is 16. So, we need to divide the end index by 4 to get the actual number of webhooks to display
     active_hooks = get_webhooks(all_hooks, "active")
     active_hooks_list = get_webhooks_list(active_hooks)
@@ -120,9 +112,7 @@ def list_all_webhooks(
     # get the disabled webhooks and button block
     disabled_hooks = get_webhooks(all_hooks, "disabled")
     disabled_hooks_list = get_webhooks_list(disabled_hooks)
-    disabled_button_block = get_webhooks_button_block(
-        "disabled", disabled_hooks_list, end
-    )
+    disabled_button_block = get_webhooks_button_block("disabled", disabled_hooks_list, end)
 
     if body.get("view", {"private_metadata": None}).get("private_metadata"):
         private_metadata = json.loads(body["view"]["private_metadata"])
@@ -135,9 +125,7 @@ def list_all_webhooks(
             "channel_name": body.get("channel_name", None),
         }
     header_active_hooks = f"There are currently {len(active_hooks)} enabled webhooks"
-    header_disabled_hooks = (
-        f"There are currently {len(disabled_hooks)} disabled webhooks"
-    )
+    header_disabled_hooks = f"There are currently {len(disabled_hooks)} disabled webhooks"
     if channel:
         suffix = f" for channel:\n{private_metadata['channel_name']}"
         header_active_hooks += suffix
@@ -163,11 +151,7 @@ def list_all_webhooks(
             ]
             # this is used to traverse the list of webhooks for the pagination. Show the webhooks slice of array based on
             # start and end index
-            + (
-                active_hooks_list[start:end]
-                if type == "active" or type == "all"
-                else active_hooks_list[0:MAX_BLOCK_SIZE]
-            )
+            + (active_hooks_list[start:end] if type == "active" or type == "all" else active_hooks_list[0:MAX_BLOCK_SIZE])
             # display the button block
             + active_button_block
             + [
@@ -180,11 +164,7 @@ def list_all_webhooks(
                 },
                 {"type": "divider"},
             ]
-            + (
-                disabled_hooks_list[start:end]
-                if type == "disabled" or type == "all"
-                else disabled_hooks_list[0:MAX_BLOCK_SIZE]
-            )
+            + (disabled_hooks_list[start:end] if type == "disabled" or type == "all" else disabled_hooks_list[0:MAX_BLOCK_SIZE])
             + disabled_button_block
         ),
     }
@@ -199,9 +179,7 @@ def list_all_webhooks(
 
 def reveal_webhook(ack, body, client: WebClient):
     ack()
-    log = logger.bind(
-        user_name=body["user"]["username"], webhook_id=body["actions"][0]["value"]
-    )
+    log = logger.bind(user_name=body["user"]["username"], webhook_id=body["actions"][0]["value"])
     hook = webhooks.get_webhook(body["actions"][0]["value"])
     id = hook["id"]["S"]
     name = hook["name"]["S"]
@@ -259,14 +237,9 @@ def toggle_webhook(ack, body, client):
         text=message,
     )
     channel_id = private_metadata.get("channel", None)
-    if channel_id:
-        all_hooks = webhooks.lookup_webhooks("channel", channel_id)
-    else:
-        all_hooks = webhooks.list_all_webhooks()
+    all_hooks = webhooks.lookup_webhooks("channel", channel_id) if channel_id else webhooks.list_all_webhooks()
 
-    list_all_webhooks(
-        client, body, 0, MAX_BLOCK_SIZE, "all", all_hooks, channel_id, update=True
-    )
+    list_all_webhooks(client, body, 0, MAX_BLOCK_SIZE, "all", all_hooks, channel_id, update=True)
 
 
 # Function to handle pagination and displaying next pages
@@ -295,6 +268,4 @@ def next_page(ack, body, client):
             update=True,
         )
     else:
-        list_all_webhooks(
-            client, body, 0, MAX_BLOCK_SIZE, type, hooks, channel, update=True
-        )
+        list_all_webhooks(client, body, 0, MAX_BLOCK_SIZE, type, hooks, channel, update=True)

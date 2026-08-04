@@ -3,9 +3,10 @@
 from typing import TYPE_CHECKING
 
 import structlog
+
 from infrastructure.resilience.retry.config import RetryConfig
-from infrastructure.resilience.retry.store import RetryStore, InMemoryRetryStore
 from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
+from infrastructure.resilience.retry.store import InMemoryRetryStore, RetryStore
 
 if TYPE_CHECKING:
     from infrastructure.configuration.infrastructure.retry import RetrySettings
@@ -15,7 +16,7 @@ logger = structlog.get_logger()
 
 def create_retry_store(
     config: RetryConfig,
-    retry_settings: "RetrySettings | None" = None,
+    retry_settings: RetrySettings | None = None,
     backend: str | None = None,
 ) -> RetryStore:
     """Factory to create appropriate retry store based on configuration.
@@ -32,9 +33,7 @@ def create_retry_store(
     Raises:
         ValueError: If unknown backend specified
     """
-    resolved_backend = backend or (
-        retry_settings.backend if retry_settings else "memory"
-    )
+    resolved_backend = backend or (retry_settings.backend if retry_settings else "memory")
 
     if resolved_backend == "memory":
         logger.info("creating_in_memory_retry_store")
@@ -55,6 +54,4 @@ def create_retry_store(
         )
 
     else:
-        raise ValueError(
-            f"Unknown retry backend: {resolved_backend}. Supported: memory, dynamodb"
-        )
+        raise ValueError(f"Unknown retry backend: {resolved_backend}. Supported: memory, dynamodb")

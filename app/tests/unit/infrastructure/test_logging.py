@@ -8,14 +8,16 @@ Tests cover:
 - Backward compatibility with get_module_logger (deprecated)
 """
 
-import pytest
 import logging
 import sys
 from unittest.mock import patch
+
+import pytest
 import structlog
+
 from infrastructure.logging.setup import (
-    configure_logging,
     _is_test_environment,
+    configure_logging,
 )
 
 
@@ -30,23 +32,22 @@ class TestLoggingConfiguration:
 
     def test_is_test_environment_without_pytest(self):
         """_is_test_environment returns False when pytest is not loaded."""
-        with patch.dict(sys.modules, {"pytest": None}):
-            # Save original state
-            had_pytest = "pytest" in sys.modules
+        had_pytest = "pytest" in sys.modules
+        original_pytest = sys.modules.get("pytest")
+        pytest_module = pytest
 
+        with patch.dict(sys.modules, {}, clear=False):
             # Remove pytest temporarily
             if "pytest" in sys.modules:
                 del sys.modules["pytest"]
 
-            try:
-                # Now pytest should not be in sys.modules
-                result = _is_test_environment()
-                assert result is False
-            finally:
-                # Restore pytest if it was there
-                if had_pytest:
-                    # Re-import pytest since we removed it
-                    import pytest as _  # noqa: F401
+            # Now pytest should not be in sys.modules
+            result = _is_test_environment()
+            assert result is False
+
+        # Restore pytest if it was there before the test
+        if had_pytest:
+            sys.modules["pytest"] = original_pytest if original_pytest is not None else pytest_module
 
     def test_configure_logging_returns_bound_logger(self, mock_settings):
         """configure_logging returns a logger instance."""
@@ -69,15 +70,21 @@ class TestLoggingConfiguration:
         assert logger is not None
         assert hasattr(logger, "bind")
 
-    def test_configure_logging_with_custom_production_flag(self, mock_settings):
-        """configure_logging accepts custom production flag."""
-        # Note: We can't easily verify the processor setup, but we can verify
-        # it doesn't raise an error with different production flags
-        logger1 = configure_logging(settings=mock_settings, is_production=True)
-        logger2 = configure_logging(settings=mock_settings, is_production=False)
+    def test_configure_logging_uses_environment_for_production_mode(self, mock_settings):
+        """configure_logging derives production mode from ENVIRONMENT."""
+        mock_settings.ENVIRONMENT = "production"
+        logger1 = configure_logging(settings=mock_settings)
+        mock_settings.ENVIRONMENT = "local"
+        logger2 = configure_logging(settings=mock_settings)
 
         assert logger1 is not None
         assert logger2 is not None
+
+    def test_contract_configure_logging_does_not_accept_legacy_production_kwarg(self, mock_settings):
+        """Contract: legacy production override is removed from configure_logging."""
+        legacy_kwarg = "is" + "_production"
+        with pytest.raises(TypeError):
+            configure_logging(settings=mock_settings, **{legacy_kwarg: False})
 
 
 @pytest.mark.unit
@@ -103,7 +110,6 @@ class TestLoggingBestPractices:
 
     def test_structlog_get_logger_pattern(self):
         """Standard structlog.get_logger() pattern works."""
-        import structlog
 
         logger = structlog.get_logger()
         # Should return a logger instance
@@ -113,7 +119,6 @@ class TestLoggingBestPractices:
 
     def test_logger_bind_for_context(self):
         """Logger.bind() adds context for structured logging."""
-        import structlog
 
         logger = structlog.get_logger()
         bound_logger = logger.bind(user_id="123", request_id="req-abc")

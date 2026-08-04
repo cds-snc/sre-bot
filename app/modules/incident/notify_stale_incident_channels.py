@@ -1,8 +1,8 @@
+from structlog import get_logger
+
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import channels as slack_channels
 from modules.incident.incident_helper import INCIDENT_CHANNELS_PATTERN
-
-from structlog import get_logger
 
 logger = get_logger()
 
@@ -11,9 +11,7 @@ def notify_stale_incident_channels(client):
     logger.info(
         "notify_stale_incident_channels_started",
     )
-    channels = slack_channels.get_stale_channels(
-        client, pattern=INCIDENT_CHANNELS_PATTERN
-    )
+    channels = slack_channels.get_stale_channels(client, pattern=INCIDENT_CHANNELS_PATTERN)
     text = """👋  Hi! There have been no updates in this incident channel for 14 days! Consider scheduling a retro or archiving it.\n
         Bonjour! Il n'y a pas eu de mise à jour dans ce canal d'incident depuis 14 jours. Pensez à planifier une rétro ou à l'archiver."""
     attachments = [
@@ -49,6 +47,4 @@ def notify_stale_incident_channels(client):
     ]
     for channel in channels:
         log_to_sentinel("sent_stale_channel_notification", {"channel": channel})
-        client.chat_postMessage(
-            channel=channel["id"], text=text, attachments=attachments
-        )
+        client.chat_postMessage(channel=channel["id"], text=text, attachments=attachments)

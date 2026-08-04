@@ -1,15 +1,11 @@
 """Integration settings __init__ - exports all integration settings."""
 
-from infrastructure.configuration.integrations.slack import (
-    SlackSettings,
-    get_slack_settings,
-)
 from infrastructure.configuration.integrations.aws import AwsSettings, get_aws_settings
 from infrastructure.configuration.integrations.google import (
-    GoogleWorkspaceSettings,
     GoogleResourcesConfig,
-    get_google_workspace_settings,
+    GoogleWorkspaceSettings,
     get_google_resources_config,
+    get_google_workspace_settings,
 )
 from infrastructure.configuration.integrations.maxmind import (
     MaxMindSettings,
@@ -26,6 +22,10 @@ from infrastructure.configuration.integrations.opsgenie import (
 from infrastructure.configuration.integrations.sentinel import (
     SentinelSettings,
     get_sentinel_settings,
+)
+from infrastructure.configuration.integrations.slack import (
+    SlackSettings,
+    get_slack_settings,
 )
 from infrastructure.configuration.integrations.trello import (
     TrelloSettings,

@@ -40,10 +40,10 @@ Usage:
 """
 
 from infrastructure.resilience.retry.config import RetryConfig
+from infrastructure.resilience.retry.factory import create_retry_store
 from infrastructure.resilience.retry.models import RetryRecord, RetryResult
 from infrastructure.resilience.retry.store import InMemoryRetryStore, RetryStore
 from infrastructure.resilience.retry.worker import RetryProcessor, RetryWorker
-from infrastructure.resilience.retry.factory import create_retry_store
 
 __all__ = [
     # Models

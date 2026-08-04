@@ -44,9 +44,7 @@ class TestSessionProvider:
     ):
         """Test basic service creation without delegation or scopes."""
         mock_creds = Mock()
-        mock_service_account.Credentials.from_service_account_info.return_value = (
-            mock_creds
-        )
+        mock_service_account.Credentials.from_service_account_info.return_value = mock_creds
         mock_build.return_value = mock_google_service
 
         provider = SessionProvider(credentials_json=google_credentials_json)
@@ -54,9 +52,7 @@ class TestSessionProvider:
 
         # Verify credentials were loaded
         mock_service_account.Credentials.from_service_account_info.assert_called_once()
-        creds_dict = (
-            mock_service_account.Credentials.from_service_account_info.call_args[0][0]
-        )
+        creds_dict = mock_service_account.Credentials.from_service_account_info.call_args[0][0]
         assert creds_dict["client_email"] == "test@test-project.iam.gserviceaccount.com"
 
         # Verify service was built
@@ -82,16 +78,12 @@ class TestSessionProvider:
         mock_creds = Mock()
         mock_delegated_creds = Mock()
         mock_creds.with_subject.return_value = mock_delegated_creds
-        mock_service_account.Credentials.from_service_account_info.return_value = (
-            mock_creds
-        )
+        mock_service_account.Credentials.from_service_account_info.return_value = mock_creds
         mock_build.return_value = mock_google_service
 
         delegated_email = "admin@example.com"
         provider = SessionProvider(credentials_json=google_credentials_json)
-        provider.get_service(
-            "admin", "directory_v1", delegated_user_email=delegated_email
-        )
+        provider.get_service("admin", "directory_v1", delegated_user_email=delegated_email)
 
         # Verify delegation was applied
         mock_creds.with_subject.assert_called_once_with(delegated_email)
@@ -116,9 +108,7 @@ class TestSessionProvider:
         mock_creds = Mock()
         mock_delegated_creds = Mock()
         mock_creds.with_subject.return_value = mock_delegated_creds
-        mock_service_account.Credentials.from_service_account_info.return_value = (
-            mock_creds
-        )
+        mock_service_account.Credentials.from_service_account_info.return_value = mock_creds
         mock_build.return_value = mock_google_service
 
         default_email = "sre-bot@example.com"
@@ -144,9 +134,7 @@ class TestSessionProvider:
         mock_creds = Mock()
         mock_scoped_creds = Mock()
         mock_creds.with_scopes.return_value = mock_scoped_creds
-        mock_service_account.Credentials.from_service_account_info.return_value = (
-            mock_creds
-        )
+        mock_service_account.Credentials.from_service_account_info.return_value = mock_creds
         mock_build.return_value = mock_google_service
 
         scopes = ["https://www.googleapis.com/auth/admin.directory.user"]
@@ -176,15 +164,11 @@ class TestSessionProvider:
         mock_creds = Mock()
         mock_scoped_creds = Mock()
         mock_creds.with_scopes.return_value = mock_scoped_creds
-        mock_service_account.Credentials.from_service_account_info.return_value = (
-            mock_creds
-        )
+        mock_service_account.Credentials.from_service_account_info.return_value = mock_creds
         mock_build.return_value = mock_google_service
 
         default_scopes = ["https://www.googleapis.com/auth/admin.directory.user"]
-        provider = SessionProvider(
-            credentials_json=google_credentials_json, default_scopes=default_scopes
-        )
+        provider = SessionProvider(credentials_json=google_credentials_json, default_scopes=default_scopes)
         provider.get_service("admin", "directory_v1")
 
         # Verify default scopes were used
@@ -203,17 +187,13 @@ class TestSessionProvider:
         mock_creds = Mock()
         mock_scoped_creds = Mock()
         mock_creds.with_scopes.return_value = mock_scoped_creds
-        mock_service_account.Credentials.from_service_account_info.return_value = (
-            mock_creds
-        )
+        mock_service_account.Credentials.from_service_account_info.return_value = mock_creds
         mock_build.return_value = mock_google_service
 
         default_scopes = ["https://www.googleapis.com/auth/admin.directory.user"]
         override_scopes = ["https://www.googleapis.com/auth/admin.directory.group"]
 
-        provider = SessionProvider(
-            credentials_json=google_credentials_json, default_scopes=default_scopes
-        )
+        provider = SessionProvider(credentials_json=google_credentials_json, default_scopes=default_scopes)
         provider.get_service("admin", "directory_v1", scopes=override_scopes)
 
         # Verify override scopes were used, not defaults
@@ -241,18 +221,14 @@ class TestSessionProvider:
         mock_scoped_creds = Mock()
         mock_creds.with_subject.return_value = mock_delegated_creds
         mock_delegated_creds.with_scopes.return_value = mock_scoped_creds
-        mock_service_account.Credentials.from_service_account_info.return_value = (
-            mock_creds
-        )
+        mock_service_account.Credentials.from_service_account_info.return_value = mock_creds
         mock_build.return_value = mock_google_service
 
         delegated_email = "admin@example.com"
         scopes = ["https://www.googleapis.com/auth/admin.directory.user"]
 
         provider = SessionProvider(credentials_json=google_credentials_json)
-        provider.get_service(
-            "admin", "directory_v1", scopes=scopes, delegated_user_email=delegated_email
-        )
+        provider.get_service("admin", "directory_v1", scopes=scopes, delegated_user_email=delegated_email)
 
         # Verify both delegation and scopes were applied in correct order
         mock_creds.with_subject.assert_called_once_with(delegated_email)

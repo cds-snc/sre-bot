@@ -1,4 +1,5 @@
 import pytest
+
 from utils import filters
 
 
@@ -16,9 +17,7 @@ def test_filter_by_condition_with_dict_list():
         {"name": "User1", "username": "username1"},
         {"name": "User2", "username": "username2"},
     ]
-    assert filters.filter_by_condition(list, lambda x: x["name"] == "User1") == [
-        {"name": "User1", "username": "username1"}
-    ]
+    assert filters.filter_by_condition(list, lambda x: x["name"] == "User1") == [{"name": "User1", "username": "username1"}]
 
 
 def test_filter_by_condition_filters_out_on_empty_list():
@@ -156,9 +155,7 @@ def test_compare_list_with_complex_values_match_mode(google_groups, aws_groups):
     prefix = "aws-"
     source_values = google_groups(3, prefix, "test.com")
     for value in source_values:
-        value["matching_key"] = (
-            value["email"].replace(prefix, "").replace("@test.com", "")
-        )
+        value["matching_key"] = value["email"].replace(prefix, "").replace("@test.com", "")
     source = {"values": source_values, "key": "matching_key"}
 
     target_values = aws_groups(5)
@@ -193,9 +190,7 @@ def test_get_unique_nested_dicts(google_groups_w_users):
                 unique_users.append(user)
     users_from_groups = filters.get_unique_nested_dicts(groups, "members")
 
-    assert sorted(users_from_groups, key=lambda user: user["id"]) == sorted(
-        unique_users, key=lambda user: user["id"]
-    )
+    assert sorted(users_from_groups, key=lambda user: user["id"]) == sorted(unique_users, key=lambda user: user["id"])
 
 
 def test_get_unique_nested_dicts_with_empty_source():
@@ -208,9 +203,7 @@ def test_get_unique_nested_dicts_from_single_dict(google_groups_w_users):
     source_group = google_groups_w_users()[0]
     users_from_groups = filters.get_unique_nested_dicts(source_group, "members")
     expected_users = source_group["members"]
-    assert sorted(users_from_groups, key=lambda user: user["id"]) == sorted(
-        expected_users, key=lambda user: user["id"]
-    )
+    assert sorted(users_from_groups, key=lambda user: user["id"]) == sorted(expected_users, key=lambda user: user["id"])
 
 
 def test_get_unique_nested_dicts_with_duplicate_key():
@@ -230,9 +223,7 @@ def test_get_unique_nested_dicts_with_duplicate_key():
         {"email": "user2.test@test.com", "id": "user2_id", "username": "user1"},
         {"email": "user3.test@test.com", "id": "user3_id", "username": "user2"},
     ]
-    assert sorted(users_from_groups, key=lambda user: user["id"]) == sorted(
-        expected_users, key=lambda user: user["id"]
-    )
+    assert sorted(users_from_groups, key=lambda user: user["id"]) == sorted(expected_users, key=lambda user: user["id"])
 
 
 def test_preformat_items():
@@ -253,9 +244,7 @@ def test_preformat_items():
     new_key = "DisplayName"
     pattern = r"^PREFIX-"
     replace = "new-"
-    response = filters.preformat_items(
-        items_to_format, lookup_key, new_key, pattern, replace
-    )
+    response = filters.preformat_items(items_to_format, lookup_key, new_key, pattern, replace)
 
     assert response == [
         {
@@ -289,9 +278,7 @@ def test_preformat_items_returns_value_if_no_matching_pattern():
     new_key = "DisplayName"
     pattern = r"^PREFIX-"
     replace = "new-"
-    response = filters.preformat_items(
-        items_to_format, lookup_key, new_key, pattern, replace
-    )
+    response = filters.preformat_items(items_to_format, lookup_key, new_key, pattern, replace)
 
     assert response == [
         {
@@ -309,9 +296,7 @@ def test_preformat_items_returns_value_if_no_matching_pattern():
 
 
 def test_preformat_items_lookup_key_not_found_raise_error(google_groups_w_users):
-    items_to_format = google_groups_w_users(
-        n_groups=1, n_users=1, group_prefix="PREFIX-"
-    )
+    items_to_format = google_groups_w_users(n_groups=1, n_users=1, group_prefix="PREFIX-")
     lookup_key = "invalid_key"
     new_key = "DisplayName"
     pattern = "PREFIX-"
@@ -320,9 +305,7 @@ def test_preformat_items_lookup_key_not_found_raise_error(google_groups_w_users)
     with pytest.raises(KeyError) as exc:
         filters.preformat_items(items_to_format, lookup_key, new_key, pattern, replace)
 
-    expected_error_message = (
-        f'"Item {items_to_format[0]} does not have {lookup_key} key"'
-    )
+    expected_error_message = f'"Item {items_to_format[0]} does not have {lookup_key} key"'
     assert str(exc.value) == expected_error_message
 
 
@@ -348,9 +331,7 @@ def test_preformat_items_with_nested_lookup_key():
     new_key = "group_name"
     pattern = r"^PREFIX-"
     replace = "new-"
-    response = filters.preformat_items(
-        items_to_format, lookup_key, new_key, pattern, replace
-    )
+    response = filters.preformat_items(items_to_format, lookup_key, new_key, pattern, replace)
 
     assert response == [
         {

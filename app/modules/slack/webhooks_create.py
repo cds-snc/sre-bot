@@ -18,9 +18,7 @@ def handle_create_webhook_action(ack, view, body, client, say):
 
     name = view["state"]["values"]["name"]["name"]["value"]
     channel = view["state"]["values"]["channel"]["channel"]["selected_channel"]
-    hook_type = view["state"]["values"]["hook_type"]["hook_type"]["selected_option"][
-        "value"
-    ]
+    hook_type = view["state"]["values"]["hook_type"]["hook_type"]["selected_option"]["value"]
     hook_type = hook_type if hook_type else "alert"
     hook_type = hook_type.lower()
     user = body["user"]["id"]

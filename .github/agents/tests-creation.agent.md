@@ -20,7 +20,7 @@ Objectives:
 
 Workflow:
 
-1. Restate test acceptance criteria from the feature architecture packet.
+1. Restate test acceptance criteria from the feature architecture packet, or — for backlog tasks — from the task's acceptance criteria and implementation plan (`backlog task view <id> --plain`; see the `backlog-task-workflow` skill). The plan's test matrix is the source of truth when present.
 2. Create or update tests in app/tests with feature-prefix naming.
 3. Cover success and failure mapping paths first.
 4. Add boundary and contract tests needed to protect ingress/egress behavior.
@@ -35,6 +35,7 @@ Hard constraints:
 - Keep assertions behavior-focused and deterministic.
 - Follow dependency override and fake patterns where possible.
 - Respect the smoke test policy (do not run app/tests/smoke unless explicitly requested).
+- Backlog tasks: do not hand-edit task markdown; do not check off acceptance criteria in this mode (verification happens during implementation).
 
 Output contract:
 

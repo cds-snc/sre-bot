@@ -13,7 +13,6 @@ from packages.access.sync.job_models import (
     UserRunningRecord,
 )
 
-
 # ---------------------------------------------------------------------------
 # JobStatus / SyncJobError constants
 # ---------------------------------------------------------------------------
@@ -177,9 +176,7 @@ def test_completed_platform_record_carries_reconciliation_metrics():
     assert d["unchanged_user_count"] == 43
     assert d["action_counts"]["apply_entitlement"] == 4
     assert d["lifecycle_actions"]["remove_user"] == ["carol@example.com"]
-    assert d["entitlements_by_action"]["apply_entitlement"]["sg-aws-admin"] == [
-        "alice@example.com"
-    ]
+    assert d["entitlements_by_action"]["apply_entitlement"]["sg-aws-admin"] == ["alice@example.com"]
     assert d["status"] == JobStatus.COMPLETED
 
 

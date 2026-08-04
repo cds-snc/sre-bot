@@ -4,7 +4,6 @@ Configuration for collaboration platform integrations (Slack, etc.).
 """
 
 from functools import lru_cache
-from typing import Optional
 
 from pydantic import Field, model_validator
 from pydantic_settings import SettingsConfigDict
@@ -24,12 +23,12 @@ class SlackPlatformSettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.infrastructure.platforms import get_platforms_settings
 
-        settings = get_settings()
+        settings = get_platforms_settings()
 
-        if settings.platforms.slack.ENABLED:
-            bot_token = settings.platforms.slack.BOT_TOKEN
+        if settings.slack.ENABLED:
+            bot_token = settings.slack.BOT_TOKEN
         ```
     """
 
@@ -45,17 +44,17 @@ class SlackPlatformSettings(InfrastructureSettings):
         description="Use Socket Mode (True) or HTTP webhooks (False)",
     )
 
-    APP_TOKEN: Optional[str] = Field(
+    APP_TOKEN: str | None = Field(
         default=None,
         description="Slack app-level token (xapp-...) for Socket Mode",
     )
 
-    BOT_TOKEN: Optional[str] = Field(
+    BOT_TOKEN: str | None = Field(
         default=None,
         description="Slack bot token (xoxb-...) for API calls",
     )
 
-    SIGNING_SECRET: Optional[str] = Field(
+    SIGNING_SECRET: str | None = Field(
         default=None,
         description="Slack signing secret for webhook verification",
     )
@@ -86,9 +85,7 @@ class SlackPlatformSettings(InfrastructureSettings):
 
         # BOT_TOKEN always required
         if not self.BOT_TOKEN:
-            raise ValueError(
-                "SLACK_BOT_TOKEN is required when Slack provider is enabled"
-            )
+            raise ValueError("SLACK_BOT_TOKEN is required when Slack provider is enabled")
 
         # Socket Mode: APP_TOKEN required
         if self.SOCKET_MODE:
@@ -119,12 +116,12 @@ class PlatformsSettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.infrastructure.platforms import get_platforms_settings
 
-        settings = get_settings()
+        settings = get_platforms_settings()
 
         # Check which platforms are enabled
-        if settings.platforms.slack.ENABLED:
+        if settings.slack.ENABLED:
             # Initialize Slack provider
 
         ```

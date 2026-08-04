@@ -5,7 +5,7 @@ building for all AWS service clients. Handles role assumption and parameter
 propagation for cross-account access.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import structlog
 
@@ -27,16 +27,16 @@ class SessionProvider:
 
     def __init__(
         self,
-        region: Optional[str] = None,
-        service_role_map: Optional[dict[str, str]] = None,
-        endpoint_url: Optional[str] = None,
+        region: str | None = None,
+        service_role_map: dict[str, str] | None = None,
+        endpoint_url: str | None = None,
     ) -> None:
         self.region = region
         self.service_role_map = service_role_map
         self.endpoint_url = endpoint_url
 
     @staticmethod
-    def _should_apply_endpoint_override(service_name: Optional[str]) -> bool:
+    def _should_apply_endpoint_override(service_name: str | None) -> bool:
         """Return whether a custom endpoint override applies to the service.
 
         The shared AWS endpoint override is reserved for local DynamoDB testing.
@@ -45,7 +45,7 @@ class SessionProvider:
         """
         return service_name == "dynamodb"
 
-    def get_role_arn_for_service(self, service_name: str) -> Optional[str]:
+    def get_role_arn_for_service(self, service_name: str) -> str | None:
         """Get the role ARN to assume for the given AWS service.
 
         Args:
@@ -60,9 +60,9 @@ class SessionProvider:
 
     def build_client_kwargs(
         self,
-        service_name: Optional[str] = None,
-        role_arn: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        service_name: str | None = None,
+        role_arn: str | None = None,
+    ) -> dict[str, Any]:
         """Build session and client configuration kwargs for boto3.
 
         Automatically resolves the role ARN from the service_role_map if
@@ -108,9 +108,7 @@ class SessionProvider:
             "role_arn": role_arn,
         }
 
-    def get_boto3_client(
-        self, service_name: str, role_arn: Optional[str] = None
-    ) -> Any:
+    def get_boto3_client(self, service_name: str, role_arn: str | None = None) -> Any:
         """Get a fully-configured boto3 client for the given service.
 
         Args:

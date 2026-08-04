@@ -4,7 +4,7 @@ This module provides JWT token validation with issuer verification
 and user information extraction from token claims.
 """
 
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import structlog
 from fastapi import HTTPException
@@ -15,8 +15,10 @@ from infrastructure.security.jwks import JWKSManager
 
 logger = structlog.get_logger()
 
+ASYMMETRIC_ALGORITHMS = frozenset({"RS256", "RS384", "RS512", "ES256", "ES384", "ES512", "PS256", "PS384", "PS512"})
 
-def get_issuer_from_token(token: str) -> Optional[str]:
+
+def get_issuer_from_token(token: str) -> str | None:
     """Extract issuer from JWT token without verifying signature.
 
     Args:
@@ -34,7 +36,7 @@ def get_issuer_from_token(token: str) -> Optional[str]:
         return None
 
 
-def extract_user_info_from_token(token: str) -> Tuple[Optional[str], Optional[str]]:
+def extract_user_info_from_token(token: str) -> tuple[str | None, str | None]:
     """Extract user ID and email from JWT token without verifying signature.
 
     Args:
@@ -67,7 +69,7 @@ def extract_user_info_from_token(token: str) -> Tuple[Optional[str], Optional[st
 def validate_jwt_token(
     jwks_manager: JWKSManager,
     credentials: HTTPAuthorizationCredentials,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Validate JWT token and extract payload.
 
     Args:
@@ -84,11 +86,7 @@ def validate_jwt_token(
         raise HTTPException(status_code=500, detail="JWKS manager not configured")
 
     # Validate credentials structure
-    if (
-        credentials is None
-        or not credentials.scheme == "Bearer"
-        or not credentials.credentials
-    ):
+    if credentials is None or not credentials.scheme == "Bearer" or not credentials.credentials:
         raise HTTPException(status_code=401, detail="Missing or invalid token")
 
     token = credentials.credentials
@@ -110,15 +108,31 @@ def validate_jwt_token(
     if not cfg:
         raise HTTPException(status_code=401, detail="Invalid token issuer")
 
+    audience = cfg.get("audience")
+    if not audience:
+        log = logger.bind(issuer=issuer)
+        log.warning("issuer_missing_audience")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    configured_algorithms = cfg.get("algorithms", ["RS256"])
+    if isinstance(configured_algorithms, str):
+        configured_algorithms = [configured_algorithms]
+    algorithms = [algorithm for algorithm in configured_algorithms if algorithm in ASYMMETRIC_ALGORITHMS]
+    if not algorithms:
+        log = logger.bind(issuer=issuer, configured_algorithms=configured_algorithms)
+        log.warning("issuer_no_permitted_algorithms")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
     # Verify and decode token
     try:
         signing_key = jwks_client.get_signing_key_from_jwt(token)
         payload = decode(
             token,
             signing_key.key,
-            algorithms=cfg.get("algorithms", ["RS256"]),
-            audience=cfg.get("audience"),
-            options={"verify_exp": True},
+            algorithms=algorithms,
+            audience=audience,
+            issuer=issuer,
+            options={"require": ["exp"], "verify_exp": True, "verify_nbf": True},
         )
         log = logger.bind(issuer=issuer)
         log.info("jwt_validation_successful")

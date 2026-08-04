@@ -1,6 +1,6 @@
-from modules.incident import notify_stale_incident_channels
-
 from unittest.mock import MagicMock, patch
+
+from modules.incident import notify_stale_incident_channels
 
 
 @patch("integrations.slack.channels.get_stale_channels")

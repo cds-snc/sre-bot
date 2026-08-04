@@ -14,9 +14,9 @@ Key Functions:
 
 import base64
 from email.message import EmailMessage
-from typing import Optional
 
 import structlog
+
 from infrastructure.operations.result import OperationResult
 from integrations.google_workspace.google_service_next import execute_google_api_call
 
@@ -82,7 +82,7 @@ def send_email(
     sender: str,
     recipient: str,
     content_type: str = "plain",
-    delegated_user_email: Optional[str] = None,
+    delegated_user_email: str | None = None,
     user_id: str = "me",
 ) -> OperationResult:
     """Send an email via Gmail API.
@@ -119,9 +119,7 @@ def send_email(
     """
     log = logger.bind(operation="send_email", recipient=recipient, sender=sender)
     try:
-        raw_message = _create_mime_message(
-            subject, body, sender, recipient, content_type
-        )
+        raw_message = _create_mime_message(subject, body, sender, recipient, content_type)
     except Exception as e:
         log.error("failed_to_create_mime_message", error=str(e))
         return OperationResult.permanent_error(
@@ -147,7 +145,7 @@ def create_draft(
     sender: str,
     recipient: str,
     content_type: str = "plain",
-    delegated_user_email: Optional[str] = None,
+    delegated_user_email: str | None = None,
     user_id: str = "me",
 ) -> OperationResult:
     """Create a draft email via Gmail API.
@@ -174,9 +172,7 @@ def create_draft(
     """
     log = logger.bind(operation="create_draft", recipient=recipient, sender=sender)
     try:
-        raw_message = _create_mime_message(
-            subject, body, sender, recipient, content_type
-        )
+        raw_message = _create_mime_message(subject, body, sender, recipient, content_type)
     except Exception as e:
         log.error("failed_to_create_mime_message", error=str(e))
         return OperationResult.permanent_error(
@@ -198,7 +194,7 @@ def create_draft(
 
 def get_message(
     message_id: str,
-    delegated_user_email: Optional[str] = None,
+    delegated_user_email: str | None = None,
     user_id: str = "me",
     format: str = "full",
 ) -> OperationResult:
@@ -227,11 +223,11 @@ def get_message(
 
 
 def list_messages(
-    query: Optional[str] = None,
+    query: str | None = None,
     max_results: int = 100,
-    delegated_user_email: Optional[str] = None,
+    delegated_user_email: str | None = None,
     user_id: str = "me",
-    label_ids: Optional[list] = None,
+    label_ids: list | None = None,
 ) -> OperationResult:
     """List messages in the user's mailbox.
 

@@ -1,6 +1,6 @@
 """Slack platform implementation for geolocate package."""
 
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 
-def register_commands(provider: "SlackPlatformProvider") -> None:
+def register_commands(provider: SlackPlatformProvider) -> None:
     """Register geolocate Slack commands with the provider.
 
     Args:
@@ -53,7 +53,7 @@ def register_commands(provider: "SlackPlatformProvider") -> None:
 
 def handle_geolocate_command(
     payload: CommandPayload,
-    parsed_args: Dict[str, Any],
+    parsed_args: dict[str, Any],
 ) -> CommandResponse:
     """Handle /sre geolocate <ip> Slack command.
 
@@ -64,9 +64,7 @@ def handle_geolocate_command(
     Returns:
         CommandResponse formatted for Slack
     """
-    log = logger.bind(
-        command="geolocate", user_id=payload.user_id, channel_id=payload.channel_id
-    )
+    log = logger.bind(command="geolocate", user_id=payload.user_id, channel_id=payload.channel_id)
     log.info("slack_command_received", text=payload.text)
 
     # Get the IP address from parsed arguments (framework ensures it's present and valid)
@@ -103,9 +101,7 @@ def handle_geolocate_command(
         return CommandResponse(message=msg, ephemeral=True)
 
 
-def _format_success_blocks(
-    data: GeolocateResponse, locale: str = "en-US"
-) -> list[Dict[str, Any]]:
+def _format_success_blocks(data: GeolocateResponse, locale: str = "en-US") -> list[dict[str, Any]]:
     """Format successful geolocation as Slack blocks."""
     fields = []
 
@@ -125,9 +121,7 @@ def _format_success_blocks(
         label = t("geolocate.result.coordinates_label", locale, "Coordinates")
         coordinates_text = f"{data.latitude}, {data.longitude}"
         if data.map_links:
-            coordinates_text = (
-                f"{coordinates_text}\n<{data.map_links.openstreetmap}|OpenStreetMap>"
-            )
+            coordinates_text = f"{coordinates_text}\n<{data.map_links.openstreetmap}|OpenStreetMap>"
         fields.append(
             {
                 "type": "mrkdwn",

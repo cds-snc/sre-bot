@@ -37,9 +37,7 @@ def test_should_plan_no_actions_when_catchall_user_is_already_provisioned(
 
     assert result.is_success
     assert isinstance(result.data, SyncOutcome)
-    assert (
-        result.data.planned_actions == []
-    ), f"Unexpected actions: {result.data.planned_actions}"
+    assert result.data.planned_actions == [], f"Unexpected actions: {result.data.planned_actions}"
     assert result.data.applied_actions == []
     reconcile_calls = [c for c in adapter.calls if c[0] == "reconcile_user"]
     assert len(reconcile_calls) == 1
@@ -65,8 +63,7 @@ def test_should_recognize_user_exists_when_adapter_returns_empty_group_set(
 
     assert result.is_success, f"sync_user failed: {result.error_code}"
     assert result.data.planned_actions == [], (
-        f"User exists on platform with correct entitlements but "
-        f"coordinator planned: {result.data.planned_actions}."
+        f"User exists on platform with correct entitlements but coordinator planned: {result.data.planned_actions}."
     )
     reconcile_calls = [c for c in adapter.calls if c[0] == "reconcile_user"]
     assert len(reconcile_calls) == 1

@@ -1,5 +1,8 @@
 """Unit tests for app-level settings singleton."""
 
+import pytest
+from pydantic import ValidationError
+
 from infrastructure.configuration.app import AppSettings, get_app_settings
 
 
@@ -10,21 +13,14 @@ class TestAppSettings:
         """AppSettings should provide stable defaults."""
         settings = AppSettings()
 
-        assert settings.PREFIX == ""
         assert settings.LOG_LEVEL == "INFO"
         assert settings.GIT_SHA == "Unknown"
 
-    def test_app_settings_is_production_when_prefix_empty(self):
-        """is_production should be True when PREFIX is empty."""
-        settings = AppSettings(PREFIX="")
+    def test_app_settings_no_legacy_prefix_attribute(self):
+        """Legacy command-prefix setting is no longer exposed on app settings."""
+        settings = AppSettings()
 
-        assert settings.is_production is True
-
-    def test_app_settings_is_not_production_when_prefix_set(self):
-        """is_production should be False when PREFIX is set."""
-        settings = AppSettings(PREFIX="dev")
-
-        assert settings.is_production is False
+        assert not hasattr(settings, "PREFIX")
 
     def test_app_settings_ignores_extra_env_vars(self, monkeypatch):
         """Unknown environment variables should be ignored during settings loading."""
@@ -32,7 +28,7 @@ class TestAppSettings:
 
         settings = AppSettings()
 
-        assert settings.PREFIX == ""
+        assert settings.LOG_LEVEL == "INFO"
 
     def test_app_settings_singleton_returns_same_instance(self):
         """Provider should return same cached singleton instance."""
@@ -43,10 +39,118 @@ class TestAppSettings:
 
         assert instance1 is instance2
 
-    def test_app_settings_reads_from_env(self, monkeypatch):
-        """Environment variables should override defaults."""
-        monkeypatch.setenv("PREFIX", "staging")
+
+class TestAppSettingsEnvironment:
+    """Behavior tests for ENVIRONMENT and DEV_BYPASS_ENABLED settings."""
+
+    def test_environment_default_is_local(self, monkeypatch):
+        """Default environment should be local."""
+        monkeypatch.delenv("ENVIRONMENT", raising=False)
 
         settings = AppSettings()
 
-        assert settings.PREFIX == "staging"
+        assert settings.ENVIRONMENT == "local"
+
+    @pytest.mark.parametrize(
+        "value",
+        ["local", "ci", "dev", "staging", "production"],
+    )
+    def test_environment_all_valid_values(self, value):
+        """All accepted environment values should construct successfully."""
+        settings = AppSettings(ENVIRONMENT=value)
+
+        assert value == settings.ENVIRONMENT
+
+    def test_environment_invalid_value_raises_validation_error(self):
+        """Unknown environment values should fail validation at settings construction."""
+        with pytest.raises(ValidationError):
+            AppSettings(ENVIRONMENT="uat")
+
+    def test_dev_bypass_enabled_default_false(self):
+        """DEV_BYPASS_ENABLED should default to False."""
+        settings = AppSettings()
+
+        assert settings.DEV_BYPASS_ENABLED is False
+
+    def test_dev_bypass_enabled_can_be_set_true(self):
+        """DEV_BYPASS_ENABLED should be configurable to True."""
+        settings = AppSettings(DEV_BYPASS_ENABLED=True)
+
+        assert settings.DEV_BYPASS_ENABLED is True
+
+
+class TestAppSettingsWebhookMaxBodyBytes:
+    """Behavior tests for the webhook body-size cap setting."""
+
+    def test_webhook_max_body_bytes_default(self):
+        """Default cap should match AWS SNS's own 256 KiB publish-size ceiling."""
+        settings = AppSettings()
+
+        assert settings.WEBHOOK_MAX_BODY_BYTES == 262_144
+
+    def test_webhook_max_body_bytes_configurable_via_env(self, monkeypatch):
+        """The cap should be overridable via the WEBHOOK_MAX_BODY_BYTES env var."""
+        monkeypatch.setenv("WEBHOOK_MAX_BODY_BYTES", "1024")
+
+        settings = AppSettings()
+
+        assert settings.WEBHOOK_MAX_BODY_BYTES == 1024
+
+    def test_contract_app_settings_has_no_legacy_production_property(self):
+        """Contract: AppSettings no longer exposes the legacy production shim."""
+        settings = AppSettings(ENVIRONMENT="production")
+        legacy_attr = "is" + "_production"
+
+        assert not hasattr(settings, legacy_attr)
+
+
+class TestAppSettingsCors:
+    """Behavior tests for CORS settings defaults and wildcard rejection."""
+
+    def test_cors_defaults_are_explicit_and_non_wildcard(self):
+        """Defaults should not allow wildcard methods or headers and should start with no origins."""
+        settings = AppSettings()
+
+        assert settings.CORS_ALLOWED_ORIGINS == []
+        assert settings.CORS_ALLOWED_METHODS == [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "OPTIONS",
+        ]
+        assert settings.CORS_ALLOWED_HEADERS == [
+            "Authorization",
+            "Content-Type",
+            "X-Request-ID",
+            "traceparent",
+        ]
+        assert "*" not in settings.CORS_ALLOWED_METHODS
+        assert "*" not in settings.CORS_ALLOWED_HEADERS
+
+    def test_cors_explicit_lists_round_trip(self):
+        """Configured CORS lists should be preserved exactly."""
+        settings = AppSettings(
+            CORS_ALLOWED_ORIGINS=["https://frontend.example"],
+            CORS_ALLOWED_METHODS=["GET", "POST"],
+            CORS_ALLOWED_HEADERS=["Authorization", "Content-Type"],
+        )
+
+        assert settings.CORS_ALLOWED_ORIGINS == ["https://frontend.example"]
+        assert settings.CORS_ALLOWED_METHODS == ["GET", "POST"]
+        assert settings.CORS_ALLOWED_HEADERS == ["Authorization", "Content-Type"]
+
+    @pytest.mark.parametrize(
+        "payload",
+        [
+            {"CORS_ALLOWED_ORIGINS": ["*"]},
+            {"CORS_ALLOWED_ORIGINS": ["*", "https://frontend.example"]},
+            {"CORS_ALLOWED_METHODS": ["*"]},
+            {"CORS_ALLOWED_HEADERS": ["*"]},
+        ],
+    )
+    def test_cors_wildcards_raise_validation_error(self, payload):
+        """Any wildcard in configured CORS lists should fail settings construction."""
+        with pytest.raises(ValidationError):
+            AppSettings(**payload)

@@ -13,9 +13,7 @@ class TestGoogleWorkspaceClients:
     """Test suite for GoogleWorkspaceClients facade."""
 
     @patch("infrastructure.clients.google_workspace.facade.SessionProvider")
-    def test_initialization(
-        self, mock_session_provider_class, mock_google_workspace_settings
-    ):
+    def test_initialization(self, mock_session_provider_class, mock_google_workspace_settings):
         """Test facade initialization with settings."""
         mock_provider_instance = Mock(spec=SessionProvider)
         mock_session_provider_class.return_value = mock_provider_instance
@@ -33,9 +31,7 @@ class TestGoogleWorkspaceClients:
         assert facade._session_provider == mock_provider_instance
 
     @patch("infrastructure.clients.google_workspace.facade.SessionProvider")
-    def test_session_provider_attribute(
-        self, mock_session_provider_class, mock_google_workspace_settings
-    ):
+    def test_session_provider_attribute(self, mock_session_provider_class, mock_google_workspace_settings):
         """Test that session provider is accessible."""
         mock_provider_instance = Mock(spec=SessionProvider)
         mock_session_provider_class.return_value = mock_provider_instance
@@ -46,9 +42,7 @@ class TestGoogleWorkspaceClients:
         assert isinstance(facade._session_provider, (SessionProvider, Mock))
 
     @patch("infrastructure.clients.google_workspace.facade.SessionProvider")
-    def test_multiple_instances_get_own_session_provider(
-        self, mock_session_provider_class, mock_google_workspace_settings
-    ):
+    def test_multiple_instances_get_own_session_provider(self, mock_session_provider_class, mock_google_workspace_settings):
         """Test that each facade instance gets its own session provider."""
         mock_provider_instance_1 = Mock(spec=SessionProvider)
         mock_provider_instance_2 = Mock(spec=SessionProvider)
@@ -86,9 +80,7 @@ class TestGoogleWorkspaceClients:
         )
 
     @patch("infrastructure.clients.google_workspace.facade.SessionProvider")
-    def test_blank_customer_id_falls_back_to_my_customer(
-        self, mock_session_provider_class, google_credentials_json
-    ):
+    def test_blank_customer_id_falls_back_to_my_customer(self, mock_session_provider_class, google_credentials_json):
         """Test blank customer settings still produce a stable default on the client."""
         mock_provider_instance = Mock(spec=SessionProvider)
         mock_session_provider_class.return_value = mock_provider_instance
@@ -103,9 +95,7 @@ class TestGoogleWorkspaceClients:
         assert facade.directory._default_customer_id == "my_customer"
 
     @patch("infrastructure.clients.google_workspace.facade.SessionProvider")
-    def test_logger_binding(
-        self, mock_session_provider_class, mock_google_workspace_settings
-    ):
+    def test_logger_binding(self, mock_session_provider_class, mock_google_workspace_settings):
         """Test that logger is properly bound with component name."""
         mock_provider_instance = Mock(spec=SessionProvider)
         mock_session_provider_class.return_value = mock_provider_instance
@@ -117,9 +107,7 @@ class TestGoogleWorkspaceClients:
         assert facade._logger is not None
 
     @patch("infrastructure.clients.google_workspace.facade.SessionProvider")
-    def test_client_attributes_exist(
-        self, mock_session_provider_class, mock_google_workspace_settings
-    ):
+    def test_client_attributes_exist(self, mock_session_provider_class, mock_google_workspace_settings):
         """Test that all client attributes are properly initialized."""
         mock_provider_instance = Mock(spec=SessionProvider)
         mock_session_provider_class.return_value = mock_provider_instance

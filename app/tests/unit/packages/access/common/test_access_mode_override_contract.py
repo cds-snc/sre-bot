@@ -143,15 +143,9 @@ def test_mode_override_contract_multiple_tokens_isolated():
         }
     )
 
-    admins_mode = check_entitlement_mode(
-        config, platform="aws", group_slug="sg-aws-admins"
-    )
-    devs_mode = check_entitlement_mode(
-        config, platform="aws", group_slug="sg-aws-developers"
-    )
-    guests_mode = check_entitlement_mode(
-        config, platform="aws", group_slug="sg-aws-guests"
-    )
+    admins_mode = check_entitlement_mode(config, platform="aws", group_slug="sg-aws-admins")
+    devs_mode = check_entitlement_mode(config, platform="aws", group_slug="sg-aws-developers")
+    guests_mode = check_entitlement_mode(config, platform="aws", group_slug="sg-aws-guests")
 
     assert admins_mode == "deactivated"
     assert devs_mode == "ephemeral"

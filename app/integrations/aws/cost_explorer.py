@@ -1,18 +1,18 @@
 """Cost Explorer API integration."""
 
 import structlog
-from core.config import settings
+
+from infrastructure.configuration.integrations.aws import get_aws_settings
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 
 logger = structlog.get_logger()
-ORG_ROLE_ARN = settings.aws.ORG_ROLE_ARN
+settings = get_aws_settings()
+ORG_ROLE_ARN = settings.ORG_ROLE_ARN
 
 
 @handle_aws_api_errors
 def get_cost_and_usage(time_period, granularity, metrics, filter=None, group_by=None):
-    log = logger.bind(
-        operation="get_cost_and_usage", granularity=granularity, metrics=str(metrics)
-    )
+    log = logger.bind(operation="get_cost_and_usage", granularity=granularity, metrics=str(metrics))
     log.debug(
         "cost_explorer_get_cost_and_usage_started",
         filter_present=filter is not None,

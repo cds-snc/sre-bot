@@ -1,12 +1,11 @@
 from unittest.mock import MagicMock, patch
+
 from modules.incident import incident_alert
 
 
 @patch("modules.incident.incident_alert.log_to_sentinel")
 @patch("modules.incident.incident_alert.incident")
-def test_handle_incident_action_buttons_call_incident(
-    incident_mock, log_to_sentinel_mock
-):
+def test_handle_incident_action_buttons_call_incident(incident_mock, log_to_sentinel_mock):
     client = MagicMock()
     ack = MagicMock()
     body = {
@@ -43,9 +42,7 @@ def test_handle_incident_action_buttons_call_incident(
 
 @patch("modules.incident.incident_alert.log_to_sentinel")
 @patch("modules.incident.incident_alert.incident")
-def test_handle_incident_action_buttons_call_incident_uses_container_fallback(
-    incident_mock, log_to_sentinel_mock
-):
+def test_handle_incident_action_buttons_call_incident_uses_container_fallback(incident_mock, log_to_sentinel_mock):
     client = MagicMock()
     ack = MagicMock()
     body = {
@@ -281,9 +278,7 @@ def test_handle_incident_action_buttons_ignore_drop_richtext_block_no_type(
 @patch("modules.incident.incident_alert.log_to_sentinel")
 @patch("modules.incident.incident_alert.webhooks.increment_acknowledged_count")
 @patch("modules.incident.incident_alert.incident")
-def test_handle_incident_action_buttons_link_preview(
-    incident_mock, increment_acknowledged_count_mock, log_to_sentinel_mock
-):
+def test_handle_incident_action_buttons_link_preview(incident_mock, increment_acknowledged_count_mock, log_to_sentinel_mock):
     client = MagicMock()
     ack = MagicMock()
     body = {

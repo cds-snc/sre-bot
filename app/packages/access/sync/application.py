@@ -10,7 +10,8 @@ All platform state assessment, planning, and execution is owned by adapters.
 """
 
 import uuid
-from typing import TYPE_CHECKING, Mapping, Optional, Protocol, Tuple
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Protocol
 
 import structlog
 
@@ -70,8 +71,8 @@ class AccessSyncApplicationService:
         adapters: Mapping[str, AccessSyncAdapter],
         config: AccessRuntimeConfig,
         membership_builder: DirectoryMembershipBuilder,
-        repository: "Optional[SyncRunRepository]" = None,
-        dispatcher: Optional[EventDispatcher] = None,
+        repository: SyncRunRepository | None = None,
+        dispatcher: EventDispatcher | None = None,
     ) -> None:
         self._adapters = adapters
         self._config = config
@@ -79,10 +80,12 @@ class AccessSyncApplicationService:
         self._repository = repository
         self._dispatcher = dispatcher
 
-    def _resolve(self, platform: str) -> Tuple[
-        Optional[AccessSyncAdapter],
-        Optional[EffectivePlatformPolicy],
-        Optional[OperationResult],
+    def _resolve(
+        self, platform: str
+    ) -> tuple[
+        AccessSyncAdapter | None,
+        EffectivePlatformPolicy | None,
+        OperationResult | None,
     ]:
         """Return (adapter, effective_policy, None) or (None, None, error)."""
         if platform not in self._config.platforms:
@@ -106,9 +109,7 @@ class AccessSyncApplicationService:
                     error_code="ADAPTER_NOT_FOUND",
                 ),
             )
-        discovered = self._membership_builder.discover_group_slugs(
-            self._config, platform
-        )
+        discovered = self._membership_builder.discover_group_slugs(self._config, platform)
         effective = resolve_effective_policy(self._config, platform, discovered)
         return adapter, effective, None
 
@@ -123,9 +124,7 @@ class AccessSyncApplicationService:
     ) -> None:
         if self._repository is None:
             return
-        status = (
-            "manual_action_required" if outcome.requires_manual_action else "success"
-        )
+        status = "manual_action_required" if outcome.requires_manual_action else "success"
         self._repository.save(
             SyncRunRecord(
                 run_id=run_id,
@@ -156,8 +155,8 @@ class AccessSyncApplicationService:
         adapter, effective, error = self._resolve(platform)
         if error is not None:
             return error
-        assert adapter is not None
-        assert effective is not None
+        assert adapter is not None  # noqa: S101 -- adapter/effective are guaranteed after _resolve() returns no error
+        assert effective is not None  # noqa: S101 -- adapter/effective are guaranteed after _resolve() returns no error
 
         desired_result = self._membership_builder.build_user_state_from_effective(
             user_email=user_email,
@@ -174,9 +173,7 @@ class AccessSyncApplicationService:
         )
 
         if result.is_success and isinstance(result.data, SyncOutcome):
-            self._persist(
-                run_id, user_email, platform, result.data, dry_run, request_id
-            )
+            self._persist(run_id, user_email, platform, result.data, dry_run, request_id)
             if self._dispatcher:
                 self._dispatcher.dispatch_background(
                     Event(
@@ -234,8 +231,8 @@ class AccessSyncApplicationService:
         adapter, effective, error = self._resolve(platform)
         if error is not None:
             return error
-        assert adapter is not None
-        assert effective is not None
+        assert adapter is not None  # noqa: S101 -- adapter/effective are guaranteed after _resolve() returns no error
+        assert effective is not None  # noqa: S101 -- adapter/effective are guaranteed after _resolve() returns no error
 
         desired_result = self._membership_builder.build_platform_state_from_effective(
             effective=effective,

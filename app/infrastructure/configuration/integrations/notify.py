@@ -17,19 +17,17 @@ class NotifySettings(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.integrations.notify import get_notify_settings
 
-        settings = get_settings()
+        settings = get_notify_settings()
 
-        api_url = settings.notify.NOTIFY_API_URL
-        username = settings.notify.NOTIFY_SRE_USER_NAME
+        api_url = settings.NOTIFY_API_URL
+        username = settings.NOTIFY_SRE_USER_NAME
         ```
     """
 
     NOTIFY_SRE_USER_NAME: str | None = Field(default=None, alias="NOTIFY_SRE_USER_NAME")
-    NOTIFY_SRE_CLIENT_SECRET: str | None = Field(
-        default=None, alias="NOTIFY_SRE_CLIENT_SECRET"
-    )
+    NOTIFY_SRE_CLIENT_SECRET: str | None = Field(default=None, alias="NOTIFY_SRE_CLIENT_SECRET")
     NOTIFY_API_URL: str = Field(default="", alias="NOTIFY_API_URL")
 
 

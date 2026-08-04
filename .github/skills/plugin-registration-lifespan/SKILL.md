@@ -3,11 +3,13 @@ name: plugin-registration-lifespan
 description: Apply pluggy registration and lifespan startup patterns for package discovery, initialization ordering, and testable startup behavior.
 ---
 
+# Plugin Registration and Lifespan Startup
+
 Use this skill when adding/refactoring package registration and startup behavior.
 
 ## Core Checklist
 
-1. Register package capabilities with pluggy (no file discovery).
+1. Register package capabilities with pluggy via entry-points declared in `pyproject.toml` (`[project.entry-points."<marker_namespace>"]`), loaded once at startup with `pm.load_setuptools_entrypoints(...)` — never via import-time registration, and not via filesystem discovery (the `auto_discover_plugins` walk is being removed per `decisions/plugins.md`). Adding a feature means adding its one entry-point line; discovery is declarative and reviewed, not implicit from disk.
 2. Initialize plugin/package resources during lifespan startup.
 3. Keep startup wiring in platform/bootstrap layer, not business modules.
 4. Ensure package contracts are typed and testable.
@@ -16,8 +18,10 @@ Use this skill when adding/refactoring package registration and startup behavior
 ## Startup Sequence Rules
 
 - Register hookspecs before plugin registration.
+- Apply `pm.set_blocked(<feature>)` for feature-flag-disabled features before `load_setuptools_entrypoints`, not with conditionals inside a hookimpl.
 - Execute discovery/registration from startup lifecycle, not module import.
 - Run validation checks (`check_pending` or equivalent) to surface invalid hook implementations early.
+- Fail fast: an unimportable entry-point target or a raising hookimpl terminates boot. Do not catch-and-continue registration errors.
 - Keep startup behavior deterministic and observable through structured logs.
 
 ## Event Handler Registration Pattern
@@ -43,7 +47,7 @@ Use this skill when adding/refactoring package registration and startup behavior
 
 - Hook signatures should be explicitly typed.
 - Hook invocations should use keyword arguments for clarity and resilience.
-- Feature packages should be independently registerable without central manual wiring edits.
+- Feature packages register declaratively through a single `pyproject.toml` entry-point line, not through composition-root code edits; the host performs no per-feature manual `pm.register()` wiring.
 
 ## Test Requirements
 

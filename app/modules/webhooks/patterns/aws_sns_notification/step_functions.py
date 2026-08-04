@@ -1,7 +1,6 @@
 import json
 import re
 from datetime import datetime
-from typing import Dict, List, Union
 
 from slack_sdk import WebClient
 from structlog import get_logger
@@ -12,7 +11,7 @@ from modules.webhooks.aws_sns_notification import AwsNotificationPattern
 logger = get_logger()
 
 
-def format_timestamp(timestamp_ms: Union[str, int]) -> str:
+def format_timestamp(timestamp_ms: str | int) -> str:
     """
     Format a Unix timestamp in milliseconds to a human-readable datetime string.
 
@@ -26,7 +25,7 @@ def format_timestamp(timestamp_ms: Union[str, int]) -> str:
         timestamp_sec = int(timestamp_ms) / 1000
         dt = datetime.fromtimestamp(timestamp_sec)
         return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return str(timestamp_ms)
 
 
@@ -50,18 +49,12 @@ def extract_account_name(input_data: str) -> str:
             .get("AccountName")
         )
         if not account_name:
-            account_name = (
-                input_json.get("account_request", {})
-                .get("control_tower_parameters", {})
-                .get("AccountName")
-            )
+            account_name = input_json.get("account_request", {}).get("control_tower_parameters", {}).get("AccountName")
         if not account_name:
-            account_name = (
-                input_json.get("account_info", {}).get("account", {}).get("name")
-            )
+            account_name = input_json.get("account_info", {}).get("account", {}).get("name")
 
         return account_name or "Unknown"
-    except (json.JSONDecodeError, TypeError, AttributeError):
+    except json.JSONDecodeError, TypeError, AttributeError:
         return "Unknown"
 
 
@@ -79,26 +72,20 @@ def extract_change_info(input_data: str) -> tuple[str, str]:
         input_json = json.loads(input_data)
         # Try different paths where change info might be
         change_params = (
-            input_json.get("control_tower_event", {})
-            .get("account_request", {})
-            .get("change_management_parameters", {})
+            input_json.get("control_tower_event", {}).get("account_request", {}).get("change_management_parameters", {})
         )
         if not change_params:
-            change_params = input_json.get("account_request", {}).get(
-                "change_management_parameters", {}
-            )
+            change_params = input_json.get("account_request", {}).get("change_management_parameters", {})
 
         reason = change_params.get("change_reason", "Not specified")
         requester = change_params.get("change_requested_by", "Unknown")
 
         return reason, requester
-    except (json.JSONDecodeError, TypeError, AttributeError):
+    except json.JSONDecodeError, TypeError, AttributeError:
         return "Not specified", "Unknown"
 
 
-def handle_step_functions_notification(
-    payload: AwsSnsPayload, client: WebClient
-) -> List[Dict]:
+def handle_step_functions_notification(payload: AwsSnsPayload, client: WebClient) -> list[dict]:
     """
     Handle AWS Step Functions state machine execution notifications from AWS SNS.
 
@@ -115,10 +102,8 @@ def handle_step_functions_notification(
             return []
 
         msg = json.loads(message)
-    except (json.JSONDecodeError, TypeError):
-        logger.warning(
-            "failed_to_parse_step_functions_message", message=payload.Message
-        )
+    except json.JSONDecodeError, TypeError:
+        logger.warning("failed_to_parse_step_functions_message", message=payload.Message)
         return []
 
     # Extract execution details
@@ -245,9 +230,7 @@ def handle_step_functions_notification(
     return blocks
 
 
-def is_step_functions_notification(
-    payload: AwsSnsPayload, parsed_message: Union[str, dict]
-) -> bool:
+def is_step_functions_notification(payload: AwsSnsPayload, parsed_message: str | dict) -> bool:
     """
     Check if the AWS SNS message is a Step Functions execution notification.
 

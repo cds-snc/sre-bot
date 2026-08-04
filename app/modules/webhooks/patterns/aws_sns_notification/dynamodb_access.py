@@ -1,6 +1,5 @@
 import json
 import re
-from typing import Dict, List, Union
 
 from slack_sdk import WebClient
 
@@ -12,7 +11,7 @@ def _message_text(payload: AwsSnsPayload) -> str:
     message = payload.Message or ""
     try:
         decoded_message = json.loads(message)
-    except (json.JSONDecodeError, TypeError):
+    except json.JSONDecodeError, TypeError:
         return message
 
     if isinstance(decoded_message, str):
@@ -20,10 +19,10 @@ def _message_text(payload: AwsSnsPayload) -> str:
     return message
 
 
-def _extract_fields(message: str) -> tuple[str, Dict[str, str]]:
+def _extract_fields(message: str) -> tuple[str, dict[str, str]]:
     lines = [line.strip() for line in message.splitlines() if line.strip()]
     title = lines[0] if lines else "Unexpected DynamoDB access"
-    fields: Dict[str, str] = {}
+    fields: dict[str, str] = {}
 
     for line in lines[1:]:
         match = re.match(r"^(?P<key>[A-Za-z ]+):\s*(?P<value>.*)$", line)
@@ -42,7 +41,7 @@ def _field_line(label: str, value: str) -> str:
     return f"*{label}:* `{value}`"
 
 
-def handle_dynamodb_access(payload: AwsSnsPayload, client: WebClient) -> List[Dict]:
+def handle_dynamodb_access(payload: AwsSnsPayload, client: WebClient) -> list[dict]:
     """
     Handle unexpected DynamoDB access notifications from AWS SNS.
 
@@ -91,16 +90,11 @@ def handle_dynamodb_access(payload: AwsSnsPayload, client: WebClient) -> List[Di
     return blocks
 
 
-def is_dynamodb_access(
-    payload: AwsSnsPayload, parsed_message: Union[str, dict]
-) -> bool:
+def is_dynamodb_access(payload: AwsSnsPayload, parsed_message: str | dict) -> bool:
     """
     Check if the AWS SNS message is an unexpected DynamoDB access notification.
     """
-    if isinstance(parsed_message, str):
-        message = parsed_message
-    else:
-        message = _message_text(payload)
+    message = parsed_message if isinstance(parsed_message, str) else _message_text(payload)
 
     return "Unexpected DynamoDB access" in message
 

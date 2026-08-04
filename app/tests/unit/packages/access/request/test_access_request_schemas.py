@@ -6,9 +6,7 @@ from packages.access.request.schemas import AccessRequestStatusResponse
 
 
 @pytest.mark.unit
-def test_access_request_status_response_decisions_description_documents_invariant() -> (
-    None
-):
+def test_access_request_status_response_decisions_description_documents_invariant() -> None:
     schema = AccessRequestStatusResponse.model_json_schema()
     decisions_schema = schema["properties"]["decisions"]
 

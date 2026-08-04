@@ -3,30 +3,30 @@ from slack_bolt import Ack, App, Respond
 from slack_sdk import WebClient
 from structlog import get_logger
 
-from core.config import settings
+from infrastructure.configuration.integrations.google import (
+    get_google_resources_config,
+    get_google_workspace_settings,
+)
+from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.google_workspace import google_drive
 from integrations.slack import commands as slack_commands
 from integrations.slack import users as slack_users
 
-PREFIX = settings.PREFIX
-BOT_EMAIL = settings.google_workspace.SRE_BOT_EMAIL
+google_settings = get_google_workspace_settings()
+google_resources = get_google_resources_config()
 
-SCORING_GUIDE_TEMPLATE = settings.google_resources.scoring_guide_template_id
-CORE_VALUES_INTERVIEW_NOTES_TEMPLATE = (
-    settings.google_resources.core_values_interview_notes_id
-)
-TECHNICAL_INTERVIEW_NOTES_TEMPLATE = (
-    settings.google_resources.technical_interview_notes_id
-)
-INTAKE_FORM_TEMPLATE = settings.google_resources.intake_form_template_id
-PHONE_SCREEN_TEMPLATE = settings.google_resources.phone_screen_template_id
-RECRUITMENT_FEEDBACK_TEMPLATE = (
-    settings.google_resources.recruitment_feedback_template_id
-)
-PANELIST_GUIDEBOOK_TEMPLATE = settings.google_resources.panelist_guidebook_template_id
+BOT_EMAIL = google_settings.SRE_BOT_EMAIL
 
-TEMPLATES_FOLDER = settings.google_resources.templates_folder_id
-INTERNAL_TALENT_FOLDER = settings.google_resources.internal_talent_folder_id
+SCORING_GUIDE_TEMPLATE = google_resources.scoring_guide_template_id
+CORE_VALUES_INTERVIEW_NOTES_TEMPLATE = google_resources.core_values_interview_notes_id
+TECHNICAL_INTERVIEW_NOTES_TEMPLATE = google_resources.technical_interview_notes_id
+INTAKE_FORM_TEMPLATE = google_resources.intake_form_template_id
+PHONE_SCREEN_TEMPLATE = google_resources.phone_screen_template_id
+RECRUITMENT_FEEDBACK_TEMPLATE = google_resources.recruitment_feedback_template_id
+PANELIST_GUIDEBOOK_TEMPLATE = google_resources.panelist_guidebook_template_id
+
+TEMPLATES_FOLDER = google_resources.templates_folder_id
+INTERNAL_TALENT_FOLDER = google_resources.internal_talent_folder_id
 
 ROLE_SCOPES = ["https://www.googleapis.com/auth/drive"]
 
@@ -41,7 +41,8 @@ logger = get_logger()
 
 
 def register(bot: App):
-    bot.command(f"/{PREFIX}talent-role")(role_command)
+    transport_settings = get_slack_transport_settings()
+    bot.command(f"/{transport_settings.COMMAND_PREFIX}talent-role")(role_command)
     bot.view("role_view")(role_view_handler)
     bot.action("role_change_locale")(update_modal_locale)
 
@@ -52,9 +53,7 @@ def update_locale(locale):
         i18n.set("locale", locale)
 
 
-def role_command(
-    ack: Ack, command: dict, respond: Respond, client: WebClient, body: dict
-):
+def role_command(ack: Ack, command: dict, respond: Respond, client: WebClient, body: dict):
     # Function to execute the role command based on the arguments provided
 
     # acknowledge to slack that the command was received
@@ -95,11 +94,7 @@ def role_command(
             update_locale("fr-FR")
             request_start_modal(client, body, locale="fr-FR")
         case _:
-            respond(
-                i18n.t(
-                    "role.unknown_command", action=action, command=command["command"]
-                )
-            )
+            respond(i18n.t("role.unknown_command", action=action, command=command["command"]))
 
 
 def request_start_modal(client, body, locale):
@@ -205,9 +200,7 @@ def role_view_handler(ack, body, say, client):
         )
 
     role_name = body["view"]["state"]["values"]["role_name"]["role_name"]["value"]
-    private_channel_name = body["view"]["state"]["values"]["channel_name"][
-        "channel_name"
-    ]["value"]
+    private_channel_name = body["view"]["state"]["values"]["channel_name"]["channel_name"]["value"]
     log.info(
         "talent_role_view_handler_called",
         role_name=role_name,
@@ -297,9 +290,7 @@ def role_view_handler(ack, body, say, client):
         folder_id,
         delegated_user_email=BOT_EMAIL,
     )
-    log_document_created(
-        "Recruitment Feedback Template", recruitment_feedback_template_id
-    )
+    log_document_created("Recruitment Feedback Template", recruitment_feedback_template_id)
 
     panelist_guidebook_template_id = google_drive.copy_file_to_folder(
         PANELIST_GUIDEBOOK_TEMPLATE,
@@ -328,19 +319,14 @@ def role_view_handler(ack, body, say, client):
     )
     # Announce channel creation
     user_id = body["user"]["id"]
-    text = (
-        f"<@{user_id}> has created a new channel for {role_name} with channel name {channel_name}"
-        f" in <#{channel_id}>\n"
-    )
+    text = f"<@{user_id}> has created a new channel for {role_name} with channel name {channel_name} in <#{channel_id}>\n"
     say(text=text, channel=channel_id)
 
     # Add role creator to channel
     client.conversations_invite(channel=channel_id, users=user_id)
 
     # Invite others to the channel
-    users = body["view"]["state"]["values"]["users_invited"]["users_invited"][
-        "selected_users"
-    ]
+    users = body["view"]["state"]["values"]["users_invited"]["users_invited"]["selected_users"]
     client.conversations_invite(channel=channel_id, users=",".join(users))
 
 
@@ -348,17 +334,10 @@ def update_modal_locale(ack, client, body):
     # update the locale
     ack()
     locale = next(
-        (
-            action
-            for action in body["actions"]
-            if action["action_id"] == "role_change_locale"
-        ),
+        (action for action in body["actions"] if action["action_id"] == "role_change_locale"),
         None,
     )["value"]
-    if locale == "en-US":
-        locale = "fr-FR"
-    else:
-        locale = "en-US"
+    locale = "fr-FR" if locale == "en-US" else "en-US"
     i18n.set("locale", locale)
     view_id = body["view"]["id"]
     view = role_modal_view(locale)

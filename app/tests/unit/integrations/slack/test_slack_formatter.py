@@ -145,9 +145,7 @@ class TestFormatError:
         """Test error formatting without code or details."""
         formatter = SlackBlockKitFormatter()
 
-        result = formatter.format_error(
-            message="Error occurred", error_code=None, details=None
-        )
+        result = formatter.format_error(message="Error occurred", error_code=None, details=None)
 
         assert len(result["blocks"]) == 1
         assert result["blocks"][0]["type"] == "section"
@@ -173,9 +171,7 @@ class TestFormatInfo:
         """Test info formatting with data."""
         formatter = SlackBlockKitFormatter()
 
-        result = formatter.format_info(
-            message="Status update", data={"progress": 50, "total": 100}
-        )
+        result = formatter.format_info(message="Status update", data={"progress": 50, "total": 100})
 
         assert "blocks" in result
         assert len(result["blocks"]) >= 3  # header + divider + data
@@ -229,9 +225,7 @@ class TestFormatOperationResult:
     def test_format_successful_operation_result(self):
         """Test formatting successful OperationResult."""
         formatter = SlackBlockKitFormatter()
-        result = OperationResult.success(
-            data={"user_id": "U123"}, message="User created"
-        )
+        result = OperationResult.success(data={"user_id": "U123"}, message="User created")
 
         formatted = formatter.format_operation_result(result)
 
@@ -259,9 +253,7 @@ class TestFormatOperationResult:
     def test_format_operation_result_without_message(self):
         """Test formatting OperationResult with no message."""
         formatter = SlackBlockKitFormatter()
-        result = OperationResult(
-            status=OperationStatus.SUCCESS, message=None, data={"id": "123"}
-        )
+        result = OperationResult(status=OperationStatus.SUCCESS, message=None, data={"id": "123"})
 
         formatted = formatter.format_operation_result(result)
 
@@ -361,9 +353,7 @@ class TestBlockKitStructure:
         """Test that error response has valid Block Kit structure."""
         formatter = SlackBlockKitFormatter()
 
-        result = formatter.format_error(
-            message="Error", error_code="ERR", details={"x": "y"}
-        )
+        result = formatter.format_error(message="Error", error_code="ERR", details={"x": "y"})
 
         assert "blocks" in result
         assert isinstance(result["blocks"], list)

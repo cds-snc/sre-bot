@@ -30,9 +30,7 @@ def test_catalog_startup_warmup_validates_runtime_config(monkeypatch):
         provider_warm_called = True
         return object()
 
-    monkeypatch.setattr(
-        catalog_pkg, "get_access_runtime_config", _runtime_config, raising=False
-    )
+    monkeypatch.setattr(catalog_pkg, "get_access_runtime_config", _runtime_config, raising=False)
     monkeypatch.setattr(catalog_pkg, "get_catalog_settings", lambda: _Settings())
     monkeypatch.setattr(catalog_pkg, "get_catalog_service", _warm_provider)
 

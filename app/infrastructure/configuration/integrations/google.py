@@ -2,10 +2,10 @@
 
 import json
 from functools import lru_cache
-from typing import Any, Optional, cast
+from typing import Any, cast
 
-from pydantic import Field, field_validator
 import structlog
+from pydantic import Field, field_validator
 
 from infrastructure.configuration.base import IntegrationSettings
 
@@ -23,25 +23,19 @@ class GoogleWorkspaceSettings(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.integrations.google import get_google_workspace_settings
 
-        settings = get_settings()
+        settings = get_google_workspace_settings()
 
-        admin_email = settings.google_workspace.GOOGLE_DELEGATED_ADMIN_EMAIL
-        customer_id = settings.google_workspace.GOOGLE_WORKSPACE_CUSTOMER_ID
+        admin_email = settings.GOOGLE_DELEGATED_ADMIN_EMAIL
+        customer_id = settings.GOOGLE_WORKSPACE_CUSTOMER_ID
         ```
     """
 
-    GOOGLE_DELEGATED_ADMIN_EMAIL: str = Field(
-        default="", alias="GOOGLE_DELEGATED_ADMIN_EMAIL"
-    )
+    GOOGLE_DELEGATED_ADMIN_EMAIL: str = Field(default="", alias="GOOGLE_DELEGATED_ADMIN_EMAIL")
     SRE_BOT_EMAIL: str = Field(default="", alias="SRE_BOT_EMAIL")
-    GOOGLE_WORKSPACE_CUSTOMER_ID: str = Field(
-        default="my_customer", alias="GOOGLE_WORKSPACE_CUSTOMER_ID"
-    )
-    GCP_SRE_SERVICE_ACCOUNT_KEY_FILE: str = Field(
-        default="", alias="GCP_SRE_SERVICE_ACCOUNT_KEY_FILE"
-    )
+    GOOGLE_WORKSPACE_CUSTOMER_ID: str = Field(default="my_customer", alias="GOOGLE_WORKSPACE_CUSTOMER_ID")
+    GCP_SRE_SERVICE_ACCOUNT_KEY_FILE: str = Field(default="", alias="GCP_SRE_SERVICE_ACCOUNT_KEY_FILE")
 
 
 class GoogleResourcesConfig(IntegrationSettings):
@@ -86,12 +80,12 @@ class GoogleResourcesConfig(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.integrations.google import get_google_resources_config
 
-        settings = get_settings()
+        settings = get_google_resources_config()
 
-        incident_drive = settings.google_resources.incident_drive_id
-        incident_folder = settings.google_resources.incident_folder_id
+        incident_drive = settings.incident_drive_id
+        incident_folder = settings.incident_folder_id
         ```
     """
 
@@ -103,7 +97,7 @@ class GoogleResourcesConfig(IntegrationSettings):
 
     @field_validator("resources", mode="before")
     @classmethod
-    def _parse_resources(cls, v: Optional[Any]) -> dict[str, Any]:
+    def _parse_resources(cls, v: Any | None) -> dict[str, Any]:
         """Parse GOOGLE_RESOURCES from JSON string or dict."""
         if v is None:
             return {}
@@ -111,15 +105,13 @@ class GoogleResourcesConfig(IntegrationSettings):
             return v
         if isinstance(v, str):
             s = v.strip()
-            if (s.startswith("'") and s.endswith("'")) or (
-                s.startswith('"') and s.endswith('"')
-            ):
+            if (s.startswith("'") and s.endswith("'")) or (s.startswith('"') and s.endswith('"')):
                 s = s[1:-1]
             try:
                 return dict(cast(dict[str, Any], json.loads(s)))
             except (json.JSONDecodeError, ValueError) as e:
                 logger.error("failed_to_parse_google_resources", error=str(e))
-                raise ValueError(f"GOOGLE_RESOURCES must be valid JSON: {e}")
+                raise ValueError(f"GOOGLE_RESOURCES must be valid JSON: {e}") from e
         raise ValueError("GOOGLE_RESOURCES must be a JSON string or a mapping")
 
     def _get_resource(self, scope: str, key: str) -> str:

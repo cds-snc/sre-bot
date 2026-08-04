@@ -3,14 +3,13 @@
 Provides operations to interact with AWS Cost Explorer service, enabling retrieval of cost and usage data with consistent error handling via OperationResult.
 """
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import structlog
 
 from infrastructure.clients.aws.executor import execute_aws_api_call
 from infrastructure.clients.aws.session_provider import SessionProvider
 from infrastructure.operations.result import OperationResult
-
 
 logger = structlog.get_logger()
 
@@ -25,21 +24,19 @@ class CostExplorerClient:
     def __init__(
         self,
         session_provider: SessionProvider,
-        default_role_arn: Optional[str] = None,
+        default_role_arn: str | None = None,
     ) -> None:
         self._session_provider = session_provider
         self._default_role_arn = default_role_arn
         self.service_name = "ce"
 
-    def get_cost_and_usage(
-        self, time_period: Dict[str, str], metrics: list, **kwargs
-    ) -> OperationResult:
+    def get_cost_and_usage(self, time_period: dict[str, str], metrics: list, **kwargs) -> OperationResult:
         """Get cost and usage data from AWS Cost Explorer.
 
         Returns an OperationResult whose `data` contains the cost and usage details
         when successful.
         """
-        params: Dict[str, Any] = {
+        params: dict[str, Any] = {
             "TimePeriod": time_period,
             "Metrics": metrics,
             **kwargs,

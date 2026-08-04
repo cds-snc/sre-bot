@@ -27,7 +27,7 @@ Adapters must not duplicate any logic from this module.
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Literal, Optional, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from packages.access.common.config import EntitlementRule
 
@@ -52,9 +52,9 @@ class EffectivePlatformPolicy:
     platform: str
     authn_group_slug: str
     authn_removal_mode: str
-    entitlement_rules: List[EntitlementRule]
+    entitlement_rules: list[EntitlementRule]
 
-    def sync_managed_rules(self) -> List[EntitlementRule]:
+    def sync_managed_rules(self) -> list[EntitlementRule]:
         """All rules (every rule in effective policy is already sync_managed)."""
         return list(self.entitlement_rules)
 
@@ -72,14 +72,14 @@ class PlanningContext:
 
     platform: str
     authn_removal_mode: str
-    entitlement_rules: List[EntitlementRule]
+    entitlement_rules: list[EntitlementRule]
 
-    def sync_managed_rules(self) -> List[EntitlementRule]:
+    def sync_managed_rules(self) -> list[EntitlementRule]:
         """All rules (every rule in planning context is already sync_managed)."""
         return list(self.entitlement_rules)
 
     @classmethod
-    def from_effective(cls, effective: "EffectivePlatformPolicy") -> "PlanningContext":
+    def from_effective(cls, effective: EffectivePlatformPolicy) -> PlanningContext:
         """Derive a PlanningContext from an EffectivePlatformPolicy."""
         return cls(
             platform=effective.platform,
@@ -89,9 +89,9 @@ class PlanningContext:
 
 
 def resolve_effective_policy(
-    config: "AccessRuntimeConfig",
+    config: AccessRuntimeConfig,
     platform: str,
-    discovered_slugs: Set[str],
+    discovered_slugs: set[str],
 ) -> EffectivePlatformPolicy:
     """Build the run-scoped effective policy from IDP-discovered group slugs.
 
@@ -113,7 +113,7 @@ def resolve_effective_policy(
     prefix = config.group_prefix(platform)
     authn_slug = config.authn_group_slug(platform)
 
-    rules: List[EntitlementRule] = []
+    rules: list[EntitlementRule] = []
     for slug in sorted(discovered_slugs):
         normalized = slug.strip().lower()
         if normalized == authn_slug.lower():
@@ -159,7 +159,7 @@ class AdapterCapabilities:
 
     supports_disable: bool
     supports_delete: bool
-    supported_entitlement_types: Set[str]
+    supported_entitlement_types: set[str]
     supports_bulk_user_delta: bool = False
 
 
@@ -180,19 +180,19 @@ class PlannedAction:
         "apply_entitlement",
         "remove_entitlement",
     ]
-    entitlement_type: Optional[str] = None
-    entitlement_id: Optional[str] = None
+    entitlement_type: str | None = None
+    entitlement_id: str | None = None
 
 
 @dataclass(frozen=True)
 class PlatformActionPlan:
     """Lifecycle and entitlement deltas for a full platform reconciliation run."""
 
-    users_to_provision: Set[str]
-    users_to_disable: Set[str]
-    users_to_remove: Set[str]
-    entitlement_adds_by_id: Dict[str, Set[str]]
-    entitlement_removes_by_id: Dict[str, Set[str]]
+    users_to_provision: set[str]
+    users_to_disable: set[str]
+    users_to_remove: set[str]
+    entitlement_adds_by_id: dict[str, set[str]]
+    entitlement_removes_by_id: dict[str, set[str]]
 
 
 class PolicyEngine:
@@ -211,10 +211,10 @@ class PolicyEngine:
         policy: PlanningContext,
         capabilities: AdapterCapabilities,
         user_should_exist: bool,
-        required_entitlements: List[EntitlementRule],
-        current_entitlement_ids: Optional[Set[str]] = None,
+        required_entitlements: list[EntitlementRule],
+        current_entitlement_ids: set[str] | None = None,
         platform_user_exists: bool = False,
-    ) -> List[PlannedAction]:
+    ) -> list[PlannedAction]:
         """Produce the minimal ordered action list to converge one user.
 
         Args:
@@ -232,18 +232,16 @@ class PolicyEngine:
             Ordered list of PlannedActions.  Entitlement removals precede
             user-lifecycle actions so records are clean before deactivation.
         """
-        planned: List[PlannedAction] = []
-        current_ids: Set[str] = current_entitlement_ids or set()
+        planned: list[PlannedAction] = []
+        current_ids: set[str] = current_entitlement_ids or set()
 
-        sync_managed_by_id: Dict[str, EntitlementRule] = {
-            r.entitlement_id: r for r in policy.sync_managed_rules()
-        }
+        sync_managed_by_id: dict[str, EntitlementRule] = {r.entitlement_id: r for r in policy.sync_managed_rules()}
 
         if user_should_exist:
             if not platform_user_exists:
                 planned.append(PlannedAction(action="provision_user"))
 
-            desired_ids: Set[str] = set()
+            desired_ids: set[str] = set()
             for rule in required_entitlements:
                 if rule.entitlement_type in capabilities.supported_entitlement_types:
                     planned.append(
@@ -258,10 +256,7 @@ class PolicyEngine:
             for ent_id in sorted(current_ids):
                 if ent_id in sync_managed_by_id and ent_id not in desired_ids:
                     rule = sync_managed_by_id[ent_id]
-                    if (
-                        rule.entitlement_type
-                        in capabilities.supported_entitlement_types
-                    ):
+                    if rule.entitlement_type in capabilities.supported_entitlement_types:
                         planned.append(
                             PlannedAction(
                                 action="remove_entitlement",
@@ -298,34 +293,24 @@ class PlatformReconciliationPlanner:
 
     def plan_platform_actions(
         self,
-        desired_users: Set[str],
-        desired_members_by_entitlement: Dict[str, Set[str]],
-        current_users: Set[str],
-        current_members_by_entitlement: Dict[str, Set[str]],
+        desired_users: set[str],
+        desired_members_by_entitlement: dict[str, set[str]],
+        current_users: set[str],
+        current_members_by_entitlement: dict[str, set[str]],
         authn_removal_mode: str,
     ) -> PlatformActionPlan:
         """Return direct set-based deltas for platform reconciliation."""
         users_to_provision = desired_users - current_users
-        users_to_disable = (
-            current_users - desired_users if authn_removal_mode == "disable" else set()
-        )
-        users_to_remove = (
-            current_users - desired_users if authn_removal_mode == "delete" else set()
-        )
+        users_to_disable = current_users - desired_users if authn_removal_mode == "disable" else set()
+        users_to_remove = current_users - desired_users if authn_removal_mode == "delete" else set()
 
-        entitlement_adds_by_id: Dict[str, Set[str]] = {}
-        entitlement_removes_by_id: Dict[str, Set[str]] = {}
-        entitlement_ids = set(desired_members_by_entitlement.keys()) | set(
-            current_members_by_entitlement.keys()
-        )
+        entitlement_adds_by_id: dict[str, set[str]] = {}
+        entitlement_removes_by_id: dict[str, set[str]] = {}
+        entitlement_ids = set(desired_members_by_entitlement.keys()) | set(current_members_by_entitlement.keys())
 
         for entitlement_id in sorted(entitlement_ids):
-            desired_members = set(
-                desired_members_by_entitlement.get(entitlement_id, set())
-            )
-            current_members = set(
-                current_members_by_entitlement.get(entitlement_id, set())
-            )
+            desired_members = set(desired_members_by_entitlement.get(entitlement_id, set()))
+            current_members = set(current_members_by_entitlement.get(entitlement_id, set()))
             members_to_add = desired_members - current_members
             members_to_remove = current_members - desired_members
 

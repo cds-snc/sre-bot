@@ -1,10 +1,11 @@
 """Unit tests for MaxMind infrastructure client."""
 
+from unittest.mock import MagicMock, Mock
+
 import pytest
-from unittest.mock import Mock, MagicMock
 from geoip2.errors import AddressNotFoundError, GeoIP2Error
 
-from infrastructure.clients.maxmind import MaxMindClient, GeoLocationData
+from infrastructure.clients.maxmind import GeoLocationData, MaxMindClient
 from infrastructure.operations import OperationStatus
 
 

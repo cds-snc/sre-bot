@@ -37,7 +37,7 @@ Separation of concerns between ``FakeDirectory`` fields:
         ``sync_platform`` batch IDP reads (Phase 1).
 """
 
-from typing import Any, Dict, List, Literal, Optional, Set
+from typing import Any, Literal
 from unittest.mock import MagicMock
 
 import pytest
@@ -105,15 +105,15 @@ class FakeDirectory:
 
     def __init__(
         self,
-        discovered_slugs: Optional[Set[str]] = None,
-        transitive_membership_slugs: Optional[Set[str]] = None,
-        user_direct_group_slugs: Optional[Set[str]] = None,
-        group_members: Optional[Dict[str, List[str]]] = None,
+        discovered_slugs: set[str] | None = None,
+        transitive_membership_slugs: set[str] | None = None,
+        user_direct_group_slugs: set[str] | None = None,
+        group_members: dict[str, list[str]] | None = None,
     ) -> None:
-        self._discovered: Set[str] = discovered_slugs or set()
-        self._transitive: Set[str] = transitive_membership_slugs or set()
-        self._direct: Set[str] = user_direct_group_slugs or set()
-        self._members: Dict[str, List[str]] = group_members or {}
+        self._discovered: set[str] = discovered_slugs or set()
+        self._transitive: set[str] = transitive_membership_slugs or set()
+        self._direct: set[str] = user_direct_group_slugs or set()
+        self._members: dict[str, list[str]] = group_members or {}
 
     def _make_group(self, slug: str) -> DirectoryGroup:
         return DirectoryGroup(
@@ -141,25 +141,21 @@ class FakeDirectory:
         )
 
     def get_user_groups(self, user_email: str) -> OperationResult:
-        return OperationResult.success(
-            data=[self._make_group(slug) for slug in self._direct]
-        )
+        return OperationResult.success(data=[self._make_group(slug) for slug in self._direct])
 
     def get_group_members(
         self,
         group_email: str,
-        include_member_types: Optional[Set[str]] = None,
+        include_member_types: set[str] | None = None,
     ) -> OperationResult:
         slug = group_email.split("@")[0]
         emails = self._members.get(slug, [])
-        return OperationResult.success(
-            data=[DirectoryMember(email=email) for email in emails]
-        )
+        return OperationResult.success(data=[DirectoryMember(email=email) for email in emails])
 
     def get_group_members_batch(
         self,
-        group_emails: List[str],
-        include_member_types: Optional[Set[str]] = None,
+        group_emails: list[str],
+        include_member_types: set[str] | None = None,
     ) -> OperationResult:
         result = {}
         for group_email in group_emails:
@@ -169,11 +165,7 @@ class FakeDirectory:
         return OperationResult.success(data=result)
 
     def list_groups(self, query: str = "") -> OperationResult:
-        matching = [
-            self._make_group(slug)
-            for slug in self._discovered
-            if not query or slug.startswith(query)
-        ]
+        matching = [self._make_group(slug) for slug in self._discovered if not query or slug.startswith(query)]
         return OperationResult.success(data=matching)
 
 
@@ -192,20 +184,18 @@ class SpyAdapter:
 
     def __init__(
         self,
-        current_entitlement_ids: Optional[Set[str]] = None,
+        current_entitlement_ids: set[str] | None = None,
         user_exists: bool = True,
-        provisioned_users: Optional[Set[str]] = None,
+        provisioned_users: set[str] | None = None,
         supports_disable: bool = False,
-        group_members: Optional[Dict[str, Set[str]]] = None,
+        group_members: dict[str, set[str]] | None = None,
     ) -> None:
-        self.calls: List[tuple] = []
-        self._current_ids: Set[str] = (
-            current_entitlement_ids if current_entitlement_ids is not None else set()
-        )
+        self.calls: list[tuple] = []
+        self._current_ids: set[str] = current_entitlement_ids if current_entitlement_ids is not None else set()
         self._user_exists = user_exists
         self._provisioned = provisioned_users
         self._supports_disable = supports_disable
-        self._group_members: Dict[str, Set[str]] = group_members or {}
+        self._group_members: dict[str, set[str]] = group_members or {}
 
     def capabilities(self) -> AdapterCapabilities:
         return AdapterCapabilities(
@@ -264,7 +254,7 @@ class SpyAdapter:
             current_entitlement_ids=current.current_entitlement_ids,
             platform_user_exists=current.platform_user_exists,
         )
-        applied: List[str] = []
+        applied: list[str] = []
         if not dry_run:
             for action in planned:
                 if action.action == "provision_user":
@@ -276,23 +266,11 @@ class SpyAdapter:
                 elif action.action == "remove_user":
                     self.remove_user(user_email)
                     applied.append(action.action)
-                elif (
-                    action.action == "apply_entitlement"
-                    and action.entitlement_type
-                    and action.entitlement_id
-                ):
-                    self.apply_entitlement(
-                        user_email, action.entitlement_type, action.entitlement_id
-                    )
+                elif action.action == "apply_entitlement" and action.entitlement_type and action.entitlement_id:
+                    self.apply_entitlement(user_email, action.entitlement_type, action.entitlement_id)
                     applied.append(action.action)
-                elif (
-                    action.action == "remove_entitlement"
-                    and action.entitlement_type
-                    and action.entitlement_id
-                ):
-                    self.remove_entitlement(
-                        user_email, action.entitlement_type, action.entitlement_id
-                    )
+                elif action.action == "remove_entitlement" and action.entitlement_type and action.entitlement_id:
+                    self.remove_entitlement(user_email, action.entitlement_type, action.entitlement_id)
                     applied.append(action.action)
         return OperationResult.success(
             data=SyncOutcome(
@@ -317,11 +295,9 @@ class SpyAdapter:
             current_members_by_entitlement=self._group_members,
             authn_removal_mode=context.authn_removal_mode,
         )
-        actions_by_user: Dict[str, List[PlannedAction]] = {}
+        actions_by_user: dict[str, list[PlannedAction]] = {}
         for email in sorted(plan.users_to_provision):
-            actions_by_user.setdefault(email, []).append(
-                PlannedAction(action="provision_user")
-            )
+            actions_by_user.setdefault(email, []).append(PlannedAction(action="provision_user"))
         for entitlement_id, members in sorted(plan.entitlement_adds_by_id.items()):
             for email in sorted(members):
                 actions_by_user.setdefault(email, []).append(
@@ -341,18 +317,14 @@ class SpyAdapter:
                     )
                 )
         for email in sorted(plan.users_to_disable):
-            actions_by_user.setdefault(email, []).append(
-                PlannedAction(action="disable_user")
-            )
+            actions_by_user.setdefault(email, []).append(PlannedAction(action="disable_user"))
         for email in sorted(plan.users_to_remove):
-            actions_by_user.setdefault(email, []).append(
-                PlannedAction(action="remove_user")
-            )
+            actions_by_user.setdefault(email, []).append(PlannedAction(action="remove_user"))
 
         users_converged = 0
-        per_user: Dict[str, SyncOutcome] = {}
+        per_user: dict[str, SyncOutcome] = {}
         for email, planned in sorted(actions_by_user.items()):
-            applied: List[str] = []
+            applied: list[str] = []
             if not dry_run:
                 for action in planned:
                     if action.action == "provision_user":
@@ -364,23 +336,11 @@ class SpyAdapter:
                     elif action.action == "remove_user":
                         self.remove_user(email)
                         applied.append(action.action)
-                    elif (
-                        action.action == "apply_entitlement"
-                        and action.entitlement_type
-                        and action.entitlement_id
-                    ):
-                        self.apply_entitlement(
-                            email, action.entitlement_type, action.entitlement_id
-                        )
+                    elif action.action == "apply_entitlement" and action.entitlement_type and action.entitlement_id:
+                        self.apply_entitlement(email, action.entitlement_type, action.entitlement_id)
                         applied.append(action.action)
-                    elif (
-                        action.action == "remove_entitlement"
-                        and action.entitlement_type
-                        and action.entitlement_id
-                    ):
-                        self.remove_entitlement(
-                            email, action.entitlement_type, action.entitlement_id
-                        )
+                    elif action.action == "remove_entitlement" and action.entitlement_type and action.entitlement_id:
+                        self.remove_entitlement(email, action.entitlement_type, action.entitlement_id)
                         applied.append(action.action)
             outcome = SyncOutcome(
                 planned_actions=[a.action for a in planned],
@@ -421,9 +381,7 @@ def make_sync_config():
         platform: str = "aws",
         authn_token: str = "authn",
         authn_removal_mode: str = "delete",
-        mode_overrides: Optional[
-            Dict[str, Literal["sync_managed", "ephemeral", "deactivated"]]
-        ] = None,
+        mode_overrides: dict[str, Literal["sync_managed", "ephemeral", "deactivated"]] | None = None,
         dir_prefix: str = "sg",
         dir_separator: str = "-",
         adapter_type: str = "fake",
@@ -474,20 +432,18 @@ def make_coordinator(make_sync_config):
     def _make(
         platform: str = "aws",
         authn_removal_mode: str = "delete",
-        mode_overrides: Optional[
-            Dict[str, Literal["sync_managed", "ephemeral", "deactivated"]]
-        ] = None,
+        mode_overrides: dict[str, Literal["sync_managed", "ephemeral", "deactivated"]] | None = None,
         # IDP state
-        discovered_slugs: Optional[Set[str]] = None,
-        transitive_membership_slugs: Optional[Set[str]] = None,
-        user_direct_group_slugs: Optional[Set[str]] = None,
-        group_members: Optional[Dict[str, List[str]]] = None,
+        discovered_slugs: set[str] | None = None,
+        transitive_membership_slugs: set[str] | None = None,
+        user_direct_group_slugs: set[str] | None = None,
+        group_members: dict[str, list[str]] | None = None,
         # Platform adapter state
-        current_entitlement_ids: Optional[Set[str]] = None,
+        current_entitlement_ids: set[str] | None = None,
         user_exists: bool = True,
-        provisioned_users: Optional[Set[str]] = None,
+        provisioned_users: set[str] | None = None,
         supports_disable: bool = False,
-        adapter_group_members: Optional[Dict[str, Set[str]]] = None,
+        adapter_group_members: dict[str, set[str]] | None = None,
     ) -> tuple:
         config = make_sync_config(
             platform=platform,
@@ -496,11 +452,7 @@ def make_coordinator(make_sync_config):
         )
         # Default transitive membership: authn slug is reachable (e.g. via a subgroup)
         authn_slug = config.authn_group_slug(platform)
-        transitive = (
-            transitive_membership_slugs
-            if transitive_membership_slugs is not None
-            else {authn_slug}
-        )
+        transitive = transitive_membership_slugs if transitive_membership_slugs is not None else {authn_slug}
         directory = FakeDirectory(
             discovered_slugs=discovered_slugs,
             transitive_membership_slugs=transitive,
@@ -568,9 +520,7 @@ def make_adapter(
         message="not a uuid",
         error_code="NOT_FOUND",
     )
-    fake_identitystore.list_groups.return_value = OperationResult.success(
-        data=aws_ic_groups
-    )
+    fake_identitystore.list_groups.return_value = OperationResult.success(data=aws_ic_groups)
     fake_aws = MagicMock()
     fake_aws.identitystore = fake_identitystore
     adapter = AwsIdentityCenterAdapter(aws_clients=fake_aws)

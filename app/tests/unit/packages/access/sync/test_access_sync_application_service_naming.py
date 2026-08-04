@@ -29,9 +29,7 @@ def test_sync_providers_return_annotation_uses_application_service() -> None:
 @pytest.mark.unit
 def test_sync_ingress_dependency_uses_application_service_port() -> None:
     """Shared ingress should accept the renamed application service protocol."""
-    ingress_module = importlib.import_module(
-        "packages.access.sync.interactions.ingress"
-    )
+    ingress_module = importlib.import_module("packages.access.sync.interactions.ingress")
 
     coordinator_type = get_type_hints(ingress_module.enqueue_user_sync)["coordinator"]
 

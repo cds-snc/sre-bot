@@ -4,7 +4,8 @@ Uses in-memory stubs for repository, directory, and dispatcher.
 Tests cover the main orchestration paths and error branches.
 """
 
-from typing import List, Optional
+from dataclasses import replace
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -17,9 +18,9 @@ from infrastructure.directory.models import (
 from infrastructure.events import Event
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig, PlatformPolicy
+from packages.access.common.events import SYNC_COMPLETED, SYNC_FAILED
 from packages.access.request.domain import AccessRequest, ApprovalDecision
 from packages.access.request.service import AccessRequestService
-
 
 # ---------------------------------------------------------------------------
 # Stubs / factories
@@ -55,9 +56,7 @@ def make_directory_group(
     )
 
 
-def make_membership(
-    is_member: bool, group_email: str = "sg-aws-admins@example.com"
-) -> MembershipCheckResult:
+def make_membership(is_member: bool, group_email: str = "sg-aws-admins@example.com") -> MembershipCheckResult:
     return MembershipCheckResult(
         group_email=group_email,
         group_slug="sg-aws-admins",
@@ -72,27 +71,25 @@ class FakeRepository:
 
     def __init__(self) -> None:
         self._store: dict[str, AccessRequest] = {}
-        self._decisions: dict[str, List[ApprovalDecision]] = {}
+        self._decisions: dict[str, list[ApprovalDecision]] = {}
         self._audit: list = []
 
     def save_request(self, request: AccessRequest) -> None:
         self._store[request.request_id] = request
 
-    def get_request(self, request_id: str) -> Optional[AccessRequest]:
+    def get_request(self, request_id: str) -> AccessRequest | None:
         return self._store.get(request_id)
 
     def save_decision(self, decision: ApprovalDecision) -> None:
         self._decisions.setdefault(decision.request_id, []).append(decision)
 
-    def get_decisions(self, request_id: str) -> List[ApprovalDecision]:
+    def get_decisions(self, request_id: str) -> list[ApprovalDecision]:
         return self._decisions.get(request_id, [])
 
     def save_audit_event(self, event) -> None:
         self._audit.append(event)
 
-    def get_request_with_decisions(
-        self, request_id: str
-    ) -> tuple[Optional[AccessRequest], List[ApprovalDecision]]:
+    def get_request_with_decisions(self, request_id: str) -> tuple[AccessRequest | None, list[ApprovalDecision]]:
         return (
             self._store.get(request_id),
             self._decisions.get(request_id, []),
@@ -103,33 +100,30 @@ class FakeDispatcher:
     """Records dispatched events."""
 
     def __init__(self) -> None:
-        self.dispatched: List[Event] = []
+        self.dispatched: list[Event] = []
 
     def dispatch_background(self, event: Event) -> None:
         self.dispatched.append(event)
 
-    def dispatch(self, event: Event) -> List:
+    def dispatch(self, event: Event) -> list:
         self.dispatched.append(event)
         return []
 
 
 def make_service(
-    config: Optional[AccessRuntimeConfig] = None,
-    directory: Optional[MagicMock] = None,
-    repo: Optional[FakeRepository] = None,
-    dispatcher: Optional[FakeDispatcher] = None,
+    config: AccessRuntimeConfig | None = None,
+    directory: MagicMock | None = None,
+    repo: FakeRepository | None = None,
+    dispatcher: FakeDispatcher | None = None,
     fallback_approver_slug: str = "sg-org-admins",
     min_approver_count: int = 1,
 ) -> tuple[AccessRequestService, FakeRepository, FakeDispatcher]:
-    from infrastructure.directory.models import DirectoryMember
 
     repo = repo or FakeRepository()
     dispatcher = dispatcher or FakeDispatcher()
     if directory is None:
         directory = MagicMock()
-        directory.get_group.return_value = OperationResult.success(
-            data=make_directory_group()
-        )
+        directory.get_group.return_value = OperationResult.success(data=make_directory_group())
 
         def _check_membership(group_key: str, user_email: str) -> OperationResult:
             # Target group check: user is not yet a member by default.
@@ -144,9 +138,7 @@ def make_service(
                 DirectoryMember(email="manager@example.com", role="OWNER"),
             ]
         )
-        directory.add_group_member.return_value = (
-            OperationResult.success()
-        )  # IDP write succeeds by default
+        directory.add_group_member.return_value = OperationResult.success()  # IDP write succeeds by default
     service = AccessRequestService(
         repository=repo,  # type: ignore[arg-type]
         directory=directory,
@@ -187,9 +179,7 @@ def test_submit_request_should_succeed_for_valid_self_request():
 @pytest.mark.unit
 def test_submit_request_should_reject_when_group_not_found():
     directory = MagicMock()
-    directory.get_group.return_value = OperationResult.error(
-        OperationStatus.NOT_FOUND, message="not found"
-    )
+    directory.get_group.return_value = OperationResult.error(OperationStatus.NOT_FOUND, message="not found")
     service, _, _ = make_service(directory=directory)
 
     result = service.submit_request(
@@ -270,12 +260,8 @@ def test_submit_request_should_reject_when_mode_is_deactivated_with_token_key_ov
 @pytest.mark.unit
 def test_submit_request_should_reject_when_already_provisioned():
     directory = MagicMock()
-    directory.get_group.return_value = OperationResult.success(
-        data=make_directory_group()
-    )
-    directory.check_membership.return_value = OperationResult.success(
-        data=make_membership(is_member=True)
-    )
+    directory.get_group.return_value = OperationResult.success(data=make_directory_group())
+    directory.check_membership.return_value = OperationResult.success(data=make_membership(is_member=True))
     service, _, _ = make_service(directory=directory)
 
     result = service.submit_request(
@@ -318,12 +304,8 @@ def test_submit_request_should_auto_approve_delegated_requests():
 @pytest.mark.unit
 def test_submit_request_should_reject_when_no_approvers_found():
     directory = MagicMock()
-    directory.get_group.return_value = OperationResult.success(
-        data=make_directory_group()
-    )
-    directory.check_membership.return_value = OperationResult.success(
-        data=make_membership(is_member=False)
-    )
+    directory.get_group.return_value = OperationResult.success(data=make_directory_group())
+    directory.check_membership.return_value = OperationResult.success(data=make_membership(is_member=False))
     directory.get_group_members.return_value = OperationResult.success(data=[])
 
     service, _, _ = make_service(directory=directory)
@@ -394,12 +376,9 @@ def test_approve_request_should_reject_self_approval():
     )
     assert submit.data is not None
     # Force actor into resolved_approvers for this test
-    from dataclasses import replace
 
     req = repo._store[submit.data.request_id]
-    repo._store[submit.data.request_id] = replace(
-        req, resolved_approvers=["actor@example.com"]
-    )
+    repo._store[submit.data.request_id] = replace(req, resolved_approvers=["actor@example.com"])
 
     result = service.approve_request(
         request_id=submit.data.request_id,
@@ -467,9 +446,7 @@ def test_approve_request_calls_add_group_member_on_approval():
         comment="LGTM.",
     )
 
-    service._directory.add_group_member.assert_called_once_with(
-        "sg-aws-admins@example.com", "user@example.com"
-    )
+    service._directory.add_group_member.assert_called_once_with("sg-aws-admins@example.com", "user@example.com")
 
 
 @pytest.mark.unit
@@ -507,21 +484,15 @@ def test_approve_request_should_fail_when_idp_write_fails():
 @pytest.mark.unit
 def test_submit_request_auto_approve_should_fail_when_idp_write_fails():
     directory = MagicMock()
-    directory.get_group.return_value = OperationResult.success(
-        data=make_directory_group()
-    )
-    directory.check_membership.return_value = OperationResult.success(
-        data=make_membership(is_member=False)
-    )
+    directory.get_group.return_value = OperationResult.success(data=make_directory_group())
+    directory.check_membership.return_value = OperationResult.success(data=make_membership(is_member=False))
     directory.get_group_members.return_value = OperationResult.success(
         data=[
             DirectoryMember(email="approver@example.com", role="OWNER"),
             DirectoryMember(email="manager@example.com", role="OWNER"),
         ]
     )
-    directory.add_group_member.return_value = OperationResult.error(
-        OperationStatus.TRANSIENT_ERROR, message="IDP unavailable"
-    )
+    directory.add_group_member.return_value = OperationResult.error(OperationStatus.TRANSIENT_ERROR, message="IDP unavailable")
     service, repo, dispatcher = make_service(directory=directory)
 
     result = service.submit_request(
@@ -643,7 +614,6 @@ def test_cancel_request_should_reject_non_actor():
 
 @pytest.mark.unit
 def test_advance_from_sync_result_transitions_to_completed():
-    from packages.access.common.events import SYNC_COMPLETED
 
     service, repo, dispatcher = make_service()
 
@@ -677,7 +647,6 @@ def test_advance_from_sync_result_transitions_to_completed():
 
 @pytest.mark.unit
 def test_advance_from_sync_result_transitions_to_failed():
-    from packages.access.common.events import SYNC_FAILED
 
     service, repo, dispatcher = make_service()
 
@@ -708,7 +677,6 @@ def test_advance_from_sync_result_transitions_to_failed():
 
 @pytest.mark.unit
 def test_advance_from_sync_result_is_noop_when_no_request_id():
-    from packages.access.common.events import SYNC_COMPLETED
 
     service, repo, _ = make_service()
 
@@ -723,7 +691,6 @@ def test_advance_from_sync_result_is_noop_when_no_request_id():
 
 @pytest.mark.unit
 def test_advance_from_sync_result_is_idempotent_for_completed_request():
-    from packages.access.common.events import SYNC_COMPLETED
 
     service, repo, dispatcher = make_service()
 
@@ -761,8 +728,6 @@ def test_advance_from_sync_result_is_idempotent_for_completed_request():
 
 def _make_failed_request(repo: FakeRepository) -> str:
     """Seed a failed request into repo and return its request_id."""
-    from datetime import datetime, timezone
-    from packages.access.request.domain import AccessRequest
 
     request_id = "retry-req-001"
     req = AccessRequest(
@@ -780,8 +745,8 @@ def _make_failed_request(repo: FakeRepository) -> str:
         status="failed",
         justification="Need access.",
         resolved_approvers=["approver@example.com"],
-        requested_at=datetime.now(tz=timezone.utc),
-        updated_at=datetime.now(tz=timezone.utc),
+        requested_at=datetime.now(tz=UTC),
+        updated_at=datetime.now(tz=UTC),
     )
     repo.save_request(req)
     return request_id
@@ -805,8 +770,7 @@ def test_retry_request_should_succeed_and_transition_to_approved():
     assert decisions == []
     assert repo._store[request_id].status == "approved"
     assert any(
-        e.event_type == "access_requests.request_approved"
-        or e.event_type == "access_request_approved"
+        e.event_type == "access_requests.request_approved" or e.event_type == "access_request_approved"
         for e in dispatcher.dispatched
     )
 
@@ -867,15 +831,10 @@ def test_retry_request_should_return_not_found_for_missing_request():
 
 @pytest.mark.unit
 def test_retry_request_should_keep_failed_state_when_idp_write_fails_again():
-    from unittest.mock import MagicMock
 
     directory = MagicMock()
-    directory.get_group.return_value = OperationResult.success(
-        data=make_directory_group()
-    )
-    directory.check_membership.return_value = OperationResult.success(
-        data=make_membership(is_member=False)
-    )
+    directory.get_group.return_value = OperationResult.success(data=make_directory_group())
+    directory.check_membership.return_value = OperationResult.success(data=make_membership(is_member=False))
     directory.get_group_members.return_value = OperationResult.success(
         data=[
             __import__(
@@ -904,10 +863,7 @@ def test_retry_request_should_keep_failed_state_when_idp_write_fails_again():
     # Status remains failed
     assert repo._store[request_id].status == "failed"
     # Audit event recorded
-    assert any(
-        getattr(e, "event_type", None) == "access_request_retry_failed"
-        for e in repo._audit
-    )
+    assert any(getattr(e, "event_type", None) == "access_request_retry_failed" for e in repo._audit)
     # No domain event dispatched
     assert dispatcher.dispatched == []
 
@@ -921,12 +877,8 @@ def test_retry_request_should_keep_failed_state_when_idp_write_fails_again():
 def test_revoke_request_should_reject_when_user_not_a_member():
     """Grant pre-check is inverted: revoke rejects if user is NOT a member."""
     directory = MagicMock()
-    directory.get_group.return_value = OperationResult.success(
-        data=make_directory_group()
-    )
-    directory.check_membership.return_value = OperationResult.success(
-        data=make_membership(is_member=False)
-    )
+    directory.get_group.return_value = OperationResult.success(data=make_directory_group())
+    directory.check_membership.return_value = OperationResult.success(data=make_membership(is_member=False))
     directory.get_group_members.return_value = OperationResult.success(
         data=[DirectoryMember(email="approver@example.com", role="OWNER")]
     )
@@ -951,12 +903,8 @@ def test_revoke_request_should_reject_when_user_not_a_member():
 def test_revoke_request_should_succeed_when_user_is_a_member():
     """Revoke proceeds to pending_approval when user is currently a member."""
     directory = MagicMock()
-    directory.get_group.return_value = OperationResult.success(
-        data=make_directory_group()
-    )
-    directory.check_membership.return_value = OperationResult.success(
-        data=make_membership(is_member=True)
-    )
+    directory.get_group.return_value = OperationResult.success(data=make_directory_group())
+    directory.check_membership.return_value = OperationResult.success(data=make_membership(is_member=True))
     directory.get_group_members.return_value = OperationResult.success(
         data=[DirectoryMember(email="approver@example.com", role="OWNER")]
     )
@@ -982,12 +930,8 @@ def test_revoke_request_should_succeed_when_user_is_a_member():
 def test_revoke_delegated_auto_approves_and_calls_remove_group_member():
     """Delegated revoke auto-approves and calls remove_group_member, not add."""
     directory = MagicMock()
-    directory.get_group.return_value = OperationResult.success(
-        data=make_directory_group()
-    )
-    directory.check_membership.return_value = OperationResult.success(
-        data=make_membership(is_member=True)
-    )
+    directory.get_group.return_value = OperationResult.success(data=make_directory_group())
+    directory.check_membership.return_value = OperationResult.success(data=make_membership(is_member=True))
     directory.get_group_members.return_value = OperationResult.success(
         data=[
             DirectoryMember(email="approver@example.com", role="OWNER"),
@@ -1010,9 +954,7 @@ def test_revoke_delegated_auto_approves_and_calls_remove_group_member():
 
     assert result.is_success
     assert result.data.status == "approved"
-    directory.remove_group_member.assert_called_once_with(
-        "sg-aws-admins@example.com", "user@example.com"
-    )
+    directory.remove_group_member.assert_called_once_with("sg-aws-admins@example.com", "user@example.com")
     directory.add_group_member.assert_not_called()
     event_types = [e.event_type for e in dispatcher.dispatched]
     assert "access_request_approved" in event_types
@@ -1022,12 +964,8 @@ def test_revoke_delegated_auto_approves_and_calls_remove_group_member():
 def test_revoke_approve_calls_remove_group_member():
     """Approving a revoke request calls remove_group_member on the IDP."""
     directory = MagicMock()
-    directory.get_group.return_value = OperationResult.success(
-        data=make_directory_group()
-    )
-    directory.check_membership.return_value = OperationResult.success(
-        data=make_membership(is_member=True)
-    )
+    directory.get_group.return_value = OperationResult.success(data=make_directory_group())
+    directory.check_membership.return_value = OperationResult.success(data=make_membership(is_member=True))
     directory.get_group_members.return_value = OperationResult.success(
         data=[DirectoryMember(email="approver@example.com", role="OWNER")]
     )
@@ -1058,9 +996,7 @@ def test_revoke_approve_calls_remove_group_member():
     assert updated.status == "approved"
     assert len(decisions) == 1
     assert decisions[0].decision == "approved"
-    directory.remove_group_member.assert_called_once_with(
-        "sg-aws-admins@example.com", "user@example.com"
-    )
+    directory.remove_group_member.assert_called_once_with("sg-aws-admins@example.com", "user@example.com")
     directory.add_group_member.assert_not_called()
     event_types = [e.event_type for e in dispatcher.dispatched]
     assert "access_request_approved" in event_types
@@ -1070,12 +1006,8 @@ def test_revoke_approve_calls_remove_group_member():
 def test_revoke_request_type_in_approved_event_metadata():
     """request_type is included in the REQUEST_APPROVED event metadata."""
     directory = MagicMock()
-    directory.get_group.return_value = OperationResult.success(
-        data=make_directory_group()
-    )
-    directory.check_membership.return_value = OperationResult.success(
-        data=make_membership(is_member=True)
-    )
+    directory.get_group.return_value = OperationResult.success(data=make_directory_group())
+    directory.check_membership.return_value = OperationResult.success(data=make_membership(is_member=True))
     directory.get_group_members.return_value = OperationResult.success(
         data=[
             DirectoryMember(email="approver@example.com", role="OWNER"),
@@ -1096,7 +1028,5 @@ def test_revoke_request_type_in_approved_event_metadata():
         justification="Off-boarding.",
     )
 
-    approved_event = next(
-        e for e in dispatcher.dispatched if e.event_type == "access_request_approved"
-    )
+    approved_event = next(e for e in dispatcher.dispatched if e.event_type == "access_request_approved")
     assert approved_event.metadata["request_type"] == "revoke"

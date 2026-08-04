@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock
+
 from modules.webhooks.patterns.aws_sns_notification import iam_user
 
 
@@ -35,9 +36,7 @@ def test_iam_user_handler_extracts_user():
     client = MagicMock()
     payload = mock_new_iam_user()
     blocks = iam_user.handle_iam_user_notification(payload, client)
-    assert any(
-        "test_user@cds-snc.ca" in b["text"]["text"] for b in blocks if "text" in b
-    )
+    assert any("test_user@cds-snc.ca" in b["text"]["text"] for b in blocks if "text" in b)
 
 
 def test_iam_user_matcher():

@@ -4,12 +4,14 @@ Both the HTTP route handler and the Slack command handlers execute the same
 underlying job lifecycle through the functions in this module.
 
 Thread lifecycle for user sync:
-  1. ``spawn_user_sync_thread`` — acquire lock, write in-progress record, start thread
-  2. ``run_user_sync_job`` (background) — execute sync, write final record, release lock
+    1. ``enqueue_user_sync`` — atomically acquire lock, then call spawn helper
+    2. ``spawn_user_sync_thread`` — write in-progress record, start thread
+    3. ``run_user_sync_job`` (background) — execute sync, write final record, release lock
 
 Thread lifecycle for platform sync:
-  1. ``spawn_platform_sync_thread`` — acquire lock, write in-progress record, start thread
-  2. ``run_platform_sync_job`` (background) — write running sentinel, execute sync,
+    1. ``enqueue_platform_sync`` — atomically acquire lock, then call spawn helper
+    2. ``spawn_platform_sync_thread`` — write in-progress record, start thread
+    3. ``run_platform_sync_job`` (background) — write running sentinel, execute sync,
      write final record, release lock
 
 No transport-specific logic here — HTTP routes and Slack handlers differ only
@@ -18,19 +20,13 @@ exact same locking, job record shape, and error sanitization semantics.
 """
 
 import threading
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 
-from infrastructure.idempotency import IdempotencyService
+from infrastructure.idempotency import IdempotencyStore
 from packages.access.sync.application import AccessSyncApplicationServicePort
 from packages.access.sync.domain import ReconciliationOutcome, SyncOutcome
-from packages.access.sync.platform_lock import (
-    acquire_lock,
-    platform_lock_key,
-    release_lock,
-    user_lock_key,
-)
 from packages.access.sync.job_models import (
     CompletedPlatformRecord,
     CompletedUserRecord,
@@ -40,6 +36,12 @@ from packages.access.sync.job_models import (
     PlatformRunningRecord,
     SyncJobError,
     UserRunningRecord,
+)
+from packages.access.sync.job_status_store import JobStatusStore
+from packages.access.sync.platform_lock import (
+    platform_lock_key,
+    release_lock,
+    user_lock_key,
 )
 
 logger = structlog.get_logger()
@@ -52,7 +54,8 @@ logger = structlog.get_logger()
 
 def run_user_sync_job(
     coordinator: AccessSyncApplicationServicePort,
-    idempotency: IdempotencyService,
+    job_status_store: JobStatusStore,
+    lock_store: IdempotencyStore,
     job_id: str,
     user_email: str,
     platform: str,
@@ -68,9 +71,7 @@ def run_user_sync_job(
     external error payload always uses ``SyncJobError.SYNC_FAILED`` so
     implementation details do not leak through the job store.
     """
-    log = logger.bind(
-        job_id=job_id, user_email=user_email, platform=platform, dry_run=dry_run
-    )
+    log = logger.bind(job_id=job_id, user_email=user_email, platform=platform, dry_run=dry_run)
     log.info("user_sync_job_started", correlation_id=request_id)
     record: FailedUserRecord | CompletedUserRecord
     try:
@@ -80,10 +81,8 @@ def run_user_sync_job(
             dry_run=dry_run,
             request_id=request_id,
         )
-        log.info(
-            "user_sync_job_finished", success=result.is_success, error=result.message
-        )
-        completed_at = datetime.now(timezone.utc).isoformat()
+        log.info("user_sync_job_finished", success=result.is_success, error=result.message)
+        completed_at = datetime.now(UTC).isoformat()
         if result.is_success and result.data is not None:
             outcome: SyncOutcome = result.data
             record = CompletedUserRecord(
@@ -118,7 +117,7 @@ def run_user_sync_job(
                 error_code=result.error_code,
             )
     except Exception as exc:
-        completed_at = datetime.now(timezone.utc).isoformat()
+        completed_at = datetime.now(UTC).isoformat()
         record = FailedUserRecord(
             job_id=job_id,
             user_email=user_email,
@@ -131,15 +130,14 @@ def run_user_sync_job(
         log.error("user_sync_job_error", error=str(exc), error_type=type(exc).__name__)
 
     payload = record.to_dict()
-    idempotency.set(job_id, payload, ttl_seconds=job_ttl_seconds)
-    release_lock(
-        user_lock_key(platform, user_email), payload, idempotency, job_ttl_seconds
-    )
+    job_status_store.put(job_id, payload, ttl_seconds=job_ttl_seconds)
+    release_lock(user_lock_key(platform, user_email), lock_store)
 
 
 def run_platform_sync_job(
     coordinator: AccessSyncApplicationServicePort,
-    idempotency: IdempotencyService,
+    job_status_store: JobStatusStore,
+    lock_store: IdempotencyStore,
     job_id: str,
     platform: str,
     dry_run: bool,
@@ -158,7 +156,7 @@ def run_platform_sync_job(
         correlation_id=request_id,
         poll_path=f"/api/v1/access/sync-runs/{job_id}",
     )
-    idempotency.set(
+    job_status_store.put(
         job_id,
         PlatformRunningRecord(
             job_id=job_id,
@@ -176,7 +174,7 @@ def run_platform_sync_job(
             dry_run=dry_run,
             request_id=request_id,
         )
-        completed_at = datetime.now(timezone.utc).isoformat()
+        completed_at = datetime.now(UTC).isoformat()
         if result.is_success and result.data is not None:
             recon: ReconciliationOutcome = result.data
             record = CompletedPlatformRecord(
@@ -192,10 +190,7 @@ def run_platform_sync_job(
                 changed_user_count=recon.changed_user_count,
                 unchanged_user_count=recon.unchanged_user_count,
                 action_counts=dict(recon.action_counts),
-                lifecycle_actions={
-                    action: list(users)
-                    for action, users in recon.lifecycle_actions.items()
-                },
+                lifecycle_actions={action: list(users) for action, users in recon.lifecycle_actions.items()},
                 entitlements_by_action={
                     action: {slug: list(users) for slug, users in by_slug.items()}
                     for action, by_slug in recon.entitlements_by_action.items()
@@ -224,7 +219,7 @@ def run_platform_sync_job(
                 error_code=result.error_code,
             )
     except Exception as exc:
-        completed_at = datetime.now(timezone.utc).isoformat()
+        completed_at = datetime.now(UTC).isoformat()
         record = FailedPlatformRecord(
             job_id=job_id,
             platform=platform,
@@ -240,18 +235,19 @@ def run_platform_sync_job(
         )
 
     payload = record.to_dict()
-    idempotency.set(job_id, payload, ttl_seconds=job_ttl_seconds)
-    release_lock(platform_lock_key(platform), payload, idempotency, job_ttl_seconds)
+    job_status_store.put(job_id, payload, ttl_seconds=job_ttl_seconds)
+    release_lock(platform_lock_key(platform), lock_store)
 
 
 # ---------------------------------------------------------------------------
-# Thread spawn helpers (acquire lock + start thread)
+# Thread spawn helpers (start thread after ingress lock acquisition)
 # ---------------------------------------------------------------------------
 
 
 def spawn_user_sync_thread(
     coordinator: AccessSyncApplicationServicePort,
-    idempotency: IdempotencyService,
+    job_status_store: JobStatusStore,
+    lock_store: IdempotencyStore,
     job_id: str,
     user_email: str,
     platform: str,
@@ -260,7 +256,7 @@ def spawn_user_sync_thread(
     started_at: str,
     job_ttl_seconds: int,
 ) -> None:
-    """Acquire user sync lock, write initial record, and start background thread.
+    """Write initial record and start background thread after lock acquisition.
 
     After this returns the caller can immediately return an accepted response;
     the background thread will update the idempotency record when done.
@@ -272,19 +268,14 @@ def spawn_user_sync_thread(
         dry_run=dry_run,
         started_at=started_at,
     )
-    acquire_lock(
-        user_lock_key(platform, user_email),
-        lock_record.to_dict(),
-        idempotency,
-        job_ttl_seconds,
-    )
     job_record = {**lock_record.to_dict(), "status": JobStatus.IN_PROGRESS}
-    idempotency.set(job_id, job_record, ttl_seconds=job_ttl_seconds)
+    job_status_store.put(job_id, job_record, ttl_seconds=job_ttl_seconds)
     thread = threading.Thread(
         target=run_user_sync_job,
         kwargs={
             "coordinator": coordinator,
-            "idempotency": idempotency,
+            "job_status_store": job_status_store,
+            "lock_store": lock_store,
             "job_id": job_id,
             "user_email": user_email,
             "platform": platform,
@@ -301,7 +292,8 @@ def spawn_user_sync_thread(
 
 def spawn_platform_sync_thread(
     coordinator: AccessSyncApplicationServicePort,
-    idempotency: IdempotencyService,
+    job_status_store: JobStatusStore,
+    lock_store: IdempotencyStore,
     job_id: str,
     platform: str,
     dry_run: bool,
@@ -309,26 +301,21 @@ def spawn_platform_sync_thread(
     started_at: str,
     job_ttl_seconds: int,
 ) -> None:
-    """Acquire platform sync lock, write initial record, and start background thread."""
+    """Write initial record and start background thread after lock acquisition."""
     lock_record = PlatformRunningRecord(
         job_id=job_id,
         platform=platform,
         dry_run=dry_run,
         started_at=started_at,
     )
-    acquire_lock(
-        platform_lock_key(platform),
-        lock_record.to_dict(),
-        idempotency,
-        job_ttl_seconds,
-    )
     job_record = {**lock_record.to_dict(), "status": JobStatus.IN_PROGRESS}
-    idempotency.set(job_id, job_record, ttl_seconds=job_ttl_seconds)
+    job_status_store.put(job_id, job_record, ttl_seconds=job_ttl_seconds)
     thread = threading.Thread(
         target=run_platform_sync_job,
         kwargs={
             "coordinator": coordinator,
-            "idempotency": idempotency,
+            "job_status_store": job_status_store,
+            "lock_store": lock_store,
             "job_id": job_id,
             "platform": platform,
             "dry_run": dry_run,

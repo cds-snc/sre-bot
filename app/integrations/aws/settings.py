@@ -6,14 +6,14 @@ error-classification surface consumed by `AWSShield` — and the cached
 
 Only AWS-transport concerns belong here (region, endpoint, retry policy,
 timeouts, boto3 error-code catalogues). Feature-domain configuration
-(SSO permission sets, instance ARNs, role mappings) lives with the
-consuming feature per `docs/adr/configuration-ownership.md`.
+(SSO permission sets, instance ARNs, role mappings) belongs in the
+Settings module of the feature package that owns that configuration.
 """
 
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,13 +31,11 @@ class AWSSettings(BaseSettings):
     )
 
     AWS_REGION: str = Field(default="ca-central-1")
-    AWS_ENDPOINT_URL: Optional[str] = Field(default=None)
+    AWS_ENDPOINT_URL: str | None = Field(default=None)
 
     RETRY_MAX_ATTEMPTS: int = Field(default=3, alias="AWS_RETRY_MAX_ATTEMPTS")
     RETRY_MODE: RetryMode = Field(default="standard", alias="AWS_RETRY_MODE")
-    CONNECT_TIMEOUT_SECONDS: int = Field(
-        default=10, alias="AWS_CONNECT_TIMEOUT_SECONDS"
-    )
+    CONNECT_TIMEOUT_SECONDS: int = Field(default=10, alias="AWS_CONNECT_TIMEOUT_SECONDS")
     READ_TIMEOUT_SECONDS: int = Field(default=10, alias="AWS_READ_TIMEOUT_SECONDS")
 
     NOT_FOUND_CODES: list[str] = Field(

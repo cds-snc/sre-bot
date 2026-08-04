@@ -5,6 +5,7 @@ This module provides functionalities to interact with Google Drive. It includes 
 """
 
 import structlog
+
 from integrations.google_workspace import google_service
 
 INCIDENT_TEMPLATE = google_service.INCIDENT_TEMPLATE

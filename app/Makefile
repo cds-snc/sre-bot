@@ -1,24 +1,25 @@
-.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit
+.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit backlog-board audit-client-usage-matrix client-usage-matrix check-deprecated-client-imports check-sdk-typing
 
 dev:
-	PREFIX="dev-" uv run uvicorn main:server_app --reload
+	SLACK__COMMAND_PREFIX="dev-" uv run uvicorn main:server_app --reload
 
 dev-setup: # Requires to be signed in to AWS
-	uv sync --extra dev
+	uv sync
 	sh ../.devcontainer/maxmind-create.sh
 	sh ../.devcontainer/dynamodb-create.sh
 
 debug:
-	PREFIX="dev-" LOG_LEVEL=DEBUG uv run uvicorn main:server_app --reload
+	SLACK__COMMAND_PREFIX="dev-" LOG_LEVEL=DEBUG uv run uvicorn main:server_app --reload
 
 fmt:
-	uv run black . $(ARGS) --target-version py311
+	uv run ruff check --fix . $(ARGS)
+	uv run ruff format . $(ARGS)
 
 install:
-	uv sync
+	uv sync --no-dev
 
 install-dev:
-	uv sync --extra dev
+	uv sync
 
 lint:
 	uv run ruff check .
@@ -61,8 +62,14 @@ test-all:
 	uv run coverage report -m
 
 # Coverage reports with focus on new structure
+lock-check:
+	uv lock --check
+
+install-ci: lock-check
+	uv sync --locked
+
 test-coverage-unit:
-	uv run coverage run -m pytest tests/unit --cov=modules --cov=core --cov=api --show-capture=log --log-level=INFO -r fE && \
+	uv run coverage run -m pytest tests/unit --cov=modules --cov=api --show-capture=log --log-level=INFO -r fE && \
 	uv run coverage report -m && \
 	uv run coverage html
 
@@ -80,7 +87,21 @@ lint-ci:
 	@command -v uv >/dev/null 2>&1 && uv run mypy . --check-untyped-defs || true
 
 fmt-ci:
-	uv run black --check . --target-version py311
+	uv run ruff format --check .
+
+audit-client-usage-matrix:
+	bash bin/generate_client_usage_matrix.sh
+
+client-usage-matrix: audit-client-usage-matrix
+
+check-deprecated-client-imports:
+	uv run python bin/check_deprecated_infra_client_imports.py
+
+check-sdk-typing:
+	uv run python bin/check_sdk_typing.py
+
+backlog-board: # Backlog.md web UI (Kanban board) at http://localhost:6421
+	cd .. && backlog browser --no-open --port 6421
 
 run:
 	uv run uvicorn main:server_app

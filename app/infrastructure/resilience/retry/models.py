@@ -5,9 +5,9 @@ These models are intentionally generic to support any module's retry needs.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class RetryResult(Enum):
@@ -59,19 +59,19 @@ class RetryRecord:
 
     # Generic fields
     operation_type: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
 
     # Tracking fields
-    id: Optional[str] = None
+    id: str | None = None
     attempts: int = 0
-    last_error: Optional[str] = None
+    last_error: str | None = None
 
     # Timestamps
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     # Optional field for stores to manage retry scheduling
-    next_retry_at: Optional[datetime] = None
+    next_retry_at: datetime | None = None
 
     def __post_init__(self) -> None:
         """Validate required fields."""

@@ -6,9 +6,10 @@ Provides:
 - Mock database lookups for webhook validation
 """
 
-import pytest
-from unittest.mock import MagicMock, PropertyMock
+from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock
 
+import pytest
 
 # ============================================================================
 # Test Payloads
@@ -107,18 +108,15 @@ def simple_text_payload():
 @pytest.fixture
 def upptime_status_payload():
     """Upptime status check webhook payload."""
-    return {
-        "text": "🟥 API Server (https://api.example.com/) is **down** : https://github.com/example/status/issues/123"
-    }
+    return {"text": "🟥 API Server (https://api.example.com/) is **down** : https://github.com/example/status/issues/123"}
 
 
 # Access Request Payloads
 @pytest.fixture
 def access_request_payload():
     """AWS access request payload."""
-    from datetime import datetime, timezone, timedelta
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return {
         "account": "ExampleAccount",
         "reason": "Testing access request webhook",
@@ -211,21 +209,10 @@ def mock_webhook_increment(monkeypatch):
 
 @pytest.fixture
 def mock_sns_signature_validation_disabled(monkeypatch):
-    """Disable SNS signature validation to allow test payloads.
-
-    In non-production environments, SNS signature validation is skipped.
-    This ensures test payloads with fake signatures work.
-
-    Since is_production is a read-only property, we monkeypatch the
-    entire app_settings object in the aws_sns module.
-    """
-    mock_settings = MagicMock()
-    # Make is_production return False so signature validation is skipped
-    type(mock_settings).is_production = PropertyMock(return_value=False)
-
+    """Disable SNS signature validation in tests to allow deterministic fake payloads."""
+    mock = MagicMock(return_value=None)
     monkeypatch.setattr(
-        "modules.webhooks.aws_sns.app_settings",
-        mock_settings,
+        "modules.webhooks.aws_sns.sns_message_validator.validate_message",
+        mock,
     )
-
-    return mock_settings
+    return mock

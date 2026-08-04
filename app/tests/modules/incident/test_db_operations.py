@@ -1,15 +1,15 @@
-from unittest.mock import patch, MagicMock, ANY
-from modules.incident import db_operations
+from unittest.mock import ANY, MagicMock, patch
+
 import pytest
+
+from modules.incident import db_operations
 
 
 @patch("modules.incident.db_operations.log_activity")
 @patch("modules.incident.db_operations.datetime")
 @patch("modules.incident.db_operations.dynamodb")
 def test_create_incident(mock_dynamodb, mock_datetime, mock_log_activity):
-    mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = (
-        1234567890
-    )
+    mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = 1234567890
     mock_dynamodb.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
     incident_data = {
         "id": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
@@ -57,12 +57,8 @@ def test_create_incident(mock_dynamodb, mock_datetime, mock_log_activity):
 @patch("modules.incident.db_operations.log_activity")
 @patch("modules.incident.db_operations.datetime")
 @patch("modules.incident.db_operations.dynamodb")
-def test_create_incident_with_optional_args(
-    mock_dynamodb, mock_datetime, mock_log_activity
-):
-    mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = (
-        1234567890
-    )
+def test_create_incident_with_optional_args(mock_dynamodb, mock_datetime, mock_log_activity):
+    mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = 1234567890
     mock_dynamodb.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
     incident_data = {
@@ -141,12 +137,8 @@ def test_create_incident_with_invalid_data(mock_logger):
 @patch("modules.incident.db_operations.log_activity")
 @patch("modules.incident.db_operations.datetime")
 @patch("modules.incident.db_operations.dynamodb")
-def test_create_incident_handle_creation_error(
-    mock_dynamodb, mock_datetime, mock_log_activity
-):
-    mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = (
-        1234567890
-    )
+def test_create_incident_handle_creation_error(mock_dynamodb, mock_datetime, mock_log_activity):
+    mock_created_at = mock_datetime.datetime.now.return_value.timestamp.return_value = 1234567890
     mock_dynamodb.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 400}}
     incident_data = {
         "id": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
@@ -260,9 +252,7 @@ def test_list_incidents_empty(
 @patch("modules.incident.db_operations.log_activity")
 @patch("modules.incident.db_operations.dynamodb")
 def test_update_incident_field(mock_dynamodb, mock_log_activity):
-    mock_dynamodb.update_item.return_value = {
-        "ResponseMetadata": {"HTTPStatusCode": 200}
-    }
+    mock_dynamodb.update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
     assert db_operations.update_incident_field("foo", "bar", "baz", "user_id")
     mock_dynamodb.update_item.assert_called_once_with(
         TableName="incidents",
@@ -271,18 +261,14 @@ def test_update_incident_field(mock_dynamodb, mock_log_activity):
         ExpressionAttributeNames={"#bar": "bar"},
         ExpressionAttributeValues={":bar": {"S": "baz"}},
     )
-    mock_log_activity.assert_called_once_with(
-        "foo", "field `bar` updated to `baz` by user: user_id"
-    )
+    mock_log_activity.assert_called_once_with("foo", "field `bar` updated to `baz` by user: user_id")
 
 
 @patch("modules.incident.db_operations.log_activity")
 @patch("modules.incident.db_operations.dynamodb")
 def test_update_incident_field_with_type(mock_dynamodb, mock_log_activity):
 
-    mock_dynamodb.update_item.return_value = {
-        "ResponseMetadata": {"HTTPStatusCode": 200}
-    }
+    mock_dynamodb.update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
     assert db_operations.update_incident_field("foo", "bar", "baz", "user_id", "M")
     mock_dynamodb.update_item.assert_called_once_with(
         TableName="incidents",
@@ -291,18 +277,14 @@ def test_update_incident_field_with_type(mock_dynamodb, mock_log_activity):
         ExpressionAttributeNames={"#bar": "bar"},
         ExpressionAttributeValues={":bar": {"M": "baz"}},
     )
-    mock_log_activity.assert_called_once_with(
-        "foo", "field `bar` updated to `baz` by user: user_id"
-    )
+    mock_log_activity.assert_called_once_with("foo", "field `bar` updated to `baz` by user: user_id")
 
 
 @patch("modules.incident.db_operations.dynamodb")
 def test_update_incident_field_handles_failure(mock_dynamodb):
     mock_logger = MagicMock()
     mock_dynamodb.update_item.return_value = None
-    response = db_operations.update_incident_field(
-        mock_logger, "foo", "bar", "baz", "user_id"
-    )
+    response = db_operations.update_incident_field(mock_logger, "foo", "bar", "baz", "user_id")
     assert response is None
 
 

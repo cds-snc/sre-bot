@@ -4,8 +4,10 @@ This module contains the user related functionality for the Slack integration.
 """
 
 import re
+
 import structlog
 from slack_sdk import WebClient
+
 from integrations.slack.client import SlackClientManager
 
 SLACK_USER_ID_REGEX = r"^[A-Z0-9]+$"
@@ -64,13 +66,8 @@ def get_user_id_from_request(body):
     if "user_id" in body:
         user_id = body["user_id"]
     elif "user" in body:
-        if isinstance(body["user"], dict) and "id" in body["user"]:
-            user_id = body["user"]["id"]
-        else:
-            user_id = body["user"]
-    elif (
-        "event" in body and isinstance(body["event"], dict) and "user" in body["event"]
-    ):
+        user_id = body["user"]["id"] if isinstance(body["user"], dict) and "id" in body["user"] else body["user"]
+    elif "event" in body and isinstance(body["event"], dict) and "user" in body["event"]:
         user_id = body["event"]["user"]
     if user_id:
         match = re.match(SLACK_USER_ID_REGEX, user_id)

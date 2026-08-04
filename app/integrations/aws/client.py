@@ -1,18 +1,19 @@
 from functools import wraps
 
-import structlog
 import boto3  # type: ignore
+import structlog
 from botocore.client import BaseClient  # type: ignore
 from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
-from core.config import settings
+
+from infrastructure.configuration.integrations.aws import get_aws_settings
 
 logger = structlog.get_logger()
-
-SYSTEM_ADMIN_PERMISSIONS = settings.aws.SYSTEM_ADMIN_PERMISSIONS
-VIEW_ONLY_PERMISSIONS = settings.aws.VIEW_ONLY_PERMISSIONS
-AWS_REGION = settings.aws.AWS_REGION
-THROTTLING_ERRS = settings.aws.THROTTLING_ERRS
-RESOURCE_NOT_FOUND_ERRS = settings.aws.RESOURCE_NOT_FOUND_ERRS
+settings = get_aws_settings()
+SYSTEM_ADMIN_PERMISSIONS = settings.SYSTEM_ADMIN_PERMISSIONS
+VIEW_ONLY_PERMISSIONS = settings.VIEW_ONLY_PERMISSIONS
+AWS_REGION = settings.AWS_REGION
+THROTTLING_ERRS = settings.THROTTLING_ERRS
+RESOURCE_NOT_FOUND_ERRS = settings.RESOURCE_NOT_FOUND_ERRS
 
 
 def handle_aws_api_errors(func):
@@ -79,9 +80,7 @@ def assume_role_session(role_arn, session_name="DefaultSession"):
         boto3.Session: A session with temporary credentials.
     """
     sts_client = boto3.client("sts")
-    assumed_role = sts_client.assume_role(
-        RoleArn=role_arn, RoleSessionName=session_name
-    )
+    assumed_role = sts_client.assume_role(RoleArn=role_arn, RoleSessionName=session_name)
     credentials = assumed_role["Credentials"]
 
     return boto3.Session(
@@ -113,10 +112,7 @@ def get_aws_service_client(
     if client_config is None:
         client_config = {}
 
-    if role_arn:
-        session = assume_role_session(role_arn, session_name)
-    else:
-        session = boto3.Session(**session_config)
+    session = assume_role_session(role_arn, session_name) if role_arn else boto3.Session(**session_config)
     return session.client(service_name, **client_config)
 
 
@@ -160,15 +156,9 @@ def execute_aws_api_call(
         client_config=client_config,
     )
     api_method = getattr(client, method)
-    if paginated:
-        results = paginator(client, method, keys, **kwargs)
-    else:
-        results = api_method(**kwargs)
+    results = paginator(client, method, keys, **kwargs) if paginated else api_method(**kwargs)
 
-    if (
-        "ResponseMetadata" in results
-        and results["ResponseMetadata"]["HTTPStatusCode"] != 200
-    ):
+    if "ResponseMetadata" in results and results["ResponseMetadata"]["HTTPStatusCode"] != 200:
         log.error(
             "aws_api_call_failed",
             status_code=results["ResponseMetadata"]["HTTPStatusCode"],
@@ -198,9 +188,7 @@ def paginator(client: BaseClient, operation, keys=None, **kwargs):
     """
     paginator = client.get_paginator(operation)
     results = []
-    log = logger.bind(
-        service=client.meta.service_model.service_name, operation=operation
-    )
+    log = logger.bind(service=client.meta.service_model.service_name, operation=operation)
 
     for page in paginator.paginate(**kwargs):
         if keys is None:

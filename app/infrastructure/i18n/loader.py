@@ -5,11 +5,10 @@ Defines the contract for loading translations and provides YAML-based loader.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict
-
-import yaml
 
 import structlog
+import yaml
+
 from infrastructure.i18n.models import Locale, TranslationCatalog
 
 logger = structlog.get_logger()
@@ -39,7 +38,7 @@ class TranslationLoader(ABC):
         pass
 
     @abstractmethod
-    def load_all(self) -> Dict[Locale, TranslationCatalog]:
+    def load_all(self) -> dict[Locale, TranslationCatalog]:
         """Load translations for all supported locales.
 
         Returns:
@@ -72,16 +71,12 @@ class YAMLTranslationLoader(TranslationLoader):
         """
         self.translations_dir = Path(translations_dir)
         self.use_cache = use_cache
-        self.cache: Dict[Locale, TranslationCatalog] = {}
+        self.cache: dict[Locale, TranslationCatalog] = {}
 
         if not self.translations_dir.exists():
-            raise ValueError(
-                f"Translations directory not found: {self.translations_dir}"
-            )
+            raise ValueError(f"Translations directory not found: {self.translations_dir}")
 
-        self.log = logger.bind(
-            translations_dir=str(self.translations_dir), use_cache=use_cache
-        )
+        self.log = logger.bind(translations_dir=str(self.translations_dir), use_cache=use_cache)
         self.log.info("initialized_yaml_loader")
 
     def load(self, locale: Locale) -> TranslationCatalog:
@@ -109,13 +104,11 @@ class YAMLTranslationLoader(TranslationLoader):
         yaml_files = sorted(self.translations_dir.glob(f"*.{locale.value}.yml"))
 
         if not yaml_files:
-            raise FileNotFoundError(
-                f"No translation files found for locale {locale.value} in {self.translations_dir}"
-            )
+            raise FileNotFoundError(f"No translation files found for locale {locale.value} in {self.translations_dir}")
 
         for yaml_file in yaml_files:
             try:
-                with open(yaml_file, "r", encoding="utf-8") as f:
+                with open(yaml_file, encoding="utf-8") as f:
                     data = yaml.safe_load(f)
                     if data:
                         self._merge_yaml_data(catalog, data, yaml_file)
@@ -136,7 +129,7 @@ class YAMLTranslationLoader(TranslationLoader):
 
         return catalog
 
-    def load_all(self) -> Dict[Locale, TranslationCatalog]:
+    def load_all(self) -> dict[Locale, TranslationCatalog]:
         """Load translations for all supported locales.
 
         Detects available locales from .yml files and loads each.
@@ -176,7 +169,7 @@ class YAMLTranslationLoader(TranslationLoader):
     def _merge_yaml_data(
         self,
         catalog: TranslationCatalog,
-        data: Dict,
+        data: dict,
         source_file: Path,
     ) -> None:
         """Merge YAML data into catalog.

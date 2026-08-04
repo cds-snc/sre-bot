@@ -15,17 +15,15 @@ class MaxMindSettings(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
 
-        settings = get_settings()
+        settings = get_maxmind_settings()
 
-        db_path = settings.maxmind.MAXMIND_DB_PATH
+        db_path = settings.MAXMIND_DB_PATH
         ```
     """
 
-    MAXMIND_DB_PATH: str = Field(
-        default="./geodb/GeoLite2-City.mmdb", alias="MAXMIND_DB_PATH"
-    )
+    MAXMIND_DB_PATH: str = Field(default="./geodb/GeoLite2-City.mmdb", alias="MAXMIND_DB_PATH")
 
 
 @lru_cache(maxsize=1)

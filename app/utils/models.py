@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Tuple, Type
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 from structlog import get_logger
@@ -8,13 +8,13 @@ from modules.ops.notifications import log_ops_message
 logger = get_logger()
 
 
-def get_parameters_from_model(model: Type[BaseModel]) -> List[str]:
+def get_parameters_from_model(model: type[BaseModel]) -> list[str]:
     return list(model.model_fields.keys())
 
 
 def get_dict_of_parameters_from_models(
-    models: List[Type[BaseModel]],
-) -> Dict[str, List[str]]:
+    models: list[type[BaseModel]],
+) -> dict[str, list[str]]:
     """
     Returns a dictionary of model names and their parameters as a list.
 
@@ -49,26 +49,24 @@ def get_dict_of_parameters_from_models(
     return {model.__name__: get_parameters_from_model(model) for model in models}
 
 
-def is_parameter_in_model(model_params: List[str], payload: Dict[str, Any]) -> bool:
-    return any(param in model_params for param in payload.keys())
+def is_parameter_in_model(model_params: list[str], payload: dict[str, Any]) -> bool:
+    return any(param in model_params for param in payload)
 
 
-def has_parameters_in_model(model_params: List[str], payload: Dict[str, Any]) -> int:
+def has_parameters_in_model(model_params: list[str], payload: dict[str, Any]) -> int:
     """Returns the number of parameters in the payload that are in the model."""
-    return sum(1 for param in model_params if param in payload.keys())
+    return sum(1 for param in model_params if param in payload)
 
 
-def are_all_parameters_in_model(
-    model_params: List[str], payload: Dict[str, Any]
-) -> bool:
-    return all(param in model_params for param in payload.keys())
+def are_all_parameters_in_model(model_params: list[str], payload: dict[str, Any]) -> bool:
+    return all(param in model_params for param in payload)
 
 
 def select_best_model(
     data: dict,
-    models: List[Type[BaseModel]],
-    priorities: Optional[Dict[Type[BaseModel], int]] = None,
-) -> Optional[Tuple[Type[BaseModel], Any]]:
+    models: list[type[BaseModel]],
+    priorities: dict[type[BaseModel], int] | None = None,
+) -> tuple[type[BaseModel], Any] | None:
     """
     Select the best matching model instance for the given data. The selection is based on an
     arbitrary scoring system that considers the number of matching fields (both required and optional)
@@ -100,11 +98,7 @@ def select_best_model(
 
         # Calculate required and optional fields
         model_fields = set(model.__pydantic_fields__.keys())
-        required_fields = {
-            key
-            for key, field in model.__pydantic_fields__.items()
-            if field.is_required()
-        }
+        required_fields = {key for key, field in model.__pydantic_fields__.items() if field.is_required()}
         # skip if not a single matching field
         if not model_fields.intersection(data.keys()):
             continue

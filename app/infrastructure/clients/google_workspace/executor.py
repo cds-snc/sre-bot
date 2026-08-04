@@ -1,7 +1,8 @@
 """Low-level Google API execution utilities with retry and error handling."""
 
 import time
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 import structlog
 from googleapiclient.errors import HttpError
@@ -41,7 +42,7 @@ def _calculate_retry_delay(attempt: int, status_code: int) -> float:
 def execute_google_api_call(
     operation_name: str,
     api_callable: Callable[[], Any],
-    max_retries: Optional[int] = None,
+    max_retries: int | None = None,
 ) -> OperationResult:
     """Execute a Google API call with retry logic and error handling.
 
@@ -64,7 +65,7 @@ def execute_google_api_call(
     retry_errors_list: list[int] = ERROR_CONFIG["retry_errors"]  # type: ignore
     retry_codes = set(retry_errors_list)
 
-    last_exception: Optional[Exception] = None
+    last_exception: Exception | None = None
 
     for attempt in range(max_attempts + 1):
         try:

@@ -68,9 +68,7 @@ def test_feature_lifecycle_specs_method_signatures() -> None:
         func = getattr(FeatureLifecycleSpecs, name)
         sig = inspect.signature(func)
         params = list(sig.parameters.keys())
-        assert (
-            params == expected_params
-        ), f"{name} params: {params} != {expected_params}"
+        assert params == expected_params, f"{name} params: {params} != {expected_params}"
 
 
 def test_plugin_manager_exposes_hooks_after_adding_specs() -> None:

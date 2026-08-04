@@ -1,9 +1,10 @@
 """Utilities for API integrations."""
 
+import random
 import re
 import string
-import random
 import time
+
 import structlog
 
 logger = structlog.get_logger()
@@ -17,9 +18,7 @@ def convert_string_to_camel_case(snake_str):
     if len(components) == 1:
         return components[0]
     else:
-        return components[0] + "".join(
-            x[0].upper() + x[1:] if x else "" for x in components[1:]
-        )
+        return components[0] + "".join(x[0].upper() + x[1:] if x else "" for x in components[1:])
 
 
 def convert_dict_to_camel_case(dict):
@@ -82,7 +81,7 @@ def generate_unique_id():
 
     # Function to generate a segment of three characters
     def generate_segment():
-        return "".join(random.choices(chars, k=3))
+        return "".join(random.choices(chars, k=3))  # noqa: S311 -- non-secret readable ID, not used for security tokens
 
     # Generate the three segments and join them with hyphens
     segments = [generate_segment() for _ in range(3)]

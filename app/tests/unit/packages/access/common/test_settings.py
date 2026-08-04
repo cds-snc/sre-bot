@@ -16,7 +16,6 @@ from packages.access.common.settings import (
     AccessSyncSettings,
 )
 
-
 # ---------------------------------------------------------------------------
 # Sub-model plain BaseModel defaults (no env reads needed)
 # ---------------------------------------------------------------------------

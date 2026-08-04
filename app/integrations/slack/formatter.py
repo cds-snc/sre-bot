@@ -4,10 +4,12 @@ Formats responses using Slack's Block Kit format for rich, interactive messages.
 See: https://api.slack.com/block-kit
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
+
 from structlog import get_logger
-from infrastructure.operations import OperationResult, OperationStatus
+
 from infrastructure.i18n import Locale, TranslationKey, TranslationService
+from infrastructure.operations import OperationResult, OperationStatus
 
 logger = get_logger(__name__)
 
@@ -33,7 +35,7 @@ class SlackBlockKitFormatter:
 
     def __init__(
         self,
-        translation_service: Optional[TranslationService] = None,
+        translation_service: TranslationService | None = None,
         locale: str = "en-US",
     ):
         """Initialize Slack Block Kit formatter.
@@ -48,9 +50,9 @@ class SlackBlockKitFormatter:
 
     def format_success(
         self,
-        data: Dict[str, Any],
-        message: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        data: dict[str, Any],
+        message: str | None = None,
+    ) -> dict[str, Any]:
         """Format a success response as Slack Block Kit.
 
         Args:
@@ -78,9 +80,9 @@ class SlackBlockKitFormatter:
     def format_error(
         self,
         message: str,
-        error_code: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        error_code: str | None = None,
+        details: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Format an error response as Slack Block Kit.
 
         Args:
@@ -113,8 +115,8 @@ class SlackBlockKitFormatter:
     def format_info(
         self,
         message: str,
-        data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Format an info response as Slack Block Kit.
 
         Args:
@@ -142,8 +144,8 @@ class SlackBlockKitFormatter:
     def format_warning(
         self,
         message: str,
-        data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Format a warning response as Slack Block Kit.
 
         Args:
@@ -168,7 +170,7 @@ class SlackBlockKitFormatter:
 
         return {"blocks": blocks}
 
-    def format_operation_result(self, result: OperationResult) -> Dict[str, Any]:
+    def format_operation_result(self, result: OperationResult) -> dict[str, Any]:
         """Convert an OperationResult to platform-specific format.
 
         Routes to format_success() or format_error() based on result status.
@@ -194,8 +196,8 @@ class SlackBlockKitFormatter:
     def translate(
         self,
         key: str,
-        variables: Optional[Dict[str, Any]] = None,
-        fallback: Optional[str] = None,
+        variables: dict[str, Any] | None = None,
+        fallback: str | None = None,
     ) -> str:
         """Translate a message key to the current locale.
 
@@ -224,16 +226,12 @@ class SlackBlockKitFormatter:
         try:
             translation_key = TranslationKey.from_string(key)
             locale = Locale.from_string(self._locale_str)
-            return self._translation_service.translate(
-                key=translation_key, locale=locale, variables=variables
-            )
+            return self._translation_service.translate(key=translation_key, locale=locale, variables=variables)
         except (KeyError, ValueError) as e:
-            self._logger.warning(
-                "translation_failed", key=key, locale=self._locale_str, error=str(e)
-            )
+            self._logger.warning("translation_failed", key=key, locale=self._locale_str, error=str(e))
             return fallback or key
 
-    def _create_section(self, text: str) -> Dict[str, Any]:
+    def _create_section(self, text: str) -> dict[str, Any]:
         """Create a Slack section block with markdown text.
 
         Args:
@@ -250,7 +248,7 @@ class SlackBlockKitFormatter:
             },
         }
 
-    def _create_context(self, elements: List[str]) -> Dict[str, Any]:
+    def _create_context(self, elements: list[str]) -> dict[str, Any]:
         """Create a Slack context block with text elements.
 
         Args:
@@ -264,7 +262,7 @@ class SlackBlockKitFormatter:
             "elements": [{"type": "mrkdwn", "text": elem} for elem in elements],
         }
 
-    def _format_data_as_text(self, data: Dict[str, Any]) -> str:
+    def _format_data_as_text(self, data: dict[str, Any]) -> str:
         """Format data dictionary as markdown text.
 
         Args:

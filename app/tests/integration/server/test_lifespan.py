@@ -8,10 +8,10 @@ import pytest
 
 from server import lifespan as lifespan_module
 from server.lifespan import (
+    _get_logger_from_app,
     _initialize_directory_provider,
-    _get_logger,
     _is_test_environment,
-    _list_configs,
+    _list_configs_from_sections,
     _register_legacy_handlers,
     _start_scheduled_tasks,
     _stop_scheduled_tasks,
@@ -57,7 +57,7 @@ def test_lifespan_get_logger_returns_logger(mock_settings):
     # Arrange
 
     # Act
-    logger = _get_logger(mock_settings)
+    logger = _get_logger_from_app(mock_settings)
 
     # Assert
     assert logger is not None
@@ -68,14 +68,29 @@ def test_lifespan_list_configs_logs_settings(mock_settings):
     """Test that _list_configs logs configuration settings."""
     # Arrange
     mock_logger = MagicMock()
+    mock_server_settings = MagicMock()
+    mock_server_settings.model_dump.return_value = {"PORT": 8080}
+    mock_directory_settings = MagicMock()
+    mock_directory_settings.model_dump.return_value = {"require_startup_warmup": True}
+    mock_sre_ops_settings = MagicMock()
+    mock_sre_ops_settings.model_dump.return_value = {"SRE_OPS_CHANNEL_ID": ""}
 
     # Act
-    _list_configs(mock_settings, mock_logger)
+    _list_configs_from_sections(
+        mock_settings,
+        mock_server_settings,
+        mock_directory_settings,
+        mock_sre_ops_settings,
+        mock_logger,
+    )
 
     # Assert
     mock_logger.info.assert_called()
-    # First call should log "configuration_initialized"
-    assert mock_logger.info.call_count >= 1
+    first_call = mock_logger.info.call_args_list[0]
+    assert first_call.args[0] == "configuration_initialized"
+
+    base_settings = first_call.kwargs["base_settings"]
+    assert all("PREFIX" not in entry for entry in base_settings)
 
 
 @pytest.mark.integration
@@ -87,10 +102,14 @@ def test_lifespan_get_logger_configures_logging(mock_configure_logging, mock_set
     mock_configure_logging.return_value = mock_logger
 
     # Act
-    logger = _get_logger(mock_settings)
+    logger = _get_logger_from_app(mock_settings)
 
     # Assert
-    mock_configure_logging.assert_called_once_with(settings=mock_settings)
+    # _get_logger_from_app now passes both settings and logging_settings to configure_logging
+    assert mock_configure_logging.call_count == 1
+    call_kwargs = mock_configure_logging.call_args.kwargs
+    assert call_kwargs["settings"] == mock_settings
+    assert "logging_settings" in call_kwargs
     assert logger == mock_logger
 
 
@@ -149,39 +168,11 @@ def test_lifespan_stop_scheduled_tasks_sets_event():
 
 
 @pytest.mark.integration
-def test_lifespan_start_scheduled_tasks_skips_when_prefix_not_empty(
-    mock_settings, mock_bot, monkeypatch
-):
-    """Test that _start_scheduled_tasks skips when PREFIX is not empty."""
+def test_lifespan_start_scheduled_tasks_runs_when_environment_is_prod(mock_settings, mock_bot, monkeypatch):
+    """Test that _start_scheduled_tasks starts when ENVIRONMENT is production."""
     # Arrange
     mock_logger = MagicMock()
-    mock_settings.PREFIX = "dev"
-    init_mock = MagicMock()
-    run_mock = MagicMock()
-    monkeypatch.setattr("server.lifespan.scheduled_tasks.init", init_mock)
-    monkeypatch.setattr("server.lifespan.scheduled_tasks.run_continuously", run_mock)
-
-    # Act
-    stop_event = _start_scheduled_tasks(mock_bot, mock_settings, mock_logger)
-
-    # Assert
-    assert stop_event is None
-    init_mock.assert_not_called()
-    run_mock.assert_not_called()
-    mock_logger.info.assert_called_with(
-        "scheduled_tasks_skipped",
-        reason="prefix_not_empty",
-    )
-
-
-@pytest.mark.integration
-def test_lifespan_start_scheduled_tasks_runs_when_prefix_empty(
-    mock_settings, mock_bot, monkeypatch
-):
-    """Test that _start_scheduled_tasks starts when PREFIX is empty."""
-    # Arrange
-    mock_logger = MagicMock()
-    mock_settings.PREFIX = ""
+    mock_settings.ENVIRONMENT = "production"
     init_mock = MagicMock()
     stop_event = threading.Event()
     run_mock = MagicMock(return_value=stop_event)
@@ -199,6 +190,30 @@ def test_lifespan_start_scheduled_tasks_runs_when_prefix_empty(
 
 
 @pytest.mark.integration
+def test_lifespan_start_scheduled_tasks_skips_when_environment_is_not_production(mock_settings, mock_bot, monkeypatch):
+    """Test that _start_scheduled_tasks skips when ENVIRONMENT is non-production."""
+    # Arrange
+    mock_logger = MagicMock()
+    mock_settings.ENVIRONMENT = "local"
+    init_mock = MagicMock()
+    run_mock = MagicMock()
+    monkeypatch.setattr("server.lifespan.scheduled_tasks.init", init_mock)
+    monkeypatch.setattr("server.lifespan.scheduled_tasks.run_continuously", run_mock)
+
+    # Act
+    result = _start_scheduled_tasks(mock_bot, mock_settings, mock_logger)
+
+    # Assert
+    assert result is None
+    init_mock.assert_not_called()
+    run_mock.assert_not_called()
+    mock_logger.info.assert_called_with(
+        "scheduled_tasks_skipped",
+        reason="environment_is_not_production",
+    )
+
+
+@pytest.mark.integration
 def test_initialize_directory_provider_stores_provider_on_app_state(monkeypatch):
     """Directory provider is warmed and stored on app.state during startup."""
     # Arrange
@@ -206,7 +221,7 @@ def test_initialize_directory_provider_stores_provider_on_app_state(monkeypatch)
     app.state = MagicMock()
     mock_logger = MagicMock()
     mock_settings = MagicMock()
-    mock_settings.directory.require_startup_warmup = True
+    mock_settings.require_startup_warmup = True
     mock_provider = MagicMock()
     mock_provider.warmup.return_value = MagicMock(is_success=True, message="ok")
 
@@ -228,7 +243,7 @@ def test_initialize_directory_provider_raises_when_required_warmup_fails(monkeyp
     app.state = MagicMock()
     mock_logger = MagicMock()
     mock_settings = MagicMock()
-    mock_settings.directory.require_startup_warmup = True
+    mock_settings.require_startup_warmup = True
     mock_provider = MagicMock()
     mock_provider.warmup.return_value = MagicMock(
         is_success=False,
@@ -250,7 +265,7 @@ def test_initialize_directory_provider_allows_failed_optional_warmup(monkeypatch
     app.state = MagicMock()
     mock_logger = MagicMock()
     mock_settings = MagicMock()
-    mock_settings.directory.require_startup_warmup = False
+    mock_settings.require_startup_warmup = False
     mock_provider = MagicMock()
 
     monkeypatch.setattr("server.lifespan.get_directory_provider", lambda: mock_provider)

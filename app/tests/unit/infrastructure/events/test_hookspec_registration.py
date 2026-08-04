@@ -5,9 +5,9 @@ from unittest.mock import MagicMock
 import pluggy
 import pytest
 
-from infrastructure.plugins.specs import FeatureLifecycleSpecs
 from infrastructure.events.service import EventDispatcher
 from infrastructure.plugins.manager import register_feature_integrations
+from infrastructure.plugins.specs import FeatureLifecycleSpecs
 
 pytestmark = pytest.mark.unit
 

@@ -8,7 +8,6 @@ module scope — never bypass providers.
 """
 
 from functools import lru_cache
-from typing import Dict
 
 from infrastructure.directory import get_directory_provider
 from packages.access.catalog.parsers import (
@@ -27,7 +26,7 @@ def get_catalog_settings() -> AccessCatalogSettings:
 
 
 @lru_cache(maxsize=1)
-def _build_parser_map() -> Dict[str, CatalogSlugParser]:
+def _build_parser_map() -> dict[str, CatalogSlugParser]:
     """Build the platform key → parser mapping from runtime config.
 
     Parser config (``known_envs``) is read from the typed ``catalog_extensions``
@@ -35,7 +34,7 @@ def _build_parser_map() -> Dict[str, CatalogSlugParser]:
     fall back to ``FallbackCatalogSlugParser``.
     """
     runtime_config = get_access_runtime_config()
-    parsers: Dict[str, CatalogSlugParser] = {}
+    parsers: dict[str, CatalogSlugParser] = {}
 
     for platform_key in runtime_config.platforms:
         known_envs = set()
@@ -66,7 +65,7 @@ def get_catalog_service() -> CatalogService:
     directory = get_directory_provider()
     parser_map = _build_parser_map()
 
-    display_names: Dict[str, str] = {}
+    display_names: dict[str, str] = {}
     if runtime_config.catalog_extensions:
         display_names = dict(runtime_config.catalog_extensions.platform_display_names)
 

@@ -19,6 +19,7 @@ import os  # noqa: E402
 import json
 import argparse
 import sys
+from typing import Any, cast
 
 from dotenv import load_dotenv
 
@@ -45,14 +46,16 @@ if "pytest" in sys.modules and not os.environ.get("RUN_SMOKE_TESTS"):
 from integrations.google_workspace import google_directory_next as gdn  # noqa: E402
 from integrations.google_workspace.schemas import User  # noqa: E402
 from infrastructure.operations import OperationResult, OperationStatus  # noqa: E402
-from infrastructure.configuration import get_settings  # noqa: E402
+from infrastructure.configuration.integrations.google import (
+    get_google_workspace_settings,
+)  # noqa: E402
 from tests.factories.google import (
     make_google_groups,
     make_google_members,
     make_google_users,
 )  # noqa: E402
 
-settings = get_settings()
+google_settings = get_google_workspace_settings()
 
 
 def _validate_integration_response(resp, expected_model=None):
@@ -83,9 +86,7 @@ def test_get_user(domain: str):
         resp = gdn.get_user(users[0]["primaryEmail"])
     else:
         # In live mode, query a known admin/test user instead of the synthetic svc- user
-        live_user = os.environ.get("TEST_GOOGLE_USER") or getattr(
-            getattr(settings, "google_workspace", {}), "SRE_BOT_EMAIL", None
-        )
+        live_user = os.environ.get("TEST_GOOGLE_USER") or google_settings.SRE_BOT_EMAIL
         if not live_user:
             print(
                 "ERROR: No TEST_GOOGLE_USER env var or settings.google_workspace.SRE_BOT_EMAIL configured for live get_user.",
@@ -96,13 +97,11 @@ def test_get_user(domain: str):
 
     # If live mode and 403 returned, print remediation steps and exit non-zero
     if _LIVE and not resp.is_success:
-        err = resp.message or {}
+        err: dict[str, Any] = cast(dict[str, Any], resp.message) if isinstance(resp.message, dict) else {}
         code = str(err.get("error_code")) if err.get("error_code") is not None else None
-        msg = err.get("message", "")
+        msg = str(err.get("message", ""))
         if code == "403" or "Not Authorized" in msg or "not authorized" in msg.lower():
-            print(
-                "ERROR: Google Admin Directory returned 403 Forbidden.", file=sys.stderr
-            )
+            print("ERROR: Google Admin Directory returned 403 Forbidden.", file=sys.stderr)
             print(
                 "This usually means the service account or impersonation lacks Admin SDK permissions or domain-wide delegation is not configured.",
                 file=sys.stderr,
@@ -176,9 +175,9 @@ def test_list_groups_with_members(domain: str):
 
     # If live mode and 403 returned, give remediation guidance and exit non-zero
     if _LIVE and not resp.is_success:
-        err = resp.message or {}
+        err: dict[str, Any] = cast(dict[str, Any], resp.message) if isinstance(resp.message, dict) else {}
         code = str(err.get("error_code")) if err.get("error_code") is not None else None
-        msg = err.get("message", "")
+        msg = str(err.get("message", ""))
         if code == "403" or "Not Authorized" in msg or "not authorized" in msg.lower():
             print(
                 "ERROR: Google Admin Directory returned 403 Forbidden while listing groups/members.",
@@ -285,25 +284,9 @@ if __name__ == "__main__":
 
     # Validate live mode requirements
     _LIVE = bool(args.live)
-    # Determine domain for mocked data: CLI flag -> settings -> fallback
-    settings_domain = getattr(
-        getattr(settings, "google_workspace", {}), "GOOGLE_WORKSPACE_DOMAIN", None
-    )
     # Only allow the project's canonical domain. Reject any other domain (e.g. servicecanada.gc.ca)
     ALLOWED_DOMAIN = "cds-snc.ca"
-    _DOMAIN = args.domain or settings_domain or ALLOWED_DOMAIN
-
-    # Safety: ensure the configured domain (settings or CLI) matches the allowed project domain
-    if settings_domain and settings_domain != ALLOWED_DOMAIN:
-        print(
-            f"ERROR: Project setting GOOGLE_WORKSPACE_DOMAIN='{settings_domain}' is not allowed. Only '{ALLOWED_DOMAIN}' is supported.",
-            file=sys.stderr,
-        )
-        print(
-            "The servicecanada.gc.ca domain is managed by an external IdP and must not be used here. Update project settings to use the cds-snc.ca domain.",
-            file=sys.stderr,
-        )
-        raise SystemExit(3)
+    _DOMAIN = args.domain or ALLOWED_DOMAIN
 
     if args.domain and args.domain != ALLOWED_DOMAIN:
         print(
@@ -313,16 +296,12 @@ if __name__ == "__main__":
         raise SystemExit(3)
     if _LIVE:
         # Ensure expected google workspace credentials/settings exist
-        gcp_key = getattr(
-            settings.google_workspace, "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", None
-        )
+        gcp_key = google_settings.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
         if not gcp_key:
             # Allow JSON path via env var for convenience
             gcp_key_env = os.environ.get("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE")
             if not gcp_key_env:
-                raise SystemExit(
-                    "Live mode requested but GCP_SRE_SERVICE_ACCOUNT_KEY_FILE is not set in settings or env"
-                )
+                raise SystemExit("Live mode requested but GCP_SRE_SERVICE_ACCOUNT_KEY_FILE is not set in settings or env")
     else:
         # default: mocked mode
         pass

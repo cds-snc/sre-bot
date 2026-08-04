@@ -1,10 +1,10 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from infrastructure.operations import OperationResult
 from tests.fixtures.aws_clients import FakeClient
 
 
-def fake_user_client(user: Dict[str, Any]) -> FakeClient:
+def fake_user_client(user: dict[str, Any]) -> FakeClient:
     """
     Return a FakeClient that responds to describe_user, get_user_id, and create_user as needed.
 
@@ -23,7 +23,7 @@ def fake_user_client(user: Dict[str, Any]) -> FakeClient:
     )
 
 
-def fake_group_client(groups: List[Dict[str, Any]]) -> FakeClient:
+def fake_group_client(groups: list[dict[str, Any]]) -> FakeClient:
     """
     Return a FakeClient that pages groups via paginator or returns describe_group.
 
@@ -40,7 +40,7 @@ def fake_group_client(groups: List[Dict[str, Any]]) -> FakeClient:
     )
 
 
-def fake_paginator_for_key(key: str, pages: List[Dict[str, Any]]) -> FakeClient:
+def fake_paginator_for_key(key: str, pages: list[dict[str, Any]]) -> FakeClient:
     """
     Create a FakeClient with a paginator that yields pages where each page contains `key`.
 
@@ -64,7 +64,7 @@ def fake_paginator_for_key(key: str, pages: List[Dict[str, Any]]) -> FakeClient:
     return FakeClient(paginated_pages=normalized)
 
 
-def fake_membership_client(memberships: List[Dict[str, Any]]) -> FakeClient:
+def fake_membership_client(memberships: list[dict[str, Any]]) -> FakeClient:
     """
     Return a FakeClient that pages group memberships for list_group_memberships.
 
@@ -78,9 +78,7 @@ def fake_membership_client(memberships: List[Dict[str, Any]]) -> FakeClient:
     return FakeClient(paginated_pages=pages)
 
 
-def fake_sts_and_session(
-    monkeypatch, fake_client: FakeClient, creds: Optional[Dict[str, str]] = None
-):
+def fake_sts_and_session(monkeypatch, fake_client: FakeClient, creds: dict[str, str] | None = None):
     """
     Monkeypatch boto3.client('sts') and boto3.Session to simulate role assumption.
 

@@ -1,25 +1,23 @@
 import json
+
 from boto3.dynamodb.types import TypeDeserializer
 from slack_bolt import Respond
 from slack_sdk import WebClient
+from structlog import get_logger
+
 from models.incidents import Incident
 from modules.incident import db_operations
-from structlog import get_logger
 
 logger = get_logger()
 
 
 def open_incident_info_view(client: WebClient, body, respond: Respond):
     """Open the incident information view. This view displays the incident details where certain fields can be updated."""
-    log = logger.bind(
-        operation="open_incident_info_view", channel_id=body.get("channel_id")
-    )
+    log = logger.bind(operation="open_incident_info_view", channel_id=body.get("channel_id"))
     incident = db_operations.get_incident_by_channel_id(body["channel_id"])
     if not incident:
         log.warning("no_incident_record", channel_id=body.get("channel_id"))
-        respond(
-            "This command is only available in incident channels. No incident records found for this channel."
-        )
+        respond("This command is only available in incident channels. No incident records found for this channel.")
         return
     else:
         deserialize = TypeDeserializer()
@@ -32,9 +30,7 @@ def open_incident_info_view(client: WebClient, body, respond: Respond):
 def incident_information_view(incident: Incident):
     """Create the view for the incident information modal.
     It should receive a valid Incident object"""
-    created_at = (
-        f"<!date^{int(float(incident.created_at))}^{{date}} at {{time}}|Unknown>"
-    )
+    created_at = f"<!date^{int(float(incident.created_at))}^{{date}} at {{time}}|Unknown>"
     impact_start_timestamp = "Unknown"
     impact_end_timestamp = "Unknown"
     detection_timestamp = "Unknown"

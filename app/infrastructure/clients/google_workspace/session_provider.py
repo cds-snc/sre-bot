@@ -1,7 +1,6 @@
 """Google Workspace session provider for authentication and service creation."""
 
 import json
-from typing import List, Optional
 
 import structlog
 from google.oauth2 import service_account
@@ -34,20 +33,20 @@ class SessionProvider:
     def __init__(
         self,
         credentials_json: str,
-        default_delegated_email: Optional[str] = None,
-        default_scopes: Optional[List[str]] = None,
+        default_delegated_email: str | None = None,
+        default_scopes: list[str] | None = None,
     ) -> None:
         self._credentials_json: str = credentials_json
-        self._default_delegated_email: Optional[str] = default_delegated_email
-        self._default_scopes: List[str] = default_scopes or []
+        self._default_delegated_email: str | None = default_delegated_email
+        self._default_scopes: list[str] = default_scopes or []
         self._logger = logger.bind(component="google_session_provider")
 
     def get_service(
         self,
         service_name: str,
         version: str,
-        scopes: Optional[List[str]] = None,
-        delegated_user_email: Optional[str] = None,
+        scopes: list[str] | None = None,
+        delegated_user_email: str | None = None,
     ) -> Resource:
         """Create an authenticated Google API service resource.
 

@@ -1,7 +1,8 @@
 from unittest.mock import MagicMock, patch
 
-from integrations.slack import users
 from slack_sdk import WebClient
+
+from integrations.slack import users
 
 
 def test_get_all_users():
@@ -14,9 +15,7 @@ def test_get_all_users():
             {"id": "U00AAAAAAA2", "name": "user3", "deleted": False, "is_bot": True},
         ],
     }
-    assert users.get_all_users(client) == [
-        {"id": "U00AAAAAAA0", "name": "user1", "deleted": False, "is_bot": False}
-    ]
+    assert users.get_all_users(client) == [{"id": "U00AAAAAAA0", "name": "user1", "deleted": False, "is_bot": False}]
 
 
 def test_get_all_users_with_pagination():
@@ -102,9 +101,7 @@ def test_get_all_users_with_error(mock_logger):
     client = MagicMock()
     client.users_list.return_value = {"ok": False, "error": "error"}
     assert users.get_all_users(client) == []
-    bound_logger_mock.error.assert_called_once_with(
-        "get_all_users_failed", response={"ok": False, "error": "error"}
-    )
+    bound_logger_mock.error.assert_called_once_with("get_all_users_failed", response={"ok": False, "error": "error"})
 
 
 def test_get_user_id_from_request_with_user_id():
@@ -168,28 +165,19 @@ def test_get_user_locale_without_user_id():
 def test_replace_user_id_with_valid_handle():
     client = MagicMock()
     client.users_profile_get.return_value = {"profile": {"display_name": "user"}}
-    assert (
-        users.replace_user_id_with_handle(client, "Hello <@U12345>, how are you?")
-        == "Hello @user, how are you?"
-    )
+    assert users.replace_user_id_with_handle(client, "Hello <@U12345>, how are you?") == "Hello @user, how are you?"
 
 
 def test_replace_user_id_with_no_pattern_in_message():
     client = MagicMock()
     client.users_profile_get.return_value = {"profile": {"display_name": "user"}}
-    assert (
-        users.replace_user_id_with_handle(client, "Hello user, how are you?")
-        == "Hello user, how are you?"
-    )
+    assert users.replace_user_id_with_handle(client, "Hello user, how are you?") == "Hello user, how are you?"
 
 
 def test_replace_user_id_with_empty_handle():
     client = MagicMock()
     client.users_profile_get.return_value = {"profile": {"display_name": ""}}
-    assert (
-        users.replace_user_id_with_handle(client, "Hello <@U12345>, how are you?")
-        == "Hello @, how are you?"
-    )
+    assert users.replace_user_id_with_handle(client, "Hello <@U12345>, how are you?") == "Hello @, how are you?"
 
 
 def test_replace_user_id_with_empty_message():
@@ -283,14 +271,8 @@ def test_get_user_email_from_handle(mock_get_all_users):
         "U5678": {"ok": True, "user": {"profile": {"email": "user_email2@test.com"}}},
     }.get(user, {})
 
-    assert (
-        users.get_user_email_from_handle(client, "@user_name1")
-        == "user_email1@test.com"
-    )
-    assert (
-        users.get_user_email_from_handle(client, "@user_name2")
-        == "user_email2@test.com"
-    )
+    assert users.get_user_email_from_handle(client, "@user_name1") == "user_email1@test.com"
+    assert users.get_user_email_from_handle(client, "@user_name2") == "user_email2@test.com"
     assert users.get_user_email_from_handle(client, "@unknown_name") is None
 
 
@@ -304,9 +286,7 @@ def test_replace_users_emails_with_mention_success(mock_slack_client_manager):
     result = users.replace_users_emails_with_mention(text)
 
     assert result == "Please contact <@U12345> for more information."
-    mock_client.users_lookupByEmail.assert_called_once_with(
-        email="john.doe@example.com"
-    )
+    mock_client.users_lookupByEmail.assert_called_once_with(email="john.doe@example.com")
 
 
 @patch("integrations.slack.users.SlackClientManager")
@@ -353,9 +333,7 @@ def test_replace_users_emails_with_mention_no_user_id(mock_slack_client_manager)
     result = users.replace_users_emails_with_mention(text)
 
     assert result == "Please contact john.doe@example.com for more information."
-    mock_client.users_lookupByEmail.assert_called_once_with(
-        email="john.doe@example.com"
-    )
+    mock_client.users_lookupByEmail.assert_called_once_with(email="john.doe@example.com")
 
 
 @patch("integrations.slack.users.SlackClientManager")
@@ -405,9 +383,7 @@ def test_replace_users_emails_in_dict_string_value(mock_replace_function):
 
 @patch("integrations.slack.users.replace_users_emails_with_mention")
 def test_replace_users_emails_in_dict_simple_dict(mock_replace_function):
-    mock_replace_function.side_effect = lambda x: x.replace(
-        "john.doe@example.com", "<@U12345>"
-    )
+    mock_replace_function.side_effect = lambda x: x.replace("john.doe@example.com", "<@U12345>")
 
     data = {"message": "Contact john.doe@example.com", "title": "Important"}
     result = users.replace_users_emails_in_dict(data)
@@ -418,9 +394,7 @@ def test_replace_users_emails_in_dict_simple_dict(mock_replace_function):
 
 @patch("integrations.slack.users.replace_users_emails_with_mention")
 def test_replace_users_emails_in_dict_nested_dict(mock_replace_function):
-    mock_replace_function.side_effect = lambda x: (
-        x.replace("jane@example.com", "<@U67890>") if "jane@example.com" in x else x
-    )
+    mock_replace_function.side_effect = lambda x: x.replace("jane@example.com", "<@U67890>") if "jane@example.com" in x else x
 
     data = {
         "user": {"contact": "jane@example.com", "name": "Jane"},
@@ -437,9 +411,7 @@ def test_replace_users_emails_in_dict_nested_dict(mock_replace_function):
 
 @patch("integrations.slack.users.replace_users_emails_with_mention")
 def test_replace_users_emails_in_dict_list_of_strings(mock_replace_function):
-    mock_replace_function.side_effect = lambda x: (
-        x.replace("test@example.com", "<@U11111>") if "test@example.com" in x else x
-    )
+    mock_replace_function.side_effect = lambda x: x.replace("test@example.com", "<@U11111>") if "test@example.com" in x else x
 
     data = ["Contact test@example.com", "No email here", "Another message"]
     result = users.replace_users_emails_in_dict(data)
@@ -450,9 +422,7 @@ def test_replace_users_emails_in_dict_list_of_strings(mock_replace_function):
 
 @patch("integrations.slack.users.replace_users_emails_with_mention")
 def test_replace_users_emails_in_dict_list_of_dicts(mock_replace_function):
-    mock_replace_function.side_effect = lambda x: (
-        x.replace("admin@example.com", "<@U22222>") if "admin@example.com" in x else x
-    )
+    mock_replace_function.side_effect = lambda x: x.replace("admin@example.com", "<@U22222>") if "admin@example.com" in x else x
 
     data = [
         {"message": "Contact admin@example.com", "priority": "high"},

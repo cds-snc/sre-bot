@@ -22,7 +22,6 @@ from packages.access.sync.policies import resolve_effective_policy
 
 from .conftest import make_adapter
 
-
 # ---------------------------------------------------------------------------
 # Config slug derivation
 # ---------------------------------------------------------------------------
@@ -179,9 +178,7 @@ def test_full_pipeline_multiple_groups(aws_config: AccessSyncRuntimeConfig):
     resolved = {}
     for rule in effective.entitlement_rules:
         result = adapter.canonicalize_entitlement_id("group", rule.entitlement_id)
-        assert (
-            result.is_success
-        ), f"Failed to resolve {rule.entitlement_id!r}: {result.message}"
+        assert result.is_success, f"Failed to resolve {rule.entitlement_id!r}: {result.message}"
         resolved[rule.entitlement_id] = result.data
 
     assert resolved == expected

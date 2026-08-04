@@ -26,12 +26,7 @@ def test_create_webhook(dynamodb_mock):
 @patch("modules.slack.webhooks.dynamodb")
 def test_create_webhook_with_type(dynamodb_mock):
     dynamodb_mock.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    assert (
-        webhooks.create_webhook(
-            "test_channel", "test_user_id", "test_name", "test_type"
-        )
-        == ANY
-    )
+    assert webhooks.create_webhook("test_channel", "test_user_id", "test_name", "test_type") == ANY
     dynamodb_mock.put_item.assert_called_once_with(
         TableName="webhooks",
         Item={
@@ -70,15 +65,9 @@ def test_create_webhook_return_none(dynamodb_mock):
 
 @patch("modules.slack.webhooks.dynamodb")
 def test_delete_webhook(dynamodb_mock):
-    dynamodb_mock.delete_item.return_value = {
-        "ResponseMetadata": {"HTTPStatusCode": 200}
-    }
-    assert webhooks.delete_webhook("test_id") == {
-        "ResponseMetadata": {"HTTPStatusCode": 200}
-    }
-    dynamodb_mock.delete_item.assert_called_once_with(
-        TableName="webhooks", Key={"id": {"S": "test_id"}}
-    )
+    dynamodb_mock.delete_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
+    assert webhooks.delete_webhook("test_id") == {"ResponseMetadata": {"HTTPStatusCode": 200}}
+    dynamodb_mock.delete_item.assert_called_once_with(TableName="webhooks", Key={"id": {"S": "test_id"}})
 
 
 @patch("modules.slack.webhooks.dynamodb")
@@ -105,18 +94,14 @@ def test_get_webhook(dynamodb_mock):
         "acknowledged_count": {"N": "0"},
         "type": {"S": "alert"},
     }
-    dynamodb_mock.get_item.assert_called_once_with(
-        TableName="webhooks", Key={"id": {"S": "test_id"}}
-    )
+    dynamodb_mock.get_item.assert_called_once_with(TableName="webhooks", Key={"id": {"S": "test_id"}})
 
 
 @patch("modules.slack.webhooks.dynamodb")
 def test_get_webhook_with_no_result(dynamodb_mock):
     dynamodb_mock.get_item.return_value = {}
     assert webhooks.get_webhook("test_id") is None
-    dynamodb_mock.get_item.assert_called_once_with(
-        TableName="webhooks", Key={"id": {"S": "test_id"}}
-    )
+    dynamodb_mock.get_item.assert_called_once_with(TableName="webhooks", Key={"id": {"S": "test_id"}})
 
 
 @patch("modules.slack.webhooks.dynamodb")
@@ -155,12 +140,8 @@ def test_lookup_webhooks(mock_dynamodb):
 
 @patch("modules.slack.webhooks.dynamodb")
 def test_increment_acknowledged_count(dynamodb_mock):
-    dynamodb_mock.update_item.return_value = {
-        "ResponseMetadata": {"HTTPStatusCode": 200}
-    }
-    assert webhooks.increment_acknowledged_count("test_id") == {
-        "ResponseMetadata": {"HTTPStatusCode": 200}
-    }
+    dynamodb_mock.update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
+    assert webhooks.increment_acknowledged_count("test_id") == {"ResponseMetadata": {"HTTPStatusCode": 200}}
     dynamodb_mock.update_item.assert_called_once_with(
         TableName="webhooks",
         Key={"id": {"S": "test_id"}},
@@ -171,12 +152,8 @@ def test_increment_acknowledged_count(dynamodb_mock):
 
 @patch("modules.slack.webhooks.dynamodb")
 def test_increment_invocation_count(dynamodb_mock):
-    dynamodb_mock.update_item.return_value = {
-        "ResponseMetadata": {"HTTPStatusCode": 200}
-    }
-    assert webhooks.increment_invocation_count("test_id") == {
-        "ResponseMetadata": {"HTTPStatusCode": 200}
-    }
+    dynamodb_mock.update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
+    assert webhooks.increment_invocation_count("test_id") == {"ResponseMetadata": {"HTTPStatusCode": 200}}
     dynamodb_mock.update_item.assert_called_once_with(
         TableName="webhooks",
         Key={"id": {"S": "test_id"}},
@@ -211,19 +188,13 @@ def test_list_all_webhooks(dynamodb_mock):
             "acknowledged_count": {"N": "0"},
         }
     ]
-    dynamodb_mock.scan.assert_called_once_with(
-        TableName="webhooks", Select="ALL_ATTRIBUTES"
-    )
+    dynamodb_mock.scan.assert_called_once_with(TableName="webhooks", Select="ALL_ATTRIBUTES")
 
 
 @patch("modules.slack.webhooks.dynamodb")
 def test_revoke_webhook(dynamodb_mock):
-    dynamodb_mock.update_item.return_value = {
-        "ResponseMetadata": {"HTTPStatusCode": 200}
-    }
-    assert webhooks.revoke_webhook("test_id") == {
-        "ResponseMetadata": {"HTTPStatusCode": 200}
-    }
+    dynamodb_mock.update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
+    assert webhooks.revoke_webhook("test_id") == {"ResponseMetadata": {"HTTPStatusCode": 200}}
     dynamodb_mock.update_item.assert_called_once_with(
         TableName="webhooks",
         Key={"id": {"S": "test_id"}},
@@ -271,9 +242,7 @@ def test_is_active_not_found(dynamodb_mock):
 @patch("modules.slack.webhooks.dynamodb")
 @patch("modules.slack.webhooks.get_webhook")
 def test_toggle_webhook(get_webhook_mock, dynamodb_mock):
-    dynamodb_mock.update_item.return_value = {
-        "ResponseMetadata": {"HTTPStatusCode": 200}
-    }
+    dynamodb_mock.update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
     get_webhook_mock.return_value = {
         "id": {"S": "test_id"},
         "channel": {"S": "test_channel"},
@@ -284,9 +253,7 @@ def test_toggle_webhook(get_webhook_mock, dynamodb_mock):
         "invocation_count": {"N": "0"},
         "acknowledged_count": {"N": "0"},
     }
-    assert webhooks.toggle_webhook("test_id") == {
-        "ResponseMetadata": {"HTTPStatusCode": 200}
-    }
+    assert webhooks.toggle_webhook("test_id") == {"ResponseMetadata": {"HTTPStatusCode": 200}}
     dynamodb_mock.update_item.assert_called_once_with(
         TableName="webhooks",
         Key={"id": {"S": "test_id"}},
@@ -313,9 +280,7 @@ def test_validate_string_payload_type_valid_json(
 
 
 @patch("modules.slack.webhooks.model_utils")
-def test_validate_string_payload_same_params_in_multiple_models_returns_first_found(
-    model_utils_mock, caplog
-):
+def test_validate_string_payload_same_params_in_multiple_models_returns_first_found(model_utils_mock, caplog):
     model_utils_mock.get_dict_of_parameters_from_models.return_value = {
         "WrongModel": ["test"],
         "TestModel": ["type", "type2"],
@@ -323,9 +288,7 @@ def test_validate_string_payload_same_params_in_multiple_models_returns_first_fo
         "TestModel3": ["type"],
     }
     model_utils_mock.has_parameters_in_model.side_effect = [0, 2, 0, 1]
-    response = webhooks.validate_string_payload_type(
-        '{"type": "test", "type2": "test"}'
-    )
+    response = webhooks.validate_string_payload_type('{"type": "test", "type2": "test"}')
     assert response == (
         "TestModel",
         {"type": "test", "type2": "test"},

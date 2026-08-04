@@ -1,23 +1,33 @@
-"""Slack Bot Bootstrap module.
+"""Slack Bot bootstrap module.
 
-This module contains the bootstrap code for the Slack integration, including the Bolt app factory and any necessary setup for the integration.
+Contains Slack integration bootstrap code, including Bolt app factories and
+setup helpers.
+
+The app selects exactly one delivery mode at startup:
+- Socket Mode (WebSocket): request authenticity is handled by the connection
+    handshake and Bolt request-signature verification is disabled.
+- HTTP Events mode: Bolt request-signature verification is enabled for inbound
+    HTTP requests.
+
+HTTP-mode per-request HMAC verification details beyond Bolt's built-in
+request-verification flow are handled separately and are not implemented here.
 """
 
 from slack_bolt import App
-from slack_sdk import WebClient
-from slack_sdk.http_retry.handler import RetryHandler
-from slack_sdk.http_retry.builtin_handlers import (
-    ConnectionErrorRetryHandler,
-    RateLimitErrorRetryHandler,
-    ServerErrorRetryHandler,
-)
 from slack_bolt.async_app import AsyncApp
+from slack_sdk import WebClient
 from slack_sdk.http_retry.async_handler import AsyncRetryHandler
 from slack_sdk.http_retry.builtin_async_handlers import (
     AsyncConnectionErrorRetryHandler,
     AsyncRateLimitErrorRetryHandler,
     AsyncServerErrorRetryHandler,
 )
+from slack_sdk.http_retry.builtin_handlers import (
+    ConnectionErrorRetryHandler,
+    RateLimitErrorRetryHandler,
+    ServerErrorRetryHandler,
+)
+from slack_sdk.http_retry.handler import RetryHandler
 from slack_sdk.web.async_client import AsyncWebClient
 
 from integrations.slack.settings import get_slack_settings
@@ -31,15 +41,9 @@ class SlackBootstrap:
     ):
         self.settings = get_slack_settings()
         retry_handlers: list[AsyncRetryHandler] = [
-            AsyncConnectionErrorRetryHandler(
-                max_retry_count=self.settings.RETRY_MAX_ATTEMPTS
-            ),
-            AsyncRateLimitErrorRetryHandler(
-                max_retry_count=self.settings.RETRY_MAX_ATTEMPTS
-            ),
-            AsyncServerErrorRetryHandler(
-                max_retry_count=self.settings.RETRY_MAX_ATTEMPTS
-            ),
+            AsyncConnectionErrorRetryHandler(max_retry_count=self.settings.RETRY_MAX_ATTEMPTS),
+            AsyncRateLimitErrorRetryHandler(max_retry_count=self.settings.RETRY_MAX_ATTEMPTS),
+            AsyncServerErrorRetryHandler(max_retry_count=self.settings.RETRY_MAX_ATTEMPTS),
         ]
         self.web: AsyncWebClient = AsyncWebClient(
             token=self.settings.BOT_TOKEN,
@@ -48,11 +52,12 @@ class SlackBootstrap:
         )
 
     def create_app(self) -> AsyncApp:
-        """Create and return a Bolt AsyncApp instance configured with the Slack settings."""
-        self.settings
+        """Create a Bolt AsyncApp configured from Slack settings."""
+        request_verification_enabled = not self.settings.SOCKET_MODE
         app = AsyncApp(
             token=self.settings.BOT_TOKEN,
             client=self.web,
+            request_verification_enabled=request_verification_enabled,
         )
         return app
 
@@ -65,12 +70,8 @@ class LegacySlackBootstrap:
     ):
         self.settings = get_slack_settings()
         retry_handlers: list[RetryHandler] = [
-            ConnectionErrorRetryHandler(
-                max_retry_count=self.settings.RETRY_MAX_ATTEMPTS
-            ),
-            RateLimitErrorRetryHandler(
-                max_retry_count=self.settings.RETRY_MAX_ATTEMPTS
-            ),
+            ConnectionErrorRetryHandler(max_retry_count=self.settings.RETRY_MAX_ATTEMPTS),
+            RateLimitErrorRetryHandler(max_retry_count=self.settings.RETRY_MAX_ATTEMPTS),
             ServerErrorRetryHandler(max_retry_count=self.settings.RETRY_MAX_ATTEMPTS),
         ]
         self.web: WebClient = WebClient(
@@ -80,10 +81,11 @@ class LegacySlackBootstrap:
         )
 
     def create_app(self) -> App:
-        """Create and return a Bolt App instance configured with the Slack settings."""
-        self.settings
+        """Create a Bolt App configured from Slack settings."""
+        request_verification_enabled = not self.settings.SOCKET_MODE
         app = App(
             token=self.settings.BOT_TOKEN,
             client=self.web,
+            request_verification_enabled=request_verification_enabled,
         )
         return app

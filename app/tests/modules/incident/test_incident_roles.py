@@ -1,5 +1,6 @@
 import json
-from unittest.mock import MagicMock, patch, ANY
+from unittest.mock import ANY, MagicMock, patch
+
 from modules.incident import incident_roles as incident_helper
 
 
@@ -13,9 +14,7 @@ def test_manage_roles(get_document_by_channel_name_mock):
     }
     ack = MagicMock()
     respond = MagicMock()
-    get_document_by_channel_name_mock.return_value = [
-        {"id": "file_id", "appProperties": {"ic_id": "ic_id", "ol_id": "ol_id"}}
-    ]
+    get_document_by_channel_name_mock.return_value = [{"id": "file_id", "appProperties": {"ic_id": "ic_id", "ol_id": "ol_id"}}]
     incident_helper.manage_roles(client, body, ack, respond)
     ack.assert_called_once()
     get_document_by_channel_name_mock.assert_called_once_with("channel_name")
@@ -50,9 +49,7 @@ def test_manage_roles_with_dev_prefix(get_document_by_channel_name_mock):
     }
     ack = MagicMock()
     respond = MagicMock()
-    get_document_by_channel_name_mock.return_value = [
-        {"id": "file_id", "appProperties": {"ic_id": "ic_id", "ol_id": "ol_id"}}
-    ]
+    get_document_by_channel_name_mock.return_value = [{"id": "file_id", "appProperties": {"ic_id": "ic_id", "ol_id": "ol_id"}}]
     incident_helper.manage_roles(client, body, ack, respond)
     ack.assert_called_once()
     get_document_by_channel_name_mock.assert_called_once_with("channel_name")
@@ -63,9 +60,7 @@ def test_manage_roles_with_dev_prefix(get_document_by_channel_name_mock):
 def test_save_incident_roles(add_metadata_mock):
     client = MagicMock()
     ack = MagicMock()
-    client.conversations_info.return_value = {
-        "channel": {"purpose": {"value": "Existing purpose text"}}
-    }
+    client.conversations_info.return_value = {"channel": {"purpose": {"value": "Existing purpose text"}}}
     view = {
         "private_metadata": json.dumps(
             {
@@ -107,9 +102,7 @@ def test_save_incident_roles_append_purpose(add_metadata_mock):
     client = MagicMock()
     ack = MagicMock()
     # Mock .conversations_info to return a channel purpose with no existing IC/OL text
-    client.conversations_info.return_value = {
-        "channel": {"purpose": {"value": "Current channel purpose with no roles."}}
-    }
+    client.conversations_info.return_value = {"channel": {"purpose": {"value": "Current channel purpose with no roles."}}}
 
     view = {
         "private_metadata": json.dumps(
@@ -146,12 +139,8 @@ def test_save_incident_roles_append_purpose(add_metadata_mock):
         channel="channel_id",
     )
     # Verify we set the channel purpose with appended roles (including leading newline)
-    expected_purpose = (
-        "Current channel purpose with no roles. \nIC: <@new_ic> / OL: <@new_ol>"
-    )
-    client.conversations_setPurpose.assert_called_once_with(
-        channel="channel_id", purpose=expected_purpose
-    )
+    expected_purpose = "Current channel purpose with no roles. \nIC: <@new_ic> / OL: <@new_ol>"
+    client.conversations_setPurpose.assert_called_once_with(channel="channel_id", purpose=expected_purpose)
 
 
 @patch("modules.incident.incident_roles.google_drive.add_metadata")
@@ -162,11 +151,7 @@ def test_save_incident_roles_replace_purpose(add_metadata_mock):
     ack = MagicMock()
     # Purpose already has "IC: <@some_ic> / OL: <@some_ol>" that we want to replace
     client.conversations_info.return_value = {
-        "channel": {
-            "purpose": {
-                "value": "Some text here. IC: <@some_ic> / OL: <@some_ol> More text."
-            }
-        }
+        "channel": {"purpose": {"value": "Some text here. IC: <@some_ic> / OL: <@some_ol> More text."}}
     }
 
     view = {
@@ -205,9 +190,7 @@ def test_save_incident_roles_replace_purpose(add_metadata_mock):
     )
     # The existing text "IC: <@some_ic> / OL: <@some_ol>" should be replaced
     expected_purpose = "Some text here. \nIC: <@new_ic> / OL: <@new_ol> More text."
-    client.conversations_setPurpose.assert_called_once_with(
-        channel="channel_id", purpose=expected_purpose
-    )
+    client.conversations_setPurpose.assert_called_once_with(channel="channel_id", purpose=expected_purpose)
 
 
 @patch("modules.incident.incident_roles.google_drive.add_metadata")
@@ -218,9 +201,7 @@ def test_save_incident_roles_purpose_truncation(add_metadata_mock):
 
     # Create a long purpose that will exceed 250 characters once we append/replace
     long_description = "X" * 240  # 240 chars
-    client.conversations_info.return_value = {
-        "channel": {"purpose": {"value": long_description}}
-    }
+    client.conversations_info.return_value = {"channel": {"purpose": {"value": long_description}}}
 
     view = {
         "private_metadata": json.dumps(
@@ -251,12 +232,8 @@ def test_save_incident_roles_purpose_truncation(add_metadata_mock):
     # If the final is over 250, it should be truncated to 250
     args, kwargs = client.conversations_setPurpose.call_args
     final_purpose = kwargs["purpose"]
-    assert (
-        len(final_purpose) <= 250
-    ), "The purpose should be truncated to 250 characters."
+    assert len(final_purpose) <= 250, "The purpose should be truncated to 250 characters."
 
     # Just to illustrate, you could also check that the final purpose starts with the original text:
-    assert final_purpose.startswith(
-        long_description
-    ), "Purpose should contain the start of the original description."
+    assert final_purpose.startswith(long_description), "Purpose should contain the start of the original description."
     # and ends somewhere in the appended text. We don't enforce the exact boundary here, just that it's truncated.

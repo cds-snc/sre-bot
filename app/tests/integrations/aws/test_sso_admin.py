@@ -1,4 +1,5 @@
 from unittest.mock import patch
+
 from integrations.aws import sso_admin
 
 
@@ -18,14 +19,9 @@ def test_create_assignment_for_user_returns_true_if_permissions_added_with_write
 ):
 
     mock_get_predefined_permission_sets.return_value = "test_admin_permissions"
-    mock_execute_aws_api_call.return_value = {
-        "AccountAssignmentCreationStatus": {"Status": "SUCCESS"}
-    }
+    mock_execute_aws_api_call.return_value = {"AccountAssignmentCreationStatus": {"Status": "SUCCESS"}}
 
-    assert (
-        sso_admin.create_account_assignment("test_user", "test_account", "write")
-        is True
-    )
+    assert sso_admin.create_account_assignment("test_user", "test_account", "write") is True
 
 
 @patch("integrations.aws.sso_admin.execute_aws_api_call")
@@ -35,13 +31,9 @@ def test_create_assignment_for_user_returns_true_if_permissions_added_with_read(
 ):
 
     mock_get_predefined_permission_sets.return_value = "test_view_permissions"
-    mock_execute_aws_api_call.return_value = {
-        "AccountAssignmentCreationStatus": {"Status": "SUCCESS"}
-    }
+    mock_execute_aws_api_call.return_value = {"AccountAssignmentCreationStatus": {"Status": "SUCCESS"}}
 
-    assert (
-        sso_admin.create_account_assignment("test_user", "test_account", "read") is True
-    )
+    assert sso_admin.create_account_assignment("test_user", "test_account", "read") is True
 
 
 @patch("integrations.aws.sso_admin.execute_aws_api_call")
@@ -51,14 +43,9 @@ def test_create_assignment_for_user_returns_false_if_permissions_failed(
 ):
 
     mock_get_predefined_permission_sets.return_value = "test_view_permissions"
-    mock_execute_aws_api_call.return_value = {
-        "AccountAssignmentCreationStatus": {"Status": "FAILED"}
-    }
+    mock_execute_aws_api_call.return_value = {"AccountAssignmentCreationStatus": {"Status": "FAILED"}}
 
-    assert (
-        sso_admin.create_account_assignment("test_user", "test_account", "read")
-        is False
-    )
+    assert sso_admin.create_account_assignment("test_user", "test_account", "read") is False
 
 
 @patch("integrations.aws.sso_admin.execute_aws_api_call")
@@ -68,14 +55,9 @@ def test_delete_assignment_for_user_returns_true_if_permissions_added_with_write
 ):
 
     mock_get_predefined_permission_sets.return_value = "test_admin_permissions"
-    mock_execute_aws_api_call.return_value = {
-        "AccountAssignmentDeletionStatus": {"Status": "SUCCESS"}
-    }
+    mock_execute_aws_api_call.return_value = {"AccountAssignmentDeletionStatus": {"Status": "SUCCESS"}}
 
-    assert (
-        sso_admin.delete_account_assignment("test_user", "test_account", "write")
-        is True
-    )
+    assert sso_admin.delete_account_assignment("test_user", "test_account", "write") is True
 
 
 @patch("integrations.aws.sso_admin.execute_aws_api_call")
@@ -85,13 +67,9 @@ def test_delete_assignment_for_user_returns_true_if_permissions_added_with_read(
 ):
 
     mock_get_predefined_permission_sets.return_value = "test_view_permissions"
-    mock_execute_aws_api_call.return_value = {
-        "AccountAssignmentDeletionStatus": {"Status": "SUCCESS"}
-    }
+    mock_execute_aws_api_call.return_value = {"AccountAssignmentDeletionStatus": {"Status": "SUCCESS"}}
 
-    assert (
-        sso_admin.delete_account_assignment("test_user", "test_account", "read") is True
-    )
+    assert sso_admin.delete_account_assignment("test_user", "test_account", "read") is True
 
 
 @patch("integrations.aws.sso_admin.execute_aws_api_call")
@@ -101,11 +79,6 @@ def test_delete_assignment_for_user_returns_false_if_permissions_failed(
 ):
 
     mock_get_predefined_permission_sets.return_value = "test_view_permissions"
-    mock_execute_aws_api_call.return_value = {
-        "AccountAssignmentDeletionStatus": {"Status": "FAILED"}
-    }
+    mock_execute_aws_api_call.return_value = {"AccountAssignmentDeletionStatus": {"Status": "FAILED"}}
 
-    assert (
-        sso_admin.delete_account_assignment("test_user", "test_account", "read")
-        is False
-    )
+    assert sso_admin.delete_account_assignment("test_user", "test_account", "read") is False

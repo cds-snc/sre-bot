@@ -11,7 +11,6 @@ sub-features.  Bootstrap config (which loader source/ref) lives there under
 """
 
 from functools import lru_cache
-from typing import Optional
 
 from infrastructure.operations import OperationResult
 from packages.access.common.config import (
@@ -37,7 +36,7 @@ def get_access_runtime_config() -> AccessRuntimeConfig:
     settings = get_access_settings()
     loader = get_access_config_loader(source=settings.config.source)
     result: OperationResult[AccessRuntimeConfig] = loader.load(ref=settings.config.ref)
-    config: Optional[AccessRuntimeConfig] = result.data
+    config: AccessRuntimeConfig | None = result.data
     if not result.is_success or config is None:
         raise RuntimeError(f"access_config_load_failed: {result.message}")
     return config

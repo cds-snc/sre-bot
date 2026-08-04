@@ -1,7 +1,8 @@
 """Unit tests for AWS users command handler."""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from modules.aws import users
 
@@ -55,9 +56,7 @@ def test_should_delegate_to_provisioning_handler_when_create_command_given(
     users.command_handler(client, body, respond, args)
 
     # Assert
-    mock_provisioning.assert_called_once_with(
-        client, body, respond, ["create", "user@example.com"]
-    )
+    mock_provisioning.assert_called_once_with(client, body, respond, ["create", "user@example.com"])
 
 
 @pytest.mark.unit
@@ -76,18 +75,19 @@ def test_should_delegate_to_provisioning_handler_when_delete_command_given(
     users.command_handler(client, body, respond, args)
 
     # Assert
-    mock_provisioning.assert_called_once_with(
-        client, body, respond, ["delete", "user@example.com"]
-    )
+    mock_provisioning.assert_called_once_with(client, body, respond, ["delete", "user@example.com"])
 
 
 @pytest.mark.unit
-@patch("modules.aws.users.get_settings")
+@patch("modules.aws.users.get_aws_feature_settings")
 @patch("modules.aws.users.identity_center")
 @patch("modules.aws.users.permissions")
 @patch("modules.aws.users.slack_users")
 def test_should_provision_user_when_user_has_permission(
-    mock_slack_users, mock_permissions, mock_identity_center, mock_get_settings
+    mock_slack_users,
+    mock_permissions,
+    mock_identity_center,
+    mock_get_aws_feature_settings,
 ):
     """Test successful user provisioning when user has permission."""
     # Arrange
@@ -96,9 +96,9 @@ def test_should_provision_user_when_user_has_permission(
     respond = MagicMock()
     args = ["create", "newuser@example.com"]
 
-    mock_settings = MagicMock()
-    mock_settings.aws_feature.AWS_ADMIN_GROUPS = ["admin@test.com"]
-    mock_get_settings.return_value = mock_settings
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_ADMIN_GROUPS = ["admin@test.com"]
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
 
     mock_slack_users.get_user_email_from_body.return_value = "admin@test.com"
     mock_permissions.is_user_member_of_groups.return_value = True
@@ -110,20 +110,16 @@ def test_should_provision_user_when_user_has_permission(
     # Assert
     mock_slack_users.get_user_email_from_body.assert_called_once_with(client, body)
     mock_permissions.is_user_member_of_groups.assert_called_once()
-    mock_identity_center.provision_aws_users.assert_called_once_with(
-        "create", ["newuser@example.com"]
-    )
+    mock_identity_center.provision_aws_users.assert_called_once_with("create", ["newuser@example.com"])
     respond.assert_called_once()
     assert "success" in respond.call_args[0][0]
 
 
 @pytest.mark.unit
-@patch("modules.aws.users.get_settings")
+@patch("modules.aws.users.get_aws_feature_settings")
 @patch("modules.aws.users.permissions")
 @patch("modules.aws.users.slack_users")
-def test_should_deny_provisioning_when_user_lacks_permission(
-    mock_slack_users, mock_permissions, mock_get_settings
-):
+def test_should_deny_provisioning_when_user_lacks_permission(mock_slack_users, mock_permissions, mock_get_aws_feature_settings):
     """Test provisioning denial when user lacks permission."""
     # Arrange
     client = MagicMock()
@@ -131,9 +127,9 @@ def test_should_deny_provisioning_when_user_lacks_permission(
     respond = MagicMock()
     args = ["create", "newuser@example.com"]
 
-    mock_settings = MagicMock()
-    mock_settings.aws_feature.AWS_ADMIN_GROUPS = ["admin@test.com"]
-    mock_get_settings.return_value = mock_settings
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_ADMIN_GROUPS = ["admin@test.com"]
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
 
     mock_slack_users.get_user_email_from_body.return_value = "user@test.com"
     mock_permissions.is_user_member_of_groups.return_value = False

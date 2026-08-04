@@ -14,7 +14,6 @@ from packages.access.common.config import (
 )
 from packages.access.common.settings import AccessSettings
 
-
 # ---------------------------------------------------------------------------
 # AccessSyncSettings defaults
 # ---------------------------------------------------------------------------
@@ -132,9 +131,7 @@ def test_inline_json_loader_preserves_extensions_for_catalog():
                     "mode_overrides": {},
                 }
             },
-            "extensions": {
-                "catalog": {"platform_display_names": {"aws": "Amazon Web Services"}}
-            },
+            "extensions": {"catalog": {"platform_display_names": {"aws": "Amazon Web Services"}}},
         }
     )
 
@@ -142,9 +139,7 @@ def test_inline_json_loader_preserves_extensions_for_catalog():
 
     assert result.is_success
     assert result.data is not None
-    assert result.data.extensions == {
-        "catalog": {"platform_display_names": {"aws": "Amazon Web Services"}}
-    }
+    assert result.data.extensions == {"catalog": {"platform_display_names": {"aws": "Amazon Web Services"}}}
 
 
 @pytest.mark.unit

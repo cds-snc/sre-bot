@@ -10,7 +10,7 @@ is assembled.  Adding a parser for a new platform is a ``providers.py``-only cha
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, Protocol, Set
+from typing import Protocol
 
 from packages.access.catalog.domain import ParsedEntitlementToken
 
@@ -48,7 +48,7 @@ class AwsCatalogSlugParser:
                     (e.g. {"dev", "staging", "prod"}).
     """
 
-    known_envs: Set[str] = field(default_factory=set)
+    known_envs: set[str] = field(default_factory=set)
 
     def parse(self, token: str) -> ParsedEntitlementToken:
         """Parse an AWS entitlement token into structured fields."""
@@ -57,7 +57,7 @@ class AwsCatalogSlugParser:
             return ParsedEntitlementToken(raw=token, parsed=False)
 
         normalized_envs = {e.lower() for e in self.known_envs}
-        env_index: Optional[int] = None
+        env_index: int | None = None
         for i, seg in enumerate(segments):
             if seg in normalized_envs:
                 env_index = i
@@ -65,7 +65,7 @@ class AwsCatalogSlugParser:
 
         if env_index is not None and env_index >= 1:
             product = "-".join(segments[:env_index])
-            env: Optional[str] = segments[env_index]
+            env: str | None = segments[env_index]
             remainder = segments[env_index + 1 :]
         else:
             # No env segment found; first segment is product, rest is role+
@@ -77,8 +77,8 @@ class AwsCatalogSlugParser:
             return ParsedEntitlementToken(raw=token, parsed=False)
 
         role = remainder[0]
-        service: Optional[str] = remainder[1] if len(remainder) > 1 else None
-        resource: Optional[str] = remainder[2] if len(remainder) > 2 else None
+        service: str | None = remainder[1] if len(remainder) > 1 else None
+        resource: str | None = remainder[2] if len(remainder) > 2 else None
 
         return ParsedEntitlementToken(
             raw=token,

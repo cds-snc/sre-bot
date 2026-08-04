@@ -1,6 +1,7 @@
 """Trello client module."""
 
 from trello import TrelloApi  # type: ignore
+
 from infrastructure.configuration.integrations.trello import get_trello_settings
 
 trello_settings = get_trello_settings()

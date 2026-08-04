@@ -1,8 +1,9 @@
 """Unit tests for schedule_retro module in Incident management process."""
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 import pytz  # type: ignore
 
@@ -34,15 +35,11 @@ def est_timezone():
 def mock_datetime_now(est_timezone):
     """Fixture to mock datetime.now() to return a specific time in the EST timezone."""
     # Mocking the specific date we want to consider as "now"
-    specific_now = datetime(
-        2023, 4, 10, 10, 0, tzinfo=est_timezone
-    )  # Assuming April 10, 2023, is a Monday
+    specific_now = datetime(2023, 4, 10, 10, 0, tzinfo=est_timezone)  # Assuming April 10, 2023, is a Monday
 
     with patch("modules.incident.schedule_retro.datetime") as mock_datetime:
         mock_datetime.now.return_value = specific_now
-        mock_datetime.strptime.side_effect = lambda *args, **kw: datetime.strptime(
-            *args, **kw
-        )
+        mock_datetime.strptime.side_effect = lambda *args, **kw: datetime.strptime(*args, **kw)
         yield mock_datetime
 
 
@@ -86,9 +83,7 @@ def test_schedule_event_successful(
 
     # Assertions
     get_freebusy_mock.assert_called_once()
-    find_first_available_slot_mock.assert_called_once_with(
-        {"result": "Mocked FreeBusy Query Result"}, mock_days
-    )
+    find_first_available_slot_mock.assert_called_once_with({"result": "Mocked FreeBusy Query Result"}, mock_days)
     assert result["first_available_start"] == start
     assert result["first_available_end"] == end
     assert result["unavailable_users"] == []
@@ -132,9 +127,7 @@ def test_schedule_event_no_available_slots(
 
     # Assertions
     get_freebusy_mock.assert_called_once()
-    find_first_available_slot_mock.assert_called_once_with(
-        {"result": "Mocked FreeBusy Query Result"}, mock_days
-    )
+    find_first_available_slot_mock.assert_called_once_with({"result": "Mocked FreeBusy Query Result"}, mock_days)
     logger_mock.warning.assert_called_once()
     assert result["first_available_start"] is None
     assert result["first_available_end"] is None
@@ -185,9 +178,7 @@ def test_open_incident_retro_modal(
     mock_ack = MagicMock()
     mock_client = MagicMock()
     mock_incident_conversation.is_incident_channel.return_value = [True, False]
-    mock_incident_conversation.get_incident_document_id.return_value = (
-        "dummy_document_id"
-    )
+    mock_incident_conversation.get_incident_document_id.return_value = "dummy_document_id"
     # The test channel and user IDs
     channel_id = "C12345"
     channel_name = "incident-some-channel-name"
@@ -239,12 +230,8 @@ def test_open_incident_retro_modal(
         mock_client,
         channel_id,
     )
-    mock_slack_channels.fetch_user_details.assert_called_once_with(
-        mock_client, channel_id
-    )
-    mock_generate_retro_options_view.assert_called_once_with(
-        metadata_json, users_details
-    )
+    mock_slack_channels.fetch_user_details.assert_called_once_with(mock_client, channel_id)
+    mock_generate_retro_options_view.assert_called_once_with(metadata_json, users_details)
     mock_client.views_open.assert_called_once_with(
         trigger_id="trigger_id",
         view=mock_generate_retro_options_view.return_value,
@@ -338,9 +325,7 @@ def test_generate_retro_options_view_with_unavailable_users():
     unavailable_users = ["user1@example.com", "user2@example.com"]
 
     # Call the function
-    result = schedule_retro.generate_retro_options_view(
-        private_metadata, all_users, unavailable_users
-    )
+    result = schedule_retro.generate_retro_options_view(private_metadata, all_users, unavailable_users)
 
     # Assertions
     assert result["type"] == "modal"
@@ -370,9 +355,7 @@ def test_generate_retro_options_view_with_unavailable_users():
             [
                 block
                 for block in result["blocks"]
-                if block["type"] == "section"
-                and "text" in block
-                and block["text"]["type"] == "mrkdwn"
+                if block["type"] == "section" and "text" in block and block["text"]["type"] == "mrkdwn"
             ]
         )
         == 5
@@ -381,9 +364,7 @@ def test_generate_retro_options_view_with_unavailable_users():
 
 @patch("modules.incident.schedule_retro.save_retro_event")
 @patch("modules.incident.schedule_retro.schedule_event")
-def test_handle_schedule_retro_submit_success(
-    schedule_event_mock, save_retro_event_mock
-):
+def test_handle_schedule_retro_submit_success(schedule_event_mock, save_retro_event_mock):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     schedule_event_mock.return_value = {
@@ -422,9 +403,7 @@ def test_handle_schedule_retro_submit_success(
     }
 
     # Call the function
-    schedule_retro.handle_schedule_retro_submit(
-        mock_client, mock_ack, body_mock, view_mock_with_link
-    )
+    schedule_retro.handle_schedule_retro_submit(mock_client, mock_ack, body_mock, view_mock_with_link)
 
     # Assertions
     mock_ack.assert_called_once()  # Ensure ack() was called
@@ -433,25 +412,17 @@ def test_handle_schedule_retro_submit_success(
 
     # Verify that the chat message was sent to the channel
     mock_client.chat_postMessage.assert_called_once()
-    mock_client.chat_postMessage.assert_any_call(
-        channel="C1234567890", text="event_info", unfurl_links=False
-    )
-    assert (
-        mock_client.views_open.call_args[1]["view"]["blocks"][0]["text"]["text"]
-        == ":beach-ball: *Scheduling the retro...*"
-    )
+    mock_client.chat_postMessage.assert_any_call(channel="C1234567890", text="event_info", unfurl_links=False)
+    assert mock_client.views_open.call_args[1]["view"]["blocks"][0]["text"]["text"] == ":beach-ball: *Scheduling the retro...*"
     # Verify the modal content for success message is updated
     assert (
-        mock_client.views_update.call_args[1]["view"]["blocks"][0]["text"]["text"]
-        == "*Successfully scheduled calender event!*"
+        mock_client.views_update.call_args[1]["view"]["blocks"][0]["text"]["text"] == "*Successfully scheduled calender event!*"
     )
 
 
 @patch("modules.incident.schedule_retro.save_retro_event")
 @patch("modules.incident.schedule_retro.schedule_event")
-def test_handle_schedule_retro_submit_no_time_found(
-    schedule_event_mock, save_retro_event_mock
-):
+def test_handle_schedule_retro_submit_no_time_found(schedule_event_mock, save_retro_event_mock):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     schedule_event_mock.return_value = {
@@ -488,19 +459,14 @@ def test_handle_schedule_retro_submit_no_time_found(
     }
 
     # Call the function
-    schedule_retro.handle_schedule_retro_submit(
-        mock_client, mock_ack, body_mock, view_mock_with_link
-    )
+    schedule_retro.handle_schedule_retro_submit(mock_client, mock_ack, body_mock, view_mock_with_link)
 
     # Assertions
     mock_ack.assert_called_once()  # Ensure ack() was called
     mock_client.views_open.assert_called_once()  # Ensure the modal was opened
     mock_client.views_update.assert_called_once()
 
-    assert (
-        mock_client.views_open.call_args[1]["view"]["blocks"][0]["text"]["text"]
-        == ":beach-ball: *Scheduling the retro...*"
-    )
+    assert mock_client.views_open.call_args[1]["view"]["blocks"][0]["text"]["text"] == ":beach-ball: *Scheduling the retro...*"
     # Verify the modal content for success
     assert (
         mock_client.views_update.call_args[1]["view"]["blocks"][0]["text"]["text"]
@@ -511,9 +477,7 @@ def test_handle_schedule_retro_submit_no_time_found(
 
 @patch("modules.incident.schedule_retro.save_retro_event")
 @patch("modules.incident.schedule_retro.schedule_event")
-def test_handle_schedule_retro_submit_save_failed(
-    schedule_event_mock, save_retro_event_mock
-):
+def test_handle_schedule_retro_submit_save_failed(schedule_event_mock, save_retro_event_mock):
     mock_client = MagicMock()
     mock_ack = MagicMock()
     schedule_event_mock.return_value = {
@@ -550,19 +514,14 @@ def test_handle_schedule_retro_submit_save_failed(
     }
 
     # Call the function
-    schedule_retro.handle_schedule_retro_submit(
-        mock_client, mock_ack, body_mock, view_mock_with_link
-    )
+    schedule_retro.handle_schedule_retro_submit(mock_client, mock_ack, body_mock, view_mock_with_link)
 
     # Assertions
     mock_ack.assert_called_once()  # Ensure ack() was called
     mock_client.views_open.assert_called_once()  # Ensure the modal was opened
     mock_client.views_update.assert_called_once()
 
-    assert (
-        mock_client.views_open.call_args[1]["view"]["blocks"][0]["text"]["text"]
-        == ":beach-ball: *Scheduling the retro...*"
-    )
+    assert mock_client.views_open.call_args[1]["view"]["blocks"][0]["text"]["text"] == ":beach-ball: *Scheduling the retro...*"
     # Verify the modal content for success
     assert (
         mock_client.views_update.call_args[1]["view"]["blocks"][0]["text"]["text"]
@@ -608,17 +567,13 @@ def test_confirm_click(mock_logger):
     }
     schedule_retro.confirm_click(ack, body, client=MagicMock())
     ack.assert_called_once()
-    mock_logger.info.assert_called_once_with(
-        "user_viewed_calendar_event", username="username"
-    )
+    mock_logger.info.assert_called_once_with("user_viewed_calendar_event", username="username")
 
 
 def test_get_users_emails_from_selected_options():
     # Setup a fake client that returns user info with an email
     mock_client = MagicMock()
-    mock_client.users_info.return_value = {
-        "user": {"profile": {"email": "test@example.com"}}
-    }
+    mock_client.users_info.return_value = {"user": {"profile": {"email": "test@example.com"}}}
     selected_options = [{"value": " U1 "}, {"value": " U2 "}]
     # For second call, change the fake response
     mock_client.users_info.side_effect = [
@@ -626,9 +581,7 @@ def test_get_users_emails_from_selected_options():
         {"user": {"profile": {"email": "test2@example.com"}}},
     ]
 
-    emails = schedule_retro.get_users_emails_from_selected_options(
-        mock_client, selected_options
-    )
+    emails = schedule_retro.get_users_emails_from_selected_options(mock_client, selected_options)
     assert emails == ["test1@example.com", "test2@example.com"]
 
 
@@ -654,9 +607,7 @@ def test_incident_selected_users_updated_empty(
     body = {
         "view": {
             "id": "VIEW456",
-            "private_metadata": json.dumps(
-                {"channel_id": "C67890", "name": "incident-test"}
-            ),
+            "private_metadata": json.dumps({"channel_id": "C67890", "name": "incident-test"}),
             "blocks": [
                 {
                     "block_id": "number_of_days",
@@ -673,9 +624,7 @@ def test_incident_selected_users_updated_empty(
     # Call the function; since selected users list is empty, it should return without further calls.
     schedule_retro.incident_selected_users_updated(mock_client, body, mock_ack)
     mock_ack.assert_called_once()
-    mock_client.views_update.assert_called_once_with(
-        view_id="VIEW456", view={"dummy": "view"}
-    )
+    mock_client.views_update.assert_called_once_with(view_id="VIEW456", view={"dummy": "view"})
     mock_schedule_event.assert_not_called()
     mock_client.users_lookupByEmail.assert_not_called()
 
@@ -702,9 +651,7 @@ def test_incident_selected_users_updated_with_users(
     body = {
         "view": {
             "id": "VIEW456",
-            "private_metadata": json.dumps(
-                {"channel_id": "C67890", "name": "incident-test"}
-            ),
+            "private_metadata": json.dumps({"channel_id": "C67890", "name": "incident-test"}),
             "blocks": [
                 {
                     "block_id": "number_of_days",

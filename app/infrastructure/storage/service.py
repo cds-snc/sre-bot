@@ -11,7 +11,7 @@ delegates all DynamoDB I/O here.
 """
 
 from functools import cache
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
@@ -30,7 +30,7 @@ _serializer = TypeSerializer()
 _deserializer = TypeDeserializer()
 
 
-def _serialize_item(item: Dict[str, Any]) -> Dict[str, Any]:
+def _serialize_item(item: dict[str, Any]) -> dict[str, Any]:
     """Serialize a plain Python dict to DynamoDB attribute format.
 
     Skips None values — DynamoDB does not accept null attribute values in
@@ -39,7 +39,7 @@ def _serialize_item(item: Dict[str, Any]) -> Dict[str, Any]:
     return {k: _serializer.serialize(v) for k, v in item.items() if v is not None}
 
 
-def _deserialize_item(item: Dict[str, Any]) -> Dict[str, Any]:
+def _deserialize_item(item: dict[str, Any]) -> dict[str, Any]:
     """Deserialize a DynamoDB attribute dict to a plain Python dict.
 
     Numeric values are returned as ``Decimal`` by the boto3 deserializer.
@@ -62,7 +62,7 @@ class DynamoDBStorageService:
         dynamodb: Configured ``DynamoDBClient`` instance (injected by provider).
     """
 
-    def __init__(self, dynamodb: "DynamoDBClient") -> None:
+    def __init__(self, dynamodb: DynamoDBClient) -> None:
         self._dynamodb = dynamodb
         logger.info("initialized_storage_service")
 
@@ -73,7 +73,7 @@ class DynamoDBStorageService:
     def put(
         self,
         table: str,
-        item: Dict[str, Any],
+        item: dict[str, Any],
     ) -> OperationResult:
         """Write (or overwrite) an item.
 
@@ -100,7 +100,7 @@ class DynamoDBStorageService:
     def put_if_not_exists(
         self,
         table: str,
-        item: Dict[str, Any],
+        item: dict[str, Any],
         pk_attribute: str,
     ) -> OperationResult:
         """Write an item only if no item with the same primary key exists.
@@ -141,7 +141,7 @@ class DynamoDBStorageService:
     def delete(
         self,
         table: str,
-        key: Dict[str, Any],
+        key: dict[str, Any],
     ) -> OperationResult:
         """Delete an item by primary key.
 
@@ -172,7 +172,7 @@ class DynamoDBStorageService:
     def get(
         self,
         table: str,
-        key: Dict[str, Any],
+        key: dict[str, Any],
     ) -> OperationResult:
         """Get a single item by primary key.
 
@@ -206,7 +206,7 @@ class DynamoDBStorageService:
         self,
         table: str,
         key_condition: str,
-        expression_values: Dict[str, Any],
+        expression_values: dict[str, Any],
         **kwargs: Any,
     ) -> OperationResult:
         """Query items using a key condition.
@@ -228,9 +228,7 @@ class DynamoDBStorageService:
         Returns:
             ``OperationResult[list[dict]]`` with deserialized items, or error.
         """
-        serialized_values = {
-            k: _serializer.serialize(v) for k, v in expression_values.items()
-        }
+        serialized_values = {k: _serializer.serialize(v) for k, v in expression_values.items()}
         result = self._dynamodb.query(
             table_name=table,
             KeyConditionExpression=key_condition,
@@ -247,12 +245,8 @@ class DynamoDBStorageService:
                 error_code=result.error_code,
             )
             return result
-        raw_items: List[Dict[str, Any]] = (
-            result.data if isinstance(result.data, list) else []
-        )
-        return OperationResult.success(
-            data=[_deserialize_item(item) for item in raw_items]
-        )
+        raw_items: list[dict[str, Any]] = result.data if isinstance(result.data, list) else []
+        return OperationResult.success(data=[_deserialize_item(item) for item in raw_items])
 
 
 @cache

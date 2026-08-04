@@ -4,6 +4,7 @@ Moved from tests/unit/modules/groups/providers/test_base_provider.py (OperationR
 """
 
 import pytest
+
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
 
@@ -43,9 +44,7 @@ class TestOperationResultFactories:
         assert result.status == OperationStatus.PERMANENT_ERROR
 
     def test_error_factory_with_error_code(self):
-        result = OperationResult.error(
-            OperationStatus.PERMANENT_ERROR, "Not found", error_code="404"
-        )
+        result = OperationResult.error(OperationStatus.PERMANENT_ERROR, "Not found", error_code="404")
         assert result.error_code == "404"
 
     def test_transient_error_factory(self):
@@ -54,9 +53,7 @@ class TestOperationResultFactories:
         assert result.message == "Timeout"
 
     def test_permanent_error_factory(self):
-        result = OperationResult.permanent_error(
-            "Invalid input", error_code="VALIDATION_ERROR"
-        )
+        result = OperationResult.permanent_error("Invalid input", error_code="VALIDATION_ERROR")
         assert result.status == OperationStatus.PERMANENT_ERROR
 
 
@@ -186,12 +183,7 @@ class TestOperationResultBind:
             # This should never execute
             raise AssertionError("Should not be called")
 
-        result = (
-            OperationResult.success(data=5)
-            .bind(add_one)
-            .bind(fail_always)
-            .bind(should_not_run)
-        )
+        result = OperationResult.success(data=5).bind(add_one).bind(fail_always).bind(should_not_run)
 
         assert not result.is_success
         assert result.message == "Failed"
@@ -201,9 +193,7 @@ class TestOperationResultBind:
         def validate_positive(x: int) -> OperationResult:
             if x > 0:
                 return OperationResult.success(data=x)
-            return OperationResult.permanent_error(
-                "Must be positive", error_code="INVALID"
-            )
+            return OperationResult.permanent_error("Must be positive", error_code="INVALID")
 
         # Valid case
         result = OperationResult.success(data=10).bind(validate_positive)
@@ -235,9 +225,7 @@ class TestOperationResultBind:
                     "User not found",
                     error_code="NOT_FOUND",
                 )
-            return OperationResult.success(
-                data={"id": user_id, "name": f"User{user_id}"}
-            )
+            return OperationResult.success(data={"id": user_id, "name": f"User{user_id}"})
 
         def enrich_profile(user: dict) -> OperationResult:
             enriched = {**user, "display_name": f"Profile: {user['name']}"}
@@ -314,9 +302,7 @@ class TestOperationResultUnwrap:
         assert value is None
 
     def test_unwrap_error_message_includes_status(self):
-        error = OperationResult.error(
-            OperationStatus.NOT_FOUND, "Not found", error_code="404"
-        )
+        error = OperationResult.error(OperationStatus.NOT_FOUND, "Not found", error_code="404")
         with pytest.raises(ValueError) as exc_info:
             error.unwrap()
 
@@ -379,9 +365,7 @@ class TestOperationResultRailwayPattern:
                     provider="database",
                     operation="fetch",
                 )
-            return OperationResult.error(
-                OperationStatus.NOT_FOUND, "User not found", error_code="NOT_FOUND"
-            )
+            return OperationResult.error(OperationStatus.NOT_FOUND, "User not found", error_code="NOT_FOUND")
 
         def check_active(user: dict) -> OperationResult:
             # Simulate active check
@@ -390,11 +374,7 @@ class TestOperationResultRailwayPattern:
 
         # Success path
         result = (
-            OperationResult.success(data=1)
-            .bind(validate_id)
-            .bind(fetch_user)
-            .bind(check_active)
-            .map(lambda u: u["name"].upper())
+            OperationResult.success(data=1).bind(validate_id).bind(fetch_user).bind(check_active).map(lambda u: u["name"].upper())
         )
 
         assert result.is_success

@@ -24,12 +24,12 @@ class DirectorySettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.infrastructure.directory import get_directory_settings
 
-        settings = get_settings()
+        settings = get_directory_settings()
 
-        provider = settings.directory.provider
-        if settings.directory.require_startup_warmup:
+        provider = settings.provider
+        if settings.require_startup_warmup:
             # Opt in to fail-fast remote validation before accepting traffic
             ...
         ```

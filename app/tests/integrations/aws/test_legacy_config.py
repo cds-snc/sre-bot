@@ -1,4 +1,5 @@
 from unittest.mock import patch
+
 from integrations.aws import config
 
 
@@ -44,14 +45,7 @@ def test_describe_aggregate_compliance_by_config_rules_passes_filters_to_api_cal
     mock_execute_aws_api_call,
 ):
     mock_execute_aws_api_call.return_value = [{"config": "foo"}]
-    assert (
-        len(
-            config.describe_aggregate_compliance_by_config_rules(
-                "foo", {"AccountId": "123456789012"}
-            )
-        )
-        == 1
-    )
+    assert len(config.describe_aggregate_compliance_by_config_rules("foo", {"AccountId": "123456789012"})) == 1
     mock_execute_aws_api_call.assert_called_once_with(
         "config",
         "describe_aggregate_compliance_by_config_rules",

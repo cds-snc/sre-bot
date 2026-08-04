@@ -6,11 +6,10 @@ and register them through the feature plugin lifecycle.
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List
-
-from infrastructure.operations import OperationResult, OperationStatus
 
 import structlog
+
+from infrastructure.operations import OperationResult, OperationStatus
 
 
 @dataclass(frozen=True)
@@ -49,7 +48,7 @@ class I18nResourceRegistry:
     discovered feature packages during startup.
     """
 
-    _specs: List[I18nResourceSpec] = field(default_factory=list)
+    _specs: list[I18nResourceSpec] = field(default_factory=list)
     _paths_seen: set[str] = field(default_factory=set)
 
     def register(self, spec: I18nResourceSpec) -> None:
@@ -74,7 +73,7 @@ class I18nResourceRegistry:
         self._specs.append(spec)
         log.info("i18n_resource_registered", required=spec.required)
 
-    def list_specs(self) -> List[I18nResourceSpec]:
+    def list_specs(self) -> list[I18nResourceSpec]:
         """Get all registered resource specifications.
 
         Returns:
@@ -82,7 +81,7 @@ class I18nResourceRegistry:
         """
         return list(self._specs)
 
-    def list_paths(self) -> List[str]:
+    def list_paths(self) -> list[str]:
         """Get all registered resource paths in order.
 
         Returns:
@@ -98,8 +97,8 @@ class I18nResourceRegistry:
             OperationResult.error() if any required path is missing.
         """
         logger = structlog.get_logger()
-        missing_required: List[str] = []
-        missing_optional: List[str] = []
+        missing_required: list[str] = []
+        missing_optional: list[str] = []
 
         for spec in self._specs:
             path = Path(spec.path)

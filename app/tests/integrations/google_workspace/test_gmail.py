@@ -1,4 +1,5 @@
 from unittest.mock import patch
+
 from integrations.google_workspace import gmail
 
 

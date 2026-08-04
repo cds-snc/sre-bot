@@ -1,7 +1,8 @@
 """Shared fixtures for Google Workspace client tests."""
 
 import json
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 from unittest.mock import MagicMock, Mock
 
 import pytest
@@ -189,9 +190,7 @@ def mock_google_api_error():
                 "error": {
                     "code": status,
                     "message": reason,
-                    "errors": [
-                        {"message": reason, "reason": reason.lower().replace(" ", "_")}
-                    ],
+                    "errors": [{"message": reason, "reason": reason.lower().replace(" ", "_")}],
                 }
             }
         ).encode()

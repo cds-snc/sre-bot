@@ -7,6 +7,7 @@ Module-specific retry logic is implemented via the RetryProcessor protocol.
 from typing import Protocol
 
 import structlog
+
 from infrastructure.resilience.retry.config import RetryConfig
 from infrastructure.resilience.retry.models import RetryRecord, RetryResult
 from infrastructure.resilience.retry.store import RetryStore
@@ -171,7 +172,8 @@ class RetryWorker:
                 )
                 # Treat unhandled exceptions as retryable errors
                 self.store.increment_attempt(
-                    record.id, last_error=f"Unhandled exception: {str(e)}"  # type: ignore
+                    record.id,
+                    last_error=f"Unhandled exception: {str(e)}",  # type: ignore
                 )
                 stats["retried"] += 1
 
@@ -247,6 +249,7 @@ class RetryWorker:
             )
             # Increment attempt for unhandled exceptions
             self.store.increment_attempt(
-                record.id, last_error=f"Processor exception: {str(e)}"  # type: ignore
+                record.id,
+                last_error=f"Processor exception: {str(e)}",  # type: ignore
             )
             return RetryResult.RETRY

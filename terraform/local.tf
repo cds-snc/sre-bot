@@ -3,4 +3,27 @@ locals {
   error_logged             = "SREBotErrorLogged"
   error_namespace          = "SREBot"
   warning_logged           = "SREBotWarningLogged"
+
+  # Plain-text terms that indicate an error-worthy log line
+  error_logged_filters = [
+    "ERROR",
+    "Exception",
+  ]
+  # Regexes (CloudWatch %...% syntax, no literal quotes allowed) matched against the raw log
+  # line to exclude known false positives from the error metric. Extend to silence new ones.
+  error_logged_skip_filters = [
+    "level.{0,6}warning", # structlog JSON renders {"level": "warning", ...} with a space after the colon; \S excludes that space
+    "level.{0,6}info",    # same rationale, but for {"level": "info", ...}
+  ]
+  error_logged_pattern = "[(w=\"*${join("*\" || w=\"*", local.error_logged_filters)}*\") && ${join(" && ", [for term in local.error_logged_skip_filters : "w!=%${term}%"])}]"
+
+  # Plain-text terms that indicate a warning-level log line
+  warning_logged_filters = [
+    "WARNING",
+  ]
+  # Regexes matched against the raw log line to detect a structured warning-level log line
+  warning_logged_regex_filters = [
+    "level.{0,6}warning", # structlog JSON renders {"level": "warning", ...} with a space after the colon; \S excludes that space
+  ]
+  warning_logged_pattern = "[w=\"*${join("*\" || w=\"*", local.warning_logged_filters)}*\" || ${join(" || ", [for term in local.warning_logged_regex_filters : "w=%${term}%"])}]"
 }

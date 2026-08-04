@@ -8,14 +8,16 @@ Tests cover:
 - Context isolation and cleanup
 """
 
+import uuid
+
 import pytest
 import structlog
-import uuid
+
 from infrastructure.logging.context import (
     bind_request_context,
+    clear_request_context,
     get_correlation_id,
     set_correlation_id,
-    clear_request_context,
 )
 
 
@@ -63,9 +65,7 @@ class TestBindRequestContext:
 
     def test_bind_request_context_binds_extra_context(self):
         """Extra keyword arguments are bound to context."""
-        with bind_request_context(
-            channel="slack", team_id="T123", custom_field="value"
-        ):
+        with bind_request_context(channel="slack", team_id="T123", custom_field="value"):
             ctx = structlog.contextvars.get_contextvars()
             assert ctx.get("channel") == "slack"
             assert ctx.get("team_id") == "T123"
@@ -91,9 +91,7 @@ class TestBindRequestContext:
 
     def test_bind_request_context_clears_after_exit(self):
         """Context is cleared after exiting the context manager."""
-        with bind_request_context(
-            correlation_id="test-123", user_email="test@example.com"
-        ):
+        with bind_request_context(correlation_id="test-123", user_email="test@example.com"):
             assert get_correlation_id() == "test-123"
 
         # After exiting, context should be cleared
@@ -104,15 +102,11 @@ class TestBindRequestContext:
     def test_bind_request_context_restores_previous_state(self):
         """Nested contexts restore previous state on exit."""
         # Set initial context
-        with bind_request_context(
-            correlation_id="outer-123", user_email="outer@example.com"
-        ):
+        with bind_request_context(correlation_id="outer-123", user_email="outer@example.com"):
             assert get_correlation_id() == "outer-123"
 
             # Nested context
-            with bind_request_context(
-                correlation_id="inner-456", user_email="inner@example.com"
-            ):
+            with bind_request_context(correlation_id="inner-456", user_email="inner@example.com"):
                 assert get_correlation_id() == "inner-456"
                 ctx = structlog.contextvars.get_contextvars()
                 assert ctx.get("user_email") == "inner@example.com"
@@ -223,15 +217,11 @@ class TestContextIsolation:
     def test_sequential_contexts_are_isolated(self):
         """Sequential bind_request_context calls are isolated."""
         # First context
-        with bind_request_context(
-            correlation_id="first", user_email="first@example.com"
-        ):
+        with bind_request_context(correlation_id="first", user_email="first@example.com"):
             assert get_correlation_id() == "first"
 
         # Second context (isolated from first)
-        with bind_request_context(
-            correlation_id="second", user_email="second@example.com"
-        ):
+        with bind_request_context(correlation_id="second", user_email="second@example.com"):
             assert get_correlation_id() == "second"
             ctx = structlog.contextvars.get_contextvars()
             assert ctx.get("user_email") == "second@example.com"

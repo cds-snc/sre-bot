@@ -15,17 +15,15 @@ class AtipSettings(FeatureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.features.atip import get_atip_settings
 
-        settings = get_settings()
+        settings = get_atip_settings()
 
-        announce_channel = settings.atip.ATIP_ANNOUNCE_CHANNEL
+        announce_channel = settings.ATIP_ANNOUNCE_CHANNEL
         ```
     """
 
-    ATIP_ANNOUNCE_CHANNEL: str | None = Field(
-        default=None, alias="ATIP_ANNOUNCE_CHANNEL"
-    )
+    ATIP_ANNOUNCE_CHANNEL: str | None = Field(default=None, alias="ATIP_ANNOUNCE_CHANNEL")
 
 
 @lru_cache(maxsize=1)

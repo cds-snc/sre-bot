@@ -5,7 +5,7 @@ with support for multiple issuers.
 """
 
 from functools import lru_cache
-from typing import Any, Dict, Optional
+from typing import Any
 
 import structlog
 from jwt import PyJWKClient, PyJWKClientError
@@ -17,7 +17,7 @@ from infrastructure.configuration.infrastructure.server import (
 logger = structlog.get_logger()
 
 
-def get_issuer_config() -> Dict[str, Dict[str, Any]] | None:
+def get_issuer_config() -> dict[str, dict[str, Any]] | None:
     """Return the JWKS settings slice from the unified security settings."""
     settings = get_server_settings()
     if settings.ISSUER_CONFIG is not None:
@@ -41,9 +41,7 @@ class JWKSManager:
         jwks_clients: Cache of JWKS clients for each issuer
     """
 
-    def __init__(
-        self, issuer_config: Optional[Dict[str, Dict[str, Any]]] = None
-    ) -> None:
+    def __init__(self, issuer_config: dict[str, dict[str, Any]] | None = None) -> None:
         """Initialize JWKS manager.
 
         Args:
@@ -51,14 +49,11 @@ class JWKSManager:
                           If None, uses settings.server.ISSUER_CONFIG.
         """
         if issuer_config is None:
-            raise ValueError(
-                "issuer_config must be provided explicitly. "
-                "Use get_jwks_manager() provider for DI."
-            )
+            raise ValueError("issuer_config must be provided explicitly. Use get_jwks_manager() provider for DI.")
         self.issuer_config = issuer_config
-        self.jwks_clients: Dict[str, PyJWKClient] = {}
+        self.jwks_clients: dict[str, PyJWKClient] = {}
 
-    def get_jwks_client(self, issuer: str) -> Optional[PyJWKClient]:
+    def get_jwks_client(self, issuer: str) -> PyJWKClient | None:
         """Get or create JWKS client for the specified issuer.
 
         Args:
@@ -84,9 +79,7 @@ class JWKSManager:
                     log.warning("issuer_missing_jwks_uri")
                     return None
 
-                self.jwks_clients[issuer] = PyJWKClient(
-                    jwks_uri, cache_jwk_set=True, lifespan=3600, timeout=10
-                )
+                self.jwks_clients[issuer] = PyJWKClient(jwks_uri, cache_jwk_set=True, lifespan=3600, timeout=10)
                 log = logger.bind(issuer=issuer)
                 log.info("jwks_client_initialized")
             except PyJWKClientError as e:
@@ -96,7 +89,7 @@ class JWKSManager:
 
         return self.jwks_clients[issuer]
 
-    def clear_cache(self, issuer: Optional[str] = None) -> None:
+    def clear_cache(self, issuer: str | None = None) -> None:
         """Clear JWKS client cache.
 
         Args:

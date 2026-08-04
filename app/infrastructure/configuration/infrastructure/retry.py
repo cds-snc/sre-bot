@@ -41,13 +41,13 @@ class RetrySettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.infrastructure.retry import get_retry_settings
 
-        settings = get_settings()
+        settings = get_retry_settings()
 
-        if settings.retry.enabled:
-            backend = settings.retry.backend
-            max_attempts = settings.retry.max_attempts
+        if settings.enabled:
+            backend = settings.backend
+            max_attempts = settings.max_attempts
             # Configure retry system...
         ```
     """

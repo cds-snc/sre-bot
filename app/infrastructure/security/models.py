@@ -1,12 +1,12 @@
 """Security-layer principal models."""
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class AuthPrincipalSource(str, Enum):
+class AuthPrincipalSource(StrEnum):
     """Source of authenticated principal information."""
 
     SLACK = "slack"

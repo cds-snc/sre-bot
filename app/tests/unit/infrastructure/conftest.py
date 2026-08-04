@@ -1,17 +1,18 @@
 """Module-level fixtures for infrastructure tests (Level 2)."""
 
-import pytest
 from unittest.mock import Mock
 
-from infrastructure.configuration import Settings
+import pytest
+
+from infrastructure.configuration import AppSettings
 
 
 @pytest.fixture
 def mock_settings():
     """Mock Settings instance for testing."""
-    settings = Mock(spec=Settings)
+    settings = Mock(spec=AppSettings)
     settings.LOG_LEVEL = "INFO"
-    settings.is_production = False
+    settings.ENVIRONMENT = "local"
     return settings
 
 

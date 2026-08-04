@@ -1,20 +1,14 @@
 ---
 name: tests-creation
-description: Create or update failing behavior tests only from approved feature architecture and acceptance criteria.
+description: Create or update failing behavior tests from an approved feature architecture packet or a planned backlog task.
 agent: tests-creation
 model: Auto (copilot)
 ---
 
-Create the fastest deterministic failing test set for the approved feature architecture.
+Create the smallest deterministic failing test set for the approved work, following the agent's full workflow and output contract.
 
-Required output:
-1. Test files created/updated in app/tests.
-2. Acceptance criteria mapping to each test.
-3. Targeted run results with intended failures.
-4. Implementation backlog implied by failing assertions.
+Invocation notes:
 
-Rules:
-- Do not implement production feature behavior.
-- Do not create tests for architecture packet text, sprint naming, or transition-planning artifacts.
-- Keep tests behavior-focused and deterministic.
-- Cover success and failure mapping paths first.
+- If the input is a backlog task id, source acceptance criteria and the test matrix from the task's implementation plan (`backlog task view <id> --plain`).
+- Cover success and failure mapping paths first; confirm each test fails for the intended reason.
+- No production code, and no tests for planning-artifact wording.

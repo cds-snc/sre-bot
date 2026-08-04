@@ -1,6 +1,6 @@
 import structlog
-from slack_sdk.web import WebClient
 from slack_bolt import Respond
+from slack_sdk.web import WebClient
 
 from integrations.aws import lambdas as aws_lambdas
 

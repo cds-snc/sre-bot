@@ -19,14 +19,13 @@ Adding a new adapter family (Github, Miro, …):
     scenarios (canonicalisation, error codes, client contract) here.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
-
 
 # ---------------------------------------------------------------------------
 # make_aws_adapter
@@ -70,41 +69,33 @@ def make_aws_adapter():
     """
 
     def _make(
-        user_id: Optional[str] = "test-user-uuid-0001",
-        group_memberships: Optional[List[Dict[str, Any]]] = None,
-        aws_groups: Optional[List[Dict[str, Any]]] = None,
-        list_memberships_error: Optional[OperationResult] = None,
+        user_id: str | None = "test-user-uuid-0001",
+        group_memberships: list[dict[str, Any]] | None = None,
+        aws_groups: list[dict[str, Any]] | None = None,
+        list_memberships_error: OperationResult | None = None,
     ) -> tuple:
         fake_identitystore = MagicMock()
 
         # get_user_id_by_username
         if user_id is not None:
-            fake_identitystore.get_user_id_by_username.return_value = (
-                OperationResult.success(data={"UserId": user_id})
-            )
+            fake_identitystore.get_user_id_by_username.return_value = OperationResult.success(data={"UserId": user_id})
         else:
-            fake_identitystore.get_user_id_by_username.return_value = (
-                OperationResult.error(
-                    OperationStatus.NOT_FOUND,
-                    message="User not found",
-                    error_code="ResourceNotFoundException",
-                )
+            fake_identitystore.get_user_id_by_username.return_value = OperationResult.error(
+                OperationStatus.NOT_FOUND,
+                message="User not found",
+                error_code="ResourceNotFoundException",
             )
 
         # list_group_memberships_for_member
         if list_memberships_error is not None:
-            fake_identitystore.list_group_memberships_for_member.return_value = (
-                list_memberships_error
-            )
+            fake_identitystore.list_group_memberships_for_member.return_value = list_memberships_error
         else:
-            fake_identitystore.list_group_memberships_for_member.return_value = (
-                OperationResult.success(data=group_memberships or [])
+            fake_identitystore.list_group_memberships_for_member.return_value = OperationResult.success(
+                data=group_memberships or []
             )
 
         # list_groups (used by group-index build in canonicalise path)
-        fake_identitystore.list_groups.return_value = OperationResult.success(
-            data=aws_groups or []
-        )
+        fake_identitystore.list_groups.return_value = OperationResult.success(data=aws_groups or [])
 
         # describe_group (used by UUID resolution path — return NOT_FOUND by default
         # so adapter falls through to name-based lookup)

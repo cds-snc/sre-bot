@@ -64,9 +64,7 @@ class TestExecuteGoogleApiCall:
 
     def test_successful_call_with_operation_result(self, make_mock_request):
         """Test API call that returns OperationResult is propagated."""
-        inner_result = OperationResult.success(
-            data={"id": "456"}, message="Inner success"
-        )
+        inner_result = OperationResult.success(data={"id": "456"}, message="Inner success")
         api_callable = make_mock_request(return_value=inner_result).execute
 
         result = execute_google_api_call("test_operation", api_callable)
@@ -75,9 +73,7 @@ class TestExecuteGoogleApiCall:
         assert result.data == {"id": "456"}
         assert result.message == "Inner success"
 
-    def test_retryable_error_succeeds_on_retry(
-        self, make_mock_request, mock_google_api_error
-    ):
+    def test_retryable_error_succeeds_on_retry(self, make_mock_request, mock_google_api_error):
         """Test that retryable errors are retried and eventually succeed."""
         error = mock_google_api_error(status=500, reason="Internal Server Error")
         success_data = {"id": "789"}
@@ -91,26 +87,20 @@ class TestExecuteGoogleApiCall:
         assert result.is_success
         assert result.data == success_data
 
-    def test_rate_limit_error_uses_correct_delay(
-        self, make_mock_request, mock_google_api_error
-    ):
+    def test_rate_limit_error_uses_correct_delay(self, make_mock_request, mock_google_api_error):
         """Test that rate limit errors use the configured delay."""
         error = mock_google_api_error(status=429, reason="Rate Limit Exceeded")
         success_data = {"id": "101"}
 
         api_callable = make_mock_request(side_effect=[error, success_data]).execute
 
-        with patch(
-            "infrastructure.clients.google_workspace.executor.time.sleep"
-        ) as mock_sleep:
+        with patch("infrastructure.clients.google_workspace.executor.time.sleep") as mock_sleep:
             result = execute_google_api_call("test_operation", api_callable)
 
         assert result.is_success
         mock_sleep.assert_called_once_with(60.0)
 
-    def test_non_retryable_error_fails_immediately(
-        self, make_mock_request, mock_google_api_error
-    ):
+    def test_non_retryable_error_fails_immediately(self, make_mock_request, mock_google_api_error):
         """Test that non-retryable errors fail without retry."""
         error = mock_google_api_error(status=404, reason="Not Found")
         api_callable = make_mock_request(raise_error=error).execute
@@ -127,9 +117,7 @@ class TestExecuteGoogleApiCall:
         api_callable = make_mock_request(raise_error=error).execute
 
         with patch("infrastructure.clients.google_workspace.executor.time.sleep"):
-            result = execute_google_api_call(
-                "test_operation", api_callable, max_retries=2
-            )
+            result = execute_google_api_call("test_operation", api_callable, max_retries=2)
 
         assert not result.is_success
         assert result.error_code == "GOOGLE_API_ERROR_500"
@@ -141,14 +129,10 @@ class TestExecuteGoogleApiCall:
         success_data = {"id": "202"}
 
         # Fail 4 times, succeed on 5th (max_retries=4 means 5 total attempts)
-        api_callable = make_mock_request(
-            side_effect=[error, error, error, error, success_data]
-        ).execute
+        api_callable = make_mock_request(side_effect=[error, error, error, error, success_data]).execute
 
         with patch("infrastructure.clients.google_workspace.executor.time.sleep"):
-            result = execute_google_api_call(
-                "test_operation", api_callable, max_retries=4
-            )
+            result = execute_google_api_call("test_operation", api_callable, max_retries=4)
 
         assert result.is_success
         assert result.data == success_data
@@ -159,15 +143,11 @@ class TestExecuteGoogleApiCall:
         success_data = {"id": "303"}
 
         for status_code in retryable_codes:
-            error = mock_google_api_error(
-                status=status_code, reason=f"Error {status_code}"
-            )
+            error = mock_google_api_error(status=status_code, reason=f"Error {status_code}")
             api_callable = make_mock_request(side_effect=[error, success_data]).execute
 
             with patch("infrastructure.clients.google_workspace.executor.time.sleep"):
-                result = execute_google_api_call(
-                    f"test_operation_{status_code}", api_callable
-                )
+                result = execute_google_api_call(f"test_operation_{status_code}", api_callable)
 
             assert result.is_success, f"Status code {status_code} should be retryable"
 
@@ -182,21 +162,15 @@ class TestExecuteGoogleApiCall:
         assert result.error_code == "GOOGLE_API_ERROR"
         assert "Invalid parameter" in result.message
 
-    def test_exponential_backoff_progression(
-        self, make_mock_request, mock_google_api_error
-    ):
+    def test_exponential_backoff_progression(self, make_mock_request, mock_google_api_error):
         """Test that exponential backoff increases correctly across retries."""
         error = mock_google_api_error(status=502, reason="Bad Gateway")
         success_data = {"id": "404"}
 
         # Fail 3 times, succeed on 4th
-        api_callable = make_mock_request(
-            side_effect=[error, error, error, success_data]
-        ).execute
+        api_callable = make_mock_request(side_effect=[error, error, error, success_data]).execute
 
-        with patch(
-            "infrastructure.clients.google_workspace.executor.time.sleep"
-        ) as mock_sleep:
+        with patch("infrastructure.clients.google_workspace.executor.time.sleep") as mock_sleep:
             result = execute_google_api_call("test_operation", api_callable)
 
         assert result.is_success

@@ -3,10 +3,11 @@
 Provides error-isolated in-process event dispatch with a DI-friendly API.
 """
 
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from functools import cache
 from threading import Lock
-from typing import Any, Callable
+from typing import Any
 
 import blinker
 import structlog
@@ -29,9 +30,7 @@ class EventDispatcher:
         """Get or create a signal for the event type."""
         return self._namespace.signal(event_type)
 
-    def register_handler(
-        self, event_type: str, handler: Callable[[Event], Any]
-    ) -> None:
+    def register_handler(self, event_type: str, handler: Callable[[Event], Any]) -> None:
         """Register a handler for an event type."""
         signal = self._get_signal(event_type)
         signal.connect(handler, weak=False)
@@ -85,9 +84,7 @@ class EventDispatcher:
         """Worker that reuses synchronous dispatch behavior."""
         self.dispatch(event)
 
-    def _get_or_create_executor(
-        self, max_workers: int = 4
-    ) -> ThreadPoolExecutor | None:
+    def _get_or_create_executor(self, max_workers: int = 4) -> ThreadPoolExecutor | None:
         """Lazily create the background executor unless shutdown was requested."""
         with self._executor_lock:
             if self._executor_shutdown:
@@ -119,11 +116,7 @@ class EventDispatcher:
 
     def get_registered_event_types(self) -> list[str]:
         """Get event types that currently have at least one handler."""
-        return [
-            name
-            for name, signal in self._namespace.items()
-            if list(signal.receivers_for(blinker.ANY))
-        ]
+        return [name for name, signal in self._namespace.items() if list(signal.receivers_for(blinker.ANY))]
 
     def get_handler_count(self, event_type: str) -> int:
         """Get number of handlers registered for an event type."""

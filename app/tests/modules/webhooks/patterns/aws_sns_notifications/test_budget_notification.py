@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock
+
 from modules.webhooks.patterns.aws_sns_notification import budget_notification
 
 

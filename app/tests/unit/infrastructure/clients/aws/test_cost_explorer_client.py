@@ -21,10 +21,7 @@ class TestCostExplorerClient:
             session_provider=session_provider,
             default_role_arn="arn:aws:iam::123456789012:role/CostExplorerRole",
         )
-        assert (
-            client._default_role_arn
-            == "arn:aws:iam::123456789012:role/CostExplorerRole"
-        )
+        assert client._default_role_arn == "arn:aws:iam::123456789012:role/CostExplorerRole"
         assert client.service_name == "ce"
 
     def test_init_without_default_role_arn(self):
@@ -42,9 +39,7 @@ class TestCostExplorerClient:
             default_role_arn="arn:aws:iam::123456789012:role/DefaultRole",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             assert role_arn == "arn:aws:iam::123456789012:role/DefaultRole"
             return make_fake_client(
                 api_responses={
@@ -55,9 +50,7 @@ class TestCostExplorerClient:
                                     "Start": "2024-01-01",
                                     "End": "2024-01-02",
                                 },
-                                "Total": {
-                                    "BlendedCost": {"Amount": "100", "Unit": "USD"}
-                                },
+                                "Total": {"BlendedCost": {"Amount": "100", "Unit": "USD"}},
                             }
                         ]
                     }
@@ -82,13 +75,9 @@ class TestCostExplorerClient:
             default_role_arn="arn:aws:iam::123456789012:role/DefaultRole",
         )
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             assert role_arn == "arn:aws:iam::123456789012:role/DefaultRole"
-            return make_fake_client(
-                api_responses={"get_cost_and_usage": {"ResultsByTime": []}}
-            )
+            return make_fake_client(api_responses={"get_cost_and_usage": {"ResultsByTime": []}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
 
@@ -106,9 +95,7 @@ class TestCostExplorerClient:
         session_provider = SessionProvider(region="us-east-1")
         client = CostExplorerClient(session_provider=session_provider)
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             return make_fake_client(
                 api_responses={
                     "get_cost_and_usage": {
@@ -118,9 +105,7 @@ class TestCostExplorerClient:
                                     "Start": "2024-01-01",
                                     "End": "2024-01-02",
                                 },
-                                "Total": {
-                                    "BlendedCost": {"Amount": "100", "Unit": "USD"}
-                                },
+                                "Total": {"BlendedCost": {"Amount": "100", "Unit": "USD"}},
                             }
                         ]
                     }

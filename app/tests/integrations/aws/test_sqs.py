@@ -2,10 +2,10 @@ from unittest.mock import patch
 
 # Import the functions to test
 from integrations.aws.sqs import (
-    get_queue_url,
-    send_message,
-    receive_message,
     delete_message,
+    get_queue_url,
+    receive_message,
+    send_message,
 )
 
 
@@ -17,17 +17,13 @@ def test_get_queue_url(mock_execute_aws_api_call):
     expected_url = "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
 
     # Mock the execute_aws_api_call function
-    mock_execute_aws_api_call.return_value = {
-        "QueueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
-    }
+    mock_execute_aws_api_call.return_value = {"QueueUrl": "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"}
 
     # Act
     result = get_queue_url(queue_name)
 
     # Assert
-    mock_execute_aws_api_call.assert_called_once_with(
-        "sqs", "get_queue_url", QueueName=queue_name
-    )
+    mock_execute_aws_api_call.assert_called_once_with("sqs", "get_queue_url", QueueName=queue_name)
     assert result == expected_url
 
 
@@ -235,9 +231,7 @@ def test_get_queue_url_api_failure(mock_execute_api_call):
     # Act & Assert
     result = get_queue_url(queue_name)
     assert result is False
-    mock_execute_api_call.assert_called_once_with(
-        "sqs", "get_queue_url", QueueName=queue_name
-    )
+    mock_execute_api_call.assert_called_once_with("sqs", "get_queue_url", QueueName=queue_name)
 
 
 @patch("integrations.aws.sqs.execute_aws_api_call")
@@ -261,9 +255,7 @@ def test_receive_message_max_number_exceeds_limit(mock_execute_api_call):
     # Arrange
     queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
     max_number_of_messages = 11  # Exceeds SQS limit of 10
-    mock_execute_api_call.side_effect = Exception(
-        "MaxNumberOfMessages cannot be greater than 10"
-    )
+    mock_execute_api_call.side_effect = Exception("MaxNumberOfMessages cannot be greater than 10")
 
     # Act & Assert
     result = receive_message(queue_url, max_number_of_messages)

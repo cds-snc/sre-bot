@@ -1,5 +1,6 @@
+from collections.abc import Callable
 from datetime import timedelta
-from typing import Callable, Protocol
+from typing import Protocol
 
 
 class BackgroundJobRegistry(Protocol):

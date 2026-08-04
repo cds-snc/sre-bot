@@ -49,9 +49,7 @@ class TestAWSIntegrationHealth:
     def test_check_service_health_dynamodb(self, monkeypatch, make_fake_client):
         """Test check_service_health for dynamodb."""
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             return make_fake_client(api_responses={"list_tables": {"TableNames": []}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
@@ -65,9 +63,7 @@ class TestAWSIntegrationHealth:
     def test_check_service_health_organizations(self, monkeypatch, make_fake_client):
         """Test check_service_health for organizations."""
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             return make_fake_client(api_responses={"list_accounts": {"Accounts": []}})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
@@ -90,9 +86,7 @@ class TestAWSIntegrationHealth:
     def test_check_all_returns_aggregated_results(self, monkeypatch, make_fake_client):
         """Test check_all returns aggregated health for all services."""
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             responses = {
                 "dynamodb": {"list_tables": {"TableNames": []}},
                 "organizations": {"list_accounts": {"Accounts": []}},
@@ -112,17 +106,11 @@ class TestAWSIntegrationHealth:
     def test_check_all_with_include_filter(self, monkeypatch, make_fake_client):
         """Test check_all with include filter only checks specified services."""
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             if service_name == "dynamodb":
-                return make_fake_client(
-                    api_responses={"list_tables": {"TableNames": []}}
-                )
+                return make_fake_client(api_responses={"list_tables": {"TableNames": []}})
             elif service_name == "organizations":
-                return make_fake_client(
-                    api_responses={"list_accounts": {"Accounts": []}}
-                )
+                return make_fake_client(api_responses={"list_accounts": {"Accounts": []}})
             return make_fake_client(api_responses={})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
@@ -139,17 +127,11 @@ class TestAWSIntegrationHealth:
     def test_check_all_with_exclude_filter(self, monkeypatch, make_fake_client):
         """Test check_all with exclude filter skips specified services."""
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             if service_name == "dynamodb":
-                return make_fake_client(
-                    api_responses={"list_tables": {"TableNames": []}}
-                )
+                return make_fake_client(api_responses={"list_tables": {"TableNames": []}})
             elif service_name == "organizations":
-                return make_fake_client(
-                    api_responses={"list_accounts": {"Accounts": []}}
-                )
+                return make_fake_client(api_responses={"list_accounts": {"Accounts": []}})
             return make_fake_client(api_responses={})
 
         monkeypatch.setattr(aws_client, "get_boto3_client", mock_boto3_client)
@@ -202,9 +184,7 @@ class TestAWSIntegrationHealth:
     def test_check_all_aggregates_results(self, monkeypatch, make_fake_client):
         """Test check_all aggregates all service check results."""
 
-        def mock_boto3_client(
-            service_name, session_config=None, client_config=None, role_arn=None
-        ):
+        def mock_boto3_client(service_name, session_config=None, client_config=None, role_arn=None):
             responses = {
                 "dynamodb": {"list_tables": {"TableNames": []}},
                 "organizations": {"list_accounts": {"Accounts": []}},

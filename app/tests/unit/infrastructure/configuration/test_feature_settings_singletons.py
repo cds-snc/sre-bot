@@ -1,5 +1,13 @@
 """Unit tests for feature settings singleton providers (PR-4)."""
 
+from infrastructure.configuration.features.atip import (
+    AtipSettings,
+    get_atip_settings,
+)
+from infrastructure.configuration.features.aws_ops import (
+    AWSFeatureSettings,
+    get_aws_feature_settings,
+)
 from infrastructure.configuration.features.groups import (
     GroupsFeatureSettings,
     get_groups_settings,
@@ -7,14 +15,6 @@ from infrastructure.configuration.features.groups import (
 from infrastructure.configuration.features.incident import (
     IncidentFeatureSettings,
     get_incident_settings,
-)
-from infrastructure.configuration.features.aws_ops import (
-    AWSFeatureSettings,
-    get_aws_feature_settings,
-)
-from infrastructure.configuration.features.atip import (
-    AtipSettings,
-    get_atip_settings,
 )
 from infrastructure.configuration.features.sre_ops import (
     SreOpsSettings,

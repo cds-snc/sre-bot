@@ -5,7 +5,7 @@ All metadata fields are stringified and prefixed with 'audit_meta_' for
 queryability in Sentinel's query language.
 """
 
-from typing import Any, Dict
+from typing import Any
 
 from infrastructure.audit.models import AuditEvent
 
@@ -25,7 +25,7 @@ class SentinelAdapter:
     """
 
     @staticmethod
-    def to_sentinel_format(audit_event: AuditEvent) -> Dict[str, Any]:
+    def to_sentinel_format(audit_event: AuditEvent) -> dict[str, Any]:
         """Convert AuditEvent to flat Sentinel format for SIEM ingestion.
 
         Args:
@@ -51,7 +51,7 @@ class SentinelAdapter:
 
         # Ensure consistency: stringify all values for SIEM compatibility
         # (Sentinel query language works best with consistent string types)
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         for key, value in payload.items():
             if value is None:
                 continue

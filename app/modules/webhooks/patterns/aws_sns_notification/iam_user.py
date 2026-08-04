@@ -1,5 +1,4 @@
 import re
-from typing import Dict, List, Union
 
 from slack_sdk import WebClient
 
@@ -7,9 +6,7 @@ from models.webhooks import AwsSnsPayload
 from modules.webhooks.aws_sns_notification import AwsNotificationPattern
 
 
-def handle_iam_user_notification(
-    payload: AwsSnsPayload, client: WebClient
-) -> List[Dict]:
+def handle_iam_user_notification(payload: AwsSnsPayload, client: WebClient) -> list[dict]:
     """
     Handle IAM user creation notifications from AWS SNS.
 
@@ -58,9 +55,7 @@ def handle_iam_user_notification(
     return blocks
 
 
-def is_iam_user_notification(
-    payload: AwsSnsPayload, parsed_message: Union[str, dict]
-) -> bool:
+def is_iam_user_notification(payload: AwsSnsPayload, parsed_message: str | dict) -> bool:
     """
     Check if the AWS SNS message is an IAM user creation notification.
 

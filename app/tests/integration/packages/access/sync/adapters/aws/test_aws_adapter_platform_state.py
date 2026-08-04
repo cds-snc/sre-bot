@@ -57,9 +57,7 @@ def test_should_return_user_exists_true_when_user_has_no_group_memberships(
 
     result = adapter._assess_live("test.user@example.com")
 
-    assert (
-        result.is_success
-    ), f"Expected success but got: {result.status!r} ({result.error_code!r})"
+    assert result.is_success, f"Expected success but got: {result.status!r} ({result.error_code!r})"
     assert isinstance(result.data, AdapterAssessment)
     assert result.data.platform_user_exists is True
     assert result.data.current_entitlement_ids == set()
@@ -178,21 +176,17 @@ def test_list_members_for_groups_bulk_resolves_member_ids_without_user_details(
     group_id = "11111111-2222-3333-4444-555555555555"
     adapter, fake_identitystore = make_aws_adapter()
 
-    fake_identitystore.describe_group.return_value = OperationResult.success(
-        data={"GroupId": group_id}
-    )
-    fake_identitystore.list_groups_with_memberships.return_value = (
-        OperationResult.success(
-            data=[
-                {
-                    "GroupId": group_id,
-                    "GroupMemberships": [
-                        {"MemberId": {"UserId": "u-1"}},
-                        {"MemberId": {"UserId": "u-2"}},
-                    ],
-                }
-            ]
-        )
+    fake_identitystore.describe_group.return_value = OperationResult.success(data={"GroupId": group_id})
+    fake_identitystore.list_groups_with_memberships.return_value = OperationResult.success(
+        data=[
+            {
+                "GroupId": group_id,
+                "GroupMemberships": [
+                    {"MemberId": {"UserId": "u-1"}},
+                    {"MemberId": {"UserId": "u-2"}},
+                ],
+            }
+        ]
     )
     fake_identitystore.list_users.return_value = OperationResult.success(
         data=[

@@ -4,7 +4,8 @@ Provides utilities to generate help text for Slack slash commands from their
 Argument definitions, with optional i18n support.
 """
 
-from typing import TYPE_CHECKING, Callable, List, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from integrations.slack.models import Argument
 
@@ -48,13 +49,13 @@ def _build_slack_command_signature(
 
 
 def _generate_slack_help_text(
-    arguments: List[Argument],
+    arguments: list[Argument],
     include_types: bool = True,
     include_defaults: bool = True,
     indent: str = "  ",
     include_header: bool = False,
-    header: Optional[str] = None,
-    translate: Optional[Callable[[Optional[str], str, str], str]] = None,
+    header: str | None = None,
+    translate: Callable[[str | None, str, str], str] | None = None,
     locale: str = "en-US",
 ) -> str:
     """Generate Slack help text from Argument definitions.
@@ -92,7 +93,7 @@ def _generate_slack_help_text(
     if not arguments:
         return ""
 
-    lines: List[str] = []
+    lines: list[str] = []
 
     if include_header and header:
         lines.append(header)
@@ -100,12 +101,7 @@ def _generate_slack_help_text(
 
     for i, arg in enumerate(arguments):
         # Argument name and syntax
-        if arg.is_positional:
-            arg_str = f"{arg.name}"
-        elif arg.is_flag:
-            arg_str = f"{arg.name}"
-        else:  # is_option
-            arg_str = f"{arg.name} VALUE"
+        arg_str = f"{arg.name}" if arg.is_positional or arg.is_flag else f"{arg.name} VALUE"
 
         # Add type and required info
         type_info = ""
@@ -126,11 +122,7 @@ def _generate_slack_help_text(
 
         # Add description
         if arg.description or arg.description_key:
-            description = (
-                translate(arg.description_key, arg.description)
-                if translate
-                else arg.description
-            )
+            description = translate(arg.description_key, arg.description) if translate else arg.description
             if description:
                 lines.append(f"{indent}{indent}{description}")
 
@@ -152,7 +144,7 @@ def _generate_slack_help_text(
 
 def _generate_usage_line(
     command_path: str,
-    arguments: List[Argument],
+    arguments: list[Argument],
 ) -> str:
     """Generate a Slack usage line for a command.
 
@@ -177,7 +169,7 @@ def _generate_usage_line(
     """
     display_path = _build_slack_display_path(command_path)
 
-    arg_parts: List[str] = []
+    arg_parts: list[str] = []
     for arg in arguments:
         if arg.is_positional:
             if arg.required:
@@ -202,9 +194,9 @@ def _generate_usage_line(
 
 
 def _get_argument_by_name(
-    arguments: List[Argument],
+    arguments: list[Argument],
     name: str,
-) -> Optional[Argument]:
+) -> Argument | None:
     """Find an argument by name or alias.
 
     Args:
@@ -248,7 +240,7 @@ class SlackHelpGenerator:
     def __init__(
         self,
         commands: dict,
-        translator: Optional[Callable[[Optional[str], str, str], str]] = None,
+        translator: Callable[[str | None, str, str], str] | None = None,
     ):
         """Initialize help generator.
 
@@ -259,9 +251,7 @@ class SlackHelpGenerator:
         self._commands = commands
         self._translator = translator or (lambda key, fallback, locale: fallback)
 
-    def generate(
-        self, command_path: str, mode: str = "command", locale: str = "en-US"
-    ) -> str:
+    def generate(self, command_path: str, mode: str = "command", locale: str = "en-US") -> str:
         """Generate help text in specified mode.
 
         Args:
@@ -281,9 +271,7 @@ class SlackHelpGenerator:
         else:
             return f"Unknown help mode: {mode}"
 
-    def _generate_tree(
-        self, root_path: Optional[str] = None, locale: str = "en-US"
-    ) -> str:
+    def _generate_tree(self, root_path: str | None = None, locale: str = "en-US") -> str:
         """Generate help tree for command and children.
 
         Args:
@@ -300,9 +288,7 @@ class SlackHelpGenerator:
                 locale,
             )
 
-        header = self._translator(
-            "commands.labels.available_commands", "Available Commands", locale
-        )
+        header = self._translator("commands.labels.available_commands", "Available Commands", locale)
         lines = [f"*{header}*", ""]
 
         if root_path:
@@ -315,9 +301,7 @@ class SlackHelpGenerator:
                     locale,
                 )
             for cmd_def in children:
-                self._append_command_tree_entry(
-                    lines, cmd_def, indent_level=0, locale=locale
-                )
+                self._append_command_tree_entry(lines, cmd_def, indent_level=0, locale=locale)
         else:
             # Show all top-level commands
             top_level = [cmd for cmd in self._commands.values() if not cmd.parent]
@@ -328,9 +312,7 @@ class SlackHelpGenerator:
                     locale,
                 )
             for cmd_def in sorted(top_level, key=lambda c: c.name):
-                self._append_command_tree_entry(
-                    lines, cmd_def, indent_level=0, locale=locale
-                )
+                self._append_command_tree_entry(lines, cmd_def, indent_level=0, locale=locale)
 
         return "\n".join(lines)
 
@@ -357,18 +339,14 @@ class SlackHelpGenerator:
 
         # Description (skip auto-generated)
         if not cmd_def.is_auto_generated:
-            desc = self._translator(
-                cmd_def.description_key, cmd_def.description, locale
-            )
+            desc = self._translator(cmd_def.description_key, cmd_def.description, locale)
             if desc:
                 lines.append(desc)
                 lines.append("")
 
         # Arguments (if leaf command)
         if cmd_def.arguments:
-            arguments_label = self._translator(
-                "commands.labels.arguments", "Arguments:", locale
-            )
+            arguments_label = self._translator("commands.labels.arguments", "Arguments:", locale)
             args_help = _generate_slack_help_text(
                 cmd_def.arguments,
                 include_types=True,
@@ -383,9 +361,7 @@ class SlackHelpGenerator:
 
         # Examples (skip auto-generated)
         if not cmd_def.is_auto_generated and cmd_def.examples:
-            examples_label = self._translator(
-                "commands.labels.examples", "Examples:", locale
-            )
+            examples_label = self._translator("commands.labels.examples", "Examples:", locale)
             lines.append("")
             lines.append(f"*{examples_label}*")
             for example in cmd_def.examples:
@@ -395,14 +371,10 @@ class SlackHelpGenerator:
         children = self._get_child_commands(command_path)
         if children:
             lines.append("")
-            subcommands_label = self._translator(
-                "commands.labels.subcommands", "Sub-commands:", locale
-            )
+            subcommands_label = self._translator("commands.labels.subcommands", "Sub-commands:", locale)
             lines.append(f"*{subcommands_label}*")
             for child in children:
-                self._append_command_tree_entry(
-                    lines, child, indent_level=0, locale=locale
-                )
+                self._append_command_tree_entry(lines, child, indent_level=0, locale=locale)
 
         return "\n".join(lines)
 
@@ -420,9 +392,7 @@ class SlackHelpGenerator:
         if not cmd_def or not cmd_def.arguments:
             return f"Command `{command_path}` has no arguments."
 
-        arguments_label = self._translator(
-            "commands.labels.arguments", "Arguments:", locale
-        )
+        arguments_label = self._translator("commands.labels.arguments", "Arguments:", locale)
         return _generate_slack_help_text(
             cmd_def.arguments,
             include_types=True,
@@ -436,8 +406,8 @@ class SlackHelpGenerator:
 
     def _append_command_tree_entry(
         self,
-        lines: List[str],
-        cmd_def: "CommandDefinition",
+        lines: list[str],
+        cmd_def: CommandDefinition,
         indent_level: int,
         locale: str = "en-US",
     ) -> None:
@@ -454,9 +424,7 @@ class SlackHelpGenerator:
 
         # Build bullet point with path and description
         if not cmd_def.is_auto_generated:
-            desc = self._translator(
-                cmd_def.description_key, cmd_def.description, locale
-            )
+            desc = self._translator(cmd_def.description_key, cmd_def.description, locale)
             if desc:
                 lines.append(f"{indent}• /{display_path} - {desc}")
             else:
@@ -465,13 +433,11 @@ class SlackHelpGenerator:
             lines.append(f"{indent}• /{display_path}")
 
         # Add signature
-        signature = _build_slack_command_signature(
-            cmd_def.full_path, cmd_def.usage_hint
-        )
+        signature = _build_slack_command_signature(cmd_def.full_path, cmd_def.usage_hint)
         lines.append(f"{indent}  `{signature}`")
         lines.append("")
 
-    def _get_child_commands(self, parent_path: str) -> List["CommandDefinition"]:
+    def _get_child_commands(self, parent_path: str) -> list[CommandDefinition]:
         """Get all direct children of a command node.
 
         Args:

@@ -14,20 +14,22 @@ Note: Group creation/deletion and permission management are handled via Terrafor
 not through this module.
 """
 
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Optional, Mapping
+from typing import Any
 
 import structlog
-from core.config import settings
-from integrations.aws.client_next import execute_aws_api_call
+
+from infrastructure.configuration.integrations.aws import get_aws_settings
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
-
-# Configuration from settings
-AWS_IDENTITY_STORE_ID = settings.aws.INSTANCE_ID
-ROLE_ARN = settings.aws.ORG_ROLE_ARN
+from integrations.aws.client_next import execute_aws_api_call
 
 logger = structlog.get_logger()
+# Configuration from settings
+settings = get_aws_settings()
+AWS_IDENTITY_STORE_ID = settings.INSTANCE_ID
+ROLE_ARN = settings.ORG_ROLE_ARN
 
 
 # User Management Functions
@@ -394,7 +396,7 @@ def list_group_memberships_for_member(user_id: str, **kwargs) -> OperationResult
 
 def is_member_in_groups(
     user_id: str,
-    group_ids: List[str],
+    group_ids: list[str],
     **kwargs,
 ) -> OperationResult:
     """
@@ -446,7 +448,7 @@ def healthcheck() -> bool:
 # Batch Operations (leveraging the enhanced error handling)
 
 
-def get_batch_users(user_ids: List[str], **kwargs) -> OperationResult:
+def get_batch_users(user_ids: list[str], **kwargs) -> OperationResult:
     """
     Get multiple users by their IDs using individual API calls with enhanced error handling.
 
@@ -465,9 +467,7 @@ def get_batch_users(user_ids: List[str], **kwargs) -> OperationResult:
             results[user_id] = response.data
         else:
             results[user_id] = None
-            errors.append(
-                {"user_id": user_id, "error": response.message or response.error_code}
-            )
+            errors.append({"user_id": user_id, "error": response.message or response.error_code})
     if errors:
         return OperationResult.error(
             status=OperationStatus.PERMANENT_ERROR,
@@ -475,12 +475,10 @@ def get_batch_users(user_ids: List[str], **kwargs) -> OperationResult:
             error_code="batch_user_fetch_failed",
             data=results,
         )
-    return OperationResult.success(
-        data=results, message="All users fetched successfully"
-    )
+    return OperationResult.success(data=results, message="All users fetched successfully")
 
 
-def get_batch_groups(group_ids: List[str], **kwargs) -> OperationResult:
+def get_batch_groups(group_ids: list[str], **kwargs) -> OperationResult:
     """
     Get multiple groups by their IDs using individual API calls with enhanced error handling.
 
@@ -499,9 +497,7 @@ def get_batch_groups(group_ids: List[str], **kwargs) -> OperationResult:
             results[group_id] = response.data
         else:
             results[group_id] = None
-            errors.append(
-                {"group_id": group_id, "error": response.message or response.error_code}
-            )
+            errors.append({"group_id": group_id, "error": response.message or response.error_code})
     if errors:
         return OperationResult.error(
             status=OperationStatus.PERMANENT_ERROR,
@@ -510,23 +506,16 @@ def get_batch_groups(group_ids: List[str], **kwargs) -> OperationResult:
             data=results,
         )
 
-    return OperationResult.success(
-        data=results, message="All groups fetched successfully"
-    )
+    return OperationResult.success(data=results, message="All groups fetched successfully")
 
 
-def _fetch_group_memberships_parallel(
-    group_ids: List[str], max_workers: int = 10, **kwargs
-) -> Dict[str, List[Dict[str, Any]]]:
+def _fetch_group_memberships_parallel(group_ids: list[str], max_workers: int = 10, **kwargs) -> dict[str, list[dict[str, Any]]]:
     """Parallel helper function to fetch memberships for multiple groups."""
     memberships_by_group = {}
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all tasks
-        future_to_gid = {
-            executor.submit(list_group_memberships, gid, **kwargs): gid
-            for gid in group_ids
-        }
+        future_to_gid = {executor.submit(list_group_memberships, gid, **kwargs): gid for gid in group_ids}
         # Collect results as they complete
         for future in as_completed(future_to_gid):
             gid = future_to_gid[future]
@@ -562,11 +551,11 @@ def _fetch_group_memberships_parallel(
 
 
 def _assemble_groups_with_memberships(
-    groups: List[Dict],
-    memberships_by_group: Dict[str, List[Dict[str, Any]]],
-    users_by_id: Mapping[str, Optional[Dict[str, Any]]],
+    groups: list[dict],
+    memberships_by_group: dict[str, list[dict[str, Any]]],
+    users_by_id: Mapping[str, dict[str, Any] | None],
     tolerate_errors: bool,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Helper function to assemble final groups with memberships and user details."""
     groups_with_memberships = []
 
@@ -580,11 +569,7 @@ def _assemble_groups_with_memberships(
         memberships = memberships_by_group.get(group_id) or []  # Always a list
         error_info = None
 
-        if (
-            not memberships
-            and memberships_by_group.get(group_id) is None
-            and tolerate_errors
-        ):
+        if not memberships and memberships_by_group.get(group_id) is None and tolerate_errors:
             error_info = "No members found or error in member fetch."
 
         processed_memberships = []
@@ -614,10 +599,10 @@ def _assemble_groups_with_memberships(
 
 
 def list_groups_with_memberships(
-    groups_filters: Optional[List] = None,
-    groups_kwargs: Optional[Dict[str, Any]] = None,
-    memberships_kwargs: Optional[Dict[str, Any]] = None,
-    users_kwargs: Optional[Dict[str, Any]] = None,
+    groups_filters: list | None = None,
+    groups_kwargs: dict[str, Any] | None = None,
+    memberships_kwargs: dict[str, Any] | None = None,
+    users_kwargs: dict[str, Any] | None = None,
     tolerate_errors: bool = False,
 ) -> OperationResult:
     """
@@ -645,7 +630,7 @@ def list_groups_with_memberships(
     # 1. Fetch all groups
     response: OperationResult = list_groups(**(groups_kwargs or {}))
     if response.is_success and isinstance(response.data, list):
-        groups: List[Dict[str, Any]] = response.data
+        groups: list[dict[str, Any]] = response.data
     else:
         return OperationResult.permanent_error(
             message="Failed to list groups",
@@ -662,9 +647,7 @@ def list_groups_with_memberships(
 
     # 3. Batch fetch group memberships using our utility functions
     group_ids = [g["GroupId"] for g in groups if "GroupId" in g]
-    memberships_by_group = _fetch_group_memberships_parallel(
-        group_ids, **memberships_kwargs or {}
-    )
+    memberships_by_group = _fetch_group_memberships_parallel(group_ids, **memberships_kwargs or {})
 
     # 5. Batch fetch all user details using our utility function
     response = list_users(**(users_kwargs or {}))
@@ -674,14 +657,12 @@ def list_groups_with_memberships(
             error_code="list_users_failed",
         )
     if isinstance(response.data, list):
-        users: List[Dict[str, Any]] = response.data
+        users: list[dict[str, Any]] = response.data
     else:
         users = []
     logger.info("users_fetched", count=len(users))
     users_by_id = {str(u.get("UserId", "")): u for u in users if u.get("UserId")}
-    groups_with_memberships = _assemble_groups_with_memberships(
-        groups, memberships_by_group, users_by_id, tolerate_errors
-    )
+    groups_with_memberships = _assemble_groups_with_memberships(groups, memberships_by_group, users_by_id, tolerate_errors)
 
     logger.info("groups_with_memberships_listed", count=len(groups_with_memberships))
     return OperationResult.success(

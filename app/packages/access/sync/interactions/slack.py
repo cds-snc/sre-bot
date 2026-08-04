@@ -9,12 +9,11 @@ Command hierarchy under /sre:
             └── status  <job_id>
 """
 
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from infrastructure.i18n import t
-from infrastructure.idempotency import get_idempotency_service
 from integrations.slack.models import CommandPayload, CommandResponse
 from integrations.slack.parser import Argument, ArgumentType
 from packages.access.sync.interactions.ingress import (
@@ -24,6 +23,8 @@ from packages.access.sync.interactions.ingress import (
 from packages.access.sync.presenters import to_slack_status_message
 from packages.access.sync.providers import (
     get_access_sync_coordinator,
+    get_access_sync_job_status_store,
+    get_access_sync_lock_store,
     get_access_sync_settings,
 )
 from packages.access.sync.schemas import SyncJobStatusResponse
@@ -34,7 +35,7 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 
-def register_commands(provider: "SlackPlatformProvider") -> None:
+def register_commands(provider: SlackPlatformProvider) -> None:
     """Register access sync Slack commands.
 
     Registers the ``access`` parent (shared by all access subpackages), the
@@ -154,7 +155,7 @@ def register_commands(provider: "SlackPlatformProvider") -> None:
 
 def handle_sync_user_command(
     payload: CommandPayload,
-    parsed_args: Dict[str, Any],
+    parsed_args: dict[str, Any],
 ) -> CommandResponse:
     """Handle /sre access sync user <user_email> <platform> [--dry-run].
 
@@ -176,12 +177,14 @@ def handle_sync_user_command(
     log.info("slack_command_received", text=payload.text)
 
     coordinator = get_access_sync_coordinator()
-    idempotency = get_idempotency_service()
+    job_status_store = get_access_sync_job_status_store()
+    lock_store = get_access_sync_lock_store()
     settings = get_access_sync_settings()
 
     result = enqueue_user_sync(
         coordinator=coordinator,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
+        lock_store=lock_store,
         settings=settings,
         user_email=user_email,
         platform=platform,
@@ -247,7 +250,7 @@ def handle_sync_user_command(
 
 def handle_sync_platform_command(
     payload: CommandPayload,
-    parsed_args: Dict[str, Any],
+    parsed_args: dict[str, Any],
 ) -> CommandResponse:
     """Handle /sre access sync platform <platform> [--dry-run].
 
@@ -268,12 +271,14 @@ def handle_sync_platform_command(
     log.info("slack_command_received", text=payload.text)
 
     coordinator = get_access_sync_coordinator()
-    idempotency = get_idempotency_service()
+    job_status_store = get_access_sync_job_status_store()
+    lock_store = get_access_sync_lock_store()
     settings = get_access_sync_settings()
 
     result = enqueue_platform_sync(
         coordinator=coordinator,
-        idempotency=idempotency,
+        job_status_store=job_status_store,
+        lock_store=lock_store,
         settings=settings,
         platform=platform,
         dry_run=dry_run,
@@ -336,7 +341,7 @@ def handle_sync_platform_command(
 
 def handle_sync_status_command(
     payload: CommandPayload,
-    parsed_args: Dict[str, Any],
+    parsed_args: dict[str, Any],
 ) -> CommandResponse:
     """Handle /sre access sync status <job_id>.
 
@@ -354,8 +359,8 @@ def handle_sync_status_command(
     )
     log.info("slack_command_received", text=payload.text)
 
-    idempotency = get_idempotency_service()
-    record = idempotency.get(job_id)
+    job_status_store = get_access_sync_job_status_store()
+    record = job_status_store.get(job_id)
 
     if record is None:
         return CommandResponse(

@@ -8,7 +8,7 @@ Covers:
   F-05  UNSUPPORTED_OPERATION from adapter sets requires_manual_action
 """
 
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 import pytest
 
@@ -36,7 +36,6 @@ from packages.access.sync.policies import (
     PolicyEngine,
 )
 
-
 # ---------------------------------------------------------------------------
 # Test doubles
 # ---------------------------------------------------------------------------
@@ -47,12 +46,12 @@ class FakeAdapter:
 
     def __init__(
         self,
-        current_entitlement_ids: Optional[Set[str]] = None,
+        current_entitlement_ids: set[str] | None = None,
         user_exists: bool = True,
         disable_fails: bool = False,
     ) -> None:
-        self.calls: List[tuple] = []
-        self._current_ids: Set[str] = current_entitlement_ids or set()
+        self.calls: list[tuple] = []
+        self._current_ids: set[str] = current_entitlement_ids or set()
         self._user_exists = user_exists
         self._disable_fails = disable_fails
 
@@ -95,16 +94,14 @@ class FakeAdapter:
 
     def _assess(self, email: str) -> AdapterAssessment:
         if not self._user_exists:
-            return AdapterAssessment(
-                platform_user_exists=False, current_entitlement_ids=set()
-            )
+            return AdapterAssessment(platform_user_exists=False, current_entitlement_ids=set())
         return AdapterAssessment(
             platform_user_exists=True,
             current_entitlement_ids=set(self._current_ids),
         )
 
     def _execute(self, email: str, planned: list) -> SyncOutcome:
-        applied: List[str] = []
+        applied: list[str] = []
         requires_manual = False
         for action in planned:
             if action.action == "provision_user":
@@ -114,13 +111,9 @@ class FakeAdapter:
             elif action.action == "remove_user":
                 r = self.remove_user(email)
             elif action.action == "apply_entitlement":
-                r = self.apply_entitlement(
-                    email, action.entitlement_type or "", action.entitlement_id or ""
-                )
+                r = self.apply_entitlement(email, action.entitlement_type or "", action.entitlement_id or "")
             elif action.action == "remove_entitlement":
-                r = self.remove_entitlement(
-                    email, action.entitlement_type or "", action.entitlement_id or ""
-                )
+                r = self.remove_entitlement(email, action.entitlement_type or "", action.entitlement_id or "")
             else:
                 continue
             if r.is_success:
@@ -175,11 +168,9 @@ class FakeAdapter:
             current_members_by_entitlement={},
             authn_removal_mode=context.authn_removal_mode,
         )
-        actions_by_user: Dict[str, List[PlannedAction]] = {}
+        actions_by_user: dict[str, list[PlannedAction]] = {}
         for email in sorted(plan.users_to_provision):
-            actions_by_user.setdefault(email, []).append(
-                PlannedAction(action="provision_user")
-            )
+            actions_by_user.setdefault(email, []).append(PlannedAction(action="provision_user"))
         for entitlement_id, members in sorted(plan.entitlement_adds_by_id.items()):
             for email in sorted(members):
                 actions_by_user.setdefault(email, []).append(
@@ -190,15 +181,11 @@ class FakeAdapter:
                     )
                 )
         for email in sorted(plan.users_to_disable):
-            actions_by_user.setdefault(email, []).append(
-                PlannedAction(action="disable_user")
-            )
+            actions_by_user.setdefault(email, []).append(PlannedAction(action="disable_user"))
         for email in sorted(plan.users_to_remove):
-            actions_by_user.setdefault(email, []).append(
-                PlannedAction(action="remove_user")
-            )
+            actions_by_user.setdefault(email, []).append(PlannedAction(action="remove_user"))
 
-        per_user: Dict[str, SyncOutcome] = {}
+        per_user: dict[str, SyncOutcome] = {}
         users_converged = 0
         for email, planned in sorted(actions_by_user.items()):
             if dry_run:
@@ -230,13 +217,13 @@ class FakeDirectory:
     def __init__(
         self,
         is_member: bool = True,
-        groups: Optional[Set[str]] = None,
-        user_group_slugs: Optional[Set[str]] = None,
+        groups: set[str] | None = None,
+        user_group_slugs: set[str] | None = None,
     ) -> None:
         self._is_member = is_member
-        self._per_group: Dict[str, bool] = {}
-        self._groups: Set[str] = groups or set()
-        self._user_group_slugs: Optional[Set[str]] = user_group_slugs
+        self._per_group: dict[str, bool] = {}
+        self._groups: set[str] = groups or set()
+        self._user_group_slugs: set[str] | None = user_group_slugs
 
     def set_membership(self, group_slug: str, value: bool) -> None:
         self._per_group[group_slug] = value
@@ -245,11 +232,7 @@ class FakeDirectory:
         if self._user_group_slugs is not None:
             slugs = self._user_group_slugs
         else:
-            slugs = {
-                slug
-                for slug in self._groups
-                if self._per_group.get(slug, self._is_member)
-            }
+            slugs = {slug for slug in self._groups if self._per_group.get(slug, self._is_member)}
         return OperationResult.success(
             data=[
                 DirectoryGroup(
@@ -283,28 +266,22 @@ class FakeDirectory:
             )
         )
 
-    def get_group_members(
-        self, group_email: str, include_member_types: Optional[set] = None
-    ) -> OperationResult:
+    def get_group_members(self, group_email: str, include_member_types: set | None = None) -> OperationResult:
         slug = group_email.split("@", 1)[0]
         if slug not in (self._user_group_slugs or set()):
             return OperationResult.success(data=[])
-        return OperationResult.success(
-            data=[DirectoryMember(email="alice@example.com", member_type="USER")]
-        )
+        return OperationResult.success(data=[DirectoryMember(email="alice@example.com", member_type="USER")])
 
     def get_group_members_batch(
         self,
-        group_emails: List[str],
-        include_member_types: Optional[set] = None,
+        group_emails: list[str],
+        include_member_types: set | None = None,
     ) -> OperationResult:
-        mapping: Dict[str, List[DirectoryMember]] = {}
+        mapping: dict[str, list[DirectoryMember]] = {}
         for group_email in group_emails:
             slug = group_email.split("@", 1)[0]
             if slug in (self._user_group_slugs or set()):
-                mapping[group_email] = [
-                    DirectoryMember(email="alice@example.com", member_type="USER")
-                ]
+                mapping[group_email] = [DirectoryMember(email="alice@example.com", member_type="USER")]
             else:
                 mapping[group_email] = []
         return OperationResult.success(data=mapping)
@@ -326,15 +303,13 @@ def make_coordinator(
     platform: str = "aws",
     authn_removal_mode: str = "delete",
     is_member: bool = True,
-    current_ids: Optional[Set[str]] = None,
+    current_ids: set[str] | None = None,
     user_exists: bool = True,
-    adapter: Optional[FakeAdapter] = None,
-    discovered_groups: Optional[Set[str]] = None,
+    adapter: FakeAdapter | None = None,
+    discovered_groups: set[str] | None = None,
 ) -> tuple:
     if adapter is None:
-        adapter = FakeAdapter(
-            current_entitlement_ids=current_ids or set(), user_exists=user_exists
-        )
+        adapter = FakeAdapter(current_entitlement_ids=current_ids or set(), user_exists=user_exists)
     config = AccessRuntimeConfig(
         dir_prefix="sg",
         platforms={
@@ -345,9 +320,7 @@ def make_coordinator(
         },
     )
     authn_slug = config.authn_group_slug(platform)
-    user_group_slugs = (
-        ({authn_slug} | (discovered_groups or set())) if is_member else set()
-    )
+    user_group_slugs = ({authn_slug} | (discovered_groups or set())) if is_member else set()
     directory = FakeDirectory(
         is_member=is_member,
         groups=discovered_groups or set(),
@@ -397,9 +370,7 @@ def test_sync_user_new_member_provisions_user():
 
 @pytest.mark.unit
 def test_sync_user_non_member_removes_user():
-    coordinator, adapter = make_coordinator(
-        is_member=False, authn_removal_mode="delete"
-    )
+    coordinator, adapter = make_coordinator(is_member=False, authn_removal_mode="delete")
     result = coordinator.sync_user("alice@example.com", "aws")
     assert result.is_success
     assert "remove_user" in result.data.planned_actions

@@ -30,13 +30,14 @@ Provides:
 - ArgumentParsingError: Exception raised when parsing fails
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Type
+from enum import Enum, StrEnum
+from typing import Any
 
 
-class ArgumentType(str, Enum):
+class ArgumentType(StrEnum):
     """Supported argument types for parsing and validation."""
 
     STRING = "string"
@@ -81,16 +82,16 @@ class Argument:
     description: str = ""
     """Human-readable description"""
 
-    description_key: Optional[str] = None
+    description_key: str | None = None
     """i18n translation key"""
 
-    choices: Optional[List[str]] = None
+    choices: list[str] | None = None
     """Valid choices (for CHOICE type)"""
 
-    default: Optional[Any] = None
+    default: Any | None = None
     """Default value if not provided"""
 
-    aliases: Optional[List[str]] = None
+    aliases: list[str] | None = None
     """Alternative names (e.g., ['-r'] for '--role')"""
 
     allow_multiple: bool = False
@@ -130,7 +131,7 @@ class ArgumentParsingError(Exception):
 
     argument: str
     message: str
-    suggestion: Optional[str] = None
+    suggestion: str | None = None
 
     def __str__(self) -> str:
         """Format error message for display."""
@@ -157,12 +158,12 @@ class CommandPayload:
 
     text: str
     user_id: str
-    user_email: Optional[str] = None
-    channel_id: Optional[str] = None
+    user_email: str | None = None
+    channel_id: str | None = None
     user_locale: str = "en-US"
-    response_url: Optional[str] = None
+    response_url: str | None = None
     correlation_id: str = ""
-    platform_metadata: Dict[str, Any] = field(default_factory=dict)
+    platform_metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self):
         """Generate correlation ID if not provided."""
@@ -176,9 +177,9 @@ class CommandResponse:
 
     message: str
     ephemeral: bool = False
-    blocks: Optional[List[Dict[str, Any]]] = None
-    attachments: Optional[List[Dict[str, Any]]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    blocks: list[dict[str, Any]] | None = None
+    attachments: list[dict[str, Any]] | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -206,20 +207,20 @@ class CommandDefinition:
     """
 
     name: str
-    handler: Optional[Callable[..., CommandResponse]] = None
+    handler: Callable[..., CommandResponse] | None = None
     description: str = ""
-    description_key: Optional[str] = None
+    description_key: str | None = None
     usage_hint: str = ""
-    examples: List[str] = field(default_factory=list)
-    example_keys: List[str] = field(default_factory=list)
-    parent: Optional[str] = None
+    examples: list[str] = field(default_factory=list)
+    example_keys: list[str] = field(default_factory=list)
+    parent: str | None = None
     full_path: str = field(init=False)
     is_auto_generated: bool = False
     legacy_mode: bool = False
-    arguments: Optional[List[Any]] = None  # List[Argument] from parsing.models
-    schema: Optional[Type[Any]] = None  # Type[BaseModel] for validation
-    argument_mapper: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None
-    fallback_handler: Optional[Callable[[CommandPayload], CommandResponse]] = None
+    arguments: list[Any] | None = None  # List[Argument] from parsing.models
+    schema: type[Any] | None = None  # Type[BaseModel] for validation
+    argument_mapper: Callable[[dict[str, Any]], dict[str, Any]] | None = None
+    fallback_handler: Callable[[CommandPayload], CommandResponse] | None = None
 
     def __post_init__(self):
         """Compute full_path from parent and name."""
@@ -241,7 +242,7 @@ class ViewField:
     label: str
     required: bool = False
     placeholder: str = ""
-    options: Optional[List[Dict[str, str]]] = None
+    options: list[dict[str, str]] | None = None
 
 
 @dataclass
@@ -250,7 +251,7 @@ class ViewDefinition:
 
     view_id: str
     title: str
-    fields: List[ViewField]
+    fields: list[ViewField]
     submit_label: str = "Submit"
     cancel_label: str = "Cancel"
     callback_url: str = ""  # HTTP endpoint for submission
@@ -262,8 +263,8 @@ class ViewSubmission:
 
     view_id: str
     user_id: str
-    user_email: Optional[str]
-    field_values: Dict[str, Any]
+    user_email: str | None
+    field_values: dict[str, Any]
     correlation_id: str = ""
 
 
@@ -293,9 +294,9 @@ class CardAction:
     action_id: str
     action_type: CardElementType
     label: str
-    value: Optional[str] = None
-    url: Optional[str] = None  # For link buttons
-    callback_url: Optional[str] = None  # HTTP endpoint for interaction
+    value: str | None = None
+    url: str | None = None  # For link buttons
+    callback_url: str | None = None  # HTTP endpoint for interaction
     style: CardActionStyle = CardActionStyle.DEFAULT
 
 
@@ -305,8 +306,8 @@ class CardSection:
 
     text: str
     markdown: bool = True
-    actions: Optional[List[CardAction]] = None
-    fields: Optional[List[Dict[str, str]]] = None  # Key-value pairs
+    actions: list[CardAction] | None = None
+    fields: list[dict[str, str]] | None = None  # Key-value pairs
 
 
 @dataclass
@@ -314,10 +315,10 @@ class CardDefinition:
     """Platform-agnostic interactive card definition."""
 
     title: str
-    sections: List[CardSection]
-    footer: Optional[str] = None
-    color: Optional[str] = None  # Accent color (hex)
-    timestamp: Optional[datetime] = None
+    sections: list[CardSection]
+    footer: str | None = None
+    color: str | None = None  # Accent color (hex)
+    timestamp: datetime | None = None
 
 
 # HTTP Request Models
@@ -327,9 +328,9 @@ class HttpEndpointRequest:
 
     method: str  # GET, POST, PUT, DELETE
     path: str  # /api/v1/groups/add
-    headers: Dict[str, str] = field(default_factory=dict)
-    query_params: Dict[str, str] = field(default_factory=dict)
-    body: Optional[Dict[str, Any]] = None
+    headers: dict[str, str] = field(default_factory=dict)
+    query_params: dict[str, str] = field(default_factory=dict)
+    body: dict[str, Any] | None = None
     timeout_seconds: int = 30
 
 
@@ -338,9 +339,9 @@ class HttpEndpointResponse:
     """Standard HTTP response from internal endpoint."""
 
     status_code: int
-    headers: Dict[str, str]
-    body: Optional[Dict[str, Any]] = None
-    raw_text: Optional[str] = None
+    headers: dict[str, str]
+    body: dict[str, Any] | None = None
+    raw_text: str | None = None
 
 
 __all__ = [

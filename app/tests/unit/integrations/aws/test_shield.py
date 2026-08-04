@@ -48,9 +48,7 @@ class TestAWSShieldClientConstruction:
             config = mock_create.call_args.kwargs["config"]
             assert config.retries == {"max_attempts": 3, "mode": "standard"}
 
-    def test_client_applies_connect_and_read_timeouts(
-        self, settings: AWSSettings
-    ) -> None:
+    def test_client_applies_connect_and_read_timeouts(self, settings: AWSSettings) -> None:
         shield = AWSShield(settings=settings)
         with patch.object(shield._session, "client") as mock_create:
             shield.client("dynamodb")
@@ -60,29 +58,21 @@ class TestAWSShieldClientConstruction:
             assert config.read_timeout == 10
 
     def test_client_passes_endpoint_url_when_set(self) -> None:
-        settings = AWSSettings(
-            AWS_REGION="us-east-1", AWS_ENDPOINT_URL="http://localhost:4566"
-        )
+        settings = AWSSettings(AWS_REGION="us-east-1", AWS_ENDPOINT_URL="http://localhost:4566")
         shield = AWSShield(settings=settings)
         with patch.object(shield._session, "client") as mock_create:
             shield.client("dynamodb")
 
-            assert (
-                mock_create.call_args.kwargs["endpoint_url"] == "http://localhost:4566"
-            )
+            assert mock_create.call_args.kwargs["endpoint_url"] == "http://localhost:4566"
 
-    def test_client_passes_none_endpoint_url_when_unset(
-        self, settings: AWSSettings
-    ) -> None:
+    def test_client_passes_none_endpoint_url_when_unset(self, settings: AWSSettings) -> None:
         shield = AWSShield(settings=settings)
         with patch.object(shield._session, "client") as mock_create:
             shield.client("dynamodb")
 
             assert mock_create.call_args.kwargs["endpoint_url"] is None
 
-    def test_client_caches_one_instance_per_service(
-        self, settings: AWSSettings
-    ) -> None:
+    def test_client_caches_one_instance_per_service(self, settings: AWSSettings) -> None:
         shield = AWSShield(settings=settings)
         with patch.object(shield._session, "client") as mock_create:
             mock_create.side_effect = lambda *a, **kw: MagicMock()
@@ -93,9 +83,7 @@ class TestAWSShieldClientConstruction:
             assert first is second
             assert mock_create.call_count == 1
 
-    def test_client_caches_separately_per_service_name(
-        self, settings: AWSSettings
-    ) -> None:
+    def test_client_caches_separately_per_service_name(self, settings: AWSSettings) -> None:
         shield = AWSShield(settings=settings)
         with patch.object(shield._session, "client") as mock_create:
             mock_create.side_effect = lambda *a, **kw: MagicMock()

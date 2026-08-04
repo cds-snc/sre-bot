@@ -13,25 +13,29 @@ Functions:
 """
 
 import json
+from collections.abc import Callable
 from functools import wraps
 from json import JSONDecodeError
-from typing import Any, Callable
+from typing import Any
 
 import structlog
 from google.oauth2 import service_account  # type: ignore
 from googleapiclient.discovery import Resource, build  # type: ignore
 from googleapiclient.errors import HttpError  # type: ignore
-from integrations.utils.api import convert_kwargs_to_camel_case
-from core.config import settings
 
-# Define the default arguments
-GOOGLE_WORKSPACE_CUSTOMER_ID = settings.google_workspace.GOOGLE_WORKSPACE_CUSTOMER_ID
-GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = (
-    settings.google_workspace.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
+from infrastructure.configuration.integrations.google import (
+    get_google_resources_config,
+    get_google_workspace_settings,
 )
-SRE_BOT_EMAIL = settings.google_workspace.SRE_BOT_EMAIL
-INCIDENT_TEMPLATE = settings.google_resources.incident_template_id
+from integrations.utils.api import convert_kwargs_to_camel_case
 
+# Define the default arguments - do not delete currently used in sibling modules
+settings = get_google_workspace_settings()
+resources = get_google_resources_config()
+GOOGLE_WORKSPACE_CUSTOMER_ID = settings.GOOGLE_WORKSPACE_CUSTOMER_ID
+GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = settings.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
+SRE_BOT_EMAIL = settings.SRE_BOT_EMAIL
+INCIDENT_TEMPLATE = resources.incident_template_id
 logger = structlog.get_logger()
 
 
@@ -54,7 +58,7 @@ def get_google_service(
         Resource: The authenticated Google service resource.
     """
 
-    creds_json = GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
+    creds_json = settings.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE
 
     if not creds_json:
         logger.error("credentials_json_missing")
@@ -69,9 +73,7 @@ def get_google_service(
             creds = creds.with_scopes(scopes)
     except JSONDecodeError as json_decode_exception:
         logger.error("invalid_credentials_json", error=str(json_decode_exception))
-        raise JSONDecodeError(
-            msg="Invalid credentials JSON", doc="Credentials JSON", pos=0
-        ) from json_decode_exception
+        raise JSONDecodeError(msg="Invalid credentials JSON", doc="Credentials JSON", pos=0) from json_decode_exception
     return build(service, version, credentials=creds, cache_discovery=False)
 
 
@@ -91,9 +93,7 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
             "get_user": ["timed out"],
             "get_sheet": ["Unable to parse range"],
         }
-        argument_string = ", ".join(
-            [str(arg) for arg in args] + [f"{k}={v}" for k, v in kwargs.items()]
-        )
+        argument_string = ", ".join([str(arg) for arg in args] + [f"{k}={v}" for k, v in kwargs.items()])
         argument_string = f"({argument_string})"
 
         try:
@@ -123,9 +123,7 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
         except HttpError as e:
             message = str(e)
             func_name = func.__name__
-            if func_name in non_critical_errors and any(
-                error in message for error in non_critical_errors[func_name]
-            ):
+            if func_name in non_critical_errors and any(error in message for error in non_critical_errors[func_name]):
                 logger.warning(
                     "google_api_http_warning",
                     function=func.__name__,
@@ -144,9 +142,7 @@ def handle_google_api_errors(func: Callable[..., Any]) -> Callable[..., Any]:
         except Exception as e:  # Catch-all for any other types of exceptions
             message = str(e)
             func_name = func.__name__
-            if func_name in non_critical_errors and any(
-                error in message for error in non_critical_errors[func_name]
-            ):
+            if func_name in non_critical_errors and any(error in message for error in non_critical_errors[func_name]):
                 logger.warning(
                     "google_api_generic_warning",
                     function=func.__name__,
@@ -192,7 +188,7 @@ def execute_google_api_call(
         Any: The result of the API call. If paginate is True, returns a list of all results.
     """
     if delegated_user_email is None:
-        delegated_user_email = SRE_BOT_EMAIL
+        delegated_user_email = settings.SRE_BOT_EMAIL
     service = get_google_service(
         service_name,
         version,
@@ -210,9 +206,7 @@ def execute_google_api_call(
                 resource=resource,
                 error=str(e),
             )
-            raise AttributeError(
-                f"Error accessing {resource} on resource object. Exception: {e}"
-            ) from e
+            raise AttributeError(f"Error accessing {resource} on resource object. Exception: {e}") from e
 
     try:
         api_method = getattr(resource_obj, method)
@@ -222,15 +216,11 @@ def execute_google_api_call(
             method=method,
             error=str(e),
         )
-        raise AttributeError(
-            f"Error executing API method {method}. Exception: {e}"
-        ) from e
+        raise AttributeError(f"Error executing API method {method}. Exception: {e}") from e
 
     supported_params = get_google_api_command_parameters(resource_obj, method)
     formatted_kwargs = convert_kwargs_to_camel_case(kwargs) if kwargs else {}
-    filtered_params = {
-        k: v for k, v in formatted_kwargs.items() if k in supported_params
-    }
+    filtered_params = {k: v for k, v in formatted_kwargs.items() if k in supported_params}
     unsupported_params = set(formatted_kwargs.keys()) - set(filtered_params.keys())
     if paginate:
         all_results = []

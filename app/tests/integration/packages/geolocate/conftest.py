@@ -4,11 +4,12 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from packages.geolocate.routes import router
+
 
 @pytest.fixture
 def app():
     """Create FastAPI app with geolocate router."""
-    from packages.geolocate.routes import router
 
     app = FastAPI()
     app.include_router(router)

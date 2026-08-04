@@ -1,7 +1,8 @@
 """Unit tests for AWS module command handler."""
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from modules.aws import aws
 
@@ -24,9 +25,7 @@ def make_command():
 
 @pytest.mark.unit
 @patch("modules.aws.aws.slack_commands.parse_command")
-def test_should_acknowledge_and_show_help_when_command_text_empty(
-    mock_parse_command, make_command
-):
+def test_should_acknowledge_and_show_help_when_command_text_empty(mock_parse_command, make_command):
     """Test that empty command text shows help message."""
     # Arrange
     ack = MagicMock()
@@ -45,9 +44,7 @@ def test_should_acknowledge_and_show_help_when_command_text_empty(
 
 @pytest.mark.unit
 @patch("modules.aws.aws.slack_commands.parse_command")
-def test_should_respond_with_help_text_when_help_command_given(
-    mock_parse_command, make_command
-):
+def test_should_respond_with_help_text_when_help_command_given(mock_parse_command, make_command):
     """Test that help command returns help text."""
     # Arrange
     ack = MagicMock()
@@ -66,9 +63,7 @@ def test_should_respond_with_help_text_when_help_command_given(
 @pytest.mark.unit
 @patch("modules.aws.aws.aws_access_requests.request_access_modal")
 @patch("modules.aws.aws.slack_commands.parse_command")
-def test_should_open_access_modal_when_access_command_given(
-    mock_parse_command, mock_request_access_modal, make_command
-):
+def test_should_open_access_modal_when_access_command_given(mock_parse_command, mock_request_access_modal, make_command):
     """Test that access command opens modal."""
     # Arrange
     ack = MagicMock()
@@ -90,9 +85,7 @@ def test_should_open_access_modal_when_access_command_given(
 @pytest.mark.unit
 @patch("modules.aws.aws.aws_account_health.request_health_modal")
 @patch("modules.aws.aws.slack_commands.parse_command")
-def test_should_open_health_modal_when_health_command_given(
-    mock_parse_command, mock_request_health_modal, make_command
-):
+def test_should_open_health_modal_when_health_command_given(mock_parse_command, mock_request_health_modal, make_command):
     """Test that health command opens modal."""
     # Arrange
     ack = MagicMock()
@@ -114,9 +107,7 @@ def test_should_open_health_modal_when_health_command_given(
 @pytest.mark.unit
 @patch("modules.aws.aws.users.command_handler")
 @patch("modules.aws.aws.slack_commands.parse_command")
-def test_should_delegate_to_users_handler_when_users_command_given(
-    mock_parse_command, mock_users_handler, make_command
-):
+def test_should_delegate_to_users_handler_when_users_command_given(mock_parse_command, mock_users_handler, make_command):
     """Test that users command delegates to handler."""
     # Arrange
     ack = MagicMock()
@@ -137,9 +128,7 @@ def test_should_delegate_to_users_handler_when_users_command_given(
 @pytest.mark.unit
 @patch("modules.aws.aws.groups.command_handler")
 @patch("modules.aws.aws.slack_commands.parse_command")
-def test_should_delegate_to_groups_handler_when_groups_command_given(
-    mock_parse_command, mock_groups_handler, make_command
-):
+def test_should_delegate_to_groups_handler_when_groups_command_given(mock_parse_command, mock_groups_handler, make_command):
     """Test that groups command delegates to handler."""
     # Arrange
     ack = MagicMock()
@@ -160,9 +149,7 @@ def test_should_delegate_to_groups_handler_when_groups_command_given(
 @pytest.mark.unit
 @patch("modules.aws.aws.lambdas.command_handler")
 @patch("modules.aws.aws.slack_commands.parse_command")
-def test_should_delegate_to_lambdas_handler_when_lambdas_command_given(
-    mock_parse_command, mock_lambdas_handler, make_command
-):
+def test_should_delegate_to_lambdas_handler_when_lambdas_command_given(mock_parse_command, mock_lambdas_handler, make_command):
     """Test that lambdas command delegates to handler."""
     # Arrange
     ack = MagicMock()
@@ -209,9 +196,7 @@ def test_should_generate_and_update_spending_when_spending_command_given(
 @pytest.mark.unit
 @patch("modules.aws.aws.spending.generate_spending_data")
 @patch("modules.aws.aws.slack_commands.parse_command")
-def test_should_show_error_when_spending_data_generation_fails(
-    mock_parse_command, mock_generate, make_command
-):
+def test_should_show_error_when_spending_data_generation_fails(mock_parse_command, mock_generate, make_command):
     """Test error handling when spending data generation fails."""
     # Arrange
     ack = MagicMock()

@@ -1,4 +1,5 @@
 import structlog
+
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 
 logger = structlog.get_logger()
@@ -18,9 +19,7 @@ def get_queue_url(queue_name):
     log.info("getting_queue_url")
     if not queue_name:
         raise ValueError("Queue_name must not be empty")
-    return execute_aws_api_call("sqs", "get_queue_url", QueueName=queue_name)[
-        "QueueUrl"
-    ]
+    return execute_aws_api_call("sqs", "get_queue_url", QueueName=queue_name)["QueueUrl"]
 
 
 @handle_aws_api_errors
@@ -96,6 +95,4 @@ def delete_message(queue_url, receipt_handle):
         receipt_handle=receipt_handle,
     )
 
-    return execute_aws_api_call(
-        "sqs", "delete_message", QueueUrl=queue_url, ReceiptHandle=receipt_handle
-    )
+    return execute_aws_api_call("sqs", "delete_message", QueueUrl=queue_url, ReceiptHandle=receipt_handle)

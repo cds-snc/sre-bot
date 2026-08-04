@@ -5,8 +5,9 @@ The protocol-based design allows for multiple storage backends (in-memory, Dynam
 """
 
 import threading
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Protocol
+from datetime import UTC, datetime, timedelta
+from typing import Any, Protocol
+
 import structlog
 
 from infrastructure.resilience.retry.config import RetryConfig
@@ -42,7 +43,7 @@ class RetryStore(Protocol):
         """
         ...
 
-    def fetch_due(self, limit: int = 100) -> List[RetryRecord]:
+    def fetch_due(self, limit: int = 100) -> list[RetryRecord]:
         """Return records that are due for retry.
 
         Should only return records that are:
@@ -123,9 +124,9 @@ class InMemoryRetryStore:
         Args:
             config: Optional RetryConfig. If not provided, uses defaults.
         """
-        self._store: Dict[str, RetryRecord] = {}
-        self._claims: Dict[str, Dict[str, Any]] = {}
-        self._dlq: Dict[str, RetryRecord] = {}
+        self._store: dict[str, RetryRecord] = {}
+        self._claims: dict[str, dict[str, Any]] = {}
+        self._dlq: dict[str, RetryRecord] = {}
         self._lock = threading.Lock()
         self._next_id = 1
 
@@ -139,10 +140,10 @@ class InMemoryRetryStore:
             self._next_id += 1
             record.id = record_id
             record.attempts = 0
-            record.created_at = datetime.now(timezone.utc)
-            record.updated_at = datetime.now(timezone.utc)
+            record.created_at = datetime.now(UTC)
+            record.updated_at = datetime.now(UTC)
             # Set next_retry_at to now (immediate retry)
-            record.next_retry_at = datetime.now(timezone.utc)
+            record.next_retry_at = datetime.now(UTC)
             self._store[record_id] = record
 
             logger.info(
@@ -152,10 +153,10 @@ class InMemoryRetryStore:
             )
             return record_id
 
-    def fetch_due(self, limit: int = 100) -> List[RetryRecord]:
+    def fetch_due(self, limit: int = 100) -> list[RetryRecord]:
         """Return records that are due for retry (not claimed, within retry window)."""
         with self._lock:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             due = []
 
             for record_id, record in self._store.items():
@@ -198,7 +199,7 @@ class InMemoryRetryStore:
             if record_id in self._claims:
                 # Check if existing claim expired
                 claim = self._claims[record_id]
-                if claim["expires_at"] > datetime.now(timezone.utc).timestamp():
+                if claim["expires_at"] > datetime.now(UTC).timestamp():
                     logger.debug(
                         "retry_claim_failed_already_claimed",
                         record_id=record_id,
@@ -208,7 +209,7 @@ class InMemoryRetryStore:
 
             self._claims[record_id] = {
                 "worker": worker_id,
-                "expires_at": datetime.now(timezone.utc).timestamp() + lease_seconds,
+                "expires_at": datetime.now(UTC).timestamp() + lease_seconds,
             }
             logger.debug(
                 "retry_record_claimed",
@@ -244,7 +245,7 @@ class InMemoryRetryStore:
             return
 
         rec.last_error = reason
-        rec.updated_at = datetime.now(timezone.utc)
+        rec.updated_at = datetime.now(UTC)
 
         # Move to DLQ
         self._dlq[record_id] = rec
@@ -271,7 +272,7 @@ class InMemoryRetryStore:
 
             rec.attempts += 1
             rec.last_error = last_error
-            rec.updated_at = datetime.now(timezone.utc)
+            rec.updated_at = datetime.now(UTC)
 
             # Check if max attempts reached
             if rec.attempts >= self.config.max_attempts:
@@ -282,9 +283,7 @@ class InMemoryRetryStore:
             else:
                 # Calculate next retry time with exponential backoff
                 retry_delay = self._calculate_retry_delay(rec.attempts)
-                rec.next_retry_at = datetime.now(timezone.utc) + timedelta(
-                    seconds=retry_delay
-                )
+                rec.next_retry_at = datetime.now(UTC) + timedelta(seconds=retry_delay)
 
                 # Release claim so it can be retried later
                 if record_id in self._claims:
@@ -314,7 +313,7 @@ class InMemoryRetryStore:
         delay = self.config.base_delay_seconds * (2**attempts)
         return min(delay, self.config.max_delay_seconds)
 
-    def get_dlq_entries(self) -> List[RetryRecord]:
+    def get_dlq_entries(self) -> list[RetryRecord]:
         """Get all dead letter queue entries (for monitoring).
 
         Returns:

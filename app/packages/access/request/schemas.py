@@ -7,10 +7,7 @@ service layer works exclusively with domain.py dataclasses.
 Route handlers translate between these schemas and internal domain models.
 """
 
-from typing import List, Optional
-
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Request bodies
@@ -29,9 +26,7 @@ class SubmitAccessRequestBody(BaseModel):
             "server-side from this slug."
         ),
     )
-    entitlement_type: str = Field(
-        default="group", description="Entitlement classification. Defaults to 'group'."
-    )
+    entitlement_type: str = Field(default="group", description="Entitlement classification. Defaults to 'group'.")
     actor_type: str = Field(
         default="self",
         description="'self' for self-service; 'delegated' for manager-submitted.",
@@ -40,17 +35,14 @@ class SubmitAccessRequestBody(BaseModel):
         default="grant",
         description="'grant' to add access; 'revoke' to remove access.",
     )
-    user_email: Optional[str] = Field(
+    user_email: str | None = Field(
         default=None,
         description=(
-            "Target user email. Required for delegated requests; defaults to the "
-            "authenticated actor for self-service requests."
+            "Target user email. Required for delegated requests; defaults to the authenticated actor for self-service requests."
         ),
     )
     justification: str = Field(..., min_length=1, description="Reason for the request.")
-    ticket_id: Optional[str] = Field(
-        default=None, description="Optional external ticket reference."
-    )
+    ticket_id: str | None = Field(default=None, description="Optional external ticket reference.")
 
 
 class ApproveRequestBody(BaseModel):
@@ -62,9 +54,7 @@ class ApproveRequestBody(BaseModel):
 class RejectRequestBody(BaseModel):
     """Body for POST /api/v1/access/requests/{request_id}/reject."""
 
-    comment: str = Field(
-        ..., min_length=1, description="Required reason for rejection."
-    )
+    comment: str = Field(..., min_length=1, description="Required reason for rejection.")
 
 
 class CancelRequestBody(BaseModel):
@@ -110,11 +100,11 @@ class AccessRequestStatusResponse(BaseModel):
     request_type: str
     status: str
     justification: str
-    resolved_approvers: List[str]
-    ticket_id: Optional[str] = None
-    requested_at: Optional[str] = None
-    updated_at: Optional[str] = None
-    decisions: List[ApprovalDecisionResponse] = Field(
+    resolved_approvers: list[str]
+    ticket_id: str | None = None
+    requested_at: str | None = None
+    updated_at: str | None = None
+    decisions: list[ApprovalDecisionResponse] = Field(
         default_factory=list,
         description=(
             "Approval decision history. This list is empty for cancel and retry "

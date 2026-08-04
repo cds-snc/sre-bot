@@ -1,9 +1,9 @@
 """Server and development infrastructure settings."""
 
 from functools import lru_cache
-from typing import Any, Dict, Optional
+from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from infrastructure.configuration.base import InfrastructureSettings
 
@@ -24,13 +24,13 @@ class ServerSettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.infrastructure.server import get_server_settings
 
-        settings = get_settings()
+        settings = get_server_settings()
 
-        backend_url = settings.server.BACKEND_URL
-        client_id = settings.server.GOOGLE_CLIENT_ID
-        token_expire = settings.server.ACCESS_TOKEN_EXPIRE_MINUTES
+        backend_url = settings.BACKEND_URL
+        client_id = settings.GOOGLE_CLIENT_ID
+        token_expire = settings.ACCESS_TOKEN_EXPIRE_MINUTES
         ```
     """
 
@@ -42,22 +42,31 @@ class ServerSettings(InfrastructureSettings):
     SECRET_KEY: str | None = Field(default=None, alias="SESSION_SECRET_KEY")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     ACCESS_TOKEN_MAX_AGE_MINUTES: int = 1440  # Defaults to 24 hours
-    ISSUER_CONFIG: Optional[Dict[str, Dict[str, Any]]] = Field(
+    ISSUER_CONFIG: dict[str, dict[str, Any]] | None = Field(
         default=None,
         alias="ISSUER_CONFIG",
     )
-    DEV_BYPASS_TOKEN: Optional[str] = Field(
+    DEV_BYPASS_TOKEN: str | None = Field(
         default=None,
         alias="DEV_BYPASS_TOKEN",
     )
 
     @field_validator("ISSUER_CONFIG", mode="before")
     @classmethod
-    def validate_issuer_config(cls, v: Optional[Dict[str, Dict[str, Any]]]) -> Any:
+    def validate_issuer_config(cls, v: dict[str, dict[str, Any]] | None) -> Any:
         """Validate the ISSUER_CONFIG field."""
         if v is None or not isinstance(v, dict):
             return {}
         return v
+
+    @model_validator(mode="after")
+    def validate_issuer_config_requires_audience(self) -> ServerSettings:
+        """Reject issuer entries that do not define an audience."""
+        issuer_config = self.ISSUER_CONFIG or {}
+        for issuer, cfg in issuer_config.items():
+            if not isinstance(cfg, dict) or not cfg.get("audience"):
+                raise ValueError(f"ISSUER_CONFIG entry for issuer '{issuer}' is missing required 'audience'")
+        return self
 
 
 class DevSettings(InfrastructureSettings):
@@ -68,11 +77,11 @@ class DevSettings(InfrastructureSettings):
 
     Example:
         ```python
-        from infrastructure.configuration import get_settings
+        from infrastructure.configuration.infrastructure.server import get_dev_settings
 
-        settings = get_settings()
+        settings = get_dev_settings()
 
-        dev_channel = settings.dev.SLACK_DEV_MSG_CHANNEL
+        dev_channel = settings.SLACK_DEV_MSG_CHANNEL
         ```
     """
 

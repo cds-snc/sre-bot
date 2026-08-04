@@ -1,7 +1,8 @@
+from structlog import get_logger
+
 from integrations.sentinel import log_to_sentinel
 from modules.incident import incident
 from modules.slack import webhooks
-from structlog import get_logger
 
 logger = get_logger()
 
@@ -39,14 +40,10 @@ def handle_incident_action_buttons(client, ack, body):
         ack()
         webhooks.increment_acknowledged_count(value)
         attachments = body["original_message"]["attachments"]
-        msg = (
-            f"🙈  <@{user}> has acknowledged and ignored the incident.\n"
-            f"<@{user}> a pris connaissance et ignoré l'incident."
-        )
+        msg = f"🙈  <@{user}> has acknowledged and ignored the incident.\n<@{user}> a pris connaissance et ignoré l'incident."
         # if the last attachment is a preview from a link, switch the places of the last 2 attachments so that the incident buttons can be appended properly
-        if len(attachments) > 1:
-            if "app_unfurl_url" in attachments[-1]:
-                attachments[-2], attachments[-1] = attachments[-1], attachments[-2]
+        if len(attachments) > 1 and "app_unfurl_url" in attachments[-1]:
+            attachments[-2], attachments[-1] = attachments[-1], attachments[-2]
         attachments[-1] = {
             "color": "3AA3E3",
             "fallback": f"{msg}",

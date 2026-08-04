@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock
 
+from googleapiclient.errors import HttpError
 
 from infrastructure.clients.google_workspace.gmail import GmailClient
 
@@ -353,10 +354,7 @@ class TestUtilityFunctions:
         assert isinstance(encoded, str)
         assert len(encoded) > 0
         # Base64 encoded strings should only contain these characters
-        assert all(
-            c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_="
-            for c in encoded
-        )
+        assert all(c in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_=" for c in encoded)
 
     def test_create_mime_message_html(self):
         """Test creating HTML MIME message."""
@@ -382,11 +380,7 @@ class TestErrorHandling:
         mock_service = mock_session_provider.get_service.return_value
 
         # Simulate API error
-        from googleapiclient.errors import HttpError
-
-        mock_service.users().messages().get().execute.side_effect = HttpError(
-            resp=MagicMock(status=404), content=b"Not found"
-        )
+        mock_service.users().messages().get().execute.side_effect = HttpError(resp=MagicMock(status=404), content=b"Not found")
 
         # Execute
         result = client.get_message("nonexistent_msg")

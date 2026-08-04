@@ -1,6 +1,7 @@
 """Fixtures for infrastructure security tests."""
 
 import pytest
+from fastapi.security import HTTPAuthorizationCredentials
 
 
 @pytest.fixture
@@ -65,7 +66,6 @@ def mock_http_credentials():
     """Factory fixture for creating mock HTTP authorization credentials."""
 
     def _make(token="valid_token", scheme="Bearer"):
-        from fastapi.security import HTTPAuthorizationCredentials
 
         return HTTPAuthorizationCredentials(scheme=scheme, credentials=token)
 

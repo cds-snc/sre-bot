@@ -7,8 +7,8 @@ Verifies:
 - DI override works for testing
 """
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 from unittest.mock import MagicMock
 
 from infrastructure.audit.models import AuditEvent
@@ -22,7 +22,7 @@ class FakeAuditTrailService:
     """Fake in-memory audit trail for testing."""
 
     def __init__(self) -> None:
-        self._events: List[Dict[str, Any]] = []
+        self._events: list[dict[str, Any]] = []
 
     def write_audit_event(
         self,
@@ -42,27 +42,27 @@ class FakeAuditTrailService:
     def get_audit_trail(
         self,
         resource_id: str,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get audit trail for resource."""
         return [e for e in self._events if e["resource_id"] == resource_id][:limit]
 
     def get_user_audit_trail(
         self,
         user_email: str,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Get audit trail for user."""
         return []
 
     def get_by_correlation_id(
         self,
         correlation_id: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Get event by correlation ID."""
         return None
 
@@ -95,7 +95,7 @@ def test_audit_dep_override_with_fake() -> None:
 
     event = AuditEvent(
         resource_id="test-group",
-        timestamp=datetime.now(timezone.utc).isoformat(),
+        timestamp=datetime.now(UTC).isoformat(),
         correlation_id="corr-123",
         user_email="user@example.com",
         action="CREATE",

@@ -1,13 +1,19 @@
-from unittest.mock import patch, MagicMock, PropertyMock, call, ANY
+from unittest.mock import ANY, MagicMock, PropertyMock, call, patch
 
-import pytest
 import httpx
+import pytest
+import structlog
 from fastapi.testclient import TestClient
+from structlog.testing import capture_logs
+
 from api.v1.routes import webhooks
+from infrastructure.logging.settings import LoggingSettings
+from infrastructure.logging.setup import _build_base_processors
 from models.webhooks import (
     WebhookPayload,
     WebhookResult,
 )
+from server.body_size_middleware import MaxBodySizeMiddleware
 from utils.tests import create_test_app
 
 
@@ -74,9 +80,63 @@ def test_handle_webhook_malformed_json_string(test_client):
     payload = '{"invalid_json": "missing_end_quote}'
     response = test_client.post("/hook/id", json=payload)
     assert response.status_code == 400
-    assert response.json() == {
-        "detail": "Unterminated string starting at: line 1 column 18 (char 17)"
+    assert response.json() == {"detail": "Unterminated string starting at: line 1 column 18 (char 17)"}
+
+
+@patch("api.v1.routes.webhooks.webhooks.get_webhook")
+def test_handle_webhook_rejects_oversized_body(mock_get_webhook):
+    """An oversized webhook body is rejected before route processing runs."""
+    test_app = create_test_app(webhooks.router, middlewares=[(MaxBodySizeMiddleware, {"max_bytes": 10})])
+    with TestClient(test_app) as client:
+        response = client.post(
+            "/hook/id",
+            content=b'{"text": "this payload is definitely larger than ten bytes"}',
+            headers={"content-type": "application/json"},
+        )
+
+    assert response.status_code == 413
+    mock_get_webhook.assert_not_called()
+
+
+@patch("api.v1.routes.webhooks.map_emails_to_slack_users")
+@patch("api.v1.routes.webhooks.log_to_sentinel")
+@patch("api.v1.routes.webhooks.append_incident_buttons")
+@patch("api.v1.routes.webhooks.handle_webhook_payload")
+@patch("api.v1.routes.webhooks.webhooks.increment_invocation_count")
+@patch("api.v1.routes.webhooks.webhooks.get_webhook")
+def test_handle_webhook_under_body_size_cap_still_succeeds(
+    mock_get_webhook,
+    mock_increment_invocation,
+    mock_handle_webhook_payload,
+    mock_append_incident_buttons,
+    mock_log_to_sentinel,
+    mock_map_emails_to_slack_users,
+    bot_mock,
+):
+    """A legitimate small webhook body still succeeds with the size cap middleware wired in."""
+    payload = {"text": "some text"}
+    mock_get_webhook.return_value = {
+        "channel": {"S": "test-channel"},
+        "hook_type": {"S": "alert"},
+        "active": {"BOOL": True},
     }
+    mock_handle_webhook_payload.return_value = WebhookResult(
+        status="success",
+        action="post",
+        payload=WebhookPayload(text="some text"),
+    )
+    mock_append_incident_buttons.return_value = WebhookPayload(
+        text="some text",
+        channel="test-channel",
+    )
+
+    test_app = create_test_app(webhooks.router, middlewares=[(MaxBodySizeMiddleware, {"max_bytes": 1_048_576})])
+    test_app.state.bot = bot_mock
+    with TestClient(test_app) as client:
+        response = client.post("/hook/id", json=payload)
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
 
 
 @patch("api.v1.routes.webhooks.webhooks.get_webhook")
@@ -87,6 +147,155 @@ def test_handle_webhook_not_found(get_webhook_mock, test_client):
     assert response.status_code == 404
     assert response.json() == {"detail": "Webhook not found"}
     assert get_webhook_mock.call_count == 1
+
+
+class TestWebhookInvocationFingerprint:
+    @staticmethod
+    def _webhook_invocation_events(entries: list[dict]) -> list[dict]:
+        return [entry for entry in entries if entry.get("event") == "webhook_invocation"]
+
+    @patch("api.v1.routes.webhooks.map_emails_to_slack_users")
+    @patch("api.v1.routes.webhooks.log_to_sentinel")
+    @patch("api.v1.routes.webhooks.append_incident_buttons")
+    @patch("api.v1.routes.webhooks.handle_webhook_payload")
+    @patch("api.v1.routes.webhooks.webhooks.increment_invocation_count")
+    @patch("api.v1.routes.webhooks.webhooks.get_webhook")
+    def test_emits_invocation_fingerprint_on_success(
+        self,
+        mock_get_webhook,
+        _mock_increment_invocation,
+        mock_handle_webhook_payload,
+        mock_append_incident_buttons,
+        _mock_log_to_sentinel,
+        mock_map_emails_to_slack_users,
+        test_client,
+    ):
+        payload = {"text": "some text"}
+        mock_get_webhook.return_value = {
+            "channel": {"S": "test-channel"},
+            "hook_type": {"S": "alert"},
+            "active": {"BOOL": True},
+        }
+        mock_handle_webhook_payload.return_value = WebhookResult(
+            status="success",
+            action="post",
+            payload=WebhookPayload(text="some text"),
+            matched_payload_type="WebhookPayload",
+        )
+        mock_append_incident_buttons.return_value = WebhookPayload(
+            text="some text",
+            channel="test-channel",
+        )
+        mock_map_emails_to_slack_users.side_effect = lambda webhook_payload: webhook_payload
+
+        with capture_logs() as entries:
+            response = test_client.post(
+                "/hook/id",
+                json=payload,
+                headers={"user-agent": "fingerprint-agent/1.0"},
+            )
+
+        assert response.status_code == 200
+        invocation_events = self._webhook_invocation_events(entries)
+        assert len(invocation_events) == 1
+        event = invocation_events[0]
+        assert event["webhook_id"] == "id"
+        assert event["matched_payload_type"] == "WebhookPayload"
+        assert isinstance(event["signing_indicator_present"], bool)
+        assert event["user_agent"] == "fingerprint-agent/1.0"
+        assert "ip_address" in event
+        assert "payload" not in event
+        assert "body" not in event
+
+    @patch("api.v1.routes.webhooks.webhooks.get_webhook")
+    def test_emits_invocation_fingerprint_on_webhook_not_found(self, get_webhook_mock, test_client):
+        get_webhook_mock.return_value = None
+
+        with capture_logs() as entries:
+            response = test_client.post("/hook/id", json={"text": "ignored"})
+
+        assert response.status_code == 404
+        invocation_events = self._webhook_invocation_events(entries)
+        assert len(invocation_events) == 1
+        event = invocation_events[0]
+        assert event["webhook_id"] == "id"
+        assert event["matched_payload_type"] is None
+        assert "payload" not in event
+        assert "body" not in event
+
+    def test_emits_invocation_fingerprint_on_malformed_json(self, test_client):
+        payload = '{"invalid_json": "missing_end_quote}'
+
+        with capture_logs() as entries:
+            response = test_client.post("/hook/id", json=payload)
+
+        assert response.status_code == 400
+        invocation_events = self._webhook_invocation_events(entries)
+        assert len(invocation_events) == 1
+        event = invocation_events[0]
+        assert event["webhook_id"] == "id"
+        assert event["matched_payload_type"] is None
+        assert "payload" not in event
+        assert "body" not in event
+
+    @patch("api.v1.routes.webhooks.map_emails_to_slack_users")
+    @patch("api.v1.routes.webhooks.log_to_sentinel")
+    @patch("api.v1.routes.webhooks.append_incident_buttons")
+    @patch("api.v1.routes.webhooks.handle_webhook_payload")
+    @patch("api.v1.routes.webhooks.webhooks.increment_invocation_count")
+    @patch("api.v1.routes.webhooks.webhooks.get_webhook")
+    def test_signing_indicator_changes_with_signature_header(
+        self,
+        mock_get_webhook,
+        _mock_increment_invocation,
+        mock_handle_webhook_payload,
+        mock_append_incident_buttons,
+        _mock_log_to_sentinel,
+        _mock_map_emails_to_slack_users,
+        test_client,
+    ):
+        payload = {"text": "some text"}
+        mock_get_webhook.return_value = {
+            "channel": {"S": "test-channel"},
+            "hook_type": {"S": "alert"},
+            "active": {"BOOL": True},
+        }
+        mock_handle_webhook_payload.return_value = WebhookResult(
+            status="success",
+            action="post",
+            payload=WebhookPayload(text="some text"),
+        )
+        mock_append_incident_buttons.return_value = WebhookPayload(
+            text="some text",
+            channel="test-channel",
+        )
+
+        with capture_logs() as entries:
+            response_with_header = test_client.post(
+                "/hook/id",
+                json=payload,
+                headers={"X-Hub-Signature": "sha1=abc"},
+            )
+            response_without_header = test_client.post("/hook/id", json=payload)
+
+        assert response_with_header.status_code == 200
+        assert response_without_header.status_code == 200
+        invocation_events = self._webhook_invocation_events(entries)
+        assert len(invocation_events) == 2
+        assert invocation_events[0]["signing_indicator_present"] is True
+        assert invocation_events[1]["signing_indicator_present"] is False
+
+
+def test_signing_indicator_field_not_redacted_in_pipeline():
+    processors = _build_base_processors(logging_settings=LoggingSettings())
+
+    with capture_logs(processors=processors) as entries:
+        logger = structlog.get_logger()
+        logger.info("webhook_invocation", signing_indicator_present=True)
+
+    assert len(entries) == 1
+    assert entries[0]["signing_indicator_present"] is True
+    assert entries[0]["signing_indicator_present"] != "***REDACTED***"
 
 
 @patch("api.v1.routes.webhooks.append_incident_buttons")
@@ -220,9 +429,7 @@ def test_handle_webhook_with_none_payload_none(
         "hook_type": {"S": "standard"},
         "active": {"BOOL": True},
     }
-    handle_webhook_payload_mock.return_value = WebhookResult(
-        status="error", action=None, payload=None
-    )
+    handle_webhook_payload_mock.return_value = WebhookResult(status="error", action=None, payload=None)
 
     response = test_client.post("/hook/id", json=payload)
 
@@ -429,15 +636,13 @@ async def test_webhooks_rate_limiting(
         payload = '{"Type": "Notification"}'
         # Return a proper WebhookPayload instance
         mock_webhook_payload = WebhookPayload(text="Test message")
-        handle_webhook_payload_mock.return_value = WebhookResult(
-            status="success", action="post", payload=mock_webhook_payload
-        )
-        # Make 30 requests to the handle_webhook endpoint
-        for _ in range(30):
+        handle_webhook_payload_mock.return_value = WebhookResult(status="success", action="post", payload=mock_webhook_payload)
+        # Make 300 requests to the handle_webhook endpoint
+        for _ in range(300):
             response = await client.post("/hook/test-id", json=payload)
             assert response.status_code == 200
 
-        # The 31st request should be rate limited
+        # The 301st request should be rate limited
         response = await client.post("/hook/test-id", json=payload)
         assert response.status_code == 429
         assert response.json() == {"message": "Rate limit exceeded"}

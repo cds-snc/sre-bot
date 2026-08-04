@@ -1,26 +1,25 @@
 """Unit tests for infrastructure settings singleton providers (PR-3)."""
 
-from infrastructure.configuration.infrastructure.server import (
-    ServerSettings,
-    DevSettings,
-    get_server_settings,
-    get_dev_settings,
-)
-from infrastructure.configuration.infrastructure.idempotency import (
-    IdempotencySettings,
-    get_idempotency_settings,
-)
-from infrastructure.configuration.infrastructure.retry import (
-    RetrySettings,
-    get_retry_settings,
+import pytest
+from pydantic import ValidationError
+
+from infrastructure.configuration.infrastructure.directory import (
+    DirectorySettings,
+    get_directory_settings,
 )
 from infrastructure.configuration.infrastructure.platforms import (
     PlatformsSettings,
     get_platforms_settings,
 )
-from infrastructure.configuration.infrastructure.directory import (
-    DirectorySettings,
-    get_directory_settings,
+from infrastructure.configuration.infrastructure.retry import (
+    RetrySettings,
+    get_retry_settings,
+)
+from infrastructure.configuration.infrastructure.server import (
+    DevSettings,
+    ServerSettings,
+    get_dev_settings,
+    get_server_settings,
 )
 
 
@@ -54,22 +53,6 @@ class TestDevSettingsSingleton:
         monkeypatch.setenv("SLACK_DEV_MSG_CHANNEL", "C_TEST123")
         settings = DevSettings()
         assert settings.SLACK_DEV_MSG_CHANNEL == "C_TEST123"
-
-
-class TestIdempotencySettingsSingleton:
-    def test_singleton_returns_same_instance(self):
-        get_idempotency_settings.cache_clear()
-        assert get_idempotency_settings() is get_idempotency_settings()
-
-    def test_has_required_model_config(self):
-        config = IdempotencySettings.model_config
-        assert config.get("env_file") == ".env"
-        assert config.get("extra") == "ignore"
-
-    def test_reads_from_env(self, monkeypatch):
-        monkeypatch.setenv("IDEMPOTENCY_TTL_SECONDS", "7200")
-        settings = IdempotencySettings()
-        assert settings.IDEMPOTENCY_TTL_SECONDS == 7200
 
 
 class TestRetrySettingsSingleton:
@@ -119,22 +102,28 @@ class TestDirectorySettingsSingleton:
         assert settings.provider == "entra_id"
 
 
-class TestInfraSettingsExportedFromInit:
-    """Verify all providers are accessible from the infrastructure package."""
+class TestServerSettingsIssuerConfigValidation:
+    def test_issuer_config_missing_audience_raises_validation_error(self):
+        with pytest.raises(ValidationError):
+            ServerSettings(
+                ISSUER_CONFIG={
+                    "issuer-1": {
+                        "jwks_uri": "https://issuer.example.com/.well-known/jwks.json",
+                        "algorithms": ["RS256"],
+                    }
+                }
+            )
 
-    def test_all_providers_importable(self):
-        from infrastructure.configuration.infrastructure import (
-            get_server_settings,
-            get_dev_settings,
-            get_idempotency_settings,
-            get_retry_settings,
-            get_platforms_settings,
-            get_directory_settings,
+    def test_issuer_config_with_audience_is_valid(self):
+        settings = ServerSettings(
+            ISSUER_CONFIG={
+                "issuer-1": {
+                    "jwks_uri": "https://issuer.example.com/.well-known/jwks.json",
+                    "algorithms": ["RS256"],
+                    "audience": "aud-1",
+                }
+            }
         )
 
-        assert callable(get_server_settings)
-        assert callable(get_dev_settings)
-        assert callable(get_idempotency_settings)
-        assert callable(get_retry_settings)
-        assert callable(get_platforms_settings)
-        assert callable(get_directory_settings)
+        assert settings.ISSUER_CONFIG is not None
+        assert settings.ISSUER_CONFIG["issuer-1"]["audience"] == "aud-1"

@@ -166,9 +166,7 @@ def test_role_command_handles_unknown_command_EN_client():
         MagicMock(),
     )
     ack.assert_called()
-    respond.assert_called_with(
-        "Sorry but I don't understand this command. Please type /role help to get usage information"
-    )
+    respond.assert_called_with("Sorry but I don't understand this command. Please type /role help to get usage information")
 
 
 def test_role_command_handles_unknown_command_FR_client():
@@ -332,9 +330,7 @@ def test_create_new_folder(mock_create_new_folder, mock_copy_file_to_folder):
 @patch("modules.role.role.logger")
 @patch("modules.role.role.google_drive.copy_file_to_folder")
 @patch("modules.role.role.google_drive.create_folder")
-def test_create_new_folder_failed(
-    mock_create_new_folder, mock_copy_file_to_folder, mock_logger
-):
+def test_create_new_folder_failed(mock_create_new_folder, mock_copy_file_to_folder, mock_logger):
     ack = MagicMock()
     say = MagicMock()
     body = helper_body_payload("en-US")
@@ -349,9 +345,7 @@ def test_create_new_folder_failed(
         "id",
         delegated_user_email="bot_email",
     )
-    bound_logger.error.assert_called_once_with(
-        "talent_role_folder_creation_failed", folder_name="foo"
-    )
+    bound_logger.error.assert_called_once_with("talent_role_folder_creation_failed", folder_name="foo")
     mock_copy_file_to_folder.assert_not_called()
 
 
@@ -360,9 +354,7 @@ def test_create_new_folder_failed(
 @patch("modules.role.role.logger")
 @patch("modules.role.role.google_drive.create_folder")
 @patch("modules.role.role.google_drive.copy_file_to_folder")
-def test_copy_files_to_internal_talent_folder(
-    mock_copy_file_to_folder, mock_create_new_folder, mock_logger
-):
+def test_copy_files_to_internal_talent_folder(mock_copy_file_to_folder, mock_create_new_folder, mock_logger):
     # test copying files to internal talent folder
     ack = MagicMock()
     say = MagicMock()
@@ -458,17 +450,13 @@ def test_role_modal_view(mock_role_modal_view):
 
 @patch("modules.role.role.google_drive.create_folder")
 @patch("modules.role.role.google_drive.copy_file_to_folder")
-def test_role_creates_channel_and_sets_topic_and_announces_channel(
-    mock_copy_file_to_folder, mock_create_new_folder
-):
+def test_role_creates_channel_and_sets_topic_and_announces_channel(mock_copy_file_to_folder, mock_create_new_folder):
     # test that a private channel is created, the topic is set and the channel is announced
     ack = MagicMock()
     say = MagicMock()
     body = helper_body_payload("en-US")
     client = MagicMock()
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": "channel_name"}
-    }
+    client.conversations_create.return_value = {"channel": {"id": "channel_id", "name": "channel_name"}}
     mock_create_new_folder.return_value = {"id": "folder_id"}
     role.role_view_handler(ack, body, say, client)
 
@@ -486,25 +474,19 @@ def test_role_creates_channel_and_sets_topic_and_announces_channel(
 # test that indicated users are invited to the channel
 @patch("modules.role.role.google_drive.create_folder")
 @patch("modules.role.role.google_drive.copy_file_to_folder")
-def test_role_add_invited_users_to_channel(
-    mock_copy_file_to_folder, mock_create_new_folder
-):
+def test_role_add_invited_users_to_channel(mock_copy_file_to_folder, mock_create_new_folder):
     ack = MagicMock()
     say = MagicMock()
     body = helper_body_payload("en-US")
     client = MagicMock()
-    client.conversations_create.return_value = {
-        "channel": {"id": "channel_id", "name": "channel_name"}
-    }
+    client.conversations_create.return_value = {"channel": {"id": "channel_id", "name": "channel_name"}}
     client.users_lookupByEmail.return_value = {
         "ok": True,
         "user": {"id": "user_id", "profile": {"display_name_normalized": "name"}},
     }
     mock_create_new_folder.return_value = {"id": "folder_id"}
     role.role_view_handler(ack, body, say, client)
-    client.conversations_invite.assert_called_with(
-        channel="channel_id", users="user_id"
-    )
+    client.conversations_invite.assert_called_with(channel="channel_id", users="user_id")
 
 
 def helper_client_locale(locale=""):
@@ -531,9 +513,7 @@ def helper_body_payload(locale):
                 "values": {
                     "role_name": {"role_name": {"value": "foo"}},
                     "channel_name": {"channel_name": {"value": "bar"}},
-                    "users_invited": {
-                        "users_invited": {"selected_users": {"user_id": "user_id"}}
-                    },
+                    "users_invited": {"users_invited": {"selected_users": {"user_id": "user_id"}}},
                 }
             },
         },

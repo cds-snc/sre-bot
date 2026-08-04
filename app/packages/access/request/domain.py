@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import List, Literal, Optional
+from typing import Literal
 
 ActorType = Literal["self", "delegated"]
 
@@ -76,10 +76,10 @@ class AccessRequest:
     entitlement_id: str
     status: RequestStatus
     justification: str
-    resolved_approvers: List[str] = field(default_factory=list)
-    ticket_id: Optional[str] = None
-    requested_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    resolved_approvers: list[str] = field(default_factory=list)
+    ticket_id: str | None = None
+    requested_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 @dataclass(frozen=True)

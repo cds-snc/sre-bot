@@ -19,22 +19,25 @@ Dependencies:
     - infrastructure.configuration.Settings
 """
 
+import contextlib
 import logging
 import sys
+from collections.abc import Callable, Mapping, MutableMapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import structlog
 from structlog.processors import CallsiteParameter
 from structlog.stdlib import BoundLogger
 
-if TYPE_CHECKING:
-    from infrastructure.configuration import Settings
+from infrastructure.configuration.app import AppSettings
+from infrastructure.logging.formatters import mask_sensitive_data
+from infrastructure.logging.settings import LoggingSettings, get_logging_settings
 
 
 def _apply_otel_code_conventions(
-    logger: Any, method_name: str, event_dict: dict[str, Any]
-) -> dict[str, Any]:
+    logger: Any, method_name: str, event_dict: MutableMapping[str, Any]
+) -> Mapping[str, Any] | str | bytes | bytearray | tuple[Any, ...]:
     """Apply OpenTelemetry semantic conventions for code attributes.
 
     Converts structlog callsite parameters to OTel standard fields:
@@ -66,7 +69,7 @@ def _apply_otel_code_conventions(
                     event_dict["code.file.path"] = pathname
             else:
                 event_dict["code.file.path"] = pathname
-        except (ValueError, IndexError):
+        except ValueError, IndexError:
             event_dict["code.file.path"] = pathname
 
     # Create fully qualified function name (module.function)
@@ -101,10 +104,43 @@ def _is_test_environment() -> bool:
     return "pytest" in sys.modules
 
 
+def _build_base_processors(
+    logging_settings: LoggingSettings,
+) -> list[
+    Callable[
+        [Any, str, MutableMapping[str, Any]],
+        Mapping[str, Any] | str | bytes | bytearray | tuple[Any, ...],
+    ]
+]:
+    return [
+        # 1. Context propagation (must be first)
+        structlog.contextvars.merge_contextvars,
+        # 2. Add metadata
+        structlog.stdlib.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        # 3. Add OpenTelemetry code attributes for debugging
+        structlog.processors.CallsiteParameterAdder(
+            parameters=[
+                CallsiteParameter.LINENO,
+                CallsiteParameter.FUNC_NAME,
+                CallsiteParameter.MODULE,  # For fully qualified function name
+                CallsiteParameter.PATHNAME,  # For code.file.path
+            ]
+        ),
+        # 4. Apply OpenTelemetry semantic conventions
+        _apply_otel_code_conventions,
+        # 5. Exception formatting
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        # 6. Redact sensitive fields before final rendering
+        mask_sensitive_data(additional_patterns=frozenset(logging_settings.REDACTION_EXTRA_KEYS)),
+    ]
+
+
 def configure_logging(
-    settings: "Settings",
+    settings: AppSettings,
     log_level: str | None = None,
-    is_production: bool | None = None,
+    logging_settings: LoggingSettings | None = None,
 ) -> BoundLogger:
     """Configure structured logging with OpenTelemetry semantic conventions.
 
@@ -115,23 +151,22 @@ def configure_logging(
     - Test environment detection for log suppression
 
     Args:
-        settings: Settings instance (REQUIRED). Must be passed explicitly.
+        settings: AppSettings instance (REQUIRED). Must be passed explicitly.
         log_level: Optional override for log level (DEBUG, INFO, WARNING, etc).
             Defaults to settings.LOG_LEVEL if not provided.
-        is_production: Optional override for production mode. Defaults to
-            settings.is_production if not provided. Controls JSON vs console output.
 
     Returns:
         Configured logger instance
 
     Example:
         # At application startup
-        from infrastructure.configuration import get_settings
-        settings = get_settings()
+        from infrastructure.configuration.app import get_app_settings
+
+        settings = get_app_settings()
         logger = configure_logging(settings=settings)
 
         # With overrides for testing
-        logger = configure_logging(settings=settings, log_level="DEBUG", is_production=False)
+        logger = configure_logging(settings=settings, log_level="DEBUG")
     """
 
     # Suppress all logging during tests
@@ -161,39 +196,18 @@ def configure_logging(
         return structlog.stdlib.get_logger()
 
     # Determine production mode
-    prod_mode = is_production if is_production is not None else settings.is_production
+    prod_mode = settings.ENVIRONMENT == "production"
+    resolved_logging_settings = logging_settings or get_logging_settings()
 
     # Build processor pipeline per structlog best practices
     # Order matters: context vars first, then enrichment, then formatting
-    processors = [
-        # 1. Context propagation (must be first)
-        structlog.contextvars.merge_contextvars,
-        # 2. Add metadata
-        structlog.stdlib.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso"),
-        # 3. Add OpenTelemetry code attributes for debugging
-        structlog.processors.CallsiteParameterAdder(
-            parameters=[
-                CallsiteParameter.LINENO,
-                CallsiteParameter.FUNC_NAME,
-                CallsiteParameter.MODULE,  # For fully qualified function name
-                CallsiteParameter.PATHNAME,  # For code.file.path
-            ]
-        ),
-        # 4. Apply OpenTelemetry semantic conventions
-        _apply_otel_code_conventions,
-        # 5. Exception formatting
-        structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
-    ]
+    processors = _build_base_processors(logging_settings=resolved_logging_settings)
 
     # 6. Final rendering (environment-specific)
     if not prod_mode:  # Development mode
         # Pretty exceptions with colors (requires rich or better-exceptions)
-        try:
+        with contextlib.suppress(ImportError):
             processors.append(structlog.processors.ExceptionPrettyPrinter())
-        except ImportError:
-            pass  # Fall back to plain exceptions if rich not installed
         processors.append(structlog.dev.ConsoleRenderer())
     else:  # Production mode
         processors.append(structlog.processors.JSONRenderer())

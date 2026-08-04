@@ -29,9 +29,7 @@ def add_app_info(app_name: str, app_version: str = "unknown"):
         )
     """
 
-    def processor(
-        logger: Any, method_name: str, event_dict: dict[str, Any]
-    ) -> dict[str, Any]:
+    def processor(logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
         event_dict["app_name"] = app_name
         event_dict["app_version"] = app_version
         return event_dict
@@ -43,6 +41,9 @@ def add_app_info(app_name: str, app_version: str = "unknown"):
 SENSITIVE_PATTERNS = frozenset(
     {
         "password",
+        "passwd",
+        "pwd",
+        "passphrase",
         "secret",
         "token",
         "api_key",
@@ -50,6 +51,8 @@ SENSITIVE_PATTERNS = frozenset(
         "authorization",
         "auth",
         "credential",
+        "signature",
+        "session",
         "private_key",
         "access_token",
         "refresh_token",
@@ -59,6 +62,27 @@ SENSITIVE_PATTERNS = frozenset(
         "bearer",
     }
 )
+
+
+def _is_sensitive_key(key: str, patterns: frozenset[str]) -> bool:
+    key_lower = key.lower()
+    return any(pattern in key_lower for pattern in patterns)
+
+
+def _redact_recursive(value: Any, patterns: frozenset[str], mask_value: str) -> Any:
+    if isinstance(value, dict):
+        redacted: dict[Any, Any] = {}
+        for key, nested_value in value.items():
+            if isinstance(key, str) and _is_sensitive_key(key, patterns) and nested_value is not None:
+                redacted[key] = mask_value
+            else:
+                redacted[key] = _redact_recursive(nested_value, patterns, mask_value)
+        return redacted
+
+    if isinstance(value, list):
+        return [_redact_recursive(item, patterns, mask_value) for item in value]
+
+    return value
 
 
 def mask_sensitive_data(
@@ -86,18 +110,13 @@ def mask_sensitive_data(
     if additional_patterns:
         patterns = patterns | additional_patterns
 
-    def processor(
-        logger: Any, method_name: str, event_dict: dict[str, Any]
-    ) -> dict[str, Any]:
+    def processor(logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
         masked_dict = {}
         for key, value in event_dict.items():
-            key_lower = key.lower()
-            # Check if any sensitive pattern is in the key
-            is_sensitive = any(pattern in key_lower for pattern in patterns)
-            if is_sensitive and value is not None:
+            if _is_sensitive_key(key, patterns) and value is not None:
                 masked_dict[key] = mask_value
             else:
-                masked_dict[key] = value
+                masked_dict[key] = _redact_recursive(value, patterns, mask_value)
         return masked_dict
 
     return processor
@@ -120,14 +139,10 @@ def truncate_large_values(max_length: int = 500):
         )
     """
 
-    def processor(
-        logger: Any, method_name: str, event_dict: dict[str, Any]
-    ) -> dict[str, Any]:
+    def processor(logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
         for key, value in event_dict.items():
             if isinstance(value, str) and len(value) > max_length:
-                event_dict[key] = (
-                    value[:max_length] + f"...[truncated, {len(value)} chars total]"
-                )
+                event_dict[key] = value[:max_length] + f"...[truncated, {len(value)} chars total]"
         return event_dict
 
     return processor
@@ -148,9 +163,7 @@ def add_environment_info(environment: str):
         )
     """
 
-    def processor(
-        logger: Any, method_name: str, event_dict: dict[str, Any]
-    ) -> dict[str, Any]:
+    def processor(logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
         event_dict["environment"] = environment
         return event_dict
 

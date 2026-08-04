@@ -9,12 +9,13 @@ Tests cover:
 """
 
 import pytest
+
 from infrastructure.logging.formatters import (
+    SENSITIVE_PATTERNS,
     add_app_info,
+    add_environment_info,
     mask_sensitive_data,
     truncate_large_values,
-    add_environment_info,
-    SENSITIVE_PATTERNS,
 )
 
 
@@ -178,9 +179,7 @@ class TestMaskSensitiveData:
 
     def test_mask_sensitive_data_additional_patterns(self):
         """Additional patterns can be added."""
-        processor = mask_sensitive_data(
-            additional_patterns=frozenset({"ssn", "credit_card"})
-        )
+        processor = mask_sensitive_data(additional_patterns=frozenset({"ssn", "credit_card"}))
         event_dict = {
             "event": "test",
             "user_ssn": "123-45-6789",
@@ -227,6 +226,96 @@ class TestMaskSensitiveData:
         assert result["email"] == "john@example.com"
         assert result["age"] == 30
         assert result["is_active"] is True
+
+    def test_mask_sensitive_data_recurses_into_nested_dict(self):
+        """Sensitive keys nested inside a dict value are redacted (SEC-7, CWE-532)."""
+        processor = mask_sensitive_data()
+        event_dict = {
+            "event": "config_loaded",
+            "config": {"api_token": "x", "region": "ca-central-1"},
+        }
+
+        result = processor(None, "info", event_dict)
+
+        assert result["config"]["api_token"] == "***REDACTED***"
+        assert result["config"]["region"] == "ca-central-1"
+
+    def test_mask_sensitive_data_recurses_into_list_of_dicts(self):
+        """Sensitive keys inside dicts nested in a list are redacted."""
+        processor = mask_sensitive_data()
+        event_dict = {
+            "event": "batch",
+            "items": [
+                {"name": "first", "password": "hunter2"},
+                {"name": "second", "password": "swordfish"},
+            ],
+        }
+
+        result = processor(None, "info", event_dict)
+
+        assert result["items"][0]["password"] == "***REDACTED***"
+        assert result["items"][1]["password"] == "***REDACTED***"
+        assert result["items"][0]["name"] == "first"
+        assert result["items"][1]["name"] == "second"
+
+    def test_mask_sensitive_data_recursion_is_case_insensitive_at_depth(self):
+        """Nested key matching remains case-insensitive at any depth."""
+        processor = mask_sensitive_data()
+        event_dict = {
+            "event": "test",
+            "payload": {"Api_Token": "abc", "AUTHORIZATION": "Bearer xyz"},
+        }
+
+        result = processor(None, "info", event_dict)
+
+        assert result["payload"]["Api_Token"] == "***REDACTED***"
+        assert result["payload"]["AUTHORIZATION"] == "***REDACTED***"
+
+    def test_mask_sensitive_data_recurses_multiple_levels(self):
+        """Redaction recurses through dict-in-list-in-dict structures."""
+        processor = mask_sensitive_data()
+        event_dict = {
+            "event": "test",
+            "outer": {
+                "middle": [
+                    {"inner": {"secret": "s3cr3t"}, "label": "safe"},
+                ],
+            },
+        }
+
+        result = processor(None, "info", event_dict)
+
+        assert result["outer"]["middle"][0]["inner"]["secret"] == "***REDACTED***"
+        assert result["outer"]["middle"][0]["label"] == "safe"
+
+    def test_mask_sensitive_data_recursion_preserves_non_sensitive_nested(self):
+        """Non-sensitive nested dicts/lists pass through unmodified."""
+        processor = mask_sensitive_data()
+        event_dict = {
+            "event": "test",
+            "user": {"name": "john", "roles": ["admin", "viewer"]},
+        }
+
+        result = processor(None, "info", event_dict)
+
+        assert result["user"] == {"name": "john", "roles": ["admin", "viewer"]}
+
+    def test_mask_sensitive_data_masks_new_catalogue_patterns(self):
+        """New deny-list entries from decisions/observability.md are masked."""
+        processor = mask_sensitive_data()
+        event_dict = {
+            "event": "test",
+            "passwd": "x",
+            "pwd": "x",
+            "signature": "x",
+            "session": "x",
+            "passphrase": "x",
+        }
+
+        result = processor(None, "info", event_dict)
+
+        for key in ("passwd", "pwd", "signature", "session", "passphrase"):
+            assert result[key] == "***REDACTED***", f"{key} should be masked"
 
 
 @pytest.mark.unit

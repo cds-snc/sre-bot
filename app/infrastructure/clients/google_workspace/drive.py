@@ -4,7 +4,7 @@ Provides type-safe access to Google Drive API (files, folders, permissions, meta
 All methods return OperationResult for consistent error handling.
 """
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -58,7 +58,7 @@ class DriveClient:
         )
     """
 
-    def __init__(self, session_provider: "SessionProvider") -> None:
+    def __init__(self, session_provider: SessionProvider) -> None:
         """Initialize Drive client.
 
         Args:
@@ -76,7 +76,7 @@ class DriveClient:
         file_id: str,
         key: str,
         value: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Add custom metadata to a file using appProperties.
 
@@ -124,7 +124,7 @@ class DriveClient:
         self,
         file_id: str,
         key: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Delete custom metadata from a file by setting key to None.
 
@@ -170,7 +170,7 @@ class DriveClient:
     def list_metadata(
         self,
         file_id: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Get all custom metadata for a file.
 
@@ -181,9 +181,7 @@ class DriveClient:
         Returns:
             OperationResult with file metadata including appProperties
         """
-        self._logger.debug(
-            "listing_metadata", file_id=file_id, delegated_user_email=delegated_email
-        )
+        self._logger.debug("listing_metadata", file_id=file_id, delegated_user_email=delegated_email)
 
         service = self._session_provider.get_service(
             service_name="drive",
@@ -216,8 +214,8 @@ class DriveClient:
         self,
         name: str,
         parent_folder_id: str,
-        fields: Optional[str] = None,
-        delegated_email: Optional[str] = None,
+        fields: str | None = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Create a new folder in Google Drive.
 
@@ -267,8 +265,8 @@ class DriveClient:
     def list_folders_in_folder(
         self,
         folder_id: str,
-        query: Optional[str] = None,
-        delegated_email: Optional[str] = None,
+        query: str | None = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """List all folders within a parent folder.
 
@@ -333,7 +331,7 @@ class DriveClient:
     def list_files_in_folder(
         self,
         folder_id: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """List all non-folder files within a parent folder.
 
@@ -344,9 +342,7 @@ class DriveClient:
         Returns:
             OperationResult with list of files (id, name)
         """
-        self._logger.debug(
-            "listing_files", folder_id=folder_id, delegated_user_email=delegated_email
-        )
+        self._logger.debug("listing_files", folder_id=folder_id, delegated_user_email=delegated_email)
 
         service = self._session_provider.get_service(
             service_name="drive",
@@ -396,8 +392,8 @@ class DriveClient:
     def get_file(
         self,
         file_id: str,
-        fields: Optional[str] = None,
-        delegated_email: Optional[str] = None,
+        fields: str | None = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Get file metadata by ID.
 
@@ -409,9 +405,7 @@ class DriveClient:
         Returns:
             OperationResult with file metadata
         """
-        self._logger.debug(
-            "getting_file", file_id=file_id, delegated_user_email=delegated_email
-        )
+        self._logger.debug("getting_file", file_id=file_id, delegated_user_email=delegated_email)
 
         service = self._session_provider.get_service(
             service_name="drive",
@@ -439,8 +433,8 @@ class DriveClient:
     def find_files_by_name(
         self,
         name: str,
-        folder_id: Optional[str] = None,
-        delegated_email: Optional[str] = None,
+        folder_id: str | None = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Find files by name, optionally within a specific folder.
 
@@ -507,8 +501,8 @@ class DriveClient:
         name: str,
         file_type: str,
         parent_folder_id: str,
-        fields: Optional[str] = None,
-        delegated_email: Optional[str] = None,
+        fields: str | None = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Create a new Google Workspace file (Doc, Sheet, Slide, Form, Site).
 
@@ -571,8 +565,8 @@ class DriveClient:
         name: str,
         template_id: str,
         parent_folder_id: str,
-        fields: Optional[str] = None,
-        delegated_email: Optional[str] = None,
+        fields: str | None = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Create a new file by copying a template.
 
@@ -626,7 +620,7 @@ class DriveClient:
         name: str,
         source_parent_id: str,
         destination_folder_id: str,
-        delegated_email: Optional[str] = None,
+        delegated_email: str | None = None,
     ) -> OperationResult:
         """Copy a file and move the copy to a destination folder.
 

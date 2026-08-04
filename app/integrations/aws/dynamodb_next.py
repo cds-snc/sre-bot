@@ -18,21 +18,22 @@ Usage:
         error = result.message
 """
 
-from typing import Any, Dict
+from typing import Any
 
 import structlog
-from core.config import settings
-from integrations.aws.client_next import execute_aws_api_call
+
+from infrastructure.configuration.integrations.aws import get_aws_settings
 from infrastructure.operations.result import OperationResult
+from integrations.aws.client_next import execute_aws_api_call
 
 logger = structlog.get_logger()
-
-AWS_REGION = settings.aws.AWS_REGION
+settings = get_aws_settings()
+AWS_REGION = settings.AWS_REGION
 
 
 def get_item(
     table_name: str,
-    Key: Dict[str, Any],
+    Key: dict[str, Any],
     **kwargs,
 ) -> OperationResult:
     """Get an item from DynamoDB table.
@@ -56,7 +57,7 @@ def get_item(
 
 def put_item(
     table_name: str,
-    Item: Dict[str, Any],
+    Item: dict[str, Any],
     **kwargs,
 ) -> OperationResult:
     """Put an item into DynamoDB table.
@@ -80,7 +81,7 @@ def put_item(
 
 def update_item(
     table_name: str,
-    Key: Dict[str, Any],
+    Key: dict[str, Any],
     **kwargs,
 ) -> OperationResult:
     """Update an item in DynamoDB table.
@@ -104,7 +105,7 @@ def update_item(
 
 def delete_item(
     table_name: str,
-    Key: Dict[str, Any],
+    Key: dict[str, Any],
     **kwargs,
 ) -> OperationResult:
     """Delete an item from DynamoDB table.

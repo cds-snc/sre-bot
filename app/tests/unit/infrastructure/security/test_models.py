@@ -2,8 +2,8 @@
 
 import importlib
 
-from pydantic import BaseModel
 import pytest
+from pydantic import BaseModel
 
 from infrastructure.security.models import AuthPrincipalSource, User
 
@@ -65,4 +65,4 @@ def test_user_is_pydantic_base_model() -> None:
 def test_slack_user_not_exported_from_security_models() -> None:
     """SlackUser is removed as part of identity package dissolution."""
     with pytest.raises(AttributeError):
-        getattr(importlib.import_module("infrastructure.security.models"), "SlackUser")
+        importlib.import_module("infrastructure.security.models").SlackUser

@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -69,6 +70,7 @@ class WebhookResult(BaseModel):
     action: str | None = None
     payload: WebhookPayload | None = None
     message: str | None = None
+    matched_payload_type: str | None = None
 
     model_config = {
         "extra": "forbid",

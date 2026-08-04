@@ -35,7 +35,7 @@ class FeatureLifecycleSpecs:
     """
 
     @hookspec
-    def register_slack_commands(self, provider: "SlackPlatformProvider") -> None:
+    def register_slack_commands(self, provider: SlackPlatformProvider) -> None:
         """Register Slack commands with the provider.
         (DEPRECATED: will be removed in favor of register_slack_listeners for direct Bolt app registration)
 
@@ -44,14 +44,14 @@ class FeatureLifecycleSpecs:
         """
 
     @hookspec
-    def register_slack_listeners(self, app: "AsyncApp") -> None:
+    def register_slack_listeners(self, app: AsyncApp) -> None:
         """Register Slack listeners directly on the Bolt app instance.
         Args:
             app: The Bolt AsyncApp instance to register listeners on.
         """
 
     @hookspec
-    def register_routes(self, app: "FastAPI") -> None:
+    def register_routes(self, app: FastAPI) -> None:
         """Register HTTP routes with the FastAPI application.
 
         Args:
@@ -59,7 +59,7 @@ class FeatureLifecycleSpecs:
         """
 
     @hookspec
-    def register_i18n_resources(self, registry: "I18nResourceRegistry") -> None:
+    def register_i18n_resources(self, registry: I18nResourceRegistry) -> None:
         """Register feature translation resource locations.
 
         Args:
@@ -67,7 +67,7 @@ class FeatureLifecycleSpecs:
         """
 
     @hookspec
-    def register_event_handlers(self, dispatcher: "EventDispatcher") -> None:
+    def register_event_handlers(self, dispatcher: EventDispatcher) -> None:
         """Register feature event handlers with the application dispatcher.
 
         Args:
@@ -75,7 +75,7 @@ class FeatureLifecycleSpecs:
         """
 
     @hookspec
-    def register_background_jobs(self, registry: "BackgroundJobRegistry") -> None:
+    def register_background_jobs(self, registry: BackgroundJobRegistry) -> None:
         """Register recurring feature jobs through the scheduler boundary.
 
         Args:
@@ -83,7 +83,7 @@ class FeatureLifecycleSpecs:
         """
 
     @hookspec
-    def startup_warmup(self, logger: "BoundLogger") -> None:
+    def startup_warmup(self, logger: BoundLogger) -> None:
         """Validate feature settings and pre-warm caches at startup.
 
         Args:

@@ -1,7 +1,8 @@
 """Test plugin discovery and i18n hook invocation."""
 
-from infrastructure.plugins.manager import get_plugin_manager
 from infrastructure.i18n.resources import I18nResourceRegistry
+from infrastructure.plugins.base import auto_discover_plugins
+from infrastructure.plugins.manager import get_plugin_manager
 
 
 def test_plugin_discovery_finds_geolocate() -> None:
@@ -9,7 +10,6 @@ def test_plugin_discovery_finds_geolocate() -> None:
     pm = get_plugin_manager()
 
     # Auto-discover plugins (same as in lifespan)
-    from infrastructure.plugins.base import auto_discover_plugins
 
     auto_discover_plugins(pm, base_paths=["packages", "modules"])
 
@@ -29,8 +29,6 @@ def test_i18n_hook_registers_geolocate_resources() -> None:
     """Test that register_i18n_resources hook is called and geolocate registers."""
     pm = get_plugin_manager()
 
-    from infrastructure.plugins.base import auto_discover_plugins
-
     auto_discover_plugins(pm, base_paths=["packages", "modules"])
 
     # Call the hook
@@ -41,9 +39,7 @@ def test_i18n_hook_registers_geolocate_resources() -> None:
     specs = registry.list_specs()
     geolocate_specs = [s for s in specs if "geolocate" in s.owner.lower()]
 
-    assert (
-        len(geolocate_specs) > 0
-    ), f"geolocate resources not registered. All specs: {specs}"
+    assert len(geolocate_specs) > 0, f"geolocate resources not registered. All specs: {specs}"
 
     # Verify geolocate spec details
     geolocate_spec = geolocate_specs[0]

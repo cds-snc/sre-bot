@@ -1,14 +1,15 @@
 import structlog
-from core.config import settings
+
+from infrastructure.configuration.integrations.aws import get_aws_settings
 from integrations.aws.client import execute_aws_api_call, handle_aws_api_errors
 
-
+settings = get_aws_settings()
 logger = structlog.get_logger()
 
-ROLE_ARN = settings.aws.ORG_ROLE_ARN
-INSTANCE_ARN = settings.aws.INSTANCE_ARN
-SYSTEM_ADMIN_PERMISSIONS = settings.aws.SYSTEM_ADMIN_PERMISSIONS
-VIEW_ONLY_PERMISSIONS = settings.aws.VIEW_ONLY_PERMISSIONS
+ROLE_ARN = settings.ORG_ROLE_ARN
+INSTANCE_ARN = settings.INSTANCE_ARN
+SYSTEM_ADMIN_PERMISSIONS = settings.SYSTEM_ADMIN_PERMISSIONS
+VIEW_ONLY_PERMISSIONS = settings.VIEW_ONLY_PERMISSIONS
 
 
 def get_predefined_permission_sets(permission_set_name):
@@ -29,9 +30,7 @@ def get_predefined_permission_sets(permission_set_name):
 
 
 @handle_aws_api_errors
-def create_account_assignment(
-    user_id, account_id, permission_set, principal_type="USER"
-):
+def create_account_assignment(user_id, account_id, permission_set, principal_type="USER"):
     """Create an account assignment for an AWS SSO user.
 
     Args:

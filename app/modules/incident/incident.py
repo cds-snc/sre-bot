@@ -1,26 +1,29 @@
 import json
 import re
+
 import i18n  # type: ignore
-from slack_sdk import WebClient
-from slack_sdk.models import views, blocks
 from slack_bolt import Ack, App
+from slack_sdk import WebClient
+from slack_sdk.models import blocks, views
+from structlog import get_logger
 
-from integrations.slack import users as slack_users
+from infrastructure.configuration.features.incident import get_incident_settings
+from infrastructure.configuration.integrations.google import get_google_resources_config
+from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.sentinel import log_to_sentinel
+from integrations.slack import users as slack_users
 from models.incidents import IncidentPayload
-
 from modules.incident import (
+    core,
     incident_conversation,
     incident_folder,
-    core,
 )
-from structlog import get_logger
-from core.config import settings
 
-PREFIX = settings.PREFIX
-INCIDENT_CHANNEL = settings.feat_incident.INCIDENT_CHANNEL
-SLACK_SECURITY_USER_GROUP_ID = settings.feat_incident.SLACK_SECURITY_USER_GROUP_ID
-INCIDENT_HANDBOOK_ID = settings.google_resources.incident_handbook_id
+incident_settings = get_incident_settings()
+google_resource = get_google_resources_config()
+INCIDENT_CHANNEL = incident_settings.INCIDENT_CHANNEL
+SLACK_SECURITY_USER_GROUP_ID = incident_settings.SLACK_SECURITY_USER_GROUP_ID
+INCIDENT_HANDBOOK_ID = google_resource.incident_handbook_id
 
 logger = get_logger()
 
@@ -31,7 +34,8 @@ i18n.set("fallback", "en-US")
 
 
 def register(bot: App):
-    bot.command(f"/{PREFIX}incident")(open_create_incident_modal)
+    transport_settings = get_slack_transport_settings()
+    bot.command(f"/{transport_settings.COMMAND_PREFIX}incident")(open_create_incident_modal)
     bot.view("incident_view")(submit)
     bot.action("incident_change_locale")(handle_change_locale_button)
 
@@ -41,13 +45,7 @@ def _incident_modal_loading_view():
         type="modal",
         callback_id="incident_view",
         title=i18n.t("incident.modal.title"),
-        blocks=[
-            blocks.SectionBlock(
-                text=blocks.MarkdownTextObject(
-                    text=f":beach-ball: {i18n.t('incident.modal.launching')}"
-                )
-            )
-        ],
+        blocks=[blocks.SectionBlock(text=blocks.MarkdownTextObject(text=f":beach-ball: {i18n.t('incident.modal.launching')}"))],
     )
     return loading_view.to_dict()
 
@@ -65,10 +63,7 @@ def open_create_incident_modal(client: WebClient, ack, command, body):
         command=command,
         body=body,
     )
-    if "user" in body:
-        user_id = body["user"]["id"]
-    else:
-        user_id = body["user_id"]
+    user_id = body["user"]["id"] if "user" in body else body["user_id"]
     locale = slack_users.get_user_locale(client, user_id)
     i18n.set("locale", locale)
     loading_view = _incident_modal_loading_view()
@@ -81,9 +76,7 @@ def open_create_incident_modal(client: WebClient, ack, command, body):
         }
         for i in folders
     ]
-    loaded_view = generate_incident_modal_view(
-        command, options, private_metadata, locale
-    )
+    loaded_view = generate_incident_modal_view(command, options, private_metadata, locale)
     client.views_update(view_id=view["id"], view=loaded_view)
 
 
@@ -98,10 +91,7 @@ def handle_change_locale_button(ack, client, body):
         for i in folders
     ]
     locale = body["actions"][0]["value"]
-    if locale == "en-US":
-        locale = "fr-FR"
-    else:
-        locale = "en-US"
+    locale = "fr-FR" if locale == "en-US" else "en-US"
     i18n.set("locale", locale)
     command = {"text": body["view"]["state"]["values"]["name"]["name"]["value"]}
     if command["text"] is None:
@@ -149,24 +139,16 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
 
     name = view["state"]["values"]["name"]["name"]["value"]
     folder = view["state"]["values"]["product"]["product"]["selected_option"]["value"]
-    product = view["state"]["values"]["product"]["product"]["selected_option"]["text"][
-        "text"
-    ]
-    security_incident = view["state"]["values"]["security_incident"][
-        "security_incident"
-    ]["selected_option"]["value"]
-    severity = view["state"]["values"]["severity"]["severity"]["selected_option"][
-        "value"
-    ]
+    product = view["state"]["values"]["product"]["product"]["selected_option"]["text"]["text"]
+    security_incident = view["state"]["values"]["security_incident"]["security_incident"]["selected_option"]["value"]
+    severity = view["state"]["values"]["severity"]["severity"]["selected_option"]["value"]
 
     if not re.match(r"^[\w\-\s]+$", name):
         errors["name"] = (
             "Description must only contain number and letters // La description ne doit contenir que des nombres et des lettres"
         )
     if len(name) > 59:
-        errors["name"] = (
-            "Description must be less than 60 characters // La description doit contenir moins de 60 caractères"
-        )
+        errors["name"] = "Description must be less than 60 characters // La description doit contenir moins de 60 caractères"
     if len(errors) > 0:
         ack(response_action="errors", errors=errors)
         return
@@ -178,9 +160,7 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
     source_alert_permalink = _get_source_alert_permalink(client, view)
 
     try:
-        channel_created = incident_conversation.create_incident_conversation(
-            client, name
-        )
+        channel_created = incident_conversation.create_incident_conversation(client, name)
         channel_id = channel_created["channel_id"]
         channel_name = channel_created["channel_name"]
         slug = channel_created["slug"]
@@ -249,9 +229,7 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
         return
 
 
-def generate_incident_modal_view(
-    command, options=None, private_metadata=None, locale="en-US"
-):
+def generate_incident_modal_view(command, options=None, private_metadata=None, locale="en-US"):
     """Generate the incident creation modal view."""
     if options is None:
         options = []

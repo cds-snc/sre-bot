@@ -15,9 +15,7 @@ def list_incidents(ack, logger, respond, client: WebClient, body):
         respond("Channel not found")
         return
     else:
-        is_incident, is_dev_incident = incident_conversation.is_incident_channel(
-            client, logger, channel_id
-        )
+        is_incident, is_dev_incident = incident_conversation.is_incident_channel(client, logger, channel_id)
         message = f"Is this an incident channel? {is_incident}\nIs dev channel? {is_dev_incident}"
         respond(message)
     logger.info("listing_incidents_initialized")
@@ -41,13 +39,9 @@ def load_incidents(ack, logger, respond, client: WebClient, body):
     """Load incidents from Google Sheet"""
     logger.info("load_incidents_received", body=body)
     incidents = incident_folder.get_incidents_from_sheet()[:30]
-    logger.info(
-        "get_incidents_from_sheet_completed", payload=incidents, count=len(incidents)
-    )
+    logger.info("get_incidents_from_sheet_completed", payload=incidents, count=len(incidents))
     incidents = incident_folder.complete_incidents_details(client, incidents)
-    logger.info(
-        "complete_incidents_details_completed", payload=incidents, count=len(incidents)
-    )
+    logger.info("complete_incidents_details_completed", payload=incidents, count=len(incidents))
     count = incident_folder.create_missing_incidents(incidents)
     respond(f"Created {count} new incidents")
     logger.info("create_missing_incidents_completed", count=count)
@@ -56,9 +50,7 @@ def load_incidents(ack, logger, respond, client: WebClient, body):
 
 def add_incident(ack, logger, respond, client: WebClient, body):
     """Add an incident to local DB from a channel"""
-    is_incident, is_dev_incident = incident_conversation.is_incident_channel(
-        client, logger, body["channel_id"]
-    )
+    is_incident, is_dev_incident = incident_conversation.is_incident_channel(client, logger, body["channel_id"])
     if not (is_incident and is_dev_incident):
         respond("This is not an incident dev channel")
         return
@@ -83,9 +75,7 @@ def add_incident(ack, logger, respond, client: WebClient, body):
     incident = incident_folder.get_incident_details(client, incident)
     if not incident.get("report_url"):
         logger.info("getting_report_url")
-        incident["report_url"] = incident_conversation.get_incident_document_id(
-            client, incident["channel_id"]
-        )
+        incident["report_url"] = incident_conversation.get_incident_document_id(client, incident["channel_id"])
     incident_data = {
         "channel_id": incident["channel_id"],
         "channel_name": incident["channel_name"],

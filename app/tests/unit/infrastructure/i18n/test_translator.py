@@ -152,9 +152,7 @@ class TestTranslator:
         """translate_message() interpolates single-brace placeholders."""
         key = TranslationKey("groups", "summary")
         # Inject a message that uses single-brace placeholders (common in YAML)
-        translator.catalogs[Locale.EN_US].messages.setdefault("groups", {})[
-            "summary"
-        ] = "✅ Retrieved {count} group{plural}"
+        translator.catalogs[Locale.EN_US].messages.setdefault("groups", {})["summary"] = "✅ Retrieved {count} group{plural}"
 
         message = translator.translate_message(
             key,
@@ -168,9 +166,7 @@ class TestTranslator:
     def test_translate_message_single_brace_missing_variable_raises(self, translator):
         """translate_message() raises ValueError for missing single-brace vars."""
         key = TranslationKey("groups", "summary")
-        translator.catalogs[Locale.EN_US].messages.setdefault("groups", {})[
-            "summary"
-        ] = "✅ Retrieved {count} group{plural}"
+        translator.catalogs[Locale.EN_US].messages.setdefault("groups", {})["summary"] = "✅ Retrieved {count} group{plural}"
 
         # Missing 'plural' should raise ValueError
         with pytest.raises(ValueError):

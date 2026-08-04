@@ -1,5 +1,3 @@
-from typing import Dict, List, Union
-
 from slack_sdk import WebClient
 from structlog import get_logger
 
@@ -9,9 +7,7 @@ from modules.webhooks.aws_sns_notification import AwsNotificationPattern
 logger = get_logger()
 
 
-def handle_budget_auto_adjustment(
-    payload: AwsSnsPayload, client: WebClient
-) -> List[Dict]:
+def handle_budget_auto_adjustment(payload: AwsSnsPayload, client: WebClient) -> list[dict]:
     """
     Handle AWS budget auto-adjustment notifications from AWS SNS.
 
@@ -31,9 +27,7 @@ def handle_budget_auto_adjustment(
     return []
 
 
-def is_budget_auto_adjustment(
-    payload: AwsSnsPayload, parsed_message: Union[str, dict]
-) -> bool:
+def is_budget_auto_adjustment(payload: AwsSnsPayload, parsed_message: str | dict) -> bool:
     """
     Check if the AWS SNS message is a budget auto-adjustment notification.
 

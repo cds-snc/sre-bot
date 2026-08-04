@@ -1,7 +1,7 @@
-from integrations.sentinel import client as sentinel
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 from unittest.mock import patch
+
+from integrations.sentinel import client as sentinel
 
 customer_id = "customer_id"
 log_type = "log_type"
@@ -24,14 +24,12 @@ def test_send_event_shared_key_not_provided():
 def test_send_event(post_data_mock):
     event = {}
     assert sentinel.send_event(event) is True
-    post_data_mock.assert_called_once_with(
-        "SENTINEL_CUSTOMER_ID", "SENTINEL_SHARED_KEY", "{}", "SENTINEL_LOG_TYPE"
-    )
+    post_data_mock.assert_called_once_with("SENTINEL_CUSTOMER_ID", "SENTINEL_SHARED_KEY", "{}", "SENTINEL_LOG_TYPE")
 
 
 @patch("integrations.sentinel.client.post_data")
 def test_send_event_serializes_datetime(post_data_mock):
-    event = {"created_at": datetime(2026, 3, 12, 16, 30, tzinfo=timezone.utc)}
+    event = {"created_at": datetime(2026, 3, 12, 16, 30, tzinfo=UTC)}
 
     assert sentinel.send_event(event) is True
     body = post_data_mock.call_args[0][2]

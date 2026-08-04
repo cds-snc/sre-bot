@@ -52,9 +52,7 @@ class TestRetryConfig:
 
     def test_config_validates_max_delay_seconds(self):
         """Test that max_delay_seconds must be >= base_delay_seconds."""
-        with pytest.raises(
-            ValueError, match="max_delay_seconds must be >= base_delay_seconds"
-        ):
+        with pytest.raises(ValueError, match="max_delay_seconds must be >= base_delay_seconds"):
             RetryConfig(base_delay_seconds=100, max_delay_seconds=50)
 
     def test_config_allows_equal_base_and_max_delay(self):

@@ -4,10 +4,8 @@ This module provides utilities for working with Slack Block Kit elements,
 including validation and construction helpers.
 """
 
-from typing import Dict, List
 
-
-def validate_blocks(blocks: List[Dict]) -> bool:
+def validate_blocks(blocks: list[dict]) -> bool:
     """
     Validate that the provided blocks are valid Slack Block Kit structures.
 
@@ -69,7 +67,7 @@ def validate_blocks(blocks: List[Dict]) -> bool:
     return True
 
 
-def create_section_block(text: str, text_type: str = "mrkdwn") -> Dict:
+def create_section_block(text: str, text_type: str = "mrkdwn") -> dict:
     """
     Create a section block with the given text.
 
@@ -83,7 +81,7 @@ def create_section_block(text: str, text_type: str = "mrkdwn") -> Dict:
     return {"type": "section", "text": {"type": text_type, "text": text}}
 
 
-def create_header_block(text: str) -> Dict:
+def create_header_block(text: str) -> dict:
     """
     Create a header block with the given text.
 
@@ -96,7 +94,7 @@ def create_header_block(text: str) -> Dict:
     return {"type": "header", "text": {"type": "plain_text", "text": text}}
 
 
-def create_divider_block() -> Dict:
+def create_divider_block() -> dict:
     """
     Create a divider block.
 
@@ -106,7 +104,7 @@ def create_divider_block() -> Dict:
     return {"type": "divider"}
 
 
-def create_context_block(elements: List[Dict]) -> Dict:
+def create_context_block(elements: list[dict]) -> dict:
     """
     Create a context block with the given elements.
 

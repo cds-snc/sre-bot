@@ -2,12 +2,15 @@
 import re
 import types
 from unittest.mock import MagicMock
+
 import pytest
 from pydantic import ValidationError
+
+from integrations.slack.blocks import validate_blocks as validate_slack_blocks
 from models.webhooks import AwsSnsPayload
 from modules.webhooks.aws_sns_notification import (
-    AwsNotificationPattern,
     NOTIFICATION_HANDLERS,
+    AwsNotificationPattern,
     find_matching_handler,
     handle_generic_notification,
     process_aws_notification_payload,
@@ -61,9 +64,7 @@ def test_aws_notification_pattern_validate_invalid_fields():
             pattern="",
             handler="x.y.z",
         )
-    assert "AwsNotificationPattern.pattern must be a non-empty str" in str(
-        excinfo.value
-    )
+    assert "AwsNotificationPattern.pattern must be a non-empty str" in str(excinfo.value)
 
 
 def test_aws_notification_pattern_validate_invalid_fields_extended():
@@ -73,9 +74,7 @@ def test_aws_notification_pattern_validate_invalid_fields_extended():
             pattern="foo",
             handler="",
         )
-    assert "AwsNotificationPattern.handler must be a non-empty str" in str(
-        excinfo.value
-    )
+    assert "AwsNotificationPattern.handler must be a non-empty str" in str(excinfo.value)
 
 
 def test_aws_notification_pattern_validate_invalid_match_type_enabled_priority():
@@ -86,10 +85,7 @@ def test_aws_notification_pattern_validate_invalid_match_type_enabled_priority()
             handler="x.y.z",
             match_type="invalid",
         )
-    assert (
-        "Input should be 'regex', 'contains', 'callable' or 'message_structure'"
-        in str(excinfo.value)
-    )
+    assert "Input should be 'regex', 'contains', 'callable' or 'message_structure'" in str(excinfo.value)
 
 
 def test_aws_notification_pattern_validate_priority_none():
@@ -111,9 +107,7 @@ def test_aws_notification_pattern_validate_invalid_enabled_priority_extended():
             handler="x.y.z",
             enabled=234,
         )
-    assert "Input should be a valid boolean, unable to interpret input" in str(
-        excinfo.value
-    )
+    assert "Input should be a valid boolean, unable to interpret input" in str(excinfo.value)
 
 
 def test_aws_notification_pattern_validate_invalid_priority():
@@ -124,10 +118,7 @@ def test_aws_notification_pattern_validate_invalid_priority():
             handler="x.y.z",
             priority="not-an-int",
         )
-    assert (
-        "Input should be a valid integer, unable to parse string as an integer"
-        in str(excinfo.value)
-    )
+    assert "Input should be a valid integer, unable to parse string as an integer" in str(excinfo.value)
 
 
 def test_get_compiled_pattern_callable_attribute_error(monkeypatch):
@@ -150,7 +141,7 @@ def test_aws_notification_pattern_get_handler_function(monkeypatch):
     def dummy_handler(payload, client):
         return [{"type": "section", "text": {"type": "mrkdwn", "text": "handled"}}]
 
-    setattr(dummy_module, "dummy_handler", dummy_handler)
+    dummy_module.dummy_handler = dummy_handler
     monkeypatch.setitem(__import__("sys").modules, "dummy_handler_module", dummy_module)
     pattern = AwsNotificationPattern(
         name="handler",
@@ -231,7 +222,7 @@ def test_from_dict_register_pattern_and_find_matching_handler(monkeypatch):
     def dummy_func(payload, parsed_message):
         return payload.Message == "callme"
 
-    setattr(dummy_module, "dummy_func", dummy_func)
+    dummy_module.dummy_func = dummy_func
     monkeypatch.setitem(__import__("sys").modules, "dummy_module", dummy_module)
     pattern3 = AwsNotificationPattern(
         name="callable",
@@ -271,7 +262,7 @@ def test_process_aws_notification_payload(monkeypatch):
             }
         ]
 
-    setattr(dummy_module, "dummy_handler", dummy_handler)
+    dummy_module.dummy_handler = dummy_handler
     monkeypatch.setitem(__import__("sys").modules, "dummy_handler_module", dummy_module)
     pattern = AwsNotificationPattern(
         name="contains",
@@ -346,7 +337,7 @@ def test_aws_notification_pattern_get_compiled_pattern_callable(monkeypatch):
     def dummy_func(payload, parsed_message):
         return payload.Message == "match"
 
-    setattr(dummy_module, "dummy_func", dummy_func)
+    dummy_module.dummy_func = dummy_func
     monkeypatch.setitem(__import__("sys").modules, "dummy_module", dummy_module)
     pattern = AwsNotificationPattern(
         name="callable",
@@ -368,7 +359,6 @@ def test_aws_notification_pattern_get_compiled_pattern_callable(monkeypatch):
 
 
 def test_validate_slack_blocks():
-    from integrations.slack.blocks import validate_blocks as validate_slack_blocks
 
     # Valid blocks
     valid_blocks = [
@@ -449,11 +439,6 @@ def test_get_match_text_all_targets():
 
 
 def test_find_matching_handler_exception_handling(monkeypatch):
-    from modules.webhooks.aws_sns_notification import (
-        NOTIFICATION_HANDLERS,
-        find_matching_handler,
-        register_notification_pattern,
-    )
 
     NOTIFICATION_HANDLERS.clear()
 
@@ -476,11 +461,6 @@ def test_find_matching_handler_exception_handling(monkeypatch):
 
 
 def test_find_matching_handler_message_structure():
-    from modules.webhooks.aws_sns_notification import (
-        NOTIFICATION_HANDLERS,
-        find_matching_handler,
-        register_notification_pattern,
-    )
 
     NOTIFICATION_HANDLERS.clear()
 
@@ -508,11 +488,6 @@ def test_find_matching_handler_message_structure():
 
 
 def test_process_aws_notification_payload_handler_exception(monkeypatch):
-    from modules.webhooks.aws_sns_notification import (
-        NOTIFICATION_HANDLERS,
-        process_aws_notification_payload,
-        register_notification_pattern,
-    )
 
     NOTIFICATION_HANDLERS.clear()
 
@@ -521,7 +496,7 @@ def test_process_aws_notification_payload_handler_exception(monkeypatch):
         raise RuntimeError("Handler execution failed")
 
     dummy_module = types.ModuleType("bad_handler_module")
-    setattr(dummy_module, "bad_handler", bad_handler)
+    dummy_module.bad_handler = bad_handler
     monkeypatch.setitem(__import__("sys").modules, "bad_handler_module", dummy_module)
 
     pattern = AwsNotificationPattern(
@@ -541,11 +516,6 @@ def test_process_aws_notification_payload_handler_exception(monkeypatch):
 
 
 def test_process_aws_notification_payload_invalid_blocks(monkeypatch):
-    from modules.webhooks.aws_sns_notification import (
-        NOTIFICATION_HANDLERS,
-        process_aws_notification_payload,
-        register_notification_pattern,
-    )
 
     NOTIFICATION_HANDLERS.clear()
 
@@ -554,10 +524,8 @@ def test_process_aws_notification_payload_invalid_blocks(monkeypatch):
         return "not a list"  # Invalid return type
 
     dummy_module = types.ModuleType("invalid_handler_module")
-    setattr(dummy_module, "invalid_blocks_handler", invalid_blocks_handler)
-    monkeypatch.setitem(
-        __import__("sys").modules, "invalid_handler_module", dummy_module
-    )
+    dummy_module.invalid_blocks_handler = invalid_blocks_handler
+    monkeypatch.setitem(__import__("sys").modules, "invalid_handler_module", dummy_module)
 
     pattern = AwsNotificationPattern(
         name="invalid_blocks_pattern",
@@ -576,11 +544,6 @@ def test_process_aws_notification_payload_invalid_blocks(monkeypatch):
 
 
 def test_process_aws_notification_payload_import_error(monkeypatch):
-    from modules.webhooks.aws_sns_notification import (
-        NOTIFICATION_HANDLERS,
-        process_aws_notification_payload,
-        register_notification_pattern,
-    )
 
     NOTIFICATION_HANDLERS.clear()
 

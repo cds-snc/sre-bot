@@ -59,8 +59,7 @@ def get_stale_channels(client, pattern=None):
     )
     stale_channels = list(
         filter(
-            lambda x: len(get_messages_in_time_period(client, x["id"], STALE_PERIOD))
-            == 0,
+            lambda x: len(get_messages_in_time_period(client, x["id"], STALE_PERIOD)) == 0,
             channels,
         )
     )
@@ -75,9 +74,7 @@ def get_messages_in_time_period(client, channel_id, time_delta):
         oldest=time.mktime((datetime.now() - time_delta).timetuple()),
     )
     if messages["ok"]:
-        return list(
-            filter(lambda x: "team" in x, messages["messages"])
-        )  # Return only messages from users
+        return list(filter(lambda x: "team" in x, messages["messages"]))  # Return only messages from users
     else:
         return []
 
@@ -99,10 +96,7 @@ def fetch_user_details(client: WebClient, channel_id):
     # extract the real name of the user and append it to the users list, excluding users with the real names 'SRE' and 'SRE Dev'
     for user_id in result["members"]:
         user_info = client.users_info(user=user_id)
-        if (
-            user_info["user"]["real_name"] != "SRE"
-            and user_info["user"]["real_name"] != "SRE Dev"
-        ):
+        if user_info["user"]["real_name"] != "SRE" and user_info["user"]["real_name"] != "SRE Dev":
             users.append(
                 {
                     "text": {

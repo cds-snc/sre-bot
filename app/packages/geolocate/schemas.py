@@ -1,7 +1,6 @@
 """Pydantic schemas for geolocate package."""
 
 import ipaddress
-from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -22,8 +21,8 @@ class GeolocateRequest(BaseModel):
         try:
             ipaddress.ip_address(v)
             return v
-        except ValueError:
-            raise ValueError(f"Invalid IP address format: {v}")
+        except ValueError as e:
+            raise ValueError(f"Invalid IP address format: {v}") from e
 
 
 class OpenSourceMapLinks(BaseModel):
@@ -33,9 +32,7 @@ class OpenSourceMapLinks(BaseModel):
     opentopomap: str = Field(..., description="OpenTopoMap URL for the coordinates")
 
 
-def build_open_source_map_links(
-    latitude: float, longitude: float
-) -> OpenSourceMapLinks:
+def build_open_source_map_links(latitude: float, longitude: float) -> OpenSourceMapLinks:
     """Build links to open-source mapping sites for a coordinate pair."""
     return OpenSourceMapLinks(
         openstreetmap=f"https://www.openstreetmap.org/?mlat={latitude}&mlon={longitude}#map=12/{latitude}/{longitude}",
@@ -66,26 +63,22 @@ class GeolocateResponse(BaseModel):
     )
 
     ip_address: str = Field(..., description="Queried IP address")
-    city: Optional[str] = Field(None, description="City name")
-    country: Optional[str] = Field(None, description="Country name")
-    country_code: Optional[str] = Field(None, description="ISO country code")
-    latitude: Optional[float] = Field(None, description="Latitude")
-    longitude: Optional[float] = Field(None, description="Longitude")
-    map_links: Optional[OpenSourceMapLinks] = Field(
+    city: str | None = Field(None, description="City name")
+    country: str | None = Field(None, description="Country name")
+    country_code: str | None = Field(None, description="ISO country code")
+    latitude: float | None = Field(None, description="Latitude")
+    longitude: float | None = Field(None, description="Longitude")
+    map_links: OpenSourceMapLinks | None = Field(
         None,
         description="Links to open-source mapping sites for the coordinates",
     )
-    postal_code: Optional[str] = Field(None, description="Postal/ZIP code")
-    time_zone: Optional[str] = Field(None, description="IANA time zone")
+    postal_code: str | None = Field(None, description="Postal/ZIP code")
+    time_zone: str | None = Field(None, description="IANA time zone")
 
     @model_validator(mode="after")
-    def populate_map_links(self) -> "GeolocateResponse":
+    def populate_map_links(self) -> GeolocateResponse:
         """Populate map links when both coordinates are present."""
-        if (
-            self.latitude is not None
-            and self.longitude is not None
-            and self.map_links is None
-        ):
+        if self.latitude is not None and self.longitude is not None and self.map_links is None:
             self.map_links = build_open_source_map_links(
                 latitude=self.latitude,
                 longitude=self.longitude,

@@ -35,9 +35,7 @@ def test_get_webhooks_disabled(mock_webhook_list_item):
     assert webhooks_list.get_webhooks(all_hooks, "disabled") == [
         helper_generate_webhook("name3", "channel3", "id3", active=False)
     ]
-    assert mock_webhook_list_item.call_args_list == [
-        call(helper_generate_webhook("name3", "channel3", "id3", active=False))
-    ]
+    assert mock_webhook_list_item.call_args_list == [call(helper_generate_webhook("name3", "channel3", "id3", active=False))]
 
 
 def test_get_webhooks_not_recognized_value():
@@ -49,10 +47,7 @@ def test_get_webhooks_not_recognized_value():
 def test_get_webhooks_list_all(get_webhooks_list_mock):
     expected_webhooks_list = helper_generate_webhook("name1", "channel1", "id1")
     get_webhooks_list_mock.return_value = [expected_webhooks_list]
-    assert (
-        webhooks_list.get_webhooks_list([expected_webhooks_list])
-        == get_webhooks_list_mock.return_value
-    )
+    assert webhooks_list.get_webhooks_list([expected_webhooks_list]) == get_webhooks_list_mock.return_value
 
 
 @patch("modules.slack.webhooks_list.get_webhooks_button_block")
@@ -150,9 +145,7 @@ def test_list_all_webhooks():
     ]
     client = MagicMock()
     body = {"trigger_id": "trigger_id"}
-    webhooks_list.list_all_webhooks(
-        client, body, 0, webhooks_list.MAX_BLOCK_SIZE, "all", all_hooks
-    )
+    webhooks_list.list_all_webhooks(client, body, 0, webhooks_list.MAX_BLOCK_SIZE, "all", all_hooks)
     client.views_open.assert_called_with(
         trigger_id="trigger_id",
         view={
@@ -285,9 +278,7 @@ def test_list_all_webhooks_empty():
 
     client = MagicMock()
     body = {"trigger_id": "trigger_id"}
-    webhooks_list.list_all_webhooks(
-        client, body, 0, webhooks_list.MAX_BLOCK_SIZE, "all", all_hooks
-    )
+    webhooks_list.list_all_webhooks(client, body, 0, webhooks_list.MAX_BLOCK_SIZE, "all", all_hooks)
     client.views_open.assert_called_with(
         trigger_id="trigger_id",
         view={
@@ -334,9 +325,7 @@ def test_list_all_webhooks_update():
     client = MagicMock()
     private_metadata = {"channel": None}
     body = {"view": {"id": "id", "private_metadata": json.dumps(private_metadata)}}
-    webhooks_list.list_all_webhooks(
-        client, body, 0, webhooks_list.MAX_BLOCK_SIZE, "all", all_hooks, update=True
-    )
+    webhooks_list.list_all_webhooks(client, body, 0, webhooks_list.MAX_BLOCK_SIZE, "all", all_hooks, update=True)
     client.views_update.assert_called_with(view_id="id", view=ANY)
 
 
@@ -494,9 +483,7 @@ def test_button_next_page(list_all_webhooks_mock, mock_list_all_webhooks_view):
 
 @patch("modules.slack.webhooks_list.list_all_webhooks")
 @patch("modules.slack.webhooks_list.webhooks.lookup_webhooks")
-def test_button_next_page_with_channel(
-    mock_lookup_webhooks, mock_list_all_webhooks_view
-):
+def test_button_next_page_with_channel(mock_lookup_webhooks, mock_list_all_webhooks_view):
     client = MagicMock()
     ack = MagicMock()
     private_metadata = {"channel": "channel_id"}

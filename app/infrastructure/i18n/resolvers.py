@@ -4,9 +4,8 @@ Provides strategies for resolving the appropriate locale from various sources
 (HTTP headers, user preferences, defaults, etc.).
 """
 
-from typing import Optional
-
 import structlog
+
 from infrastructure.i18n.models import Locale, LocaleResolutionContext
 
 logger = structlog.get_logger().bind(component="i18n.resolver")
@@ -33,8 +32,8 @@ class LocaleResolver:
 
     def resolve_from_header(
         self,
-        accept_language: Optional[str],
-        supported_locales: Optional[list] = None,
+        accept_language: str | None,
+        supported_locales: list | None = None,
     ) -> Locale:
         """Resolve locale from HTTP Accept-Language header.
 
@@ -164,8 +163,8 @@ class LanguageNegotiator:
     def find_best_match(
         requested: list,
         available: list,
-        default: Optional[str] = None,
-    ) -> Optional[str]:
+        default: str | None = None,
+    ) -> str | None:
         """Find best matching language from available options.
 
         Args:
@@ -179,16 +178,12 @@ class LanguageNegotiator:
         for req_lang in requested:
             # Try exact match first
             for avail_lang in available:
-                if LanguageNegotiator.matches_language(
-                    req_lang, avail_lang, strict=True
-                ):
+                if LanguageNegotiator.matches_language(req_lang, avail_lang, strict=True):
                     return avail_lang
 
             # Try language-only match
             for avail_lang in available:
-                if LanguageNegotiator.matches_language(
-                    req_lang, avail_lang, strict=False
-                ):
+                if LanguageNegotiator.matches_language(req_lang, avail_lang, strict=False):
                     return avail_lang
 
         return default
