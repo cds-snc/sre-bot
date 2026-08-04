@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:49'
+updated_date: '2026-08-04 19:39'
 labels:
   - clients
   - phase-3
@@ -36,4 +37,5 @@ Slice 4 (largest, done last) of TASK-25.2. Migrate integrations/aws/{organizatio
 - [ ] #1 integrations/aws/organizations.py and sso_admin.py no longer call execute_aws_api_call/handle_aws_api_errors; identity_store.py is repointed onto TASK-22.3's existing get_aws_client("identitystore")/classify_aws_error instance (not a new one)
 - [ ] #2 All identified consumer files behave per the raise+classify contract explicitly (no silent False-swallowing); resulting error-path behavior documented and human-reviewed per file, not assumed zero-diff
 - [ ] #3 integrations/aws/client.py is deleted (zero remaining execute_aws_api_call/handle_aws_api_errors callers repo-wide, verified via grep)
+- [ ] #4 moto-backed integration conformance test(s) under app/tests/integration/ exercise organizations.py's list_accounts/describe_account/list_tags_for_resource, sso_admin.py's create_account_assignment/delete_account_assignment/list_account_assignments_for_principal/list_accounts_for_provisioned_permission_set, and identity_store.py's ops already covered by TASK-22.3's suite (excluding get_group_membership_id, which moto does not implement) against real semantics via moto.mock_aws(), additive alongside existing MagicMock-based unit tests
 <!-- AC:END -->

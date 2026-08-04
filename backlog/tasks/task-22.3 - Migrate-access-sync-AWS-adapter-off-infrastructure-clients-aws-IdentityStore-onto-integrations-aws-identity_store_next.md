@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-29 21:11'
-updated_date: '2026-07-31 17:05'
+updated_date: '2026-08-04 19:39'
 labels:
   - clients
   - phase-3
@@ -39,6 +39,7 @@ Test migration: relocate app/tests/integrations/aws/test_identity_store_next.py 
 - [ ] #1 packages/access/sync/providers.py and adapters/aws_identity_center.py no longer import infrastructure.clients.aws; the Path B adapter calls a typed boto3 identitystore client from get_aws_client("identitystore") directly and classifies via classify_aws_error - no AWSClients facade, no identity_store_next dependency, no wrapper class
 - [ ] #2 All access-sync adapter unit + integration tests pass behavior-neutral (same OperationResult status/error_code per method, including ResourceNotFoundException -> NOT_FOUND normalization), verified against the method-name mapping (get_user_id_by_username, describe_group, create/delete_group_membership, etc.)
 - [ ] #3 classify_aws_error (from TASK-22.2) is reused and extended with any identitystore-specific families, with coverage under tests/unit/integrations/aws/; identity_store_next is left untouched for TASK-23 to delete; any touched vendor test lands under tests/unit or tests/integration (legacy tests/integrations/ count does not grow)
+- [ ] #4 moto-backed integration conformance test(s) under app/tests/integration/ exercise the identitystore consumer's create_user/delete_user/get_user_id/describe_user/list_users/create_group_membership/delete_group_membership/list_group_memberships operations against real identitystore semantics via moto.mock_aws() (mirroring tests/integration/infrastructure/idempotency/conftest.py's fixture pattern), additive alongside existing MagicMock-based unit tests -- not a replacement
 <!-- AC:END -->
 
 ## Definition of Done
