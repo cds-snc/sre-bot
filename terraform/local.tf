@@ -12,7 +12,8 @@ locals {
   # Regexes (CloudWatch %...% syntax, no literal quotes allowed) matched against the raw log
   # line to exclude known false positives from the error metric. Extend to silence new ones.
   error_logged_skip_filters = [
-    "level\\S*warning", # structlog logs at level=warning, e.g. {"level": "warning", ...}
+    "level.{0,6}warning", # structlog JSON renders {"level": "warning", ...} with a space after the colon; \S excludes that space
+    "level.{0,6}info",    # same rationale, but for {"level": "info", ...}
   ]
   error_logged_pattern = "[(w=\"*${join("*\" || w=\"*", local.error_logged_filters)}*\") && ${join(" && ", [for term in local.error_logged_skip_filters : "w!=%${term}%"])}]"
 
@@ -22,7 +23,7 @@ locals {
   ]
   # Regexes matched against the raw log line to detect a structured warning-level log line
   warning_logged_regex_filters = [
-    "level\\S*warning", # structlog logs at level=warning, e.g. {"level": "warning", ...}
+    "level.{0,6}warning", # structlog JSON renders {"level": "warning", ...} with a space after the colon; \S excludes that space
   ]
   warning_logged_pattern = "[w=\"*${join("*\" || w=\"*", local.warning_logged_filters)}*\" || ${join(" || ", [for term in local.warning_logged_regex_filters : "w=%${term}%"])}]"
 }
