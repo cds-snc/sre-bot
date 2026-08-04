@@ -47,6 +47,10 @@ jobs:
         working-directory: ./app
         run: make check-deprecated-client-imports
 
+      - name: SDK typing anti-pattern freeze check
+        working-directory: ./app
+        run: make check-sdk-typing
+
       - name: Test
         working-directory: ./app
         run: make test
