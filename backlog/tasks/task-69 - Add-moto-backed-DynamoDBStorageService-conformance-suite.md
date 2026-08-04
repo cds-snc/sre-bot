@@ -1,10 +1,11 @@
 ---
 id: TASK-69
 title: Add moto-backed DynamoDBStorageService conformance suite
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-31 16:28'
-updated_date: '2026-08-04 19:36'
+updated_date: '2026-08-04 19:57'
 labels:
   - testing
   - clients
@@ -27,9 +28,9 @@ Add a moto-backed integration conformance suite for DynamoDBStorageService (put/
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 New tests/integration/infrastructure/storage/test_storage_service_conformance.py exists, moto-backed via moto.mock_aws() + a real boto3 dynamodb client + a real created table, exercising DynamoDBStorageService.put/put_if_not_exists/get/query/delete against real ConditionExpression and pagination semantics
-- [ ] #2 Existing tests/unit/infrastructure/storage/ MagicMock-based unit tests are left unchanged (this task is additive only, not a replacement)
-- [ ] #3 Fixture pattern mirrors tests/integration/infrastructure/idempotency/conftest.py (pytest.importorskip guards, dummy AWS creds via monkeypatch, ENVIRONMENT=test to bypass the local/dev/ci dynamodb-local endpoint override)
+- [x] #1 New tests/integration/infrastructure/storage/test_storage_service_conformance.py exists, moto-backed via moto.mock_aws() + a real boto3 dynamodb client + a real created table, exercising DynamoDBStorageService.put/put_if_not_exists/get/query/delete against real ConditionExpression and pagination semantics
+- [x] #2 Existing tests/unit/infrastructure/storage/ MagicMock-based unit tests are left unchanged (this task is additive only, not a replacement)
+- [x] #3 Fixture pattern mirrors tests/integration/infrastructure/idempotency/conftest.py (pytest.importorskip guards, dummy AWS creds via monkeypatch, ENVIRONMENT=test to bypass the local/dev/ci dynamodb-local endpoint override)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -68,3 +69,9 @@ ASSUMPTIONS / DOUBTS (verified):
 
 BLAST RADIUS / ROLLBACK: purely additive -- 3 new files under app/tests/integration/infrastructure/storage/ (__init__.py, conftest.py, test_storage_service_conformance.py); zero production code changes; zero changes to any existing test file. Single git revert of the new directory fully rolls this back. No decomposition needed -- well under the single-PR size gate (new-file-only test addition, ~150-200 LOC, one subsystem).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented additive moto-backed DynamoDBStorageService conformance integration suite under app/tests/integration/infrastructure/storage with no production-code changes. Added/verified: app/tests/integration/infrastructure/storage/__init__.py, app/tests/integration/infrastructure/storage/conftest.py, app/tests/integration/infrastructure/storage/test_storage_service_conformance.py. Coverage exercises put, put_if_not_exists (real attribute_not_exists behavior), get (found + NOT_FOUND), delete, and query including paginator aggregation with Limit=1. Fixture uses pytest.importorskip for moto/boto3, dummy AWS credential env vars via monkeypatch, and ENVIRONMENT=test override on integrations.aws.client.app_settings to bypass dynamodb-local endpoint override. Existing MagicMock unit suite under app/tests/unit/infrastructure/storage was left unchanged. Evidence: uv run pytest tests/integration/infrastructure/storage -v => 7 passed; uv run pytest tests/unit/infrastructure/storage -v => 29 passed; uv run ruff check . => passed; user-reported make test => all green. Task remains In Progress for human DoD verification/closure.
+<!-- SECTION:NOTES:END -->
