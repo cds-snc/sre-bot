@@ -1,33 +1,40 @@
 """Generic storage service for DynamoDB-backed feature repositories.
 
-Provides a clean interface over ``infrastructure.clients.aws.DynamoDBClient``
-with automatic Python ↔ DynamoDB type conversion via boto3's built-in
-``TypeSerializer`` / ``TypeDeserializer``.
+Provides a clean interface over a typed boto3 DynamoDB client from
+``integrations.aws.client.get_aws_client`` with automatic Python ↔ DynamoDB
+type conversion via boto3's built-in ``TypeSerializer`` / ``TypeDeserializer``.
 
-Feature packages MUST NOT call ``DynamoDBClient`` or ``dynamodb_next`` directly.
-Instead, define a thin repository class that takes
-``infrastructure.storage.protocol.StorageService`` as a constructor argument and
-delegates all DynamoDB I/O here.
+Feature packages MUST NOT call boto3 clients directly. Instead, define a thin
+repository class that takes ``infrastructure.storage.protocol.StorageService``
+as a constructor argument and delegates all DynamoDB I/O here.
 """
 
 from functools import cache
-from typing import TYPE_CHECKING, Any
+from typing import Any, Protocol, cast
 
 import structlog
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
+from botocore.exceptions import BotoCoreError, ClientError
 
-from infrastructure.clients.aws import get_aws_clients
 from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
 from infrastructure.storage.protocol import StorageService
-
-if TYPE_CHECKING:
-    from infrastructure.clients.aws.dynamodb import DynamoDBClient
+from integrations.aws.client import classify_aws_error, get_aws_client
 
 logger = structlog.get_logger(__name__)
 
 _serializer = TypeSerializer()
 _deserializer = TypeDeserializer()
+
+
+class DynamoDBClient(Protocol):
+    def put_item(self, **kwargs: Any) -> dict[str, Any]: ...
+
+    def get_item(self, **kwargs: Any) -> dict[str, Any]: ...
+
+    def delete_item(self, **kwargs: Any) -> dict[str, Any]: ...
+
+    def get_paginator(self, operation_name: str) -> Any: ...
 
 
 def _serialize_item(item: dict[str, Any]) -> dict[str, Any]:
@@ -55,16 +62,25 @@ class DynamoDBStorageService:
     all feature packages.  Handles serialization, deserialization, and error
     normalisation so feature repositories stay free of boto3 plumbing.
 
-    Backed by ``infrastructure.clients.aws.DynamoDBClient`` which uses the
-    ``SessionProvider`` for credential and role-assumption management.
+    Backed by ``integrations.aws.client.get_aws_client`` and
+    ``integrations.aws.client.classify_aws_error`` (see decisions/sdk-typing.md).
 
     Args:
-        dynamodb: Configured ``DynamoDBClient`` instance (injected by provider).
+        dynamodb: Configured boto3 ``DynamoDBClient`` instance (injected by provider).
     """
 
     def __init__(self, dynamodb: DynamoDBClient) -> None:
         self._dynamodb = dynamodb
         logger.info("initialized_storage_service")
+
+    def _map_sdk_exception(self, exc: Exception) -> OperationResult[Any]:
+        status, error_code, retry_after = classify_aws_error(exc)
+        return OperationResult.error(
+            status=status,
+            message=str(exc),
+            error_code=error_code,
+            retry_after=retry_after,
+        )
 
     # ------------------------------------------------------------------
     # Write operations
@@ -85,7 +101,12 @@ class DynamoDBStorageService:
             ``OperationResult[None]`` — success with no data payload, or error.
         """
         serialized = _serialize_item(item)
-        result = self._dynamodb.put_item(table, Item=serialized)
+        result: OperationResult[Any]
+        try:
+            self._dynamodb.put_item(TableName=table, Item=serialized)
+            result = OperationResult.success(data=None)
+        except (ClientError, BotoCoreError) as exc:
+            result = self._map_sdk_exception(exc)
         if result.is_success:
             logger.debug("storage_put_ok", table=table)
         else:
@@ -119,11 +140,16 @@ class DynamoDBStorageService:
             ``OperationResult[bool]``
         """
         serialized = _serialize_item(item)
-        result = self._dynamodb.put_item(
-            table,
-            Item=serialized,
-            ConditionExpression=f"attribute_not_exists({pk_attribute})",
-        )
+        result: OperationResult[Any]
+        try:
+            self._dynamodb.put_item(
+                TableName=table,
+                Item=serialized,
+                ConditionExpression=f"attribute_not_exists({pk_attribute})",
+            )
+            result = OperationResult.success(data=None)
+        except (ClientError, BotoCoreError) as exc:
+            result = self._map_sdk_exception(exc)
         if result.is_success:
             logger.debug("storage_put_if_not_exists_created", table=table)
             return OperationResult.success(data=True, message="Item created")
@@ -153,7 +179,12 @@ class DynamoDBStorageService:
             ``OperationResult[None]``
         """
         serialized_key = _serialize_item(key)
-        result = self._dynamodb.delete_item(table, Key=serialized_key)
+        result: OperationResult[Any]
+        try:
+            self._dynamodb.delete_item(TableName=table, Key=serialized_key)
+            result = OperationResult.success(data=None)
+        except (ClientError, BotoCoreError) as exc:
+            result = self._map_sdk_exception(exc)
         if result.is_success:
             logger.debug("storage_delete_ok", table=table)
         else:
@@ -185,7 +216,11 @@ class DynamoDBStorageService:
             ``OperationResult.not_found`` if the item does not exist.
         """
         serialized_key = _serialize_item(key)
-        result = self._dynamodb.get_item(table, Key=serialized_key)
+        try:
+            response = self._dynamodb.get_item(TableName=table, Key=serialized_key)
+            result: OperationResult[Any] = OperationResult.success(data=response)
+        except (ClientError, BotoCoreError) as exc:
+            result = self._map_sdk_exception(exc)
         if not result.is_success:
             logger.error(
                 "storage_get_error",
@@ -229,14 +264,22 @@ class DynamoDBStorageService:
             ``OperationResult[list[dict]]`` with deserialized items, or error.
         """
         serialized_values = {k: _serializer.serialize(v) for k, v in expression_values.items()}
-        result = self._dynamodb.query(
-            table_name=table,
-            KeyConditionExpression=key_condition,
-            ExpressionAttributeValues=serialized_values,
-            keys=["Items"],
-            force_paginate=True,
+        query_args: dict[str, Any] = {
+            "TableName": table,
+            "KeyConditionExpression": key_condition,
+            "ExpressionAttributeValues": serialized_values,
             **kwargs,
-        )
+        }
+        try:
+            paginator = self._dynamodb.get_paginator("query")
+            raw_items: list[dict[str, Any]] = []
+            for page in paginator.paginate(**query_args):
+                page_items = page.get("Items", [])
+                if isinstance(page_items, list):
+                    raw_items.extend(page_items)
+            result = OperationResult.success(data=raw_items)
+        except (ClientError, BotoCoreError) as exc:
+            result = self._map_sdk_exception(exc)
         if not result.is_success:
             logger.error(
                 "storage_query_error",
@@ -245,7 +288,7 @@ class DynamoDBStorageService:
                 error_code=result.error_code,
             )
             return result
-        raw_items: list[dict[str, Any]] = result.data if isinstance(result.data, list) else []
+        raw_items = result.data if isinstance(result.data, list) else []
         return OperationResult.success(data=[_deserialize_item(item) for item in raw_items])
 
 
@@ -256,5 +299,5 @@ def get_storage_service() -> StorageService:
     Returns:
         StorageService instance.
     """
-    dynamodb = get_aws_clients().dynamodb
+    dynamodb = cast(DynamoDBClient, get_aws_client("dynamodb"))
     return DynamoDBStorageService(dynamodb)

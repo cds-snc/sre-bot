@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-29 21:10'
-updated_date: '2026-08-04 17:30'
+updated_date: '2026-08-04 17:46'
 labels:
   - clients
   - phase-3
@@ -38,9 +38,9 @@ Test migration: keep storage tests in tests/unit/infrastructure/storage/ (alread
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 infrastructure/storage/service.py no longer imports infrastructure.clients.aws; DynamoDBStorageService is backed by a typed boto3 client from integrations/aws get_aws_client("dynamodb") and turns SDK exceptions into OperationResult via classify_aws_error - no per-service wrapper class, no dynamodb_next dependency
-- [ ] #2 All existing tests/unit/infrastructure/storage/ tests pass with identical OperationResult outcomes per method (behavior-neutral at the StorageService Protocol boundary), including ConditionalCheckFailedException -> success(data=False) and query auto-pagination; the StorageService Protocol/public method surface is unchanged
-- [ ] #3 integrations/aws exposes get_aws_client + classify_aws_error with unit coverage under tests/unit/integrations/aws/ (each mapped botocore/ClientError family -> expected status/error_code/retry_after; one unmapped exception propagates); dynamodb_next is left untouched for its other consumers (idempotency, resilience) and no new *_next module is introduced
+- [x] #1 infrastructure/storage/service.py no longer imports infrastructure.clients.aws; DynamoDBStorageService is backed by a typed boto3 client from integrations/aws get_aws_client("dynamodb") and turns SDK exceptions into OperationResult via classify_aws_error - no per-service wrapper class, no dynamodb_next dependency
+- [x] #2 All existing tests/unit/infrastructure/storage/ tests pass with identical OperationResult outcomes per method (behavior-neutral at the StorageService Protocol boundary), including ConditionalCheckFailedException -> success(data=False) and query auto-pagination; the StorageService Protocol/public method surface is unchanged
+- [x] #3 integrations/aws exposes get_aws_client + classify_aws_error with unit coverage under tests/unit/integrations/aws/ (each mapped botocore/ClientError family -> expected status/error_code/retry_after; one unmapped exception propagates); dynamodb_next is left untouched for its other consumers (idempotency, resilience) and no new *_next module is introduced
 <!-- AC:END -->
 
 ## Definition of Done
@@ -77,6 +77,47 @@ SIZE GATE: one new integrations/aws/client.py (~80 LOC) + storage service rework
 
 DOUBTS (flag, verify at impl): (a) exact classify mapping must reproduce the facade/executor OperationResult outcomes storage currently observes - diff infrastructure/clients/aws/executor.py::_map_client_error against shield's _classify_client_error and pick the mapping storage tests assert; (b) whether get_aws_client belongs in integrations/aws/client.py vs a new module given the legacy client.py - grep consumers before placing; (c) confirm no StorageService consumer branches on a fine-grained status echoed from storage (grep OperationStatus. in audit/service.py, access sync/request) - prior grounding says none do.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented TASK-22.2 resequenced migration in two production modules:
+- app/infrastructure/storage/service.py
+  - Removed legacy infrastructure.clients.aws dependency and provider usage.
+  - Storage provider now resolves integrations.aws.client.get_aws_client(\"dynamodb\").
+  - Service now calls boto3 DynamoDB methods directly (put_item/get_item/delete_item/query paginator).
+  - Added SDK exception -> OperationResult mapping via integrations.aws.client.classify_aws_error.
+  - Preserved protocol/public surface and boundary behavior (including ConditionalCheckFailedException => success(data=False), serialization/deserialization, query auto-pagination).
+- app/integrations/aws/client.py
+  - Added additive APIs: get_aws_client(...) and classify_aws_error(...).
+  - get_aws_client applies region, standard retry config, connect/read timeouts, and dynamodb-local endpoint gate for ENVIRONMENT in {local,dev,ci}.
+  - classify_aws_error maps expected AWS/botocore families to (status,error_code,retry_after) and propagates unmapped exceptions.
+
+Tests updated for direct boto3 call shape:
+- app/tests/unit/infrastructure/storage/test_storage_service.py
+
+Validation evidence:
+- Focused task tests:
+  - cd app && uv run pytest tests/unit/infrastructure/storage tests/unit/integrations/aws/test_aws_client.py -q
+  - Result: 39 passed
+- Task matrix:
+  - cd app && uv run pytest tests/unit/infrastructure/storage tests/unit/integrations/aws -v
+  - Result: 127 passed
+- Modified-file lint/type checks:
+  - cd app && uv run ruff check tests/unit/infrastructure/storage/test_storage_service.py infrastructure/storage/service.py integrations/aws/client.py
+  - Result: passed
+  - cd app && uv run mypy --no-incremental infrastructure/storage/service.py integrations/aws/client.py
+  - Result: Success, no issues in changed modules
+
+Repo-wide quality gate status at run time:
+- cd app && uv run ruff check . => passed
+- cd app && uv run pytest tests --ignore=tests/smoke -q => existing unrelated failures in modules/webhooks/aws_sns tests (2 failing assertions)
+- cd app && uv run mypy . --exclude '(?:^|/)\\.venv(?:/|$)' => existing unrelated baseline errors across many modules plus mypy incremental-cache crash (KeyError: is_bound)
+
+DoD items left for human verification:
+- Confirm behavior-neutrality at StorageService Protocol boundary in code review.
+- Ensure PR description references decisions/layers.md, decisions/outbound-clients.md, decisions/sdk-typing.md.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

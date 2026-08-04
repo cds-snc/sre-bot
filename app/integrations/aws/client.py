@@ -1,19 +1,129 @@
 from functools import wraps
+from typing import Any, cast
 
 import boto3  # type: ignore
 import structlog
 from botocore.client import BaseClient  # type: ignore
+from botocore.config import Config  # type: ignore
 from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 
+from infrastructure.configuration.app import get_app_settings
 from infrastructure.configuration.integrations.aws import get_aws_settings
+from infrastructure.operations.status import OperationStatus
 
 logger = structlog.get_logger()
 settings = get_aws_settings()
+app_settings = get_app_settings()
 SYSTEM_ADMIN_PERMISSIONS = settings.SYSTEM_ADMIN_PERMISSIONS
 VIEW_ONLY_PERMISSIONS = settings.VIEW_ONLY_PERMISSIONS
 AWS_REGION = settings.AWS_REGION
 THROTTLING_ERRS = settings.THROTTLING_ERRS
 RESOURCE_NOT_FOUND_ERRS = settings.RESOURCE_NOT_FOUND_ERRS
+
+
+def get_aws_client(
+    service_name: str,
+    session_config: dict[str, Any] | None = None,
+    client_config: dict[str, Any] | None = None,
+    role_arn: str | None = None,
+    session_name: str = "DefaultSession",
+) -> BaseClient:
+    """Construct a boto3 client with standardized retry/timeouts and endpoint gating.
+
+    For DynamoDB in local-style environments, this applies the dynamodb-local
+    endpoint override used across the integrations package.
+    """
+    region_name = getattr(settings, "AWS_REGION", "ca-central-1")
+    retry_mode = getattr(settings, "RETRY_MODE", "standard")
+    retry_max_attempts = getattr(settings, "RETRY_MAX_ATTEMPTS", 3)
+    connect_timeout = getattr(settings, "CONNECT_TIMEOUT_SECONDS", 10)
+    read_timeout = getattr(settings, "READ_TIMEOUT_SECONDS", 10)
+
+    merged_session_config: dict[str, Any] = {"region_name": region_name}
+    if session_config:
+        merged_session_config.update(session_config)
+
+    merged_client_config: dict[str, Any] = {"region_name": region_name}
+    if client_config:
+        merged_client_config.update(client_config)
+
+    if "config" not in merged_client_config:
+        retries: dict[str, Any] = {"mode": retry_mode}
+        if retry_max_attempts is not None:
+            retries["max_attempts"] = retry_max_attempts
+        merged_client_config["config"] = Config(
+            retries=cast(Any, retries),
+            connect_timeout=connect_timeout,
+            read_timeout=read_timeout,
+        )
+
+    environment = getattr(app_settings, "ENVIRONMENT", None)
+    if service_name == "dynamodb" and environment in ("local", "dev", "ci"):
+        merged_client_config["endpoint_url"] = "http://dynamodb-local:8000"
+
+    if role_arn:
+        sts_client = boto3.client("sts")
+        assumed_role = sts_client.assume_role(RoleArn=role_arn, RoleSessionName=session_name)
+        credentials = assumed_role["Credentials"]
+        session = boto3.Session(
+            aws_access_key_id=credentials["AccessKeyId"],
+            aws_secret_access_key=credentials["SecretAccessKey"],
+            aws_session_token=credentials["SessionToken"],
+            **merged_session_config,
+        )
+    else:
+        session = boto3.Session(**merged_session_config)
+
+    # boto3 stubs expose per-service overloads; runtime selection by str needs
+    # the generic BaseClient return type.
+    return cast(BaseClient, session.client(service_name, **merged_client_config))  # type: ignore[call-overload,no-any-return]
+
+
+def classify_aws_error(exc: Exception) -> tuple[OperationStatus, str | None, int | None]:
+    """Classify expected botocore errors; propagate unknown exceptions unchanged."""
+    if isinstance(exc, BotoCoreError):
+        return OperationStatus.TRANSIENT_ERROR, type(exc).__name__, None
+
+    if not isinstance(exc, ClientError):
+        raise exc
+
+    response = getattr(exc, "response", None) or {}
+    error = response.get("Error", {}) if isinstance(response, dict) else {}
+    code = error.get("Code")
+    if not isinstance(code, str) or not code:
+        raise exc
+
+    not_found_codes = set(getattr(settings, "NOT_FOUND_CODES", ["ResourceNotFoundException"]))
+    unauthorized_codes = set(
+        getattr(
+            settings,
+            "UNAUTHORIZED_CODES",
+            ["AccessDeniedException", "UnauthorizedOperation", "UnauthorizedException"],
+        )
+    )
+    transient_codes = set(
+        getattr(
+            settings,
+            "TRANSIENT_CODES",
+            [
+                "Throttling",
+                "ThrottlingException",
+                "RequestLimitExceeded",
+                "ProvisionedThroughputExceededException",
+            ],
+        )
+    )
+
+    if code in not_found_codes:
+        return OperationStatus.NOT_FOUND, code, None
+    if code in unauthorized_codes:
+        return OperationStatus.UNAUTHORIZED, code, None
+    if code in transient_codes:
+        return OperationStatus.TRANSIENT_ERROR, code, 60
+    if code == "ConditionalCheckFailedException":
+        return OperationStatus.PERMANENT_ERROR, code, None
+
+    raise exc
 
 
 def handle_aws_api_errors(func):
