@@ -8,8 +8,8 @@ from decimal import Decimal
 from unittest.mock import MagicMock
 
 import pytest
+from botocore.exceptions import ClientError
 
-from infrastructure.operations.result import OperationResult
 from infrastructure.storage.service import DynamoDBStorageService
 
 
@@ -24,7 +24,7 @@ class TestStorageServicePut:
 
     def test_put_success(self):
         service, dynamo = _make_service()
-        dynamo.put_item.return_value = OperationResult.success(data=None)
+        dynamo.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
         result = service.put("my_table", {"pk": "abc", "name": "test"})
 
@@ -34,7 +34,7 @@ class TestStorageServicePut:
     def test_put_serializes_item(self):
         """Plain Python values are converted to DynamoDB attribute format."""
         service, dynamo = _make_service()
-        dynamo.put_item.return_value = OperationResult.success(data=None)
+        dynamo.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
         service.put("my_table", {"pk": "abc", "count": 5, "active": True})
 
@@ -47,7 +47,7 @@ class TestStorageServicePut:
     def test_put_skips_none_values(self):
         """None-valued keys are excluded from the serialized item."""
         service, dynamo = _make_service()
-        dynamo.put_item.return_value = OperationResult.success(data=None)
+        dynamo.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
         service.put("my_table", {"pk": "abc", "optional_field": None})
 
@@ -57,8 +57,9 @@ class TestStorageServicePut:
 
     def test_put_propagates_error(self):
         service, dynamo = _make_service()
-        dynamo.put_item.return_value = OperationResult.permanent_error(
-            message="Table not found", error_code="ResourceNotFoundException"
+        dynamo.put_item.side_effect = ClientError(
+            error_response={"Error": {"Code": "ResourceNotFoundException", "Message": "Table not found"}},
+            operation_name="PutItem",
         )
 
         result = service.put("my_table", {"pk": "abc"})
@@ -73,7 +74,7 @@ class TestStorageServicePutIfNotExists:
 
     def test_creates_item_returns_true(self):
         service, dynamo = _make_service()
-        dynamo.put_item.return_value = OperationResult.success(data=None)
+        dynamo.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
         result = service.put_if_not_exists("my_table", {"pk": "abc"}, pk_attribute="pk")
 
@@ -82,9 +83,14 @@ class TestStorageServicePutIfNotExists:
 
     def test_existing_item_returns_false(self):
         service, dynamo = _make_service()
-        dynamo.put_item.return_value = OperationResult.permanent_error(
-            message="Conflict",
-            error_code="ConditionalCheckFailedException",
+        dynamo.put_item.side_effect = ClientError(
+            error_response={
+                "Error": {
+                    "Code": "ConditionalCheckFailedException",
+                    "Message": "Conflict",
+                }
+            },
+            operation_name="PutItem",
         )
 
         result = service.put_if_not_exists("my_table", {"pk": "abc"}, pk_attribute="pk")
@@ -94,7 +100,7 @@ class TestStorageServicePutIfNotExists:
 
     def test_uses_condition_expression(self):
         service, dynamo = _make_service()
-        dynamo.put_item.return_value = OperationResult.success(data=None)
+        dynamo.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
         service.put_if_not_exists("my_table", {"pk": "abc"}, pk_attribute="pk")
 
@@ -103,8 +109,9 @@ class TestStorageServicePutIfNotExists:
 
     def test_other_errors_propagate(self):
         service, dynamo = _make_service()
-        dynamo.put_item.return_value = OperationResult.permanent_error(
-            message="Access denied", error_code="AccessDeniedException"
+        dynamo.put_item.side_effect = ClientError(
+            error_response={"Error": {"Code": "AccessDeniedException", "Message": "Access denied"}},
+            operation_name="PutItem",
         )
 
         result = service.put_if_not_exists("my_table", {"pk": "abc"}, pk_attribute="pk")
@@ -119,7 +126,7 @@ class TestStorageServiceGet:
 
     def test_get_returns_deserialized_item(self):
         service, dynamo = _make_service()
-        dynamo.get_item.return_value = OperationResult.success(data={"Item": {"pk": {"S": "abc"}, "count": {"N": "5"}}})
+        dynamo.get_item.return_value = {"Item": {"pk": {"S": "abc"}, "count": {"N": "5"}}}
 
         result = service.get("my_table", {"pk": "abc"})
 
@@ -130,7 +137,7 @@ class TestStorageServiceGet:
     def test_get_missing_item_returns_not_found(self):
         service, dynamo = _make_service()
         # DynamoDB returns empty dict (no "Item" key) when not found
-        dynamo.get_item.return_value = OperationResult.success(data={})
+        dynamo.get_item.return_value = {}
 
         result = service.get("my_table", {"pk": "missing"})
 
@@ -139,7 +146,7 @@ class TestStorageServiceGet:
 
     def test_get_serializes_key(self):
         service, dynamo = _make_service()
-        dynamo.get_item.return_value = OperationResult.success(data={"Item": {"pk": {"S": "abc"}}})
+        dynamo.get_item.return_value = {"Item": {"pk": {"S": "abc"}}}
 
         service.get("my_table", {"pk": "abc"})
 
@@ -148,7 +155,10 @@ class TestStorageServiceGet:
 
     def test_get_propagates_dynamo_error(self):
         service, dynamo = _make_service()
-        dynamo.get_item.return_value = OperationResult.permanent_error(message="Error", error_code="InternalServerError")
+        dynamo.get_item.side_effect = ClientError(
+            error_response={"Error": {"Code": "AccessDeniedException", "Message": "Error"}},
+            operation_name="GetItem",
+        )
 
         result = service.get("my_table", {"pk": "abc"})
 
@@ -161,11 +171,16 @@ class TestStorageServiceQuery:
 
     def test_query_returns_deserialized_items(self):
         service, dynamo = _make_service()
-        raw_items = [
-            {"pk": {"S": "abc"}, "action": {"S": "created"}},
-            {"pk": {"S": "abc"}, "action": {"S": "updated"}},
+        paginator = MagicMock()
+        paginator.paginate.return_value = [
+            {
+                "Items": [
+                    {"pk": {"S": "abc"}, "action": {"S": "created"}},
+                    {"pk": {"S": "abc"}, "action": {"S": "updated"}},
+                ]
+            }
         ]
-        dynamo.query.return_value = OperationResult.success(data=raw_items)
+        dynamo.get_paginator.return_value = paginator
 
         result = service.query(
             "my_table",
@@ -180,7 +195,9 @@ class TestStorageServiceQuery:
 
     def test_query_serializes_expression_values(self):
         service, dynamo = _make_service()
-        dynamo.query.return_value = OperationResult.success(data=[])
+        paginator = MagicMock()
+        paginator.paginate.return_value = [{"Items": []}]
+        dynamo.get_paginator.return_value = paginator
 
         service.query(
             "my_table",
@@ -188,27 +205,46 @@ class TestStorageServiceQuery:
             expression_values={":pk": "abc"},
         )
 
-        kwargs = dynamo.query.call_args[1]
+        kwargs = paginator.paginate.call_args[1]
         assert kwargs["ExpressionAttributeValues"][":pk"] == {"S": "abc"}
 
-    def test_query_passes_pagination_flags(self):
+    def test_query_uses_paginator_and_aggregates_items(self):
         service, dynamo = _make_service()
-        dynamo.query.return_value = OperationResult.success(data=[])
+        paginator = MagicMock()
+        paginator.paginate.return_value = [
+            {
+                "Items": [
+                    {"pk": {"S": "abc"}, "action": {"S": "created"}},
+                ]
+            },
+            {
+                "Items": [
+                    {"pk": {"S": "abc"}, "action": {"S": "updated"}},
+                ]
+            },
+        ]
+        dynamo.get_paginator.return_value = paginator
 
-        service.query(
+        result = service.query(
             "my_table",
             key_condition="pk = :pk",
             expression_values={":pk": "abc"},
         )
 
-        kwargs = dynamo.query.call_args[1]
-        assert kwargs.get("force_paginate") is True
-        assert kwargs.get("keys") == ["Items"]
+        dynamo.get_paginator.assert_called_once_with("query")
+        assert paginator.paginate.called
+        assert result.is_success
+        assert result.data == [
+            {"pk": "abc", "action": "created"},
+            {"pk": "abc", "action": "updated"},
+        ]
 
     def test_query_passes_through_extra_kwargs(self):
-        """IndexName, Limit, ScanIndexForward, etc. pass through to DynamoDBClient."""
+        """IndexName, Limit, ScanIndexForward, etc. pass through to paginator kwargs."""
         service, dynamo = _make_service()
-        dynamo.query.return_value = OperationResult.success(data=[])
+        paginator = MagicMock()
+        paginator.paginate.return_value = [{"Items": []}]
+        dynamo.get_paginator.return_value = paginator
 
         service.query(
             "my_table",
@@ -219,14 +255,17 @@ class TestStorageServiceQuery:
             ScanIndexForward=False,
         )
 
-        kwargs = dynamo.query.call_args[1]
+        kwargs = paginator.paginate.call_args[1]
         assert kwargs.get("IndexName") == "my-gsi"
         assert kwargs.get("Limit") == 10
         assert kwargs.get("ScanIndexForward") is False
 
     def test_query_error_propagates(self):
         service, dynamo = _make_service()
-        dynamo.query.return_value = OperationResult.permanent_error(message="Error", error_code="InternalServerError")
+        dynamo.get_paginator.side_effect = ClientError(
+            error_response={"Error": {"Code": "AccessDeniedException", "Message": "Error"}},
+            operation_name="Query",
+        )
 
         result = service.query(
             "my_table",
@@ -243,7 +282,7 @@ class TestStorageServiceDelete:
 
     def test_delete_success(self):
         service, dynamo = _make_service()
-        dynamo.delete_item.return_value = OperationResult.success(data=None)
+        dynamo.delete_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
         result = service.delete("my_table", {"pk": "abc"})
 
@@ -251,7 +290,7 @@ class TestStorageServiceDelete:
 
     def test_delete_serializes_key(self):
         service, dynamo = _make_service()
-        dynamo.delete_item.return_value = OperationResult.success(data=None)
+        dynamo.delete_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
         service.delete("my_table", {"pk": "abc"})
 
@@ -260,8 +299,50 @@ class TestStorageServiceDelete:
 
     def test_delete_propagates_error(self):
         service, dynamo = _make_service()
-        dynamo.delete_item.return_value = OperationResult.permanent_error(message="Error", error_code="InternalServerError")
+        dynamo.delete_item.side_effect = ClientError(
+            error_response={"Error": {"Code": "AccessDeniedException", "Message": "Error"}},
+            operation_name="DeleteItem",
+        )
 
         result = service.delete("my_table", {"pk": "abc"})
 
         assert not result.is_success
+
+
+@pytest.mark.unit
+class TestStorageServiceProviderAndSdkExceptions:
+    """Contract tests for provider wiring and SDK exception mapping."""
+
+    def test_get_storage_service_uses_integrations_get_aws_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import infrastructure.storage.service as service_module
+
+        service_module.get_storage_service.cache_clear()
+
+        dynamodb_client = MagicMock()
+        get_aws_client = MagicMock(return_value=dynamodb_client)
+        monkeypatch.setattr(service_module, "get_aws_client", get_aws_client, raising=False)
+
+        try:
+            service = service_module.get_storage_service()
+        finally:
+            service_module.get_storage_service.cache_clear()
+
+        get_aws_client.assert_called_once_with("dynamodb")
+        assert isinstance(service, DynamoDBStorageService)
+
+    def test_put_if_not_exists_conditional_client_error_returns_false(self) -> None:
+        service, dynamo = _make_service()
+        dynamo.put_item.side_effect = ClientError(
+            error_response={
+                "Error": {
+                    "Code": "ConditionalCheckFailedException",
+                    "Message": "condition failed",
+                }
+            },
+            operation_name="PutItem",
+        )
+
+        result = service.put_if_not_exists("my_table", {"pk": "abc"}, pk_attribute="pk")
+
+        assert result.is_success
+        assert result.data is False
