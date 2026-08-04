@@ -15,7 +15,6 @@ from __future__ import annotations
 from datetime import timedelta
 
 from infrastructure.plugins import hookimpl
-
 from packages.oncall_sync.settings import get_oncall_rotations
 
 SYNC_INTERVAL = timedelta(minutes=5)

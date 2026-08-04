@@ -44,10 +44,7 @@ class OnCallRotations(BaseModel):
         handles = [r.slack_handle for r in v]
         duplicates = {h for h in handles if handles.count(h) > 1}
         if duplicates:
-            raise ValueError(
-                f"rotations.json contains duplicate slack_handle values: "
-                f"{sorted(duplicates)}"
-            )
+            raise ValueError(f"rotations.json contains duplicate slack_handle values: {sorted(duplicates)}")
         return v
 
 
@@ -65,9 +62,7 @@ def load_rotations() -> list[OnCallRotation]:
     except json.JSONDecodeError as exc:
         raise ValueError(f"Invalid JSON in {ROTATIONS_RESOURCE}: {exc}") from exc
     if not isinstance(data, list):
-        raise ValueError(
-            f"{ROTATIONS_RESOURCE} must contain a JSON list at the top level"
-        )
+        raise ValueError(f"{ROTATIONS_RESOURCE} must contain a JSON list at the top level")
     return OnCallRotations(rotations=data).rotations
 
 

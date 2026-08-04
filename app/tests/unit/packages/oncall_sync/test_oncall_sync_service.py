@@ -64,9 +64,7 @@ def test_sync_all_skips_target_when_rotation_has_no_on_call() -> None:
     on_call = _FakeOnCall(emails={"a": None})
     target = _FakeTarget()
 
-    OnCallSyncService(
-        on_call=on_call, target=target, rotations=[_rotation("a")]
-    ).sync_all()
+    OnCallSyncService(on_call=on_call, target=target, rotations=[_rotation("a")]).sync_all()
 
     assert target.calls == []
 

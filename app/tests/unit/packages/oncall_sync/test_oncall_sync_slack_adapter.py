@@ -30,9 +30,7 @@ def _slack_error(code: str) -> SlackApiError:
 def test_updates_existing_user_group() -> None:
     client = MagicMock()
     client.users_lookupByEmail.return_value = {"ok": True, "user": {"id": "U1"}}
-    client.usergroups_list.return_value = {
-        "usergroups": [{"id": "S123", "handle": "oncall-x", "date_delete": 0}]
-    }
+    client.usergroups_list.return_value = {"usergroups": [{"id": "S123", "handle": "oncall-x", "date_delete": 0}]}
 
     SlackUserGroupTarget(client).sync_user_group(_rotation(), "a@x.ca")
 
@@ -50,9 +48,7 @@ def test_creates_user_group_when_missing() -> None:
 
     SlackUserGroupTarget(client).sync_user_group(_rotation(), "a@x.ca")
 
-    client.usergroups_create.assert_called_once_with(
-        name="On-call X", handle="oncall-x", description="desc"
-    )
+    client.usergroups_create.assert_called_once_with(name="On-call X", handle="oncall-x", description="desc")
     client.usergroups_users_update.assert_called_once_with(usergroup="S999", users="U1")
 
 
@@ -60,9 +56,7 @@ def test_creates_user_group_when_missing() -> None:
 def test_reenables_disabled_user_group() -> None:
     client = MagicMock()
     client.users_lookupByEmail.return_value = {"ok": True, "user": {"id": "U1"}}
-    client.usergroups_list.return_value = {
-        "usergroups": [{"id": "S123", "handle": "oncall-x", "date_delete": 123456}]
-    }
+    client.usergroups_list.return_value = {"usergroups": [{"id": "S123", "handle": "oncall-x", "date_delete": 123456}]}
 
     SlackUserGroupTarget(client).sync_user_group(_rotation(), "a@x.ca")
 

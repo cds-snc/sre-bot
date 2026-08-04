@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.request import Request, urlopen
 
 import structlog
@@ -44,17 +44,12 @@ def get_on_call_user_for_rotation(schedule_id: str, rotation_name: str) -> str |
     # With no `date` param, OpsGenie anchors `finalTimeline` at "now", so the
     # first period of the matching rotation is the active one — unless its
     # startDate is in the future, which indicates a coverage gap.
-    url = (
-        f"https://api.opsgenie.com/v2/schedules/{schedule_id}/timeline"
-        "?identifierType=id&interval=1&intervalUnit=days"
-    )
+    url = f"https://api.opsgenie.com/v2/schedules/{schedule_id}/timeline?identifierType=id&interval=1&intervalUnit=days"
     try:
         content = api_get_request(url, {"name": "GenieKey", "token": OPSGENIE_KEY})
         rotations = json.loads(content)["data"]["finalTimeline"]["rotations"]
     except Exception as exc:
-        raise OpsGenieAPIError(
-            f"OpsGenie timeline request failed for schedule {schedule_id!r}"
-        ) from exc
+        raise OpsGenieAPIError(f"OpsGenie timeline request failed for schedule {schedule_id!r}") from exc
 
     rotation = next((r for r in rotations if r.get("name") == rotation_name), None)
     if not rotation:
@@ -63,7 +58,7 @@ def get_on_call_user_for_rotation(schedule_id: str, rotation_name: str) -> str |
     if not periods:
         return None
     period = periods[0]
-    if datetime.fromisoformat(period["startDate"]) > datetime.now(timezone.utc):
+    if datetime.fromisoformat(period["startDate"]) > datetime.now(UTC):
         return None
     recipient = period.get("recipient") or {}
     return recipient.get("name") if recipient.get("type") == "user" else None

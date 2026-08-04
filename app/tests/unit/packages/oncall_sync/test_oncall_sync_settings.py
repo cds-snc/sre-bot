@@ -26,12 +26,10 @@ def test_rotation_default_description() -> None:
 
 
 @pytest.mark.unit
-def test_load_rotations_returns_empty_when_resource_missing(
-    monkeypatch, tmp_path
-) -> None:
+def test_load_rotations_returns_empty_when_resource_missing(monkeypatch, tmp_path) -> None:
     class _MissingResource:
         @staticmethod
-        def joinpath(_: str) -> "_MissingResource":
+        def joinpath(_: str) -> _MissingResource:
             return _MissingResource()
 
         @staticmethod

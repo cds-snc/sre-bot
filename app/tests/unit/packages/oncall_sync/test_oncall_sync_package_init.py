@@ -63,11 +63,7 @@ def test_startup_warmup_logs_rotation_count(monkeypatch) -> None:
     logger = _Logger()
     pkg.startup_warmup(logger=logger)
 
-    loaded = next(
-        evt
-        for lvl, evt in logger.events
-        if evt["event"] == "oncall_sync_settings_loaded"
-    )
+    loaded = next(evt for lvl, evt in logger.events if evt["event"] == "oncall_sync_settings_loaded")
     assert loaded["rotation_count"] == 2
     assert loaded["sync_interval_seconds"] == 300
 
@@ -80,7 +76,4 @@ def test_startup_warmup_warns_when_no_rotations(monkeypatch) -> None:
     logger = _Logger()
     pkg.startup_warmup(logger=logger)
 
-    assert any(
-        lvl == "warning" and evt["event"] == "oncall_sync_no_rotations"
-        for lvl, evt in logger.events
-    )
+    assert any(lvl == "warning" and evt["event"] == "oncall_sync_no_rotations" for lvl, evt in logger.events)

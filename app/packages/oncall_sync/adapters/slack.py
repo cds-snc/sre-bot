@@ -45,9 +45,7 @@ class SlackUserGroupTarget:
             usergroup_id = self._find_or_create_usergroup(rotation, log)
             self._client.usergroups_users_update(usergroup=usergroup_id, users=user_id)
         except SlackApiError as exc:
-            raise OnCallSyncError(
-                f"Slack API call failed: {exc.response.get('error')}"
-            ) from exc
+            raise OnCallSyncError(f"Slack API call failed: {exc.response.get('error')}") from exc
 
         log.info("oncall_sync_usergroup_updated", usergroup_id=usergroup_id)
 
