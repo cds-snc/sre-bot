@@ -86,6 +86,40 @@ class TestSlackSettingsDeliveryMode:
         assert SlackSettings().SIGNING_SECRET == "abc123"
 
 
+class TestSlackSettingsUserToken:
+    """Slack user-token is a dedicated vendor credential field for user-scoped writes."""
+
+    def test_user_token_defaults_to_empty_string(self):
+        settings = SlackSettings()
+
+        assert settings.USER_TOKEN == ""
+
+    def test_user_token_reads_from_env(self, monkeypatch):
+        monkeypatch.setenv("SLACK_USER_TOKEN", "xoxp-user-token")
+
+        settings = SlackSettings()
+
+        assert settings.USER_TOKEN == "xoxp-user-token"
+
+    def test_user_token_does_not_appear_in_repr(self, monkeypatch):
+        monkeypatch.setenv("SLACK_USER_TOKEN", "xoxp-user-token")
+
+        settings = SlackSettings()
+        settings_repr = repr(settings)
+
+        assert "USER_TOKEN" not in settings_repr
+        assert "xoxp-user-token" not in settings_repr
+
+    def test_user_token_is_not_coupled_to_transport_validation(self, monkeypatch):
+        monkeypatch.setenv("SLACK_USER_TOKEN", "xoxp-user-token")
+        monkeypatch.setenv("SLACK_ENABLED", "false")
+
+        settings = SlackSettings()
+
+        assert settings.ENABLED is False
+        assert settings.USER_TOKEN == "xoxp-user-token"
+
+
 class TestSlackSettingsFailFast:
     """Fail-fast validation fires when enabled but required credentials are absent."""
 
