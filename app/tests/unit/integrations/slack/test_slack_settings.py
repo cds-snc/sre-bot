@@ -87,7 +87,7 @@ class TestSlackSettingsDeliveryMode:
 
 
 class TestSlackSettingsUserToken:
-    """Slack user-token is a dedicated vendor credential field for user-scoped writes."""
+    """Slack user token is a dedicated vendor credential for user-group writes."""
 
     def test_user_token_defaults_to_empty_string(self):
         settings = SlackSettings()

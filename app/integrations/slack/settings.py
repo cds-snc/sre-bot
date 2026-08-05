@@ -38,6 +38,7 @@ class SlackSettings(BaseSettings):
     SOCKET_MODE: bool = Field(default=True, alias="SLACK_SOCKET_MODE")
 
     BOT_TOKEN: str = Field(default="", alias="SLACK_BOT_TOKEN")
+    USER_TOKEN: str = Field(default="", alias="SLACK_USER_TOKEN", repr=False)
     APP_TOKEN: str | None = Field(default=None, alias="SLACK_APP_TOKEN")
     SIGNING_SECRET: str | None = Field(default=None, alias="SLACK_SIGNING_SECRET")
 

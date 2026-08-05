@@ -4,10 +4,12 @@ title: 'i18n: unbounded t() memoization causes continuous ECS memory growth'
 status: To Do
 assignee: []
 created_date: '2026-08-05 19:48'
+updated_date: '2026-08-05 21:00'
 labels:
   - i18n
   - reliability
   - performance
+milestone: m-3
 dependencies: []
 references:
   - decisions/i18n.md
