@@ -5,6 +5,10 @@ import boto3  # type: ignore
 import structlog
 from botocore.client import BaseClient  # type: ignore
 from botocore.config import Config  # type: ignore
+from botocore.credentials import (  # type: ignore
+    DeferredRefreshableCredentials,
+    create_assume_role_refresher,
+)
 from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
 
 from infrastructure.configuration.app import get_app_settings
@@ -62,14 +66,18 @@ def get_aws_client(
         merged_client_config["endpoint_url"] = "http://dynamodb-local:8000"
 
     if role_arn:
-        sts_client = boto3.client("sts")
-        assumed_role = sts_client.assume_role(RoleArn=role_arn, RoleSessionName=session_name)
-        credentials = assumed_role["Credentials"]
-        session = boto3.Session(
-            aws_access_key_id=credentials["AccessKeyId"],
-            aws_secret_access_key=credentials["SecretAccessKey"],
-            aws_session_token=credentials["SessionToken"],
-            **merged_session_config,
+        # Defer the actual AssumeRole call until the client's first real
+        # request needs credentials, instead of assuming the role eagerly at
+        # client-construction time (matches the previous facade's lazy
+        # per-call session/credential behavior).
+        session = boto3.Session(**merged_session_config)
+        sts_client = session.client("sts")
+        refresher = create_assume_role_refresher(sts_client, {"RoleArn": role_arn, "RoleSessionName": session_name})
+        # Reaches into botocore's internal session to install lazily-refreshed
+        # credentials; no public boto3 API exposes this hook.
+        session._session._credentials = DeferredRefreshableCredentials(  # type: ignore[attr-defined]
+            method="assume-role",
+            refresh_using=refresher,
         )
     else:
         session = boto3.Session(**merged_session_config)

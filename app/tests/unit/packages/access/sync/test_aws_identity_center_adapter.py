@@ -148,6 +148,7 @@ def test_apply_entitlement_does_not_create_membership_when_lookup_fails() -> Non
     client.get_group_membership_id.side_effect = _client_error(
         "GetGroupMembershipId", code="AccessDeniedException", message="access denied"
     )
+    client.describe_group.side_effect = None
     client.describe_group.return_value = {"GroupId": "11111111-2222-3333-4444-555555555555"}
     adapter = make_adapter(client)
 
@@ -166,6 +167,7 @@ def test_apply_entitlement_does_not_create_membership_when_lookup_fails() -> Non
 def test_remove_entitlement_reports_already_absent_when_not_member() -> None:
     """GetGroupMembershipId NOT_FOUND should be treated as an idempotent no-op."""
     client = make_client()
+    client.describe_group.side_effect = None
     client.describe_group.return_value = {"GroupId": "11111111-2222-3333-4444-555555555555"}
     adapter = make_adapter(client)
 
@@ -241,6 +243,7 @@ def test_list_members_for_groups_always_uses_per_group_fallback() -> None:
     """
     client = make_client()
     group_1_id = "11111111-2222-3333-4444-555555555555"
+    client.describe_group.side_effect = None
     client.describe_group.return_value = {"GroupId": group_1_id}
     _configure_paginated(
         client,
@@ -300,6 +303,7 @@ def test_resolve_group_id_uuid_passthrough() -> None:
     """A UUID that describe_group confirms should be returned as-is without index."""
     client = make_client()
     group_id = "11111111-2222-3333-4444-555555555555"
+    client.describe_group.side_effect = None
     client.describe_group.return_value = {"GroupId": group_id, "DisplayName": "Admin"}
     adapter = make_adapter(client)
 

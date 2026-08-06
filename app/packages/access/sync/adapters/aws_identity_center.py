@@ -2,7 +2,10 @@
 
 Maps normalized Access Sync actions to AWS IdentityStore API calls.
 All external API calls are wrapped in try/except and return OperationResult.
-Clients are injected from infrastructure.clients — never instantiated locally.
+The adapter is injected with a typed boto3 identitystore client — built by
+``build_aws_identity_center_adapter()`` in this module via
+``integrations.aws.client.get_aws_client`` — never instantiated within
+packages/** outside adapters/ (decisions/layers.md).
 
 Entitlement model: entitlement_type="group", entitlement_id=AWS IC GroupId (UUID).
 Group sync maps IDP security groups → AWS IC groups via group membership.
@@ -11,15 +14,17 @@ AWS IC has no native "disable" state; disable_user signals manual_action_require
 """
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from dataclasses import replace as dc_replace
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import structlog
+from botocore.exceptions import BotoCoreError, ClientError
 
-from infrastructure.clients.aws import AWSClients
+from infrastructure.configuration.integrations.aws import get_aws_settings
 from infrastructure.operations import OperationResult, OperationStatus
+from integrations.aws.client import classify_aws_error, get_aws_client
 from packages.access.sync.domain import (
     AdapterAssessment,
     CurrentPlatformState,
@@ -37,6 +42,17 @@ from packages.access.sync.policies import (
     PlatformReconciliationPlanner,
     PolicyEngine,
 )
+
+if TYPE_CHECKING:
+    from types_boto3_identitystore.client import IdentityStoreClient as _BotoIdentityStoreClient
+    from types_boto3_identitystore.type_defs import NameTypeDef
+
+_PaginatorName = Literal[
+    "list_users",
+    "list_groups",
+    "list_group_memberships",
+    "list_group_memberships_for_member",
+]
 
 logger = structlog.get_logger()
 
@@ -67,25 +83,52 @@ class _AwsGroupIndex:
 class AwsIdentityCenterAdapter:
     """AWS Identity Center adapter.
 
-    Uses pre-configured centralized AWSClients to access IdentityStore and SsoAdmin.
-    All external API calls wrapped in try/except, returning OperationResult.
-
-    The AWSClients facade is received fully configured with AWS_SSO_INSTANCE_ID bootstrap
-    setting applied to the underlying IdentityStoreClient. No additional configuration
-    is needed at the feature layer—the client is ready to use.
+    Wraps a typed boto3 identitystore client (``get_aws_client("identitystore")``),
+    calling operations directly and classifying failures via
+    ``integrations.aws.client.classify_aws_error``. All external API calls are
+    wrapped in try/except, returning OperationResult.
 
     Args:
-        aws_clients: Centralized AWS clients facade from infrastructure.clients.aws.get_aws_clients
-            Must have been initialized with AWS_SSO_INSTANCE_ID bootstrap setting.
+        identitystore: Typed boto3 IdentityStore client (injected — never
+            constructed here). Use ``build_aws_identity_center_adapter()`` to
+            wire the production instance.
+        identity_store_id: AWS SSO Identity Store ID (``AWS_SSO_INSTANCE_ID``),
+            passed as ``IdentityStoreId`` on every call.
     """
 
-    def __init__(self, aws_clients: AWSClients) -> None:
-        self._aws = aws_clients
+    def __init__(self, identitystore: _BotoIdentityStoreClient, identity_store_id: str) -> None:
+        self._identitystore = identitystore
+        self._identity_store_id = identity_store_id
         self._group_id_cache: dict[str, str] = {}
         self._group_index: _AwsGroupIndex | None = None
 
+    def _map_sdk_exception(self, exc: Exception) -> OperationResult:
+        """Classify a botocore exception into an OperationResult error."""
+        status, error_code, retry_after = classify_aws_error(exc)
+        return OperationResult.error(status, message=str(exc), error_code=error_code, retry_after=retry_after)
+
+    def _call(self, fn: Callable[[], Mapping[str, Any]]) -> OperationResult:
+        """Invoke a single identitystore operation, classifying SDK errors."""
+        try:
+            return OperationResult.success(data=fn())
+        except (ClientError, BotoCoreError) as exc:
+            return self._map_sdk_exception(exc)
+
+    def _paginate(self, paginator_name: _PaginatorName, response_key: str, **kwargs: Any) -> OperationResult:
+        """Invoke a paginated identitystore operation, flattening pages into a list."""
+        try:
+            paginator = self._identitystore.get_paginator(paginator_name)
+            items: list[Any] = []
+            for page in paginator.paginate(**kwargs):
+                page_items = page.get(response_key, [])
+                if isinstance(page_items, list):
+                    items.extend(page_items)
+            return OperationResult.success(data=items)
+        except (ClientError, BotoCoreError) as exc:
+            return self._map_sdk_exception(exc)
+
     @staticmethod
-    def _build_identitystore_name(user_email: str) -> dict[str, str]:
+    def _build_identitystore_name(user_email: str) -> NameTypeDef:
         """Build a minimal AWS Identity Store Name payload from an email address."""
         local_part = user_email.split("@", 1)[0].strip()
         normalized = re.sub(r"[._-]+", " ", local_part)
@@ -116,8 +159,8 @@ class AwsIdentityCenterAdapter:
         return None
 
     def _list_users(self) -> OperationResult:
-        """Return Identity Store users using the infrastructure client contract."""
-        result = self._aws.identitystore.list_users()
+        """Return Identity Store users using the typed identitystore client."""
+        result = self._paginate("list_users", "Users", IdentityStoreId=self._identity_store_id)
         if not result.is_success:
             return result
         if not isinstance(result.data, list):
@@ -164,7 +207,7 @@ class AwsIdentityCenterAdapter:
         log = logger.bind(adapter="aws_identity_center")
         log.info("build_group_index_started")
 
-        result = self._aws.identitystore.list_groups()
+        result = self._paginate("list_groups", "Groups", IdentityStoreId=self._identity_store_id)
         if not result.is_success:
             log.error("build_group_index_failed", error=result.message)
             return result
@@ -234,7 +277,12 @@ class AwsIdentityCenterAdapter:
 
         # Step 1: UUID-shaped token — verify with describe_group.
         if _looks_like_group_id(candidate):
-            describe_result = self._aws.identitystore.describe_group(group_id=candidate)
+            describe_result = self._call(
+                lambda: self._identitystore.describe_group(
+                    IdentityStoreId=self._identity_store_id,
+                    GroupId=candidate,
+                )
+            )
             if describe_result.is_success:
                 self._group_id_cache[candidate] = candidate
                 log.info("resolve_group_id_uuid", group_id=candidate)
@@ -303,8 +351,15 @@ class AwsIdentityCenterAdapter:
         Identity Store ID is obtained from the pre-configured client.
         """
         log = logger.bind(user_email=user_email, adapter="aws_identity_center")
-        result = self._aws.identitystore.get_user_id_by_username(
-            username=user_email,
+        result = self._call(
+            lambda: self._identitystore.get_user_id(
+                IdentityStoreId=self._identity_store_id,
+                # AttributeValue is a boto3 "document" type (any JSON scalar); the
+                # generated stub over-narrows it to Mapping[str, Any].
+                AlternateIdentifier={
+                    "UniqueAttribute": {"AttributePath": "userName", "AttributeValue": user_email}  # type: ignore[typeddict-item]
+                },
+            )
         )
         if not result.is_success:
             # IdentityStore returns ResourceNotFoundException for unknown users.
@@ -348,11 +403,14 @@ class AwsIdentityCenterAdapter:
         name = self._build_identitystore_name(user_email)
         display_name = f"{name['GivenName']} {name['FamilyName']}".strip()
 
-        result = self._aws.identitystore.create_user(
-            UserName=user_email,
-            DisplayName=display_name,
-            Name=name,
-            Emails=[{"Value": user_email, "Primary": True, "Type": "WORK"}],
+        result = self._call(
+            lambda: self._identitystore.create_user(
+                IdentityStoreId=self._identity_store_id,
+                UserName=user_email,
+                DisplayName=display_name,
+                Name=name,
+                Emails=[{"Value": user_email, "Primary": True, "Type": "WORK"}],
+            )
         )
         if result.is_success:
             user_id = (result.data or {}).get("UserId", "")
@@ -389,8 +447,11 @@ class AwsIdentityCenterAdapter:
             return id_result
 
         user_id = (id_result.data or {}).get("user_id", "")
-        result = self._aws.identitystore.delete_user(
-            user_id=user_id,
+        result = self._call(
+            lambda: self._identitystore.delete_user(
+                IdentityStoreId=self._identity_store_id,
+                UserId=user_id,
+            )
         )
         if result.is_success:
             log.info("remove_user_deleted", user_id=user_id)
@@ -437,9 +498,12 @@ class AwsIdentityCenterAdapter:
         group_id = str(group_id_result.data)
 
         # Check if already a member (idempotency).
-        membership_result = self._aws.identitystore.get_group_membership_id(
-            group_id=group_id,
-            member_id={"UserId": user_id},
+        membership_result = self._call(
+            lambda: self._identitystore.get_group_membership_id(
+                IdentityStoreId=self._identity_store_id,
+                GroupId=group_id,
+                MemberId={"UserId": user_id},
+            )
         )
         if membership_result.is_success:
             log.info("apply_entitlement_already_member", group_id=group_id)
@@ -447,9 +511,12 @@ class AwsIdentityCenterAdapter:
         if membership_result.status != OperationStatus.NOT_FOUND:
             return membership_result
 
-        result = self._aws.identitystore.create_group_membership(
-            GroupId=group_id,
-            MemberId={"UserId": user_id},
+        result = self._call(
+            lambda: self._identitystore.create_group_membership(
+                IdentityStoreId=self._identity_store_id,
+                GroupId=group_id,
+                MemberId={"UserId": user_id},
+            )
         )
         if result.is_success:
             log.info("apply_entitlement_added", group_id=group_id)
@@ -495,9 +562,12 @@ class AwsIdentityCenterAdapter:
             return group_id_result
         group_id = str(group_id_result.data)
 
-        membership_result = self._aws.identitystore.get_group_membership_id(
-            group_id=group_id,
-            member_id={"UserId": user_id},
+        membership_result = self._call(
+            lambda: self._identitystore.get_group_membership_id(
+                IdentityStoreId=self._identity_store_id,
+                GroupId=group_id,
+                MemberId={"UserId": user_id},
+            )
         )
         if not membership_result.is_success:
             if membership_result.status == OperationStatus.NOT_FOUND:
@@ -506,8 +576,11 @@ class AwsIdentityCenterAdapter:
             return membership_result
 
         membership_id: str = (membership_result.data or {}).get("MembershipId", "")
-        result = self._aws.identitystore.delete_group_membership(
-            membership_id=membership_id,
+        result = self._call(
+            lambda: self._identitystore.delete_group_membership(
+                IdentityStoreId=self._identity_store_id,
+                MembershipId=membership_id,
+            )
         )
         if result.is_success:
             log.info("remove_entitlement_removed", group_id=group_id)
@@ -528,8 +601,11 @@ class AwsIdentityCenterAdapter:
             return id_result
         user_id = (id_result.data or {}).get("user_id", "")
 
-        result = self._aws.identitystore.list_group_memberships_for_member(
-            member_id={"UserId": user_id},
+        result = self._paginate(
+            "list_group_memberships_for_member",
+            "GroupMemberships",
+            IdentityStoreId=self._identity_store_id,
+            MemberId={"UserId": user_id},
         )
         if not result.is_success:
             log.error("fetch_current_state_failed", error=result.message)
@@ -591,7 +667,12 @@ class AwsIdentityCenterAdapter:
         log = logger.bind(group_id=resolved_group_id, adapter="aws_identity_center")
         log.info("list_group_members_started")
 
-        memberships_result = self._aws.identitystore.list_group_memberships(group_id=resolved_group_id)
+        memberships_result = self._paginate(
+            "list_group_memberships",
+            "GroupMemberships",
+            IdentityStoreId=self._identity_store_id,
+            GroupId=resolved_group_id,
+        )
         if not memberships_result.is_success:
             log.error("list_group_memberships_failed", error=memberships_result.message)
             return memberships_result
@@ -623,10 +704,10 @@ class AwsIdentityCenterAdapter:
         return OperationResult.success(data=member_emails)
 
     def list_members_for_groups(self, group_ids: set[str]) -> OperationResult:
-        """Return group_id -> member email set using a bulk read path.
+        """Return group_id -> member email set via per-group list_group_members reads.
 
-        Prefers the infrastructure client's list_groups_with_memberships orchestration
-        when available, then falls back to per-group list_group_members reads.
+        The typed boto3 identitystore client has no bulk group-membership
+        orchestration operation, so each group is resolved individually.
         """
         if not group_ids:
             return OperationResult.success(data={})
@@ -640,26 +721,17 @@ class AwsIdentityCenterAdapter:
             adapter="aws_identity_center",
             group_count=len(resolved_group_ids),
         )
-        bulk_mapping_result = self._list_members_for_groups_bulk(resolved_group_ids)
-        if bulk_mapping_result.is_success and isinstance(bulk_mapping_result.data, dict):
-            log.info("list_members_for_groups_ok", groups=len(bulk_mapping_result.data))
-            return bulk_mapping_result
-        if not bulk_mapping_result.is_success:
-            log.warning(
-                "list_members_for_groups_bulk_failed",
-                error=bulk_mapping_result.message,
-            )
 
-        fallback_mapping: dict[str, set[str]] = {}
+        mapping: dict[str, set[str]] = {}
         for group_id in resolved_group_ids:
             result = self.list_group_members(group_id)
             if not result.is_success:
                 return result
             members = result.data if isinstance(result.data, set) else set()
-            fallback_mapping[group_id] = {email for email in members if isinstance(email, str)}
+            mapping[group_id] = {email for email in members if isinstance(email, str)}
 
-        log.info("list_members_for_groups_ok_fallback", groups=len(fallback_mapping))
-        return OperationResult.success(data=fallback_mapping)
+        log.info("list_members_for_groups_ok", groups=len(mapping))
+        return OperationResult.success(data=mapping)
 
     def _resolve_group_ids(self, group_ids: set[str]) -> OperationResult:
         """Resolve many group identifiers to canonical GroupIds."""
@@ -670,72 +742,6 @@ class AwsIdentityCenterAdapter:
                 return resolved_result
             resolved_group_ids.add(resolved_result.data)
         return OperationResult.success(data=resolved_group_ids)
-
-    def _list_members_for_groups_bulk(  # noqa: C901
-        self, group_ids: set[str]
-    ) -> OperationResult:
-        """Attempt one bulk list path for many groups."""
-        identitystore = self._aws.identitystore
-        if not hasattr(identitystore, "list_groups_with_memberships"):
-            return OperationResult.error(
-                OperationStatus.NOT_FOUND,
-                message="bulk_memberships_unsupported",
-                error_code="BULK_MEMBERSHIPS_UNSUPPORTED",
-            )
-
-        target_ids = set(group_ids)
-        bulk_result = identitystore.list_groups_with_memberships(
-            groups_filters=[lambda group: isinstance(group, dict) and group.get("GroupId") in target_ids]
-        )
-        if not bulk_result.is_success or not isinstance(bulk_result.data, list):
-            return bulk_result
-
-        mapping: dict[str, set[str]] = {}
-        user_ids_by_group: dict[str, set[str]] = {}
-        for group in bulk_result.data:
-            if not isinstance(group, dict):
-                continue
-            group_identifier = group.get("GroupId")
-            if not isinstance(group_identifier, str) or group_identifier not in target_ids:
-                continue
-            members = group.get("GroupMemberships", [])
-            emails: set[str] = set()
-            pending_user_ids: set[str] = set()
-            if isinstance(members, list):
-                for membership in members:
-                    if not isinstance(membership, dict):
-                        continue
-                    details = membership.get("UserDetails")
-                    if isinstance(details, dict):
-                        email = self._extract_primary_email(details)
-                        if email is not None:
-                            emails.add(email)
-                            continue
-
-                    member_id = membership.get("MemberId")
-                    if isinstance(member_id, dict):
-                        user_id = member_id.get("UserId")
-                        if isinstance(user_id, str) and user_id:
-                            pending_user_ids.add(user_id)
-            mapping[group_identifier] = emails
-            user_ids_by_group[group_identifier] = pending_user_ids
-
-        unresolved_user_ids = {user_id for user_ids in user_ids_by_group.values() for user_id in user_ids}
-        if unresolved_user_ids:
-            user_map_result = self._build_user_id_email_map()
-            if not user_map_result.is_success or not isinstance(user_map_result.data, dict):
-                return user_map_result
-            user_id_to_email: dict[str, str] = user_map_result.data
-
-            for group_identifier, pending_user_ids in user_ids_by_group.items():
-                mapping.setdefault(group_identifier, set()).update(
-                    user_id_to_email[user_id] for user_id in pending_user_ids if user_id in user_id_to_email
-                )
-
-        for group_identifier in target_ids:
-            mapping.setdefault(group_identifier, set())
-
-        return OperationResult.success(data=mapping)
 
     def _build_user_id_email_map(self) -> OperationResult:
         """Build a UserId → primary email mapping from all identity store users.
@@ -1205,3 +1211,17 @@ class AwsIdentityCenterAdapter:
                 current_entitlement_ids=group_ids,
             )
         )
+
+
+def build_aws_identity_center_adapter() -> AwsIdentityCenterAdapter:
+    """Build the production adapter wired to a typed boto3 identitystore client.
+
+    Identity Store/Identity Center is centrally managed in the AWS
+    Organization's management account, while sre-bot's own task runs in a
+    member account, so identitystore calls assume ``SERVICE_ROLE_MAP``'s org
+    role when one is configured.
+    """
+    settings = get_aws_settings()
+    role_arn = settings.SERVICE_ROLE_MAP.get("identitystore") or None
+    client = cast("_BotoIdentityStoreClient", get_aws_client("identitystore", role_arn=role_arn))
+    return AwsIdentityCenterAdapter(client, settings.INSTANCE_ID)

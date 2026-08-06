@@ -4,9 +4,10 @@ title: >-
   Migrate access-sync AWS adapter off infrastructure/clients/aws IdentityStore
   onto integrations/aws/identity_store_next
 status: In Progress
-assignee: []
+assignee:
+  - '@me'
 created_date: '2026-07-29 21:11'
-updated_date: '2026-08-06 16:07'
+updated_date: '2026-08-06 17:39'
 labels:
   - clients
   - phase-3
@@ -36,11 +37,11 @@ Test migration: relocate app/tests/integrations/aws/test_identity_store_next.py 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 packages/access/sync/providers.py and adapters/aws_identity_center.py no longer import infrastructure.clients.aws; the Path B adapter calls a typed boto3 identitystore client from get_aws_client("identitystore") directly and classifies via classify_aws_error - no AWSClients facade, no identity_store_next dependency, no wrapper class
-- [ ] #2 All access-sync adapter unit + integration tests pass behavior-neutral (same OperationResult status/error_code per method, including ResourceNotFoundException -> NOT_FOUND normalization), verified against the method-name mapping (get_user_id_by_username, describe_group, create/delete_group_membership, etc.)
-- [ ] #3 classify_aws_error (from TASK-22.2) is reused and extended with any identitystore-specific families, with coverage under tests/unit/integrations/aws/; identity_store_next is left untouched for TASK-23 to delete; any touched vendor test lands under tests/unit or tests/integration (legacy tests/integrations/ count does not grow)
-- [ ] #4 moto-backed integration conformance test(s) under app/tests/integration/ exercise the identitystore consumer's create_user/delete_user/get_user_id/describe_user/list_users/create_group_membership/delete_group_membership/list_group_memberships operations against real identitystore semantics via moto.mock_aws() (mirroring tests/integration/infrastructure/idempotency/conftest.py's fixture pattern), additive alongside existing MagicMock-based unit tests -- not a replacement
-- [ ] #5 get_aws_client("identitystore") is invoked with role_arn resolved from AwsSettings.SERVICE_ROLE_MAP["identitystore"] (ORG_ROLE_ARN) so identitystore calls keep running under the assumed org-account role, not the bot's default credentials; covered by a unit test asserting the role_arn passed to get_aws_client
+- [x] #1 packages/access/sync/providers.py and adapters/aws_identity_center.py no longer import infrastructure.clients.aws; the Path B adapter calls a typed boto3 identitystore client from get_aws_client("identitystore") directly and classifies via classify_aws_error - no AWSClients facade, no identity_store_next dependency, no wrapper class
+- [x] #2 All access-sync adapter unit + integration tests pass behavior-neutral (same OperationResult status/error_code per method, including ResourceNotFoundException -> NOT_FOUND normalization), verified against the method-name mapping (get_user_id_by_username, describe_group, create/delete_group_membership, etc.)
+- [x] #3 classify_aws_error (from TASK-22.2) is reused and extended with any identitystore-specific families, with coverage under tests/unit/integrations/aws/; identity_store_next is left untouched for TASK-23 to delete; any touched vendor test lands under tests/unit or tests/integration (legacy tests/integrations/ count does not grow)
+- [x] #4 moto-backed integration conformance test(s) under app/tests/integration/ exercise the identitystore consumer's create_user/delete_user/get_user_id/describe_user/list_users/create_group_membership/delete_group_membership/list_group_memberships operations against real identitystore semantics via moto.mock_aws() (mirroring tests/integration/infrastructure/idempotency/conftest.py's fixture pattern), additive alongside existing MagicMock-based unit tests -- not a replacement
+- [x] #5 get_aws_client("identitystore") is invoked with role_arn resolved from AwsSettings.SERVICE_ROLE_MAP["identitystore"] (ORG_ROLE_ARN) so identitystore calls keep running under the assumed org-account role, not the bot's default credentials; covered by a unit test asserting the role_arn passed to get_aws_client
 <!-- AC:END -->
 
 ## Definition of Done
@@ -100,6 +101,12 @@ SIZE GATE: production diff is ONE subsystem (adapter file + provider file + a po
 
 DOUBTS (verify at impl): (a) whether get_group_membership_id's two call sites (apply_entitlement, remove_entitlement) should share one private wrapper vs. inline calls — purely a style choice, no behavior impact; (b) exact ClientError shape moto raises for its supported-but-not-found cases (e.g. get_user_id on an unknown username) vs. real AWS, to make sure the moto conformance test's NOT_FOUND assertions match; (c) [RESOLVED 2026-08-05, confirmed by human] SERVICE_ROLE_MAP's identitystore role_arn is genuinely required in every real deployed environment, not a hypothetical no-op — Identity Store/Identity Center is centrally managed in the AWS Organization's management account, while sre-bot's own ECS task runs in a member account, so the assumed role is load-bearing for actual connectivity, not defensive-only. sso-admin shares the identical rationale (also mapped to ORG_ROLE_ARN in SERVICE_ROLE_MAP) but sso-admin consumers are out of this task's scope (covered by the AWS-remainder decomposition, TASK-25.2.4).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Migrated AwsIdentityCenterAdapter off the AWSClients facade onto a typed boto3 identitystore client (types_boto3_identitystore.client.IdentityStoreClient) injected via a new build_aws_identity_center_adapter() factory in adapters/aws_identity_center.py. All 12 identitystore call sites converted to direct typed calls through two private helpers (_call/_paginate) that classify botocore errors via integrations.aws.client.classify_aws_error; removed the dead _list_members_for_groups_bulk path (real boto3 client has no list_groups_with_memberships) so list_members_for_groups always uses the per-group fallback. providers.py now calls build_aws_identity_center_adapter() instead of AwsIdentityCenterAdapter(get_aws_clients()). Root-cause fix: integrations/aws/client.py::get_aws_client() previously called sts.assume_role() eagerly when role_arn was set, which broke app-startup tests once the identitystore adapter began invoking it during the packages.access.sync startup_warmup pluggy hook; changed to use botocore DeferredRefreshableCredentials/create_assume_role_refresher so AssumeRole is deferred to the first real API call (matches prior lazy facade behavior; no other current get_aws_client caller passes role_arn, so this is a safe, behavior-neutral change). Test suite: fixed a MagicMock config bug in 4 test_aws_identity_center_adapter.py tests where describe_group.return_value was set without clearing the fixture's default describe_group.side_effect (side_effect silently wins over return_value), added client.describe_group.side_effect = None before each override. Test evidence: tests/unit/packages/access/sync + tests/integration/packages/access/sync + tests/integration/integrations/aws/test_identity_store_conformance.py = 182 passed. Full suite (tests --ignore=tests/smoke --ignore=tests/unit/modules/aws, the latter a pre-existing unrelated collection break) = 2959 passed, 5 pre-existing unrelated failures (test_client_next.py x2, test_webhooks_aws_sns.py x3) verified identical on unmodified baseline. ruff check . clean; mypy clean on all 3 touched files (integrations/aws/client.py, packages/access/sync/adapters/aws_identity_center.py, packages/access/sync/providers.py). DoD#1 (behavior-neutral + PR citing decisions/layers.md, decisions/outbound-clients.md, decisions/sdk-typing.md) left for human PR-description/DoD verification.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
