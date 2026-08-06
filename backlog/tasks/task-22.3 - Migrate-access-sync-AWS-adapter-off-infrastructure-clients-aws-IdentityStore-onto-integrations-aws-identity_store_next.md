@@ -3,10 +3,10 @@ id: TASK-22.3
 title: >-
   Migrate access-sync AWS adapter off infrastructure/clients/aws IdentityStore
   onto integrations/aws/identity_store_next
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-07-29 21:11'
-updated_date: '2026-08-05 16:03'
+updated_date: '2026-08-06 16:07'
 labels:
   - clients
   - phase-3

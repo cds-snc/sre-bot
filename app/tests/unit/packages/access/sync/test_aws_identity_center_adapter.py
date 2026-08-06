@@ -1,162 +1,140 @@
-"""Unit tests for the AWS Identity Center access-sync adapter."""
+"""Unit tests for the AWS Identity Center access-sync adapter.
 
-from typing import Any, cast
+The adapter is injected with a typed boto3 ``identitystore`` client — never
+an ``AWSClients`` facade. Fakes here are ``MagicMock(spec=...)`` instances
+restricted to the real boto3 IdentityStore operation surface (plus
+``get_paginator``), so any facade-only helper (e.g. ``list_groups_with_memberships``)
+is absent by construction, matching production.
+"""
+
+from typing import Any
+from unittest.mock import MagicMock, call
 
 import pytest
+from botocore.exceptions import ClientError
 
-from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.sync.adapters.aws_identity_center import (
     AwsIdentityCenterAdapter,
     normalize_group_name,
 )
 
+_IDENTITY_STORE_ID = "d-1234567890"
 
-class FakeIdentityStoreClient:
-    """Minimal Identity Store client test double."""
+_IDENTITYSTORE_CLIENT_METHODS = [
+    "list_users",
+    "list_groups",
+    "describe_group",
+    "get_user_id",
+    "create_user",
+    "delete_user",
+    "get_group_membership_id",
+    "create_group_membership",
+    "delete_group_membership",
+    "list_group_memberships_for_member",
+    "list_group_memberships",
+    "get_paginator",
+]
 
-    def __init__(self) -> None:
-        self.calls: list[tuple[str, Any]] = []
-        self.describe_user_result: OperationResult = OperationResult.success(
-            data={"UserId": "user-123", "UserName": "alice@example.com"}
-        )
-        self.user_lookup_result: OperationResult = OperationResult.success(data={"UserId": "user-123"})
-        self.create_user_result: OperationResult = OperationResult.success(data={"UserId": "user-123"})
-        self.membership_lookup_result: OperationResult = OperationResult.error(
-            OperationStatus.NOT_FOUND,
-            message="membership not found",
-            error_code="RESOURCE_NOT_FOUND",
-        )
-        self.create_membership_result: OperationResult = OperationResult.success()
-        self.delete_membership_result: OperationResult = OperationResult.success()
-        self.list_group_memberships_for_member_result: OperationResult = OperationResult.success(data=[])
-        self.list_group_memberships_result: OperationResult = OperationResult.success(data=[])
-        self.describe_group_result: OperationResult = OperationResult.success(data={})
-        self.get_group_id_by_group_name_result: OperationResult = OperationResult.success(data={"GroupId": "group-123"})
-        self.list_groups_with_memberships_result: OperationResult = OperationResult.success(data=[])
-        self.list_groups_result: OperationResult = OperationResult.success(data=[])
-        self.list_users_result: OperationResult = OperationResult.success(data=[])
-        self.delete_user_result: OperationResult = OperationResult.success()
-
-    def get_user_id_by_username(self, username: str) -> OperationResult:
-        self.calls.append(("get_user_id_by_username", username))
-        return self.user_lookup_result
-
-    def describe_user_by_username(self, username: str) -> OperationResult:
-        self.calls.append(("describe_user_by_username", username))
-        return self.describe_user_result
-
-    def create_user(self, **kwargs: Any) -> OperationResult:
-        self.calls.append(("create_user", kwargs))
-        return self.create_user_result
-
-    def get_group_membership_id(self, **kwargs: Any) -> OperationResult:
-        self.calls.append(("get_group_membership_id", kwargs))
-        return self.membership_lookup_result
-
-    def create_group_membership(self, **kwargs: Any) -> OperationResult:
-        self.calls.append(("create_group_membership", kwargs))
-        return self.create_membership_result
-
-    def delete_group_membership(self, **kwargs: Any) -> OperationResult:
-        self.calls.append(("delete_group_membership", kwargs))
-        return self.delete_membership_result
-
-    def list_group_memberships_for_member(self, **kwargs: Any) -> OperationResult:
-        self.calls.append(("list_group_memberships_for_member", kwargs))
-        return self.list_group_memberships_for_member_result
-
-    def list_group_memberships(self, **kwargs: Any) -> OperationResult:
-        self.calls.append(("list_group_memberships", kwargs))
-        return self.list_group_memberships_result
-
-    def describe_group(self, **kwargs: Any) -> OperationResult:
-        self.calls.append(("describe_group", kwargs))
-        return self.describe_group_result
-
-    def get_group_id_by_group_name(self, **kwargs: Any) -> OperationResult:
-        self.calls.append(("get_group_id_by_group_name", kwargs))
-        return self.get_group_id_by_group_name_result
-
-    def list_users(self, **kwargs: Any) -> OperationResult:
-        self.calls.append(("list_users", kwargs))
-        return self.list_users_result
-
-    def list_groups_with_memberships(self, **kwargs: Any) -> OperationResult:
-        self.calls.append(("list_groups_with_memberships", kwargs))
-        return self.list_groups_with_memberships_result
-
-    def list_groups(self, **kwargs: Any) -> OperationResult:
-        self.calls.append(("list_groups", kwargs))
-        return self.list_groups_result
-
-    def delete_user(self, **kwargs: Any) -> OperationResult:
-        self.calls.append(("delete_user", kwargs))
-        return self.delete_user_result
+_DEFAULT_PAGES: dict[str, list[dict[str, Any]]] = {
+    "list_users": [{"Users": []}],
+    "list_groups": [{"Groups": []}],
+    "list_group_memberships": [{"GroupMemberships": []}],
+    "list_group_memberships_for_member": [{"GroupMemberships": []}],
+}
 
 
-class FakeAWSClients:
-    """Minimal AWS clients facade for adapter tests."""
-
-    def __init__(self, identitystore: FakeIdentityStoreClient) -> None:
-        self.identitystore = identitystore
+def _client_error(operation: str, code: str = "ResourceNotFoundException", message: str = "not found") -> ClientError:
+    return ClientError(error_response={"Error": {"Code": code, "Message": message}}, operation_name=operation)
 
 
-def make_adapter(
-    client: FakeIdentityStoreClient,
-) -> AwsIdentityCenterAdapter:
-    """Create an adapter with a fake AWS facade."""
-    return AwsIdentityCenterAdapter(
-        cast(Any, FakeAWSClients(client)),
-    )
+def _configure_paginated(client: MagicMock, **overrides: list[dict[str, Any]] | ClientError) -> None:
+    """Wire ``client.get_paginator(op).paginate(...)`` per operation.
+
+    Each override is either a list of pages to return, or a ``ClientError``
+    to raise when ``paginate(...)`` is invoked.
+    """
+    pages_by_op: dict[str, Any] = {**_DEFAULT_PAGES, **overrides}
+    paginators: dict[str, MagicMock] = {}
+    for op, value in pages_by_op.items():
+        paginator = MagicMock()
+        if isinstance(value, Exception):
+            paginator.paginate.side_effect = value
+        else:
+            paginator.paginate.return_value = value
+        paginators[op] = paginator
+    client.get_paginator.side_effect = lambda operation_name: paginators[operation_name]
+
+
+def make_client() -> MagicMock:
+    """Build a typed-boto3-identitystore-shaped mock restricted to the real operation surface."""
+    client = MagicMock(spec=_IDENTITYSTORE_CLIENT_METHODS)
+    client.describe_group.side_effect = _client_error("DescribeGroup")
+    client.get_group_membership_id.side_effect = _client_error("GetGroupMembershipId")
+    client.get_user_id.return_value = {"UserId": "user-123"}
+    client.create_user.return_value = {"UserId": "user-123"}
+    client.create_group_membership.return_value = {"MembershipId": "membership-123"}
+    client.delete_group_membership.return_value = {}
+    client.delete_user.return_value = {}
+    _configure_paginated(client)
+    return client
+
+
+def make_adapter(client: MagicMock) -> AwsIdentityCenterAdapter:
+    """Create an adapter with a typed identitystore client — no facade."""
+    return AwsIdentityCenterAdapter(identitystore=client, identity_store_id=_IDENTITY_STORE_ID)
 
 
 @pytest.mark.unit
 def test_ensure_user_uses_username_lookup_instead_of_list_users() -> None:
-    """User existence checks should use the dedicated username lookup helper."""
-    client = FakeIdentityStoreClient()
+    """User existence checks should use GetUserId, not a full ListUsers scan."""
+    client = make_client()
     adapter = make_adapter(client)
 
     result = adapter.ensure_user("alice@example.com")
 
     assert result.is_success
-    assert ("get_user_id_by_username", "alice@example.com") in client.calls
-    assert all(call[0] != "list_users" for call in client.calls)
+    assert client.get_user_id.called
+    alternate_identifier = client.get_user_id.call_args.kwargs["AlternateIdentifier"]
+    assert alternate_identifier["UniqueAttribute"]["AttributeValue"] == "alice@example.com"
+    assert not client.list_users.called
+
+
+@pytest.mark.unit
+def test_ensure_user_passes_identity_store_id_to_get_user_id() -> None:
+    """Every call must be scoped to the configured Identity Store ID."""
+    client = make_client()
+    adapter = make_adapter(client)
+
+    adapter.ensure_user("alice@example.com")
+
+    assert client.get_user_id.call_args.kwargs["IdentityStoreId"] == _IDENTITY_STORE_ID
 
 
 @pytest.mark.unit
 def test_ensure_user_creates_when_identity_store_user_not_found() -> None:
-    """ResourceNotFoundException from get_user_id should trigger user creation."""
-    client = FakeIdentityStoreClient()
-    client.user_lookup_result = OperationResult.error(
-        OperationStatus.PERMANENT_ERROR,
-        message="USER not found.",
-        error_code="ResourceNotFoundException",
-    )
+    """ResourceNotFoundException from GetUserId should trigger user creation."""
+    client = make_client()
+    client.get_user_id.side_effect = _client_error("GetUserId")
     adapter = make_adapter(client)
 
     result = adapter.ensure_user("alice@example.com")
 
     assert result.is_success
-    assert any(call[0] == "create_user" for call in client.calls)
+    assert client.create_user.called
 
 
 @pytest.mark.unit
 def test_ensure_user_create_payload_matches_identitystore_requirements() -> None:
     """CreateUser payload should include Name and canonical WORK email type."""
-    client = FakeIdentityStoreClient()
-    client.user_lookup_result = OperationResult.error(
-        OperationStatus.PERMANENT_ERROR,
-        message="USER not found.",
-        error_code="ResourceNotFoundException",
-    )
+    client = make_client()
+    client.get_user_id.side_effect = _client_error("GetUserId")
     adapter = make_adapter(client)
 
     result = adapter.ensure_user("sre-bot@cds-snc.ca")
 
     assert result.is_success
-    create_calls = [call for call in client.calls if call[0] == "create_user"]
-    assert len(create_calls) == 1
-    payload = create_calls[0][1]
+    assert client.create_user.call_count == 1
+    payload = client.create_user.call_args.kwargs
     assert payload["UserName"] == "sre-bot@cds-snc.ca"
     assert payload["DisplayName"] == "Sre Bot"
     assert payload["Name"] == {"GivenName": "Sre", "FamilyName": "Bot"}
@@ -165,13 +143,12 @@ def test_ensure_user_create_payload_matches_identitystore_requirements() -> None
 
 @pytest.mark.unit
 def test_apply_entitlement_does_not_create_membership_when_lookup_fails() -> None:
-    """Only NOT_FOUND should trigger membership creation."""
-    client = FakeIdentityStoreClient()
-    client.membership_lookup_result = OperationResult.error(
-        OperationStatus.PERMANENT_ERROR,
-        message="access denied",
-        error_code="ACCESS_DENIED",
+    """Only NOT_FOUND should trigger membership creation; other errors propagate."""
+    client = make_client()
+    client.get_group_membership_id.side_effect = _client_error(
+        "GetGroupMembershipId", code="AccessDeniedException", message="access denied"
     )
+    client.describe_group.return_value = {"GroupId": "11111111-2222-3333-4444-555555555555"}
     adapter = make_adapter(client)
 
     result = adapter.apply_entitlement(
@@ -181,30 +158,69 @@ def test_apply_entitlement_does_not_create_membership_when_lookup_fails() -> Non
     )
 
     assert not result.is_success
-    assert result.error_code == "ACCESS_DENIED"
-    assert all(call[0] != "create_group_membership" for call in client.calls)
+    assert result.error_code == "AccessDeniedException"
+    assert not client.create_group_membership.called
+
+
+@pytest.mark.unit
+def test_remove_entitlement_reports_already_absent_when_not_member() -> None:
+    """GetGroupMembershipId NOT_FOUND should be treated as an idempotent no-op."""
+    client = make_client()
+    client.describe_group.return_value = {"GroupId": "11111111-2222-3333-4444-555555555555"}
+    adapter = make_adapter(client)
+
+    result = adapter.remove_entitlement(
+        "alice@example.com",
+        "group",
+        "11111111-2222-3333-4444-555555555555",
+    )
+
+    assert result.is_success
+    assert result.message == "group_membership_already_absent"
+    assert not client.delete_group_membership.called
+
+
+@pytest.mark.unit
+def test_remove_user_reports_already_absent_when_user_not_found() -> None:
+    """ResourceNotFoundException from GetUserId should be an idempotent no-op for remove_user."""
+    client = make_client()
+    client.get_user_id.side_effect = _client_error("GetUserId")
+    adapter = make_adapter(client)
+
+    result = adapter.remove_user("alice@example.com")
+
+    assert result.is_success
+    assert result.message == "user_already_absent"
+    assert not client.delete_user.called
 
 
 @pytest.mark.unit
 def test_list_all_provisioned_users_collects_primary_emails() -> None:
-    """Primary emails should be normalized from the list_users client response."""
-    client = FakeIdentityStoreClient()
-    client.list_users_result = OperationResult.success(
-        data=[
+    """Primary emails should be normalized from the paginated list_users response."""
+    client = make_client()
+    _configure_paginated(
+        client,
+        list_users=[
             {
-                "UserId": "user-1",
-                "Emails": [
-                    {"Value": "Alice@example.com", "Primary": True},
-                    {"Value": "alt@example.com", "Primary": False},
-                ],
+                "Users": [
+                    {
+                        "UserId": "user-1",
+                        "Emails": [
+                            {"Value": "Alice@example.com", "Primary": True},
+                            {"Value": "alt@example.com", "Primary": False},
+                        ],
+                    },
+                ]
             },
             {
-                "UserId": "user-2",
-                "Emails": [
-                    {"Value": "bob@example.com", "Primary": True},
-                ],
+                "Users": [
+                    {
+                        "UserId": "user-2",
+                        "Emails": [{"Value": "bob@example.com", "Primary": True}],
+                    },
+                ]
             },
-        ]
+        ],
     )
     adapter = make_adapter(client)
 
@@ -212,73 +228,24 @@ def test_list_all_provisioned_users_collects_primary_emails() -> None:
 
     assert result.is_success
     assert result.data == {"alice@example.com", "bob@example.com"}
+    client.get_paginator.assert_any_call("list_users")
 
 
 @pytest.mark.unit
-def test_list_members_for_groups_uses_bulk_path() -> None:
-    """Bulk group read should map GroupMemberships.UserDetails to email sets."""
-    client = FakeIdentityStoreClient()
+def test_list_members_for_groups_always_uses_per_group_fallback() -> None:
+    """The typed client has no ``list_groups_with_memberships`` helper.
+
+    Unlike the legacy facade, the real boto3 IdentityStore client does not
+    expose a bulk group-membership orchestration method, so the adapter must
+    always resolve members via the per-group ``list_group_memberships`` path.
+    """
+    client = make_client()
     group_1_id = "11111111-2222-3333-4444-555555555555"
-    group_2_id = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-    client.list_groups_with_memberships_result = OperationResult.success(
-        data=[
-            {
-                "GroupId": group_1_id,
-                "GroupMemberships": [
-                    {
-                        "MemberId": {"UserId": "u-1"},
-                        "UserDetails": {
-                            "UserId": "u-1",
-                            "Emails": [
-                                {
-                                    "Value": "Alice@example.com",
-                                    "Primary": True,
-                                }
-                            ],
-                        },
-                    }
-                ],
-            },
-            {
-                "GroupId": group_2_id,
-                "GroupMemberships": [],
-            },
-        ]
-    )
-    adapter = make_adapter(client)
-
-    result = adapter.list_members_for_groups({group_1_id, group_2_id})
-
-    assert result.is_success
-    assert result.data == {
-        group_1_id: {"alice@example.com"},
-        group_2_id: set(),
-    }
-    assert any(call[0] == "list_groups_with_memberships" for call in client.calls)
-
-
-@pytest.mark.unit
-def test_list_members_for_groups_falls_back_when_bulk_fails() -> None:
-    """Fallback should call list_group_members when bulk orchestration fails."""
-    client = FakeIdentityStoreClient()
-    group_1_id = "11111111-2222-3333-4444-555555555555"
-    client.list_groups_with_memberships_result = OperationResult.error(
-        OperationStatus.TRANSIENT_ERROR,
-        message="temporary failure",
-        error_code="THROTTLED",
-    )
-    client.list_group_memberships_result = OperationResult.success(
-        data=[
-            {"MemberId": {"UserId": "u-1"}},
-        ]
-    )
-    client.list_users_result = OperationResult.success(
-        data=[
-            {
-                "UserId": "u-1",
-                "Emails": [{"Value": "alice@example.com", "Primary": True}],
-            }
-        ]
+    client.describe_group.return_value = {"GroupId": group_1_id}
+    _configure_paginated(
+        client,
+        list_group_memberships=[{"GroupMemberships": [{"MemberId": {"UserId": "u-1"}}]}],
+        list_users=[{"Users": [{"UserId": "u-1", "Emails": [{"Value": "alice@example.com", "Primary": True}]}]}],
     )
     adapter = make_adapter(client)
 
@@ -286,57 +253,15 @@ def test_list_members_for_groups_falls_back_when_bulk_fails() -> None:
 
     assert result.is_success
     assert result.data == {group_1_id: {"alice@example.com"}}
-    assert any(call[0] == "list_group_memberships" for call in client.calls)
-
-
-@pytest.mark.unit
-def test_list_members_for_groups_bulk_resolves_member_ids_without_user_details() -> None:
-    """Bulk group read should resolve MemberId.UserId when UserDetails is omitted."""
-    client = FakeIdentityStoreClient()
-    group_1_id = "11111111-2222-3333-4444-555555555555"
-    client.list_groups_with_memberships_result = OperationResult.success(
-        data=[
-            {
-                "GroupId": group_1_id,
-                "GroupMemberships": [
-                    {"MemberId": {"UserId": "u-1"}},
-                    {"MemberId": {"UserId": "u-2"}},
-                ],
-            }
-        ]
-    )
-    client.list_users_result = OperationResult.success(
-        data=[
-            {
-                "UserId": "u-1",
-                "Emails": [{"Value": "Alice@example.com", "Primary": True}],
-            },
-            {
-                "UserId": "u-2",
-                "Emails": [{"Value": "bob@example.com", "Primary": True}],
-            },
-        ]
-    )
-    adapter = make_adapter(client)
-
-    result = adapter.list_members_for_groups({group_1_id})
-
-    assert result.is_success
-    assert result.data == {group_1_id: {"alice@example.com", "bob@example.com"}}
-    assert any(call[0] == "list_groups_with_memberships" for call in client.calls)
-    assert any(call[0] == "list_users" for call in client.calls)
+    assert not hasattr(client, "list_groups_with_memberships")
+    client.get_paginator.assert_any_call("list_group_memberships")
 
 
 @pytest.mark.unit
 def test_apply_entitlement_resolves_group_name_to_group_id() -> None:
     """Group-name entitlement IDs should resolve via the group index."""
-    client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(
-        OperationStatus.NOT_FOUND,
-        message="group id not found",
-        error_code="GROUP_NOT_FOUND",
-    )
-    client.list_groups_result = OperationResult.success(data=_make_group_list(("team1-prd-admin", "resolved-group-id")))
+    client = make_client()
+    _configure_paginated(client, list_groups=[{"Groups": _make_group_list(("team1-prd-admin", "resolved-group-id"))}])
     adapter = make_adapter(client)
 
     result = adapter.apply_entitlement(
@@ -346,8 +271,7 @@ def test_apply_entitlement_resolves_group_name_to_group_id() -> None:
     )
 
     assert result.is_success
-    create_call = next(call for call in client.calls if call[0] == "create_group_membership")
-    assert create_call[1]["GroupId"] == "resolved-group-id"
+    assert client.create_group_membership.call_args.kwargs["GroupId"] == "resolved-group-id"
 
 
 # ---------------------------------------------------------------------------
@@ -374,9 +298,9 @@ def _make_group_list(*name_id_pairs: tuple[str, str]) -> list[dict[str, str]]:
 @pytest.mark.unit
 def test_resolve_group_id_uuid_passthrough() -> None:
     """A UUID that describe_group confirms should be returned as-is without index."""
-    client = FakeIdentityStoreClient()
+    client = make_client()
     group_id = "11111111-2222-3333-4444-555555555555"
-    client.describe_group_result = OperationResult.success(data={"GroupId": group_id, "DisplayName": "Admin"})
+    client.describe_group.return_value = {"GroupId": group_id, "DisplayName": "Admin"}
     adapter = make_adapter(client)
 
     result = adapter.canonicalize_entitlement_id("group", group_id)
@@ -384,15 +308,14 @@ def test_resolve_group_id_uuid_passthrough() -> None:
     assert result.is_success
     assert result.data == group_id
     # list_groups should NOT have been called for UUID resolution
-    assert all(call[0] != "list_groups" for call in client.calls)
+    assert not client.list_groups.called
 
 
 @pytest.mark.unit
 def test_resolve_group_id_exact_display_name() -> None:
     """A token that exactly matches an AWS IC display name resolves via the index."""
-    client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
-    client.list_groups_result = OperationResult.success(data=_make_group_list(("admin", "group-admin-id")))
+    client = make_client()
+    _configure_paginated(client, list_groups=[{"Groups": _make_group_list(("admin", "group-admin-id"))}])
     adapter = make_adapter(client)
 
     result = adapter.canonicalize_entitlement_id("group", "admin")
@@ -404,23 +327,22 @@ def test_resolve_group_id_exact_display_name() -> None:
 @pytest.mark.unit
 def test_resolve_group_id_non_uuid_skips_describe_group() -> None:
     """Display-name tokens should not trigger describe_group UUID validation calls."""
-    client = FakeIdentityStoreClient()
-    client.list_groups_result = OperationResult.success(data=_make_group_list(("scratch", "group-scratch-id")))
+    client = make_client()
+    _configure_paginated(client, list_groups=[{"Groups": _make_group_list(("scratch", "group-scratch-id"))}])
     adapter = make_adapter(client)
 
     result = adapter.canonicalize_entitlement_id("group", "scratch")
 
     assert result.is_success
     assert result.data == "group-scratch-id"
-    assert all(call[0] != "describe_group" for call in client.calls)
+    assert not client.describe_group.called
 
 
 @pytest.mark.unit
 def test_resolve_group_id_normalized_display_name() -> None:
     """A token whose casefold matches an AWS IC group resolves via the index."""
-    client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
-    client.list_groups_result = OperationResult.success(data=_make_group_list(("FinOps-ReadOnly", "group-finops-id")))
+    client = make_client()
+    _configure_paginated(client, list_groups=[{"Groups": _make_group_list(("FinOps-ReadOnly", "group-finops-id"))}])
     adapter = make_adapter(client)
 
     # Token "finops-readonly" normalizes via casefold to "finops-readonly"
@@ -434,13 +356,17 @@ def test_resolve_group_id_normalized_display_name() -> None:
 @pytest.mark.unit
 def test_resolve_group_id_ambiguous_name_returns_error() -> None:
     """When normalized token matches multiple groups, AMBIGUOUS_GROUP_NAME is returned."""
-    client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
-    client.list_groups_result = OperationResult.success(
-        data=_make_group_list(
-            ("Admin", "group-admin-1"),
-            ("ADMIN", "group-admin-2"),
-        )
+    client = make_client()
+    _configure_paginated(
+        client,
+        list_groups=[
+            {
+                "Groups": _make_group_list(
+                    ("Admin", "group-admin-1"),
+                    ("ADMIN", "group-admin-2"),
+                )
+            }
+        ],
     )
     adapter = make_adapter(client)
 
@@ -453,9 +379,8 @@ def test_resolve_group_id_ambiguous_name_returns_error() -> None:
 @pytest.mark.unit
 def test_resolve_group_id_not_found_returns_error() -> None:
     """When no group matches the token, GROUP_ID_NOT_FOUND is returned."""
-    client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
-    client.list_groups_result = OperationResult.success(data=_make_group_list(("other-group", "group-other-id")))
+    client = make_client()
+    _configure_paginated(client, list_groups=[{"Groups": _make_group_list(("other-group", "group-other-id"))}])
     adapter = make_adapter(client)
 
     result = adapter.canonicalize_entitlement_id("group", "missing")
@@ -467,9 +392,8 @@ def test_resolve_group_id_not_found_returns_error() -> None:
 @pytest.mark.unit
 def test_resolve_group_id_caches_result() -> None:
     """Repeated resolution of the same token should not re-call list_groups."""
-    client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
-    client.list_groups_result = OperationResult.success(data=_make_group_list(("admin", "group-cached-id")))
+    client = make_client()
+    _configure_paginated(client, list_groups=[{"Groups": _make_group_list(("admin", "group-cached-id"))}])
     adapter = make_adapter(client)
 
     result1 = adapter.canonicalize_entitlement_id("group", "admin")
@@ -477,33 +401,27 @@ def test_resolve_group_id_caches_result() -> None:
 
     assert result1.is_success and result2.is_success
     assert result1.data == result2.data == "group-cached-id"
-    assert sum(1 for call in client.calls if call[0] == "list_groups") == 1
+    assert client.get_paginator.call_args_list.count(call("list_groups")) == 1
 
 
 @pytest.mark.unit
 def test_resolve_group_id_list_groups_failure_propagates() -> None:
     """If list_groups fails, the error propagates from canonicalize_entitlement_id."""
-    client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
-    client.list_groups_result = OperationResult.error(
-        OperationStatus.TRANSIENT_ERROR,
-        message="throttled",
-        error_code="THROTTLED",
-    )
+    client = make_client()
+    _configure_paginated(client, list_groups=_client_error("ListGroups", code="ThrottlingException", message="throttled"))
     adapter = make_adapter(client)
 
     result = adapter.canonicalize_entitlement_id("group", "admin")
 
     assert not result.is_success
-    assert result.error_code == "THROTTLED"
+    assert result.error_code == "ThrottlingException"
 
 
 @pytest.mark.unit
 def test_resolve_group_id_no_prefix_matches_full_slug() -> None:
     """Token passed directly (pre-stripped) resolves via exact display-name match."""
-    client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
-    client.list_groups_result = OperationResult.success(data=_make_group_list(("platform-admin", "group-platform-admin-id")))
+    client = make_client()
+    _configure_paginated(client, list_groups=[{"Groups": _make_group_list(("platform-admin", "group-platform-admin-id"))}])
     adapter = make_adapter(client)
 
     result = adapter.canonicalize_entitlement_id("group", "platform-admin")
@@ -515,12 +433,102 @@ def test_resolve_group_id_no_prefix_matches_full_slug() -> None:
 @pytest.mark.unit
 def test_resolve_group_id_token_direct_lookup() -> None:
     """Pre-stripped token resolves directly without any prefix handling."""
-    client = FakeIdentityStoreClient()
-    client.describe_group_result = OperationResult.error(OperationStatus.NOT_FOUND, message="not found", error_code="NOT_FOUND")
-    client.list_groups_result = OperationResult.success(data=_make_group_list(("ops-team", "group-ops-id")))
+    client = make_client()
+    _configure_paginated(client, list_groups=[{"Groups": _make_group_list(("ops-team", "group-ops-id"))}])
     adapter = make_adapter(client)
 
     result = adapter.canonicalize_entitlement_id("group", "ops-team")
 
     assert result.is_success
     assert result.data == "group-ops-id"
+
+
+# ---------------------------------------------------------------------------
+# build_aws_identity_center_adapter() factory tests (AC#1, AC#5)
+# ---------------------------------------------------------------------------
+
+
+class _FakeAwsSettings:
+    """Minimal AwsSettings stand-in for factory-wiring tests."""
+
+    def __init__(self, instance_id: str, identitystore_role_arn: str) -> None:
+        self.INSTANCE_ID = instance_id
+        self.SERVICE_ROLE_MAP = {"identitystore": identitystore_role_arn}
+
+
+@pytest.mark.unit
+def test_build_aws_identity_center_adapter_wires_typed_client_no_facade(monkeypatch: pytest.MonkeyPatch) -> None:
+    """AC#1: the factory must build the adapter from get_aws_client("identitystore"), not an AWSClients facade."""
+    from packages.access.sync.adapters import aws_identity_center as module
+
+    fake_client = make_client()
+    fake_client.get_user_id.return_value = {"UserId": "user-123"}
+    captured: dict[str, Any] = {}
+
+    def _fake_get_aws_client(service_name: str, role_arn: str | None = None) -> MagicMock:
+        captured["service_name"] = service_name
+        return fake_client
+
+    monkeypatch.setattr(module, "get_aws_client", _fake_get_aws_client)
+    monkeypatch.setattr(
+        module,
+        "get_aws_settings",
+        lambda: _FakeAwsSettings(instance_id="d-9876543210", identitystore_role_arn="arn:aws:iam::111111111111:role/org-role"),
+    )
+
+    adapter = module.build_aws_identity_center_adapter()
+
+    assert isinstance(adapter, AwsIdentityCenterAdapter)
+    assert captured["service_name"] == "identitystore"
+    adapter.ensure_user("alice@example.com")
+    assert fake_client.get_user_id.call_args.kwargs["IdentityStoreId"] == "d-9876543210"
+
+
+@pytest.mark.unit
+def test_build_aws_identity_center_adapter_assumes_org_role_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    """AC#5: identitystore must be assumed under SERVICE_ROLE_MAP's org role, not the bot's own credentials."""
+    from packages.access.sync.adapters import aws_identity_center as module
+
+    captured: dict[str, Any] = {}
+
+    def _fake_get_aws_client(service_name: str, role_arn: str | None = None) -> MagicMock:
+        captured["role_arn"] = role_arn
+        return make_client()
+
+    monkeypatch.setattr(module, "get_aws_client", _fake_get_aws_client)
+    monkeypatch.setattr(
+        module,
+        "get_aws_settings",
+        lambda: _FakeAwsSettings(instance_id="d-9876543210", identitystore_role_arn="arn:aws:iam::111111111111:role/org-role"),
+    )
+
+    module.build_aws_identity_center_adapter()
+
+    assert captured["role_arn"] == "arn:aws:iam::111111111111:role/org-role"
+
+
+@pytest.mark.unit
+def test_build_aws_identity_center_adapter_omits_role_arn_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When SERVICE_ROLE_MAP has no identitystore role configured, role_arn must be None.
+
+    Prevents a spurious STS AssumeRole call with an empty-string RoleArn in
+    default/test configuration.
+    """
+    from packages.access.sync.adapters import aws_identity_center as module
+
+    captured: dict[str, Any] = {}
+
+    def _fake_get_aws_client(service_name: str, role_arn: str | None = None) -> MagicMock:
+        captured["role_arn"] = role_arn
+        return make_client()
+
+    monkeypatch.setattr(module, "get_aws_client", _fake_get_aws_client)
+    monkeypatch.setattr(
+        module,
+        "get_aws_settings",
+        lambda: _FakeAwsSettings(instance_id="d-9876543210", identitystore_role_arn=""),
+    )
+
+    module.build_aws_identity_center_adapter()
+
+    assert captured["role_arn"] is None
