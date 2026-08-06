@@ -10,7 +10,9 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from integrations.slack.client import SlackClientManager
+from slack_sdk import WebClient
+
+from integrations.slack.settings import get_slack_settings
 from packages.oncall_sync.adapters.opsgenie import OpsGenieScheduleProvider
 from packages.oncall_sync.adapters.slack import SlackUserGroupTarget
 from packages.oncall_sync.ports import (
@@ -28,7 +30,13 @@ def get_oncall_schedule_provider() -> OnCallScheduleProvider:
 
 @lru_cache(maxsize=1)
 def get_user_group_sync_target() -> UserGroupSyncTarget:
-    return SlackUserGroupTarget(SlackClientManager.get_client())
+    settings = get_slack_settings()
+    if not settings.USER_TOKEN:
+        raise ValueError(
+            "SLACK_USER_TOKEN is required to sync on-call rotations into Slack user groups "
+            "(usergroups.* writes cannot use the shared inbound bot token)."
+        )
+    return SlackUserGroupTarget(WebClient(token=settings.USER_TOKEN))
 
 
 @lru_cache(maxsize=1)

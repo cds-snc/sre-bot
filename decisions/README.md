@@ -27,6 +27,7 @@ The app is a modular monolith that started as a Slack bot and is becoming platfo
 | [platform-transports.md](platform-transports.md) | How a chat platform composes into the host | target |
 | [transport-slack.md](transport-slack.md) | Slack: verification, delivery mode, handlers, errors | target |
 | [outbound-clients.md](outbound-clients.md) | Gateway pattern, retry, exception classification | target |
+| [service-accounts.md](service-accounts.md) | When a feature needs a dedicated non-human identity inside a SaaS | target |
 | [sdk-typing.md](sdk-typing.md) | Typing rich vendor SDKs without a wrapper tier (boto3 stubs, Google discovery) | target |
 | [operation-result.md](operation-result.md) | The boundary return envelope | target |
 | [errors-and-http.md](errors-and-http.md) | RFC 9457 mapping at the HTTP edge | target |
