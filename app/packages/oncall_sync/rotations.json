@@ -4,5 +4,23 @@
     "opsgenie_rotation_name": "OL-SRE-Rotation",
     "slack_handle": "cl-oncall-platform",
     "slack_name": "CanadaLogin OnCall - Platform"
+  },
+  {
+    "opsgenie_schedule_id": "657ce41a-2ff6-4d23-b2a2-53571995d710",
+    "opsgenie_rotation_name": "OL-App-Rotation",
+    "slack_handle": "cl-oncall-app",
+    "slack_name": "CanadaLogin OnCall - App"
+  },
+  {
+    "opsgenie_schedule_id": "657ce41a-2ff6-4d23-b2a2-53571995d710",
+    "opsgenie_rotation_name": "IC_rotation",
+    "slack_handle": "cl-oncall-ic",
+    "slack_name": "CanadaLogin OnCall - IC"
+  },
+  {
+    "opsgenie_schedule_id": "657ce41a-2ff6-4d23-b2a2-53571995d710",
+    "opsgenie_rotation_name": "PSO_rotation",
+    "slack_handle": "cl-oncall-pso",
+    "slack_name": "CanadaLogin OnCall - PSO"
   }
 ]
