@@ -48,14 +48,14 @@
       "slack_name": "GC Forms On-Call",
       "rotations": [
         {
-          "opsgenie_rotation_name": "Incident commander",
+          "opsgenie_rotation_name": "Incident Commander",
           "slack_handle": "forms-ic",
           "slack_name": "GC Forms - Incident Commander"
         },
         {
-          "opsgenie_rotation_name": "Operations lead",
+          "opsgenie_rotation_name": "Ops Lead",
           "slack_handle": "forms-ol",
-          "slack_name": "GC Forms - Ops Lead"
+          "slack_name": "GC Forms - Operations Lead"
         }
         }
       ]
