@@ -20,7 +20,7 @@ from packages.oncall_sync.ports import (
     UserGroupSyncTarget,
 )
 from packages.oncall_sync.service import OnCallSyncService
-from packages.oncall_sync.settings import get_oncall_rotations
+from packages.oncall_sync.settings import get_oncall_schedules
 
 
 @lru_cache(maxsize=1)
@@ -44,5 +44,5 @@ def get_oncall_sync_service() -> OnCallSyncService:
     return OnCallSyncService(
         on_call=get_oncall_schedule_provider(),
         target=get_user_group_sync_target(),
-        rotations=get_oncall_rotations(),
+        schedules=get_oncall_schedules(),
     )

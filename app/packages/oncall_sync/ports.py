@@ -9,9 +9,10 @@ protocols and wiring it in the provider — no changes to ``service.py``.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Protocol
 
-from packages.oncall_sync.settings import OnCallRotation
+from packages.oncall_sync.settings import OnCallRotation, OnCallScheduleConfig
 
 
 class OnCallScheduleProvider(Protocol):
@@ -28,18 +29,31 @@ class OnCallScheduleProvider(Protocol):
 
 
 class UserGroupSyncTarget(Protocol):
-    """Messaging-platform user group that should mirror the on-call user."""
+    """Messaging-platform user groups that should mirror on-call membership."""
 
     def sync_user_group(
         self,
         rotation: OnCallRotation,
         on_call_email: str,
     ) -> None:
-        """Ensure the configured user group contains exactly ``on_call_email``.
+        """Ensure the rotation user group contains exactly ``on_call_email``.
 
         Implementations should be idempotent. Raise ``OnCallSyncError`` to
         signal a transport/permission failure that should be reported but
         should not abort the remaining rotations.
+        """
+        ...
+
+    def sync_schedule_user_group(
+        self,
+        schedule: OnCallScheduleConfig,
+        on_call_emails: Sequence[str],
+    ) -> None:
+        """Ensure the schedule aggregate group contains all ``on_call_emails``.
+
+        Called once per schedule after all rotation groups have been
+        successfully synced. Implementations should be idempotent. Raise
+        ``OnCallSyncError`` to signal a transport/permission failure.
         """
         ...
 

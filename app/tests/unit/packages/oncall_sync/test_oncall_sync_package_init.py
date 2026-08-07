@@ -31,9 +31,9 @@ class _Logger:
 
 
 @pytest.mark.unit
-def test_register_background_jobs_with_rotations(monkeypatch) -> None:
+def test_register_background_jobs_with_schedules(monkeypatch) -> None:
     pkg = _reload_pkg()
-    monkeypatch.setattr(pkg, "get_oncall_rotations", lambda: [object()])
+    monkeypatch.setattr(pkg, "get_oncall_schedules", lambda: [object()])
 
     registry = _Registry()
     pkg.register_background_jobs(registry=registry)
@@ -45,9 +45,9 @@ def test_register_background_jobs_with_rotations(monkeypatch) -> None:
 
 
 @pytest.mark.unit
-def test_register_background_jobs_noop_when_no_rotations(monkeypatch) -> None:
+def test_register_background_jobs_noop_when_no_schedules(monkeypatch) -> None:
     pkg = _reload_pkg()
-    monkeypatch.setattr(pkg, "get_oncall_rotations", lambda: [])
+    monkeypatch.setattr(pkg, "get_oncall_schedules", lambda: [])
 
     registry = _Registry()
     pkg.register_background_jobs(registry=registry)
@@ -56,24 +56,29 @@ def test_register_background_jobs_noop_when_no_rotations(monkeypatch) -> None:
 
 
 @pytest.mark.unit
-def test_startup_warmup_logs_rotation_count(monkeypatch) -> None:
+def test_startup_warmup_logs_schedule_and_rotation_counts(monkeypatch) -> None:
     pkg = _reload_pkg()
-    monkeypatch.setattr(pkg, "get_oncall_rotations", lambda: [object(), object()])
+
+    class _FakeSchedule:
+        rotations = [object(), object()]
+
+    monkeypatch.setattr(pkg, "get_oncall_schedules", lambda: [_FakeSchedule(), _FakeSchedule()])
 
     logger = _Logger()
     pkg.startup_warmup(logger=logger)
 
     loaded = next(evt for lvl, evt in logger.events if evt["event"] == "oncall_sync_settings_loaded")
-    assert loaded["rotation_count"] == 2
+    assert loaded["schedule_count"] == 2
+    assert loaded["rotation_count"] == 4
     assert loaded["sync_interval_seconds"] == 300
 
 
 @pytest.mark.unit
-def test_startup_warmup_warns_when_no_rotations(monkeypatch) -> None:
+def test_startup_warmup_warns_when_no_schedules(monkeypatch) -> None:
     pkg = _reload_pkg()
-    monkeypatch.setattr(pkg, "get_oncall_rotations", lambda: [])
+    monkeypatch.setattr(pkg, "get_oncall_schedules", lambda: [])
 
     logger = _Logger()
     pkg.startup_warmup(logger=logger)
 
-    assert any(lvl == "warning" and evt["event"] == "oncall_sync_no_rotations" for lvl, evt in logger.events)
+    assert any(lvl == "warning" and evt["event"] == "oncall_sync_no_schedules" for lvl, evt in logger.events)
