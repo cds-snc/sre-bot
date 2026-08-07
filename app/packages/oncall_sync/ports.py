@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Protocol
 
-from packages.oncall_sync.settings import OnCallRotation, OnCallScheduleConfig
+from packages.oncall_sync.settings import OnCallRotation
 
 
 class OnCallScheduleProvider(Protocol):
@@ -29,31 +29,20 @@ class OnCallScheduleProvider(Protocol):
 
 
 class UserGroupSyncTarget(Protocol):
-    """Messaging-platform user groups that should mirror on-call membership."""
+    """Messaging-platform user group that should mirror on-call membership."""
 
     def sync_user_group(
         self,
-        rotation: OnCallRotation,
-        on_call_email: str,
+        handle: str,
+        name: str,
+        description: str,
+        emails: Sequence[str],
     ) -> None:
-        """Ensure the rotation user group contains exactly ``on_call_email``.
+        """Ensure the user group identified by ``handle`` contains exactly ``emails``.
 
         Implementations should be idempotent. Raise ``OnCallSyncError`` to
         signal a transport/permission failure that should be reported but
-        should not abort the remaining rotations.
-        """
-        ...
-
-    def sync_schedule_user_group(
-        self,
-        schedule: OnCallScheduleConfig,
-        on_call_emails: Sequence[str],
-    ) -> None:
-        """Ensure the schedule aggregate group contains all ``on_call_emails``.
-
-        Called once per schedule after all rotation groups have been
-        successfully synced. Implementations should be idempotent. Raise
-        ``OnCallSyncError`` to signal a transport/permission failure.
+        should not abort the remaining syncs.
         """
         ...
 

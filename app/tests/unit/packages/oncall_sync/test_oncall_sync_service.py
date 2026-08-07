@@ -55,20 +55,14 @@ class _FakeOnCall:
 class _FakeTarget:
     def __init__(self, *, raise_for: set[str] | None = None) -> None:
         self._raise_for = raise_for or set()
-        self.rotation_calls: list[tuple[OnCallRotation, str]] = []
-        self.schedule_calls: list[tuple[OnCallScheduleConfig, list[str]]] = []
+        self.calls: list[tuple[str, list[str]]] = []  # (handle, emails)
 
-    def sync_user_group(self, rotation: OnCallRotation, on_call_email: str) -> None:
-        if rotation.slack_handle in self._raise_for:
-            raise OnCallSyncError("target failed")
-        self.rotation_calls.append((rotation, on_call_email))
-
-    def sync_schedule_user_group(
-        self, schedule: OnCallScheduleConfig, on_call_emails: Sequence[str]
+    def sync_user_group(
+        self, handle: str, name: str, description: str, emails: Sequence[str]
     ) -> None:
-        if schedule.slack_handle in self._raise_for:
-            raise OnCallSyncError("schedule target failed")
-        self.schedule_calls.append((schedule, list(on_call_emails)))
+        if handle in self._raise_for:
+            raise OnCallSyncError("target failed")
+        self.calls.append((handle, list(emails)))
 
 
 @pytest.mark.unit
@@ -79,11 +73,9 @@ def test_sync_all_updates_rotation_and_schedule_groups() -> None:
 
     OnCallSyncService(on_call=on_call, target=target, schedules=[schedule]).sync_all()
 
-    assert [c[0].slack_handle for c in target.rotation_calls] == ["a", "b"]
-    assert [c[1] for c in target.rotation_calls] == ["alice@x.ca", "bob@x.ca"]
-    assert len(target.schedule_calls) == 1
-    assert target.schedule_calls[0][0].slack_handle == "oncall"
-    assert sorted(target.schedule_calls[0][1]) == ["alice@x.ca", "bob@x.ca"]
+    # Rotation groups: single email each; schedule group: union of both
+    assert target.calls[:2] == [("a", ["alice@x.ca"]), ("b", ["bob@x.ca"])]
+    assert target.calls[2] == ("oncall", ["alice@x.ca", "bob@x.ca"])
 
 
 @pytest.mark.unit
@@ -95,8 +87,7 @@ def test_sync_all_skips_empty_rotation_in_schedule_group() -> None:
     OnCallSyncService(on_call=on_call, target=target, schedules=[schedule]).sync_all()
 
     # Rotation b has no on-call user; schedule group gets only alice
-    assert len(target.schedule_calls) == 1
-    assert target.schedule_calls[0][1] == ["alice@x.ca"]
+    assert target.calls == [("a", ["alice@x.ca"]), ("oncall", ["alice@x.ca"])]
 
 
 @pytest.mark.unit
@@ -108,8 +99,8 @@ def test_sync_all_skips_schedule_group_when_rotation_fails() -> None:
     OnCallSyncService(on_call=on_call, target=target, schedules=[schedule]).sync_all()
 
     # b still gets its rotation group synced; schedule group is skipped
-    assert [c[0].slack_handle for c in target.rotation_calls] == ["b"]
-    assert target.schedule_calls == []
+    assert [h for h, _ in target.calls] == ["b"]
+    assert not any(h == "oncall" for h, _ in target.calls)
 
 
 @pytest.mark.unit
@@ -121,7 +112,7 @@ def test_sync_all_skips_schedule_group_when_rotation_target_fails() -> None:
     OnCallSyncService(on_call=on_call, target=target, schedules=[schedule]).sync_all()
 
     # a fails in target; schedule group is skipped
-    assert target.schedule_calls == []
+    assert not any(h == "oncall" for h, _ in target.calls)
 
 
 @pytest.mark.unit
@@ -132,8 +123,7 @@ def test_sync_all_skips_schedule_group_when_all_rotations_empty() -> None:
 
     OnCallSyncService(on_call=on_call, target=target, schedules=[schedule]).sync_all()
 
-    assert target.rotation_calls == []
-    assert target.schedule_calls == []
+    assert target.calls == []
 
 
 @pytest.mark.unit
@@ -154,8 +144,7 @@ def test_sync_all_noop_when_no_schedules() -> None:
     OnCallSyncService(on_call=on_call, target=target, schedules=[]).sync_all()
 
     assert on_call.calls == []
-    assert target.rotation_calls == []
-    assert target.schedule_calls == []
+    assert target.calls == []
 
 
 @pytest.mark.unit
@@ -182,6 +171,5 @@ def test_multiple_schedules_are_each_synced() -> None:
 
     OnCallSyncService(on_call=on_call, target=target, schedules=schedules).sync_all()
 
-    assert len(target.schedule_calls) == 2
-    schedule_handles = {c[0].slack_handle for c in target.schedule_calls}
-    assert schedule_handles == {"oncall-1", "oncall-2"}
+    # Each schedule has one rotation + one schedule group = 2 calls each, 4 total
+    assert {h for h, _ in target.calls} == {"a", "b", "oncall-1", "oncall-2"}

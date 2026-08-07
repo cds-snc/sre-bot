@@ -10,7 +10,6 @@ import pytest
 
 from packages.oncall_sync import providers
 from packages.oncall_sync.adapters.slack import SlackUserGroupTarget
-from packages.oncall_sync.settings import OnCallRotation
 
 pytestmark = pytest.mark.unit
 
@@ -20,16 +19,6 @@ def _provider_cache_isolation() -> Iterator[None]:
     providers.get_user_group_sync_target.cache_clear()
     yield
     providers.get_user_group_sync_target.cache_clear()
-
-
-def _rotation() -> OnCallRotation:
-    return OnCallRotation(
-        opsgenie_schedule_id="abc",
-        opsgenie_rotation_name="rot",
-        slack_handle="oncall-x",
-        slack_name="On-call X",
-        slack_description="desc",
-    )
 
 
 def test_get_user_group_sync_target_builds_client_with_user_token(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -54,7 +43,7 @@ def test_usergroup_write_is_issued_via_user_scoped_client(monkeypatch: pytest.Mo
     web_client.users_lookupByEmail.return_value = {"ok": True, "user": {"id": "U1"}}
     web_client.usergroups_list.return_value = {"usergroups": [{"id": "S123", "handle": "oncall-x", "date_delete": 0}]}
 
-    target.sync_user_group(_rotation(), "a@x.ca")
+    target.sync_user_group("oncall-x", "On-call X", "desc", ["a@x.ca"])
 
     web_client.usergroups_users_update.assert_called_once_with(usergroup="S123", users="U1")
     assert target._client.token == "xoxp-user-token"

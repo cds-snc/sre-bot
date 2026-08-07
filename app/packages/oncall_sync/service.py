@@ -46,35 +46,38 @@ class OnCallSyncService:
             self._sync_schedule(schedule)
 
     def _sync_schedule(self, schedule: OnCallScheduleConfig) -> None:
+        log = logger.bind(slack_handle=schedule.slack_handle)
         on_call_emails: list[str] = []
         any_rotation_failed = False
 
         for rotation_config in schedule.rotations:
             rotation = _resolve_rotation(schedule, rotation_config)
-            email, failed = self._sync_rotation(rotation)
-            if failed:
+            try:
+                email = self._sync_rotation(rotation)
+            except OnCallSyncError:
                 any_rotation_failed = True
-            elif email is not None:
+                continue
+            if email is not None:
                 on_call_emails.append(email)
 
         if any_rotation_failed:
-            logger.error(
+            log.error(
                 "oncall_sync_schedule_group_skipped",
-                slack_handle=schedule.slack_handle,
                 reason="one_or_more_rotations_failed",
             )
             return
 
         if not on_call_emails:
-            logger.info(
-                "oncall_sync_schedule_group_empty",
-                slack_handle=schedule.slack_handle,
-            )
+            log.info("oncall_sync_schedule_group_empty")
             return
 
-        log = logger.bind(slack_handle=schedule.slack_handle)
         try:
-            self._target.sync_schedule_user_group(schedule, on_call_emails)
+            self._target.sync_user_group(
+                schedule.slack_handle,
+                schedule.slack_name,
+                schedule.slack_description,
+                on_call_emails,
+            )
         except OnCallSyncError as exc:
             cause = exc.__cause__
             log.error(
@@ -85,13 +88,12 @@ class OnCallSyncService:
             return
         log.info("oncall_sync_schedule_group_synced")
 
-    def _sync_rotation(self, rotation: OnCallRotation) -> tuple[str | None, bool]:
-        """Sync one rotation group.
+    def _sync_rotation(self, rotation: OnCallRotation) -> str | None:
+        """Sync one rotation's user group.
 
-        Returns ``(email, failed)`` where ``email`` is the on-call address
-        (or ``None`` if the rotation is empty) and ``failed`` is ``True``
-        when an ``OnCallSyncError`` was raised by either the provider or the
-        target.
+        Returns the on-call email on success, or ``None`` if the rotation has
+        no current participant. Raises ``OnCallSyncError`` (already logged) on
+        provider or target failure.
         """
         log = logger.bind(
             slack_handle=rotation.slack_handle,
@@ -107,14 +109,19 @@ class OnCallSyncService:
                 error=str(exc),
                 error_type=type(cause).__name__ if cause is not None else None,
             )
-            return None, True
+            raise
 
         if email is None:
             log.info("oncall_sync_rotation_empty")
-            return None, False
+            return None
 
         try:
-            self._target.sync_user_group(rotation, email)
+            self._target.sync_user_group(
+                rotation.slack_handle,
+                rotation.slack_name,
+                rotation.slack_description,
+                [email],
+            )
         except OnCallSyncError as exc:
             cause = exc.__cause__
             log.error(
@@ -122,10 +129,10 @@ class OnCallSyncService:
                 error=str(exc),
                 error_type=type(cause).__name__ if cause is not None else None,
             )
-            return None, True
+            raise
 
         log.info("oncall_sync_rotation_synced")
-        return email, False
+        return email
 
 
 def _resolve_rotation(
