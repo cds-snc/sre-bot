@@ -6,7 +6,7 @@ Sync OpsGenie on-call schedules to Slack UserGroups to make contacting on-call f
 
 Synced rotations are defined in [rotations.json](./rotations.json).
 
-Every 5 minutes, SRE Bot will fetch the current on-call individual for each rotation and update the linked Slack UserGroup if necessary.
+Every 5 minutes, SRE Bot will fetch the current on-call individual for each rotation and update the linked Slack UserGroup if necessary. SRE Bot will also update the schedule-level UserGroup to contain all folks on-call for the nested rotations.
 
 ## Getting started
 
