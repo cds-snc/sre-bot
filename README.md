@@ -4,6 +4,8 @@
 
 **SRE Bot** is a Slack bot designed for site reliability engineering at CDS. It automates incident management, integrates with cloud and collaboration platforms, and streamlines SRE workflows for modern teams.
 
+Note: This project is currently undergoing a large refactor to improve maintainability and add new features.
+
 ---
 
 ## Features
