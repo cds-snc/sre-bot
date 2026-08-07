@@ -26,6 +26,23 @@
           "slack_name": "CanadaLogin OnCall - PSO"
         }
       ]
+    },
+    {
+      "opsgenie_schedule_id": "ed7d2088-2c1c-4cfb-820d-9411b4a209d1",
+      "slack_handle": "notify-oncall",
+      "slack_name": "GCNotify Support OnCall",
+      "rotations": [
+        {
+          "opsgenie_rotation_name": "Incident commander",
+          "slack_handle": "notify-ic",
+          "slack_name": "GCNotify - Incident Commander"
+        },
+        {
+          "opsgenie_rotation_name": "Ops lead",
+          "slack_handle": "notify-ol",
+          "slack_name": "GCNotify - Ops Lead"
+        }
+      ]
     }
   ]
 }
