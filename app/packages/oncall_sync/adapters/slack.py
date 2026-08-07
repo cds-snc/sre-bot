@@ -35,11 +35,7 @@ class SlackUserGroupTarget:
         """Set the user group to contain exactly the resolved on-call users."""
         log = logger.bind(slack_handle=handle)
 
-        user_ids = [
-            uid
-            for email in emails
-            if (uid := self._resolve_user_id(email, log)) is not None
-        ]
+        user_ids = [uid for email in emails if (uid := self._resolve_user_id(email, log)) is not None]
         if not user_ids:
             # No emails resolved to Slack users — skip rather than empty the group.
             log.info("oncall_sync_usergroup_no_resolvable_users")
@@ -47,9 +43,7 @@ class SlackUserGroupTarget:
 
         try:
             usergroup_id = self._find_or_create_usergroup(handle, name, description, log)
-            self._client.usergroups_users_update(
-                usergroup=usergroup_id, users=",".join(user_ids)
-            )
+            self._client.usergroups_users_update(usergroup=usergroup_id, users=",".join(user_ids))
         except SlackApiError as exc:
             raise OnCallSyncError(f"Slack API call failed: {exc.response.get('error')}") from exc
 
@@ -70,9 +64,7 @@ class SlackUserGroupTarget:
             return user_id
         return None
 
-    def _find_or_create_usergroup(
-        self, handle: str, name: str, description: str, log
-    ) -> str:
+    def _find_or_create_usergroup(self, handle: str, name: str, description: str, log) -> str:
         existing = self._lookup_usergroup(handle)
         if existing is not None:
             group_id, is_disabled = existing

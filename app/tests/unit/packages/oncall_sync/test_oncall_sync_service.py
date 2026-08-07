@@ -57,9 +57,7 @@ class _FakeTarget:
         self._raise_for = raise_for or set()
         self.calls: list[tuple[str, list[str]]] = []  # (handle, emails)
 
-    def sync_user_group(
-        self, handle: str, name: str, description: str, emails: Sequence[str]
-    ) -> None:
+    def sync_user_group(self, handle: str, name: str, description: str, emails: Sequence[str]) -> None:
         if handle in self._raise_for:
             raise OnCallSyncError("target failed")
         self.calls.append((handle, list(emails)))

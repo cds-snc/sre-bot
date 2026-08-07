@@ -122,9 +122,7 @@ def test_load_schedules_rejects_duplicate_rotation_handles(monkeypatch, tmp_path
 
 
 @pytest.mark.unit
-def test_load_schedules_rejects_handle_collision_between_schedule_and_rotation(
-    monkeypatch, tmp_path
-) -> None:
+def test_load_schedules_rejects_handle_collision_between_schedule_and_rotation(monkeypatch, tmp_path) -> None:
     payload = {
         "schedules": [
             {

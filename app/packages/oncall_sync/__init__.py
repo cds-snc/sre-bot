@@ -62,5 +62,4 @@ def startup_warmup(logger) -> None:
         )
 
 
-
 __all__ = ["register_background_jobs", "startup_warmup"]
