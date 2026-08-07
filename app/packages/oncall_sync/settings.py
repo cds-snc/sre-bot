@@ -1,13 +1,13 @@
 """On-call sync feature settings — colocated with the consuming package.
 
 ``OnCallScheduleConfig`` and ``OnCallRotationConfig`` define the declarative
-mappings between OpsGenie schedules/rotations and Slack user groups. Schedules
-are loaded from the packaged ``rotations.json`` resource via
-``importlib.resources``, so the lookup is not coupled to the filesystem layout
-of the repo.
+mappings between on-call schedules/rotations (today: OpsGenie) and
+messaging-platform user groups (today: Slack). Schedules are loaded from the
+packaged ``rotations.json`` resource via ``importlib.resources``, so the lookup
+is not coupled to the filesystem layout of the repo.
 
-Each schedule maps to one Slack aggregate user group (containing all currently
-on-call users across its rotations) plus one Slack user group per rotation
+Each schedule maps to one aggregate user group (containing all currently
+on-call users across its rotations) plus one user group per rotation
 (containing exactly the one on-call user for that rotation).
 """
 
@@ -23,7 +23,7 @@ ROTATIONS_RESOURCE = "rotations.json"
 
 
 class OnCallRotationConfig(BaseModel):
-    """One rotation within an OpsGenie schedule, mapped to a Slack user group.
+    """One on-call rotation within a schedule, mapped to a messaging-platform user group.
 
     The parent schedule's ``opsgenie_schedule_id`` is resolved at runtime by
     the service when constructing the flat ``OnCallRotation`` passed to adapters.
@@ -36,11 +36,11 @@ class OnCallRotationConfig(BaseModel):
 
 
 class OnCallScheduleConfig(BaseModel):
-    """An OpsGenie schedule with its child rotations and a Slack aggregate group.
+    """An on-call schedule with its child rotations and an aggregate user group.
 
-    The ``slack_handle`` / ``slack_name`` fields describe the schedule-level
-    aggregate Slack user group, which mirrors all currently on-call users
-    across every rotation in this schedule.
+    The ``slack_handle`` / ``slack_name`` fields (vendor-prefixed) describe the
+    schedule-level aggregate user group, which mirrors all currently on-call
+    users across every rotation in this schedule.
     """
 
     opsgenie_schedule_id: str
