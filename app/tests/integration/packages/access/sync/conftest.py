@@ -41,13 +41,14 @@ from typing import Any, Literal
 from unittest.mock import MagicMock
 
 import pytest
+from botocore.exceptions import ClientError
 
 from infrastructure.directory.models import (
     DirectoryGroup,
     DirectoryMember,
     MembershipCheckResult,
 )
-from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.operations import OperationResult
 from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 from packages.access.common.config import PlatformPolicy
 from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
@@ -481,6 +482,23 @@ def make_coordinator(make_sync_config):
 # AWS-specific helpers (used by test_adapter_group_mapping.py)
 # ---------------------------------------------------------------------------
 
+_IDENTITY_STORE_ID = "d-1234567890"
+
+_IDENTITYSTORE_CLIENT_METHODS = [
+    "list_users",
+    "list_groups",
+    "describe_group",
+    "get_user_id",
+    "create_user",
+    "delete_user",
+    "get_group_membership_id",
+    "create_group_membership",
+    "delete_group_membership",
+    "list_group_memberships_for_member",
+    "list_group_memberships",
+    "get_paginator",
+]
+
 
 @pytest.fixture
 def aws_config() -> AccessSyncRuntimeConfig:
@@ -509,19 +527,21 @@ def make_adapter(
 
     Returns ``(adapter, fake_identitystore)`` so callers can assert on mock
     call counts with the correct ``MagicMock`` type rather than piercing the
-    adapter's private ``_aws`` attribute through a typed production facade.
+    adapter's private ``_identitystore`` attribute through a typed production client.
 
-    ``describe_group`` always returns NOT_FOUND (tokens are not UUIDs) so the
-    adapter falls through to the name-based group index on every resolution.
+    ``describe_group`` always raises ``ResourceNotFoundException`` (tokens are
+    not UUIDs) so the adapter falls through to the name-based group index on
+    every resolution.
     """
-    fake_identitystore = MagicMock()
-    fake_identitystore.describe_group.return_value = OperationResult.error(
-        OperationStatus.NOT_FOUND,
-        message="not a uuid",
-        error_code="NOT_FOUND",
+    fake_identitystore = MagicMock(spec=_IDENTITYSTORE_CLIENT_METHODS)
+    fake_identitystore.describe_group.side_effect = ClientError(
+        error_response={"Error": {"Code": "ResourceNotFoundException", "Message": "not a uuid"}},
+        operation_name="DescribeGroup",
     )
-    fake_identitystore.list_groups.return_value = OperationResult.success(data=aws_ic_groups)
-    fake_aws = MagicMock()
-    fake_aws.identitystore = fake_identitystore
-    adapter = AwsIdentityCenterAdapter(aws_clients=fake_aws)
+    list_groups_paginator = MagicMock()
+    list_groups_paginator.paginate.return_value = [{"Groups": aws_ic_groups}]
+    fake_identitystore.get_paginator.side_effect = lambda operation_name: {
+        "list_groups": list_groups_paginator,
+    }.get(operation_name, MagicMock(paginate=MagicMock(return_value=[])))
+    adapter = AwsIdentityCenterAdapter(identitystore=fake_identitystore, identity_store_id=_IDENTITY_STORE_ID)
     return adapter, fake_identitystore

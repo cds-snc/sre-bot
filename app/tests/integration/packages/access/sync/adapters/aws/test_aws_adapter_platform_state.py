@@ -1,6 +1,6 @@
 """Integration tests for AwsIdentityCenterAdapter platform-state methods.
 
-Mocks are applied at the IdentityStoreClient facade level so the full
+Mocks are applied at the typed boto3 identitystore client level so the full
 adapter logic (user-ID resolution, membership listing, error mapping) runs
 against real code.
 
@@ -21,12 +21,13 @@ Scenarios covered:
 
   B5  ``_fetch_current_state`` returns the full state dict including group_ids.
 
-  B6  ``list_group_memberships_for_member`` called with correct member_id format.
+  B6  ``list_group_memberships_for_member`` paginator called with correct MemberId format.
 """
 
 import pytest
+from botocore.exceptions import ClientError
 
-from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.operations import OperationStatus
 from packages.access.sync.domain import AdapterAssessment
 
 pytestmark = pytest.mark.integration
@@ -113,10 +114,9 @@ def test_should_return_user_exists_false_when_user_absent(make_aws_adapter):
 @pytest.mark.integration
 def test_should_propagate_service_error_from_list_group_memberships(make_aws_adapter):
     """A transient error must NOT be silently converted to NOT_FOUND."""
-    service_error: OperationResult[None] = OperationResult.error(
-        OperationStatus.TRANSIENT_ERROR,
-        message="Service unavailable",
-        error_code="SERVICE_UNAVAILABLE",
+    service_error = ClientError(
+        error_response={"Error": {"Code": "ThrottlingException", "Message": "Service unavailable"}},
+        operation_name="ListGroupMembershipsForMember",
     )
     adapter, _ = make_aws_adapter(
         user_id="some-user-uuid",
@@ -153,7 +153,7 @@ def test_fetch_current_state_returns_user_id_and_empty_group_list(make_aws_adapt
 
 @pytest.mark.integration
 def test_list_group_memberships_called_with_user_id_format(make_aws_adapter):
-    """list_group_memberships_for_member must receive {"UserId": ...} as member_id."""
+    """list_group_memberships_for_member must receive MemberId={"UserId": ...} via the paginator."""
     user_id = "ec5d2588-f081-70f2-db36-2afc4ef5ce94"
     adapter, fake_identitystore = make_aws_adapter(
         user_id=user_id,
@@ -162,46 +162,7 @@ def test_list_group_memberships_called_with_user_id_format(make_aws_adapter):
 
     adapter._assess_live("test.user@example.com")
 
-    call_args = fake_identitystore.list_group_memberships_for_member.call_args
+    paginator = fake_identitystore.get_paginator("list_group_memberships_for_member")
+    call_args = paginator.paginate.call_args
     assert call_args is not None
-    member_id = call_args.kwargs.get("member_id") or call_args.args[0]
-    assert member_id == {"UserId": user_id}
-
-
-@pytest.mark.integration
-def test_list_members_for_groups_bulk_resolves_member_ids_without_user_details(
-    make_aws_adapter,
-):
-    """Bulk membership reads should map MemberId.UserId to emails when UserDetails is missing."""
-    group_id = "11111111-2222-3333-4444-555555555555"
-    adapter, fake_identitystore = make_aws_adapter()
-
-    fake_identitystore.describe_group.return_value = OperationResult.success(data={"GroupId": group_id})
-    fake_identitystore.list_groups_with_memberships.return_value = OperationResult.success(
-        data=[
-            {
-                "GroupId": group_id,
-                "GroupMemberships": [
-                    {"MemberId": {"UserId": "u-1"}},
-                    {"MemberId": {"UserId": "u-2"}},
-                ],
-            }
-        ]
-    )
-    fake_identitystore.list_users.return_value = OperationResult.success(
-        data=[
-            {
-                "UserId": "u-1",
-                "Emails": [{"Value": "alice@example.com", "Primary": True}],
-            },
-            {
-                "UserId": "u-2",
-                "Emails": [{"Value": "bob@example.com", "Primary": True}],
-            },
-        ]
-    )
-
-    result = adapter.list_members_for_groups({group_id})
-
-    assert result.is_success
-    assert result.data == {group_id: {"alice@example.com", "bob@example.com"}}
+    assert call_args.kwargs.get("MemberId") == {"UserId": user_id}

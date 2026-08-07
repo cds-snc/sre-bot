@@ -1,11 +1,11 @@
 ---
 id: TASK-69
 title: Add moto-backed DynamoDBStorageService conformance suite
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-31 16:28'
-updated_date: '2026-08-04 19:57'
+updated_date: '2026-08-05 15:18'
 labels:
   - testing
   - clients

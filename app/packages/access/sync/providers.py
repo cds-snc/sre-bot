@@ -1,6 +1,5 @@
 import functools
 
-from infrastructure.clients.aws import get_aws_clients
 from infrastructure.directory import get_directory_provider
 from infrastructure.events import get_event_dispatcher
 from infrastructure.idempotency import IdempotencyStore, build_idempotency_store
@@ -8,7 +7,7 @@ from infrastructure.storage import get_storage_service
 from packages.access.common.providers import get_access_runtime_config
 from packages.access.common.settings import AccessSyncSettings, get_access_settings
 from packages.access.sync.adapters import AccessSyncAdapter
-from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
+from packages.access.sync.adapters.aws_identity_center import build_aws_identity_center_adapter
 from packages.access.sync.adapters.fake_platform import FakePlatformAdapter
 from packages.access.sync.application import AccessSyncApplicationService
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
@@ -35,7 +34,7 @@ def get_access_sync_adapters() -> dict[str, AccessSyncAdapter]:
 
     for platform_name, policy in config.platforms.items():
         if policy.adapter_type == "aws_identity_center":
-            adapters[platform_name] = AwsIdentityCenterAdapter(get_aws_clients())
+            adapters[platform_name] = build_aws_identity_center_adapter()
         elif policy.adapter_type == "fake":
             adapters[platform_name] = FakePlatformAdapter()
         else:

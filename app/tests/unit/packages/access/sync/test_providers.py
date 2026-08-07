@@ -4,7 +4,6 @@ import pytest
 
 from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 from packages.access.sync import providers
-from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
 from packages.access.sync.adapters.fake_platform import FakePlatformAdapter
 
 
@@ -23,10 +22,16 @@ def test_get_access_sync_adapters_registers_aws_and_fake(
             "fake": make_platform_policy(adapter_type="fake"),
         },
     )
+    sentinel_aws_adapter = object()
     monkeypatch.setattr(
         providers,
         "get_access_runtime_config",
         lambda: runtime_config,
+    )
+    monkeypatch.setattr(
+        providers,
+        "build_aws_identity_center_adapter",
+        lambda: sentinel_aws_adapter,
     )
 
     # Act
@@ -34,7 +39,7 @@ def test_get_access_sync_adapters_registers_aws_and_fake(
 
     # Assert
     assert sorted(adapters.keys()) == ["aws", "fake"]
-    assert isinstance(adapters["aws"], AwsIdentityCenterAdapter)
+    assert adapters["aws"] is sentinel_aws_adapter
     assert isinstance(adapters["fake"], FakePlatformAdapter)
 
     providers.get_access_sync_adapters.cache_clear()
