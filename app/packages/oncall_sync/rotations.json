@@ -43,6 +43,23 @@
           "slack_name": "GCNotify - Ops Lead"
         }
       ]
+    },
+    {
+      "opsgenie_schedule_id": "f9b3fabf-a566-46ef-be97-335398f0a85f",
+      "slack_handle": "forms-oncall",
+      "slack_name": "GC Forms On-Call",
+      "rotations": [
+        {
+          "opsgenie_rotation_name": "Incident Commander",
+          "slack_handle": "forms-ic",
+          "slack_name": "GC Forms - Incident Commander"
+        },
+        {
+          "opsgenie_rotation_name": "Ops Lead",
+          "slack_handle": "forms-ol",
+          "slack_name": "GC Forms - Operations Lead"
+        }
+      ]
     }
   ]
 }
