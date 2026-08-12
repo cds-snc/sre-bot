@@ -562,6 +562,18 @@ class SlackPlatformProvider:
         return self._formatter
 
     @property
+    def client(self) -> Any:
+        """Get the Slack Web API client.
+
+        Available after the provider has been started (``start()``). May be
+        ``None`` before initialization.
+
+        Returns:
+            The Slack Bolt ``WebClient`` instance, or ``None`` if not started.
+        """
+        return self._client
+
+    @property
     def settings(self):
         """Get Slack platform settings.
 
