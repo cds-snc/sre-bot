@@ -6,8 +6,7 @@ consumed by ``app.integrations.openai.client`` -- and the cached
 
 Only OpenAI-transport concerns belong here (API key, model, token/timeout
 limits, base URL). Feature-domain configuration (what gets summarized, how
-history is bounded) lives with the consuming feature per
-``decisions/configuration.md``.
+history is bounded) lives with the consuming feature.
 """
 
 from __future__ import annotations
@@ -22,7 +21,6 @@ class OpenAISettings(BaseSettings):
     """Vendor-credential and transport settings for the OpenAI API."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
         case_sensitive=True,
         extra="ignore",
     )

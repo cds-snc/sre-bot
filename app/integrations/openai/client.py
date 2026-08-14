@@ -1,13 +1,10 @@
 """OpenAI vendor client: authenticated client factory and error
 classification.
 
-Per ``decisions/outbound-clients.md``: this module provides authenticated
-client construction and ``classify_openai_error``. It raises typed httpx
-exceptions and contains no business logic; the adapter in
+This module provides authenticated client construction and ``classify_openai_error``. 
+exceptions and contains no business logic. The adapter in
 ``app.integrations.openai.summarizer`` is the boundary that calls into this
-module inside ``try/except`` and classifies. No hand-rolled retry loops --
-httpx owns transport, and the OpenAI REST API is called directly (the same
-approach the GitHub integration takes with its REST API).
+module inside ``try/except`` and classifies. 
 """
 
 from __future__ import annotations

@@ -1,8 +1,7 @@
 """Feature settings for the incident_summary package.
 
 Feature-domain configuration (how much channel history to summarize) lives
-with the consuming feature per ``decisions/configuration.md`` -- vendor
-transport concerns (OpenAI key/model/timeout) stay in
+with the consuming feature -- vendor transport concerns (OpenAI key/model/timeout) stay in
 ``integrations.openai.settings``. All fields carry safe defaults so the
 package works with no environment configuration.
 """

@@ -8,8 +8,7 @@ delegates the actual summarization to the platform-agnostic
 
 The Slack Web API client is captured lazily from the provider at dispatch
 time (it only exists after startup); ``slack_sdk`` is imported for typing
-only, keeping the package free of a runtime Slack SDK dependency per
-``decisions/transport-slack.md``.
+only, keeping the package free of a runtime Slack SDK dependency.
 """
 
 from __future__ import annotations

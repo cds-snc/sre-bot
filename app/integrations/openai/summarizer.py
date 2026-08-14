@@ -2,8 +2,7 @@
 
 ``Summarizer`` is the narrow behavior contract feature packages depend on
 (per the model-boundary rules: ``Protocol`` for service contracts). The
-``OpenAISummarizer`` adapter is the boundary tier described in
-``decisions/outbound-clients.md``: it calls the vendor client inside
+``OpenAISummarizer`` adapter is the boundary tier: it calls the vendor client inside
 ``try/except``, classifies failures via ``classify_openai_error``, and
 returns ``OperationResult``. Unmapped exceptions propagate -- they are bugs,
 not outcomes.
