@@ -21,6 +21,7 @@ class OpenAISettings(BaseSettings):
     """Vendor-credential and transport settings for the OpenAI API."""
 
     model_config = SettingsConfigDict(
+        env_file=".env",
         case_sensitive=True,
         extra="ignore",
     )
