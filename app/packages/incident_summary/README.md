@@ -8,8 +8,8 @@ channel, for someone jumping into an incident.
 Fetches recent channel history, resolves author display names, builds a plain
 transcript, and asks the `Summarizer` port (OpenAI, see
 `app/integrations/openai/`) to produce a concise, factual summary: what is
-happening, key events in order, current status, actions taken, and open
-questions. The summary is returned **ephemerally** — only the person who ran
+happening, current status, actions taken, and next steps. The summary is
+returned **ephemerally** — only the person who ran
 the command sees it, so it never adds noise to the incident channel.
 
 ## Usage

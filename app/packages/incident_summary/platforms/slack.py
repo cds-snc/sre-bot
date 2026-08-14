@@ -54,7 +54,7 @@ _SLACK_FORMAT_INSTRUCTIONS = (
     "Format the summary using Slack mrkdwn, NOT standard Markdown. "
     "Rules: use *single asterisks* for bold (never **double**); use _underscores_ "
     "for italics; do NOT use Markdown headings (#, ##, ###) -- make section titles "
-    "a bold line instead (e.g. *Key events*); start bullet lines with '• '; "
+    "a bold line instead (e.g. *Current status*); start bullet lines with '• '; "
     "separate sections with a blank line. Keep links as plain URLs."
 )
 

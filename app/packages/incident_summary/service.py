@@ -31,12 +31,9 @@ _CONTENT_INSTRUCTIONS = (
     "transcript from an incident channel so that a responder joining now can "
     "quickly catch up. Be brief and high-signal -- aim for a summary readable "
     "in under 30 seconds. Cover, each in at most 1-2 short sentences: what is "
-    "happening, current status, and key actions taken. For key events, list "
-    "at most 5 of the most important turning points as short bullets (group "
-    "or omit minor back-and-forth; do not include timestamps unless essential). "
-    "End with any open questions or next steps as short bullets. Prefer fewer, "
-    "denser bullets over long chronological logs. Do not invent details that "
-    "are not in the transcript."
+    "happening, current status, and key actions taken. End with next steps as "
+    "short bullets. Prefer fewer, denser bullets over long chronological logs. "
+    "Do not invent details that are not in the transcript."
 )
 
 

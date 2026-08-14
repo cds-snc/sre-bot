@@ -24,9 +24,9 @@ logger = structlog.get_logger()
 _DEFAULT_INSTRUCTIONS = (
     "You are an incident-response assistant. Summarize the following chat "
     "transcript from an incident channel so that a responder joining now can "
-    "quickly catch up. Be concise and factual. Cover: what is happening, key "
-    "events in order, current status, actions taken, and any open questions or "
-    "next steps. Do not invent details that are not in the transcript."
+    "quickly catch up. Be concise and factual. Cover: what is happening, "
+    "current status, actions taken, and next steps. Do not invent details "
+    "that are not in the transcript."
 )
 
 
