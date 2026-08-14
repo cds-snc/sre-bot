@@ -1,10 +1,10 @@
 """OpenAI vendor client: authenticated client factory and error
 classification.
 
-This module provides authenticated client construction and ``classify_openai_error``. 
+This module provides authenticated client construction and ``classify_openai_error``.
 exceptions and contains no business logic. The adapter in
 ``app.integrations.openai.summarizer`` is the boundary that calls into this
-module inside ``try/except`` and classifies. 
+module inside ``try/except`` and classifies.
 """
 
 from __future__ import annotations
