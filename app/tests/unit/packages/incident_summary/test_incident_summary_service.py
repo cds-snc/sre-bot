@@ -23,9 +23,7 @@ class _StubSummarizer:
         self.received_instructions: str | None = None
         self.calls = 0
 
-    async def summarize(
-        self, transcript: str, *, instructions: str | None = None
-    ) -> OperationResult[str]:
+    async def summarize(self, transcript: str, *, instructions: str | None = None) -> OperationResult[str]:
         self.calls += 1
         self.received_transcript = transcript
         self.received_instructions = instructions
@@ -62,9 +60,7 @@ class TestSummarizeTranscript:
         stub = _StubSummarizer(OperationResult.success(data="ok"))
         messages = [TranscriptMessage(author="Ada", text="prod is down")]
 
-        await summarize_transcript(
-            messages, instructions="USE SLACK MRKDWN", summarizer=stub
-        )
+        await summarize_transcript(messages, instructions="USE SLACK MRKDWN", summarizer=stub)
 
         assert stub.received_instructions is not None
         # Feature content prompt is always present...
@@ -84,9 +80,7 @@ class TestSummarizeTranscript:
 
     @pytest.mark.asyncio
     async def test_summarizer_error_is_propagated(self):
-        error = OperationResult.transient_error(
-            message="rate limited", error_code="RATE_LIMITED", retry_after=7
-        )
+        error = OperationResult.transient_error(message="rate limited", error_code="RATE_LIMITED", retry_after=7)
         stub = _StubSummarizer(error)
         messages = [TranscriptMessage(author="Ada", text="hello")]
 

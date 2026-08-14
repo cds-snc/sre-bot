@@ -80,10 +80,7 @@ def register_commands(provider: SlackPlatformProvider) -> None:
         command="summarize",
         handler=_dispatch,
         parent="sre.incident",
-        description=(
-            "Summarize what has happened in this channel so far for someone "
-            "joining the incident"
-        ),
+        description=("Summarize what has happened in this channel so far for someone joining the incident"),
         description_key=f"{_DOMAIN}.description",
         usage_hint="[--since 2h] [--limit 100]",
         examples=["", "--since 2h --limit 100"],
@@ -93,10 +90,7 @@ def register_commands(provider: SlackPlatformProvider) -> None:
                 name="--since",
                 type=ArgumentType.STRING,
                 required=False,
-                description=(
-                    "How far back to summarize, e.g. 30m, 2h, 1d "
-                    "(defaults to the start of the incident channel)"
-                ),
+                description=("How far back to summarize, e.g. 30m, 2h, 1d (defaults to the start of the incident channel)"),
             ),
             Argument(
                 name="--limit",
@@ -152,13 +146,9 @@ def handle_summarize_command(
         # channel (incident) was created.
         oldest = _resolve_channel_start(client, payload.channel_id, settings, log)
 
-    messages = _fetch_transcript(
-        client, payload.channel_id, limit=limit, oldest=oldest, log=log
-    )
+    messages = _fetch_transcript(client, payload.channel_id, limit=limit, oldest=oldest, log=log)
 
-    result = asyncio.run(
-        summarize_transcript(messages, instructions=_SLACK_FORMAT_INSTRUCTIONS)
-    )
+    result = asyncio.run(summarize_transcript(messages, instructions=_SLACK_FORMAT_INSTRUCTIONS))
 
     if result.is_success:
         header = t(f"{_DOMAIN}.result.header", locale, "🧾 Incident summary")
@@ -195,9 +185,7 @@ def _fetch_transcript(
     list is returned so the caller renders the empty-history path.
     """
     try:
-        response = client.conversations_history(
-            channel=channel_id, limit=limit, oldest=f"{oldest:.6f}"
-        )
+        response = client.conversations_history(channel=channel_id, limit=limit, oldest=f"{oldest:.6f}")
     except Exception as exc:  # noqa: BLE001 - degrade to empty history on any API error
         log.warning("incident_summary_history_fetch_failed", error=str(exc))
         return []
@@ -238,12 +226,7 @@ def _resolve_display_name(
         info = client.users_info(user=user_id)
         user: dict[str, Any] = info.get("user") or {}
         profile: dict[str, Any] = user.get("profile") or {}
-        name = (
-            profile.get("display_name")
-            or profile.get("real_name")
-            or user.get("real_name")
-            or user_id
-        )
+        name = profile.get("display_name") or profile.get("real_name") or user.get("real_name") or user_id
     except Exception as exc:  # noqa: BLE001 - a missing name must not fail the summary
         log.warning("incident_summary_user_lookup_failed", user_id=user_id, error=str(exc))
 
@@ -257,7 +240,7 @@ def _resolve_limit(raw: Any, settings: IncidentSummarySettings) -> int:
         return settings.DEFAULT_HISTORY_LIMIT
     try:
         limit = int(raw)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return settings.DEFAULT_HISTORY_LIMIT
     if limit <= 0:
         return settings.DEFAULT_HISTORY_LIMIT
@@ -318,7 +301,7 @@ def _parse_since_seconds(raw: Any) -> int | None:
 
     try:
         amount = int(number)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
     if amount <= 0:
         return None

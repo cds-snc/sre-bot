@@ -23,15 +23,9 @@ class IncidentSummarySettings(BaseSettings):
         extra="ignore",
     )
 
-    DEFAULT_HISTORY_LIMIT: int = Field(
-        default=500, alias="INCIDENT_SUMMARY__DEFAULT_HISTORY_LIMIT"
-    )
-    MAX_HISTORY_LIMIT: int = Field(
-        default=1000, alias="INCIDENT_SUMMARY__MAX_HISTORY_LIMIT"
-    )
-    DEFAULT_SINCE_HOURS: int = Field(
-        default=24, alias="INCIDENT_SUMMARY__DEFAULT_SINCE_HOURS"
-    )
+    DEFAULT_HISTORY_LIMIT: int = Field(default=500, alias="INCIDENT_SUMMARY__DEFAULT_HISTORY_LIMIT")
+    MAX_HISTORY_LIMIT: int = Field(default=1000, alias="INCIDENT_SUMMARY__MAX_HISTORY_LIMIT")
+    DEFAULT_SINCE_HOURS: int = Field(default=24, alias="INCIDENT_SUMMARY__DEFAULT_SINCE_HOURS")
 
 
 @lru_cache(maxsize=1)

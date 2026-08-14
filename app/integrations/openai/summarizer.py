@@ -34,9 +34,7 @@ _DEFAULT_INSTRUCTIONS = (
 class Summarizer(Protocol):
     """Behavior contract for producing a text summary of a transcript."""
 
-    async def summarize(
-        self, transcript: str, *, instructions: str | None = None
-    ) -> OperationResult[str]:
+    async def summarize(self, transcript: str, *, instructions: str | None = None) -> OperationResult[str]:
         """Return an ``OperationResult`` carrying the summary text on success."""
         ...
 
@@ -47,9 +45,7 @@ class OpenAISummarizer:
     def __init__(self, settings: OpenAISettings | None = None) -> None:
         self._settings = settings or get_openai_settings()
 
-    async def summarize(
-        self, transcript: str, *, instructions: str | None = None
-    ) -> OperationResult[str]:
+    async def summarize(self, transcript: str, *, instructions: str | None = None) -> OperationResult[str]:
         """Summarize ``transcript`` via the OpenAI chat completions endpoint."""
         payload = {
             "model": self._settings.MODEL,

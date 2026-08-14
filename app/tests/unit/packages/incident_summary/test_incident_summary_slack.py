@@ -80,14 +80,10 @@ class TestRegisterCommands:
 
 class TestHandleSummarizeCommand:
     def test_success_renders_ephemeral_summary(self):
-        client = _client_with_history(
-            [{"user": "U1", "text": "prod is down", "ts": "1"}]
-        )
+        client = _client_with_history([{"user": "U1", "text": "prod is down", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
-        with patch(_SUMMARIZE, new=AsyncMock(
-            return_value=OperationResult.success(data="Everything is on fire")
-        )) as mock_service:
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="Everything is on fire"))) as mock_service:
             response = handle_summarize_command(payload, {}, client)
 
         assert response.ephemeral is True
@@ -98,27 +94,22 @@ class TestHandleSummarizeCommand:
         client = _client_with_history([])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
-        with patch(_SUMMARIZE, new=AsyncMock(
-            return_value=OperationResult.permanent_error(
-                message="nothing", error_code=EMPTY_HISTORY_CODE
-            )
-        )):
+        with patch(
+            _SUMMARIZE,
+            new=AsyncMock(return_value=OperationResult.permanent_error(message="nothing", error_code=EMPTY_HISTORY_CODE)),
+        ):
             response = handle_summarize_command(payload, {}, client)
 
         assert response.ephemeral is True
         assert "nothing to summarize" in response.message.lower()
 
     def test_summarizer_error_renders_generic_error(self):
-        client = _client_with_history(
-            [{"user": "U1", "text": "prod is down", "ts": "1"}]
-        )
+        client = _client_with_history([{"user": "U1", "text": "prod is down", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
-        with patch(_SUMMARIZE, new=AsyncMock(
-            return_value=OperationResult.transient_error(
-                message="boom", error_code="SERVER_ERROR"
-            )
-        )):
+        with patch(
+            _SUMMARIZE, new=AsyncMock(return_value=OperationResult.transient_error(message="boom", error_code="SERVER_ERROR"))
+        ):
             response = handle_summarize_command(payload, {}, client)
 
         assert response.ephemeral is True
@@ -135,9 +126,7 @@ class TestHandleSummarizeCommand:
         mock_service.assert_not_awaited()
 
     def test_missing_channel_id_returns_error_without_calling_service(self):
-        client = _client_with_history(
-            [{"user": "U1", "text": "hi", "ts": "1"}]
-        )
+        client = _client_with_history([{"user": "U1", "text": "hi", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="")
 
         with patch(_SUMMARIZE, new=AsyncMock()) as mock_service:
@@ -149,14 +138,10 @@ class TestHandleSummarizeCommand:
         client.conversations_history.assert_not_called()
 
     def test_success_message_includes_header(self):
-        client = _client_with_history(
-            [{"user": "U1", "text": "prod is down", "ts": "1"}]
-        )
+        client = _client_with_history([{"user": "U1", "text": "prod is down", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
-        with patch(_SUMMARIZE, new=AsyncMock(
-            return_value=OperationResult.success(data="the summary body")
-        )):
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="the summary body"))):
             response = handle_summarize_command(payload, {}, client)
 
         # Header precedes the summary body, separated by a blank line.
@@ -165,15 +150,11 @@ class TestHandleSummarizeCommand:
         assert response.message != "the summary body"
 
     def test_summary_body_is_normalized_to_slack_mrkdwn(self):
-        client = _client_with_history(
-            [{"user": "U1", "text": "prod is down", "ts": "1"}]
-        )
+        client = _client_with_history([{"user": "U1", "text": "prod is down", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
         raw = "## **Key events**\n- • first\n- second"
 
-        with patch(_SUMMARIZE, new=AsyncMock(
-            return_value=OperationResult.success(data=raw)
-        )):
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data=raw))):
             response = handle_summarize_command(payload, {}, client)
 
         assert "**" not in response.message
@@ -182,14 +163,10 @@ class TestHandleSummarizeCommand:
         assert "*Key events*" in response.message
 
     def test_limit_argument_is_passed_to_history_fetch(self):
-        client = _client_with_history(
-            [{"user": "U1", "text": "hi", "ts": "1"}]
-        )
+        client = _client_with_history([{"user": "U1", "text": "hi", "ts": "1"}])
         payload = CommandPayload(text="--limit 25", user_id="U9", channel_id="C123")
 
-        with patch(_SUMMARIZE, new=AsyncMock(
-            return_value=OperationResult.success(data="ok")
-        )):
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))):
             handle_summarize_command(payload, {"--limit": 25}, client)
 
         assert client.conversations_history.call_args.kwargs["limit"] == 25
@@ -203,14 +180,10 @@ class TestHandleSummarizeCommand:
     def test_since_argument_sets_oldest_window(self):
         import time
 
-        client = _client_with_history(
-            [{"user": "U1", "text": "hi", "ts": "1"}]
-        )
+        client = _client_with_history([{"user": "U1", "text": "hi", "ts": "1"}])
         payload = CommandPayload(text="--since 2h", user_id="U9", channel_id="C123")
 
-        with patch(_SUMMARIZE, new=AsyncMock(
-            return_value=OperationResult.success(data="ok")
-        )):
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))):
             handle_summarize_command(payload, {"--since": "2h"}, client)
 
         oldest = float(client.conversations_history.call_args.kwargs["oldest"])
@@ -218,15 +191,11 @@ class TestHandleSummarizeCommand:
         assert abs((time.time() - 2 * 3600) - oldest) < 5
 
     def test_default_window_starts_at_channel_creation(self):
-        client = _client_with_history(
-            [{"user": "U1", "text": "hi", "ts": "1"}]
-        )
+        client = _client_with_history([{"user": "U1", "text": "hi", "ts": "1"}])
         client.conversations_info.return_value = {"channel": {"created": 1_700_000_000}}
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
-        with patch(_SUMMARIZE, new=AsyncMock(
-            return_value=OperationResult.success(data="ok")
-        )):
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))):
             handle_summarize_command(payload, {}, client)
 
         client.conversations_info.assert_called_once_with(channel="C123")
@@ -234,14 +203,10 @@ class TestHandleSummarizeCommand:
         assert oldest == 1_700_000_000.0
 
     def test_slack_mrkdwn_instructions_passed_to_service(self):
-        client = _client_with_history(
-            [{"user": "U1", "text": "hi", "ts": "1"}]
-        )
+        client = _client_with_history([{"user": "U1", "text": "hi", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
-        with patch(_SUMMARIZE, new=AsyncMock(
-            return_value=OperationResult.success(data="ok")
-        )) as mock_service:
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
             handle_summarize_command(payload, {}, client)
 
         instructions = mock_service.await_args.kwargs["instructions"]
@@ -259,9 +224,7 @@ class TestHandleSummarizeCommand:
         )
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
-        with patch(_SUMMARIZE, new=AsyncMock(
-            return_value=OperationResult.success(data="ok")
-        )) as mock_service:
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
             handle_summarize_command(payload, {}, client)
 
         messages = mock_service.await_args.args[0]
@@ -272,11 +235,10 @@ class TestHandleSummarizeCommand:
         client.conversations_history.side_effect = RuntimeError("slack exploded")
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
-        with patch(_SUMMARIZE, new=AsyncMock(
-            return_value=OperationResult.permanent_error(
-                message="nothing", error_code=EMPTY_HISTORY_CODE
-            )
-        )) as mock_service:
+        with patch(
+            _SUMMARIZE,
+            new=AsyncMock(return_value=OperationResult.permanent_error(message="nothing", error_code=EMPTY_HISTORY_CODE)),
+        ) as mock_service:
             response = handle_summarize_command(payload, {}, client)
 
         # A Slack API failure degrades to an empty transcript, so the service
@@ -297,9 +259,7 @@ class TestHandleSummarizeCommand:
         )
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
-        with patch(_SUMMARIZE, new=AsyncMock(
-            return_value=OperationResult.success(data="ok")
-        )) as mock_service:
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
             handle_summarize_command(payload, {}, client)
 
         messages = mock_service.await_args.args[0]
@@ -383,9 +343,7 @@ class TestResolveDisplayName:
 
     def test_caches_lookups_to_avoid_repeat_api_calls(self):
         client = MagicMock()
-        client.users_info.return_value = {
-            "user": {"profile": {"display_name": "Ada"}}
-        }
+        client.users_info.return_value = {"user": {"profile": {"display_name": "Ada"}}}
         cache: dict[str, str] = {}
         log = structlog.get_logger()
 
@@ -437,9 +395,7 @@ class TestResolveChannelStart:
         client.conversations_info.return_value = {"channel": {"created": 1_700_000_000}}
         settings = IncidentSummarySettings(DEFAULT_SINCE_HOURS=24)
 
-        oldest = _resolve_channel_start(
-            client, "C123", settings, structlog.get_logger()
-        )
+        oldest = _resolve_channel_start(client, "C123", settings, structlog.get_logger())
 
         assert oldest == 1_700_000_000.0
 
@@ -450,9 +406,7 @@ class TestResolveChannelStart:
         client.conversations_info.side_effect = RuntimeError("no scope")
         settings = IncidentSummarySettings(DEFAULT_SINCE_HOURS=24)
 
-        oldest = _resolve_channel_start(
-            client, "C123", settings, structlog.get_logger()
-        )
+        oldest = _resolve_channel_start(client, "C123", settings, structlog.get_logger())
 
         assert abs((time.time() - 24 * 3600) - oldest) < 5
 
@@ -463,9 +417,7 @@ class TestResolveChannelStart:
         client.conversations_info.return_value = {"channel": {}}
         settings = IncidentSummarySettings(DEFAULT_SINCE_HOURS=24)
 
-        oldest = _resolve_channel_start(
-            client, "C123", settings, structlog.get_logger()
-        )
+        oldest = _resolve_channel_start(client, "C123", settings, structlog.get_logger())
 
         assert abs((time.time() - 24 * 3600) - oldest) < 5
 
@@ -475,9 +427,7 @@ class TestFetchTranscript:
         client = MagicMock()
         client.conversations_history.side_effect = RuntimeError("boom")
 
-        messages = _fetch_transcript(
-            client, "C123", limit=200, oldest=0.0, log=structlog.get_logger()
-        )
+        messages = _fetch_transcript(client, "C123", limit=200, oldest=0.0, log=structlog.get_logger())
 
         assert messages == []
 
@@ -489,12 +439,8 @@ class TestFetchTranscript:
                 {"user": "U1", "text": "oldest", "ts": "1"},
             ]
         }
-        client.users_info.return_value = {
-            "user": {"profile": {"display_name": "Ada"}}
-        }
+        client.users_info.return_value = {"user": {"profile": {"display_name": "Ada"}}}
 
-        messages = _fetch_transcript(
-            client, "C123", limit=200, oldest=0.0, log=structlog.get_logger()
-        )
+        messages = _fetch_transcript(client, "C123", limit=200, oldest=0.0, log=structlog.get_logger())
 
         assert [m.text for m in messages] == ["oldest", "newest"]

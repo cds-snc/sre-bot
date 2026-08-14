@@ -59,9 +59,7 @@ class TestOpenAISummarizer:
 
         def handler(request: httpx.Request) -> httpx.Response:
             captured["body"] = request.read().decode()
-            return httpx.Response(
-                200, json={"choices": [{"message": {"content": "ok"}}]}
-            )
+            return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}]})
 
         summarizer = OpenAISummarizer(settings=openai_settings)
         with patch(

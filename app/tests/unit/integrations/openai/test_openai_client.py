@@ -15,16 +15,10 @@ from integrations.openai.client import build_openai_client, classify_openai_erro
 pytestmark = pytest.mark.unit
 
 
-def _http_status_error(
-    status_code: int, headers: dict[str, str] | None = None
-) -> httpx.HTTPStatusError:
+def _http_status_error(status_code: int, headers: dict[str, str] | None = None) -> httpx.HTTPStatusError:
     request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
-    response = httpx.Response(
-        status_code=status_code, headers=headers or {}, request=request
-    )
-    return httpx.HTTPStatusError(
-        f"HTTP {status_code}", request=request, response=response
-    )
+    response = httpx.Response(status_code=status_code, headers=headers or {}, request=request)
+    return httpx.HTTPStatusError(f"HTTP {status_code}", request=request, response=response)
 
 
 class TestBuildOpenAIClient:
@@ -56,9 +50,7 @@ class TestClassifyOpenAIError:
         assert result.error_code == "NOT_FOUND"
 
     def test_rate_limited_with_retry_after(self):
-        result = classify_openai_error(
-            _http_status_error(429, headers={"Retry-After": "42"})
-        )
+        result = classify_openai_error(_http_status_error(429, headers={"Retry-After": "42"}))
 
         assert result.status == OperationStatus.TRANSIENT_ERROR
         assert result.error_code == "RATE_LIMITED"
