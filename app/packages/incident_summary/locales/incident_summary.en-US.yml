@@ -1,0 +1,7 @@
+incident_summary:
+  description: "Summarize what has happened in this channel so far, for someone jumping into the incident."
+  examples.default: "`/sre incident summarize` - Summarize recent channel activity."
+  examples.since: "`/sre incident summarize --since 2h --limit 100` - Summarize the last 2 hours (up to 100 messages)."
+  result.header: "\U0001F9FE Incident summary"
+  result.empty_history: "There's nothing to summarize yet in this channel."
+  result.error: "\u274C Couldn't generate a summary right now. Please try again shortly."

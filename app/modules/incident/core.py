@@ -578,6 +578,7 @@ def initiate_resources_creation(
 • `/sre incident status update <status>` - Update incident status
 • `/sre incident updates add` - Add incident updates
 • `/sre incident show` - View incident details
+• `/sre incident summarize` - Summarize the channel to catch up someone joining the incident (optionally add `--since 30m` or `--since 2h` to limit the time range)
 
 *Quick Actions:*
 📋 Use the bookmarked incident report above to document findings
