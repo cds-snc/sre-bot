@@ -27,9 +27,9 @@ class OpenAISettings(BaseSettings):
     )
 
     API_KEY: SecretStr = Field(alias="OPENAI_API_KEY")
-    MODEL: str = Field(default="gpt-5.4-nano", alias="OPENAI_MODEL")
+    MODEL: str = Field(default="gpt-5.6-luna", alias="OPENAI_MODEL")
     MAX_OUTPUT_TOKENS: int = Field(default=800, alias="OPENAI_MAX_OUTPUT_TOKENS")
-    TIMEOUT_SECONDS: float = Field(default=30.0, alias="OPENAI_TIMEOUT_SECONDS")
+    TIMEOUT_SECONDS: float = Field(default=60.0, alias="OPENAI_TIMEOUT_SECONDS")
     BASE_URL: str = Field(default="https://ai.cdssandbox.xyz", alias="OPENAI_BASE_URL")
 
 

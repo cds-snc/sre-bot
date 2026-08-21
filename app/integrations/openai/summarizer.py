@@ -34,7 +34,13 @@ _DEFAULT_INSTRUCTIONS = (
 class Summarizer(Protocol):
     """Behavior contract for producing a text summary of a transcript."""
 
-    async def summarize(self, transcript: str, *, instructions: str | None = None) -> OperationResult[str]:
+    async def summarize(
+        self,
+        transcript: str,
+        *,
+        instructions: str | None = None,
+        max_output_tokens: int | None = None,
+    ) -> OperationResult[str]:
         """Return an ``OperationResult`` carrying the summary text on success."""
         ...
 
@@ -45,11 +51,26 @@ class OpenAISummarizer:
     def __init__(self, settings: OpenAISettings | None = None) -> None:
         self._settings = settings or get_openai_settings()
 
-    async def summarize(self, transcript: str, *, instructions: str | None = None) -> OperationResult[str]:
-        """Summarize ``transcript`` via the OpenAI chat completions endpoint."""
+    async def summarize(
+        self,
+        transcript: str,
+        *,
+        instructions: str | None = None,
+        max_output_tokens: int | None = None,
+    ) -> OperationResult[str]:
+        """Summarize ``transcript`` via the OpenAI chat completions endpoint.
+
+        Args:
+            transcript: The user content to summarize.
+            instructions: Optional system prompt replacing the default.
+            max_output_tokens: Optional per-call completion budget. Callers
+                that need substantially more output than a catch-up summary
+                (e.g. structured multi-section drafts) raise it; ``None`` uses
+                the configured ``MAX_OUTPUT_TOKENS``.
+        """
         payload = {
             "model": self._settings.MODEL,
-            "max_completion_tokens": self._settings.MAX_OUTPUT_TOKENS,
+            "max_completion_tokens": max_output_tokens or self._settings.MAX_OUTPUT_TOKENS,
             "messages": [
                 {"role": "system", "content": instructions or _DEFAULT_INSTRUCTIONS},
                 {"role": "user", "content": transcript},
@@ -66,6 +87,18 @@ class OpenAISummarizer:
             return classify_openai_error(exc)
 
         summary = _extract_summary(body)
+        finish_reason = _finish_reason(body)
+        if finish_reason == "length":
+            # The completion budget ran out mid-response, so the text is cut
+            # off. Callers parsing structured output need to know this.
+            logger.warning(
+                "openai_summarize_truncated",
+                max_completion_tokens=payload["max_completion_tokens"],
+                summary_length=len(summary),
+            )
+        elif not summary:
+            logger.warning("openai_summarize_empty_content", finish_reason=finish_reason)
+
         return OperationResult.success(
             data=summary,
             provider="openai",
@@ -80,6 +113,15 @@ def _extract_summary(body: dict) -> str:
         return ""
     message = choices[0].get("message") or {}
     return (message.get("content") or "").strip()
+
+
+def _finish_reason(body: dict) -> str | None:
+    """Return the first choice's ``finish_reason`` (``"length"`` when truncated)."""
+    choices = body.get("choices") or []
+    if not choices:
+        return None
+    reason = choices[0].get("finish_reason")
+    return str(reason) if reason is not None else None
 
 
 @lru_cache(maxsize=1)
