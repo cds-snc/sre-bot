@@ -6,13 +6,19 @@ real request/response/raise_for_status path is exercised offline.
 
 from __future__ import annotations
 
+<<<<<<< HEAD
 import json
+=======
+>>>>>>> main
 from unittest.mock import patch
 
 import httpx
 import pytest
 
+<<<<<<< HEAD
 import integrations.openai.summarizer as summarizer_module
+=======
+>>>>>>> main
 from infrastructure.operations.status import OperationStatus
 from integrations.openai.summarizer import OpenAISummarizer, Summarizer
 
@@ -117,6 +123,7 @@ class TestOpenAISummarizer:
         assert result.status == OperationStatus.TRANSIENT_ERROR
         assert result.error_code == "RATE_LIMITED"
         assert result.retry_after == 7
+<<<<<<< HEAD
 
 
 class TestTemperature:
@@ -218,3 +225,5 @@ class TestErrorDiagnostics:
             result = await OpenAISummarizer(settings=openai_settings).summarize("transcript")
 
         assert result.status == OperationStatus.TRANSIENT_ERROR
+=======
+>>>>>>> main
