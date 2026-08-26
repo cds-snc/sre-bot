@@ -28,7 +28,13 @@ class OpenAISettings(BaseSettings):
 
     API_KEY: SecretStr = Field(alias="OPENAI_API_KEY")
     MODEL: str = Field(default="gpt-5.6-luna", alias="OPENAI_MODEL")
-    MAX_OUTPUT_TOKENS: int = Field(default=800, alias="OPENAI_MAX_OUTPUT_TOKENS")
+    MAX_OUTPUT_TOKENS: int = Field(default=3000, alias="OPENAI_MAX_OUTPUT_TOKENS")
+    # Summarising wants reproducibility, not creativity, so a temperature of 0
+    # is worth having where the model supports it. It is omitted by default
+    # because reasoning-style models -- including the gateway's current default
+    # -- reject the parameter outright with a 400, which fails the whole
+    # request. Set 0.0 to opt in; any negative value omits it.
+    TEMPERATURE: float = Field(default=-1.0, alias="OPENAI_TEMPERATURE")
     TIMEOUT_SECONDS: float = Field(default=60.0, alias="OPENAI_TIMEOUT_SECONDS")
     BASE_URL: str = Field(default="https://ai.cdssandbox.xyz", alias="OPENAI_BASE_URL")
 

@@ -6,11 +6,13 @@ real request/response/raise_for_status path is exercised offline.
 
 from __future__ import annotations
 
+import json
 from unittest.mock import patch
 
 import httpx
 import pytest
 
+import integrations.openai.summarizer as summarizer_module
 from infrastructure.operations.status import OperationStatus
 from integrations.openai.summarizer import OpenAISummarizer, Summarizer
 
@@ -115,3 +117,104 @@ class TestOpenAISummarizer:
         assert result.status == OperationStatus.TRANSIENT_ERROR
         assert result.error_code == "RATE_LIMITED"
         assert result.retry_after == 7
+
+
+class TestTemperature:
+    """Drafting wants reproducibility: the same channel should draft the same."""
+
+    @staticmethod
+    def _capturing_handler(captured: dict):
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured["body"] = json.loads(request.read().decode())
+            return httpx.Response(
+                200,
+                json={"choices": [{"message": {"content": "a summary"}, "finish_reason": "stop"}]},
+            )
+
+        return handler
+
+    async def _payload_for(self, settings) -> dict:
+        captured: dict = {}
+        with patch(
+            "integrations.openai.summarizer.build_openai_client",
+            return_value=_mock_client(self._capturing_handler(captured), settings),
+        ):
+            await OpenAISummarizer(settings=settings).summarize("transcript")
+        return captured["body"]
+
+    @pytest.mark.asyncio
+    async def test_temperature_is_omitted_by_default(self, openai_settings):
+        """The gateway's model rejects the parameter with a 400."""
+        payload = await self._payload_for(openai_settings)
+
+        assert "temperature" not in payload
+
+    @pytest.mark.asyncio
+    async def test_zero_is_sent_when_opted_into(self, openai_settings, monkeypatch):
+        monkeypatch.setattr(openai_settings, "TEMPERATURE", 0.0)
+
+        payload = await self._payload_for(openai_settings)
+
+        assert payload["temperature"] == 0.0
+
+    @pytest.mark.asyncio
+    async def test_a_configured_temperature_is_used(self, openai_settings, monkeypatch):
+        monkeypatch.setattr(openai_settings, "TEMPERATURE", 0.7)
+
+        payload = await self._payload_for(openai_settings)
+
+        assert payload["temperature"] == 0.7
+
+    @pytest.mark.asyncio
+    async def test_a_negative_temperature_omits_the_parameter(self, openai_settings, monkeypatch):
+        """Some models reject temperature outright, which would fail the call."""
+        monkeypatch.setattr(openai_settings, "TEMPERATURE", -1.0)
+
+        payload = await self._payload_for(openai_settings)
+
+        assert "temperature" not in payload
+        assert payload["model"] == openai_settings.MODEL
+
+
+class TestErrorDiagnostics:
+    """A 400 must say what the API objected to, not just that it objected."""
+
+    @pytest.mark.asyncio
+    async def test_the_error_body_and_sent_parameters_are_logged(self, openai_settings, monkeypatch):
+        monkeypatch.setattr(openai_settings, "TEMPERATURE", 0.0)
+        body = '{"error": {"message": "Unsupported parameter: temperature", "param": "temperature"}}'
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(400, text=body)
+
+        logged: dict = {}
+
+        def capture(event, **kwargs):
+            logged.update(kwargs, event=event)
+
+        with (
+            patch(
+                "integrations.openai.summarizer.build_openai_client",
+                return_value=_mock_client(handler, openai_settings),
+            ),
+            patch.object(summarizer_module.logger, "warning", capture),
+        ):
+            result = await OpenAISummarizer(settings=openai_settings).summarize("transcript")
+
+        assert result.status == OperationStatus.PERMANENT_ERROR
+        # The body names the offending parameter, and we record what we sent.
+        assert "Unsupported parameter: temperature" in logged["response_body"]
+        assert "temperature" in logged["sent_parameters"]
+
+    @pytest.mark.asyncio
+    async def test_a_failure_without_a_response_still_logs_cleanly(self, openai_settings):
+        def handler(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("no route to host")
+
+        with patch(
+            "integrations.openai.summarizer.build_openai_client",
+            return_value=_mock_client(handler, openai_settings),
+        ):
+            result = await OpenAISummarizer(settings=openai_settings).summarize("transcript")
+
+        assert result.status == OperationStatus.TRANSIENT_ERROR

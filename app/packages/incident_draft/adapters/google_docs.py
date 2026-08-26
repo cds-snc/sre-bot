@@ -16,7 +16,7 @@ allowed to import ``integrations``.
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -24,37 +24,23 @@ import structlog
 
 from infrastructure.configuration.integrations.google import get_google_resources_config
 from integrations.google_workspace import google_docs, google_drive
-from packages.incident_draft.domain import DocumentField, DocumentSection, DraftWriteResult, SectionDraft
+from packages.incident_draft.domain import (
+    NOT_INDICATED,
+    DocumentField,
+    DocumentSection,
+    DraftWriteResult,
+    SectionDraft,
+)
 
 logger = structlog.get_logger()
 
 _DRAFT_TITLE_SUFFIX = " - AI draft"
 _SUBHEADING_STYLE = "HEADING_3"
-# Only these delimit sections; deeper headings are content within one.
-_SECTION_HEADING_STYLES = frozenset({"HEADING_1", "HEADING_2"})
-_BANNER_PREFIX = "AI draft · generated"
-# Generated content is wrapped in named ranges under this prefix so a re-run can
-# find and replace exactly what it wrote, leaving the template untouched.
-_NAMED_RANGE_PREFIX = "incident_draft::"
-# Metadata labels the template renders as bold headings, which makes them loom
-# over the content beneath. They are normalised to ordinary body text instead.
-# Some live in the preamble, others inside the Impact section, so they are
-# matched by label wherever they appear.
-_REGULAR_LABEL_FONT_PT = 11
-_REGULAR_TEXT_LABELS = frozenset(
-    {
-        "start-of-impact time",
-        "detection time",
-        "end-of-impact time",
-        "on-call",
-        "author(s)",
-        "facilitators",
-        "end-users",
-        "cds staff",
-        "other government department(s)",
-        "other",
-    }
-)
+_TIMELINE_HEADING_MARKER = "timeline"
+# The heading that closes the timeline section in the incident template.
+_TIMELINE_END_MARKER = "Trigger"
+# modules.incident locates the timeline by this exact line; it must survive.
+_SENTINEL_LINE = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 
 # Line kinds produced by _render_body_lines.
 _SUBHEADING = "subheading"
@@ -73,11 +59,82 @@ _SUBHEADING_LABELS = frozenset(
         "what could have gone better",
     }
 )
-_TIMELINE_HEADING_MARKER = "timeline"
-# The heading that closes the timeline section in the incident template.
-_TIMELINE_END_MARKER = "Trigger"
-# modules.incident locates the timeline by this exact line; it must survive.
-_SENTINEL_LINE = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
+# Only these delimit sections; deeper headings are content within one.
+_SECTION_HEADING_STYLES = frozenset({"HEADING_1", "HEADING_2"})
+_BANNER_PREFIX = "AI draft · generated"
+# Generated content is wrapped in named ranges under this prefix so a re-run can
+# find and replace exactly what it wrote, leaving the template untouched.
+_NAMED_RANGE_PREFIX = "incident_draft::"
+# "PR 1898", "PR #1898", "pr1898" -- how the model refers to a pull request in
+# prose once the original Slack link has been summarised away.
+_PR_REFERENCE_PATTERN = re.compile(r"\bPR\s*#?(?P<number>\d+)\b", re.IGNORECASE)
+
+# (named range, insert index, block lines, inline text). Exactly one of the last
+# two is used: inline text is written on an existing label's line, block lines
+# become new paragraphs.
+_Placement = tuple[str, int, list[tuple[str, str]], str | None]
+
+# Guidance every draft should carry under these headings. The report's own
+# copy can be missing it -- the timeline's was replaced by the bot's banner
+# long ago -- so it is restored rather than assumed.
+_ENSURED_GUIDANCE = {
+    "detailedtimeline": (
+        "Provide a detailed incident timeline, in chronological order, timestamp with timezone(s). "
+        "Include any lead-up; start of impact; detection time; escalations, decisions, and changes; "
+        "and end of impact."
+    ),
+    "trigger": "Was there a clear trigger to the incident/outage? If not, leave it blank.",
+}
+
+# Impact's labelled groups, dropped from a drafted section when nothing fills
+# them rather than left as bare stubs.
+_REMOVE_WHEN_EMPTY_LABELS = frozenset(
+    {
+        "end-users",
+        "cds staff",
+        "other government department(s)",
+        "other",
+    }
+)
+
+# Metadata labels the template renders as bold headings, which makes them loom
+# over the content beneath. They are normalised to ordinary body text instead.
+# Some live in the preamble, others inside the Impact section, so they are
+# matched by label wherever they appear.
+_REGULAR_TEXT_LABELS = frozenset(
+    {
+        "start-of-impact time",
+        "detection time",
+        "end-of-impact time",
+        "on-call",
+        "author(s)",
+        "facilitators",
+        "end-users",
+        "cds staff",
+        "other government department(s)",
+        "other",
+    }
+)
+_REGULAR_LABEL_FONT_PT = 11
+
+# Labels the template may style as headings. A heading reading "Name: ..." is a
+# labelled value, not a section: drafting it as one wrote the value in again
+# beneath itself.
+_METADATA_LABELS = frozenset(
+    {
+        "name",
+        "team",
+        "date",
+        "slack channel",
+        "status",
+    }
+)
+
+# Normalised forms, so "Other government department(s)" matches regardless of
+# punctuation or spacing drift between the template and the model's output.
+_REGULAR_TEXT_LABEL_KEYS = frozenset(re.sub(r"[^a-z0-9]+", "", label) for label in _REGULAR_TEXT_LABELS)
+_REMOVE_WHEN_EMPTY_KEYS = frozenset(re.sub(r"[^a-z0-9]+", "", label) for label in _REMOVE_WHEN_EMPTY_LABELS)
+_KNOWN_LABEL_KEYS = _REGULAR_TEXT_LABEL_KEYS | frozenset(re.sub(r"[^a-z0-9]+", "", label) for label in _METADATA_LABELS)
 
 
 class GoogleDocsIncidentDocument:
@@ -118,7 +175,7 @@ class GoogleDocsIncidentDocument:
             sections.append(DocumentSection(heading=heading, instructions="".join(instruction_parts)))
         return sections
 
-    def replace_timeline(self, document_id: str, entries: str) -> bool:
+    def replace_timeline(self, document_id: str, entries: str, links: Mapping[str, str] = {}) -> bool:
         """Replace the incident report's timeline entries with ``entries``.
 
         This is the only write this package makes to the incident report
@@ -147,7 +204,7 @@ class GoogleDocsIncidentDocument:
         requests: list[dict[str, Any]] = []
         if end > start:
             requests.append({"deleteContentRange": {"range": {"startIndex": start, "endIndex": end}}})
-        requests.extend(_render_timeline_requests(start, entries))
+        requests.extend(_render_timeline_requests(start, entries, links))
 
         result = google_docs.batch_update(document_id, requests)
         if not isinstance(result, dict):
@@ -162,6 +219,7 @@ class GoogleDocsIncidentDocument:
         source_document_id: str,
         drafts: Sequence[SectionDraft],
         fields: Sequence[DocumentField] = (),
+        links: Mapping[str, str] = {},
     ) -> DraftWriteResult | None:
         """Write the draft as a filled-in copy of the incident report.
 
@@ -178,15 +236,21 @@ class GoogleDocsIncidentDocument:
         if not drafts and not fields:
             return None
 
-        title = _source_title(source_document_id)
-        if title is None:
-            return None
+        # One Drive metadata call yields both the name and the parent folder;
+        # fetching the document itself just to read its title meant pulling the
+        # whole body over the wire for one string.
+        title, folder = _source_name_and_folder(source_document_id)
 
-        draft_title = f"{title}{_DRAFT_TITLE_SUFFIX}"
-        folder = _source_folder(source_document_id)
+        stamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
+        draft_title = f"{title}{_DRAFT_TITLE_SUFFIX} {stamp}"
 
-        existing_id = _find_existing_draft(draft_title, folder, source_document_id)
-        document_id = existing_id or _copy_source_document(source_document_id, draft_title, folder)
+        # Every run starts from a pristine copy of the report. Editing a
+        # long-lived draft in place meant each run inherited the last one's
+        # output and had to identify it by heuristics -- the source of
+        # duplicated sections, stacked banners and, when two of those analyses
+        # proposed overlapping deletions, shredded text. A fresh document
+        # cannot accumulate any of it.
+        document_id = _copy_source_document(source_document_id, draft_title, folder)
         if not document_id:
             return None
 
@@ -195,7 +259,7 @@ class GoogleDocsIncidentDocument:
             logger.warning("incident_draft_draft_fetch_failed", document_id=document_id)
             return None
 
-        requests = _fill_section_requests(document, drafts, fields)
+        requests = _fill_section_requests(document, drafts, fields, links)
         if not requests:
             logger.warning("incident_draft_no_sections_filled", document_id=document_id)
             return None
@@ -205,37 +269,12 @@ class GoogleDocsIncidentDocument:
             logger.warning("incident_draft_populate_failed", document_id=document_id)
             return None
 
-        _normalize_label_styling(document_id)
-
         logger.info(
             "incident_draft_document_written",
             document_id=document_id,
-            created=existing_id is None,
             filled_sections=sum(1 for d in drafts if d.is_drafted),
         )
-        return DraftWriteResult(document_id=document_id, created=existing_id is None)
-
-
-def _normalize_label_styling(document_id: str) -> None:
-    """Render the report's metadata labels as ordinary body text.
-
-    Deliberately a separate ``batchUpdate`` on a freshly fetched document:
-    styling ranges are computed from indices, and running them alongside the
-    content edits would mean reasoning about how every insert and delete shifts
-    them. Re-reading first makes the indices exact. Purely cosmetic, so a
-    failure is logged and swallowed rather than failing the draft.
-    """
-    document = google_docs.get_document(document_id)
-    if not isinstance(document, dict):
-        logger.warning("incident_draft_label_style_fetch_failed", document_id=document_id)
-        return
-
-    requests = _regular_label_requests(document)
-    if not requests:
-        return
-
-    if not isinstance(google_docs.batch_update(document_id, requests), dict):
-        logger.warning("incident_draft_label_styling_failed", document_id=document_id)
+        return DraftWriteResult(document_id=document_id, created=True)
 
 
 def _regular_label_requests(document: dict) -> list[dict[str, Any]]:
@@ -252,7 +291,7 @@ def _regular_label_requests(document: dict) -> list[dict[str, Any]]:
             continue
         text = _paragraph_text(paragraph)
         label, separator, _ = text.partition(":")
-        if not separator or label.strip().lower() not in _REGULAR_TEXT_LABELS:
+        if not separator or _label_key(label) not in _REGULAR_TEXT_LABEL_KEYS:
             continue
 
         start, end = element.get("startIndex"), element.get("endIndex")
@@ -289,6 +328,7 @@ def _fill_section_requests(
     document: dict,
     drafts: Sequence[SectionDraft],
     fields: Sequence[DocumentField] = (),
+    links: Mapping[str, str] = {},
 ) -> list[dict[str, Any]]:
     """Write each answered section's draft into the copied template.
 
@@ -311,24 +351,73 @@ def _fill_section_requests(
     answered = [d for d in drafts if d.is_drafted and d.heading in spans]
     field_spans = _field_spans(document)
     fillable_fields = [f for f in fields if f.value.strip() and f.label in field_spans]
-    if not answered and not fillable_fields:
+    # Restyling changes no text lengths, so it can lead the batch: it applies
+    # against the snapshot every other edit was computed from, which saves
+    # re-fetching the document for a second round trip.
+    requests: list[dict[str, Any]] = _regular_label_requests(document)
+    repairs = _doubled_value_repairs(document)
+    sentinel_blocks = _sentinel_spans(document)
+    if not answered and not fillable_fields and not repairs and not sentinel_blocks:
         return []
 
-    placements: list[tuple[str, int, list[tuple[str, str]]]] = []
+    placements: list[_Placement] = []
+    stale_blocks: list[tuple[int, int]] = []
     for draft in answered:
-        placements.extend(_placements_for(document, draft, spans[draft.heading], generated))
+        section_placements = _placements_for(document, draft, spans[draft.heading], generated)
+        placements.extend(section_placements)
+        stale_blocks.extend(_duplicate_sub_label_blocks(document, spans[draft.heading]))
+        stale_blocks.extend(_empty_label_spans(document, spans[draft.heading], section_placements))
+        stale_blocks.extend(_empty_bullet_spans(document, spans[draft.heading]))
+        protected = [span for name, _, _, _ in section_placements for span in generated.get(name, [])]
+        stale_blocks.extend(_stale_content_blocks(document, spans[draft.heading], protected))
 
-    requests: list[dict[str, Any]] = []
-    for name, insert_at, lines in sorted(placements, key=lambda p: p[1], reverse=True):
+    # Everything that touches the body is ordered bottom-up together, so an
+    # edit higher up cannot invalidate indices already used below it.
+    # Several independent sweeps propose deletions from the same snapshot, and
+    # they can target overlapping spans. Applied in sequence, the first shifts
+    # the document and the second then deletes the wrong range -- which shredded
+    # neighbouring text into fragments. Merging first makes the set disjoint.
+    operations: list[tuple[int, list[dict[str, Any]]]] = [
+        (start, [{"deleteContentRange": {"range": {"startIndex": start, "endIndex": end}}}])
+        for start, end in _merge_overlapping([*stale_blocks, *sentinel_blocks])
+    ]
+    operations.extend(repairs)
+    operations.extend(_ensured_guidance_operations(document, spans))
+
+    numbered_names = {f"{_NAMED_RANGE_PREFIX}{draft.heading}" for draft in answered if draft.is_question_chain}
+    for name, insert_at, lines, inline_text in sorted(placements, key=lambda p: p[1], reverse=True):
+        placement_requests: list[dict[str, Any]] = []
+        # A five-whys chain reads as a numbered list; the template asks for the
+        # whys "as a list here".
+        numbered = name in numbered_names
         previous = generated.get(name, [])
         if previous:
             # Drop the marker before its content so the name is free to reuse.
-            requests.append({"deleteNamedRange": {"name": name}})
+            placement_requests.append({"deleteNamedRange": {"name": name}})
             for start, end in sorted(previous, reverse=True):
-                requests.append({"deleteContentRange": {"range": {"startIndex": start, "endIndex": end}}})
+                placement_requests.append({"deleteContentRange": {"range": {"startIndex": start, "endIndex": end}}})
 
-        builder = _RequestBuilder(start_index=insert_at)
+        if inline_text is not None:
+            # Written on the label's own line, after its colon.
+            placement_requests.append({"insertText": {"location": {"index": insert_at}, "text": inline_text}})
+            placement_requests.extend(_pr_link_requests(inline_text, insert_at, links))
+            placement_requests.append(
+                {
+                    "createNamedRange": {
+                        "name": name,
+                        "range": {"startIndex": insert_at, "endIndex": insert_at + len(inline_text)},
+                    }
+                }
+            )
+            operations.append((insert_at, placement_requests))
+            continue
+
+        builder = _RequestBuilder(start_index=insert_at, links=links)
+        question_number = 0
         for text, kind in lines:
+            if kind == _QUESTION and numbered:
+                question_number += 1
+                text = f"{question_number}. {text}"
             if kind == _SUBHEADING:
                 builder.insert(f"{text}\n", named_style=_SUBHEADING_STYLE)
                 continue
@@ -339,10 +428,10 @@ def _fill_section_requests(
                 bold=kind == _QUESTION,
                 indent_pt=18 if kind == _ANSWER else 0,
             )
-        requests.extend(builder.build())
+        placement_requests.extend(builder.build())
 
         if builder.end_index > insert_at:
-            requests.append(
+            placement_requests.append(
                 {
                     "createNamedRange": {
                         "name": name,
@@ -350,6 +439,10 @@ def _fill_section_requests(
                     }
                 }
             )
+        operations.append((insert_at, placement_requests))
+
+    for _, operation_requests in sorted(operations, key=lambda item: item[0], reverse=True):
+        requests.extend(operation_requests)
 
     # The metadata block sits above every section, so it is filled after them
     # -- still bottom-up overall.
@@ -385,33 +478,194 @@ def _placements_for(
     draft: SectionDraft,
     span: tuple[int, int],
     generated: dict[str, list[tuple[int, int]]],
-) -> list[tuple[str, int, list[tuple[str, str]]]]:
-    """Split a draft into ``(range name, insert index, lines)`` placements.
+) -> list[_Placement]:
+    """Split a draft into placements against the template's own structure.
 
-    Groups whose label the template already prints are placed under it, sans
-    the duplicate label. Everything else forms one placement at the end of the
-    section.
+    Three shapes, in priority order:
+
+    - A ``Label: value`` line whose label the template already prints on its own
+      line (Impact's "End-users:", "CDS Staff:", ...) is written *inline* after
+      that label's colon, so the value sits beside its label instead of in a
+      paragraph of prose further down.
+    - A group under a sub-label the template prints ("What went wrong") goes
+      beneath that label, without repeating it.
+    - Anything left over forms one block at the end of the section.
     """
     lines = _render_body_lines(draft.content, force_bullets=draft.as_list)
-    template_labels = _sub_label_indices(document, span)
+    sub_labels = _sub_label_indices(document, span)
+    inline_labels = _inline_label_spans(document, span)
 
-    placements: list[tuple[str, int, list[tuple[str, str]]]] = []
+    placements: list[_Placement] = []
     remainder: list[tuple[str, str]] = []
+
+    # Action items belong in the template's table, which is where a reader
+    # expects to assign a type, owner and priority. Rows are filled first;
+    # anything that does not fit falls through to the bullets above it, so no
+    # item is silently dropped.
+    rows = _empty_table_rows(document, span)
+    if draft.as_list or rows:
+        logger.info(
+            "incident_draft_table_scan",
+            heading=draft.heading,
+            section_span=span,
+            as_list=draft.as_list,
+            tables_in_section=_table_count(document, span),
+            empty_rows=len(rows),
+        )
+    if rows and draft.as_list:
+        items = [text for text, kind in lines if kind in (_BULLET, _TEXT) and text.strip()]
+        for row_index, (item, cell_index) in enumerate(zip(items, rows, strict=False)):
+            name = f"{_NAMED_RANGE_PREFIX}{draft.heading}::row{row_index}"
+            placements.append((name, _placement_index(name, cell_index, generated), [], item))
+        placed = set(items[: len(rows)])
+        lines = [(text, kind) for text, kind in lines if text not in placed]
 
     for label, group in _group_by_subheading(lines):
         key = label.rstrip(":").strip().lower() if label else ""
-        if key and key in template_labels:
+        if key and key in sub_labels:
             name = f"{_NAMED_RANGE_PREFIX}{draft.heading}::{key}"
-            placements.append((name, _placement_index(name, template_labels[key], generated), group))
+            placements.append((name, _placement_index(name, sub_labels[key], generated), group, None))
             continue
         if label:
             remainder.append((label, _SUBHEADING))
-        remainder.extend(group)
+
+        for text, kind in group:
+            inline = _match_inline_label(text, inline_labels)
+            if inline is None:
+                remainder.append((text, kind))
+                continue
+
+            inline_key, value = inline
+            name = f"{_NAMED_RANGE_PREFIX}{draft.heading}::{inline_key}"
+            value_start, _, has_value = inline_labels[inline_key]
+            if has_value and name not in generated:
+                # The template filled this at incident creation (Name, Team,
+                # Date, Slack channel, Status). That value is authoritative;
+                # writing beside it is what duplicated the text.
+                continue
+            placements.append((name, _placement_index(name, value_start, generated), [], f" {value}"))
+
+    # A sub-heading the model skipped still gets a point, so the reader can see
+    # the question was asked rather than meeting a bare label.
+    covered = {name.rpartition("::")[2] for name, _, _, _ in placements}
+    for key, label_index in sub_labels.items():
+        if key in covered:
+            continue
+        name = f"{_NAMED_RANGE_PREFIX}{draft.heading}::{key}"
+        placements.append((name, _placement_index(name, label_index, generated), [(NOT_INDICATED, _BULLET)], None))
 
     if remainder:
         name = f"{_NAMED_RANGE_PREFIX}{draft.heading}"
-        placements.append((name, _placement_index(name, span[1], generated), remainder))
+        content_end = _section_content_end(document, span)
+        placements.append((name, _placement_index(name, content_end, generated), remainder, None))
     return placements
+
+
+def _match_inline_label(text: str, inline_labels: dict[str, tuple[int, int, bool]]) -> tuple[str, str] | None:
+    """Split ``"Label: value"`` when the template prints that label inline."""
+    label, separator, value = text.partition(":")
+    if not separator:
+        return None
+    key = label.strip().lower()
+    if key not in inline_labels or not value.strip():
+        return None
+    return key, value.strip()
+
+
+def _inline_label_spans(document: dict, span: tuple[int, int]) -> dict[str, tuple[int, int, bool]]:
+    """Map ``Label:`` lines inside a section to ``(start, end, has_value)``.
+
+    ``has_value`` reports whether the label already carries text. Fields filled
+    when the incident was created -- Name, Team, Date, Slack channel, Status --
+    arrive that way, and writing beside them produced "Status: In Progress In
+    Progress". Only labels the template left blank are filled.
+
+    Only short labels qualify, so a sentence of guidance that merely contains a
+    colon is not mistaken for one.
+    """
+    start, end = span
+    labels: dict[str, tuple[int, int, bool]] = {}
+    for element in _body_content(document):
+        element_start, element_end = element.get("startIndex"), element.get("endIndex")
+        if not isinstance(element_start, int) or not isinstance(element_end, int):
+            continue
+        if element_start < start or element_end > end:
+            continue
+        paragraph = element.get("paragraph")
+        if not paragraph:
+            continue
+
+        text = _paragraph_text(paragraph)
+        label, separator, value = text.partition(":")
+        key = label.strip().lower()
+        if not separator or not key or len(key.split()) > 6 or len(key) > 40:
+            continue
+        if key not in labels:
+            value_start = element_start + len(label) + 1
+            labels[key] = (value_start, max(value_start, element_end - 1), bool(value.strip()))
+    return labels
+
+
+def _empty_table_rows(document: dict, span: tuple[int, int]) -> list[int]:
+    """Insert positions for the first cell of each empty row in a section's table.
+
+    The header row and any row somebody has already filled are skipped, so a
+    re-run adds to the table rather than overwriting work.
+    """
+    start, end = span
+    positions: list[int] = []
+    for element in _body_content(document):
+        element_start = element.get("startIndex")
+        table = element.get("table")
+        if not table or not isinstance(element_start, int):
+            continue
+        # Matched on where the table begins: a final section's span stops one
+        # character short of the body, so requiring the whole table to fit
+        # inside it would miss the Action Items table entirely.
+        if not start <= element_start < end:
+            continue
+
+        for row in table.get("tableRows") or []:
+            cells = row.get("tableCells") or []
+            if not cells:
+                continue
+            first = cells[0]
+            text = _table_cell_text(first)
+            if text.strip():
+                continue  # a header, or a row already written
+            insert_at = _table_cell_insert_index(first)
+            if insert_at is not None:
+                positions.append(insert_at)
+    return positions
+
+
+def _table_count(document: dict, span: tuple[int, int]) -> int:
+    """How many tables sit in a section -- diagnostics for the Action Items fill."""
+    start, end = span
+    return sum(
+        1
+        for element in _body_content(document)
+        if element.get("table") and isinstance(element.get("startIndex"), int) and start <= element["startIndex"] < end
+    )
+
+
+def _table_cell_text(cell: dict) -> str:
+    """Concatenate the text of every paragraph in a table cell."""
+    parts = []
+    for element in cell.get("content") or []:
+        paragraph = element.get("paragraph")
+        if paragraph:
+            parts.append(_paragraph_text(paragraph))
+    return "".join(parts)
+
+
+def _table_cell_insert_index(cell: dict) -> int | None:
+    """Return the index at which text is inserted into a cell."""
+    for element in cell.get("content") or []:
+        start = element.get("startIndex")
+        if element.get("paragraph") and isinstance(start, int):
+            return start
+    return None
 
 
 def _group_by_subheading(lines: list[tuple[str, str]]) -> list[tuple[str, list[tuple[str, str]]]]:
@@ -423,6 +677,323 @@ def _group_by_subheading(lines: list[tuple[str, str]]) -> list[tuple[str, list[t
             continue
         groups[-1][1].append((text, kind))
     return [(label, group) for label, group in groups if label or group]
+
+
+def _guidance_spans(document: dict, span: tuple[int, int]) -> list[tuple[int, int]]:
+    """Spans of the template's italic guidance inside a section.
+
+    Used only for sections listed in ``_REMOVE_GUIDANCE_HEADINGS``, where the
+    guidance contradicts the drafted answer once one exists ("Was there a clear
+    trigger...? If not, leave it blank."). Every other section keeps its
+    guidance, which is what the model and the reviewer both work from.
+    """
+    start, end = span
+    spans: list[tuple[int, int]] = []
+    for element in _body_content(document):
+        element_start, element_end = element.get("startIndex"), element.get("endIndex")
+        if not isinstance(element_start, int) or not isinstance(element_end, int):
+            continue
+        if element_start < start or element_end > end:
+            continue
+        paragraph = element.get("paragraph")
+        if not paragraph or not _paragraph_text(paragraph).strip():
+            continue
+        if _is_italic_paragraph(paragraph):
+            spans.append((element_start, element_end))
+    return spans
+
+
+def _stale_content_blocks(
+    document: dict,
+    span: tuple[int, int],
+    protected: Sequence[tuple[int, int]],
+) -> list[tuple[int, int]]:
+    """Content in a drafted section that belongs to neither template nor this run.
+
+    A section should end up holding the template's structure plus exactly one
+    generation. Anything else is output from an earlier run that predates named
+    ranges, and appending beside it is what produced two summaries saying the
+    same thing. Four things are spared:
+
+    - **Italic paragraphs** -- the template's guidance.
+    - **``Label:`` lines** -- Impact's groups and the metadata block, which the
+      template prints and this package fills in place.
+    - **Sub-labels** -- "What went wrong" and friends.
+    - **Named ranges this run replaces**, which would otherwise be deleted
+      twice.
+
+    Empty paragraphs and non-paragraph elements (the Action Items table) are
+    left alone.
+    """
+    start, end = span
+    blocks: list[tuple[int, int]] = []
+
+    for element in _body_content(document):
+        element_start, element_end = element.get("startIndex"), element.get("endIndex")
+        if not isinstance(element_start, int) or not isinstance(element_end, int):
+            continue
+        if element_start < start or element_end > end:
+            continue
+        paragraph = element.get("paragraph")
+        if not paragraph:
+            continue
+        if any(p_start <= element_start and p_end >= element_end for p_start, p_end in protected):
+            continue
+
+        text = _paragraph_text(paragraph).strip()
+        if not text or _is_guidance_paragraph(paragraph):
+            continue
+        if text.rstrip(":").strip().lower() in _SUBHEADING_LABELS:
+            continue
+        if _looks_like_label_line(text):
+            continue
+        blocks.append((element_start, element_end))
+
+    return _merge_adjacent(blocks)
+
+
+def _looks_like_label_line(text: str) -> bool:
+    """Whether a line is a ``Label:`` the template prints and we fill in place."""
+    label, separator, _ = text.partition(":")
+    key = label.strip()
+    return bool(separator) and bool(key) and len(key.split()) <= 6 and len(key) <= 40
+
+
+def _merge_adjacent(blocks: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    """Join touching spans so consecutive paragraphs delete as one range."""
+    return _merge_overlapping(blocks)
+
+
+def _merge_overlapping(blocks: Sequence[tuple[int, int]]) -> list[tuple[int, int]]:
+    """Reduce spans to a disjoint set, joining those that touch or overlap.
+
+    Two deletions that overlap cannot both be applied: the first shifts every
+    index after it, so the second removes text it was never meant to. Merging
+    them into one range is the only safe way to honour both.
+    """
+    merged: list[tuple[int, int]] = []
+    for block_start, block_end in sorted(blocks):
+        if block_end <= block_start:
+            continue
+        if merged and block_start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], block_end))
+        else:
+            merged.append((block_start, block_end))
+    return merged
+
+
+def _is_italic_paragraph(paragraph: dict) -> bool:
+    """Whether a paragraph's text is italic -- the template's guidance style."""
+    runs = _text_runs(paragraph)
+    if not runs:
+        return False
+    return all((run.get("textStyle") or {}).get("italic") for run in runs)
+
+
+def _is_guidance_paragraph(paragraph: dict) -> bool:
+    """Whether a paragraph is template guidance rather than written content.
+
+    Guidance is italic *or* grey. Both are checked because deleting a template's
+    instructions would be a destructive misread, and a template that styles its
+    guidance with colour alone is entirely plausible.
+    """
+    runs = _text_runs(paragraph)
+    if not runs:
+        return False
+    return all((run.get("textStyle") or {}).get("italic") or _is_grey(run.get("textStyle") or {}) for run in runs)
+
+
+def _is_grey(text_style: dict) -> bool:
+    """Whether a run is rendered in grey, as template guidance usually is."""
+    rgb = (((text_style.get("foregroundColor") or {}).get("color") or {}).get("rgbColor")) or {}
+    if not rgb:
+        return False
+    channels = [float(rgb.get(channel, 0.0)) for channel in ("red", "green", "blue")]
+    # Near-equal channels well short of black: a grey rather than a hue.
+    return max(channels) - min(channels) < 0.1 and 0.2 < sum(channels) / 3 < 0.85
+
+
+def _text_runs(paragraph: dict) -> list[dict]:
+    """Return a paragraph's non-empty text runs."""
+    runs = [element.get("textRun") for element in paragraph.get("elements") or []]
+    return [run for run in runs if run and (run.get("content") or "").strip()]
+
+
+def _empty_label_spans(
+    document: dict,
+    span: tuple[int, int],
+    placements: Sequence[_Placement],
+) -> list[tuple[int, int]]:
+    """Spans of labels left with no value after filling a section.
+
+    Only labels this package fills (Impact's groups) and only in a section it
+    actually drafted: a label carrying a value -- written now, or left by an
+    earlier run -- is kept, and a section the transcript could not answer keeps
+    its template structure untouched so a human can fill it in.
+    """
+    filled = {name.rpartition("::")[2] for name, _, _, inline in placements if inline is not None}
+    start, end = span
+    spans: list[tuple[int, int]] = []
+
+    for element in _body_content(document):
+        element_start, element_end = element.get("startIndex"), element.get("endIndex")
+        if not isinstance(element_start, int) or not isinstance(element_end, int):
+            continue
+        if element_start < start or element_end > end:
+            continue
+        paragraph = element.get("paragraph")
+        if not paragraph:
+            continue
+
+        text = _paragraph_text(paragraph)
+        label, separator, value = text.partition(":")
+        key = label.strip().lower()
+        if not separator or _label_key(label) not in _REMOVE_WHEN_EMPTY_KEYS:
+            continue
+        if key in filled or value.strip():
+            continue
+        spans.append((element_start, element_end))
+    return spans
+
+
+def _duplicate_sub_label_blocks(document: dict, span: tuple[int, int]) -> list[tuple[int, int]]:
+    """Spans of repeated sub-labels in a section, second occurrence onwards.
+
+    Earlier versions of this package wrote their own "What went wrong" headings
+    instead of filling the template's, and nothing marks those as generated. A
+    document carrying that history shows each label twice -- once filled, once
+    bare. Every occurrence after the first is removed, along with the content
+    beneath it, so the label appears exactly once.
+    """
+    start, end = span
+    blocks: list[tuple[int, int]] = []
+    seen: set[str] = set()
+    open_block: tuple[str, int] | None = None
+
+    for element in _body_content(document):
+        element_start, element_end = element.get("startIndex"), element.get("endIndex")
+        if not isinstance(element_start, int) or not isinstance(element_end, int):
+            continue
+        if element_start < start or element_end > end:
+            continue
+        paragraph = element.get("paragraph")
+        if not paragraph:
+            continue
+
+        key = _paragraph_text(paragraph).strip().rstrip(":").strip().lower()
+        if key not in _SUBHEADING_LABELS:
+            continue
+
+        if open_block is not None:
+            blocks.append((open_block[1], element_start))
+            open_block = None
+        if key in seen:
+            open_block = (key, element_start)
+        else:
+            seen.add(key)
+
+    if open_block is not None:
+        blocks.append((open_block[1], end))
+    return [(block_start, block_end) for block_start, block_end in blocks if block_end > block_start]
+
+
+def _ensured_guidance_operations(
+    document: dict,
+    spans: dict[str, tuple[int, int]],
+) -> list[tuple[int, list[dict[str, Any]]]]:
+    """Restore the template guidance a section is missing.
+
+    Inserted immediately under the heading, in the same muted italic the
+    template uses elsewhere. A section that already has guidance is left alone,
+    so this never produces a second copy.
+    """
+    operations: list[tuple[int, list[dict[str, Any]]]] = []
+    for heading, span in spans.items():
+        text = _ENSURED_GUIDANCE.get(_label_key(heading))
+        if not text or _has_guidance(document, span):
+            continue
+
+        builder = _RequestBuilder(start_index=span[0])
+        builder.insert(f"{text}\n", named_style="NORMAL_TEXT", italic=True, muted=True)
+        operations.append((span[0], builder.build()))
+    return operations
+
+
+def _has_guidance(document: dict, span: tuple[int, int]) -> bool:
+    """Whether a section already carries a line of template guidance."""
+    start, end = span
+    for element in _body_content(document):
+        element_start, element_end = element.get("startIndex"), element.get("endIndex")
+        if not isinstance(element_start, int) or not isinstance(element_end, int):
+            continue
+        if element_start < start or element_end > end:
+            continue
+        paragraph = element.get("paragraph")
+        if paragraph and _paragraph_text(paragraph).strip() and _is_guidance_paragraph(paragraph):
+            return True
+    return False
+
+
+def _section_content_end(document: dict, span: tuple[int, int]) -> int:
+    """Where a section's written content belongs: after its last real line.
+
+    The template leaves a blank paragraph before the next heading. Inserting at
+    the section boundary put the draft below that blank, showing a gap between
+    the guidance and the answer.
+    """
+    start, end = span
+    content_end = end
+    for element in _body_content(document):
+        element_start, element_end = element.get("startIndex"), element.get("endIndex")
+        if not isinstance(element_start, int) or not isinstance(element_end, int):
+            continue
+        if element_start < start or element_end > end:
+            continue
+        paragraph = element.get("paragraph")
+        if paragraph and _paragraph_text(paragraph).strip():
+            content_end = element_end
+    return content_end
+
+
+def _empty_bullet_spans(document: dict, span: tuple[int, int]) -> list[tuple[int, int]]:
+    """Spans of the template's empty bullets inside a section.
+
+    The template seeds each of Trigger, Detection, Resolution/Recovery and the
+    retrospective groupings with a bullet holding no text. Once the section is
+    drafted those read as items nobody filled in.
+    """
+    start, end = span
+    spans: list[tuple[int, int]] = []
+    for element in _body_content(document):
+        element_start, element_end = element.get("startIndex"), element.get("endIndex")
+        if not isinstance(element_start, int) or not isinstance(element_end, int):
+            continue
+        if element_start < start or element_end > end:
+            continue
+        paragraph = element.get("paragraph")
+        if not paragraph or "bullet" not in paragraph:
+            continue
+        if not _paragraph_text(paragraph).strip():
+            spans.append((element_start, element_end))
+    return spans
+
+
+def _sentinel_spans(document: dict) -> list[tuple[int, int]]:
+    """Spans of the bot's timeline sentinel, which a draft has no use for.
+
+    It exists so ``modules.incident`` can find the timeline in the *report*;
+    the draft is a copy nothing appends to, where it is only noise. The report's
+    own copy is untouched.
+    """
+    spans: list[tuple[int, int]] = []
+    for element in _body_content(document):
+        element_start, element_end = element.get("startIndex"), element.get("endIndex")
+        if not isinstance(element_start, int) or not isinstance(element_end, int):
+            continue
+        paragraph = element.get("paragraph")
+        if paragraph and _SENTINEL_LINE in _paragraph_text(paragraph):
+            spans.append((element_start, element_end))
+    return spans
 
 
 def _sub_label_indices(document: dict, span: tuple[int, int]) -> dict[str, int]:
@@ -456,6 +1027,66 @@ def _placement_index(name: str, default: int, generated: dict[str, list[tuple[in
     return default
 
 
+def _doubled_value_repairs(document: dict) -> list[tuple[int, list[dict[str, Any]]]]:
+    """Collapse ``Label: value value`` lines back to a single value.
+
+    Earlier versions wrote a value beside one the template already had, leaving
+    "Status: In Progress In Progress". That text is not inside a named range, so
+    nothing else can identify it as generated -- but a value repeated verbatim
+    is unambiguous, and repairing it is better than asking for the document to
+    be recreated. Only an exact doubling is touched; anything else is left
+    alone.
+    """
+    operations: list[tuple[int, list[dict[str, Any]]]] = []
+    for element in _body_content(document):
+        element_start, element_end = element.get("startIndex"), element.get("endIndex")
+        if not isinstance(element_start, int) or not isinstance(element_end, int):
+            continue
+        paragraph = element.get("paragraph")
+        if not paragraph:
+            continue
+
+        text = _paragraph_text(paragraph)
+        label, separator, value = text.partition(":")
+        if not separator or not _looks_like_label_line(text):
+            continue
+
+        single = _halve_if_doubled(value)
+        if single is None:
+            continue
+
+        value_start = element_start + len(label) + 1
+        value_end = max(value_start, element_end - 1)
+        if value_end <= value_start:
+            continue
+        operations.append(
+            (
+                value_start,
+                [
+                    {"deleteContentRange": {"range": {"startIndex": value_start, "endIndex": value_end}}},
+                    {"insertText": {"location": {"index": value_start}, "text": f" {single}"}},
+                ],
+            )
+        )
+    return operations
+
+
+def _halve_if_doubled(value: str) -> str | None:
+    """Return the single value when ``value`` is one string written twice."""
+    stripped = value.strip()
+    if not stripped:
+        return None
+    for separator in (" ", ""):
+        remainder = len(stripped) - len(separator)
+        if remainder <= 0 or remainder % 2:
+            continue
+        half = remainder // 2
+        first, second = stripped[:half], stripped[half + len(separator) :]
+        if first and first == second:
+            return first
+    return None
+
+
 def _banner_spans(document: dict) -> list[tuple[int, int]]:
     """Return the spans of *every* previous run's banner, in document order.
 
@@ -479,11 +1110,16 @@ def _banner_spans(document: dict) -> list[tuple[int, int]]:
 def _field_spans(document: dict) -> dict[str, tuple[int, int]]:
     """Map metadata labels to the ``(start, end)`` span of their value.
 
-    Only the preamble above the first heading is scanned -- that is where the
-    report's ``Label: value`` block lives, and a colon further down the
+    Only the preamble above the first real section is scanned -- that is where
+    the report's ``Label: value`` block lives, and a colon further down the
     document is ordinary prose. The span covers the text after the colon up to
     (but not including) the paragraph's newline, so filling a field rewrites
     only its value.
+
+    The stop condition is a *section* heading, not any heading: the template
+    styles ``Name:``, ``Team:`` and ``Date:`` as headings, so stopping at the
+    first heading of any kind ended the scan before the metadata block began,
+    and no field was ever filled.
     """
     spans: dict[str, tuple[int, int]] = {}
     for element in _body_content(document):
@@ -491,8 +1127,8 @@ def _field_spans(document: dict) -> dict[str, tuple[int, int]]:
         if not paragraph:
             continue
         text = _paragraph_text(paragraph)
-        if _is_heading(paragraph) and text.strip():
-            break  # the metadata block ends at the first heading
+        if _is_section_heading(paragraph) and text.strip():
+            break  # the metadata block ends at the first real section
 
         label, separator, _ = text.partition(":")
         start_index = element.get("startIndex")
@@ -616,14 +1252,14 @@ def _timeline_region(document: dict) -> tuple[int, int] | None:
     return None
 
 
-def _render_timeline_requests(start: int, entries: str) -> list[dict[str, Any]]:
+def _render_timeline_requests(start: int, entries: str, links: Mapping[str, str] = {}) -> list[dict[str, Any]]:
     """Build the insert/style requests writing the timeline section at ``start``.
 
     Re-inserts the sentinel line the delete removed -- muted and italic, since
     it is machinery rather than content -- followed by the drafted entries as
     bullets.
     """
-    builder = _RequestBuilder(start_index=start)
+    builder = _RequestBuilder(start_index=start, links=links)
     builder.insert(f"{_SENTINEL_LINE}\n", named_style="NORMAL_TEXT", italic=True, muted=True)
     for text, kind in _render_body_lines(entries, force_bullets=True):
         if kind == _SUBHEADING:
@@ -633,36 +1269,14 @@ def _render_timeline_requests(start: int, entries: str) -> list[dict[str, Any]]:
     return builder.build()
 
 
-def _find_existing_draft(draft_title: str, folder: str, source_document_id: str) -> str | None:
-    """Return the id of this incident's existing draft document, if any.
-
-    Looks only for an exact title match inside the incident's own folder, and
-    refuses to return the source document's id -- that value goes on to be
-    cleared, so it must never point at the incident report.
-    """
-    matches = google_drive.find_files_by_name(draft_title, folder)
-    if not isinstance(matches, list):
-        return None
-
-    for match in matches:
-        if not isinstance(match, dict):
-            continue
-        file_id = match.get("id")
-        if not file_id or file_id == source_document_id:
-            continue
-        if match.get("name") != draft_title:
-            continue
-        return str(file_id)
-    return None
-
-
 class _RequestBuilder:
     """Accumulates ``batchUpdate`` requests while tracking the running index."""
 
-    def __init__(self, start_index: int = 1) -> None:
+    def __init__(self, start_index: int = 1, links: Mapping[str, str] = {}) -> None:
         self._requests: list[dict[str, Any]] = []
         self._bullets: list[tuple[int, int]] = []
         self._index = start_index
+        self._links = links
 
     def insert(
         self,
@@ -685,6 +1299,7 @@ class _RequestBuilder:
             self._requests.append(_text_style_request(start, end, italic=italic, muted=muted, bold=bold))
         if bullet:
             self._bullets.append((start, end))
+        self._requests.extend(_pr_link_requests(text, start, self._links))
         self._index = end
 
     @property
@@ -768,6 +1383,33 @@ def _strip_markdown(text: str) -> str:
     return text.strip()
 
 
+def _pr_link_requests(text: str, start: int, links: Mapping[str, str]) -> list[dict[str, Any]]:
+    """Hyperlink each "PR 1898" reference whose URL the channel supplied.
+
+    A reference whose number nobody posted a link for is left as plain text --
+    the repository cannot be inferred from a bare number, and a wrong link is
+    worse than none.
+    """
+    if not links:
+        return []
+
+    requests: list[dict[str, Any]] = []
+    for match in _PR_REFERENCE_PATTERN.finditer(text):
+        url = links.get(match.group("number"))
+        if not url:
+            continue
+        requests.append(
+            {
+                "updateTextStyle": {
+                    "range": {"startIndex": start + match.start(), "endIndex": start + match.end()},
+                    "textStyle": {"link": {"url": url}},
+                    "fields": "link",
+                }
+            }
+        )
+    return requests
+
+
 def _paragraph_style_request(start: int, end: int, style: str, *, indent_pt: int = 0) -> dict[str, Any]:
     """Build an ``updateParagraphStyle`` request for a named style and indent."""
     paragraph_style: dict[str, Any] = {"namedStyleType": style}
@@ -816,28 +1458,23 @@ def _bullet_request(start: int, end: int) -> dict[str, Any]:
     }
 
 
-def _source_title(document_id: str) -> str | None:
-    """Return the source document's title, or ``None`` when unreadable."""
-    document = google_docs.get_document(document_id)
-    if not isinstance(document, dict):
-        logger.warning("incident_draft_document_fetch_failed", document_id=document_id)
-        return None
-    return document.get("title") or "Incident report"
+def _source_name_and_folder(document_id: str) -> tuple[str, str]:
+    """Return the source document's name and parent folder in one call.
 
-
-def _source_folder(document_id: str) -> str:
-    """Return the source document's parent folder id.
-
-    Falls back to the configured incident folder when the Drive metadata
-    lookup fails, so the draft still lands somewhere responders can find.
+    Falls back to the configured incident folder when the metadata lookup
+    fails, so a draft still lands somewhere responders can find it.
     """
     metadata = google_drive.get_file_by_id(document_id, fields="id, name, parents")
+    name, folder = "Incident report", ""
     if isinstance(metadata, dict):
+        name = str(metadata.get("name") or name)
         parents = metadata.get("parents") or []
         if parents:
-            return str(parents[0])
-    logger.warning("incident_draft_parent_folder_not_found", document_id=document_id)
-    return get_google_resources_config().incident_folder_id
+            folder = str(parents[0])
+    if not folder:
+        logger.warning("incident_draft_parent_folder_not_found", document_id=document_id)
+        folder = get_google_resources_config().incident_folder_id
+    return name, folder
 
 
 def _created_file_id(created: Any) -> str | None:
@@ -870,8 +1507,27 @@ def _is_section_heading(paragraph: dict) -> bool:
     re-run see "What went wrong" as its own section, so the Lessons Learned
     span collapsed to nothing, nothing was deleted, and each run stacked
     another copy of the content.
+
+    A heading that is really a labelled value ("Name:", "Other:") is not a
+    section either. The template styles several of those as headings, and
+    drafting them as sections wrote each value in again underneath itself.
     """
-    return _heading_style(paragraph) in _SECTION_HEADING_STYLES
+    if _heading_style(paragraph) not in _SECTION_HEADING_STYLES:
+        return False
+    return not _is_label_heading(_paragraph_text(paragraph))
+
+
+def _is_label_heading(text: str) -> bool:
+    """Whether a heading is a ``Label:`` line rather than a section title."""
+    label, separator, _ = text.partition(":")
+    if not separator:
+        return False
+    return _label_key(label) in _KNOWN_LABEL_KEYS
+
+
+def _label_key(label: str) -> str:
+    """Normalise a label for comparison: case, spacing and punctuation."""
+    return re.sub(r"[^a-z0-9]+", "", label.lower())
 
 
 def _heading_style(paragraph: dict) -> str:

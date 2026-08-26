@@ -7,7 +7,13 @@ import json
 import pytest
 
 from infrastructure.operations import OperationResult, OperationStatus
-from packages.incident_draft.domain import DocumentSection, DraftWriteResult, SectionDraft, TranscriptMessage
+from packages.incident_draft.domain import (
+    NOT_INDICATED,
+    DocumentSection,
+    DraftWriteResult,
+    SectionDraft,
+    TranscriptMessage,
+)
 from packages.incident_draft.service import (
     CREATE_FAILED_CODE,
     DOCUMENT_UNREADABLE_CODE,
@@ -70,19 +76,23 @@ class _StubDocumentPort:
         self.timeline_document_id: str | None = None
         self.timeline_entries: str | None = None
         self.written_fields: list = []
+        self.written_links: dict = {}
+        self.timeline_links: dict = {}
 
     def read_sections(self, document_id: str) -> list[DocumentSection]:
         return self._sections
 
-    def replace_timeline(self, document_id: str, entries: str) -> bool:
+    def replace_timeline(self, document_id: str, entries: str, links=None) -> bool:
         self.timeline_document_id = document_id
         self.timeline_entries = entries
+        self.timeline_links = dict(links or {})
         return self._timeline_ok
 
-    def write_draft_document(self, source_document_id: str, drafts, fields=()) -> DraftWriteResult | None:
+    def write_draft_document(self, source_document_id: str, drafts, fields=(), links=None) -> DraftWriteResult | None:
         self.created_from = source_document_id
         self.created_drafts = list(drafts)
         self.written_fields = list(fields)
+        self.written_links = dict(links or {})
         if self._new_document_id is None:
             return None
         return DraftWriteResult(document_id=self._new_document_id, created=self._created)
@@ -481,20 +491,20 @@ class TestMetadataFieldInference:
         assert "End-of-impact time" not in written
 
     @pytest.mark.asyncio
-    async def test_authors_are_derived_from_who_spoke(self):
+    async def test_the_author_is_the_bot_not_the_responders(self):
+        """Responders spoke in the channel; they did not author this draft."""
         documents = _StubDocumentPort(sections=self._sections())
         summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "Checkout was down."}'))
         messages = [
             TranscriptMessage(author="Sylvia", text="report failing"),
             TranscriptMessage(author="Pat", text="failing query"),
-            TranscriptMessage(author="Sylvia", text="PR 1899 should fix it"),
         ]
 
         await draft_incident_document("D1", messages, documents=documents, summarizer=summarizer)
 
         written = {f.label: f.value for f in documents.written_fields}
-        # Distinct, in order of first appearance.
-        assert written["Author(s)"] == "Sylvia, Pat"
+        assert written["Author(s)"] == "SRE Bot (AI Generated)"
+        assert "Sylvia" not in written["Author(s)"]
 
     @pytest.mark.asyncio
     async def test_on_call_and_facilitators_are_filled_when_evidenced(self):
@@ -531,3 +541,188 @@ class TestMetadataFieldInference:
         payload = summarizer.received_payload or ""
         assert "Metadata fields:" in payload
         assert "- Detection time" in payload
+
+
+class TestFiveWhysCap:
+    """The chain is capped at five questions, however many the model returns."""
+
+    @staticmethod
+    def _sections():
+        return [DocumentSection(heading="Five whys and Root Cause(s)", instructions="Ask why 5 times.\n")]
+
+    @staticmethod
+    def _chain(pairs: int, *, root_cause: str = "") -> str:
+        blocks = [f"Why did step {i} happen?\nBecause of cause {i}.\n" for i in range(1, pairs + 1)]
+        return "\n".join(blocks) + (f"\n{root_cause}" if root_cause else "")
+
+    async def _content_for(self, answer: str) -> str:
+        documents = _StubDocumentPort(sections=self._sections())
+        summarizer = _StubSummarizer(OperationResult.success(data=json.dumps({"Five whys and Root Cause(s)": answer})))
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+        return (documents.created_drafts or [])[0].content
+
+    @pytest.mark.asyncio
+    async def test_surplus_questions_are_dropped(self):
+        content = await self._content_for(self._chain(8))
+
+        assert content.count("?") == 5
+        assert "Why did step 5 happen?" in content
+        assert "Why did step 6 happen?" not in content
+        # The dropped questions' answers go with them.
+        assert "Because of cause 6." not in content
+
+    @pytest.mark.asyncio
+    async def test_a_shorter_chain_is_left_alone(self):
+        content = await self._content_for(self._chain(3))
+
+        assert content.count("?") == 3
+
+    @pytest.mark.asyncio
+    async def test_exactly_five_is_untouched(self):
+        content = await self._content_for(self._chain(5))
+
+        assert content.count("?") == 5
+        assert "Because of cause 5." in content
+
+    @pytest.mark.asyncio
+    async def test_trailing_root_cause_survives_the_cap(self):
+        """It is not part of the chain, so trimming the chain must not eat it."""
+        content = await self._content_for(self._chain(7, root_cause="Root cause: an unguarded config removal."))
+
+        assert content.count("?") == 5
+        assert "Root cause: an unguarded config removal." in content
+
+    @pytest.mark.asyncio
+    async def test_other_sections_are_not_capped(self):
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        many = "\n".join(f"Question {i}?" for i in range(1, 9))
+        summarizer = _StubSummarizer(OperationResult.success(data=json.dumps({"Summary": many})))
+
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        assert (documents.created_drafts or [])[0].content.count("?") == 8
+
+
+class TestFiveWhysCapListShapes:
+    """The chain is capped whatever list shape the model returns it in."""
+
+    @staticmethod
+    def _sections():
+        return [DocumentSection(heading="Five whys and Root Cause(s)", instructions="Document your whys as a list.\n")]
+
+    async def _content_for(self, answer: str) -> str:
+        documents = _StubDocumentPort(sections=self._sections())
+        summarizer = _StubSummarizer(OperationResult.success(data=json.dumps({"Five whys and Root Cause(s)": answer})))
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+        return (documents.created_drafts or [])[0].content
+
+    @pytest.mark.asyncio
+    async def test_bulleted_chain_is_capped(self):
+        """The template asks for a list, so this is a normal shape — and it slipped the cap."""
+        chain = "\n".join(f"- Why did step {i} happen?" for i in range(1, 9))
+
+        content = await self._content_for(chain)
+
+        assert content.count("?") == 5
+        assert "Why did step 5 happen?" in content
+        assert "Why did step 6 happen?" not in content
+
+    @pytest.mark.asyncio
+    async def test_numbered_chain_is_capped(self):
+        chain = "\n".join(f"{i}. Why did step {i} happen?" for i in range(1, 8))
+
+        content = await self._content_for(chain)
+
+        assert content.count("?") == 5
+        assert "7. Why did step 7 happen?" not in content
+
+    @pytest.mark.asyncio
+    async def test_bulleted_pairs_drop_their_answers_too(self):
+        chain = "\n".join(f"- Why {i}?\n- Because {i}.\n" for i in range(1, 8))
+
+        content = await self._content_for(chain)
+
+        assert content.count("?") == 5
+        assert "Because 6." not in content
+
+
+class TestPullRequestLinks:
+    """PR numbers in prose are matched back to the URLs posted in the channel."""
+
+    @staticmethod
+    def _sections():
+        return [DocumentSection(heading="Summary", instructions="")]
+
+    async def _run(self, messages):
+        documents = _StubDocumentPort(sections=self._sections())
+        summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "PR 1899 fixed it."}'))
+        await draft_incident_document("D1", messages, documents=documents, summarizer=summarizer)
+        return documents
+
+    @pytest.mark.asyncio
+    async def test_links_are_harvested_from_the_transcript(self):
+        messages = [
+            TranscriptMessage(author="Sylvia", text="PR https://github.com/cds-snc/sre-bot/pull/1899 should fix it"),
+            TranscriptMessage(author="Guillaume", text="opened https://github.com/cds-snc/sre-bot/pull/1898"),
+        ]
+
+        documents = await self._run(messages)
+
+        assert documents.written_links == {
+            "1899": "https://github.com/cds-snc/sre-bot/pull/1899",
+            "1898": "https://github.com/cds-snc/sre-bot/pull/1898",
+        }
+
+    @pytest.mark.asyncio
+    async def test_slack_link_markup_does_not_leak_into_the_url(self):
+        messages = [TranscriptMessage(author="Sylvia", text="see <https://github.com/cds-snc/sre-bot/pull/1899|PR 1899>")]
+
+        documents = await self._run(messages)
+
+        assert documents.written_links == {"1899": "https://github.com/cds-snc/sre-bot/pull/1899"}
+
+    @pytest.mark.asyncio
+    async def test_no_links_when_the_channel_posted_none(self):
+        documents = await self._run([TranscriptMessage(author="Sylvia", text="PR 1899 should fix it")])
+
+        assert documents.written_links == {}
+
+    @pytest.mark.asyncio
+    async def test_links_reach_the_timeline_too(self):
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="Detailed Timeline", instructions="Log key events.\n")])
+        summarizer = _StubSummarizer(OperationResult.success(data='{"Detailed Timeline": "- 11:34 Guillaume: opened PR 1898"}'))
+        messages = [TranscriptMessage(author="G", text="https://github.com/cds-snc/sre-bot/pull/1898")]
+
+        await draft_incident_document("D1", messages, documents=documents, summarizer=summarizer)
+
+        assert documents.timeline_links == {"1898": "https://github.com/cds-snc/sre-bot/pull/1898"}
+
+
+class TestFiveWhysPromptAsksForFive:
+    """The cap is a maximum; the prompt has to ask for five in the first place."""
+
+    @pytest.mark.asyncio
+    async def test_prompt_requires_exactly_five_and_forbids_stopping_early(self):
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
+
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        instructions = summarizer.received_instructions or ""
+        assert "always write exactly five pairs" in instructions
+        assert "Do not stop early" in instructions
+        # The earlier wording told it to stop as soon as evidence ran out,
+        # which is why only one why came back.
+        assert "stopping as soon as the transcript no longer supports" not in instructions
+
+    @pytest.mark.asyncio
+    async def test_prompt_asks_for_a_placeholder_rather_than_omitting_a_sub_heading(self):
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
+
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        instructions = summarizer.received_instructions or ""
+        assert "Include all three sub-headings" in instructions
+        assert NOT_INDICATED in instructions
+        assert "Omit a sub-heading entirely" not in instructions

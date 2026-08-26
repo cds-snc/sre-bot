@@ -81,7 +81,7 @@ class TestRegisterCommands:
 
 
 class TestHandleDraftCommand:
-    def test_success_links_the_new_draft_and_lists_headings(self):
+    def test_success_is_a_single_line_linking_the_draft(self):
         client = _client([{"user": "U1", "text": "prod is down", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
         outcome = _outcome(drafted=("Trigger", "Impact"), unanswered=("Lessons Learned",))
@@ -90,22 +90,16 @@ class TestHandleDraftCommand:
             response = handle_draft_command(payload, {}, client)
 
         assert response.ephemeral is True
-        assert "https://docs.google.com/document/d/NEW1/edit" in response.message
-        assert "• Trigger" in response.message
-        assert "• Lessons Learned" in response.message
+        assert response.message == (
+            "Created an AI-generated <https://docs.google.com/document/d/NEW1/edit|draft incident report> "
+            "from this channel. Copy over whatever's useful — all or part — into the original incident doc "
+            "created when the incident opened."
+        )
+        # No per-section listing, however many sections were drafted or skipped.
+        assert "•" not in response.message
+        assert "\n" not in response.message
         # The source document is passed to the service; the draft is a new doc.
         assert mock_service.await_args.args[0] == "DOC123"
-
-    def test_rerun_says_refreshed_rather_than_created(self):
-        client = _client([{"user": "U1", "text": "prod is down", "ts": "1"}])
-        payload = CommandPayload(text="", user_id="U9", channel_id="C123")
-        outcome = _outcome(created=False)
-
-        with patch(_DRAFT, new=AsyncMock(return_value=OperationResult.success(data=outcome))):
-            response = handle_draft_command(payload, {}, client)
-
-        assert "refreshed" in response.message.lower()
-        assert "created" not in response.message.lower()
 
     def test_transcript_is_passed_to_the_service_chronologically(self):
         client = _client(
@@ -316,3 +310,51 @@ class TestBotDetectionSignals:
         messages = _fetch_transcript(client, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
 
         assert [m.text for m in messages] == ["prod is down"]
+
+
+class TestProgressNotice:
+    """The invoker is told work is underway, before the slow part starts."""
+
+    def _run(self, client):
+        payload = CommandPayload(text="", user_id="U9", channel_id="C123")
+        with patch(_DRAFT, new=AsyncMock(return_value=OperationResult.success(data=_outcome()))):
+            return handle_draft_command(payload, {}, client)
+
+    def test_an_ephemeral_notice_is_posted_to_the_invoker(self):
+        client = _client([{"user": "U1", "text": "prod is down", "ts": "1"}])
+
+        self._run(client)
+
+        client.chat_postEphemeral.assert_called_once()
+        kwargs = client.chat_postEphemeral.call_args.kwargs
+        assert kwargs["channel"] == "C123"
+        assert kwargs["user"] == "U9"
+        assert "drafting the incident report" in kwargs["text"]
+
+    def test_the_notice_precedes_the_transcript_fetch(self):
+        """Posting it after the slow work would defeat the point."""
+        client = _client([{"user": "U1", "text": "prod is down", "ts": "1"}])
+        order: list[str] = []
+        client.chat_postEphemeral.side_effect = lambda **_: order.append("notice")
+        client.conversations_history.side_effect = lambda **_: (order.append("history"), {"messages": []})[1]
+
+        self._run(client)
+
+        assert order[0] == "notice"
+
+    def test_no_notice_when_the_channel_has_no_incident_document(self):
+        """Nothing slow follows, so a progress note would only be noise."""
+        client = _client()
+        client.bookmarks_list.return_value = {"ok": True, "bookmarks": []}
+
+        self._run(client)
+
+        client.chat_postEphemeral.assert_not_called()
+
+    def test_a_failed_notice_does_not_fail_the_command(self):
+        client = _client([{"user": "U1", "text": "prod is down", "ts": "1"}])
+        client.chat_postEphemeral.side_effect = RuntimeError("missing scope")
+
+        response = self._run(client)
+
+        assert "draft incident report" in response.message

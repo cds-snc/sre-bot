@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from unittest.mock import patch
 
 import pytest
@@ -226,15 +227,15 @@ def _template_document() -> dict:
             _paragraph("End-users:\n"),
             _paragraph("CDS Staff:\n"),
             _paragraph("Summary\n", style="HEADING_1"),
-            _paragraph("Summarize the incident in a few sentences.\n"),
+            _italic("Summarize the incident in a few sentences.\n"),
             _paragraph("Detailed Timeline\n", style="HEADING_1"),
-            _paragraph("DO NOT REMOVE this line as the SRE bot needs it as a placeholder.\n"),
+            _italic("Provide a detailed incident timeline.\n"),
             _paragraph("Five whys and Root Cause(s)\n", style="HEADING_1"),
-            _paragraph("Ask yourself why 5 times.\n"),
+            _italic("Ask yourself why 5 times.\n"),
             _paragraph("Lessons Learned\n", style="HEADING_1"),
-            _paragraph("What did we learn from this incident?\n"),
+            _italic("What did we learn from this incident?\n"),
             _paragraph("Action Items:\n", style="HEADING_1"),
-            _paragraph("What should we do now to prevent a future incident?\n"),
+            _italic("What should we do now to prevent a future incident?\n"),
         ]
     )
 
@@ -243,7 +244,7 @@ def _write(mock_docs, mock_drive, drafts, *, existing: bool = False, fields=()):
     """Run write_draft_document against a copied template and return requests."""
     mock_docs.get_document.return_value = _template_document()
     mock_docs.batch_update.return_value = {}
-    mock_drive.get_file_by_id.return_value = {"parents": ["FOLDER1"]}
+    mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
     mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
     mock_drive.find_files_by_name.return_value = (
         [{"id": "OLD1", "name": "testing draft functionality - AI draft"}] if existing else []
@@ -289,7 +290,7 @@ class TestWriteDraftDocument:
         # Copied from the source so the template's tables, metadata block and
         # guidance survive; never created as an empty document.
         name, folder, template = mock_drive.create_file_from_template.call_args.args
-        assert name == "testing draft functionality - AI draft"
+        assert name.startswith("testing draft functionality - AI draft ")
         assert folder == "FOLDER1"
         assert template == "D1"
         mock_drive.create_file.assert_not_called()
@@ -363,17 +364,29 @@ class TestWriteDraftDocument:
         assert inserts[-1]["location"]["index"] == 1
         assert inserts[-1]["text"].startswith("AI draft · generated ")
 
-    def test_rerun_refills_the_existing_draft_without_copying_again(self):
+    def test_every_run_starts_from_a_fresh_copy(self):
+        """A pristine document cannot inherit the previous run's output."""
         drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
 
         with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
             written, requests = _write(mock_docs, mock_drive, drafts, existing=True)
 
         assert written is not None
-        assert written.document_id == "OLD1"
-        assert written.created is False
-        mock_drive.create_file_from_template.assert_not_called()
-        assert mock_docs.batch_update.call_args.args[0] == "OLD1"
+        assert written.document_id == "NEW1"
+        assert written.created is True
+        mock_drive.create_file_from_template.assert_called_once()
+        # Nothing to sweep on a clean copy, so nothing is deleted.
+        assert not any("deleteContentRange" in r for r in requests)
+
+    def test_each_run_gets_its_own_name(self):
+        """Otherwise the folder fills with identically titled documents."""
+        drafts = [SectionDraft(heading="Summary", content="x", is_drafted=True)]
+
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            _write(mock_docs, mock_drive, drafts)
+
+        name = mock_drive.create_file_from_template.call_args.args[0]
+        assert re.fullmatch(r"testing draft functionality - AI draft \d{4}-\d{2}-\d{2} \d{2}:\d{2}", name)
 
     def test_source_document_is_never_written_to(self):
         drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
@@ -491,7 +504,9 @@ class TestMetadataFields:
         with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
             _, requests = _write(mock_docs, mock_drive, [], fields=fields)
 
-        insert = next(r["insertText"] for r in requests if r["insertText"]["text"].strip() == "2026-08-17 10:46")
+        insert = next(
+            r["insertText"] for r in requests if "insertText" in r and r["insertText"]["text"].strip() == "2026-08-17 10:46"
+        )
         # Lands immediately after "Detection time:" and before the newline.
         assert insert["location"]["index"] == detection["startIndex"] + len("Detection time:")
         assert insert["location"]["index"] < detection["endIndex"]
@@ -526,7 +541,7 @@ class TestMetadataFields:
         with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"parents": ["FOLDER1"]}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
             mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
             mock_drive.find_files_by_name.return_value = []
             written = GoogleDocsIncidentDocument().write_draft_document("D1", [], fields)
@@ -561,8 +576,9 @@ class TestRerunDoesNotDuplicate:
         with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"parents": ["FOLDER1"]}
-            mock_drive.find_files_by_name.return_value = [{"id": "OLD1", "name": "testing draft functionality - AI draft"}]
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
 
         requests = mock_docs.batch_update.call_args.args[1]
@@ -584,8 +600,9 @@ class TestRerunDoesNotDuplicate:
         with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"parents": ["FOLDER1"]}
-            mock_drive.find_files_by_name.return_value = [{"id": "OLD1", "name": "testing draft functionality - AI draft"}]
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
 
         requests = mock_docs.batch_update.call_args_list[0].args[1]
@@ -616,24 +633,30 @@ class TestRegularTextLabels:
         with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
             _write(mock_docs, mock_drive, [SectionDraft(heading="Summary", content="x", is_drafted=True)])
             calls = mock_docs.batch_update.call_args_list
-            return calls[1].args[1] if len(calls) > 1 else []
+            return calls[0].args[1] if calls else []
 
     def test_labels_become_body_text_not_headings(self):
         requests = self._styling_requests()
 
-        paragraph_styles = [r["updateParagraphStyle"] for r in requests if "updateParagraphStyle" in r]
-        text_styles = [r["updateTextStyle"] for r in requests if "updateTextStyle" in r]
+        # The batch also carries content styling now, so match the label
+        # restyling by its own field mask.
+        text_styles = [r["updateTextStyle"] for r in requests if r.get("updateTextStyle", {}).get("fields") == "bold,fontSize"]
+        label_starts = {t["range"]["startIndex"] for t in text_styles}
+        paragraph_styles = [
+            r["updateParagraphStyle"]
+            for r in requests
+            if r.get("updateParagraphStyle", {}).get("range", {}).get("startIndex") in label_starts
+        ]
 
         # Five labels in the fixture: On-call, Author(s), Detection time
         # (preamble) plus End-users and CDS Staff (inside Impact).
-        assert len(paragraph_styles) == 5
         assert len(text_styles) == 5
+        assert len(paragraph_styles) == 5
 
         assert all(p["paragraphStyle"]["namedStyleType"] == "NORMAL_TEXT" for p in paragraph_styles)
         # Bold and an enlarged font both make a label loom; reset both.
         assert all(t["textStyle"]["bold"] is False for t in text_styles)
         assert all(t["textStyle"]["fontSize"]["magnitude"] == 11 for t in text_styles)
-        assert all(t["fields"] == "bold,fontSize" for t in text_styles)
 
     def test_labels_are_matched_wherever_they_appear(self):
         """End-users/CDS Staff live inside Impact, not the preamble block."""
@@ -660,7 +683,7 @@ class TestRegularTextLabels:
         with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
             mock_docs.get_document.return_value = _template_document()
             mock_docs.batch_update.side_effect = [{}, None]
-            mock_drive.get_file_by_id.return_value = {"parents": ["FOLDER1"]}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
             mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
             mock_drive.find_files_by_name.return_value = []
             written = GoogleDocsIncidentDocument().write_draft_document(
@@ -693,8 +716,9 @@ class TestBannerAccumulation:
         with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"parents": ["FOLDER1"]}
-            mock_drive.find_files_by_name.return_value = [{"id": "OLD1", "name": "testing draft functionality - AI draft"}]
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
             return mock_docs.batch_update.call_args_list[0].args[1]
 
@@ -742,12 +766,12 @@ class TestTemplateSubLabels:
             [
                 _paragraph("testing draft functionality\n"),
                 _paragraph("Lessons Learned\n", style="HEADING_1"),
-                _paragraph("What did we learn from this incident?\n"),
+                _italic("What did we learn from this incident?\n"),
                 _paragraph("What went well\n"),
                 _paragraph("What went wrong\n"),
                 _paragraph("Where we got lucky\n"),
                 _paragraph("Action Items:\n", style="HEADING_1"),
-                _paragraph("What should we do now?\n"),
+                _italic("What should we do now?\n"),
             ]
         )
 
@@ -757,7 +781,7 @@ class TestTemplateSubLabels:
         with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"parents": ["FOLDER1"]}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
             mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
             mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
@@ -811,4 +835,1353 @@ class TestTemplateSubLabels:
         assert "What surprised us" in inserted
         assert "The alert never fired" in inserted
         names = {r["createNamedRange"]["name"] for r in requests if "createNamedRange" in r}
-        assert names == {"incident_draft::Lessons Learned"}
+        assert "incident_draft::Lessons Learned" in names
+
+    def test_sub_headings_the_model_skipped_get_a_placeholder_point(self):
+        """A bare label reads as an oversight; this shows the question was asked."""
+        _, requests = self._run("What went wrong:\n- The canary step was skipped\n")
+
+        inserted = _inserted_text(requests)
+        assert inserted.count("This was not indicated in the report") == 2
+        names = {r["createNamedRange"]["name"] for r in requests if "createNamedRange" in r}
+        assert names == {
+            "incident_draft::Lessons Learned::what went wrong",
+            "incident_draft::Lessons Learned::what went well",
+            "incident_draft::Lessons Learned::where we got lucky",
+        }
+
+    def test_a_placeholder_is_a_bullet_under_its_own_label(self):
+        document, requests = self._run("What went wrong:\n- The canary step was skipped\n")
+        lucky = next(e for e in document["body"]["content"] if _paragraph_text_of(e).strip() == "Where we got lucky")
+
+        placeholder = next(
+            r["insertText"]
+            for r in requests
+            if "insertText" in r and r["insertText"]["text"].startswith("This was not indicated")
+        )
+        assert placeholder["location"]["index"] == lucky["endIndex"]
+        assert any("createParagraphBullets" in r for r in requests)
+
+
+class TestInlineLabelValues:
+    """Impact's labelled groups are filled beside their label, not below it."""
+
+    def _impact_template(self) -> dict:
+        return _indexed(
+            [
+                _paragraph("testing draft functionality\n"),
+                _paragraph("Impact\n", style="HEADING_1"),
+                _paragraph("Include impact to all potential different groups.\n"),
+                _paragraph("End-users:\n"),
+                _paragraph("CDS Staff:\n"),
+                _paragraph("Other government department(s):\n"),
+                _paragraph("Other:\n"),
+                _paragraph("Detailed Timeline\n", style="HEADING_1"),
+                _italic("Provide a detailed timeline.\n"),
+            ]
+        )
+
+    def _run(self, content: str):
+        drafts = [SectionDraft(heading="Impact", content=content, is_drafted=True)]
+        document = self._impact_template()
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        return document, mock_docs.batch_update.call_args_list[0].args[1]
+
+    _CONTENT = (
+        "End-users: Vulnerability reports were not generated.\n"
+        "CDS Staff: Three engineers investigated.\n"
+        "Other government department(s): No impact was stated.\n"
+        "Other: No financial impact was stated.\n"
+    )
+
+    def test_values_land_on_their_label_line(self):
+        document, requests = self._run(self._CONTENT)
+        labels = {_paragraph_text_of(e).partition(":")[0]: e for e in document["body"]["content"] if ":" in _paragraph_text_of(e)}
+
+        placed = {r["insertText"]["text"].strip(): r["insertText"]["location"]["index"] for r in requests if "insertText" in r}
+        end_users = labels["End-users"]
+        # Immediately after "End-users:" and before that paragraph's newline.
+        assert placed["Vulnerability reports were not generated."] == end_users["startIndex"] + len("End-users:")
+        assert placed["Vulnerability reports were not generated."] < end_users["endIndex"]
+
+    def test_labels_are_not_repeated_in_the_output(self):
+        _, requests = self._run(self._CONTENT)
+
+        inserted = _inserted_text(requests)
+        assert "End-users:" not in inserted
+        assert "CDS Staff:" not in inserted
+        # The values themselves are written.
+        assert "Three engineers investigated." in inserted
+
+    def test_each_label_gets_its_own_named_range(self):
+        _, requests = self._run(self._CONTENT)
+
+        names = {r["createNamedRange"]["name"] for r in requests if "createNamedRange" in r}
+        assert names == {
+            "incident_draft::Impact::end-users",
+            "incident_draft::Impact::cds staff",
+            "incident_draft::Impact::other government department(s)",
+            "incident_draft::Impact::other",
+        }
+
+    def test_unlabelled_prose_still_goes_below_the_guidance(self):
+        _, requests = self._run("The failure went unnoticed for about five weeks.\n")
+
+        inserted = _inserted_text(requests)
+        assert "The failure went unnoticed for about five weeks." in inserted
+        names = {r["createNamedRange"]["name"] for r in requests if "createNamedRange" in r}
+        assert names == {"incident_draft::Impact"}
+
+    def test_guidance_sentences_with_colons_are_not_treated_as_labels(self):
+        """A long lead-in is prose, not a label to fill."""
+        _, requests = self._run("Include impact to all potential different groups: none stated.\n")
+
+        names = {r["createNamedRange"]["name"] for r in requests if "createNamedRange" in r}
+        assert names == {"incident_draft::Impact"}
+
+
+class TestDuplicateSubLabelCleanup:
+    """A document carrying labels from older runs is repaired, not appended to."""
+
+    def _document_with_duplicates(self) -> dict:
+        """Template labels first, then a second set left by an earlier run."""
+        return _indexed(
+            [
+                _paragraph("testing draft functionality\n"),
+                _paragraph("Lessons Learned\n", style="HEADING_1"),
+                _italic("What did we learn from this incident?\n"),
+                _paragraph("What went well\n"),
+                _paragraph("Rollback was quick\n"),
+                _paragraph("What went wrong\n"),
+                _paragraph("The canary step was skipped\n"),
+                _paragraph("Where we got lucky\n"),
+                _paragraph("Traffic was low\n"),
+                # Left behind by a previous version that wrote its own labels.
+                _paragraph("What went well\n", style="HEADING_3"),
+                _paragraph("What went wrong\n", style="HEADING_3"),
+                _paragraph("Where we got lucky\n", style="HEADING_3"),
+                _paragraph("Action Items:\n", style="HEADING_1"),
+                _italic("What should we do now?\n"),
+            ]
+        )
+
+    def _run(self):
+        document = self._document_with_duplicates()
+        drafts = [
+            SectionDraft(
+                heading="Lessons Learned",
+                content="What went wrong:\n- Something new\n",
+                is_drafted=True,
+                as_list=True,
+            )
+        ]
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        return document, mock_docs.batch_update.call_args_list[0].args[1]
+
+    def test_repeat_occurrences_are_deleted(self):
+        document, requests = self._run()
+        duplicates = [
+            e
+            for e in document["body"]["content"]
+            if e.get("paragraph", {}).get("paragraphStyle", {}).get("namedStyleType") == "HEADING_3"
+        ]
+
+        deletes = [r["deleteContentRange"]["range"] for r in requests if "deleteContentRange" in r]
+        for duplicate in duplicates:
+            assert any(d["startIndex"] <= duplicate["startIndex"] and d["endIndex"] >= duplicate["endIndex"] for d in deletes), (
+                f"{_paragraph_text_of(duplicate)!r} should have been removed"
+            )
+
+    def test_the_first_occurrence_is_kept_and_filled(self):
+        document, requests = self._run()
+        first_wrong = next(
+            e
+            for e in document["body"]["content"]
+            if _paragraph_text_of(e).strip() == "What went wrong"
+            and e["paragraph"]["paragraphStyle"]["namedStyleType"] != "HEADING_3"
+        )
+
+        insert = next(
+            r["insertText"] for r in requests if "insertText" in r and r["insertText"]["text"].startswith("Something new")
+        )
+        assert insert["location"]["index"] == first_wrong["endIndex"]
+
+    def test_edits_are_ordered_bottom_up(self):
+        """Deletes and inserts share one descending order, or indices drift."""
+        _, requests = self._run()
+
+        positions = []
+        for request in requests:
+            if "deleteContentRange" in request:
+                positions.append(request["deleteContentRange"]["range"]["startIndex"])
+            elif "insertText" in request and request["insertText"]["location"]["index"] > 1:
+                positions.append(request["insertText"]["location"]["index"])
+        assert positions == sorted(positions, reverse=True)
+
+    def test_a_clean_document_has_nothing_removed(self):
+        document = _indexed(
+            [
+                _paragraph("Lessons Learned\n", style="HEADING_1"),
+                _italic("What did we learn?\n"),
+                _paragraph("What went wrong\n"),
+                _paragraph("Action Items:\n", style="HEADING_1"),
+            ]
+        )
+        drafts = [SectionDraft(heading="Lessons Learned", content="What went wrong:\n- x\n", is_drafted=True, as_list=True)]
+
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+
+        requests = mock_docs.batch_update.call_args_list[0].args[1]
+        assert not any("deleteContentRange" in r for r in requests)
+
+
+class TestEmptyImpactLabels:
+    """Labels nothing filled are dropped rather than left as bare stubs."""
+
+    def _impact_document(self) -> dict:
+        return _indexed(
+            [
+                _paragraph("testing draft functionality\n"),
+                _paragraph("Impact\n", style="HEADING_1"),
+                _paragraph("Include impact to all potential different groups.\n"),
+                _paragraph("End-users:\n"),
+                _paragraph("CDS Staff:\n"),
+                _paragraph("Other government department(s):\n"),
+                _paragraph("Other:\n"),
+                _paragraph("Detailed Timeline\n", style="HEADING_1"),
+                _paragraph("Provide a timeline.\n"),
+            ]
+        )
+
+    def _run(self, drafts, document=None):
+        document = document or self._impact_document()
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        calls = mock_docs.batch_update.call_args_list
+        return document, (calls[0].args[1] if calls else [])
+
+    @staticmethod
+    def _deleted(requests, element) -> bool:
+        return any(
+            r["deleteContentRange"]["range"]["startIndex"] <= element["startIndex"]
+            and r["deleteContentRange"]["range"]["endIndex"] >= element["endIndex"]
+            for r in requests
+            if "deleteContentRange" in r
+        )
+
+    def test_unfilled_labels_are_removed_and_filled_ones_kept(self):
+        drafts = [
+            SectionDraft(
+                heading="Impact",
+                content="End-users: Reports were not generated.\nCDS Staff: Three engineers investigated.\n",
+                is_drafted=True,
+            )
+        ]
+
+        document, requests = self._run(drafts)
+        by_label = {
+            _paragraph_text_of(e).partition(":")[0]: e for e in document["body"]["content"] if ":" in _paragraph_text_of(e)
+        }
+
+        assert not self._deleted(requests, by_label["End-users"])
+        assert not self._deleted(requests, by_label["CDS Staff"])
+        assert self._deleted(requests, by_label["Other government department(s)"])
+        assert self._deleted(requests, by_label["Other"])
+
+    def test_an_undrafted_section_keeps_its_template_labels(self):
+        """Nothing was written there, so the structure stays for a human."""
+        drafts = [SectionDraft(heading="Impact", content="Guidance", is_drafted=False)]
+
+        document, requests = self._run(drafts)
+
+        assert requests == []
+
+    def test_a_label_holding_an_earlier_value_is_not_removed(self):
+        document = self._impact_document()
+        existing = next(e for e in document["body"]["content"] if _paragraph_text_of(e).startswith("Other:"))
+        existing["paragraph"]["elements"][0]["textRun"]["content"] = "Other: A value from a previous run\n"
+        drafts = [SectionDraft(heading="Impact", content="End-users: Reports were not generated.\n", is_drafted=True)]
+
+        document, requests = self._run(drafts, document)
+
+        assert not self._deleted(requests, existing)
+
+
+class TestPullRequestHyperlinks:
+    """ "PR 1898" in the written text becomes a link when a URL is known."""
+
+    _LINKS = {"1898": "https://github.com/cds-snc/sre-bot/pull/1898"}
+
+    def _run(self, content: str, links=...):
+        links = self._LINKS if links is ... else links
+        drafts = [SectionDraft(heading="Summary", content=content, is_drafted=True)]
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = _template_document()
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts, (), links)
+        return mock_docs.batch_update.call_args_list[0].args[1]
+
+    @staticmethod
+    def _links_in(requests):
+        return [r["updateTextStyle"] for r in requests if r.get("updateTextStyle", {}).get("fields") == "link"]
+
+    @staticmethod
+    def _insert_of(requests, fragment):
+        return next(r["insertText"] for r in requests if "insertText" in r and fragment in r["insertText"]["text"])
+
+    def test_reference_is_linked_over_exactly_its_own_text(self):
+        requests = self._run("Guillaume opened PR 1898 to add try/except.")
+
+        linked = self._links_in(requests)
+        assert len(linked) == 1
+        assert linked[0]["textStyle"]["link"]["url"] == self._LINKS["1898"]
+
+        insert = self._insert_of(requests, "PR 1898")
+        text, base = insert["text"], insert["location"]["index"]
+        span = linked[0]["range"]
+        assert text[span["startIndex"] - base : span["endIndex"] - base] == "PR 1898"
+
+    def test_hash_and_case_variants_are_recognised(self):
+        requests = self._run("See pr #1898 for the fix.")
+
+        assert len(self._links_in(requests)) == 1
+
+    def test_unknown_numbers_are_left_as_plain_text(self):
+        """The repository cannot be inferred, and a wrong link beats no link."""
+        requests = self._run("PR 4242 was mentioned but never linked.")
+
+        assert self._links_in(requests) == []
+
+    def test_no_links_map_means_no_link_requests(self):
+        requests = self._run("Guillaume opened PR 1898.", links={})
+
+        assert self._links_in(requests) == []
+
+
+def _italic(text: str) -> dict:
+    """A guidance paragraph, as the template renders it."""
+    return {
+        "paragraph": {
+            "paragraphStyle": {"namedStyleType": "NORMAL_TEXT"},
+            "elements": [{"textRun": {"content": text, "textStyle": {"italic": True}}}],
+        }
+    }
+
+
+class TestFiveWhysSectionHoldsOneChain:
+    """A chain left by an earlier run is swept before the new one is written."""
+
+    def _document(self) -> dict:
+        return _indexed(
+            [
+                _paragraph("testing draft functionality\n"),
+                _paragraph("Five whys and Root Cause(s)\n", style="HEADING_1"),
+                _italic("Ask yourself why 5 times to ensure this is the root cause.\n"),
+                # Guidance that is itself a question -- must survive.
+                _italic("If you're adamant the error lies with the user, what affordances were missing?\n"),
+                # Left by an earlier run, unmarked.
+                _paragraph("Why did the report fail?\n"),
+                _paragraph("Because the workspace id was removed.\n"),
+                _paragraph("What was the root cause?\n"),
+                _paragraph("A mismatch between the removal and its continued use.\n"),
+                _paragraph("Lessons Learned\n", style="HEADING_1"),
+                _italic("What did we learn?\n"),
+            ]
+        )
+
+    def _run(self):
+        document = self._document()
+        drafts = [
+            SectionDraft(
+                heading="Five whys and Root Cause(s)",
+                content="Why did it fail?\nBecause of a config removal.\n",
+                is_drafted=True,
+                is_question_chain=True,
+            )
+        ]
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        return document, mock_docs.batch_update.call_args_list[0].args[1]
+
+    @staticmethod
+    def _deleted(requests, element) -> bool:
+        return any(
+            r["deleteContentRange"]["range"]["startIndex"] <= element["startIndex"]
+            and r["deleteContentRange"]["range"]["endIndex"] >= element["endIndex"]
+            for r in requests
+            if "deleteContentRange" in r
+        )
+
+    def test_the_previous_chain_is_removed(self):
+        document, requests = self._run()
+        previous = [
+            e
+            for e in document["body"]["content"]
+            if _paragraph_text_of(e).strip()
+            in (
+                "Why did the report fail?",
+                "Because the workspace id was removed.",
+                "What was the root cause?",
+                "A mismatch between the removal and its continued use.",
+            )
+        ]
+
+        assert len(previous) == 4
+        for element in previous:
+            assert self._deleted(requests, element), f"{_paragraph_text_of(element)!r} should have been swept"
+
+    def test_italic_guidance_survives_even_when_it_is_a_question(self):
+        document, requests = self._run()
+        guidance = [e for e in document["body"]["content"] if _paragraph_text_of(e).startswith("If you're adamant")]
+
+        assert not self._deleted(requests, guidance[0])
+
+    def test_other_sections_are_not_swept(self):
+        document, requests = self._run()
+        other = next(e for e in document["body"]["content"] if _paragraph_text_of(e).startswith("What did we learn"))
+
+        assert not self._deleted(requests, other)
+
+    def test_the_new_chain_is_written(self):
+        _, requests = self._run()
+
+        assert "Why did it fail?" in _inserted_text(requests)
+
+
+class TestEnsuredGuidance:
+    """Detailed Timeline and Trigger always carry their guidance."""
+
+    _TIMELINE_TEXT = "Provide a detailed incident timeline, in chronological order"
+    _TRIGGER_TEXT = "Was there a clear trigger to the incident/outage?"
+
+    def _document(self, *, with_guidance: bool) -> dict:
+        trigger_body = (
+            [_italic("Was there a clear trigger to the incident/outage? If not, leave it blank.\n")] if with_guidance else []
+        )
+        timeline_body = (
+            [_italic("Provide a detailed incident timeline, in chronological order, timestamp…\n")]
+            if with_guidance
+            else [_paragraph("DO NOT REMOVE this line as the SRE bot needs it as a placeholder.\n")]
+        )
+        return _indexed(
+            [
+                _paragraph("testing draft functionality\n"),
+                _paragraph("Detailed Timeline\n", style="HEADING_1"),
+                *timeline_body,
+                _paragraph("Trigger\n", style="HEADING_1"),
+                *trigger_body,
+                _paragraph("Detection\n", style="HEADING_1"),
+                _italic("How and when did CDS detect the incident?\n"),
+            ]
+        )
+
+    def _run(self, document, drafts):
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        return mock_docs.batch_update.call_args_list[0].args[1]
+
+    def test_missing_guidance_is_restored_under_both_headings(self):
+        document = self._document(with_guidance=False)
+        drafts = [SectionDraft(heading="Trigger", content="A config removal.", is_drafted=True)]
+
+        requests = self._run(document, drafts)
+
+        inserted = _inserted_text(requests)
+        assert self._TIMELINE_TEXT in inserted
+        assert self._TRIGGER_TEXT in inserted
+
+    def test_restored_guidance_is_muted_italic_like_the_template(self):
+        document = self._document(with_guidance=False)
+
+        requests = self._run(document, [SectionDraft(heading="Trigger", content="x", is_drafted=True)])
+
+        insert = next(r["insertText"] for r in requests if "insertText" in r and self._TRIGGER_TEXT in r["insertText"]["text"])
+        style = next(
+            r["updateTextStyle"]
+            for r in requests
+            if r.get("updateTextStyle", {}).get("range", {}).get("startIndex") == insert["location"]["index"]
+        )
+        assert style["textStyle"]["italic"] is True
+        assert "foregroundColor" in style["textStyle"]
+
+    def test_guidance_lands_directly_under_its_heading(self):
+        document = self._document(with_guidance=False)
+        heading = next(e for e in document["body"]["content"] if _paragraph_text_of(e).startswith("Trigger"))
+
+        requests = self._run(document, [SectionDraft(heading="Trigger", content="x", is_drafted=True)])
+
+        insert = next(r["insertText"] for r in requests if "insertText" in r and self._TRIGGER_TEXT in r["insertText"]["text"])
+        assert insert["location"]["index"] == heading["endIndex"]
+
+    def test_existing_guidance_is_not_duplicated(self):
+        document = self._document(with_guidance=True)
+
+        requests = self._run(document, [SectionDraft(heading="Trigger", content="x", is_drafted=True)])
+
+        inserted = _inserted_text(requests)
+        assert self._TRIGGER_TEXT not in inserted
+        assert self._TIMELINE_TEXT not in inserted
+
+    def test_drafted_trigger_keeps_its_guidance(self):
+        """It is no longer removed once answered."""
+        document = self._document(with_guidance=True)
+        guidance = next(e for e in document["body"]["content"] if _paragraph_text_of(e).startswith("Was there"))
+
+        requests = self._run(document, [SectionDraft(heading="Trigger", content="A config removal.", is_drafted=True)])
+
+        assert not any(
+            r["deleteContentRange"]["range"]["startIndex"] <= guidance["startIndex"]
+            and r["deleteContentRange"]["range"]["endIndex"] >= guidance["endIndex"]
+            for r in requests
+            if "deleteContentRange" in r
+        )
+
+
+class TestPreFilledMetadataIsNotDuplicated:
+    """Values set at incident creation are authoritative and left alone."""
+
+    def _document(self) -> dict:
+        return _indexed(
+            [
+                _paragraph("Impact\n", style="HEADING_1"),
+                _italic("Include impact to all potential different groups.\n"),
+                # Filled when the incident was created.
+                _paragraph("Name: testing draft functionality\n"),
+                _paragraph("Team: Site reliability engineering\n"),
+                _paragraph("Status: In Progress\n"),
+                # Left blank by the template.
+                _paragraph("End-users:\n"),
+                _paragraph("Detailed Timeline\n", style="HEADING_1"),
+                _italic("Provide a timeline.\n"),
+            ]
+        )
+
+    def _run(self, content: str):
+        document = self._document()
+        drafts = [SectionDraft(heading="Impact", content=content, is_drafted=True)]
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        calls = mock_docs.batch_update.call_args_list
+        return document, (calls[0].args[1] if calls else [])
+
+    def test_a_label_that_already_has_a_value_is_not_written_beside(self):
+        """The reported bug: "Status: In Progress In Progress"."""
+        _, requests = self._run("Status: In Progress\nName: testing draft functionality\n")
+
+        inserts = [r["insertText"]["text"] for r in requests if "insertText" in r]
+        assert not any("In Progress" in text for text in inserts)
+        assert not any("testing draft functionality" in text for text in inserts)
+
+    def test_blank_labels_are_still_filled(self):
+        document, requests = self._run("End-users: Reports were not generated.\nStatus: In Progress\n")
+        end_users = next(e for e in document["body"]["content"] if _paragraph_text_of(e).startswith("End-users:"))
+
+        insert = next(
+            r["insertText"] for r in requests if "insertText" in r and "Reports were not generated." in r["insertText"]["text"]
+        )
+        assert insert["location"]["index"] == end_users["startIndex"] + len("End-users:")
+
+    def test_a_value_this_package_wrote_before_is_replaced_not_appended(self):
+        # Built with the earlier value in place so the indices match the text.
+        document = _indexed(
+            [
+                _paragraph("Impact\n", style="HEADING_1"),
+                _italic("Include impact to all potential different groups.\n"),
+                _paragraph("End-users: An earlier value\n"),
+                _paragraph("Detailed Timeline\n", style="HEADING_1"),
+                _italic("Provide a timeline.\n"),
+            ]
+        )
+        end_users = next(e for e in document["body"]["content"] if _paragraph_text_of(e).startswith("End-users:"))
+        value_start = end_users["startIndex"] + len("End-users:")
+        document["namedRanges"] = {
+            "incident_draft::Impact::end-users": {
+                "namedRanges": [
+                    {"namedRangeId": "r1", "ranges": [{"startIndex": value_start, "endIndex": end_users["endIndex"] - 1}]}
+                ]
+            }
+        }
+        drafts = [SectionDraft(heading="Impact", content="End-users: A newer value.\n", is_drafted=True)]
+
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+
+        requests = mock_docs.batch_update.call_args_list[0].args[1]
+        deletes = [r["deleteContentRange"]["range"] for r in requests if "deleteContentRange" in r]
+        assert {"startIndex": value_start, "endIndex": end_users["endIndex"] - 1} in deletes
+        assert "A newer value." in _inserted_text(requests)
+
+
+def _grey(text: str) -> dict:
+    """Guidance styled with colour rather than italics."""
+    return {
+        "paragraph": {
+            "paragraphStyle": {"namedStyleType": "NORMAL_TEXT"},
+            "elements": [
+                {
+                    "textRun": {
+                        "content": text,
+                        "textStyle": {"foregroundColor": {"color": {"rgbColor": {"red": 0.6, "green": 0.6, "blue": 0.6}}}},
+                    }
+                }
+            ],
+        }
+    }
+
+
+class TestStaleSectionContentSweep:
+    """A section holds the template plus one generation — not two summaries."""
+
+    def _document(self, guidance=None) -> dict:
+        guidance = guidance or _italic("Summarize the incident in a few sentences.\n")
+        return _indexed(
+            [
+                _paragraph("testing draft functionality\n"),
+                _paragraph("Summary\n", style="HEADING_1"),
+                guidance,
+                # An earlier run's paragraph, unmarked.
+                _paragraph("The vulnerability report had been failing for a couple of weeks.\n"),
+                _paragraph("Impact\n", style="HEADING_1"),
+                _italic("Include impact to all groups.\n"),
+                _paragraph("End-users:\n"),
+                _paragraph("CDS Staff:\n"),
+            ]
+        )
+
+    def _run(self, document):
+        drafts = [SectionDraft(heading="Summary", content="A newer, tighter summary.", is_drafted=True)]
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        return mock_docs.batch_update.call_args_list[0].args[1]
+
+    @staticmethod
+    def _deleted(requests, element) -> bool:
+        return any(
+            r["deleteContentRange"]["range"]["startIndex"] <= element["startIndex"]
+            and r["deleteContentRange"]["range"]["endIndex"] >= element["endIndex"]
+            for r in requests
+            if "deleteContentRange" in r
+        )
+
+    def _find(self, document, prefix):
+        return next(e for e in document["body"]["content"] if _paragraph_text_of(e).startswith(prefix))
+
+    def test_the_earlier_runs_paragraph_is_swept(self):
+        document = self._document()
+        requests = self._run(document)
+
+        assert self._deleted(requests, self._find(document, "The vulnerability report had been failing"))
+        assert "A newer, tighter summary." in _inserted_text(requests)
+
+    def test_italic_guidance_survives(self):
+        document = self._document()
+        requests = self._run(document)
+
+        assert not self._deleted(requests, self._find(document, "Summarize the incident"))
+
+    def test_grey_guidance_survives_even_without_italics(self):
+        """Deleting a template's instructions would be a destructive misread."""
+        document = self._document(guidance=_grey("Summarize the incident in a few sentences.\n"))
+        requests = self._run(document)
+
+        assert not self._deleted(requests, self._find(document, "Summarize the incident"))
+
+    def test_other_sections_and_their_labels_are_untouched(self):
+        document = self._document()
+        requests = self._run(document)
+
+        for prefix in ("Include impact to all groups", "End-users:", "CDS Staff:"):
+            assert not self._deleted(requests, self._find(document, prefix))
+
+
+class TestLabelHeadingsAreNotSections:
+    """A heading reading "Name: ..." is a labelled value, not a section."""
+
+    def _document(self) -> dict:
+        """Labels the template styles as headings, as the real one does."""
+        return _indexed(
+            [
+                _paragraph("testing draft functionality\n"),
+                _paragraph("Name: testing draft functionality\n", style="HEADING_2"),
+                _paragraph("Team: Site reliability engineering\n", style="HEADING_2"),
+                _paragraph("Status: In Progress\n", style="HEADING_2"),
+                _paragraph("Impact\n", style="HEADING_1"),
+                _italic("Include impact to all groups.\n"),
+                _paragraph("End-users:\n"),
+                _paragraph("Other government department(s):\n", style="HEADING_2"),
+                _paragraph("Other:\n", style="HEADING_2"),
+                _paragraph("Summary\n", style="HEADING_1"),
+                _italic("Summarize the incident.\n"),
+            ]
+        )
+
+    def test_labelled_headings_are_not_offered_as_sections(self):
+        with patch(_DOCS) as mock_docs:
+            mock_docs.get_document.return_value = self._document()
+            sections = GoogleDocsIncidentDocument().read_sections("D1")
+
+        headings = [s.heading for s in sections]
+        assert headings == ["Impact", "Summary"]
+        for label in ("Name: testing draft functionality", "Other:", "Other government department(s):"):
+            assert label not in headings
+
+    def test_impact_labels_styled_as_headings_are_filled_inline(self):
+        """They belong to Impact, so each value lands beside its own label."""
+        document = self._document()
+        drafts = [
+            SectionDraft(
+                heading="Impact",
+                content=(
+                    "End-users: Reports were not generated.\n"
+                    "Other government department(s): No impact.\n"
+                    "Other: No financial impact.\n"
+                ),
+                is_drafted=True,
+            )
+        ]
+
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+
+        requests = mock_docs.batch_update.call_args_list[0].args[1]
+        placed = {r["insertText"]["text"].strip(): r["insertText"]["location"]["index"] for r in requests if "insertText" in r}
+        for label, value in (
+            ("End-users:", "Reports were not generated."),
+            ("Other government department(s):", "No impact."),
+            ("Other:", "No financial impact."),
+        ):
+            element = next(e for e in document["body"]["content"] if _paragraph_text_of(e).startswith(label))
+            assert placed[value] == element["startIndex"] + len(label)
+
+    def test_labels_styled_as_headings_are_restyled_to_body_text(self):
+        """Otherwise "Other:" looms over "End-users:" beside it."""
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = self._document()
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document(
+                "D1", [SectionDraft(heading="Summary", content="x", is_drafted=True)]
+            )
+
+        styling = mock_docs.batch_update.call_args_list[0].args[1]
+        styles = [r["updateParagraphStyle"]["paragraphStyle"]["namedStyleType"] for r in styling if "updateParagraphStyle" in r]
+        assert styles and all(style == "NORMAL_TEXT" for style in styles)
+
+
+class TestMetadataBlockBelowLabelHeadings:
+    """The metadata block sits under headings the template styles as labels."""
+
+    def _document(self) -> dict:
+        return _indexed(
+            [
+                _paragraph("testing draft functionality\n"),
+                # Styled as headings by the template — the scan must not stop here.
+                _paragraph("Name: testing draft functionality\n", style="HEADING_2"),
+                _paragraph("Team: Site reliability engineering\n", style="HEADING_2"),
+                _paragraph("On-call:\n"),
+                _paragraph("Author(s):\n"),
+                _paragraph("Detection time:\n"),
+                _paragraph("Summary\n", style="HEADING_1"),
+                _italic("Summarize the incident.\n"),
+            ]
+        )
+
+    def test_fields_below_a_label_heading_are_still_found(self):
+        document = self._document()
+        fields = [
+            DocumentField(label="Author(s)", value="SRE Bot (AI Generated)"),
+            DocumentField(label="Detection time", value="2026-08-17 10:46"),
+        ]
+
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", [], (), {})
+            requests = mock_docs.batch_update.call_args_list[0].args[1] if mock_docs.batch_update.call_args_list else []
+            assert requests == []  # nothing to write without fields
+
+            mock_docs.batch_update.reset_mock()
+            mock_docs.get_document.return_value = self._document()
+            GoogleDocsIncidentDocument().write_draft_document("D1", [], fields, {})
+
+        requests = mock_docs.batch_update.call_args_list[0].args[1]
+        inserted = _inserted_text(requests)
+        assert "SRE Bot (AI Generated)" in inserted
+        assert "2026-08-17 10:46" in inserted
+
+    def test_the_scan_still_stops_at_a_real_section(self):
+        """A colon inside a section body is prose, not a metadata field."""
+        document = _indexed(
+            [
+                _paragraph("On-call:\n"),
+                _paragraph("Summary\n", style="HEADING_1"),
+                _paragraph("Note: this is prose inside a section\n"),
+            ]
+        )
+
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            written = GoogleDocsIncidentDocument().write_draft_document(
+                "D1", [], [DocumentField(label="Note", value="should not be written")], {}
+            )
+
+        assert written is None
+
+
+class TestDoubledValueRepair:
+    """`Status: In Progress In Progress` is collapsed back to one value."""
+
+    def _document(self, *lines: str) -> dict:
+        return _indexed(
+            [
+                _paragraph("testing draft functionality\n"),
+                *[_paragraph(line) for line in lines],
+                _paragraph("Summary\n", style="HEADING_1"),
+                _italic("Summarize the incident.\n"),
+            ]
+        )
+
+    def _run(self, document):
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            # A real run always carries at least one drafted section.
+            drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts, (), {})
+        calls = mock_docs.batch_update.call_args_list
+        return calls[0].args[1] if calls else []
+
+    def test_a_doubled_value_is_collapsed(self):
+        document = self._document("Status: In Progress In Progress\n")
+        status = next(e for e in document["body"]["content"] if _paragraph_text_of(e).startswith("Status:"))
+
+        requests = self._run(document)
+
+        value_start = status["startIndex"] + len("Status") + 1
+        assert {"deleteContentRange": {"range": {"startIndex": value_start, "endIndex": status["endIndex"] - 1}}} in requests
+        insert = next(
+            r["insertText"] for r in requests if "insertText" in r and r["insertText"]["location"]["index"] == value_start
+        )
+        assert insert["text"] == " In Progress"
+
+    def test_every_doubled_metadata_line_is_repaired(self):
+        document = self._document(
+            "Name: testing draft functionality testing draft functionality\n",
+            "Team: Site reliability engineering Site reliability engineering\n",
+            "Date: 2026-08-17 2026-08-17\n",
+        )
+
+        requests = self._run(document)
+
+        inserted = [r["insertText"]["text"] for r in requests if "insertText" in r]
+        assert " testing draft functionality" in inserted
+        assert " Site reliability engineering" in inserted
+        assert " 2026-08-17" in inserted
+
+    def test_a_doubled_url_is_repaired(self):
+        url = "https://gcdigital.slack.com/archives/C0BRP3Z7WQ0"
+        document = self._document(f"Slack channel: {url} {url}\n")
+
+        requests = self._run(document)
+
+        inserted = [r["insertText"]["text"] for r in requests if "insertText" in r]
+        assert f" {url}" in inserted
+
+    def test_a_single_value_is_left_alone(self):
+        document = self._document("Status: In Progress\n", "Name: testing draft functionality\n")
+
+        assert not any("deleteContentRange" in r for r in self._run(document))
+
+    def test_a_value_that_merely_repeats_a_word_is_left_alone(self):
+        """Only an exact doubling is collapsed; prose is not second-guessed."""
+        document = self._document("Other: The report failed and the report was fixed\n")
+
+        assert not any("deleteContentRange" in r for r in self._run(document))
+
+    def test_repairs_are_ordered_bottom_up_with_everything_else(self):
+        document = self._document(
+            "Name: testing draft functionality testing draft functionality\n",
+            "Status: In Progress In Progress\n",
+        )
+
+        requests = self._run(document)
+
+        positions = [r["deleteContentRange"]["range"]["startIndex"] for r in requests if "deleteContentRange" in r]
+        assert positions == sorted(positions, reverse=True)
+
+
+class TestEditsNeverOverlap:
+    """Overlapping deletions shred neighbouring text into fragments."""
+
+    def _accumulated_draft(self) -> dict:
+        """A draft carrying history from several earlier versions."""
+        return _indexed(
+            [
+                _paragraph("AI draft · generated 2026-08-20 23:13 UTC · review\n"),
+                _paragraph("Name: testing draft functionality testing draft functionality\n"),
+                _paragraph("Status: In Progress In Progress\n"),
+                _paragraph("Lessons Learned\n", style="HEADING_1"),
+                _italic("What did we learn?\n"),
+                _paragraph("What went well\n"),
+                _paragraph("Rollback was quick\n"),
+                _paragraph("What went wrong\n"),
+                _paragraph("Old stale paragraph from an earlier run\n"),
+                _paragraph("What went well\n", style="HEADING_3"),
+                _paragraph("Another stale line\n"),
+                _paragraph("Summary\n", style="HEADING_1"),
+                _italic("Summarize the incident.\n"),
+                _paragraph("An earlier summary paragraph\n"),
+            ]
+        )
+
+    def _requests(self):
+        drafts = [
+            SectionDraft(heading="Lessons Learned", content="What went wrong:\n- New point\n", is_drafted=True, as_list=True),
+            SectionDraft(heading="Summary", content="A new summary.", is_drafted=True),
+        ]
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = self._accumulated_draft()
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts, (), {})
+        return mock_docs.batch_update.call_args_list[0].args[1]
+
+    def test_no_two_deletions_overlap(self):
+        requests = self._requests()
+        deletes = [
+            (r["deleteContentRange"]["range"]["startIndex"], r["deleteContentRange"]["range"]["endIndex"])
+            for r in requests
+            if "deleteContentRange" in r
+        ]
+
+        overlapping = [
+            (first, second)
+            for i, first in enumerate(deletes)
+            for second in deletes[i + 1 :]
+            if first[0] < second[1] and second[0] < first[1]
+        ]
+        assert overlapping == [], f"overlapping deletions corrupt the document: {overlapping}"
+
+    def test_no_insert_lands_inside_a_deleted_range(self):
+        requests = self._requests()
+        deletes = [
+            (r["deleteContentRange"]["range"]["startIndex"], r["deleteContentRange"]["range"]["endIndex"])
+            for r in requests
+            if "deleteContentRange" in r
+        ]
+        inserts = [r["insertText"]["location"]["index"] for r in requests if "insertText" in r]
+
+        swallowed = [(d, i) for d in deletes for i in inserts if d[0] < i < d[1]]
+        assert swallowed == [], f"these inserts would be deleted again: {swallowed}"
+
+    def test_merging_joins_overlapping_and_touching_spans(self):
+        from packages.incident_draft.adapters.google_docs import _merge_overlapping
+
+        assert _merge_overlapping([(271, 305), (286, 305)]) == [(271, 305)]
+        assert _merge_overlapping([(10, 20), (20, 30)]) == [(10, 30)]
+        assert _merge_overlapping([(10, 20), (25, 30)]) == [(10, 20), (25, 30)]
+        assert _merge_overlapping([(10, 10), (12, 11)]) == []
+
+
+def _bullet(text: str = "") -> dict:
+    """A list item, as the template seeds each section with."""
+    return {
+        "paragraph": {
+            "paragraphStyle": {"namedStyleType": "NORMAL_TEXT"},
+            "bullet": {"listId": "l1"},
+            "elements": [{"textRun": {"content": f"{text}\n"}}],
+        }
+    }
+
+
+class TestTemplateNoiseRemoved:
+    """Scaffolding the template seeds is cleared once a section is drafted."""
+
+    def _document(self) -> dict:
+        return _indexed(
+            [
+                _paragraph("testing draft functionality\n"),
+                _paragraph("Summary\n", style="HEADING_1"),
+                _italic("Summarize the incident in a few sentences.\n"),
+                _paragraph("\n"),  # the template's trailing blank
+                _paragraph("Detailed Timeline\n", style="HEADING_1"),
+                _paragraph("DO NOT REMOVE this line as the SRE bot needs it as a placeholder.\n"),
+                _paragraph("Trigger\n", style="HEADING_1"),
+                _italic("Was there a clear trigger?\n"),
+                _bullet(),
+                _paragraph("Lessons Learned\n", style="HEADING_1"),
+                _italic("What did we learn?\n"),
+                _paragraph("What went well\n"),
+                _bullet(),
+            ]
+        )
+
+    def _run(self, drafts):
+        document = self._document()
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        return document, mock_docs.batch_update.call_args_list[0].args[1]
+
+    @staticmethod
+    def _deleted(requests, element) -> bool:
+        return any(
+            r["deleteContentRange"]["range"]["startIndex"] <= element["startIndex"]
+            and r["deleteContentRange"]["range"]["endIndex"] >= element["endIndex"]
+            for r in requests
+            if "deleteContentRange" in r
+        )
+
+    def _find(self, document, prefix):
+        return next(e for e in document["body"]["content"] if _paragraph_text_of(e).startswith(prefix))
+
+    def test_the_sentinel_is_removed_from_the_draft(self):
+        """It exists so the report can be appended to; a draft has no use for it."""
+        document, requests = self._run([SectionDraft(heading="Summary", content="x", is_drafted=True)])
+
+        assert self._deleted(requests, self._find(document, "DO NOT REMOVE"))
+
+    def test_empty_template_bullets_are_removed_from_a_drafted_section(self):
+        document, requests = self._run([SectionDraft(heading="Trigger", content="A config removal.", is_drafted=True)])
+        empty_bullet = document["body"]["content"][8]
+
+        assert self._deleted(requests, empty_bullet)
+
+    def test_content_lands_directly_under_the_guidance(self):
+        """Not below the template's trailing blank, which showed as a gap."""
+        document, requests = self._run([SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)])
+        guidance = self._find(document, "Summarize the incident")
+
+        insert = next(
+            r["insertText"] for r in requests if "insertText" in r and r["insertText"]["text"].startswith("Checkout was down.")
+        )
+        assert insert["location"]["index"] == guidance["endIndex"]
+
+    def test_an_undrafted_sections_bullets_are_left_alone(self):
+        """Nothing filled it, so its scaffolding is still the useful content."""
+        document, requests = self._run([SectionDraft(heading="Summary", content="x", is_drafted=True)])
+        trigger_bullet = document["body"]["content"][8]
+
+        assert not self._deleted(requests, trigger_bullet)
+
+
+class TestNumberedWhys:
+    def test_questions_are_numbered_in_order(self):
+        document = _indexed(
+            [
+                _paragraph("Five whys and Root Cause(s)\n", style="HEADING_1"),
+                _italic("Ask yourself why 5 times.\n"),
+                _paragraph("Lessons Learned\n", style="HEADING_1"),
+                _italic("What did we learn?\n"),
+            ]
+        )
+        content = "Why did it fail?\nBecause A.\nWhy did A happen?\nBecause B.\n"
+        drafts = [SectionDraft(heading="Five whys and Root Cause(s)", content=content, is_drafted=True, is_question_chain=True)]
+
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+
+        inserted = _inserted_text(mock_docs.batch_update.call_args_list[0].args[1])
+        assert "1. Why did it fail?" in inserted
+        assert "2. Why did A happen?" in inserted
+        # Answers are not numbered.
+        assert "1. Because A." not in inserted
+
+    def test_other_sections_questions_are_not_numbered(self):
+        document = _indexed(
+            [
+                _paragraph("Summary\n", style="HEADING_1"),
+                _italic("Summarize.\n"),
+                _paragraph("Impact\n", style="HEADING_1"),
+                _italic("Impact guidance.\n"),
+            ]
+        )
+        drafts = [SectionDraft(heading="Summary", content="Why did it fail?\nBecause A.\n", is_drafted=True)]
+
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+
+        inserted = _inserted_text(mock_docs.batch_update.call_args_list[0].args[1])
+        assert "Why did it fail?" in inserted
+        assert "1. Why did it fail?" not in inserted
+
+
+def _table(rows: list[list[str]]) -> dict:
+    """A Docs table whose cells carry plausible index ranges."""
+    return {"table": {"tableRows": [{"tableCells": [{"content": [], "_text": c} for c in row]} for row in rows]}}
+
+
+def _indexed_with_table(elements: list[dict], table_rows: list[list[str]]) -> dict:
+    """Build a document ending in a table, indexing paragraphs and cells alike."""
+    cursor = 1
+    for element in elements:
+        length = len(_paragraph_text_of(element)) or 1
+        element["startIndex"], element["endIndex"] = cursor, cursor + length
+        cursor += length
+
+    rows = []
+    table_start = cursor
+    for row in table_rows:
+        cells = []
+        for cell_text in row:
+            length = len(cell_text) + 1
+            cells.append(
+                {
+                    "content": [
+                        {
+                            "startIndex": cursor,
+                            "endIndex": cursor + length,
+                            "paragraph": {
+                                "paragraphStyle": {"namedStyleType": "NORMAL_TEXT"},
+                                "elements": [{"textRun": {"content": f"{cell_text}\n"}}],
+                            },
+                        }
+                    ]
+                }
+            )
+            cursor += length
+        rows.append({"tableCells": cells})
+    table = {"startIndex": table_start, "endIndex": cursor, "table": {"tableRows": rows}}
+    return {"title": "testing draft functionality", "body": {"content": [*elements, table]}}
+
+
+class TestActionItemsTable:
+    """Action items land in the template's table, where owners get assigned."""
+
+    def _document(self, extra_rows: int = 3) -> dict:
+        return _indexed_with_table(
+            [
+                _paragraph("testing draft functionality\n"),
+                _paragraph("Action Items:\n", style="HEADING_1"),
+                _italic("What should we do now to prevent a future incident?\n"),
+            ],
+            [
+                ["Action Item", "Type", "Owner", "Issue #", "Priority", "Done"],
+                *[["", "", "", "", "", ""] for _ in range(extra_rows)],
+            ],
+        )
+
+    def _run(self, content: str, extra_rows: int = 3):
+        document = self._document(extra_rows)
+        drafts = [SectionDraft(heading="Action Items:", content=content, is_drafted=True, as_list=True)]
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        return document, mock_docs.batch_update.call_args_list[0].args[1]
+
+    @staticmethod
+    def _cell_index(document, row: int) -> int:
+        table = document["body"]["content"][-1]["table"]
+        return table["tableRows"][row]["tableCells"][0]["content"][0]["startIndex"]
+
+    def test_items_are_written_into_successive_rows(self):
+        content = "- Add a canary deploy step\n- Alert on the 500 rate\n"
+
+        document, requests = self._run(content)
+
+        placed = {r["insertText"]["text"].strip(): r["insertText"]["location"]["index"] for r in requests if "insertText" in r}
+        assert placed["Add a canary deploy step"] == self._cell_index(document, 1)
+        assert placed["Alert on the 500 rate"] == self._cell_index(document, 2)
+
+    def test_the_header_row_is_never_written_over(self):
+        document, requests = self._run("- Add a canary deploy step\n")
+
+        header_index = self._cell_index(document, 0)
+        assert all(r["insertText"]["location"]["index"] != header_index for r in requests if "insertText" in r)
+
+    def test_items_beyond_the_available_rows_stay_as_bullets(self):
+        """Filling only what fits would silently drop the rest."""
+        content = "- First\n- Second\n- Third\n"
+
+        _, requests = self._run(content, extra_rows=1)
+
+        inserted = _inserted_text(requests)
+        assert "First" in inserted
+        assert "Second" in inserted and "Third" in inserted
+        # The overflow keeps its bullets rather than vanishing.
+        assert any("createParagraphBullets" in r for r in requests)
+
+    def test_items_are_not_written_both_to_the_table_and_as_bullets(self):
+        _, requests = self._run("- Add a canary deploy step\n")
+
+        inserted = _inserted_text(requests)
+        assert inserted.count("Add a canary deploy step") == 1
+
+    def test_a_row_someone_already_filled_is_left_alone(self):
+        document = _indexed_with_table(
+            [
+                _paragraph("Action Items:\n", style="HEADING_1"),
+                _italic("What should we do now?\n"),
+            ],
+            [
+                ["Action Item", "Type", "Owner", "Issue #", "Priority", "Done"],
+                ["Existing item somebody wrote", "Repair", "Ada", "", "P1", ""],
+                ["", "", "", "", "", ""],
+            ],
+        )
+        drafts = [SectionDraft(heading="Action Items:", content="- A new item\n", is_drafted=True, as_list=True)]
+
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+
+        requests = mock_docs.batch_update.call_args_list[0].args[1]
+        table = document["body"]["content"][-1]["table"]
+        filled_index = table["tableRows"][1]["tableCells"][0]["content"][0]["startIndex"]
+        empty_index = table["tableRows"][2]["tableCells"][0]["content"][0]["startIndex"]
+
+        placed = [r["insertText"]["location"]["index"] for r in requests if "insertText" in r]
+        assert filled_index not in placed
+        assert empty_index in placed
+
+    def test_a_section_without_a_table_still_writes_bullets(self):
+        document = _indexed(
+            [
+                _paragraph("Lessons Learned\n", style="HEADING_1"),
+                _italic("What did we learn?\n"),
+                _paragraph("Summary\n", style="HEADING_1"),
+                _italic("Summarize.\n"),
+            ]
+        )
+        drafts = [SectionDraft(heading="Lessons Learned", content="- A point\n", is_drafted=True, as_list=True)]
+
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = document
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+
+        requests = mock_docs.batch_update.call_args_list[0].args[1]
+        assert "A point" in _inserted_text(requests)
+
+
+class TestRoundTripCount:
+    """Network round trips dominate the run; each one removed is real time."""
+
+    def test_writing_a_draft_makes_the_minimum_calls(self):
+        drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
+
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            _write(mock_docs, mock_drive, drafts)
+
+        # One metadata lookup for name and folder together, one copy.
+        assert mock_drive.get_file_by_id.call_count == 1
+        assert mock_drive.create_file_from_template.call_count == 1
+        # The source is never fetched just to read its title.
+        assert mock_docs.get_document.call_count == 1
+        # Content and label styling share a single batch.
+        assert mock_docs.batch_update.call_count == 1
+
+    def test_the_existing_draft_lookup_is_gone(self):
+        """Every run copies, so searching Drive for a previous draft is waste."""
+        drafts = [SectionDraft(heading="Summary", content="x", is_drafted=True)]
+
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            _write(mock_docs, mock_drive, drafts)
+
+        mock_drive.find_files_by_name.assert_not_called()
+
+    def test_label_styling_leads_the_batch(self):
+        """It changes no lengths, so it is valid against the same snapshot."""
+        drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
+
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            _, requests = _write(mock_docs, mock_drive, drafts)
+
+        first_edit = next(i for i, r in enumerate(requests) if "insertText" in r or "deleteContentRange" in r)
+        styling = [i for i, r in enumerate(requests) if r.get("updateTextStyle", {}).get("fields") == "bold,fontSize"]
+        assert styling and max(styling) < first_edit

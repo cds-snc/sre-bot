@@ -13,62 +13,115 @@ from the incident channel's messages, and writes the filled-in result into a
 /sre incident draft --limit 200    # draft from at most 200 messages
 ```
 
-History always starts at the channel's creation, so the draft covers the whole
-incident; `--limit` caps how many messages are read (capped at
+History starts at the channel's creation, so the draft covers the whole
+incident; `--limit` caps how many messages are read (itself capped at
 `MAX_HISTORY_LIMIT`).
+
+The invoker gets an ephemeral notice while the work runs — the AI call alone
+takes most of a minute — then a one-line confirmation linking the draft and
+asking them to carry changes back into the original incident document.
 
 ## How it works
 
-1. The Slack adapter finds the incident document via the channel's
-   "Incident report" bookmark (set when the incident is created), and fetches
-   the channel transcript with display names resolved, then filters out noise:
+1. **Locate and read the channel.** The incident document is found via the
+   channel's "Incident report" bookmark. The transcript is fetched from channel
+   creation, display names resolved, timestamps attached, and noise removed:
 
-   - **This bot's own messages** (topic changes, hangout links, "an incident
-     report has been created at…") — scaffolding, not incident facts. Matched
-     on *any* of `user_id`, `bot_id`, or normalised display name from
-     `auth_test`, because a message may carry only some of those.
-   - **Slack system events** — `channel_topic`, `channel_join`, pins and
-     similar, whoever triggered them.
+   - **This bot's own messages** — topic changes, hangout links, "an incident
+     report has been created at…". Matched on *any* of `user_id`, `bot_id` or
+     normalised display name, because a message may carry only some of those.
+   - **Slack system events** — `channel_topic`, `channel_join`, pins.
 
-   Other bots are kept on purpose: an alerting bot's message is often the
-   first real timeline event. The prompt additionally forbids describing
-   automated bot activity as team actions, and forbids creating action items
-   for work a bot performed.
-2. The Google adapter walks the document body: each `HEADING_*` paragraph is a
-   section, and the text under it is that section's **instructions** (the
-   template's guidance for what belongs there).
-3. The service sends every heading with its instructions, plus the transcript,
-   to the `Summarizer` port (`integrations.openai`) asking for a strict JSON
-   mapping of heading → section content. The instructions say *what to write*;
-   the transcript is the *only* source of facts.
-4. The draft document — `"<incident doc title> - AI draft"` — is a **Drive
-   copy of the incident report**, so it keeps the template's exact format:
-   every heading, the metadata block, the blameless statement, the italic
-   guidance under each heading, and the Action Items table.
-5. Drafted content is **appended below each section's guidance**, at the end of
-   that section. Nothing in the template is ever deleted — the guidance stays
-   in the document, serving as both the model's instructions and the reader's.
-   Where the template already prints sub-labels (`What went well`,
-   `What went wrong`, `Where we got lucky`), each matching group is placed
-   directly under **the template's own label** and the generated label is
-   dropped — otherwise the heading appears twice. A group with no matching
-   template label keeps its own heading and goes at the end of the section.
-6. The report's **metadata block** (the `Label: value` lines above the first
-   heading) is filled in the draft too — see below.
+   Other bots are kept deliberately: an alerting bot's message is often the
+   first real timeline event.
 
-### Replacing a previous run
+2. **Draft every section in one AI call.** Each heading is sent with the
+   template's guidance beneath it as that section's instructions; the
+   transcript is the only permitted source of facts.
 
-Generated content is wrapped in a Google Docs **named range** —
-`incident_draft::<heading>` for a section, `incident_draft::<heading>::<label>`
-for a group placed under a template sub-label. Named ranges are invisible, and Google keeps
-their offsets in sync as the document changes, so a re-run can find exactly
-what the last run wrote and replace just that — leaving every template heading
-and every line of guidance untouched. Matching on the text itself would be
-guesswork; this is a record.
+3. **Copy the report and fill the copy.** See below.
 
-Sections are written **bottom-up** so an edit higher in the document can never
-invalidate indices already used below it. Metadata fields and the banner follow,
-for the same reason.
+4. **Write the timeline back into the real report.** The only write into the
+   live incident document — see [Writes to the real incident report](#writes-to-the-real-incident-report).
+
+### A fresh copy every run
+
+Each invocation copies the report to its own document, named with the run time
+(`<title> - AI draft 2026-08-26 09:12`). Nothing is reused.
+
+Editing one long-lived draft in place was the source of a whole class of bugs:
+every run inherited the previous run's output, could only identify it by
+heuristics, and needed a separate sweep for each way that guess went wrong —
+duplicated sections, stacked banners, doubled label values, orphaned
+sub-headings. When two of those sweeps proposed overlapping deletions, the
+second deleted against indices the first had already shifted, shredding
+neighbouring text into fragments. A pristine document cannot accumulate any of
+it, so the whole class disappears rather than being patched case by case.
+
+The trade is that drafts accumulate in the Drive folder instead of inside one
+document, and each run has its own URL. The sweeps described below still run,
+because a copy inherits whatever damage the *report itself* carries.
+
+### Editing the copy safely
+
+Every edit is computed against one snapshot of the document and applied in a
+single `batchUpdate`, under three rules:
+
+- **Bottom-up.** Edits are ordered by descending position, so an edit higher in
+  the document can never invalidate an index already used below it.
+- **Disjoint.** Deletions proposed by different sweeps are merged into a
+  non-overlapping set first. Two overlapping deletions cannot both be honoured:
+  the first shifts every index after it, so the second removes text it was
+  never meant to.
+- **Styling first.** Label restyling changes no text lengths, so it leads the
+  batch — valid against the same snapshot, and one round trip cheaper than a
+  second pass.
+
+Generated content is wrapped in named ranges (`incident_draft::<heading>`,
+`::<label>` for a group under a sub-label). With a fresh copy each run they are
+not needed for replacement; they remain as an invisible record of what the
+machine wrote.
+
+### One chain in the five-whys section
+
+The cap trims the model's output to five pairs, but that only governs what a
+single run writes. The section must hold one chain overall, so before writing,
+any question-and-answer content already sitting there is swept. Two things are
+spared: **italic paragraphs**, which are the template's guidance — that
+guidance itself ends in a question mark ("...what affordances were missing to
+allow for this?"), so matching on the question mark alone would delete it — and
+content inside a named range the run already replaces, which would otherwise be
+deleted twice.
+
+### Pull-request links
+
+The model writes "PR 1898" in prose, having summarised away the link somebody
+posted. Those references are hyperlinked back to the real URL: PR links are
+harvested from the raw channel messages into a `number -> url` map, and every
+`PR 1898` / `PR #1898` reference written into the document — including in the
+report's timeline — is linked over exactly that text.
+
+A number nobody posted a link for is left as plain text. A bare PR number does
+not identify a repository, so the alternative would be guessing one, and a link
+to the wrong repository is worse than no link at all.
+
+### Pre-filled metadata is never overwritten
+
+A label that already carries a value is left alone: `Name`, `Team`, `Date`,
+`Slack channel` and `Status` are filled by `modules/incident` when the incident
+is created, and those values are authoritative. Writing beside them is what
+produced `Status: In Progress In Progress`. Only labels the template left blank
+are filled — or ones this package wrote itself on an earlier run, which are
+replaced through their named range rather than appended to.
+
+### Empty Impact labels
+
+`End-users`, `CDS Staff`, `Other government department(s)` and `Other` are
+dropped when nothing fills them, rather than left as bare stubs. Two guards
+keep that from removing anything useful: a label carrying a value — written on
+this run or left by an earlier one — is kept, and a section the transcript
+could not answer is left entirely alone, template structure included, so a
+human can fill it in by hand.
 
 ## Metadata fields
 
@@ -83,10 +136,10 @@ further down is never mistaken for a field).
 | Field | Filled from |
 | --- | --- |
 | `Start-of-impact time`, `Detection time`, `End-of-impact time` | The `YYYY-MM-DD HH:MM` timestamp of the message evidencing impact starting, first detection, and impact ending. Omitted when no message evidences them — never estimated. |
-| `Author(s)` | Derived directly from who spoke in the channel, in order of first appearance. No inference involved. |
+| `Author(s)` | Always `SRE Bot (AI Generated)`. The responders who spoke in the channel did not author this document, and a reader needs to know it was machine-written. |
 | `On-call` | The person the transcript names as on call or paged. Blank unless stated — the first person to speak is not assumed to be on call. Note this is also filled from the on-call rotation at creation. |
 | `Facilitators` | Anyone the transcript identifies as coordinating the incident or its review. Blank unless stated. |
-| `Name`, `Team`, `Date`, `Slack channel`, `Status` | Already filled by `modules/incident` at creation; left alone. |
+| `Name`, `Team`, `Date`, `Slack channel`, `Status` | Already filled by `modules/incident` at creation; left alone. The template styles several of these as headings, so they are recognised as labelled values rather than draftable sections — otherwise each value was written in again beneath itself. |
 
 Because the date matters for these fields, transcript timestamps carry the full
 `YYYY-MM-DD HH:MM`, while timeline entries still render just the clock time.
@@ -98,10 +151,9 @@ headings, which makes them loom over the content beneath, so all three causes
 are reset: the named style to `NORMAL_TEXT`, bold off, and the font to 11pt.
 Matching is by label, so it works both in the preamble and inside a section.
 
-The restyle runs as a second `batchUpdate` against a freshly fetched document:
-styling is index-based, and re-reading avoids reasoning about how the content
-edits shifted everything. Being purely cosmetic, a failure there is logged and
-swallowed rather than failing the draft.
+The restyle leads the same `batchUpdate` as the content: it changes no text
+lengths, so it is valid against the snapshot every other edit was computed
+from.
 
 ## Writes to the real incident report
 
@@ -193,14 +245,48 @@ Why did the deploy introduce it?
     Because the canary step was skipped.
 ```
 
-The prompt asks five-whys chains to start from the user-visible failure and
-let each question ask why the previous answer happened — stopping as soon as
-the transcript stops supporting the next step, rather than inventing a deeper
-cause to reach five.
+The prompt asks five-whys chains to start from the user-visible failure and let
+each question ask why the previous answer happened, producing **exactly five**
+pairs. Where the transcript runs out first, the model is told to say so in that
+answer rather than invent a cause.
+
+The five-question limit is also enforced in code (`_cap_questions`): surplus
+pairs are dropped before anything is written, since a prompt is a request and
+not a guarantee. Only the extra pairs go — a trailing root-cause statement is
+not part of the chain and survives — and a capped run logs
+`incident_draft_whys_capped` with how many the model returned.
 
 Sections the transcript can't support keep the template's original
 instructions in the draft, so a human still sees what that section needs, and
 the ephemeral reply lists them explicitly.
+
+## Template scaffolding
+
+The copy keeps the template's structure, with four exceptions applied only to
+sections that were actually drafted — an undrafted section keeps everything, so
+the scaffolding is still there for a human to fill in.
+
+| Removed | Why |
+| --- | --- |
+| Empty bullets under Trigger, Detection, Resolution/Recovery and the retrospective groupings | Once a section has content, an empty bullet reads as an item nobody filled in. |
+| The `DO NOT REMOVE…` sentinel | It exists so `modules/incident` can find the timeline in the **report**; a draft is a copy nothing appends to. The report's own copy is untouched. |
+| Impact labels nothing filled | See [Empty Impact labels](#empty-impact-labels). |
+| The trailing blank paragraph before the next heading | Content lands directly under the guidance rather than below a gap. |
+
+Guidance is **added** where the report lacks it: `Detailed Timeline` and
+`Trigger` always carry their template text, inserted in the same muted italic
+if missing. The timeline's was replaced by the bot's banner in the report long
+ago, so a copy inherits a section with none — it has to be written in rather
+than merely preserved.
+
+## Action items table
+
+Action items are written into the **Action Item** column of the template's
+table, leaving Type, Owner, Issue #, Priority and Done for whoever triages the
+retro. The header row and any row somebody has already filled are skipped, so a
+re-run adds rather than overwrites. Items beyond the available empty rows stay
+as bullets above the table — filling only what fits would silently drop the
+rest.
 
 ## Settings (all optional)
 
@@ -209,7 +295,13 @@ the ephemeral reply lists them explicitly.
 | `INCIDENT_DRAFT__DEFAULT_HISTORY_LIMIT` | 500 | Messages fetched when `--limit` is absent |
 | `INCIDENT_DRAFT__MAX_HISTORY_LIMIT` | 1000 | Hard cap on `--limit` |
 | `INCIDENT_DRAFT__DEFAULT_SINCE_HOURS` | 24 | Fallback window when the channel creation time can't be read |
-| `INCIDENT_DRAFT__MAX_OUTPUT_TOKENS` | 8000 | Completion budget for the draft. Drafting emits JSON covering every section, so it needs far more than the vendor default of 800 (which truncates the JSON mid-object). Raise it for very long reports. |
+| `INCIDENT_DRAFT__MAX_OUTPUT_TOKENS` | 8000 | Completion budget for the draft. One response covers every section, so it needs far more than the vendor default, which truncates the JSON mid-object. |
+
+Vendor settings live in `integrations.openai`. Two matter here:
+`OPENAI_MAX_OUTPUT_TOKENS` (the fallback budget, overridden per call by the
+row above) and `OPENAI_TEMPERATURE`, which is **omitted by default** — the
+gateway's current model rejects the parameter with a 400. Set `0.0` to opt in
+where the model supports it, for more reproducible drafts.
 
 ## Truncated responses are discarded, never written
 

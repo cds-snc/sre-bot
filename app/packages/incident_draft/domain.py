@@ -8,6 +8,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+# Written under a retrospective sub-heading the transcript says nothing about,
+# so a reader sees the question was considered rather than an empty bullet.
+NOT_INDICATED = "This was not indicated in the report"
+
+# Written into Author(s). The responders who spoke in the channel did not author
+# this document, and a reader needs to know it was machine-written.
+AI_AUTHOR = "SRE Bot (AI Generated)"
+
 
 @dataclass(frozen=True)
 class TranscriptMessage:
@@ -53,12 +61,16 @@ class SectionDraft:
     ``as_list`` marks sections that read as lists rather than prose -- action
     items, follow-ups, timelines -- so the renderer bullets every line even
     when the model returned them unmarked.
+
+    ``is_question_chain`` marks a five-whys section, whose written content must
+    be the only chain in that section.
     """
 
     heading: str
     content: str
     is_drafted: bool
     as_list: bool = False
+    is_question_chain: bool = False
 
 
 @dataclass(frozen=True)

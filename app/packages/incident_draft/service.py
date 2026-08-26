@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any, Protocol, runtime_checkable
 
 import structlog
@@ -28,6 +28,8 @@ import structlog
 from infrastructure.operations import OperationResult
 from integrations.openai import Summarizer, get_summarizer
 from packages.incident_draft.domain import (
+    AI_AUTHOR,
+    NOT_INDICATED,
     DocumentField,
     DocumentSection,
     DraftedDocument,
@@ -57,7 +59,13 @@ _DRAFT_INSTRUCTIONS = (
     "complete sentences and past tense; 1-4 sentences per section unless its "
     "instructions ask for a list. Never invent details, names, times, or "
     "causes that are not in the transcript. Do not repeat the instructions "
-    "back. Respond with a single JSON object and nothing else: keys are the "
+    "back. Answer the specific questions a section's instructions ask -- if it "
+    "asks for severity and how long impact lasted, give them. Never write "
+    "about what the transcript does not contain: omit an unsupported detail "
+    "instead of writing that it was not stated, not provided, or not "
+    "confirmed. Do not restate the same point in two sentences, and do not add "
+    "a closing sentence that recaps what you just wrote. "
+    "Respond with a single JSON object and nothing else: keys are the "
     "section headings EXACTLY as given, values are the section's content as "
     "plain text (no markdown). Use an empty string for any section the "
     "transcript does not support. For a section whose heading refers to a "
@@ -75,18 +83,31 @@ _DRAFT_INSTRUCTIONS = (
     "(lessons learned), organise the content under the sub-headings 'What "
     "went wrong', 'What went well' and 'Where we got lucky': write each "
     "sub-heading on its own line ending with a colon, followed by its points "
-    "one per line each starting with '- '. Omit a sub-heading entirely if the "
-    "transcript supports no points for it. For a "
+    "one per line each starting with '- '. Include all three sub-headings even "
+    "when the transcript supports nothing for one: give it the single point "
+    f"'- {NOT_INDICATED}' rather than leaving it out. For a "
     "section about action items, follow-ups or next steps, write one item per "
     "line, each starting with '- ', phrased as a concrete task and naming an "
     "owner when the transcript identifies one -- never as a prose paragraph. "
+    "When a section's instructions list labelled groups -- Impact's "
+    "'End-users', 'CDS Staff', 'Other government department(s)' and 'Other', "
+    "for example -- answer each on its own line as 'Label: value', using the "
+    "labels exactly as given and keeping each to one or two sentences. Do not "
+    "run them together into a paragraph, and do not add a separate summary "
+    "paragraph repeating them. "
     "For a five-whys or root-cause section, write it as question-and-answer "
     "pairs: each question on its own line ending with '?', its answer on the "
     "very next line, with a blank line between pairs and no bullet markers. "
-    "For five whys, start from the user-visible failure and let each question "
-    "ask why the previous answer happened, chaining up to five pairs but "
-    "stopping as soon as the transcript no longer supports the next step -- "
-    "never invent a deeper cause to reach five. Ignore automated bot activity "
+    "For five whys, always write exactly five pairs: start from the "
+    "user-visible failure and let each question ask why the previous answer "
+    "happened, drilling from symptom through mechanism to the underlying "
+    "process or design gap. Do not stop early. Where the transcript stops "
+    "supporting the chain, keep asking the next why and answer it with what "
+    "the evidence does allow -- name the gap plainly (for example 'No check "
+    "caught the removed configuration before it shipped') rather than "
+    "inventing a specific cause or writing that the transcript is silent. "
+    "Then state the root cause on its own line after the fifth pair. "
+    "Ignore automated bot activity "
     "entirely: channel setup, topic or description changes, severity-warning "
     "posts, hangout/meeting links, and 'an incident report has been created' "
     "notices are tooling scaffolding, not incident events. Never list them in "
@@ -120,8 +141,18 @@ _MODEL_FIELD_LABELS = (
     "Detection time",
     "End-of-impact time",
 )
-# Derived directly from who spoke, so no inference is involved.
 _AUTHORS_FIELD_LABEL = "Author(s)"
+
+# Five-whys sections are capped at this many questions. The prompt asks for
+# exactly five; this enforces it, since a prompt is a request and not a
+# guarantee.
+# Pull-request links as they appear in Slack messages. The model writes "PR
+# 1898" in prose, so the number is mapped back to the URL somebody actually
+# posted -- inferring a repository from a bare number would be a guess.
+_PR_URL_PATTERN = re.compile(r"https?://(?:www\.)?github\.com/[\w.-]+/[\w.-]+/pull/(\d+)")
+
+_MAX_WHYS = 5
+_FIVE_WHYS_MARKERS = ("five whys", "root cause")
 
 # Sections that read as lists rather than prose: every line is bulleted, even
 # when the model returns them unmarked.
@@ -151,11 +182,12 @@ class IncidentDocumentPort(Protocol):
         source_document_id: str,
         drafts: Sequence[SectionDraft],
         fields: Sequence[DocumentField],
+        links: Mapping[str, str],
     ) -> DraftWriteResult | None:
         """Write the draft document (creating or rewriting it); ``None`` on failure."""
         ...
 
-    def replace_timeline(self, document_id: str, entries: str) -> bool:
+    def replace_timeline(self, document_id: str, entries: str, links: Mapping[str, str]) -> bool:
         """Replace the incident report's timeline entries; ``True`` on success."""
         ...
 
@@ -273,7 +305,8 @@ async def draft_incident_document(
         )
 
     fields = _build_fields(answers, messages)
-    written = documents.write_draft_document(document_id, drafts, fields)
+    links = _extract_pr_links(messages)
+    written = documents.write_draft_document(document_id, drafts, fields, links)
     if written is None:
         log.warning("incident_draft_write_failed", section_count=len(drafts))
         return OperationResult.transient_error(
@@ -286,7 +319,7 @@ async def draft_incident_document(
     timeline_updated = False
     timeline = _find_timeline_draft(drafts)
     if timeline is not None:
-        timeline_updated = documents.replace_timeline(document_id, timeline.content)
+        timeline_updated = documents.replace_timeline(document_id, timeline.content, links)
         if not timeline_updated:
             log.warning("incident_draft_timeline_not_updated", heading=timeline.heading)
 
@@ -466,15 +499,61 @@ def _build_drafts(
     drafts: list[SectionDraft] = []
     for section in sections:
         answer = _match_answer(section.heading, answers, lookup)
+        content = answer or section.instructions.strip()
+        is_chain = _is_five_whys_heading(section.heading)
+        if answer and is_chain:
+            content = _cap_questions(content, _MAX_WHYS, section.heading)
         drafts.append(
             SectionDraft(
                 heading=section.heading,
-                content=answer or section.instructions.strip(),
+                content=content,
                 is_drafted=bool(answer),
                 as_list=_is_list_heading(section.heading),
+                is_question_chain=is_chain,
             )
         )
     return drafts
+
+
+def _is_five_whys_heading(heading: str) -> bool:
+    """Whether a section holds a five-whys chain."""
+    lowered = heading.lower()
+    return any(marker in lowered for marker in _FIVE_WHYS_MARKERS)
+
+
+def _cap_questions(content: str, limit: int, heading: str) -> str:
+    """Drop question-and-answer pairs beyond ``limit``.
+
+    Only the surplus pairs are removed: a trailing root-cause statement, which
+    is not part of the chain, survives. Answers are recognised as the lines
+    following a question up to the next blank line.
+
+    Every line ending in "?" counts, bullets and numbering included. The
+    template asks for the whys "as a list", so a bulleted chain is a normal
+    shape for this section -- excluding those let a long chain past the cap
+    untouched.
+    """
+    kept: list[str] = []
+    questions = 0
+    dropping = False
+
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.endswith("?"):
+            questions += 1
+            dropping = questions > limit
+            if dropping:
+                continue
+        elif dropping:
+            if stripped:
+                continue  # the dropped question's answer
+            dropping = False
+            continue
+        kept.append(line)
+
+    if questions > limit:
+        logger.info("incident_draft_whys_capped", heading=heading, returned=questions, kept=limit)
+    return "\n".join(kept).strip()
 
 
 def _match_answer(heading: str, answers: dict[str, str], lookup: dict[str, str]) -> str:
@@ -501,8 +580,9 @@ def _build_fields(answers: dict[str, str], messages: Sequence[TranscriptMessage]
     """Build the metadata values to write into the report's header block.
 
     The model fills what the transcript evidences -- on-call, facilitators and
-    the impact/detection times -- while the author list is derived directly
-    from who spoke, which needs no inference. Fields the model left empty are
+    the impact/detection times. The author is always the bot: a reader needs to
+    know the draft was machine-written, and the responders who spoke in the
+    channel did not author this document. Fields the model left empty are
     omitted entirely, so an unestablished field keeps the template's blank line
     rather than acquiring a guess.
     """
@@ -512,20 +592,22 @@ def _build_fields(answers: dict[str, str], messages: Sequence[TranscriptMessage]
         if value:
             fields.append(DocumentField(label=label, value=value))
 
-    authors = _distinct_authors(messages)
-    if authors:
-        fields.append(DocumentField(label=_AUTHORS_FIELD_LABEL, value=", ".join(authors)))
+    fields.append(DocumentField(label=_AUTHORS_FIELD_LABEL, value=AI_AUTHOR))
     return fields
 
 
-def _distinct_authors(messages: Sequence[TranscriptMessage]) -> list[str]:
-    """Return the people who spoke, in order of first appearance."""
-    seen: dict[str, None] = {}
+def _extract_pr_links(messages: Sequence[TranscriptMessage]) -> dict[str, str]:
+    """Map pull-request numbers to the URLs posted in the channel.
+
+    Slack wraps links as ``<url|label>``; the pattern stops at the PR number so
+    the label never leaks into the URL. The first link posted for a number
+    wins.
+    """
+    links: dict[str, str] = {}
     for message in messages:
-        author = message.author.strip()
-        if author:
-            seen.setdefault(author, None)
-    return list(seen)
+        for match in _PR_URL_PATTERN.finditer(message.text):
+            links.setdefault(match.group(1), match.group(0))
+    return links
 
 
 def _is_list_heading(heading: str) -> bool:

@@ -11,7 +11,7 @@ not outcomes.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import structlog
 
@@ -68,7 +68,7 @@ class OpenAISummarizer:
                 (e.g. structured multi-section drafts) raise it; ``None`` uses
                 the configured ``MAX_OUTPUT_TOKENS``.
         """
-        payload = {
+        payload: dict[str, Any] = {
             "model": self._settings.MODEL,
             "max_completion_tokens": max_output_tokens or self._settings.MAX_OUTPUT_TOKENS,
             "messages": [
@@ -76,6 +76,10 @@ class OpenAISummarizer:
                 {"role": "user", "content": transcript},
             ],
         }
+        if self._settings.TEMPERATURE >= 0:
+            # Omitted when negative: some models accept no temperature at all,
+            # and a rejected parameter fails the whole request.
+            payload["temperature"] = self._settings.TEMPERATURE
 
         try:
             async with build_openai_client(self._settings) as client:
@@ -83,7 +87,15 @@ class OpenAISummarizer:
                 response.raise_for_status()
                 body = response.json()
         except Exception as exc:
-            logger.warning("openai_summarize_failed", error=str(exc))
+            # The status alone does not say what the API objected to; a 400's
+            # body names the offending parameter, which is the difference
+            # between diagnosing this and guessing at it.
+            logger.warning(
+                "openai_summarize_failed",
+                error=str(exc),
+                response_body=_error_body(exc),
+                sent_parameters=sorted(payload),
+            )
             return classify_openai_error(exc)
 
         summary = _extract_summary(body)
@@ -104,6 +116,17 @@ class OpenAISummarizer:
             provider="openai",
             operation="summarize",
         )
+
+
+def _error_body(exc: Exception) -> str:
+    """Return the API's error body, truncated, when the failure carries one."""
+    response = getattr(exc, "response", None)
+    if response is None:
+        return ""
+    try:
+        return str(response.text)[:500]
+    except Exception:  # noqa: BLE001 - diagnostics must never mask the real error
+        return ""
 
 
 def _extract_summary(body: dict) -> str:

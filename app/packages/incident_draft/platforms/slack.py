@@ -155,6 +155,11 @@ def handle_draft_command(
         )
         return CommandResponse(message=msg, ephemeral=True)
 
+    # Everything past this point is slow -- fetching the channel, one AI call,
+    # then several Google Docs round trips. Bolt has already acked, so without
+    # this the invoker watches nothing happen for a minute.
+    _notify_working(client, payload.channel_id, payload, locale, log)
+
     settings = get_incident_draft_settings()
     limit = _resolve_limit(parsed_args.get("--limit"), settings)
     oldest = _resolve_channel_start(client, payload.channel_id, settings, log)
@@ -167,44 +172,47 @@ def handle_draft_command(
     return _render_error(result.error_code, locale, log, result)
 
 
+def _notify_working(
+    client: WebClient,
+    channel_id: str,
+    payload: CommandPayload,
+    locale: str,
+    log: structlog.stdlib.BoundLogger,
+) -> None:
+    """Tell the invoker the draft is being written, before the slow work starts.
+
+    Ephemeral, so only they see it. A failure here must never fail the command:
+    a missing progress note is a far smaller problem than a lost draft.
+    """
+    text = t(
+        f"{_DOMAIN}.result.working",
+        locale,
+        "🤖 Reading this channel and drafting the incident report — this usually takes up to a minute. "
+        "I'll post a link here when it's ready.",
+    )
+    try:
+        client.chat_postEphemeral(channel=channel_id, user=payload.user_id, text=text)
+    except Exception as exc:  # noqa: BLE001 - a missing notice must not fail the draft
+        log.warning("incident_draft_progress_notice_failed", error=str(exc))
+
+
 def _success_response(outcome: DraftedDocument | None, locale: str) -> CommandResponse:
-    """Render the link to the new draft and the drafted/unanswered headings."""
+    """Render the one-line confirmation, linking the new draft."""
     if outcome is None:
         return _error_response(locale)
 
     url = f"https://docs.google.com/document/d/{outcome.document_id}/edit"
-    if outcome.created:
-        key, fallback = "result.header", "📝 Created a <{{url}}|draft incident report> — please review and edit it:"
-    else:
-        key, fallback = (
-            "result.header_updated",
-            "📝 Refreshed the <{{url}}|draft incident report> — please review and edit it:",
-        )
-    header = t(f"{_DOMAIN}.{key}", locale, fallback, url=url)
+    message = t(
+        f"{_DOMAIN}.result.header",
+        locale,
+        "Created an AI-generated <{{url}}|draft incident report> from this channel. "
+        "Copy over whatever's useful — all or part — into the original incident doc "
+        "created when the incident opened.",
+        url=url,
+    )
     # t() returns the fallback template verbatim when the catalogue isn't
     # loaded; interpolating here covers both paths (no-op when translated).
-    header = header.replace("{{url}}", url)
-    lines = [header]
-    lines.extend(f"• {heading}" for heading in outcome.drafted_headings)
-    if outcome.unanswered_headings:
-        skipped = t(
-            f"{_DOMAIN}.result.unanswered",
-            locale,
-            "The channel history didn't cover these — they keep the template's instructions:",
-        )
-        lines.append("")
-        lines.append(skipped)
-        lines.extend(f"• {heading}" for heading in outcome.unanswered_headings)
-    if outcome.timeline_updated:
-        lines.append("")
-        lines.append(
-            t(
-                f"{_DOMAIN}.result.timeline_updated",
-                locale,
-                "🕒 The incident report's timeline section has been replaced with the AI timeline.",
-            )
-        )
-    return CommandResponse(message="\n".join(lines), ephemeral=True)
+    return CommandResponse(message=message.replace("{{url}}", url), ephemeral=True)
 
 
 def _render_error(
