@@ -358,3 +358,34 @@ class TestProgressNotice:
         response = self._run(client)
 
         assert "draft incident report" in response.message
+
+
+class TestPartialDraftMessage:
+    """A truncated run still produces a draft, and says what is missing."""
+
+    def _run(self, partial: bool):
+        client = _client([{"user": "U1", "text": "prod is down", "ts": "1"}])
+        payload = CommandPayload(text="", user_id="U9", channel_id="C123")
+        outcome = DraftedDocument(
+            document_id="NEW1",
+            created=True,
+            drafted_headings=("Trigger",),
+            unanswered_headings=(),
+            partial=partial,
+        )
+        with patch(_DRAFT, new=AsyncMock(return_value=OperationResult.success(data=outcome))):
+            return handle_draft_command(payload, {}, client)
+
+    def test_a_partial_run_links_the_draft_and_explains_the_gap(self):
+        response = self._run(partial=True)
+
+        assert "https://docs.google.com/document/d/NEW1/edit" in response.message
+        assert "later sections are missing" in response.message
+        assert "re-run" in response.message
+        # Not an error: a usable draft exists.
+        assert not response.message.startswith("⚠")
+
+    def test_a_complete_run_says_nothing_about_missing_sections(self):
+        response = self._run(partial=False)
+
+        assert "later sections are missing" not in response.message

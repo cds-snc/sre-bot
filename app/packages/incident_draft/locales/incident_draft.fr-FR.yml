@@ -4,6 +4,7 @@ incident_draft:
   examples.limit: "`/sre incident draft --limit 200` - Rédiger à partir d'au plus 200 messages du canal."
   result.working: "\U0001F916 Lecture du canal et rédaction du rapport d'incident en cours — cela prend généralement jusqu'à une minute. Je publierai un lien ici dès que ce sera prêt."
   result.header: "<{{url}}|Rapport d'incident provisoire> généré par IA à partir de ce canal. Reprenez ce qui vous est utile — en tout ou en partie — dans le document d'incident original créé à l'ouverture de l'incident."
+  result.partial: "<{{url}}|Rapport d'incident provisoire> généré par IA à partir de ce canal, mais la réponse a été trop longue et les dernières sections manquent — relancez la commande pour les compléter. Reprenez ce qui vous est utile dans le document d'incident original."
   result.no_document: "Je n'ai pas trouvé de document d'incident dans les signets de ce canal."
   result.unreadable: "Je n'ai pu lire aucune section du document d'incident."
   result.empty_history: "Il n'y a pas encore d'historique de canal à partir duquel rédiger."

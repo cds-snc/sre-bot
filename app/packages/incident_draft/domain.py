@@ -14,7 +14,7 @@ NOT_INDICATED = "This was not indicated in the report"
 
 # Written into Author(s). The responders who spoke in the channel did not author
 # this document, and a reader needs to know it was machine-written.
-AI_AUTHOR = "SRE Bot (AI Generated)"
+AI_AUTHOR = "SRE Bot (AI generated)"
 
 
 @dataclass(frozen=True)
@@ -112,6 +112,8 @@ class DraftedDocument:
             keep their original guidance text in the draft.
         timeline_updated: True when the AI timeline was written into the
             original incident report's timeline section.
+        partial: True when the model's response was cut off, so later sections
+            are missing from an otherwise usable draft.
     """
 
     document_id: str
@@ -119,3 +121,4 @@ class DraftedDocument:
     drafted_headings: tuple[str, ...]
     unanswered_headings: tuple[str, ...]
     timeline_updated: bool = False
+    partial: bool = False

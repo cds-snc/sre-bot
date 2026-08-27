@@ -268,18 +268,15 @@ async def draft_incident_document(
     raw = result.data or ""
     answers, was_truncated = _parse_answers(raw)
     if answers is not None and was_truncated:
-        # The response was cut off mid-object. Writing the salvaged fragment
-        # would replace a good draft (and the report's timeline) with a
-        # partial one -- the sections after the cutoff would silently vanish.
+        # Keep what arrived. Discarding it made sense when a run rewrote a
+        # long-lived draft, where a fragment would replace good content; every
+        # run now writes a fresh document, so a partial draft costs nothing and
+        # beats no draft at all. The timeline is the exception -- see below.
         log.warning(
-            "incident_draft_truncated_response_discarded",
+            "incident_draft_truncated_response_salvaged",
             recovered_sections=len(answers),
             section_count=len(sections),
             raw_length=len(raw),
-        )
-        return OperationResult.transient_error(
-            message="The model's response was cut off before it finished the draft",
-            error_code=TRUNCATED_CODE,
         )
     if answers is None:
         # Log what actually came back -- an empty string, prose instead of
@@ -318,7 +315,11 @@ async def draft_incident_document(
     # itself; everything else stays in the draft document.
     timeline_updated = False
     timeline = _find_timeline_draft(drafts)
-    if timeline is not None:
+    if timeline is not None and was_truncated:
+        # The timeline overwrites curated entries in the real report, so a
+        # chain that may itself have been cut short must not be written there.
+        log.warning("incident_draft_timeline_skipped_after_truncation", heading=timeline.heading)
+    elif timeline is not None:
         timeline_updated = documents.replace_timeline(document_id, timeline.content, links)
         if not timeline_updated:
             log.warning("incident_draft_timeline_not_updated", heading=timeline.heading)
@@ -326,6 +327,7 @@ async def draft_incident_document(
     outcome = DraftedDocument(
         document_id=written.document_id,
         created=written.created,
+        partial=was_truncated,
         drafted_headings=tuple(d.heading for d in drafts if d.is_drafted),
         unanswered_headings=tuple(d.heading for d in drafts if not d.is_drafted),
         timeline_updated=timeline_updated,

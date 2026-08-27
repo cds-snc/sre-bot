@@ -1647,7 +1647,7 @@ class TestMetadataBlockBelowLabelHeadings:
     def test_fields_below_a_label_heading_are_still_found(self):
         document = self._document()
         fields = [
-            DocumentField(label="Author(s)", value="SRE Bot (AI Generated)"),
+            DocumentField(label="Author(s)", value="SRE Bot (AI generated)"),
             DocumentField(label="Detection time", value="2026-08-17 10:46"),
         ]
 
@@ -1667,7 +1667,7 @@ class TestMetadataBlockBelowLabelHeadings:
 
         requests = mock_docs.batch_update.call_args_list[0].args[1]
         inserted = _inserted_text(requests)
-        assert "SRE Bot (AI Generated)" in inserted
+        assert "SRE Bot (AI generated)" in inserted
         assert "2026-08-17 10:46" in inserted
 
     def test_the_scan_still_stops_at_a_real_section(self):

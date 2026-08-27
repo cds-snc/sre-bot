@@ -202,6 +202,19 @@ def _success_response(outcome: DraftedDocument | None, locale: str) -> CommandRe
         return _error_response(locale)
 
     url = f"https://docs.google.com/document/d/{outcome.document_id}/edit"
+    if outcome.partial:
+        # Worth saying: later sections are missing because the response ran out,
+        # not because the channel had nothing to say about them.
+        message = t(
+            f"{_DOMAIN}.result.partial",
+            locale,
+            "Created an AI-generated <{{url}}|draft incident report> from this channel, but the "
+            "response ran long and later sections are missing — re-run to fill them in. Copy over "
+            "whatever's useful into the original incident doc created when the incident opened.",
+            url=url,
+        )
+        return CommandResponse(message=message.replace("{{url}}", url), ephemeral=True)
+
     message = t(
         f"{_DOMAIN}.result.header",
         locale,

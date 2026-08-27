@@ -8,6 +8,7 @@ import pytest
 
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.incident_draft.domain import (
+    AI_AUTHOR,
     NOT_INDICATED,
     DocumentSection,
     DraftWriteResult,
@@ -20,7 +21,6 @@ from packages.incident_draft.service import (
     DRAFT_UNPARSEABLE_CODE,
     EMPTY_HISTORY_CODE,
     NO_ANSWERS_CODE,
-    TRUNCATED_CODE,
     _parse_answers,
     draft_incident_document,
 )
@@ -199,19 +199,18 @@ class TestDraftIncidentDocument:
         assert result.data.drafted_headings == ("Trigger",)
 
     @pytest.mark.asyncio
-    async def test_truncated_response_is_discarded_and_writes_nothing(self):
-        """A partial draft must never replace good content in the doc or report."""
+    async def test_truncated_response_still_produces_a_partial_draft(self):
+        """Every run writes a fresh document, so a fragment costs nothing."""
         truncated = '{"Trigger": "A bad deploy caused 500s.", "Impact": "Checkout was down.", "Lessons Learned": "The team lea'
         documents = _StubDocumentPort(sections=_sections())
         summarizer = _StubSummarizer(OperationResult.success(data=truncated))
 
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
 
-        assert result.status == OperationStatus.TRANSIENT_ERROR
-        assert result.error_code == TRUNCATED_CODE
-        # Neither the draft document nor the report's timeline is touched.
-        assert documents.created_drafts is None
-        assert documents.timeline_document_id is None
+        assert result.is_success
+        assert result.data.partial is True
+        assert result.data.drafted_headings == ("Trigger", "Impact")
+        assert documents.created_drafts is not None
 
     @pytest.mark.asyncio
     async def test_empty_model_response_returns_unparseable(self):
@@ -438,6 +437,7 @@ class TestTruncationNeverDestroysContent:
 
     @pytest.mark.asyncio
     async def test_truncated_run_leaves_the_reports_timeline_untouched(self):
+        """The draft is written, but the report's curated timeline is not risked."""
         sections = [
             DocumentSection(heading="Detailed Timeline", instructions="Log key events.\n"),
             DocumentSection(heading="Trigger", instructions="What started it?\n"),
@@ -448,8 +448,12 @@ class TestTruncationNeverDestroysContent:
 
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
 
-        assert result.error_code == TRUNCATED_CODE
+        assert result.is_success
+        assert result.data.partial is True
+        assert documents.created_drafts is not None
+        # The one thing a possibly-cut-short chain must not overwrite.
         assert documents.timeline_document_id is None
+        assert result.data.timeline_updated is False
 
     def test_clean_json_is_not_flagged_as_truncated(self):
         answers, was_truncated = _parse_answers('{"Trigger": "A bad deploy."}')
@@ -503,7 +507,7 @@ class TestMetadataFieldInference:
         await draft_incident_document("D1", messages, documents=documents, summarizer=summarizer)
 
         written = {f.label: f.value for f in documents.written_fields}
-        assert written["Author(s)"] == "SRE Bot (AI Generated)"
+        assert written["Author(s)"] == "SRE Bot (AI generated)"
         assert "Sylvia" not in written["Author(s)"]
 
     @pytest.mark.asyncio
@@ -726,3 +730,29 @@ class TestFiveWhysPromptAsksForFive:
         assert "Include all three sub-headings" in instructions
         assert NOT_INDICATED in instructions
         assert "Omit a sub-heading entirely" not in instructions
+
+
+class TestAuthorIsAlwaysTheBot:
+    """Author(s) is fixed: it never reflects who spoke, and is never blank."""
+
+    @pytest.mark.asyncio
+    async def test_written_even_when_the_model_offers_its_own_author(self):
+        answers = {"Summary": "x", "Author(s)": "Sylvia and Pat"}
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        summarizer = _StubSummarizer(OperationResult.success(data=json.dumps(answers)))
+
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        written = {f.label: f.value for f in documents.written_fields}
+        assert written["Author(s)"] == AI_AUTHOR
+        assert "Sylvia" not in written["Author(s)"]
+
+    @pytest.mark.asyncio
+    async def test_written_even_when_nothing_else_is_established(self):
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
+
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        written = {f.label: f.value for f in documents.written_fields}
+        assert written["Author(s)"] == "SRE Bot (AI generated)"

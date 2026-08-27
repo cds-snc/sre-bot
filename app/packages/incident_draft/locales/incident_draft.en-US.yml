@@ -4,6 +4,7 @@ incident_draft:
   examples.limit: "`/sre incident draft --limit 200` - Draft from at most 200 channel messages."
   result.working: "\U0001F916 Reading this channel and drafting the incident report — this usually takes up to a minute. I'll post a link here when it's ready."
   result.header: "Created an AI-generated <{{url}}|draft incident report> from this channel. Copy over whatever's useful — all or part — into the original incident doc created when the incident opened."
+  result.partial: "Created an AI-generated <{{url}}|draft incident report> from this channel, but the response ran long and later sections are missing — re-run to fill them in. Copy over whatever's useful into the original incident doc created when the incident opened."
   result.no_document: "I couldn't find an incident document bookmarked in this channel."
   result.unreadable: "I couldn't read any sections from the incident document."
   result.empty_history: "There's no channel history to draft from yet."
