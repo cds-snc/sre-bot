@@ -415,7 +415,7 @@ def _format_time(raw_ts: Any) -> str:
     """
     try:
         return datetime.fromtimestamp(float(raw_ts), tz=UTC).strftime("%Y-%m-%d %H:%M")
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return ""
 
 
