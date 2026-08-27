@@ -39,8 +39,10 @@ _SUBHEADING_STYLE = "HEADING_3"
 _TIMELINE_HEADING_MARKER = "timeline"
 # The heading that closes the timeline section in the incident template.
 _TIMELINE_END_MARKER = "Trigger"
-# modules.incident locates the timeline by this exact line; it must survive.
-_SENTINEL_LINE = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
+# The line marking where the SRE bot's generated timeline begins.
+# ``modules.incident`` locates the timeline by this exact string to append
+# 💾-reacted messages, so it must survive every rewrite of the report.
+_SRE_BOT_GENERATED_TIMELINE = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 
 # Line kinds produced by _render_body_lines.
 _SUBHEADING = "subheading"
@@ -181,7 +183,7 @@ class GoogleDocsIncidentDocument:
         This is the only write this package makes to the incident report
         itself. It replaces the whole timeline section -- the template's
         warning banner, its explanatory paragraph, and any existing entries --
-        with the sentinel line plus the drafted timeline. The sentinel is
+        with the marker line plus the drafted timeline. The marker is
         re-inserted verbatim so reaction-driven timeline updates in
         ``modules.incident`` keep working, and every other section of the
         report is untouched. Returns ``False`` (writing nothing) when the
@@ -356,8 +358,8 @@ def _fill_section_requests(
     # re-fetching the document for a second round trip.
     requests: list[dict[str, Any]] = _regular_label_requests(document)
     repairs = _doubled_value_repairs(document)
-    sentinel_blocks = _sentinel_spans(document)
-    if not answered and not fillable_fields and not repairs and not sentinel_blocks:
+    marker_blocks = _sre_bot_generated_timeline_spans(document)
+    if not answered and not fillable_fields and not repairs and not marker_blocks:
         return []
 
     placements: list[_Placement] = []
@@ -379,7 +381,7 @@ def _fill_section_requests(
     # neighbouring text into fragments. Merging first makes the set disjoint.
     operations: list[tuple[int, list[dict[str, Any]]]] = [
         (start, [{"deleteContentRange": {"range": {"startIndex": start, "endIndex": end}}}])
-        for start, end in _merge_overlapping([*stale_blocks, *sentinel_blocks])
+        for start, end in _merge_overlapping([*stale_blocks, *marker_blocks])
     ]
     operations.extend(repairs)
     operations.extend(_ensured_guidance_operations(document, spans))
@@ -978,8 +980,8 @@ def _empty_bullet_spans(document: dict, span: tuple[int, int]) -> list[tuple[int
     return spans
 
 
-def _sentinel_spans(document: dict) -> list[tuple[int, int]]:
-    """Spans of the bot's timeline sentinel, which a draft has no use for.
+def _sre_bot_generated_timeline_spans(document: dict) -> list[tuple[int, int]]:
+    """Spans of the bot's timeline marker, which a draft has no use for.
 
     It exists so ``modules.incident`` can find the timeline in the *report*;
     the draft is a copy nothing appends to, where it is only noise. The report's
@@ -991,7 +993,7 @@ def _sentinel_spans(document: dict) -> list[tuple[int, int]]:
         if not isinstance(element_start, int) or not isinstance(element_end, int):
             continue
         paragraph = element.get("paragraph")
-        if paragraph and _SENTINEL_LINE in _paragraph_text(paragraph):
+        if paragraph and _SRE_BOT_GENERATED_TIMELINE in _paragraph_text(paragraph):
             spans.append((element_start, element_end))
     return spans
 
@@ -1206,7 +1208,7 @@ def _timeline_region(document: dict) -> tuple[int, int] | None:
     Returns ``(start, end)`` spanning everything between the timeline heading
     and the section that follows it -- the template's warning banner and
     explanatory paragraph included, since those are boilerplate the drafted
-    timeline replaces. The sentinel line is deleted along with them and then
+    timeline replaces. The marker line is deleted along with them and then
     re-inserted by ``_render_timeline_requests``, so it survives every rewrite
     while the surrounding clutter does not.
 
@@ -1255,12 +1257,12 @@ def _timeline_region(document: dict) -> tuple[int, int] | None:
 def _render_timeline_requests(start: int, entries: str, links: Mapping[str, str] = {}) -> list[dict[str, Any]]:
     """Build the insert/style requests writing the timeline section at ``start``.
 
-    Re-inserts the sentinel line the delete removed -- muted and italic, since
+    Re-inserts the timeline marker the delete removed -- muted and italic, since
     it is machinery rather than content -- followed by the drafted entries as
     bullets.
     """
     builder = _RequestBuilder(start_index=start, links=links)
-    builder.insert(f"{_SENTINEL_LINE}\n", named_style="NORMAL_TEXT", italic=True, muted=True)
+    builder.insert(f"{_SRE_BOT_GENERATED_TIMELINE}\n", named_style="NORMAL_TEXT", italic=True, muted=True)
     for text, kind in _render_body_lines(entries, force_bullets=True):
         if kind == _SUBHEADING:
             builder.insert(f"{text}\n", named_style=_SUBHEADING_STYLE)

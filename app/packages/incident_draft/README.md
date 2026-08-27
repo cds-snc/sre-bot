@@ -183,7 +183,7 @@ dead-end speculation and status pings, and merging related messages into a
 single entry (roughly 5–12 for a typical incident).
 
 Note that this **replaces** the reaction-curated timeline entries. Responders
-can re-pin messages afterwards; pinning keeps working because the sentinel is
+can re-pin messages afterwards; pinning keeps working because that line is
 preserved.
 
 ## Formatting applied when filling a section
@@ -263,7 +263,7 @@ the scaffolding is still there for a human to fill in.
 | Removed | Why |
 | --- | --- |
 | Empty bullets under Trigger, Detection, Resolution/Recovery and the retrospective groupings | Once a section has content, an empty bullet reads as an item nobody filled in. |
-| The `DO NOT REMOVE…` sentinel | It exists so `modules/incident` can find the timeline in the **report**; a draft is a copy nothing appends to. The report's own copy is untouched. |
+| The `DO NOT REMOVE…` line | It exists so `modules/incident` can find the timeline in the **report**; a draft is a copy nothing appends to. The report's own copy is untouched. |
 | Impact labels nothing filled | See [Empty Impact labels](#empty-impact-labels). |
 | The trailing blank paragraph before the next heading | Content lands directly under the guidance rather than below a gap. |
 

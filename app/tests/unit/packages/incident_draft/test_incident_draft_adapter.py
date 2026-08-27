@@ -96,7 +96,7 @@ def _paragraph_text_of(element: dict) -> str:
 
 
 class TestReplaceTimeline:
-    def test_replaces_the_whole_section_but_reinserts_the_sentinel(self):
+    def test_replaces_the_whole_section_but_reinserts_the_marker(self):
         adapter = GoogleDocsIncidentDocument()
         report = _report_with_timeline()
         heading = next(e for e in report["body"]["content"] if _paragraph_text_of(e).startswith("Detailed Timeline"))
@@ -112,18 +112,18 @@ class TestReplaceTimeline:
         deletes = [r["deleteContentRange"]["range"] for r in requests if "deleteContentRange" in r]
         assert len(deletes) == 1
         # Everything from the heading to the next section goes: banner,
-        # explanation, sentinel and old entries alike.
+        # explanation, marker and old entries alike.
         assert deletes[0]["startIndex"] == heading["endIndex"]
         assert deletes[0]["endIndex"] == next_heading["startIndex"]
 
         inserted = "".join(r["insertText"]["text"] for r in requests if "insertText" in r)
-        # The boilerplate is gone but the sentinel comes back, first.
+        # The boilerplate is gone but the marker comes back, first.
         assert inserted.startswith("DO NOT REMOVE this line as the SRE bot needs it as a placeholder.\n")
         assert "SRE Bot Automatically Generated Timeline" not in inserted
         assert "reacting with" not in inserted
         assert "14:02 Ada: alerts firing" in inserted
 
-    def test_sentinel_is_reinserted_verbatim_for_the_legacy_timeline_updater(self):
+    def test_marker_is_reinserted_verbatim_for_the_legacy_timeline_updater(self):
         """modules.incident matches this string exactly; drift would break pinning."""
         from modules.incident.incident_document import START_HEADING
 
@@ -1909,7 +1909,7 @@ class TestTemplateNoiseRemoved:
     def _find(self, document, prefix):
         return next(e for e in document["body"]["content"] if _paragraph_text_of(e).startswith(prefix))
 
-    def test_the_sentinel_is_removed_from_the_draft(self):
+    def test_the_timeline_marker_is_removed_from_the_draft(self):
         """It exists so the report can be appended to; a draft has no use for it."""
         document, requests = self._run([SectionDraft(heading="Summary", content="x", is_drafted=True)])
 
