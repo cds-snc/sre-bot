@@ -427,7 +427,7 @@ def _parse_answers(raw: str) -> tuple[dict[str, str] | None, bool]:
     candidate = _first_json_object(text) or text
     try:
         parsed = json.loads(candidate)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         parsed = None
 
     if isinstance(parsed, dict):
