@@ -3,11 +3,10 @@
 Owns every Google structural detail: walking the source document body to turn
 heading-styled paragraphs into ``DocumentSection`` values (the heading plus the
 template guidance written under it), and writing the draft document -- in the
-source document's Drive folder -- populated with the drafted sections. The
-draft is reused across runs: an existing one is cleared and rebuilt so repeated
-invocations leave a single document. The source incident report is only ever
-read; the sole content-removing operation here is guarded to fire only on a
-document whose title matches the expected draft.
+source document's Drive folder -- populated with the drafted sections. Each run
+creates a fresh Drive copy of the source document, so repeated invocations
+produce new draft documents rather than rewriting one in place. The source
+incident report is only ever read; the sole content-removing operation here is guarded to fire only on a
 
 Per ``decisions/feature-packages.md`` this is the only place in the package
 allowed to import ``integrations``.
@@ -232,7 +231,7 @@ class GoogleDocsIncidentDocument:
         unanswered sections keep the template's guidance untouched, which is
         both simpler and more faithful than rebuilding the layout in code.
 
-        A re-run refills the same document rather than creating another.
+        Each run creates a new draft document rather than rewriting one in place.
         Returns ``None`` on any failure; the source report is never written to.
         """
         if not drafts and not fields:
