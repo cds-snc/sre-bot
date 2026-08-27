@@ -8,6 +8,5 @@ incident_draft:
   result.no_document: "I couldn't find an incident document bookmarked in this channel."
   result.unreadable: "I couldn't read any sections from the incident document."
   result.empty_history: "There's no channel history to draft from yet."
-  result.truncated: "⚠️ The AI response was cut off before it finished, so nothing was written — your existing draft and the report's timeline are unchanged. Try again, or raise INCIDENT_DRAFT__MAX_OUTPUT_TOKENS if it keeps happening."
   result.no_answers: "The channel history didn't answer any of the document's sections, so no draft was created."
   result.error: "❌ Couldn't create the draft document right now. Please try again shortly."

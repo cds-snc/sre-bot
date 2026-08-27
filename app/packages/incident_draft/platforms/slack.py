@@ -36,7 +36,6 @@ from packages.incident_draft.service import (
     DOCUMENT_UNREADABLE_CODE,
     EMPTY_HISTORY_CODE,
     NO_ANSWERS_CODE,
-    TRUNCATED_CODE,
     draft_incident_document,
 )
 from packages.incident_draft.settings import (
@@ -247,15 +246,6 @@ def _render_error(
             f"{_DOMAIN}.result.empty_history",
             locale,
             "There's no channel history to draft from yet.",
-        )
-        return CommandResponse(message=msg, ephemeral=True)
-    if error_code == TRUNCATED_CODE:
-        msg = t(
-            f"{_DOMAIN}.result.truncated",
-            locale,
-            "⚠️ The AI response was cut off before it finished, so nothing was written — "
-            "your existing draft and the report's timeline are unchanged. Try again, or "
-            "raise INCIDENT_DRAFT__MAX_OUTPUT_TOKENS if it keeps happening.",
         )
         return CommandResponse(message=msg, ephemeral=True)
     if error_code == NO_ANSWERS_CODE:

@@ -8,6 +8,5 @@ incident_draft:
   result.no_document: "Je n'ai pas trouvé de document d'incident dans les signets de ce canal."
   result.unreadable: "Je n'ai pu lire aucune section du document d'incident."
   result.empty_history: "Il n'y a pas encore d'historique de canal à partir duquel rédiger."
-  result.truncated: "⚠️ La réponse de l'IA a été tronquée avant la fin; rien n'a été écrit — votre ébauche et la chronologie du rapport sont inchangées. Réessayez, ou augmentez INCIDENT_DRAFT__MAX_OUTPUT_TOKENS si cela persiste."
   result.no_answers: "L'historique du canal n'a répondu à aucune des sections du document, donc aucune ébauche n'a été créée."
   result.error: "❌ Impossible de créer le document d'ébauche pour le moment. Veuillez réessayer sous peu."
