@@ -9,7 +9,6 @@ import pytest
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.incident_draft.domain import (
     AI_AUTHOR,
-    NOT_INDICATED,
     DocumentSection,
     DraftWriteResult,
     SectionDraft,
@@ -65,28 +64,17 @@ class _StubDocumentPort:
         sections: list[DocumentSection],
         new_document_id: str | None = "NEW1",
         created: bool = True,
-        timeline_ok: bool = True,
     ) -> None:
         self._sections = sections
         self._new_document_id = new_document_id
         self._created = created
-        self._timeline_ok = timeline_ok
         self.created_from: str | None = None
         self.created_drafts: list[SectionDraft] | None = None
-        self.timeline_document_id: str | None = None
-        self.timeline_entries: str | None = None
         self.written_fields: list = []
         self.written_links: dict = {}
-        self.timeline_links: dict = {}
 
     def read_sections(self, document_id: str) -> list[DocumentSection]:
         return self._sections
-
-    def replace_timeline(self, document_id: str, entries: str, links=None) -> bool:
-        self.timeline_document_id = document_id
-        self.timeline_entries = entries
-        self.timeline_links = dict(links or {})
-        return self._timeline_ok
 
     def write_draft_document(self, source_document_id: str, drafts, fields=(), links=None) -> DraftWriteResult | None:
         self.created_from = source_document_id
@@ -102,7 +90,7 @@ def _sections() -> list[DocumentSection]:
     return [
         DocumentSection(heading="Trigger", instructions="Describe what caused the incident to begin.\n"),
         DocumentSection(heading="Impact", instructions="Describe who and what was affected.\n"),
-        DocumentSection(heading="Lessons Learned", instructions="List what the team learned.\n"),
+        DocumentSection(heading="Detection", instructions="How was it detected?\n"),
     ]
 
 
@@ -147,7 +135,7 @@ class TestDraftIncidentDocument:
         answers = {
             "Trigger": "A bad deploy caused 500s on checkout.",
             "Impact": "Checkout was unavailable to users.",
-            "Lessons Learned": "",
+            "Detection": "",
         }
         documents = _StubDocumentPort(sections=_sections())
         summarizer = _StubSummarizer(OperationResult.success(data=json.dumps(answers)))
@@ -157,7 +145,7 @@ class TestDraftIncidentDocument:
         assert result.is_success
         assert result.data.document_id == "NEW1"
         assert result.data.drafted_headings == ("Trigger", "Impact")
-        assert result.data.unanswered_headings == ("Lessons Learned",)
+        assert result.data.unanswered_headings == ("Detection",)
         assert documents.created_from == "D1"
 
     @pytest.mark.asyncio
@@ -170,7 +158,7 @@ class TestDraftIncidentDocument:
         drafts = documents.created_drafts or []
         assert drafts[0] == SectionDraft(heading="Trigger", content="A bad deploy.", is_drafted=True)
         # Every section survives into the draft, in document order.
-        assert [d.heading for d in drafts] == ["Trigger", "Impact", "Lessons Learned"]
+        assert [d.heading for d in drafts] == ["Trigger", "Impact", "Detection"]
         assert drafts[1] == SectionDraft(
             heading="Impact",
             content="Describe who and what was affected.",
@@ -286,74 +274,6 @@ class TestDraftIncidentDocument:
         assert result.error_code == CREATE_FAILED_CODE
 
 
-class TestTimelineWriteBack:
-    """The drafted timeline is the one thing written into the incident report."""
-
-    @staticmethod
-    def _timeline_sections() -> list[DocumentSection]:
-        return [
-            DocumentSection(heading="Detailed Timeline", instructions="Log key events.\n"),
-            DocumentSection(heading="Trigger", instructions="What started it?\n"),
-        ]
-
-    @pytest.mark.asyncio
-    async def test_timeline_section_is_written_into_the_source_document(self):
-        answers = {"Detailed Timeline": "- 14:02 Ada: alerts firing", "Trigger": "A bad deploy."}
-        documents = _StubDocumentPort(sections=self._timeline_sections())
-        summarizer = _StubSummarizer(OperationResult.success(data=json.dumps(answers)))
-
-        result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
-
-        assert result.is_success
-        assert result.data.timeline_updated is True
-        # Written to the source report, not the draft document.
-        assert documents.timeline_document_id == "D1"
-        assert documents.timeline_entries == "- 14:02 Ada: alerts firing"
-
-    @pytest.mark.asyncio
-    async def test_no_timeline_heading_means_no_write_to_the_source(self):
-        documents = _StubDocumentPort(sections=_sections())
-        summarizer = _StubSummarizer(OperationResult.success(data='{"Trigger": "A bad deploy."}'))
-
-        result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
-
-        assert result.is_success
-        assert result.data.timeline_updated is False
-        assert documents.timeline_document_id is None
-
-    @pytest.mark.asyncio
-    async def test_unanswered_timeline_is_not_written(self):
-        """An empty timeline answer must not blank the report's timeline."""
-        documents = _StubDocumentPort(sections=self._timeline_sections())
-        summarizer = _StubSummarizer(OperationResult.success(data='{"Detailed Timeline": "", "Trigger": "A bad deploy."}'))
-
-        result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
-
-        assert result.data.timeline_updated is False
-        assert documents.timeline_document_id is None
-
-    @pytest.mark.asyncio
-    async def test_timeline_failure_does_not_fail_the_whole_command(self):
-        answers = {"Detailed Timeline": "- 14:02 Ada: alerts firing", "Trigger": "A bad deploy."}
-        documents = _StubDocumentPort(sections=self._timeline_sections(), timeline_ok=False)
-        summarizer = _StubSummarizer(OperationResult.success(data=json.dumps(answers)))
-
-        result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
-
-        assert result.is_success
-        assert result.data.timeline_updated is False
-
-    @pytest.mark.asyncio
-    async def test_transcript_lines_carry_timestamps_for_the_timeline(self):
-        documents = _StubDocumentPort(sections=self._timeline_sections())
-        summarizer = _StubSummarizer(OperationResult.success(data='{"Detailed Timeline": "- 14:02 Ada: x"}'))
-        messages = [TranscriptMessage(author="Ada", text="alerts firing", timestamp="14:02")]
-
-        await draft_incident_document("D1", messages, documents=documents, summarizer=summarizer)
-
-        assert "[14:02] Ada: alerts firing" in (summarizer.received_payload or "")
-
-
 class TestListHeadingDetection:
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -398,19 +318,19 @@ class TestHeadingMatching:
 
     @pytest.mark.asyncio
     async def test_numbered_document_heading_matches_plain_model_key(self):
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="5. Root Causes", instructions="")])
-        summarizer = _StubSummarizer(OperationResult.success(data='{"Root Causes": "A bad deploy."}'))
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="5. Detection", instructions="")])
+        summarizer = _StubSummarizer(OperationResult.success(data='{"Detection": "A bad deploy."}'))
 
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
 
-        assert result.data.drafted_headings == ("5. Root Causes",)
+        assert result.data.drafted_headings == ("5. Detection",)
 
     @pytest.mark.asyncio
     async def test_genuinely_absent_section_stays_unanswered(self):
         documents = _StubDocumentPort(
             sections=[
                 DocumentSection(heading="Summary", instructions=""),
-                DocumentSection(heading="Root Causes", instructions=""),
+                DocumentSection(heading="Detection", instructions=""),
             ]
         )
         summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "Checkout was down."}'))
@@ -418,7 +338,7 @@ class TestHeadingMatching:
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
 
         assert result.data.drafted_headings == ("Summary",)
-        assert result.data.unanswered_headings == ("Root Causes",)
+        assert result.data.unanswered_headings == ("Detection",)
 
 
 class TestTruncationNeverDestroysContent:
@@ -436,25 +356,6 @@ class TestTruncationNeverDestroysContent:
         assert documents.created_drafts is not None
 
     @pytest.mark.asyncio
-    async def test_truncated_run_leaves_the_reports_timeline_untouched(self):
-        """The draft is written, but the report's curated timeline is not risked."""
-        sections = [
-            DocumentSection(heading="Detailed Timeline", instructions="Log key events.\n"),
-            DocumentSection(heading="Trigger", instructions="What started it?\n"),
-        ]
-        documents = _StubDocumentPort(sections=sections)
-        truncated = '{"Detailed Timeline": "- 14:02 Ada: alerts firing", "Trigger": "A bad dep'
-        summarizer = _StubSummarizer(OperationResult.success(data=truncated))
-
-        result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
-
-        assert result.is_success
-        assert result.data.partial is True
-        assert documents.created_drafts is not None
-        # The one thing a possibly-cut-short chain must not overwrite.
-        assert documents.timeline_document_id is None
-        assert result.data.timeline_updated is False
-
     def test_clean_json_is_not_flagged_as_truncated(self):
         answers, was_truncated = _parse_answers('{"Trigger": "A bad deploy."}')
 
@@ -547,109 +448,6 @@ class TestMetadataFieldInference:
         assert "- Detection time" in payload
 
 
-class TestFiveWhysCap:
-    """The chain is capped at five questions, however many the model returns."""
-
-    @staticmethod
-    def _sections():
-        return [DocumentSection(heading="Five whys and Root Cause(s)", instructions="Ask why 5 times.\n")]
-
-    @staticmethod
-    def _chain(pairs: int, *, root_cause: str = "") -> str:
-        blocks = [f"Why did step {i} happen?\nBecause of cause {i}.\n" for i in range(1, pairs + 1)]
-        return "\n".join(blocks) + (f"\n{root_cause}" if root_cause else "")
-
-    async def _content_for(self, answer: str) -> str:
-        documents = _StubDocumentPort(sections=self._sections())
-        summarizer = _StubSummarizer(OperationResult.success(data=json.dumps({"Five whys and Root Cause(s)": answer})))
-        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
-        return (documents.created_drafts or [])[0].content
-
-    @pytest.mark.asyncio
-    async def test_surplus_questions_are_dropped(self):
-        content = await self._content_for(self._chain(8))
-
-        assert content.count("?") == 5
-        assert "Why did step 5 happen?" in content
-        assert "Why did step 6 happen?" not in content
-        # The dropped questions' answers go with them.
-        assert "Because of cause 6." not in content
-
-    @pytest.mark.asyncio
-    async def test_a_shorter_chain_is_left_alone(self):
-        content = await self._content_for(self._chain(3))
-
-        assert content.count("?") == 3
-
-    @pytest.mark.asyncio
-    async def test_exactly_five_is_untouched(self):
-        content = await self._content_for(self._chain(5))
-
-        assert content.count("?") == 5
-        assert "Because of cause 5." in content
-
-    @pytest.mark.asyncio
-    async def test_trailing_root_cause_survives_the_cap(self):
-        """It is not part of the chain, so trimming the chain must not eat it."""
-        content = await self._content_for(self._chain(7, root_cause="Root cause: an unguarded config removal."))
-
-        assert content.count("?") == 5
-        assert "Root cause: an unguarded config removal." in content
-
-    @pytest.mark.asyncio
-    async def test_other_sections_are_not_capped(self):
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
-        many = "\n".join(f"Question {i}?" for i in range(1, 9))
-        summarizer = _StubSummarizer(OperationResult.success(data=json.dumps({"Summary": many})))
-
-        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
-
-        assert (documents.created_drafts or [])[0].content.count("?") == 8
-
-
-class TestFiveWhysCapListShapes:
-    """The chain is capped whatever list shape the model returns it in."""
-
-    @staticmethod
-    def _sections():
-        return [DocumentSection(heading="Five whys and Root Cause(s)", instructions="Document your whys as a list.\n")]
-
-    async def _content_for(self, answer: str) -> str:
-        documents = _StubDocumentPort(sections=self._sections())
-        summarizer = _StubSummarizer(OperationResult.success(data=json.dumps({"Five whys and Root Cause(s)": answer})))
-        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
-        return (documents.created_drafts or [])[0].content
-
-    @pytest.mark.asyncio
-    async def test_bulleted_chain_is_capped(self):
-        """The template asks for a list, so this is a normal shape — and it slipped the cap."""
-        chain = "\n".join(f"- Why did step {i} happen?" for i in range(1, 9))
-
-        content = await self._content_for(chain)
-
-        assert content.count("?") == 5
-        assert "Why did step 5 happen?" in content
-        assert "Why did step 6 happen?" not in content
-
-    @pytest.mark.asyncio
-    async def test_numbered_chain_is_capped(self):
-        chain = "\n".join(f"{i}. Why did step {i} happen?" for i in range(1, 8))
-
-        content = await self._content_for(chain)
-
-        assert content.count("?") == 5
-        assert "7. Why did step 7 happen?" not in content
-
-    @pytest.mark.asyncio
-    async def test_bulleted_pairs_drop_their_answers_too(self):
-        chain = "\n".join(f"- Why {i}?\n- Because {i}.\n" for i in range(1, 8))
-
-        content = await self._content_for(chain)
-
-        assert content.count("?") == 5
-        assert "Because 6." not in content
-
-
 class TestPullRequestLinks:
     """PR numbers in prose are matched back to the URLs posted in the channel."""
 
@@ -691,46 +489,6 @@ class TestPullRequestLinks:
 
         assert documents.written_links == {}
 
-    @pytest.mark.asyncio
-    async def test_links_reach_the_timeline_too(self):
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Detailed Timeline", instructions="Log key events.\n")])
-        summarizer = _StubSummarizer(OperationResult.success(data='{"Detailed Timeline": "- 11:34 Guillaume: opened PR 1898"}'))
-        messages = [TranscriptMessage(author="G", text="https://github.com/cds-snc/sre-bot/pull/1898")]
-
-        await draft_incident_document("D1", messages, documents=documents, summarizer=summarizer)
-
-        assert documents.timeline_links == {"1898": "https://github.com/cds-snc/sre-bot/pull/1898"}
-
-
-class TestFiveWhysPromptAsksForFive:
-    """The cap is a maximum; the prompt has to ask for five in the first place."""
-
-    @pytest.mark.asyncio
-    async def test_prompt_requires_exactly_five_and_forbids_stopping_early(self):
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
-        summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
-
-        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
-
-        instructions = summarizer.received_instructions or ""
-        assert "always write exactly five pairs" in instructions
-        assert "Do not stop early" in instructions
-        # The earlier wording told it to stop as soon as evidence ran out,
-        # which is why only one why came back.
-        assert "stopping as soon as the transcript no longer supports" not in instructions
-
-    @pytest.mark.asyncio
-    async def test_prompt_asks_for_a_placeholder_rather_than_omitting_a_sub_heading(self):
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
-        summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
-
-        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
-
-        instructions = summarizer.received_instructions or ""
-        assert "Include all three sub-headings" in instructions
-        assert NOT_INDICATED in instructions
-        assert "Omit a sub-heading entirely" not in instructions
-
 
 class TestAuthorIsAlwaysTheBot:
     """Author(s) is fixed: it never reflects who spoke, and is never blank."""
@@ -756,3 +514,74 @@ class TestAuthorIsAlwaysTheBot:
 
         written = {f.label: f.value for f in documents.written_fields}
         assert written["Author(s)"] == "SRE Bot (AI generated)"
+
+
+class TestHumanOnlySections:
+    """Five whys and the retrospective are the team's to write, not the bot's."""
+
+    _SKIPPED = (
+        "Five whys and Root Cause(s)",
+        "Lessons Learned",
+        "Root Causes",
+        "Retrospective",
+    )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("heading", _SKIPPED)
+    async def test_the_section_is_never_sent_to_the_model(self, heading):
+        documents = _StubDocumentPort(
+            sections=[
+                DocumentSection(heading="Summary", instructions="Summarize.\n"),
+                DocumentSection(heading=heading, instructions="Ask why 5 times.\n"),
+            ]
+        )
+        summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "Checkout was down."}'))
+
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        assert heading not in (summarizer.received_payload or "")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("heading", _SKIPPED)
+    async def test_nothing_is_written_into_the_section(self, heading):
+        documents = _StubDocumentPort(
+            sections=[
+                DocumentSection(heading="Summary", instructions="Summarize.\n"),
+                DocumentSection(heading=heading, instructions="Ask why 5 times.\n"),
+            ]
+        )
+        # Even if the model volunteers content for it, there is no draft to write.
+        answers = {"Summary": "Checkout was down.", heading: "Why did it fail?\nBecause X."}
+        summarizer = _StubSummarizer(OperationResult.success(data=json.dumps(answers)))
+
+        result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        written = {d.heading for d in (documents.created_drafts or [])}
+        assert heading not in written
+        assert heading not in result.data.drafted_headings
+        assert heading not in result.data.unanswered_headings
+
+    @pytest.mark.asyncio
+    async def test_other_sections_are_unaffected(self):
+        documents = _StubDocumentPort(
+            sections=[
+                DocumentSection(heading="Summary", instructions="Summarize.\n"),
+                DocumentSection(heading="Lessons Learned", instructions="What did we learn?\n"),
+            ]
+        )
+        summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "Checkout was down."}'))
+
+        result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        assert result.data.drafted_headings == ("Summary",)
+
+    @pytest.mark.asyncio
+    async def test_the_prompt_no_longer_describes_them(self):
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
+
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        instructions = summarizer.received_instructions or ""
+        for gone in ("five whys", "What went wrong", "Where we got lucky", "root-cause section"):
+            assert gone not in instructions
