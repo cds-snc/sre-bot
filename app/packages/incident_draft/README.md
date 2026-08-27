@@ -4,7 +4,8 @@ Adds `/sre incident draft`: from inside an incident channel, reads the
 incident Google Doc created at channel creation, treats the guidance written
 under each heading as that section's drafting instructions, answers each one
 from the incident channel's messages, and writes the filled-in result into a
-**new** document. The original incident document is only ever read.
+**new** document. The original report is read, not rewritten — with one
+deliberate exception, its timeline section (see below).
 
 ## Usage
 
@@ -82,16 +83,14 @@ Generated content is wrapped in named ranges (`incident_draft::<heading>`,
 not needed for replacement; they remain as an invisible record of what the
 machine wrote.
 
-### One chain in the five-whys section
+### One generation per section
 
-The cap trims the model's output to five pairs, but that only governs what a
-single run writes. The section must hold one chain overall, so before writing,
-any question-and-answer content already sitting there is swept. Two things are
-spared: **italic paragraphs**, which are the template's guidance — that
-guidance itself ends in a question mark ("...what affordances were missing to
-allow for this?"), so matching on the question mark alone would delete it — and
-content inside a named range the run already replaces, which would otherwise be
-deleted twice.
+A drafted section should hold the template's structure plus exactly one
+generation, so anything else already sitting there is swept before writing.
+This matters because a copy inherits whatever the *report* carries. Four things
+are spared: **guidance** (italic or grey — the five-whys guidance itself ends in
+a question mark, so matching on that alone would delete it), **`Label:` lines**,
+**sub-labels**, and content inside a named range the run already replaces.
 
 ### Pull-request links
 
@@ -195,10 +194,6 @@ Note that this **replaces** the reaction-curated timeline entries. Responders
 can re-pin messages afterwards; pinning keeps working because the sentinel is
 preserved.
 
-The draft copy is located by title within the incident's folder, and never by
-the source document's id — so a lookup mishap cannot point the fill at the
-report itself.
-
 ## Formatting applied when filling a section
 
 The copied template supplies the layout; these rules shape the content written
@@ -213,37 +208,45 @@ sections keep their template guidance as plain prose, so instructions are
 never dressed up as completed items.
 
 **Retrospective sub-headings.** A lessons-learned section is organised under
-*What went wrong*, *What went well* and *Where we got lucky*, each rendered as
-a `HEADING_3` with its points bulleted beneath:
+*What went wrong*, *What went well* and *Where we got lucky*. The template
+already prints those labels, so each group's points are filed **under the
+template's own label** and the generated label is dropped — emitting our own
+would print each heading twice:
 
 ```
-Lessons Learned                          ← HEADING_2
-What went wrong                          ← HEADING_3
+Lessons Learned                          ← HEADING_2 (template)
+What went well                           ← template's label
+  • Rollback took under two minutes      ← written here
+What went wrong                          ← template's label
   • The canary step was skipped
-  • Alerting missed the 500 spike
-What went well                           ← HEADING_3
-  • Rollback took under two minutes
-Where we got lucky                       ← HEADING_3
-  • Traffic was low at the time
+Where we got lucky                       ← template's label
+  • This was not indicated in the report ← placeholder when unsupported
 ```
+
+A group with no matching template label keeps its own heading (as `HEADING_3`)
+and goes at the end of the section.
 
 A sub-heading is any line matching one of those labels, or any short
 unbulleted line ending in a colon (≤ 6 words, so an ordinary sentence
 containing a colon is not mistaken for one). Sub-headings win over forced
-bullets, and a grouping the transcript cannot support is omitted entirely
-rather than left empty.
+bullets. A grouping the transcript cannot support gets the single bulleted
+point *"This was not indicated in the report"* — a bare label reads as an
+oversight, whereas the placeholder shows the question was asked.
 
 **Question-and-answer sections.** Any unbulleted line ending in `?` renders as
 a bold question, and the line directly beneath it as its indented answer — the
 shape five-whys and root-cause sections want:
 
 ```
-Five Whys                                        ← HEADING_2
-Why did checkout return 500s?                    ← bold
-    Because the deploy introduced a null deref.  ← indented answer
-Why did the deploy introduce it?
+Five whys and Root Cause(s)                        ← HEADING_2
+1. Why did checkout return 500s?                   ← numbered, bold
+    Because the deploy introduced a null deref.    ← indented answer
+2. Why did the deploy introduce it?
     Because the canary step was skipped.
 ```
+
+Questions are numbered in the five-whys section only; answers are not, and
+questions elsewhere are left unnumbered.
 
 The prompt asks five-whys chains to start from the user-visible failure and let
 each question ask why the previous answer happened, producing **exactly five**
@@ -256,9 +259,8 @@ not a guarantee. Only the extra pairs go — a trailing root-cause statement is
 not part of the chain and survives — and a capped run logs
 `incident_draft_whys_capped` with how many the model returned.
 
-Sections the transcript can't support keep the template's original
-instructions in the draft, so a human still sees what that section needs, and
-the ephemeral reply lists them explicitly.
+Sections the transcript can't support are left untouched, so they keep the
+template's original guidance and a human still sees what that section needs.
 
 ## Template scaffolding
 
@@ -305,8 +307,7 @@ where the model supports it, for more reproducible drafts.
 
 ## Truncated responses are discarded, never written
 
-The draft document is rewritten in place on every run, so a degraded run could
-otherwise replace good content with a fragment. If the model's JSON is cut off
+A degraded run must not produce a half-written report. If the model's JSON is cut off
 mid-object, the run is **abandoned**: neither the draft document nor the
 report's timeline is touched, and the invoker is told to retry. The sections
 missing from a truncated response are an artefact of the cutoff, not the
@@ -325,12 +326,15 @@ with `documents` and `drive` scopes).
 Per `decisions/feature-packages.md` and `decisions/transport-slack.md`:
 
 - `domain.py` — frozen values: `TranscriptMessage`, `DocumentSection`
-  (heading + instructions), `SectionDraft`, `DraftedDocument`.
+  (heading + instructions), `SectionDraft`, `DocumentField`,
+  `DraftWriteResult`, `DraftedDocument`.
 - `service.py` — platform-agnostic orchestrator; depends on the
   `IncidentDocumentPort` Protocol and the `Summarizer` port; no Slack, HTTP,
   or Google SDK imports.
-- `adapters/google_docs.py` — the only file importing `integrations`
-  (Docs read + Drive create + Docs populate).
+- `adapters/google_docs.py` — the only file touching **Google**
+  (Docs read + Drive copy + Docs populate). `service.py` imports the
+  `Summarizer` port and `platforms/slack.py` the transport models, both by
+  design.
 - `providers.py` — feature-local DI wiring for the document port.
 - `platforms/slack.py` — five-step handler; ephemeral responses; EN/FR
   locales in `locales/`.
