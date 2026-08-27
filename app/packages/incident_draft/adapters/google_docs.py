@@ -231,7 +231,7 @@ class GoogleDocsIncidentDocument:
         unanswered sections keep the template's guidance untouched, which is
         both simpler and more faithful than rebuilding the layout in code.
 
-        A re-run refills the same document rather than creating another.
+        Each run creates a new draft document rather than rewriting one in place.
         Returns ``None`` on any failure; the source report is never written to.
         """
         if not drafts and not fields:
