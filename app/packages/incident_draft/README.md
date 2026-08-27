@@ -4,8 +4,7 @@ Adds `/sre incident draft`: from inside an incident channel, reads the
 incident Google Doc created at channel creation, treats the guidance written
 under each heading as that section's drafting instructions, answers each one
 from the incident channel's messages, and writes the filled-in result into a
-**new** document. The original report is read, not rewritten — with one
-deliberate exception, its timeline section (see below).
+**new** document. The original report is read, not rewritten.
 
 ## Usage
 
@@ -135,7 +134,6 @@ further down is never mistaken for a field).
 | Field | Filled from |
 | --- | --- |
 | `Start-of-impact time`, `Detection time`, `End-of-impact time` | The `YYYY-MM-DD HH:MM` timestamp of the message evidencing impact starting, first detection, and impact ending. Omitted when no message evidences them — never estimated. |
-| `Author(s)` | Always `SRE Bot (AI Generated)`. The responders who spoke in the channel did not author this document, and a reader needs to know it was machine-written. |
 | `On-call` | The person the transcript names as on call or paged. Blank unless stated — the first person to speak is not assumed to be on call. Note this is also filled from the on-call rotation at creation. |
 | `Facilitators` | Anyone the transcript identifies as coordinating the incident or its review. Blank unless stated. |
 | `Name`, `Team`, `Date`, `Slack channel`, `Status` | Already filled by `modules/incident` at creation; left alone. The template styles several of these as headings, so they are recognised as labelled values rather than draftable sections — otherwise each value was written in again beneath itself. |
@@ -162,7 +160,6 @@ explaining the 💾 reaction mechanism, and any existing entries — leaving:
 
 ```
 Detailed Timeline
-DO NOT REMOVE this line as the SRE bot needs it as a placeholder.   ← muted italic
   • 14:02 Ada: PagerDuty alert on checkout 500s
   • 14:09 Bob: rolled back deploy 41c9
   • 14:20 Ada: error rate back to baseline
@@ -170,11 +167,6 @@ DO NOT REMOVE this line as the SRE bot needs it as a placeholder.   ← muted it
 Trigger                                                             ← untouched
 ```
 
-- The sentinel is deleted with the rest and **re-inserted verbatim**, styled
-  muted italic since it is machinery rather than content. `modules/incident`
-  locates the timeline by that exact line to append 💾-reacted messages;
-  losing it would make every future reaction fail silently. A test asserts the
-  re-inserted text matches that module's `START_HEADING` constant.
 - The section's end is the next heading *or* a paragraph reading `Trigger`,
   mirroring how `modules/incident` finds the same boundary — so it works even
   where `Trigger` is not styled as a real heading.
@@ -305,17 +297,35 @@ row above) and `OPENAI_TEMPERATURE`, which is **omitted by default** — the
 gateway's current model rejects the parameter with a 400. Set `0.0` to opt in
 where the model supports it, for more reproducible drafts.
 
-## Truncated responses are discarded, never written
+## Truncated responses
 
-A degraded run must not produce a half-written report. If the model's JSON is cut off
-mid-object, the run is **abandoned**: neither the draft document nor the
-report's timeline is touched, and the invoker is told to retry. The sections
-missing from a truncated response are an artefact of the cutoff, not the
-model's judgement, so writing them as "unanswered" would silently delete work.
+If the model's JSON is cut off mid-object, the sections that arrived are kept
+and written; the invoker is told the draft is partial and can re-run. Since
+every run writes a fresh document, a fragment replaces nothing, so a partial
+draft beats no draft.
 
-Vendor settings come from `integrations.openai` (`OPENAI_API_KEY`, model,
-timeout) and the Google Workspace integration (service-account credentials
-with `documents` and `drive` scopes).
+Two exceptions:
+
+- **The timeline is not written** on a truncated run. It is the only thing
+  written into the *real* report, where it replaces curated entries — a chain
+  that may itself have been cut short must not overwrite them
+  (`incident_draft_timeline_skipped_after_truncation`).
+- **Nothing usable, nothing written.** When no key/value pair can be recovered
+  at all, the run fails with `DRAFT_UNPARSEABLE` rather than producing an empty
+  document. The failure logs the response length and a preview, because an
+  empty completion, prose instead of JSON, and a cutoff otherwise look
+  identical.
+
+`openai_summarize_truncated` records the budget and how much came back — the
+number to look at before raising `INCIDENT_DRAFT__MAX_OUTPUT_TOKENS`, since a
+length well short of the budget means the model has its own ceiling and raising
+ours will not help.
+
+## Credentials
+
+`OPENAI_API_KEY` (`integrations.openai`, which also supplies the model and
+timeout) and the Google Workspace service account, with the `documents` and
+`drive` scopes.
 
 ## Required Slack scopes
 
