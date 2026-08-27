@@ -3,11 +3,10 @@
 Owns every Google structural detail: walking the source document body to turn
 heading-styled paragraphs into ``DocumentSection`` values (the heading plus the
 template guidance written under it), and writing the draft document -- in the
-source document's Drive folder -- populated with the drafted sections. The
-draft is reused across runs: an existing one is cleared and rebuilt so repeated
-invocations leave a single document. The source incident report is only ever
-read; the sole content-removing operation here is guarded to fire only on a
-document whose title matches the expected draft.
+source document's Drive folder -- populated with the drafted sections. Each run
+creates a fresh Drive copy of the source document, so repeated invocations
+produce new draft documents rather than rewriting one in place. The source
+incident report is only ever read; the sole content-removing operation here is guarded to fire only on a
 
 Per ``decisions/feature-packages.md`` this is the only place in the package
 allowed to import ``integrations``.
