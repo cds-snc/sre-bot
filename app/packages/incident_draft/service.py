@@ -5,11 +5,10 @@ is followed by guidance describing what belongs in that section. This service
 reads those heading/guidance pairs through the ``IncidentDocumentPort``, treats
 the guidance as per-section drafting instructions, answers each one from the
 incident channel transcript via the ``Summarizer`` port
-(``integrations.openai``), and writes the answers into this incident's draft
-document -- created on the first run and rewritten in place on later ones, so
-repeated invocations leave a single draft. The one exception is the incident
-report's own timeline section: the drafted timeline is written back there,
-replacing the entries beneath the bot's generated-timeline marker.
+(``integrations.openai``), and writes the answers into a new draft document on
+each run (a fresh copy of the incident report template). The one exception is
+the incident report's own timeline section: the drafted timeline is written back
+there, replacing the entries beneath the bot's generated-timeline marker.
 
 This module is deliberately free of Slack, HTTP, and Google SDK imports: it
 consumes domain values and Protocols and returns an ``OperationResult`` so any
