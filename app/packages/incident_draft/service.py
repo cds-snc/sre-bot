@@ -74,7 +74,7 @@ _DRAFT_INSTRUCTIONS = (
     "alert, confirmation of impact, key diagnostic findings, decisions taken, "
     "mitigation and rollback actions, recovery, and resolution. Exclude "
     "greetings, acknowledgements ('ok', 'thanks', 'on it'), speculation that "
-    "led nowhere, status pings, and routine chatter. Prefer roughly 5-12 "
+    "led nowhere, status pings, and routine chatter. Prefer roughly 10-15 "
     "entries for a typical incident; merge closely related messages into one "
     "entry rather than listing each message. "
     "For a "
