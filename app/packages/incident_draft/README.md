@@ -21,6 +21,15 @@ The invoker gets an ephemeral notice while the work runs — the AI call alone
 takes most of a minute — then a one-line confirmation linking the draft and
 asking them to carry changes back into the original incident document.
 
+## Sections left for humans
+
+**Five whys / root causes** and **Lessons Learned** (*What went well*, *What
+went wrong*, *Where we got lucky*) are never drafted. They are judgement calls
+the team makes together in the retro, not conclusions to be inferred from a
+transcript, so those sections are filtered out before the request is built —
+the model never sees them, and nothing is written into them. Their template
+guidance is left exactly as it is, ready for a human.
+
 ## How it works
 
 1. **Locate and read the channel.** The incident document is found via the
@@ -41,8 +50,8 @@ asking them to carry changes back into the original incident document.
 
 3. **Copy the report and fill the copy.** See below.
 
-4. **Write the timeline back into the real report.** The only write into the
-   live incident document — see [Writes to the real incident report](#writes-to-the-real-incident-report).
+4. **Nothing is written to the report.** See
+   [The incident report is never written to](#the-incident-report-is-never-written-to).
 
 ### A fresh copy every run
 
@@ -81,15 +90,6 @@ Generated content is wrapped in named ranges (`incident_draft::<heading>`,
 `::<label>` for a group under a sub-label). With a fresh copy each run they are
 not needed for replacement; they remain as an invisible record of what the
 machine wrote.
-
-### One generation per section
-
-A drafted section should hold the template's structure plus exactly one
-generation, so anything else already sitting there is swept before writing.
-This matters because a copy inherits whatever the *report* carries. Four things
-are spared: **guidance** (italic or grey — the five-whys guidance itself ends in
-a question mark, so matching on that alone would delete it), **`Label:` lines**,
-**sub-labels**, and content inside a named range the run already replaces.
 
 ### Pull-request links
 
@@ -152,107 +152,32 @@ The restyle leads the same `batchUpdate` as the content: it changes no text
 lengths, so it is valid against the snapshot every other edit was computed
 from.
 
-## Writes to the real incident report
+## The incident report is never written to
 
-The timeline section is the only part of the incident report this package
-writes to. The whole section is replaced — the ⚠️ banner, the paragraph
-explaining the 💾 reaction mechanism, and any existing entries — leaving:
+Every section — the timeline included — is drafted into the **copy**. The
+report created when the incident opened is only ever read.
 
-```
-Detailed Timeline
-  • 14:02 Ada: PagerDuty alert on checkout 500s
-  • 14:09 Bob: rolled back deploy 41c9
-  • 14:20 Ada: error rate back to baseline
+This is deliberate: its `Detailed Timeline` is maintained by `modules/incident`,
+which appends 💾-reacted messages beneath the `DO NOT REMOVE…` line. Writing an
+AI timeline there replaced entries responders had curated by hand. The two
+mechanisms now stay out of each other's way — 💾 owns the report's timeline,
+this command owns the draft's.
 
-Trigger                                                             ← untouched
-```
-
-- The section's end is the next heading *or* a paragraph reading `Trigger`,
-  mirroring how `modules/incident` finds the same boundary — so it works even
-  where `Trigger` is not styled as a real heading.
-- If that boundary cannot be found, **nothing is written**. Guessing the end
-  would delete every remaining section of the report.
-- Every other section of the report is untouched.
-- A report with no timeline heading, or an empty AI timeline, is not written to
-  at all — the command still produces the draft document and says so.
-
-The timeline is deliberately **selective**, not a transcript log: the prompt
-asks for detection, impact confirmation, key findings, decisions, mitigation,
-recovery and resolution, explicitly excluding greetings, acknowledgements,
-dead-end speculation and status pings, and merging related messages into a
-single entry (roughly 5–12 for a typical incident).
-
-Note that this **replaces** the reaction-curated timeline entries. Responders
-can re-pin messages afterwards; pinning keeps working because that line is
-preserved.
+The `DO NOT REMOVE…` line is stripped from the **copy**, where nothing appends
+to it and it is only noise. The report's own copy is untouched.
 
 ## Formatting applied when filling a section
 
 The copied template supplies the layout; these rules shape the content written
 into each answered section.
 
-**List sections** — any heading containing *lessons learned*, *retrospective*,
-*action item*, *follow-up*, *next step*, *to-do* or *timeline* — always render
+**List sections** — any heading containing *action item*, *follow-up*,
+*next step*, *to-do* or *timeline* — always render
 as real Google Docs bullets, one per line, even when the model returns them
 unmarked. The prompt additionally asks for action items phrased as concrete
 tasks naming an owner where the transcript identifies one. Unanswered list
 sections keep their template guidance as plain prose, so instructions are
 never dressed up as completed items.
-
-**Retrospective sub-headings.** A lessons-learned section is organised under
-*What went wrong*, *What went well* and *Where we got lucky*. The template
-already prints those labels, so each group's points are filed **under the
-template's own label** and the generated label is dropped — emitting our own
-would print each heading twice:
-
-```
-Lessons Learned                          ← HEADING_2 (template)
-What went well                           ← template's label
-  • Rollback took under two minutes      ← written here
-What went wrong                          ← template's label
-  • The canary step was skipped
-Where we got lucky                       ← template's label
-  • This was not indicated in the report ← placeholder when unsupported
-```
-
-A group with no matching template label keeps its own heading (as `HEADING_3`)
-and goes at the end of the section.
-
-A sub-heading is any line matching one of those labels, or any short
-unbulleted line ending in a colon (≤ 6 words, so an ordinary sentence
-containing a colon is not mistaken for one). Sub-headings win over forced
-bullets. A grouping the transcript cannot support gets the single bulleted
-point *"This was not indicated in the report"* — a bare label reads as an
-oversight, whereas the placeholder shows the question was asked.
-
-**Question-and-answer sections.** Any unbulleted line ending in `?` renders as
-a bold question, and the line directly beneath it as its indented answer — the
-shape five-whys and root-cause sections want:
-
-```
-Five whys and Root Cause(s)                        ← HEADING_2
-1. Why did checkout return 500s?                   ← numbered, bold
-    Because the deploy introduced a null deref.    ← indented answer
-2. Why did the deploy introduce it?
-    Because the canary step was skipped.
-```
-
-Questions are numbered in the five-whys section only; answers are not, and
-questions elsewhere are left unnumbered.
-
-The prompt asks five-whys chains to start from the user-visible failure and let
-each question ask why the previous answer happened, producing **exactly five**
-pairs. Where the transcript runs out first, the model is told to say so in that
-answer rather than invent a cause.
-
-The five-question limit is also enforced in code (`_cap_questions`): surplus
-pairs are dropped before anything is written, since a prompt is a request and
-not a guarantee. Only the extra pairs go — a trailing root-cause statement is
-not part of the chain and survives — and a capped run logs
-`incident_draft_whys_capped` with how many the model returned.
-
-Sections the transcript can't support are left untouched, so they keep the
-template's original guidance and a human still sees what that section needs.
 
 ## Template scaffolding
 
@@ -306,10 +231,6 @@ draft beats no draft.
 
 Two exceptions:
 
-- **The timeline is not written** on a truncated run. It is the only thing
-  written into the *real* report, where it replaces curated entries — a chain
-  that may itself have been cut short must not overwrite them
-  (`incident_draft_timeline_skipped_after_truncation`).
 - **Nothing usable, nothing written.** When no key/value pair can be recovered
   at all, the run fails with `DRAFT_UNPARSEABLE` rather than producing an empty
   document. The failure logs the response length and a preview, because an

@@ -28,7 +28,6 @@ from infrastructure.operations import OperationResult
 from integrations.openai import Summarizer, get_summarizer
 from packages.incident_draft.domain import (
     AI_AUTHOR,
-    NOT_INDICATED,
     DocumentField,
     DocumentSection,
     DraftedDocument,
@@ -77,13 +76,8 @@ _DRAFT_INSTRUCTIONS = (
     "greetings, acknowledgements ('ok', 'thanks', 'on it'), speculation that "
     "led nowhere, status pings, and routine chatter. Prefer roughly 5-12 "
     "entries for a typical incident; merge closely related messages into one "
-    "entry rather than listing each message. For a retrospective section "
-    "(lessons learned), organise the content under the sub-headings 'What "
-    "went wrong', 'What went well' and 'Where we got lucky': write each "
-    "sub-heading on its own line ending with a colon, followed by its points "
-    "one per line each starting with '- '. Include all three sub-headings even "
-    "when the transcript supports nothing for one: give it the single point "
-    f"'- {NOT_INDICATED}' rather than leaving it out. For a "
+    "entry rather than listing each message. "
+    "For a "
     "section about action items, follow-ups or next steps, write one item per "
     "line, each starting with '- ', phrased as a concrete task and naming an "
     "owner when the transcript identifies one -- never as a prose paragraph. "
@@ -93,18 +87,6 @@ _DRAFT_INSTRUCTIONS = (
     "labels exactly as given and keeping each to one or two sentences. Do not "
     "run them together into a paragraph, and do not add a separate summary "
     "paragraph repeating them. "
-    "For a five-whys or root-cause section, write it as question-and-answer "
-    "pairs: each question on its own line ending with '?', its answer on the "
-    "very next line, with a blank line between pairs and no bullet markers. "
-    "For five whys, always write exactly five pairs: start from the "
-    "user-visible failure and let each question ask why the previous answer "
-    "happened, drilling from symptom through mechanism to the underlying "
-    "process or design gap. Do not stop early. Where the transcript stops "
-    "supporting the chain, keep asking the next why and answer it with what "
-    "the evidence does allow -- name the gap plainly (for example 'No check "
-    "caught the removed configuration before it shipped') rather than "
-    "inventing a specific cause or writing that the transcript is silent. "
-    "Then state the root cause on its own line after the fifth pair. "
     "Ignore automated bot activity "
     "entirely: channel setup, topic or description changes, severity-warning "
     "posts, hangout/meeting links, and 'an incident report has been created' "
@@ -125,10 +107,6 @@ _DRAFT_INSTRUCTIONS = (
     "review. Names must appear in the transcript."
 )
 
-# Headings matching this are written back into the incident report itself,
-# not just the draft document.
-_TIMELINE_HEADING_MARKER = "timeline"
-
 # Metadata fields the model is asked to fill from the transcript. Each is left
 # blank unless a message actually establishes it -- a wrong on-call name or
 # detection time in a retro is worse than an empty line.
@@ -141,22 +119,24 @@ _MODEL_FIELD_LABELS = (
 )
 _AUTHORS_FIELD_LABEL = "Author(s)"
 
-# Five-whys sections are capped at this many questions. The prompt asks for
-# exactly five; this enforces it, since a prompt is a request and not a
-# guarantee.
 # Pull-request links as they appear in Slack messages. The model writes "PR
 # 1898" in prose, so the number is mapped back to the URL somebody actually
 # posted -- inferring a repository from a bare number would be a guess.
 _PR_URL_PATTERN = re.compile(r"https?://(?:www\.)?github\.com/[\w.-]+/[\w.-]+/pull/(\d+)")
 
-_MAX_WHYS = 5
-_FIVE_WHYS_MARKERS = ("five whys", "root cause")
+# Sections left for humans: a five-whys chain and a retrospective are
+# judgement calls the team makes together, not something to be pre-filled from
+# a transcript. They are never sent to the model and never written.
+_HUMAN_ONLY_HEADING_MARKERS = (
+    "five whys",
+    "root cause",
+    "lessons learned",
+    "retrospective",
+)
 
 # Sections that read as lists rather than prose: every line is bulleted, even
 # when the model returns them unmarked.
 _LIST_HEADING_MARKERS = (
-    "lessons learned",
-    "retrospective",
     "action item",
     "follow-up",
     "follow up",
@@ -183,10 +163,6 @@ class IncidentDocumentPort(Protocol):
         links: Mapping[str, str],
     ) -> DraftWriteResult | None:
         """Write the draft document (creating or rewriting it); ``None`` on failure."""
-        ...
-
-    def replace_timeline(self, document_id: str, entries: str, links: Mapping[str, str]) -> bool:
-        """Replace the incident report's timeline entries; ``True`` on success."""
         ...
 
 
@@ -229,7 +205,7 @@ async def draft_incident_document(
 
         documents = get_incident_document_port()
 
-    sections = documents.read_sections(document_id)
+    sections = [s for s in documents.read_sections(document_id) if not _is_human_only(s.heading)]
     if not sections:
         log.warning("incident_draft_document_unreadable")
         return OperationResult.permanent_error(
@@ -309,26 +285,12 @@ async def draft_incident_document(
             error_code=CREATE_FAILED_CODE,
         )
 
-    # The timeline is the one section written back into the incident report
-    # itself; everything else stays in the draft document.
-    timeline_updated = False
-    timeline = _find_timeline_draft(drafts)
-    if timeline is not None and was_truncated:
-        # The timeline overwrites curated entries in the real report, so a
-        # chain that may itself have been cut short must not be written there.
-        log.warning("incident_draft_timeline_skipped_after_truncation", heading=timeline.heading)
-    elif timeline is not None:
-        timeline_updated = documents.replace_timeline(document_id, timeline.content, links)
-        if not timeline_updated:
-            log.warning("incident_draft_timeline_not_updated", heading=timeline.heading)
-
     outcome = DraftedDocument(
         document_id=written.document_id,
         created=written.created,
         partial=was_truncated,
         drafted_headings=tuple(d.heading for d in drafts if d.is_drafted),
         unanswered_headings=tuple(d.heading for d in drafts if not d.is_drafted),
-        timeline_updated=timeline_updated,
     )
     log.info(
         "incident_draft_generated",
@@ -336,7 +298,6 @@ async def draft_incident_document(
         created=written.created,
         drafted=len(outcome.drafted_headings),
         unanswered=len(outcome.unanswered_headings),
-        timeline_updated=timeline_updated,
     )
     return OperationResult.success(
         data=outcome,
@@ -396,14 +357,6 @@ def _transcript_line(message: TranscriptMessage) -> str:
     if message.timestamp:
         return f"[{message.timestamp}] {message.author}: {message.text}"
     return f"{message.author}: {message.text}"
-
-
-def _find_timeline_draft(drafts: Sequence[SectionDraft]) -> SectionDraft | None:
-    """Return the drafted timeline section, if the document has one."""
-    for draft in drafts:
-        if draft.is_drafted and _TIMELINE_HEADING_MARKER in draft.heading.lower():
-            return draft
-    return None
 
 
 def _parse_answers(raw: str) -> tuple[dict[str, str] | None, bool]:
@@ -499,61 +452,15 @@ def _build_drafts(
     drafts: list[SectionDraft] = []
     for section in sections:
         answer = _match_answer(section.heading, answers, lookup)
-        content = answer or section.instructions.strip()
-        is_chain = _is_five_whys_heading(section.heading)
-        if answer and is_chain:
-            content = _cap_questions(content, _MAX_WHYS, section.heading)
         drafts.append(
             SectionDraft(
                 heading=section.heading,
-                content=content,
+                content=answer or section.instructions.strip(),
                 is_drafted=bool(answer),
                 as_list=_is_list_heading(section.heading),
-                is_question_chain=is_chain,
             )
         )
     return drafts
-
-
-def _is_five_whys_heading(heading: str) -> bool:
-    """Whether a section holds a five-whys chain."""
-    lowered = heading.lower()
-    return any(marker in lowered for marker in _FIVE_WHYS_MARKERS)
-
-
-def _cap_questions(content: str, limit: int, heading: str) -> str:
-    """Drop question-and-answer pairs beyond ``limit``.
-
-    Only the surplus pairs are removed: a trailing root-cause statement, which
-    is not part of the chain, survives. Answers are recognised as the lines
-    following a question up to the next blank line.
-
-    Every line ending in "?" counts, bullets and numbering included. The
-    template asks for the whys "as a list", so a bulleted chain is a normal
-    shape for this section -- excluding those let a long chain past the cap
-    untouched.
-    """
-    kept: list[str] = []
-    questions = 0
-    dropping = False
-
-    for line in content.splitlines():
-        stripped = line.strip()
-        if stripped.endswith("?"):
-            questions += 1
-            dropping = questions > limit
-            if dropping:
-                continue
-        elif dropping:
-            if stripped:
-                continue  # the dropped question's answer
-            dropping = False
-            continue
-        kept.append(line)
-
-    if questions > limit:
-        logger.info("incident_draft_whys_capped", heading=heading, returned=questions, kept=limit)
-    return "\n".join(kept).strip()
 
 
 def _match_answer(heading: str, answers: dict[str, str], lookup: dict[str, str]) -> str:
@@ -608,6 +515,12 @@ def _extract_pr_links(messages: Sequence[TranscriptMessage]) -> dict[str, str]:
         for match in _PR_URL_PATTERN.finditer(message.text):
             links.setdefault(match.group(1), match.group(0))
     return links
+
+
+def _is_human_only(heading: str) -> bool:
+    """Whether a section is left for the team rather than drafted."""
+    lowered = heading.lower()
+    return any(marker in lowered for marker in _HUMAN_ONLY_HEADING_MARKERS)
 
 
 def _is_list_heading(heading: str) -> bool:

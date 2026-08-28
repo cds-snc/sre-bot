@@ -24,7 +24,6 @@ import structlog
 from infrastructure.configuration.integrations.google import get_google_resources_config
 from integrations.google_workspace import google_docs, google_drive
 from packages.incident_draft.domain import (
-    NOT_INDICATED,
     DocumentField,
     DocumentSection,
     DraftWriteResult,
@@ -35,36 +34,15 @@ logger = structlog.get_logger()
 
 _DRAFT_TITLE_SUFFIX = " - AI draft"
 _SUBHEADING_STYLE = "HEADING_3"
-_TIMELINE_HEADING_MARKER = "timeline"
-# The heading that closes the timeline section in the incident template.
-_TIMELINE_END_MARKER = "Trigger"
 # The line marking where the SRE bot's generated timeline begins.
 # ``modules.incident`` locates the timeline by this exact string to append
 # 💾-reacted messages, so it must survive every rewrite of the report.
 _SRE_BOT_GENERATED_TIMELINE = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 
-# Line kinds produced by _render_body_lines.
-_SUBHEADING = "subheading"
-_BULLET = "bullet"
-_QUESTION = "question"
-_ANSWER = "answer"
-_TEXT = "text"
-
-# Retrospective groupings that render as sub-headings with bullets beneath.
-_SUBHEADING_LABELS = frozenset(
-    {
-        "what went wrong",
-        "what went well",
-        "where we got lucky",
-        "what could be improved",
-        "what could have gone better",
-    }
-)
 # Only these delimit sections; deeper headings are content within one.
 _SECTION_HEADING_STYLES = frozenset({"HEADING_1", "HEADING_2"})
 _BANNER_PREFIX = "AI draft · generated"
-# Generated content is wrapped in named ranges under this prefix so a re-run can
-# find and replace exactly what it wrote, leaving the template untouched.
+# Generated content is wrapped in named ranges under this prefix.
 _NAMED_RANGE_PREFIX = "incident_draft::"
 # "PR 1898", "PR #1898", "pr1898" -- how the model refers to a pull request in
 # prose once the original Slack link has been summarised away.
@@ -75,9 +53,13 @@ _PR_REFERENCE_PATTERN = re.compile(r"\bPR\s*#?(?P<number>\d+)\b", re.IGNORECASE)
 # become new paragraphs.
 _Placement = tuple[str, int, list[tuple[str, str]], str | None]
 
+# Line kinds produced by _render_body_lines.
+_SUBHEADING = "subheading"
+_BULLET = "bullet"
+_TEXT = "text"
+
 # Guidance every draft should carry under these headings. The report's own
-# copy can be missing it -- the timeline's was replaced by the bot's banner
-# long ago -- so it is restored rather than assumed.
+# copy can be missing it, so it is restored rather than assumed.
 _ENSURED_GUIDANCE = {
     "detailedtimeline": (
         "Provide a detailed incident timeline, in chronological order, timestamp with timezone(s). "
@@ -175,45 +157,6 @@ class GoogleDocsIncidentDocument:
         if heading is not None:
             sections.append(DocumentSection(heading=heading, instructions="".join(instruction_parts)))
         return sections
-
-    def replace_timeline(self, document_id: str, entries: str, links: Mapping[str, str] = {}) -> bool:
-        """Replace the incident report's timeline entries with ``entries``.
-
-        This is the only write this package makes to the incident report
-        itself. It replaces the whole timeline section -- the template's
-        warning banner, its explanatory paragraph, and any existing entries --
-        with the marker line plus the drafted timeline. The marker is
-        re-inserted verbatim so reaction-driven timeline updates in
-        ``modules.incident`` keep working, and every other section of the
-        report is untouched. Returns ``False`` (writing nothing) when the
-        document has no timeline section or cannot be read.
-        """
-        if not entries.strip():
-            return False
-
-        document = google_docs.get_document(document_id)
-        if not isinstance(document, dict):
-            logger.warning("incident_draft_timeline_fetch_failed", document_id=document_id)
-            return False
-
-        region = _timeline_region(document)
-        if region is None:
-            logger.warning("incident_draft_timeline_section_not_found", document_id=document_id)
-            return False
-
-        start, end = region
-        requests: list[dict[str, Any]] = []
-        if end > start:
-            requests.append({"deleteContentRange": {"range": {"startIndex": start, "endIndex": end}}})
-        requests.extend(_render_timeline_requests(start, entries, links))
-
-        result = google_docs.batch_update(document_id, requests)
-        if not isinstance(result, dict):
-            logger.warning("incident_draft_timeline_update_failed", document_id=document_id)
-            return False
-
-        logger.info("incident_draft_timeline_replaced", document_id=document_id, start=start, end=end)
-        return True
 
     def write_draft_document(
         self,
@@ -366,7 +309,6 @@ def _fill_section_requests(
     for draft in answered:
         section_placements = _placements_for(document, draft, spans[draft.heading], generated)
         placements.extend(section_placements)
-        stale_blocks.extend(_duplicate_sub_label_blocks(document, spans[draft.heading]))
         stale_blocks.extend(_empty_label_spans(document, spans[draft.heading], section_placements))
         stale_blocks.extend(_empty_bullet_spans(document, spans[draft.heading]))
         protected = [span for name, _, _, _ in section_placements for span in generated.get(name, [])]
@@ -385,12 +327,8 @@ def _fill_section_requests(
     operations.extend(repairs)
     operations.extend(_ensured_guidance_operations(document, spans))
 
-    numbered_names = {f"{_NAMED_RANGE_PREFIX}{draft.heading}" for draft in answered if draft.is_question_chain}
     for name, insert_at, lines, inline_text in sorted(placements, key=lambda p: p[1], reverse=True):
         placement_requests: list[dict[str, Any]] = []
-        # A five-whys chain reads as a numbered list; the template asks for the
-        # whys "as a list here".
-        numbered = name in numbered_names
         previous = generated.get(name, [])
         if previous:
             # Drop the marker before its content so the name is free to reuse.
@@ -414,11 +352,7 @@ def _fill_section_requests(
             continue
 
         builder = _RequestBuilder(start_index=insert_at, links=links)
-        question_number = 0
         for text, kind in lines:
-            if kind == _QUESTION and numbered:
-                question_number += 1
-                text = f"{question_number}. {text}"
             if kind == _SUBHEADING:
                 builder.insert(f"{text}\n", named_style=_SUBHEADING_STYLE)
                 continue
@@ -426,8 +360,6 @@ def _fill_section_requests(
                 f"{text}\n",
                 named_style="NORMAL_TEXT",
                 bullet=kind == _BULLET,
-                bold=kind == _QUESTION,
-                indent_pt=18 if kind == _ANSWER else 0,
             )
         placement_requests.extend(builder.build())
 
@@ -493,7 +425,6 @@ def _placements_for(
     - Anything left over forms one block at the end of the section.
     """
     lines = _render_body_lines(draft.content, force_bullets=draft.as_list)
-    sub_labels = _sub_label_indices(document, span)
     inline_labels = _inline_label_spans(document, span)
 
     placements: list[_Placement] = []
@@ -522,11 +453,6 @@ def _placements_for(
         lines = [(text, kind) for text, kind in lines if text not in placed]
 
     for label, group in _group_by_subheading(lines):
-        key = label.rstrip(":").strip().lower() if label else ""
-        if key and key in sub_labels:
-            name = f"{_NAMED_RANGE_PREFIX}{draft.heading}::{key}"
-            placements.append((name, _placement_index(name, sub_labels[key], generated), group, None))
-            continue
         if label:
             remainder.append((label, _SUBHEADING))
 
@@ -545,15 +471,6 @@ def _placements_for(
                 # writing beside it is what duplicated the text.
                 continue
             placements.append((name, _placement_index(name, value_start, generated), [], f" {value}"))
-
-    # A sub-heading the model skipped still gets a point, so the reader can see
-    # the question was asked rather than meeting a bare label.
-    covered = {name.rpartition("::")[2] for name, _, _, _ in placements}
-    for key, label_index in sub_labels.items():
-        if key in covered:
-            continue
-        name = f"{_NAMED_RANGE_PREFIX}{draft.heading}::{key}"
-        placements.append((name, _placement_index(name, label_index, generated), [(NOT_INDICATED, _BULLET)], None))
 
     if remainder:
         name = f"{_NAMED_RANGE_PREFIX}{draft.heading}"
@@ -744,8 +661,6 @@ def _stale_content_blocks(
         text = _paragraph_text(paragraph).strip()
         if not text or _is_guidance_paragraph(paragraph):
             continue
-        if text.rstrip(":").strip().lower() in _SUBHEADING_LABELS:
-            continue
         if _looks_like_label_line(text):
             continue
         blocks.append((element_start, element_end))
@@ -857,47 +772,6 @@ def _empty_label_spans(
     return spans
 
 
-def _duplicate_sub_label_blocks(document: dict, span: tuple[int, int]) -> list[tuple[int, int]]:
-    """Spans of repeated sub-labels in a section, second occurrence onwards.
-
-    Earlier versions of this package wrote their own "What went wrong" headings
-    instead of filling the template's, and nothing marks those as generated. A
-    document carrying that history shows each label twice -- once filled, once
-    bare. Every occurrence after the first is removed, along with the content
-    beneath it, so the label appears exactly once.
-    """
-    start, end = span
-    blocks: list[tuple[int, int]] = []
-    seen: set[str] = set()
-    open_block: tuple[str, int] | None = None
-
-    for element in _body_content(document):
-        element_start, element_end = element.get("startIndex"), element.get("endIndex")
-        if not isinstance(element_start, int) or not isinstance(element_end, int):
-            continue
-        if element_start < start or element_end > end:
-            continue
-        paragraph = element.get("paragraph")
-        if not paragraph:
-            continue
-
-        key = _paragraph_text(paragraph).strip().rstrip(":").strip().lower()
-        if key not in _SUBHEADING_LABELS:
-            continue
-
-        if open_block is not None:
-            blocks.append((open_block[1], element_start))
-            open_block = None
-        if key in seen:
-            open_block = (key, element_start)
-        else:
-            seen.add(key)
-
-    if open_block is not None:
-        blocks.append((open_block[1], end))
-    return [(block_start, block_end) for block_start, block_end in blocks if block_end > block_start]
-
-
 def _ensured_guidance_operations(
     document: dict,
     spans: dict[str, tuple[int, int]],
@@ -995,29 +869,6 @@ def _sre_bot_generated_timeline_spans(document: dict) -> list[tuple[int, int]]:
         if paragraph and _SRE_BOT_GENERATED_TIMELINE in _paragraph_text(paragraph):
             spans.append((element_start, element_end))
     return spans
-
-
-def _sub_label_indices(document: dict, span: tuple[int, int]) -> dict[str, int]:
-    """Map the template's sub-labels inside a section to their insert points.
-
-    The insert point is just after the label's own paragraph, so generated
-    points sit directly beneath the label the template already prints.
-    """
-    start, end = span
-    labels: dict[str, int] = {}
-    for element in _body_content(document):
-        element_start, element_end = element.get("startIndex"), element.get("endIndex")
-        if not isinstance(element_start, int) or not isinstance(element_end, int):
-            continue
-        if element_start < start or element_end > end:
-            continue
-        paragraph = element.get("paragraph")
-        if not paragraph:
-            continue
-        key = _paragraph_text(paragraph).strip().rstrip(":").strip().lower()
-        if key in _SUBHEADING_LABELS and key not in labels:
-            labels[key] = element_end
-    return labels
 
 
 def _placement_index(name: str, default: int, generated: dict[str, list[tuple[int, int]]]) -> int:
@@ -1201,75 +1052,6 @@ def _section_spans(document: dict) -> dict[str, tuple[int, int]]:
     return spans
 
 
-def _timeline_region(document: dict) -> tuple[int, int] | None:
-    """Locate the replaceable span of the incident report's timeline section.
-
-    Returns ``(start, end)`` spanning everything between the timeline heading
-    and the section that follows it -- the template's warning banner and
-    explanatory paragraph included, since those are boilerplate the drafted
-    timeline replaces. The marker line is deleted along with them and then
-    re-inserted by ``_render_timeline_requests``, so it survives every rewrite
-    while the surrounding clutter does not.
-
-    The section's end is the next heading, or a paragraph reading ``Trigger``
-    -- matching how ``modules.incident`` finds the same boundary, which is
-    robust to templates where ``Trigger`` is not styled as a real heading.
-
-    Returns ``None`` when the timeline heading or its closing boundary cannot
-    be found, in which case nothing is written at all. Refusing to guess the
-    end matters: falling back to the document end would delete every remaining
-    section.
-    """
-    start: int | None = None
-    fallback: int | None = None
-
-    for element in _body_content(document):
-        paragraph = element.get("paragraph")
-        if not paragraph:
-            continue
-        text = _paragraph_text(paragraph).strip()
-        element_start = element.get("startIndex")
-        element_end = element.get("endIndex")
-
-        if start is None:
-            if _is_section_heading(paragraph) and text and _TIMELINE_HEADING_MARKER in text.lower():
-                start = element_end if isinstance(element_end, int) else None
-            continue
-
-        if not isinstance(element_start, int):
-            continue
-        if _is_section_heading(paragraph) and text:
-            # A real section heading is the authoritative boundary.
-            return (start, max(start, element_start))
-        if text.startswith(_TIMELINE_END_MARKER):
-            # Fallback for templates where "Trigger" is plain text. Recorded
-            # rather than returned so a later real heading still wins -- a
-            # stray "Trigger" line inside the section must not truncate the
-            # replacement and leave duplicated entries behind.
-            fallback = fallback or max(start, element_start)
-
-    if start is not None and fallback is not None:
-        return (start, fallback)
-    return None
-
-
-def _render_timeline_requests(start: int, entries: str, links: Mapping[str, str] = {}) -> list[dict[str, Any]]:
-    """Build the insert/style requests writing the timeline section at ``start``.
-
-    Re-inserts the timeline marker the delete removed -- muted and italic, since
-    it is machinery rather than content -- followed by the drafted entries as
-    bullets.
-    """
-    builder = _RequestBuilder(start_index=start, links=links)
-    builder.insert(f"{_SRE_BOT_GENERATED_TIMELINE}\n", named_style="NORMAL_TEXT", italic=True, muted=True)
-    for text, kind in _render_body_lines(entries, force_bullets=True):
-        if kind == _SUBHEADING:
-            builder.insert(f"{text}\n", named_style=_SUBHEADING_STYLE)
-            continue
-        builder.insert(f"{text}\n", named_style="NORMAL_TEXT", bullet=kind == _BULLET)
-    return builder.build()
-
-
 class _RequestBuilder:
     """Accumulates ``batchUpdate`` requests while tracking the running index."""
 
@@ -1348,15 +1130,6 @@ def _render_body_lines(content: str, *, force_bullets: bool = False) -> list[tup
             lines.append((text.rstrip(":").strip(), _SUBHEADING))
             continue
 
-        if text.endswith("?"):
-            lines.append((text, _QUESTION))
-            continue
-
-        # A line directly under a question is that question's answer.
-        if lines and lines[-1][1] == _QUESTION:
-            lines.append((text, _ANSWER))
-            continue
-
         lines.append((text, _BULLET if force_bullets else _TEXT))
     return lines or [("", _TEXT)]
 
@@ -1364,10 +1137,7 @@ def _render_body_lines(content: str, *, force_bullets: bool = False) -> list[tup
 def _is_subheading(text: str) -> bool:
     """Whether an unbulleted line introduces a group of points."""
     stripped = text.rstrip(":").strip().lower()
-    if stripped in _SUBHEADING_LABELS:
-        return True
-    # "What went well:" style — a short trailing-colon label, not a sentence
-    # that merely happens to contain a colon.
+    # A short trailing-colon label, not a sentence that merely contains a colon.
     return text.endswith(":") and len(stripped.split()) <= 6
 
 
