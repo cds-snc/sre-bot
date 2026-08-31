@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-08-31 17:35'
-updated_date: '2026-08-31 18:53'
+updated_date: '2026-08-31 19:15'
 labels:
   - clients
   - phase-3
@@ -37,11 +37,11 @@ Critical invariant: claim() branches on error_code == "ConditionalCheckFailedExc
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 infrastructure/idempotency/dynamodb.py imports no symbol from integrations.aws.dynamodb_next; it holds a boto3 DynamoDB client obtained via integrations.aws.client.get_aws_client and wraps every call in try/except with integrations.aws.client.classify_aws_error
-- [ ] #2 claim/complete/release outcomes are unchanged: a conditional-write failure still yields ClaimResult.IN_PROGRESS or COMPLETED via the ConditionalCheckFailedException error_code, and a COMPLETED record still returns its stored outcome payload
-- [ ] #3 The moto-backed conformance suite under tests/integration/infrastructure/idempotency passes with its conftest importing no symbol from any _next module (neither integrations.aws.client_next nor integrations.aws.dynamodb_next); both its ENVIRONMENT override target and AWS_REGION come from integrations.aws.client
-- [ ] #4 Unit tests cover the three claim outcomes, complete, release, and one unmapped SDK exception propagating rather than being swallowed into a permanent error
-- [ ] #5 infrastructure/idempotency/factory.py owns DynamoDB client construction: get_idempotency_store() and build_idempotency_store() both obtain the client via get_aws_client for the dynamodb service and inject it into DynamoDBIdempotencyStore, pinned by a unit test on the provider wiring
+- [x] #1 infrastructure/idempotency/dynamodb.py imports no symbol from integrations.aws.dynamodb_next; it holds a boto3 DynamoDB client obtained via integrations.aws.client.get_aws_client and wraps every call in try/except with integrations.aws.client.classify_aws_error
+- [x] #2 claim/complete/release outcomes are unchanged: a conditional-write failure still yields ClaimResult.IN_PROGRESS or COMPLETED via the ConditionalCheckFailedException error_code, and a COMPLETED record still returns its stored outcome payload
+- [x] #3 The moto-backed conformance suite under tests/integration/infrastructure/idempotency passes with its conftest importing no symbol from any _next module (neither integrations.aws.client_next nor integrations.aws.dynamodb_next); both its ENVIRONMENT override target and AWS_REGION come from integrations.aws.client
+- [x] #4 Unit tests cover the three claim outcomes, complete, release, and one unmapped SDK exception propagating rather than being swallowed into a permanent error
+- [x] #5 infrastructure/idempotency/factory.py owns DynamoDB client construction: get_idempotency_store() and build_idempotency_store() both obtain the client via get_aws_client for the dynamodb service and inject it into DynamoDBIdempotencyStore, pinned by a unit test on the provider wiring
 <!-- AC:END -->
 
 ## Definition of Done
@@ -111,6 +111,14 @@ Verified against live code this session (not the task prose):
 - Rollback: single `git revert` - 2 production files and 4 test files, no data/schema/config migration (same table, same item shape, same attribute names).
 <!-- SECTION:PLAN:END -->
 
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented approved Steps 1-6 in the two scoped production files. DynamoDBIdempotencyStore now receives a typed boto3 DynamoDB client, calls put_item/get_item/delete_item directly, classifies botocore failures, preserves conditional contention and conservative read-failure behavior, and propagates unmapped SDK exceptions. Both factory paths now construct and inject get_aws_client("dynamodb") without role_arn. Validation: focused idempotency suites 77 passed; scoped mypy for both changed modules passed; ruff check passed; legacy-symbol grep returned no dynamodb_next/client_next references in the scoped directories; make test passed (2069 new-structure tests, 988 legacy tests). The requested whole-tree mypy command remains red on 107 pre-existing errors across 40 unrelated files; neither changed idempotency module appears in those diagnostics. No acceptance criteria checked and status remains In Progress for human closure.
+
+Verification (2026-08-31): targeted suites 77 passed (tests/unit/infrastructure/idempotency + tests/integration/infrastructure/idempotency, moto-backed conformance included). Full 'make test' split green: 2069 passed (test-new) + 988 passed (test-legacy); none of the 5 known cross-directory-pollution failures appeared. 'uv run ruff check .' from app/: all checks passed. Grep evidence for AC#1/AC#3: no dynamodb_next or client_next symbol remains under infrastructure/idempotency/, tests/unit/infrastructure/idempotency/ or tests/integration/infrastructure/idempotency/. Note on DoD#1: 'uv run mypy . --exclude ...' from app/ reports 107 pre-existing errors across 40 unrelated files (legacy app/modules/ and untyped-import debt on origin/main); zero of them are in the files touched by this task, so DoD#1 is left unchecked pending a human call on whether the repo-wide mypy baseline is in scope.
+<!-- SECTION:NOTES:END -->
+
 ## Comments
 
 <!-- COMMENTS:BEGIN -->
@@ -119,3 +127,9 @@ created: 2026-08-31 18:51
 Human sign-off on the two open plan items (2026-08-31): D1 RESOLVED - keep the existing conservative downgrade in claim(), where a classified read failure still yields IN_PROGRESS; letting some errors pass through silently is acceptable for this slice and will be reassessed later, most likely during the TASK-25.2.x AWS-remainder work. R1 RESOLVED - the behavior change is accepted: unmapped SDK exceptions propagate raw instead of becoming RuntimeError, since the lease/dedup concept is expected to be revisited as a whole in a later task. No plan or AC changes needed; implement as written.
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Converged DynamoDBIdempotencyStore off integrations.aws.dynamodb_next onto the canonical AWS primitive: the store now takes an injected typed boto3 DynamoDB client (types_boto3_dynamodb.client.DynamoDBClient under TYPE_CHECKING), calls put_item/get_item/delete_item directly, and wraps each call in try/except (ClientError, BotoCoreError) + integrations.aws.client.classify_aws_error; infrastructure/idempotency/factory.py now owns client construction via get_aws_client for dynamodb and injects it into both get_idempotency_store() and build_idempotency_store(). Item payloads, ConditionExpression and attribute names are unchanged, so claim/complete/release outcomes are identical - contention is still detected via the ConditionalCheckFailedException error_code that classify_aws_error preserves. One intentional, human-signed-off behavior change: an unmapped SDK exception now propagates raw instead of being converted into a permanent error and re-raised as RuntimeError (mapped failures still raise RuntimeError with the same message prefixes); the conservative downgrade of a classified read failure to IN_PROGRESS was deliberately kept and is flagged for reassessment in TASK-25.2.x. Verified by 77 targeted tests (unit store/factory/lease plus the moto-backed integration conformance suite, unchanged and green on both the in-memory and DynamoDB parameters), a fully green make test split (2069 + 988 passed), clean ruff, and grep proof that no _next symbol remains in the idempotency production or test trees. integrations/aws/dynamodb_next.py is intentionally retained for the resilience retry store until TASK-23.3.
+<!-- SECTION:FINAL_SUMMARY:END -->
