@@ -3,11 +3,11 @@ id: TASK-22.4
 title: >-
   Migrate directory provider off infrastructure/clients/google_workspace onto
   integrations/google_workspace/google_directory_next
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-29 21:11'
-updated_date: '2026-08-07 22:04'
+updated_date: '2026-08-31 14:14'
 labels:
   - clients
   - phase-3
