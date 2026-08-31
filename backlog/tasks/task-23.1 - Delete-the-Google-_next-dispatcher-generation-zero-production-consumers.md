@@ -1,10 +1,10 @@
 ---
 id: TASK-23.1
 title: Delete the Google _next dispatcher generation (zero production consumers)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-31 17:35'
-updated_date: '2026-08-31 18:09'
+updated_date: '2026-08-31 18:22'
 labels:
   - clients
   - phase-3
