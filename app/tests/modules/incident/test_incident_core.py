@@ -119,6 +119,7 @@ def test_initiate_resources_creation_succeeds(
 • `/sre incident updates add` - Add incident updates
 • `/sre incident show` - View incident details
 • `/sre incident summarize` - Summarize the channel to catch up someone joining the incident (optionally add `--since 30m` or `--since 2h` to limit the time range)
+• `/sre incident draft` - Draft an incident report from this channel into a new document, ready for you to review and edit
 
 *Quick Actions:*
 📋 Use the bookmarked incident report above to document findings

@@ -63,6 +63,7 @@ Usage:
 • close        - Close the current incident
 • list         - List incidents or resources
 • summarize    - Summarize the channel to catch up someone joining the incident
+• draft        - Draft an incident report from the channel into a new document
 • help         - Show this help message
 • schedule     - Schedule an event for the incident
 • show         - Show details of the current incident
@@ -75,6 +76,7 @@ Usage:
 - `/sre incident summarize`
 - `/sre incident summarize --since 30m --limit 100`
 - `/sre incident summarize --since 2h --limit 100`
+- `/sre incident draft`
 - `/sre incident products create "foo bar"`
 - `/sre incident schedule retro`
 - `/sre incident status update Ready to be Reviewed`
@@ -109,6 +111,7 @@ Utilisation:
 • close        - Clore l'incident en cours
 • list         - Lister les incidents ou ressources
 • summarize    - Résumer le canal pour informer une personne rejoignant l'incident
+• draft        - Rédiger une ébauche de rapport d'incident à partir du canal
 • help         - Afficher ce message d'aide
 • schedule     - Planifier un événement pour l'incident
 • show         - Afficher les détails de l'incident en cours
@@ -121,6 +124,7 @@ Utilisation:
 - `/sre incident summarize`
 - `/sre incident summarize --since 30m --limit 100`
 - `/sre incident summarize --since 2h --limit 100`
+- `/sre incident draft`
 - `/sre incident products create "foo bar"`
 - `/sre incident schedule retro`
 - `/sre incident status update Ready to be Reviewed`
