@@ -4,6 +4,7 @@ title: Converge the DynamoDB retry store; delete the AWS _next dispatcher genera
 status: To Do
 assignee: []
 created_date: '2026-08-31 17:35'
+updated_date: '2026-08-31 17:44'
 labels:
   - clients
   - phase-3
@@ -49,3 +50,12 @@ After this slice, find app/integrations -name "*_next.py" returns zero.
 - [ ] #1 mypy, ruff and pytest (excluding smoke) green from app/
 - [ ] #2 Single git revert restores the previous behavior; PR references decisions/outbound-clients.md and decisions/sdk-typing.md
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-08-31 17:44
+---
+Human decision 2026-08-31: the fetch_due / get_stats / get_dlq_entries list-vs-dict fix ships INSIDE this migration PR rather than as a separate preceding PR. Rationale: the bug only exists because dynamodb_next.query() force-paginates, so it disappears by construction when the store calls the boto3 client directly - a standalone fix would have to patch code this PR deletes. AC#3 (real-shape response fakes) is the review gate for it.
+---
+<!-- COMMENTS:END -->
