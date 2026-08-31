@@ -80,8 +80,13 @@ class TestGetLeaseStore:
     """Tests for the TTL-parameterized lease store factory."""
 
     @pytest.mark.unit
-    def test_get_lease_store_returns_singleton_per_ttl(self) -> None:
+    def test_get_lease_store_returns_singleton_per_ttl(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """get_lease_store(ttl) called twice with the same ttl returns the same instance."""
+        monkeypatch.setattr(
+            "infrastructure.idempotency.factory.get_aws_client",
+            MagicMock(return_value=MagicMock(spec=["put_item", "get_item", "delete_item"])),
+            raising=False,
+        )
         try:
             store1 = get_lease_store(600)
             store2 = get_lease_store(600)
@@ -92,8 +97,13 @@ class TestGetLeaseStore:
             get_lease_store.cache_clear()
 
     @pytest.mark.unit
-    def test_get_lease_store_returns_distinct_instance_for_different_ttl(self) -> None:
+    def test_get_lease_store_returns_distinct_instance_for_different_ttl(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """get_lease_store(ttl) called with different ttls returns different instances."""
+        monkeypatch.setattr(
+            "infrastructure.idempotency.factory.get_aws_client",
+            MagicMock(return_value=MagicMock(spec=["put_item", "get_item", "delete_item"])),
+            raising=False,
+        )
         try:
             store1 = get_lease_store(600)
             store2 = get_lease_store(1800)

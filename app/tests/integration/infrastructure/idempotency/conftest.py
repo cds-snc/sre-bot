@@ -9,8 +9,8 @@ import pytest
 from infrastructure.idempotency.dynamodb import DynamoDBIdempotencyStore
 from infrastructure.idempotency.in_memory import InMemoryIdempotencyStore
 from infrastructure.idempotency.settings import IdempotencySettings
-from integrations.aws import client_next as aws_client_next
-from integrations.aws.dynamodb_next import AWS_REGION
+from integrations.aws import client as aws_client
+from integrations.aws.client import AWS_REGION, get_aws_client
 
 STORE_TEST_TABLE_NAME = "test-sre-bot-idempotency-store"
 
@@ -30,7 +30,7 @@ def _set_moto_aws_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AWS_SECURITY_TOKEN", "testing")
     monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
     monkeypatch.setenv("AWS_DEFAULT_REGION", AWS_REGION)
-    monkeypatch.setattr(aws_client_next.app_settings, "ENVIRONMENT", "test")
+    monkeypatch.setattr(aws_client.app_settings, "ENVIRONMENT", "test")
 
 
 def _create_store_table(client: Any) -> None:
@@ -74,13 +74,14 @@ def expiring_in_memory_idempotency_store(
 @pytest.fixture
 def dynamodb_idempotency_store(idempotency_store_settings: IdempotencySettings, monkeypatch: pytest.MonkeyPatch) -> Iterator[Any]:
     moto = pytest.importorskip("moto")
-    boto3 = pytest.importorskip("boto3")
     _set_moto_aws_credentials(monkeypatch)
 
     with moto.mock_aws():
-        _create_store_table(boto3.client("dynamodb", region_name=AWS_REGION))
+        dynamodb = get_aws_client("dynamodb")
+        _create_store_table(dynamodb)
 
         yield DynamoDBIdempotencyStore(
+            dynamodb,
             idempotency_settings=idempotency_store_settings,
             table_name=STORE_TEST_TABLE_NAME,
         )
@@ -92,13 +93,14 @@ def expiring_dynamodb_idempotency_store(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[Any]:
     moto = pytest.importorskip("moto")
-    boto3 = pytest.importorskip("boto3")
     _set_moto_aws_credentials(monkeypatch)
 
     with moto.mock_aws():
-        _create_store_table(boto3.client("dynamodb", region_name=AWS_REGION))
+        dynamodb = get_aws_client("dynamodb")
+        _create_store_table(dynamodb)
 
         yield DynamoDBIdempotencyStore(
+            dynamodb,
             idempotency_settings=expiring_idempotency_store_settings,
             table_name=STORE_TEST_TABLE_NAME,
         )

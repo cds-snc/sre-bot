@@ -3,10 +3,10 @@ id: TASK-23.2
 title: >-
   Converge the DynamoDB idempotency store onto get_aws_client +
   classify_aws_error
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-31 17:35'
-updated_date: '2026-08-31 18:51'
+updated_date: '2026-08-31 18:53'
 labels:
   - clients
   - phase-3
