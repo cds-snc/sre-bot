@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from infrastructure.configuration.app import AppSettings
-from integrations.aws import client_next
+from integrations.aws import client as aws_client
 from integrations.aws import dynamodb as dynamodb_module
 from modules.aws import aws_access_requests
 
@@ -54,12 +54,12 @@ def test_integrations_aws_dynamodb_endpoint_matrix(
         ("production", None),
     ],
 )
-def test_integrations_aws_client_next_dynamodb_endpoint_matrix(
+def test_integrations_aws_client_dynamodb_endpoint_matrix(
     monkeypatch: pytest.MonkeyPatch,
     environment: str,
     expected_url: str | None,
 ) -> None:
-    """integrations.aws.client_next.get_aws_client should gate by ENVIRONMENT."""
+    """integrations.aws.client.get_aws_client should gate by ENVIRONMENT."""
 
     captured: dict[str, object] = {}
 
@@ -75,16 +75,16 @@ def test_integrations_aws_client_next_dynamodb_endpoint_matrix(
     class FakeBoto3:
         Session = FakeSession
 
-    monkeypatch.setattr(client_next, "boto3", FakeBoto3())
+    monkeypatch.setattr(aws_client, "boto3", FakeBoto3())
     monkeypatch.setattr(
-        client_next,
+        aws_client,
         "app_settings",
         SimpleNamespace(ENVIRONMENT=environment),
         raising=False,
     )
-    monkeypatch.setattr(client_next, "settings", SimpleNamespace(PREFIX=""))
+    monkeypatch.setattr(aws_client, "settings", SimpleNamespace(AWS_REGION="ca-central-1"))
 
-    client_next.get_aws_client("dynamodb")
+    aws_client.get_aws_client("dynamodb")
 
     client_config = captured.get("client_config", {})
     assert isinstance(client_config, dict)

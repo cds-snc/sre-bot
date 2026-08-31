@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from infrastructure.configuration.infrastructure.retry import RetrySettings
-from infrastructure.operations import OperationResult
 from infrastructure.resilience.retry import (
     InMemoryRetryStore,
     RetryConfig,
@@ -94,35 +93,32 @@ def mock_processor():
 
 
 @pytest.fixture
-def mock_dynamodb_next():
-    """Mock dynamodb_next module for testing."""
-    mock = MagicMock()
+def mock_dynamodb_client():
+    """Provide a DynamoDB client double with boto3 response-shaped defaults."""
+    mock = MagicMock(spec=["put_item", "get_item", "delete_item", "update_item", "query", "get_paginator"])
 
     # Default successful responses
-    mock.put_item.return_value = OperationResult.success(data={})
-    mock.get_item.return_value = OperationResult.success(data={"Item": {}})
-    mock.query.return_value = OperationResult.success(data={"Items": [], "Count": 0})
-    mock.update_item.return_value = OperationResult.success(data={})
-    mock.delete_item.return_value = OperationResult.success(data={})
+    mock.put_item.return_value = {}
+    mock.get_item.return_value = {"Item": {}}
+    mock.query.return_value = {"Items": [], "Count": 0}
+    mock.update_item.return_value = {}
+    mock.delete_item.return_value = {}
+    mock.get_paginator.return_value.paginate.return_value = [{"Count": 0}]
 
     return mock
 
 
 @pytest.fixture
-def dynamodb_retry_store(retry_config_factory, mock_dynamodb_next, monkeypatch):
-    """Create DynamoDB retry store with mocked dynamodb_next."""
-    monkeypatch.setattr(
-        "infrastructure.resilience.retry.dynamodb_store.dynamodb_next",
-        mock_dynamodb_next,
-    )
-
+def dynamodb_retry_store(retry_config_factory, mock_dynamodb_client):
+    """Create a DynamoDB retry store with an injected client double."""
     config = retry_config_factory()
     store = DynamoDBRetryStore(
+        mock_dynamodb_client,
         config=config,
         table_name="test-retry-table",
         ttl_days=30,
     )
-    store._mock_dynamodb_next = mock_dynamodb_next  # Attach for test access
+    store._mock_dynamodb = mock_dynamodb_client  # Attach for test access
     return store
 
 
