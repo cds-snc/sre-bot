@@ -1,10 +1,11 @@
 """Google Workspace implementation of DirectoryProvider."""
 
-from typing import Any, TypeVar
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import structlog
+from googleapiclient.errors import HttpError
 
-from infrastructure.clients.google_workspace import GoogleWorkspaceClients
 from infrastructure.configuration.infrastructure import DirectorySettings
 from infrastructure.directory.models import (
     DirectoryGroup,
@@ -13,16 +14,24 @@ from infrastructure.directory.models import (
     MembershipCheckResult,
 )
 from infrastructure.operations import OperationResult
+from integrations.google_workspace.client import classify_google_error, execute_batch_request
+
+if TYPE_CHECKING:
+    from googleapiclient._apis.admin.directory_v1 import DirectoryResource as AdminDirectoryResource
 
 logger = structlog.get_logger()
 
 T = TypeVar("T")
 
+_NUM_RETRIES = 3
+
 
 class GoogleDirectoryProvider:
-    """DirectoryProvider backed by Google Workspace Directory API.
+    """DirectoryProvider backed by Google Workspace Admin SDK Directory API.
 
-    Receives a GoogleWorkspaceClients facade injected by the factory.  Direct
+    Calls the discovery Resource directly via an injected, per-call scoped
+    service factory (preserving today's least-privilege OAuth scoping) and
+    classifies googleapiclient errors with classify_google_error.  Direct
     instantiation of Google API credentials or service clients inside this
     class is forbidden — use build_google_directory_provider() from the factory
     module instead.
@@ -30,20 +39,63 @@ class GoogleDirectoryProvider:
 
     def __init__(
         self,
-        google_clients: GoogleWorkspaceClients,
+        get_service: Callable[[list[str]], AdminDirectoryResource],
         directory_settings: DirectorySettings,
+        customer_id: str = "my_customer",
     ) -> None:
-        """Initialise with injected Google Workspace clients facade.
+        """Initialise with an injected, per-call scoped service factory.
 
         Args:
-            google_clients: Configured GoogleWorkspaceClients facade.
+            get_service: Factory building a scoped Admin Directory Resource
+                for a given OAuth scope list — called once per operation.
             directory_settings: Directory provider settings.
+            customer_id: Google Workspace customer ID for directory operations.
         """
-        self._directory = google_clients.directory
+        self._get_service = get_service
         self._directory_settings = directory_settings
+        self._customer_id = customer_id or "my_customer"
         self._managed_group_domain = directory_settings.managed_group_domain.strip().lower()
         self._managed_group_prefix = directory_settings.managed_group_prefix.strip().lower()
         self._logger = logger.bind(provider="google")
+
+    def _map_sdk_exception(self, exc: Exception, operation: str) -> OperationResult[Any]:
+        """Classify a raised googleapiclient exception into an OperationResult error."""
+        status, error_code, retry_after = classify_google_error(exc)
+        return OperationResult.error(
+            status=status,
+            message=str(exc),
+            error_code=error_code,
+            retry_after=retry_after,
+            provider="google",
+            operation=operation,
+        )
+
+    def _call(self, operation: str, fn: Callable[[], Any]) -> OperationResult[Any]:
+        """Execute a Directory API call, classifying googleapiclient errors."""
+        try:
+            return OperationResult.success(data=fn())
+        except HttpError as exc:
+            return self._map_sdk_exception(exc, operation)
+
+    def _paginate(
+        self,
+        operation: str,
+        resource: Any,
+        list_kwargs: dict[str, Any],
+        response_key: str,
+    ) -> OperationResult[list[dict[str, Any]]]:
+        """Execute a paginated Directory list call, aggregating all pages."""
+
+        def run() -> list[dict[str, Any]]:
+            items: list[dict[str, Any]] = []
+            request = resource.list(**list_kwargs)
+            while request is not None:
+                response = request.execute(num_retries=_NUM_RETRIES)
+                items.extend(response.get(response_key, []))
+                request = resource.list_next(request, response)
+            return items
+
+        return self._call(operation, run)
 
     def _normalize_email(self, value: str) -> str:
         """Normalize email-form identifiers used by the shared contract.
@@ -284,7 +336,11 @@ class GoogleDirectoryProvider:
         """
         log = logger.bind(provider="google", operation="warmup")
         log.info("directory_warmup_started")
-        result = self._directory.health_check()
+        service = self._get_service(["https://www.googleapis.com/auth/admin.directory.customer.readonly"])
+        result = self._call(
+            "warmup",
+            lambda: service.customers().get(customerKey=self._customer_id).execute(num_retries=_NUM_RETRIES),
+        )
         if result.is_success:
             log.info("directory_warmup_completed")
             return OperationResult.success()
@@ -303,7 +359,12 @@ class GoogleDirectoryProvider:
     def get_user(self, email: str) -> OperationResult[DirectoryUser]:
         """Return a canonical directory user by email."""
         self._logger.info("getting_user", email=email)
-        result = self._directory.get_user(self._normalize_email(email))
+        normalized_email = self._normalize_email(email)
+        service = self._get_service(["https://www.googleapis.com/auth/admin.directory.user.readonly"])
+        result = self._call(
+            "get_user",
+            lambda: service.users().get(userKey=normalized_email).execute(num_retries=_NUM_RETRIES),
+        )
         self._logger.info(
             "get_user_result",
             success=result.is_success,
@@ -332,11 +393,12 @@ class GoogleDirectoryProvider:
         if limit <= 0:
             return OperationResult.success(data=[])
 
-        list_kwargs: dict[str, Any] = {"maxResults": limit}
+        list_kwargs: dict[str, Any] = {"customer": self._customer_id, "maxResults": limit}
         if query:
             list_kwargs["query"] = query
 
-        result = self._directory.list_users(**list_kwargs)
+        service = self._get_service(["https://www.googleapis.com/auth/admin.directory.user.readonly"])
+        result = self._paginate("list_users", service.users(), list_kwargs, "users")
         if not result.is_success:
             return self._typed_error(result)
 
@@ -383,9 +445,13 @@ class GoogleDirectoryProvider:
         Returns:
             OperationResult: success with the DirectoryMember list for the group.
         """
-        result = self._directory.list_members(
-            self._normalize_email(group_key),
-            includeDerivedMembership=True,
+        normalized_group_key = self._normalize_email(group_key)
+        service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.member.readonly"])
+        result = self._paginate(
+            "get_group_members",
+            service.members(),
+            {"groupKey": normalized_group_key, "includeDerivedMembership": True},
+            "members",
         )
         if not result.is_success:
             return self._typed_error(result)
@@ -446,7 +512,20 @@ class GoogleDirectoryProvider:
             return OperationResult.success(data={})
 
         normalized_keys = [self._normalize_email(k) for k in group_keys]
-        result = self._directory.get_batch_group_members(normalized_keys)
+        service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.readonly"])
+        members_resource = service.members()
+        batch_requests = [(key, members_resource.list(groupKey=key)) for key in normalized_keys]
+        batch_result = execute_batch_request(service, batch_requests)
+        if not batch_result.is_success:
+            return self._typed_error(batch_result)
+
+        raw_results = batch_result.data.get("results", {}) if isinstance(batch_result.data, dict) else {}
+        members_by_group_response: dict[str, Any] = {}
+        for group_key in normalized_keys:
+            group_response = raw_results.get(group_key)
+            members_by_group_response[group_key] = group_response.get("members", []) if isinstance(group_response, dict) else []
+
+        result = OperationResult.success(data=members_by_group_response)
         if not result.is_success:
             return self._typed_error(result)
 
@@ -494,7 +573,11 @@ class GoogleDirectoryProvider:
             OperationResult: success with the canonical DirectoryGroup.
         """
         normalized_group_key = self._normalize_email(group_key)
-        result = self._directory.get_group(normalized_group_key)
+        service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.readonly"])
+        result = self._call(
+            "get_group",
+            lambda: service.groups().get(groupKey=normalized_group_key).execute(num_retries=_NUM_RETRIES),
+        )
         if not result.is_success:
             return self._typed_error(result)
 
@@ -536,12 +619,17 @@ class GoogleDirectoryProvider:
         normalized_user_email = self._normalize_email(user_email)
         normalized_role = role.strip().upper() if role.strip() else "MEMBER"
 
-        result = self._directory.add_member(
-            normalized_group,
-            body={
-                "email": normalized_user_email,
-                "role": normalized_role,
-            },
+        service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.member"])
+        result = self._call(
+            "add_member",
+            lambda: (
+                service.members()
+                .insert(
+                    groupKey=normalized_group,
+                    body={"email": normalized_user_email, "role": normalized_role},
+                )
+                .execute(num_retries=_NUM_RETRIES)
+            ),
         )
         if not result.is_success:
             return self._typed_error(result)
@@ -582,9 +670,14 @@ class GoogleDirectoryProvider:
         normalized_group = self._normalize_email(group_key)
         normalized_user_email = self._normalize_email(user_email)
 
-        result = self._directory.remove_member(
-            normalized_group,
-            normalized_user_email,
+        service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.member"])
+        result = self._call(
+            "remove_member",
+            lambda: (
+                service.members()
+                .delete(groupKey=normalized_group, memberKey=normalized_user_email)
+                .execute(num_retries=_NUM_RETRIES)
+            ),
         )
         if not result.is_success:
             return self._typed_error(result)
@@ -608,7 +701,15 @@ class GoogleDirectoryProvider:
         normalized_group = self._normalize_email(group_key)
         normalized_user_email = self._normalize_email(user_email)
 
-        result = self._directory.has_member(normalized_group, normalized_user_email)
+        service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.member.readonly"])
+        result = self._call(
+            "has_member",
+            lambda: (
+                service.members()
+                .hasMember(groupKey=normalized_group, memberKey=normalized_user_email)
+                .execute(num_retries=_NUM_RETRIES)
+            ),
+        )
         if not result.is_success:
             return self._typed_error(result)
 
@@ -640,16 +741,27 @@ class GoogleDirectoryProvider:
             OperationResult: success with the matching DirectoryGroup list.
         """
         managed_prefix = self._managed_group_query_prefix(query)
+        service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.readonly"])
         if managed_prefix is not None:
             self._logger.info(
                 "listing_groups_alias_aware",
                 query=query,
                 managed_prefix=managed_prefix,
             )
-            result = self._directory.list_groups()
+            result = self._paginate(
+                "list_groups",
+                service.groups(),
+                {"customer": self._customer_id},
+                "groups",
+            )
         else:
             google_query = f"email:{query}*" if ":" not in query and "=" not in query else query
-            result = self._directory.list_groups(query=google_query)
+            result = self._paginate(
+                "list_groups",
+                service.groups(),
+                {"customer": self._customer_id, "query": google_query},
+                "groups",
+            )
         if not result.is_success:
             return self._typed_error(result)
 
@@ -702,7 +814,13 @@ class GoogleDirectoryProvider:
         """
         log = self._logger.bind(operation="get_user_groups", user_email=user_email)
         normalized_email = self._normalize_email(user_email)
-        result = self._directory.list_user_groups(normalized_email)
+        service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.readonly"])
+        result = self._paginate(
+            "list_user_groups",
+            service.groups(),
+            {"userKey": normalized_email},
+            "groups",
+        )
         log.debug(
             "list_user_groups_result",
             success=result.is_success,

@@ -6,36 +6,3 @@
 # infrastructure.clients and are not listed here fail the check; entries that no longer
 # import it are reported as stale (safe to remove) but do not fail the check.
 #
-# Production consumers (migrated off by TASK-22 and its subtasks):
-infrastructure/directory/factory.py
-infrastructure/directory/google.py
-infrastructure/storage/service.py
-packages/access/sync/adapters/aws_identity_center.py
-packages/access/sync/providers.py
-packages/geolocate/service.py
-#
-# Legacy tests for the deprecated infrastructure/clients/ tree itself:
-tests/unit/infrastructure/clients/aws/conftest.py
-tests/unit/infrastructure/clients/aws/test_aws_client.py
-tests/unit/infrastructure/clients/aws/test_aws_clients_facade.py
-tests/unit/infrastructure/clients/aws/test_aws_config.py
-tests/unit/infrastructure/clients/aws/test_config_client.py
-tests/unit/infrastructure/clients/aws/test_cost_explorer_client.py
-tests/unit/infrastructure/clients/aws/test_dynamodb_client.py
-tests/unit/infrastructure/clients/aws/test_guard_duty_client.py
-tests/unit/infrastructure/clients/aws/test_health_aggregator.py
-tests/unit/infrastructure/clients/aws/test_identity_store_client.py
-tests/unit/infrastructure/clients/aws/test_organizations_client.py
-tests/unit/infrastructure/clients/aws/test_session_provider.py
-tests/unit/infrastructure/clients/aws/test_sso_admin_client.py
-tests/unit/infrastructure/clients/google_workspace/test_batch_executor.py
-tests/unit/infrastructure/clients/google_workspace/test_directory.py
-tests/unit/infrastructure/clients/google_workspace/test_docs.py
-tests/unit/infrastructure/clients/google_workspace/test_drive.py
-tests/unit/infrastructure/clients/google_workspace/test_executor.py
-tests/unit/infrastructure/clients/google_workspace/test_facade.py
-tests/unit/infrastructure/clients/google_workspace/test_gmail.py
-tests/unit/infrastructure/clients/google_workspace/test_session_provider.py
-tests/unit/infrastructure/clients/google_workspace/test_sheets.py
-tests/unit/infrastructure/clients/test_maxmind.py
-tests/unit/infrastructure/services/test_narrow_slice_providers.py

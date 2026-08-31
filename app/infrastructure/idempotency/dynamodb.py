@@ -2,9 +2,10 @@
 
 import json
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
+from botocore.exceptions import BotoCoreError, ClientError
 
 from infrastructure.idempotency.protocol import (
     ClaimOutcome,
@@ -12,7 +13,10 @@ from infrastructure.idempotency.protocol import (
     IdempotencyStore,
 )
 from infrastructure.idempotency.settings import IdempotencySettings
-from integrations.aws.dynamodb_next import delete_item, get_item, put_item
+from integrations.aws.client import classify_aws_error
+
+if TYPE_CHECKING:
+    from types_boto3_dynamodb.client import DynamoDBClient
 
 logger = structlog.get_logger().bind(component="idempotency.dynamodb")
 
@@ -26,9 +30,11 @@ class DynamoDBIdempotencyStore(IdempotencyStore):
 
     def __init__(
         self,
+        dynamodb: DynamoDBClient,
         idempotency_settings: IdempotencySettings,
         table_name: str = IDEMPOTENCY_TABLE,
     ) -> None:
+        self._dynamodb = dynamodb
         self.table_name = table_name
         self.record_ttl_seconds = idempotency_settings.IDEMPOTENCY_TTL_SECONDS
         self.in_progress_ttl_seconds = idempotency_settings.IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS
@@ -45,43 +51,52 @@ class DynamoDBIdempotencyStore(IdempotencyStore):
         now = int(time.time())
         expires_at = now + self.in_progress_ttl_seconds
 
-        claim_result = put_item(
-            table_name=self.table_name,
-            Item={
-                PARTITION_KEY: {"S": key},
-                "status": {"S": ClaimResult.IN_PROGRESS.name},
-                "claimed_at": {"N": str(now)},
-                "in_progress_expires_at": {"N": str(expires_at)},
-                "ttl": {"N": str(expires_at)},
-            },
-            ConditionExpression="attribute_not_exists(#pk) OR (#status = :in_progress AND #expires_at < :now)",
-            ExpressionAttributeNames={
-                "#pk": PARTITION_KEY,
-                "#status": "status",
-                "#expires_at": "in_progress_expires_at",
-            },
-            ExpressionAttributeValues={
-                ":in_progress": {"S": ClaimResult.IN_PROGRESS.name},
-                ":now": {"N": str(now)},
-            },
-        )
-
-        if claim_result.is_success:
+        try:
+            self._dynamodb.put_item(
+                TableName=self.table_name,
+                Item={
+                    PARTITION_KEY: {"S": key},
+                    "status": {"S": ClaimResult.IN_PROGRESS.name},
+                    "claimed_at": {"N": str(now)},
+                    "in_progress_expires_at": {"N": str(expires_at)},
+                    "ttl": {"N": str(expires_at)},
+                },
+                ConditionExpression="attribute_not_exists(#pk) OR (#status = :in_progress AND #expires_at < :now)",
+                ExpressionAttributeNames={
+                    "#pk": PARTITION_KEY,
+                    "#status": "status",
+                    "#expires_at": "in_progress_expires_at",
+                },
+                ExpressionAttributeValues={
+                    ":in_progress": {"S": ClaimResult.IN_PROGRESS.name},
+                    ":now": {"N": str(now)},
+                },
+            )
             return ClaimOutcome(result=ClaimResult.NEW)
+        except (ClientError, BotoCoreError) as exc:
+            _, error_code, _ = classify_aws_error(exc)
+            if error_code != "ConditionalCheckFailedException":
+                raise RuntimeError(f"Failed to claim idempotency key: {exc}") from exc
 
-        if claim_result.error_code != "ConditionalCheckFailedException":
-            raise RuntimeError(f"Failed to claim idempotency key: {claim_result.message}")
-
-        read_result = get_item(
-            table_name=self.table_name,
-            Key={PARTITION_KEY: {"S": key}},
-            ConsistentRead=True,
-        )
-
-        if not read_result.is_success or read_result.data is None or "Item" not in read_result.data:
+        try:
+            response = self._dynamodb.get_item(
+                TableName=self.table_name,
+                Key={PARTITION_KEY: {"S": key}},
+                ConsistentRead=True,
+            )
+            item = response.get("Item")
+        except (ClientError, BotoCoreError) as exc:
+            classified_status, error_code, _ = classify_aws_error(exc)
+            self.log.warning(
+                "failed_to_read_idempotency_key",
+                status=classified_status,
+                error_code=error_code,
+            )
             return ClaimOutcome(result=ClaimResult.IN_PROGRESS)
 
-        item = read_result.data.get("Item", {})
+        if item is None:
+            return ClaimOutcome(result=ClaimResult.IN_PROGRESS)
+
         status = item.get("status", {}).get("S")
 
         if status == ClaimResult.COMPLETED.name:
@@ -98,25 +113,28 @@ class DynamoDBIdempotencyStore(IdempotencyStore):
         ttl_timestamp = now + self.record_ttl_seconds
         outcome_json = json.dumps(outcome)
 
-        result = put_item(
-            table_name=self.table_name,
-            Item={
-                PARTITION_KEY: {"S": key},
-                "status": {"S": ClaimResult.COMPLETED.name},
-                "outcome_json": {"S": outcome_json},
-                "completed_at": {"N": str(now)},
-                "ttl": {"N": str(ttl_timestamp)},
-            },
-        )
-
-        if not result.is_success:
-            raise RuntimeError(f"Failed to complete idempotency key: {result.message}")
+        try:
+            self._dynamodb.put_item(
+                TableName=self.table_name,
+                Item={
+                    PARTITION_KEY: {"S": key},
+                    "status": {"S": ClaimResult.COMPLETED.name},
+                    "outcome_json": {"S": outcome_json},
+                    "completed_at": {"N": str(now)},
+                    "ttl": {"N": str(ttl_timestamp)},
+                },
+            )
+        except (ClientError, BotoCoreError) as exc:
+            classify_aws_error(exc)
+            raise RuntimeError(f"Failed to complete idempotency key: {exc}") from exc
 
     def release(self, key: str) -> None:
         """Delete key so failed processing can be retried via redelivery."""
-        result = delete_item(
-            table_name=self.table_name,
-            Key={PARTITION_KEY: {"S": key}},
-        )
-        if not result.is_success:
-            raise RuntimeError(f"Failed to release idempotency key: {result.message}")
+        try:
+            self._dynamodb.delete_item(
+                TableName=self.table_name,
+                Key={PARTITION_KEY: {"S": key}},
+            )
+        except (ClientError, BotoCoreError) as exc:
+            classify_aws_error(exc)
+            raise RuntimeError(f"Failed to release idempotency key: {exc}") from exc

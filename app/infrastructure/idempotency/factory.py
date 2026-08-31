@@ -1,5 +1,7 @@
 """Idempotency cache factory."""
 
+from typing import TYPE_CHECKING, cast
+
 import structlog
 
 from infrastructure.idempotency.dynamodb import DynamoDBIdempotencyStore
@@ -7,6 +9,10 @@ from infrastructure.idempotency.protocol import IdempotencyStore
 from infrastructure.idempotency.settings import (
     get_idempotency_settings,
 )
+from integrations.aws.client import get_aws_client
+
+if TYPE_CHECKING:
+    from types_boto3_dynamodb.client import DynamoDBClient
 
 logger = structlog.get_logger().bind(component="idempotency.factory")
 
@@ -20,7 +26,11 @@ def get_idempotency_store() -> IdempotencyStore:
     if _idempotency_store_instance is not None:
         return _idempotency_store_instance
 
-    _idempotency_store_instance = DynamoDBIdempotencyStore(idempotency_settings=get_idempotency_settings())
+    dynamodb = cast("DynamoDBClient", get_aws_client("dynamodb"))
+    _idempotency_store_instance = DynamoDBIdempotencyStore(
+        dynamodb,
+        idempotency_settings=get_idempotency_settings(),
+    )
     logger.info("initialized_idempotency_store", backend="dynamodb")
     return _idempotency_store_instance
 
@@ -28,7 +38,8 @@ def get_idempotency_store() -> IdempotencyStore:
 def build_idempotency_store(in_progress_ttl_seconds: int) -> IdempotencyStore:
     """Build a non-singleton idempotency store with a custom in-progress TTL."""
     settings = get_idempotency_settings().model_copy(update={"IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS": in_progress_ttl_seconds})
-    return DynamoDBIdempotencyStore(idempotency_settings=settings)
+    dynamodb = cast("DynamoDBClient", get_aws_client("dynamodb"))
+    return DynamoDBIdempotencyStore(dynamodb, idempotency_settings=settings)
 
 
 def reset_idempotency_store() -> None:
