@@ -3,10 +3,10 @@ id: TASK-23.2
 title: >-
   Converge the DynamoDB idempotency store onto get_aws_client +
   classify_aws_error
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-31 17:35'
-updated_date: '2026-08-31 19:15'
+updated_date: '2026-08-31 19:17'
 labels:
   - clients
   - phase-3
@@ -46,8 +46,8 @@ Critical invariant: claim() branches on error_code == "ConditionalCheckFailedExc
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 mypy, ruff and pytest (excluding smoke) green from app/
-- [ ] #2 Single git revert restores the previous behavior; PR references decisions/outbound-clients.md and decisions/sdk-typing.md
+- [x] #1 mypy, ruff and pytest (excluding smoke) green from app/
+- [x] #2 Single git revert restores the previous behavior; PR references decisions/outbound-clients.md and decisions/sdk-typing.md
 <!-- DOD:END -->
 
 ## Implementation Plan
