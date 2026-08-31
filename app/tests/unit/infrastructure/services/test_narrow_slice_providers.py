@@ -10,10 +10,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from infrastructure.clients.maxmind.client import MaxMindClient
 from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.configuration.integrations.maxmind import MaxMindSettings
 from infrastructure.resilience.service import ResilienceService
+from integrations.maxmind.client import MaxMindClient
 
 pytestmark = pytest.mark.unit
 
