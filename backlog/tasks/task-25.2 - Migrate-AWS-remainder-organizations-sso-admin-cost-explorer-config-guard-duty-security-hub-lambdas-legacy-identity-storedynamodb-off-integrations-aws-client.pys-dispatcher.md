@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:48'
+updated_date: '2026-08-31 18:52'
 labels:
   - clients
   - phase-3
@@ -35,3 +36,12 @@ Coordinator for the AWS-remainder slice of TASK-25. Confirmed via repo grep (202
 - [ ] #2 Every one of the 14 identified legacy consumer files is migrated onto get_aws_client + classify_aws_error (reusing the TASK-22.2/22.3 primitive and its DynamoDB/IdentityStore instances directly where the same service is involved, not reinventing), with each error path now raising/classifying instead of the current silent-False swallow - human-reviewed per subtask since this is a behavior change, not zero-diff
 - [ ] #3 integrations/aws/sqs.py is deleted (zero production consumers, confirmed)
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-08-31 18:52
+---
+Forward reference from TASK-23.2 planning (2026-08-31): the DynamoDB idempotency store keeps a conservative error-swallow on one path - a classified (mapped) SDK failure while re-reading a contended claim is downgraded to ClaimResult.IN_PROGRESS rather than raised. That was deliberately left as-is for TASK-23.2 and is flagged for reassessment during this AWS-remainder work, alongside the same question for other classify-and-continue call sites.
+---
+<!-- COMMENTS:END -->
