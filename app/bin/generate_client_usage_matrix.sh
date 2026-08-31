@@ -16,7 +16,7 @@ total_usage_file="tmp/client_callsite_audit_sorted.tsv"
 external_usage_file="tmp/client_external_usage_sorted.tsv"
 joined_usage_file="tmp/client_usage_matrix.tsv"
 
-find app/infrastructure/clients app/integrations \
+find app/integrations \
   -type f -name '*.py' ! -path '*/__pycache__/*' | sort > "$all_modules_file"
 
 : > tmp/client_callsite_audit.tsv
