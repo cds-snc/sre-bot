@@ -1,8 +1,11 @@
 """Unit tests for GoogleDirectoryProvider."""
 
+from typing import Any
 from unittest.mock import MagicMock
 
+import httplib2
 import pytest
+from googleapiclient.errors import HttpError
 
 from infrastructure.directory.google import GoogleDirectoryProvider
 from infrastructure.directory.models import (
@@ -11,16 +14,57 @@ from infrastructure.directory.models import (
     DirectoryUser,
     MembershipCheckResult,
 )
-from infrastructure.operations import OperationResult
 from infrastructure.operations.status import OperationStatus
 
 
+def _request(payload: Any) -> MagicMock:
+    """Build a fake googleapiclient request whose execute() returns payload."""
+    request = MagicMock()
+    request.execute.return_value = payload
+    return request
+
+
+def _http_error(status: int) -> HttpError:
+    """Build a fake googleapiclient HttpError carrying the given HTTP status."""
+    return HttpError(httplib2.Response({"status": status}), b"{}")
+
+
+def _install_fake_batch(service: MagicMock, responses: dict[str, Any]) -> None:
+    """Configure new_batch_http_request to synchronously invoke callback per added request.
+
+    Requests whose request_id is missing from responses invoke the callback
+    with an exception, mirroring a per-item Admin SDK batch failure.
+    """
+
+    def new_batch_http_request(callback):
+        added: list[tuple[str, Any]] = []
+        batch = MagicMock()
+
+        def add(request, request_id):
+            added.append((request_id, request))
+
+        def execute(**kwargs):
+            for request_id, _request_obj in added:
+                if request_id in responses:
+                    callback(request_id, responses[request_id], None)
+                else:
+                    callback(request_id, None, RuntimeError(f"missing response for {request_id}"))
+
+        batch.add.side_effect = add
+        batch.execute.side_effect = execute
+        return batch
+
+    service.new_batch_http_request.side_effect = new_batch_http_request
+
+
 @pytest.fixture
-def mock_google_clients():
-    """Factory for GoogleWorkspaceClients mock with a stubbed directory client."""
-    clients = MagicMock()
-    clients.directory = MagicMock()
-    return clients
+def google_service() -> MagicMock:
+    """Fake Admin SDK Directory service with single-page list defaults."""
+    service = MagicMock()
+    service.users.return_value.list_next.return_value = None
+    service.groups.return_value.list_next.return_value = None
+    service.members.return_value.list_next.return_value = None
+    return service
 
 
 @pytest.fixture
@@ -34,36 +78,37 @@ def mock_directory_settings():
 
 
 @pytest.fixture
-def provider(mock_google_clients, mock_directory_settings):
-    """GoogleDirectoryProvider backed by mocked clients."""
+def provider(google_service, mock_directory_settings):
+    """GoogleDirectoryProvider backed by a fake Admin SDK Directory service."""
     return GoogleDirectoryProvider(
-        google_clients=mock_google_clients,
+        get_service=lambda scopes: google_service,
         directory_settings=mock_directory_settings,
+        customer_id="my_customer",
     )
 
 
 class TestWarmup:
-    def test_warmup_returns_success_when_health_check_succeeds(self, provider, mock_google_clients):
+    def test_warmup_returns_success_when_health_check_succeeds(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.health_check.return_value = OperationResult.success(data=[])
+        google_service.customers.return_value.get.return_value = _request({"id": "customer-1"})
 
         # Act
         result = provider.warmup()
 
         # Assert
         assert result.is_success
-        mock_google_clients.directory.health_check.assert_called_once_with()
+        google_service.customers.return_value.get.assert_called_once_with(customerKey="my_customer")
 
-    def test_warmup_propagates_directory_error(self, provider, mock_google_clients):
+    def test_warmup_propagates_directory_error(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.health_check.return_value = OperationResult.permanent_error("credentials_invalid")
+        google_service.customers.return_value.get.return_value.execute.side_effect = _http_error(401)
 
         # Act
         result = provider.warmup()
 
         # Assert
         assert not result.is_success
-        assert result.status == OperationStatus.PERMANENT_ERROR
+        assert result.status == OperationStatus.UNAUTHORIZED
 
 
 class TestHealthCheck:
@@ -74,20 +119,20 @@ class TestHealthCheck:
         # Assert
         assert result.is_success
 
-    def test_health_check_does_not_call_directory_api(self, provider, mock_google_clients):
+    def test_health_check_does_not_call_directory_api(self, provider, google_service):
         # Act
         provider.health_check()
 
         # Assert
-        mock_google_clients.directory.health_check.assert_not_called()
-        mock_google_clients.directory.list_members.assert_not_called()
+        google_service.customers.assert_not_called()
+        google_service.members.assert_not_called()
 
 
 class TestGetUser:
-    def test_returns_canonical_user(self, provider, mock_google_clients):
+    def test_returns_canonical_user(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.get_user.return_value = OperationResult.success(
-            data={
+        google_service.users.return_value.get.return_value = _request(
+            {
                 "primaryEmail": "USER@EXAMPLE.COM",
                 "id": "user-123",
                 "name": {"fullName": "Test User"},
@@ -107,12 +152,12 @@ class TestGetUser:
             is_active=True,
             provider="google",
         )
-        mock_google_clients.directory.get_user.assert_called_once_with("user@example.com")
+        google_service.users.return_value.get.assert_called_once_with(userKey="user@example.com")
 
-    def test_falls_back_to_email_list_and_name_parts(self, provider, mock_google_clients):
+    def test_falls_back_to_email_list_and_name_parts(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.get_user.return_value = OperationResult.success(
-            data={
+        google_service.users.return_value.get.return_value = _request(
+            {
                 "id": "user-456",
                 "emails": [
                     {"address": "USER.ALIAS@EXAMPLE.COM", "primary": True},
@@ -137,35 +182,37 @@ class TestGetUser:
             provider="google",
         )
 
-    def test_propagates_get_user_error(self, provider, mock_google_clients):
+    def test_propagates_get_user_error(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.get_user.return_value = OperationResult.permanent_error("user_not_found")
+        google_service.users.return_value.get.return_value.execute.side_effect = _http_error(404)
 
         # Act
         result = provider.get_user("user@example.com")
 
         # Assert
         assert not result.is_success
-        assert result.status == OperationStatus.PERMANENT_ERROR
+        assert result.status == OperationStatus.NOT_FOUND
 
 
 class TestListUsers:
-    def test_returns_canonical_users_for_query(self, provider, mock_google_clients):
+    def test_returns_canonical_users_for_query(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.list_users.return_value = OperationResult.success(
-            data=[
-                {
-                    "primaryEmail": "USER1@EXAMPLE.COM",
-                    "id": "user-1",
-                    "name": {"fullName": "User One"},
-                },
-                {
-                    "primaryEmail": "user2@example.com",
-                    "id": "user-2",
-                    "name": {"fullName": "User Two"},
-                    "suspended": True,
-                },
-            ]
+        google_service.users.return_value.list.return_value = _request(
+            {
+                "users": [
+                    {
+                        "primaryEmail": "USER1@EXAMPLE.COM",
+                        "id": "user-1",
+                        "name": {"fullName": "User One"},
+                    },
+                    {
+                        "primaryEmail": "user2@example.com",
+                        "id": "user-2",
+                        "name": {"fullName": "User Two"},
+                        "suspended": True,
+                    },
+                ]
+            }
         )
 
         # Act
@@ -182,7 +229,8 @@ class TestListUsers:
                 provider="google",
             )
         ]
-        mock_google_clients.directory.list_users.assert_called_once_with(
+        google_service.users.return_value.list.assert_called_once_with(
+            customer="my_customer",
             maxResults=1,
             query="name:User",
         )
@@ -195,9 +243,9 @@ class TestListUsers:
         assert result.is_success
         assert result.data == []
 
-    def test_propagates_list_users_error(self, provider, mock_google_clients):
+    def test_propagates_list_users_error(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.list_users.return_value = OperationResult.transient_error("directory_unavailable")
+        google_service.users.return_value.list.return_value.execute.side_effect = _http_error(503)
 
         # Act
         result = provider.list_users(query="email:user")
@@ -208,7 +256,7 @@ class TestListUsers:
 
 
 class TestGetGroupMembers:
-    def test_returns_canonical_members_for_group(self, provider, mock_google_clients):
+    def test_returns_canonical_members_for_group(self, provider, google_service):
         # Arrange
         members = [
             {
@@ -224,7 +272,7 @@ class TestGetGroupMembers:
                 "type": "USER",
             },
         ]
-        mock_google_clients.directory.list_members.return_value = OperationResult.success(data=members)
+        google_service.members.return_value.list.return_value = _request({"members": members})
 
         # Act
         result = provider.get_group_members("sg-admin@example.com")
@@ -249,12 +297,12 @@ class TestGetGroupMembers:
                 provider="google",
             ),
         ]
-        mock_google_clients.directory.list_members.assert_called_once_with(
-            "sg-admin@example.com",
+        google_service.members.return_value.list.assert_called_once_with(
+            groupKey="sg-admin@example.com",
             includeDerivedMembership=True,
         )
 
-    def test_returns_all_member_types_by_default(self, provider, mock_google_clients):
+    def test_returns_all_member_types_by_default(self, provider, google_service):
         # Arrange
         members = [
             {
@@ -270,7 +318,7 @@ class TestGetGroupMembers:
                 "type": "GROUP",
             },
         ]
-        mock_google_clients.directory.list_members.return_value = OperationResult.success(data=members)
+        google_service.members.return_value.list.return_value = _request({"members": members})
 
         # Act
         result = provider.get_group_members("sg-admin@example.com")
@@ -296,7 +344,7 @@ class TestGetGroupMembers:
             ),
         ]
 
-    def test_filters_to_requested_member_types(self, provider, mock_google_clients):
+    def test_filters_to_requested_member_types(self, provider, google_service):
         # Arrange
         members = [
             {
@@ -312,7 +360,7 @@ class TestGetGroupMembers:
                 "type": "GROUP",
             },
         ]
-        mock_google_clients.directory.list_members.return_value = OperationResult.success(data=members)
+        google_service.members.return_value.list.return_value = _request({"members": members})
 
         # Act
         result = provider.get_group_members(
@@ -333,7 +381,7 @@ class TestGetGroupMembers:
             ),
         ]
 
-    def test_can_include_group_members_when_requested(self, provider, mock_google_clients):
+    def test_can_include_group_members_when_requested(self, provider, google_service):
         # Arrange
         members = [
             {
@@ -349,7 +397,7 @@ class TestGetGroupMembers:
                 "type": "GROUP",
             },
         ]
-        mock_google_clients.directory.list_members.return_value = OperationResult.success(data=members)
+        google_service.members.return_value.list.return_value = _request({"members": members})
 
         # Act
         result = provider.get_group_members(
@@ -370,7 +418,7 @@ class TestGetGroupMembers:
             )
         ]
 
-    def test_uses_primary_email_when_member_email_is_missing(self, provider, mock_google_clients):
+    def test_uses_primary_email_when_member_email_is_missing(self, provider, google_service):
         # Arrange
         members = [
             {
@@ -381,7 +429,7 @@ class TestGetGroupMembers:
             },
             {"id": "2", "role": "OWNER"},
         ]
-        mock_google_clients.directory.list_members.return_value = OperationResult.success(data=members)
+        google_service.members.return_value.list.return_value = _request({"members": members})
 
         # Act
         result = provider.get_group_members("sg-admin@example.com")
@@ -399,22 +447,22 @@ class TestGetGroupMembers:
             ),
         ]
 
-    def test_normalises_group_key_to_lowercase(self, provider, mock_google_clients):
+    def test_normalises_group_key_to_lowercase(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.list_members.return_value = OperationResult.success(data=[])
+        google_service.members.return_value.list.return_value = _request({"members": []})
 
         # Act
         provider.get_group_members("SG-ADMIN@EXAMPLE.COM")
 
         # Assert
-        mock_google_clients.directory.list_members.assert_called_once_with(
-            "sg-admin@example.com",
+        google_service.members.return_value.list.assert_called_once_with(
+            groupKey="sg-admin@example.com",
             includeDerivedMembership=True,
         )
 
-    def test_propagates_directory_error(self, provider, mock_google_clients):
+    def test_propagates_directory_error(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.list_members.return_value = OperationResult.transient_error("rate_limited")
+        google_service.members.return_value.list.return_value.execute.side_effect = _http_error(429)
 
         # Act
         result = provider.get_group_members("sg-admin@example.com")
@@ -423,25 +471,25 @@ class TestGetGroupMembers:
         assert not result.is_success
         assert result.status == OperationStatus.TRANSIENT_ERROR
 
-    def test_composes_group_email_from_slug(self, provider, mock_google_clients):
+    def test_composes_group_email_from_slug(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.list_members.return_value = OperationResult.success(data=[])
+        google_service.members.return_value.list.return_value = _request({"members": []})
 
         # Act
         provider.get_group_members("sg-admin")
 
         # Assert
-        mock_google_clients.directory.list_members.assert_called_once_with(
-            "sg-admin@example.com",
+        google_service.members.return_value.list.assert_called_once_with(
+            groupKey="sg-admin@example.com",
             includeDerivedMembership=True,
         )
 
 
 class TestGetGroup:
-    def test_returns_canonical_group(self, provider, mock_google_clients):
+    def test_returns_canonical_group(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.get_group.return_value = OperationResult.success(
-            data={
+        google_service.groups.return_value.get.return_value = _request(
+            {
                 "email": "SG-ADMIN@EXAMPLE.COM",
                 "id": "group-1",
                 "name": "Admins",
@@ -462,14 +510,11 @@ class TestGetGroup:
             description="Admin group",
             provider="google",
         )
-        mock_google_clients.directory.get_group.assert_called_once_with("sg-admin@example.com")
+        google_service.groups.return_value.get.assert_called_once_with(groupKey="sg-admin@example.com")
 
-    def test_propagates_directory_error(self, provider, mock_google_clients):
+    def test_propagates_directory_error(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.get_group.return_value = OperationResult.error(
-            OperationStatus.NOT_FOUND,
-            "group_not_found",
-        )
+        google_service.groups.return_value.get.return_value.execute.side_effect = _http_error(404)
 
         # Act
         result = provider.get_group("sg-ghost@example.com")
@@ -478,9 +523,9 @@ class TestGetGroup:
         assert not result.is_success
         assert result.status == OperationStatus.NOT_FOUND
 
-    def test_returns_error_when_group_payload_is_not_dict(self, provider, mock_google_clients):
+    def test_returns_error_when_group_payload_is_not_dict(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.get_group.return_value = OperationResult.success(data=[])
+        google_service.groups.return_value.get.return_value = _request([])
 
         # Act
         result = provider.get_group("sg-admin@example.com")
@@ -491,10 +536,10 @@ class TestGetGroup:
 
 
 class TestAddGroupMember:
-    def test_adds_member_and_returns_canonical_member(self, provider, mock_google_clients):
+    def test_adds_member_and_returns_canonical_member(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.add_member.return_value = OperationResult.success(
-            data={
+        google_service.members.return_value.insert.return_value = _request(
+            {
                 "email": "USER@EXAMPLE.COM",
                 "id": "member-1",
                 "role": "OWNER",
@@ -513,18 +558,18 @@ class TestAddGroupMember:
             role="OWNER",
             provider="google",
         )
-        mock_google_clients.directory.add_member.assert_called_once_with(
-            "sg-admin@example.com",
+        google_service.members.return_value.insert.assert_called_once_with(
+            groupKey="sg-admin@example.com",
             body={
                 "email": "user@example.com",
                 "role": "OWNER",
             },
         )
 
-    def test_falls_back_to_requested_role_when_payload_role_missing(self, provider, mock_google_clients):
+    def test_falls_back_to_requested_role_when_payload_role_missing(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.add_member.return_value = OperationResult.success(
-            data={
+        google_service.members.return_value.insert.return_value = _request(
+            {
                 "email": "user@example.com",
                 "id": "member-2",
             }
@@ -543,9 +588,9 @@ class TestAddGroupMember:
             provider="google",
         )
 
-    def test_propagates_directory_error(self, provider, mock_google_clients):
+    def test_propagates_directory_error(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.add_member.return_value = OperationResult.transient_error("directory_unavailable")
+        google_service.members.return_value.insert.return_value.execute.side_effect = _http_error(503)
 
         # Act
         result = provider.add_group_member("sg-admin@example.com", "user@example.com")
@@ -554,9 +599,9 @@ class TestAddGroupMember:
         assert not result.is_success
         assert result.status == OperationStatus.TRANSIENT_ERROR
 
-    def test_returns_error_when_member_payload_is_not_dict(self, provider, mock_google_clients):
+    def test_returns_error_when_member_payload_is_not_dict(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.add_member.return_value = OperationResult.success(data=[])
+        google_service.members.return_value.insert.return_value = _request([])
 
         # Act
         result = provider.add_group_member("sg-admin@example.com", "user@example.com")
@@ -565,9 +610,9 @@ class TestAddGroupMember:
         assert not result.is_success
         assert result.error_code == "DIRECTORY_MEMBER_PAYLOAD_INVALID"
 
-    def test_returns_error_when_member_email_missing(self, provider, mock_google_clients):
+    def test_returns_error_when_member_email_missing(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.add_member.return_value = OperationResult.success(data={"id": "member-3"})
+        google_service.members.return_value.insert.return_value = _request({"id": "member-3"})
 
         # Act
         result = provider.add_group_member("sg-admin@example.com", "user@example.com")
@@ -578,9 +623,9 @@ class TestAddGroupMember:
 
 
 class TestRemoveGroupMember:
-    def test_removes_member_with_normalized_keys(self, provider, mock_google_clients):
+    def test_removes_member_with_normalized_keys(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.remove_member.return_value = OperationResult.success()
+        google_service.members.return_value.delete.return_value = _request({})
 
         # Act
         result = provider.remove_group_member(
@@ -591,14 +636,14 @@ class TestRemoveGroupMember:
         # Assert
         assert result.is_success
         assert result.data is None
-        mock_google_clients.directory.remove_member.assert_called_once_with(
-            "sg-admin@example.com",
-            "user@example.com",
+        google_service.members.return_value.delete.assert_called_once_with(
+            groupKey="sg-admin@example.com",
+            memberKey="user@example.com",
         )
 
-    def test_propagates_directory_error(self, provider, mock_google_clients):
+    def test_propagates_directory_error(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.remove_member.return_value = OperationResult.transient_error("directory_unavailable")
+        google_service.members.return_value.delete.return_value.execute.side_effect = _http_error(503)
 
         # Act
         result = provider.remove_group_member("sg-admin@example.com", "user@example.com")
@@ -609,9 +654,9 @@ class TestRemoveGroupMember:
 
 
 class TestCheckMembership:
-    def test_returns_true_when_user_is_member(self, provider, mock_google_clients):
+    def test_returns_true_when_user_is_member(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.has_member.return_value = OperationResult.success(data={"isMember": True})
+        google_service.members.return_value.hasMember.return_value = _request({"isMember": True})
 
         # Act
         result = provider.check_membership("sg-team@example.com", "member@example.com")
@@ -626,9 +671,9 @@ class TestCheckMembership:
             is_member=True,
         )
 
-    def test_returns_false_when_user_is_not_member(self, provider, mock_google_clients):
+    def test_returns_false_when_user_is_not_member(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.has_member.return_value = OperationResult.success(data={"isMember": False})
+        google_service.members.return_value.hasMember.return_value = _request({"isMember": False})
 
         # Act
         result = provider.check_membership("sg-team@example.com", "absent@example.com")
@@ -643,9 +688,9 @@ class TestCheckMembership:
             is_member=False,
         )
 
-    def test_returns_false_when_not_a_member(self, provider, mock_google_clients):
+    def test_returns_false_when_not_a_member(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.has_member.return_value = OperationResult.success(data={"isMember": False})
+        google_service.members.return_value.hasMember.return_value = _request({"isMember": False})
 
         # Act
         result = provider.check_membership("sg-empty@example.com", "user@example.com")
@@ -660,30 +705,33 @@ class TestCheckMembership:
             is_member=False,
         )
 
-    def test_normalises_group_key_and_email_to_lowercase(self, provider, mock_google_clients):
+    def test_normalises_group_key_and_email_to_lowercase(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.has_member.return_value = OperationResult.success(data={"isMember": False})
+        google_service.members.return_value.hasMember.return_value = _request({"isMember": False})
 
         # Act
         provider.check_membership("SG-TEAM@EXAMPLE.COM", "USER@EXAMPLE.COM")
 
         # Assert
-        mock_google_clients.directory.has_member.assert_called_once_with("sg-team@example.com", "user@example.com")
+        google_service.members.return_value.hasMember.assert_called_once_with(
+            groupKey="sg-team@example.com",
+            memberKey="user@example.com",
+        )
 
-    def test_propagates_directory_error(self, provider, mock_google_clients):
+    def test_propagates_directory_error(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.has_member.return_value = OperationResult.permanent_error("group_not_found")
+        google_service.members.return_value.hasMember.return_value.execute.side_effect = _http_error(404)
 
         # Act
         result = provider.check_membership("sg-ghost@example.com", "user@example.com")
 
         # Assert
         assert not result.is_success
-        assert result.status == OperationStatus.PERMANENT_ERROR
+        assert result.status == OperationStatus.NOT_FOUND
 
-    def test_returns_error_when_has_member_payload_is_not_dict(self, provider, mock_google_clients):
+    def test_returns_error_when_has_member_payload_is_not_dict(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.has_member.return_value = OperationResult.success(data=None)
+        google_service.members.return_value.hasMember.return_value = _request(None)
 
         # Act
         result = provider.check_membership("sg-team@example.com", "user@example.com")
@@ -694,7 +742,7 @@ class TestCheckMembership:
 
 
 class TestListGroups:
-    def test_returns_canonical_groups_for_query(self, provider, mock_google_clients):
+    def test_returns_canonical_groups_for_query(self, provider, google_service):
         # Arrange
         groups = [
             {
@@ -710,7 +758,7 @@ class TestListGroups:
                 "description": "Dev group",
             },
         ]
-        mock_google_clients.directory.list_groups.return_value = OperationResult.success(data=groups)
+        google_service.groups.return_value.list.return_value = _request({"groups": groups})
 
         # Act
         result = provider.list_groups(query="sg-")
@@ -735,9 +783,9 @@ class TestListGroups:
                 provider="google",
             ),
         ]
-        mock_google_clients.directory.list_groups.assert_called_once_with()
+        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer")
 
-    def test_uses_group_alias_fields_when_standard_keys_are_missing(self, provider, mock_google_clients):
+    def test_uses_group_alias_fields_when_standard_keys_are_missing(self, provider, google_service):
         # Arrange
         groups = [
             {
@@ -746,14 +794,14 @@ class TestListGroups:
                 "displayName": "Ops",
             }
         ]
-        mock_google_clients.directory.list_groups.return_value = OperationResult.success(data=groups)
+        google_service.groups.return_value.list.return_value = _request({"groups": groups})
 
         # Act
         result = provider.list_groups(query="email:sg-*")
 
         # Assert
         assert result.is_success
-        mock_google_clients.directory.list_groups.assert_called_once_with()
+        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer")
         assert result.data == [
             DirectoryGroup(
                 group_email="sg-ops@example.com",
@@ -765,17 +813,19 @@ class TestListGroups:
             ),
         ]
 
-    def test_prefers_managed_alias_when_primary_email_uses_old_pattern(self, provider, mock_google_clients):
+    def test_prefers_managed_alias_when_primary_email_uses_old_pattern(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.list_groups.return_value = OperationResult.success(
-            data=[
-                {
-                    "email": "aws-finops@example.com",
-                    "aliases": ["sg-aws-finops@example.com"],
-                    "id": "group-10",
-                    "name": "FinOps",
-                }
-            ]
+        google_service.groups.return_value.list.return_value = _request(
+            {
+                "groups": [
+                    {
+                        "email": "aws-finops@example.com",
+                        "aliases": ["sg-aws-finops@example.com"],
+                        "id": "group-10",
+                        "name": "FinOps",
+                    }
+                ]
+            }
         )
 
         # Act
@@ -783,7 +833,7 @@ class TestListGroups:
 
         # Assert
         assert result.is_success
-        mock_google_clients.directory.list_groups.assert_called_once_with()
+        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer")
         assert result.data == [
             DirectoryGroup(
                 group_email="sg-aws-finops@example.com",
@@ -795,11 +845,9 @@ class TestListGroups:
             )
         ]
 
-    def test_skips_groups_when_email_is_missing_for_alias_aware_discovery(self, provider, mock_google_clients):
+    def test_skips_groups_when_email_is_missing_for_alias_aware_discovery(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.list_groups.return_value = OperationResult.success(
-            data=[{"id": "group-1", "name": "Admins"}]
-        )
+        google_service.groups.return_value.list.return_value = _request({"groups": [{"id": "group-1", "name": "Admins"}]})
 
         # Act
         result = provider.list_groups(query="sg-")
@@ -807,18 +855,20 @@ class TestListGroups:
         # Assert
         assert result.is_success
         assert result.data == []
-        mock_google_clients.directory.list_groups.assert_called_once_with()
+        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer")
 
-    def test_returns_error_when_managed_group_domain_mismatches(self, provider, mock_google_clients):
+    def test_returns_error_when_managed_group_domain_mismatches(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.list_groups.return_value = OperationResult.success(
-            data=[
-                {
-                    "email": "platform-admins@other.example",
-                    "id": "group-1",
-                    "name": "Admins",
-                }
-            ]
+        google_service.groups.return_value.list.return_value = _request(
+            {
+                "groups": [
+                    {
+                        "email": "platform-admins@other.example",
+                        "id": "group-1",
+                        "name": "Admins",
+                    }
+                ]
+            }
         )
 
         # Act
@@ -826,13 +876,13 @@ class TestListGroups:
 
         # Assert
         # name:Admins is a Google query expression — passed through unchanged
-        mock_google_clients.directory.list_groups.assert_called_once_with(query="name:Admins")
+        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", query="name:Admins")
         assert not result.is_success
         assert result.error_code == "DIRECTORY_GROUP_DOMAIN_MISMATCH"
 
-    def test_propagates_directory_error(self, provider, mock_google_clients):
+    def test_propagates_directory_error(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.list_groups.return_value = OperationResult.transient_error("service_unavailable")
+        google_service.groups.return_value.list.return_value.execute.side_effect = _http_error(503)
 
         # Act
         result = provider.list_groups(query="sg-")
@@ -843,17 +893,18 @@ class TestListGroups:
 
 
 class TestGetGroupMembersBatch:
-    def test_returns_members_for_each_group(self, provider, mock_google_clients):
+    def test_returns_members_for_each_group(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.get_batch_group_members.return_value = OperationResult.success(
-            data={
-                "sg-aws-admin@example.com": [
-                    {"email": "alice@example.com", "type": "USER", "id": "m1"},
-                ],
-                "sg-aws-read@example.com": [
-                    {"email": "bob@example.com", "type": "USER", "id": "m2"},
-                ],
-            }
+        _install_fake_batch(
+            google_service,
+            {
+                "sg-aws-admin@example.com": {
+                    "members": [{"email": "alice@example.com", "type": "USER", "id": "m1"}],
+                },
+                "sg-aws-read@example.com": {
+                    "members": [{"email": "bob@example.com", "type": "USER", "id": "m2"}],
+                },
+            },
         )
 
         # Act
@@ -873,41 +924,42 @@ class TestGetGroupMembersBatch:
         assert len(result.data["sg-aws-read@example.com"]) == 1
         assert result.data["sg-aws-read@example.com"][0].email == "bob@example.com"
 
-    def test_returns_empty_dict_for_empty_input(self, provider, mock_google_clients):
+    def test_returns_empty_dict_for_empty_input(self, provider, google_service):
         # Act
         result = provider.get_group_members_batch([])
 
         # Assert
         assert result.is_success
         assert result.data == {}
-        mock_google_clients.directory.get_batch_group_members.assert_not_called()
+        google_service.new_batch_http_request.assert_not_called()
 
-    def test_propagates_batch_failure(self, provider, mock_google_clients):
+    def test_propagates_batch_failure(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.get_batch_group_members.return_value = OperationResult.transient_error(
-            "batch_request_failed"
-        )
+        _install_fake_batch(google_service, {})
 
         # Act
         result = provider.get_group_members_batch(["sg-aws-admin@example.com"])
 
         # Assert
         assert not result.is_success
-        assert result.status == OperationStatus.TRANSIENT_ERROR
+        assert result.status == OperationStatus.PERMANENT_ERROR
 
-    def test_filters_to_requested_member_types(self, provider, mock_google_clients):
+    def test_filters_to_requested_member_types(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.get_batch_group_members.return_value = OperationResult.success(
-            data={
-                "sg-aws-admin@example.com": [
-                    {"email": "alice@example.com", "type": "USER", "id": "m1"},
-                    {
-                        "email": "nested-group@example.com",
-                        "type": "GROUP",
-                        "id": "m2",
-                    },
-                ],
-            }
+        _install_fake_batch(
+            google_service,
+            {
+                "sg-aws-admin@example.com": {
+                    "members": [
+                        {"email": "alice@example.com", "type": "USER", "id": "m1"},
+                        {
+                            "email": "nested-group@example.com",
+                            "type": "GROUP",
+                            "id": "m2",
+                        },
+                    ],
+                },
+            },
         )
 
         # Act
@@ -922,14 +974,12 @@ class TestGetGroupMembersBatch:
         assert len(members) == 1
         assert members[0].email == "alice@example.com"
 
-    def test_normalises_group_keys_to_lowercase(self, provider, mock_google_clients):
+    def test_normalises_group_keys_to_lowercase(self, provider, google_service):
         # Arrange
-        mock_google_clients.directory.get_batch_group_members.return_value = OperationResult.success(
-            data={"sg-aws-admin@example.com": []}
-        )
+        _install_fake_batch(google_service, {"sg-aws-admin@example.com": {"members": []}})
 
         # Act
         provider.get_group_members_batch(["SG-AWS-Admin@EXAMPLE.COM"])
 
         # Assert
-        mock_google_clients.directory.get_batch_group_members.assert_called_once_with(["sg-aws-admin@example.com"])
+        google_service.members.return_value.list.assert_called_once_with(groupKey="sg-aws-admin@example.com")
