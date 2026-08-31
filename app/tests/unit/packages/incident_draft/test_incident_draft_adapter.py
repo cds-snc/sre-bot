@@ -1646,3 +1646,59 @@ class TestReportIsReadOnly:
     def test_the_port_no_longer_offers_a_timeline_write(self):
         """Removed deliberately: 💾-curated entries are the report's own."""
         assert not hasattr(GoogleDocsIncidentDocument(), "replace_timeline")
+
+
+class TestEveryPullRequestFormIsLinked:
+    """Whatever wording the model uses, the reader gets a clickable link."""
+
+    _LINKS = {
+        "1898": "https://github.com/cds-snc/sre-bot/pull/1898",
+        "2001": "https://github.com/cds-snc/sre-bot/pull/2001",
+    }
+
+    def _linked_urls(self, content: str) -> list[str]:
+        drafts = [SectionDraft(heading="Summary", content=content, is_drafted=True)]
+        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+            mock_docs.get_document.return_value = _template_document()
+            mock_docs.batch_update.return_value = {}
+            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
+            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
+            mock_drive.find_files_by_name.return_value = []
+            GoogleDocsIncidentDocument().write_draft_document("D1", drafts, (), self._LINKS)
+        requests = mock_docs.batch_update.call_args_list[0].args[1]
+        return [
+            r["updateTextStyle"]["textStyle"]["link"]["url"]
+            for r in requests
+            if r.get("updateTextStyle", {}).get("fields") == "link"
+        ]
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            pytest.param("Reverted by PR 1898.", id="pr_number"),
+            pytest.param("Reverted by PR #1898.", id="pr_hash"),
+            pytest.param("Reverted by PRs 1898.", id="plural"),
+            pytest.param("Reverted by pull request 1898.", id="spelled_out"),
+            pytest.param("Reverted by #1898.", id="bare_hash"),
+        ],
+    )
+    def test_each_wording_becomes_a_link(self, content):
+        assert self._linked_urls(content) == ["https://github.com/cds-snc/sre-bot/pull/1898"]
+
+    def test_a_url_written_into_the_text_links_to_itself(self):
+        """The model may copy the URL through; it must still be clickable."""
+        urls = self._linked_urls("Reverted by https://github.com/cds-snc/other/pull/77.")
+
+        assert urls == ["https://github.com/cds-snc/other/pull/77"]
+
+    def test_several_references_in_one_line_are_each_linked(self):
+        urls = self._linked_urls("PR 1898 broke it and PR 2001 fixed it.")
+
+        assert urls == [
+            "https://github.com/cds-snc/sre-bot/pull/1898",
+            "https://github.com/cds-snc/sre-bot/pull/2001",
+        ]
+
+    def test_an_unresolved_reference_stays_plain_text(self):
+        """A wrong link is worse than none."""
+        assert self._linked_urls("Reverted by PR 4242.") == []

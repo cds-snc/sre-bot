@@ -35,7 +35,10 @@ class OpenAISettings(BaseSettings):
     # -- reject the parameter outright with a 400, which fails the whole
     # request. Set 0.0 to opt in; any negative value omits it.
     TEMPERATURE: float = Field(default=-1.0, alias="OPENAI_TEMPERATURE")
-    TIMEOUT_SECONDS: float = Field(default=60.0, alias="OPENAI_TIMEOUT_SECONDS")
+    # Must outlast generating MAX_OUTPUT_TOKENS: at 60-100 tokens/sec a large
+    # completion takes well over a minute, so a 60s timeout aborted requests
+    # the model was still legitimately writing.
+    TIMEOUT_SECONDS: float = Field(default=180.0, alias="OPENAI_TIMEOUT_SECONDS")
     BASE_URL: str = Field(default="https://ai.cdssandbox.xyz", alias="OPENAI_BASE_URL")
 
 

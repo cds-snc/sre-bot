@@ -21,6 +21,7 @@ import re
 import time
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import structlog
 
@@ -162,7 +163,7 @@ def handle_draft_command(
     settings = get_incident_draft_settings()
     limit = _resolve_limit(parsed_args.get("--limit"), settings)
     oldest = _resolve_channel_start(client, payload.channel_id, settings, log)
-    messages = _fetch_transcript(client, payload.channel_id, limit=limit, oldest=oldest, log=log)
+    messages = _fetch_transcript(client, payload.channel_id, limit=limit, oldest=oldest, log=log, tzname=settings.TIMEZONE)
 
     result = asyncio.run(draft_incident_document(document_id, messages))
 
@@ -299,6 +300,7 @@ def _fetch_transcript(
     limit: int,
     oldest: float,
     log: structlog.stdlib.BoundLogger,
+    tzname: str = "UTC",
 ) -> list[TranscriptMessage]:
     """Fetch channel history and resolve authors into transcript messages.
 
@@ -335,7 +337,7 @@ def _fetch_transcript(
             # kept: an alerting bot's message is often the first real event.
             skipped_own += 1
             continue
-        messages.append(TranscriptMessage(author=author, text=text, timestamp=_format_time(raw.get("ts"))))
+        messages.append(TranscriptMessage(author=author, text=text, timestamp=_format_time(raw.get("ts"), tzname)))
 
     log.info(
         "incident_draft_history_fetched",
@@ -395,18 +397,24 @@ def _normalize_name(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", name.lower())
 
 
-def _format_time(raw_ts: Any) -> str:
-    """Format a Slack ``ts`` as ``YYYY-MM-DD HH:MM`` UTC.
+def _format_time(raw_ts: Any, tzname: str) -> str:
+    """Format a Slack ``ts`` as ``YYYY-MM-DD HH:MM ZZZ`` in the configured zone.
 
-    The date matters: incidents span days, and the report's impact/detection
-    fields want a full timestamp even though timeline entries show only the
-    clock time. Returns an empty string for a missing or malformed value; the
-    transcript line then simply carries no time.
+    Responders read the report in local time, and an incident spanning days --
+    or a daylight-saving boundary -- is ambiguous without the date and zone.
+    Falls back to UTC when the zone name is unknown, and returns an empty string for a missing or
+    malformed value; the transcript line then simply carries no time.
     """
     try:
-        return datetime.fromtimestamp(float(raw_ts), tz=UTC).strftime("%Y-%m-%d %H:%M")
+        moment = datetime.fromtimestamp(float(raw_ts), tz=UTC)
     except TypeError, ValueError:
         return ""
+
+    try:
+        moment = moment.astimezone(ZoneInfo(tzname))
+    except ZoneInfoNotFoundError, ValueError:
+        logger.warning("incident_draft_unknown_timezone", timezone=tzname)
+    return moment.strftime("%Y-%m-%d %H:%M %Z")
 
 
 def _resolve_display_name(

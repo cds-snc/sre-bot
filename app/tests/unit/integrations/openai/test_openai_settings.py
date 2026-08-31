@@ -19,7 +19,7 @@ class TestOpenAISettings:
         assert settings.MODEL == "gpt-5.6-luna"
         assert settings.MAX_OUTPUT_TOKENS == 3000
         assert settings.TEMPERATURE == -1.0
-        assert settings.TIMEOUT_SECONDS == 60.0
+        assert settings.TIMEOUT_SECONDS == 180.0
         assert settings.BASE_URL == "https://ai.cdssandbox.xyz"
 
     def test_overrides_from_env(self, monkeypatch):

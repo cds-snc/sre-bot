@@ -46,7 +46,16 @@ _BANNER_PREFIX = "AI draft · generated"
 _NAMED_RANGE_PREFIX = "incident_draft::"
 # "PR 1898", "PR #1898", "pr1898" -- how the model refers to a pull request in
 # prose once the original Slack link has been summarised away.
-_PR_REFERENCE_PATTERN = re.compile(r"\bPR\s*#?(?P<number>\d+)\b", re.IGNORECASE)
+# Every way a pull request can appear in drafted text: a full URL the model
+# copied through, an explicit "PR 1898"/"pull request 1898", or a bare
+# "#1898". Each becomes a hyperlink so no PR is named without a way to open
+# it.
+_PR_REFERENCE_PATTERN = re.compile(
+    r"(?P<url>https?://(?:www\.)?github\.com/[\w.-]+/[\w.-]+/pull/\d+)"
+    r"|\b(?:PRs?|pull requests?)\s*#?(?P<number>\d+)\b"
+    r"|(?<![\w/])#(?P<issue_number>\d+)\b",
+    re.IGNORECASE,
+)
 
 # (named range, insert index, block lines, inline text). Exactly one of the last
 # two is used: inline text is written on an existing label's line, block lines
@@ -1155,18 +1164,16 @@ def _strip_markdown(text: str) -> str:
 
 
 def _pr_link_requests(text: str, start: int, links: Mapping[str, str]) -> list[dict[str, Any]]:
-    """Hyperlink each "PR 1898" reference whose URL the channel supplied.
+    """Hyperlink every pull request the drafted text names.
 
-    A reference whose number nobody posted a link for is left as plain text --
-    the repository cannot be inferred from a bare number, and a wrong link is
-    worse than none.
+    A URL written out in the text links to itself; a "PR 1898" or "#1898"
+    reference links to the URL the service resolved for that number. Only a
+    reference the service could not resolve at all is left as plain text -- a
+    wrong link is worse than none.
     """
-    if not links:
-        return []
-
     requests: list[dict[str, Any]] = []
     for match in _PR_REFERENCE_PATTERN.finditer(text):
-        url = links.get(match.group("number"))
+        url = match.group("url") or links.get(match.group("number") or match.group("issue_number") or "")
         if not url:
             continue
         requests.append(
