@@ -4,12 +4,13 @@ title: 'Resolve every _next.py twin: one canonical client per vendor module'
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-31 18:49'
+updated_date: '2026-08-31 17:37'
 labels:
   - clients
   - phase-3
 milestone: m-3
 dependencies:
+  - TASK-22.2
   - TASK-22.4
 references:
   - decisions/outbound-clients.md
@@ -32,9 +33,10 @@ Steps:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 find app/integrations -name "*_next.py" returns zero files
-- [ ] #2 Each vendor module has exactly one client construction path (get_aws_client for AWS, the Google Directory factory for Google); the _next-suffixed generation's execute_aws_api_call / execute_google_api_call string-dispatchers and the get_google_api_command_parameters docstring scraper no longer exist in app/integrations/ (decisions/sdk-typing.md dispatcher/scraper checks pass for the _next generation). NOTE: a separate, non-_next execute_aws_api_call (integrations/aws/client.py) and execute_google_api_call (integrations/google_workspace/google_service.py) generation also exists with many live consumers - deleting those is TASK-25.2 (AWS) and TASK-25.1 (Google) scope, not this task's; sdk-typing.md's repo-wide dispatcher checks only pass fully once TASK-25.1 and TASK-25.2 are also Done
-- [ ] #3 The remaining _next consumers (idempotency store, resilience retry store, and any others found by grep) are converged onto the shared get_aws_client + classify_aws_error primitive from TASK-22.2 with behavior-neutral OperationResult outcomes; all consumers import the canonical modules and tests pass per vendor PR
+- [ ] #1 All three subtasks are Done: TASK-23.1 (Google _next deletion), TASK-23.2 (idempotency store convergence), TASK-23.3 (retry store convergence + AWS _next deletion)
+- [ ] #2 find app/integrations -name '*_next.py' returns zero files
+- [ ] #3 The _next-suffixed generation's string-dispatchers are gone: integrations/aws/client_next.py::execute_aws_api_call and integrations/google_workspace/google_service_next.py::execute_google_api_call no longer exist. Explicitly NOT in scope: the separate non-_next execute_aws_api_call (integrations/aws/client.py, TASK-25.2) and execute_google_api_call (integrations/google_workspace/google_service.py, TASK-25.1), each with many live consumers, and the get_google_api_command_parameters docstring scraper, which exists only in google_service.py (TASK-25.1). decisions/sdk-typing.md's repo-wide dispatcher and scraper checks pass only once TASK-25.1 and TASK-25.2 are also Done
+- [ ] #4 The two remaining _next consumers (infrastructure/idempotency/dynamodb.py, infrastructure/resilience/retry/dynamodb_store.py) call a boto3 client from integrations.aws.client.get_aws_client inside try/except with classify_aws_error; claim/lease/dedup outcomes are unchanged and unmapped SDK exceptions propagate instead of being swallowed
 <!-- AC:END -->
 
 ## Definition of Done
@@ -46,29 +48,38 @@ Steps:
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-RESEQUENCED (2026-07-31, decisions/sdk-typing.md): this task is no longer "pick the survivor twin and rename it" - the consumer surfaces (storage, access-sync, directory) already migrated DIRECTLY to canonical factory+classify in TASK-22.2/22.3/22.4, and the canonical AWS/Google primitives already exist. This task now DELETES the residual _next dispatcher generation and converges its remaining (non-facade) consumers onto those primitives. It is the task that makes decisions/sdk-typing.md's "find *_next.py == 0" and "no generic dispatcher" checks pass.
+DECOMPOSED 2026-08-31 (task-planner). This task now COORDINATES three single-PR slices; it holds no code of its own. All TASK-22.x dependencies are Done, so the canonical primitives already exist and are proven in production code.
 
-PREREQUISITE: TASK-22.4 Done (so get_aws_client + classify_aws_error from TASK-22.2 and the Google Directory factory + classify_google_error from TASK-22.4 all exist and are proven by the migrated consumers).
+CANONICAL PRIMITIVES (verified in source, not assumed):
+- AWS: integrations/aws/client.py::get_aws_client (boto3 Config(retries) + timeouts + dynamodb-local ENVIRONMENT gate + lazy AssumeRole) and classify_aws_error (returns (OperationStatus, error_code, retry_after); raises unmapped exceptions; maps ConditionalCheckFailedException -> PERMANENT_ERROR with the code preserved). Proven by infrastructure/storage/service.py (TASK-22.2) and packages/access/sync/adapters/aws_identity_center.py (TASK-22.3).
+- Google: integrations/google_workspace/client.py::get_admin_directory_service + classify_google_error + execute_batch_request. Proven by infrastructure/directory/google.py (TASK-22.4).
 
-TWIN/DISPATCHER INVENTORY (re-grep at implementation): integrations/aws/{client_next.py (the execute_aws_api_call dispatcher + time.sleep retry), dynamodb_next.py, identity_store_next.py}; integrations/google_workspace/{google_service_next.py (execute_google_api_call + retry), gmail_next.py, google_directory_next.py}. After TASK-22.x their FACADE-migrated consumers are gone; the REMAINING consumers to converge are the non-facade ones - notably the idempotency store and the resilience retry store on dynamodb_next (grep-confirm the full set before editing; also check identity_store_next and the google _next modules for stragglers).
+CONSUMER INVENTORY (fresh repo-wide grep 2026-08-31, excluding backlog/, tmp/, caches):
+- integrations/aws/dynamodb_next.py -> infrastructure/idempotency/dynamodb.py:15 (get_item/put_item/delete_item) and infrastructure/resilience/retry/dynamodb_store.py:16 (10 call sites at lines 124, 159, 219, 263, 309, 340, 386, 416, 429, 467).
+- integrations/aws/client_next.py -> only dynamodb_next.py:27 and identity_store_next.py:26 (plus tests).
+- integrations/aws/identity_store_next.py -> ZERO consumers.
+- google_workspace/google_service_next.py, google_directory_next.py, gmail_next.py -> ZERO production consumers (only each other, their own tests, and tests/smoke/google_smoke_test.py:46).
+Test-side references: tests/integrations/aws/{test_client_next.py, test_identity_store_next.py, fixtures_identity_store.py}, tests/unit/integrations/aws/{test_dynamodb_next.py, test_dynamodb_local_endpoint.py:57-87}, tests/unit/infrastructure/resilience/retry/{conftest.py:104, test_dynamodb_store.py, test_resilience_factory.py}, tests/integration/infrastructure/idempotency/conftest.py:12-13,33, tests/integrations/google_workspace/{test_google_service_next.py, test_google_directory_next.py}.
 
-SCOPE:
-1. Converge every remaining dynamodb_next / identity_store_next consumer onto get_aws_client + classify_aws_error (TASK-22.2's primitive): idempotency store and resilience retry store call the typed boto3 client directly inside try/except+classify, behavior-neutral (same OperationResult outcomes, same ConditionalCheckFailedException handling their claim/lease/dedup primitives depend on).
-2. Converge any remaining google_service_next / google_directory_next / gmail_next consumer onto the Google factory + classify_google_error (TASK-22.4). gmail_next with zero consumers is simply deleted.
-3. Delete every integrations *_next.py file and the generic dispatchers they contained (execute_aws_api_call, execute_google_api_call) plus the get_google_api_command_parameters docstring scraper if it survives outside the directory path.
-4. Ensure exactly one construction path per vendor remains (get_aws_client; the Google Directory factory). Do NOT delete integrations/aws/shield.py here - AWSShield feeds remaining AWS services and is retired in TASK-25.
+SIZE GATE: FAILED as a single PR. ~350 changed production LOC across two independent correctness-critical primitives (idempotency claim gate, retry-store claim/lease gate) plus ~1200 LOC of module deletions and ~2400 LOC of test deletions/rewrites; it also mixes a mechanical deletion with a real behavior change (gate rule 3). Decomposed with human approval into:
 
-PR SLICES (one vendor per PR, behavior-neutral):
-- PR A - AWS: converge idempotency + resilience stores onto get_aws_client/classify_aws_error; delete dynamodb_next.py, identity_store_next.py, client_next.py; grep both old names to zero.
-- PR B - Google: converge any residual google _next consumer onto the TASK-22.4 factory/classify; delete google_service_next.py, google_directory_next.py, gmail_next.py.
+- TASK-23.1 (dep TASK-22.4) - delete the Google _next trio + their tests + the smoke-test import. Pure deletion, zero production consumers, independently shippable, no ordering constraint against the AWS slices. Ship first.
+- TASK-23.2 (dep TASK-22.2) - converge infrastructure/idempotency/dynamodb.py onto get_aws_client + classify_aws_error, mirroring DynamoDBStorageService. dynamodb_next survives this slice.
+- TASK-23.3 (dep TASK-23.2) - converge infrastructure/resilience/retry/dynamodb_store.py, then delete integrations/aws/{dynamodb_next,client_next,identity_store_next}.py once consumer count is zero. This is the slice that makes AC#2 pass.
 
-TEST MIGRATION: touched vendor tests relocate into tests/unit/integrations/<vendor>; legacy trees only shrink. Add convergence coverage for the idempotency/resilience stores (behavior-neutral: same claim/lease/dedup outcomes).
+BEHAVIOR DELTAS the slices must own explicitly (this task is NOT purely behavior-neutral, contrary to its original framing):
+(a) client_next.execute_api_call caught EVERY exception and returned OperationResult.permanent_error. classify_aws_error re-raises unmapped exceptions instead. That is the decided contract (outbound-clients.md: "a KeyError is a bug, not an outcome") and each slice needs a test asserting propagation.
+(b) dynamodb_next.query() hardcodes keys=["Items"] + force_paginate=True, so its OperationResult.data is a LIST, while dynamodb_store.fetch_due/get_stats/get_dlq_entries all call result.data.get("Items")/.get("Count"). Those three paths are broken against the real dispatcher today and pass only because tests/unit/infrastructure/resilience/retry/conftest.py:104 fakes a dict. Calling the boto3 client directly restores the dict shape the code already expects - a fix, not a regression - and TASK-23.3 carries an AC requiring real-shape fakes.
+(c) client_next's ERROR_CONFIG downgraded ConditionalCheckFailedException to a warning log for dynamodb put_item/update_item. After migration the consumer owns that logging decision; keep contention out of error-level logs so alarms do not fire on normal claim contention.
 
-AC-TO-STEP: AC#1 -> Steps 3 (find *_next.py == 0). AC#2 -> Steps 3-4 (dispatchers/scraper deleted; one path per vendor; sdk-typing.md checks pass). AC#3 -> Steps 1-2 (idempotency/resilience + any residual consumers converged, behavior-neutral). DoD -> per-vendor PR green + import-linter (TASK-18) + PR cites outbound-clients.md/sdk-typing.md.
+AC-TO-SLICE: AC#1 -> TASK-23.1 + TASK-23.3. AC#2 -> TASK-23.1 (Google dispatcher) + TASK-23.3 (AWS dispatcher). AC#3 -> TASK-23.2 + TASK-23.3. AC#4 -> all three Done.
 
-SIZE GATE: mechanical deletion + converging ~2-3 infra consumers onto an existing primitive, no new logic - two per-vendor PRs, each within the ~400 LOC / ~10 file gate.
+SCOPE BOUNDARIES (re-verified this session, correcting the earlier plan text):
+- get_google_api_command_parameters exists ONLY in integrations/google_workspace/google_service.py:238, i.e. the NON-_next generation with 16 live consumer files. It is TASK-25.1 scope and cannot be closed here; AC#2 was reworded accordingly.
+- "Exactly one client construction path per vendor" also cannot close here: integrations/aws/client.py still hosts execute_aws_api_call (TASK-25.2), integrations/aws/dynamodb.py is a third, older generation with its own client_config (TASK-25.2.2), and integrations/aws/shield.py still constructs its own clients (TASK-25.5 - confirmed zero production consumers). AC#2 now asserts only the _next generation's removal.
+- AWSShield is NOT touched here. The earlier claim in this task's own text that "AWSShield feeds remaining AWS services" was disproven on re-grep and is owned by TASK-25.5 as a pure deletion.
 
-RISKS / DOUBTS (verify at impl): (a) the idempotency + resilience stores rely on ConditionalCheckFailedException as their contention signal - classify_aws_error must preserve that error_code exactly (TASK-22.2 already requires this; re-assert here); (b) grep BOTH the *_next names AND execute_aws_api_call/execute_google_api_call after each PR to catch stragglers (DI, providers, __init__ re-exports, tests); (c) confirm no integration module OTHER than the _next files imports client_next's execute_aws_api_call before deleting it.
+BLAST RADIUS / ROLLBACK: each slice is a single git revert. TASK-23.1 has zero production blast radius. TASK-23.2 and TASK-23.3 each touch one correctness-critical primitive whose failure mode is duplicate processing (idempotency) or duplicate/dropped retries (retry store) - both are covered by existing unit suites plus the moto-backed idempotency conformance suite. No terraform, CI or environment-variable changes in any slice; table names and item shapes are unchanged.
 <!-- SECTION:PLAN:END -->
 
 ## Comments
@@ -89,5 +100,16 @@ Dependency changed from TASK-22.5 to TASK-22.4 (the AWS + Google primitives exis
 created: 2026-07-31 18:49
 ---
 Correction (2026-07-31): AC#2's wording was over-broad - it implied ALL execute_aws_api_call/execute_google_api_call occurrences disappear once this task is Done, but this task's own inventory only ever covered the _next-suffixed generation. Repo-wide grep (done while verifying AWS/Google client-migration task coverage) found a separate, non-_next execute_aws_api_call (integrations/aws/client.py, ~9 services/14 consumer files) and execute_google_api_call (integrations/google_workspace/google_service.py, 6 surfaces/16 consumer files) generation, each with far more live consumers than the _next twins. Those are now tracked as TASK-25.2 (AWS remainder) and TASK-25.1 (Google remainder) respectively. AC#2 reworded to scope explicitly to the _next generation and cross-reference the sibling tasks rather than silently over-promising.
+---
+
+created: 2026-08-31 17:37
+---
+DECOMPOSED 2026-08-31 (human-approved). TASK-23 tripped the single-PR size gate and is now a coordinator over TASK-23.1 / 23.2 / 23.3. Three corrections to earlier task text, all from fresh grep rather than the prior plan's prose:
+
+1. AC#2's get_google_api_command_parameters clause was unachievable here: the docstring scraper exists only in integrations/google_workspace/google_service.py:238 (the non-_next generation, 16 live consumers, TASK-25.1 scope). google_service_next.py has no scraper. Same for "exactly one client construction path per vendor" - integrations/aws/{client.py, dynamodb.py, shield.py} all still construct clients after this task (TASK-25.2 / 25.2.2 / 25.5). AC#2 reworded to assert only the _next generation's dispatchers are gone.
+
+2. AC#3's "behavior-neutral OperationResult outcomes" was inaccurate. The stores do not return OperationResult to their callers, and there are two real deltas: unmapped SDK exceptions now propagate instead of being swallowed into permanent_error (the decided contract), and dynamodb_next.query() returns a LIST (force_paginate + keys=["Items"]) while dynamodb_store.fetch_due / get_stats / get_dlq_entries all call result.data.get("Items")/.get("Count"). Those three paths are broken against the real dispatcher today and pass only because the unit conftest fakes a dict; calling boto3 directly fixes them. TASK-23.3 carries an AC requiring real-shape response fakes.
+
+3. Consumer inventory confirmed much smaller than the original description implied: identity_store_next.py and all three Google _next modules have ZERO production consumers, so only two files (idempotency/dynamodb.py, resilience/retry/dynamodb_store.py) actually need migrating; everything else is deletion.
 ---
 <!-- COMMENTS:END -->
