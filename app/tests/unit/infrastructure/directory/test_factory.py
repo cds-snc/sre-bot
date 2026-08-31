@@ -14,14 +14,14 @@ from infrastructure.directory.provider import DirectoryProvider
 class TestBuildGoogleDirectoryProvider:
     def test_returns_google_directory_provider_instance(self):
         # Arrange
-        mock_google_clients = MagicMock()
-        mock_google_clients.directory = MagicMock()
+        mock_get_service = MagicMock()
         mock_directory_settings = MagicMock()
 
         # Act
         provider = build_google_directory_provider(
-            google_clients=mock_google_clients,
+            get_service=mock_get_service,
             directory_settings=mock_directory_settings,
+            customer_id="my_customer",
         )
 
         # Assert
@@ -29,33 +29,34 @@ class TestBuildGoogleDirectoryProvider:
 
     def test_returned_object_satisfies_directory_provider_protocol(self):
         # Arrange
-        mock_google_clients = MagicMock()
-        mock_google_clients.directory = MagicMock()
+        mock_get_service = MagicMock()
         mock_directory_settings = MagicMock()
 
         # Act
         provider = build_google_directory_provider(
-            google_clients=mock_google_clients,
+            get_service=mock_get_service,
             directory_settings=mock_directory_settings,
+            customer_id="my_customer",
         )
 
         # Assert
         assert isinstance(provider, DirectoryProvider)
 
-    def test_provider_uses_injected_clients_directory(self):
+    def test_provider_uses_injected_service_factory(self):
         # Arrange
-        mock_google_clients = MagicMock()
-        mock_google_clients.directory = MagicMock()
+        mock_get_service = MagicMock()
         mock_directory_settings = MagicMock()
 
         # Act
         provider = build_google_directory_provider(
-            google_clients=mock_google_clients,
+            get_service=mock_get_service,
             directory_settings=mock_directory_settings,
+            customer_id="my_customer",
         )
 
-        # Assert — internal _directory attribute is the mocked directory client
-        assert provider._directory is mock_google_clients.directory
+        # Assert — internal attributes reflect the injected scoped service factory
+        assert provider._get_service is mock_get_service
+        assert provider._customer_id == "my_customer"
 
 
 @pytest.mark.unit

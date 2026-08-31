@@ -3,10 +3,11 @@ id: TASK-22.4
 title: >-
   Migrate directory provider off infrastructure/clients/google_workspace onto
   integrations/google_workspace/google_directory_next
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-29 21:11'
-updated_date: '2026-08-07 15:31'
+updated_date: '2026-08-07 22:04'
 labels:
   - clients
   - phase-3
@@ -37,10 +38,10 @@ Test migration: relocate app/tests/integrations/google_workspace/test_google_dir
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 infrastructure/directory/factory.py and google.py no longer import infrastructure.clients.google_workspace; GoogleDirectoryProvider is backed by a Google Directory adapter that calls the discovery Resource directly (built by a factory with cache_discovery=False, static_discovery=True that RAISES, and whose return is annotated with the google-api-python-client-stubs-provided Resource type, e.g. AdminDirectoryResource, imported under TYPE_CHECKING per decisions/sdk-typing.md item 3) and translates responses into typed domain dataclasses via classify_google_error - the execute_google_api_call dispatcher and the get_google_api_command_parameters docstring scraper are NOT on the directory path
-- [ ] #2 A health_check equivalent returning OperationResult exists in integrations/google_workspace and is used by GoogleDirectoryProvider with behavior parity
-- [ ] #3 All tests/unit/infrastructure/directory/ tests pass behavior-neutral (identical OperationResult outcomes + payload normalization across the 11 provider calls); classify_google_error has coverage under tests/unit/integrations/google_workspace/; google_directory_next/google_service_next are left for TASK-23 deletion; touched vendor tests land under tests/unit (legacy tests/integrations/ count does not grow)
-- [ ] #4 get_admin_directory_service is invoked per-operation with that operation's existing, narrowly-scoped OAuth scope list (e.g. admin.directory.user.readonly for get_user/list_users, admin.directory.group.member for add_member/remove_member, etc.) rather than a broader unioned scope set, preserving today's per-call least-privilege delegated-credential behavior; covered by a unit test asserting the exact scopes passed to the injected get_service callable per method
+- [x] #1 infrastructure/directory/factory.py and google.py no longer import infrastructure.clients.google_workspace; GoogleDirectoryProvider is backed by a Google Directory adapter that calls the discovery Resource directly (built by a factory with cache_discovery=False, static_discovery=True that RAISES, and whose return is annotated with the google-api-python-client-stubs-provided Resource type, e.g. AdminDirectoryResource, imported under TYPE_CHECKING per decisions/sdk-typing.md item 3) and translates responses into typed domain dataclasses via classify_google_error - the execute_google_api_call dispatcher and the get_google_api_command_parameters docstring scraper are NOT on the directory path
+- [x] #2 A health_check equivalent returning OperationResult exists in integrations/google_workspace and is used by GoogleDirectoryProvider with behavior parity
+- [x] #3 All tests/unit/infrastructure/directory/ tests pass behavior-neutral (identical OperationResult outcomes + payload normalization across the 11 provider calls); classify_google_error has coverage under tests/unit/integrations/google_workspace/; google_directory_next/google_service_next are left for TASK-23 deletion; touched vendor tests land under tests/unit (legacy tests/integrations/ count does not grow)
+- [x] #4 get_admin_directory_service is invoked per-operation with that operation's existing, narrowly-scoped OAuth scope list (e.g. admin.directory.user.readonly for get_user/list_users, admin.directory.group.member for add_member/remove_member, etc.) rather than a broader unioned scope set, preserving today's per-call least-privilege delegated-credential behavior; covered by a unit test asserting the exact scopes passed to the injected get_service callable per method
 <!-- AC:END -->
 
 ## Definition of Done
@@ -91,6 +92,12 @@ SIZE GATE: one capability surface (directory provider) + one new integrations mo
 
 DOUBTS (verify at impl): (a) exact Retry-After header access on googleapiclient HttpError — confirm exc.resp.get("retry-after") (httplib2.Response is dict-like) returns the right value/format in a live test, or whether Google's Admin SDK ever actually sends it for 429s (may always be None in practice — classify_google_error must handle that gracefully either way); (b) whether get_batch_group_members's batch_executor.execute_batch_request usage should be inlined into google.py or kept as a reused helper import from infrastructure/clients/google_workspace/batch_executor.py — reusing it avoids duplicating BatchHttpRequest wiring but keeps one import from the soon-to-be-orphaned infrastructure/clients tree; recommend copying the ~15-line helper into the new integrations/google_workspace/client.py (or inline in google.py) instead, so infrastructure/directory/google.py has zero infrastructure.clients.google_workspace imports post-migration (cleaner AC#1 grep) — flagged for human confirmation, not mandatory; (c) whether SRE_BOT_EMAIL should be threaded as a per-call default inside get_admin_directory_service (mirroring today's SessionProvider default_delegated_email) or passed explicitly from factory.py's partial() — either preserves identical behavior, pure implementer style choice.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Completed the migration started in a prior session: GoogleDirectoryProvider (infrastructure/directory/google.py) and build_google_directory_provider (infrastructure/directory/factory.py) no longer reference infrastructure.clients.google_workspace; they call the Admin SDK Directory discovery Resource directly via an injected per-call scoped get_service factory. New integrations/google_workspace/client.py provides get_admin_directory_service (raises, cache_discovery=False/static_discovery=True, TYPE_CHECKING-only stub-typed return) and classify_google_error (HttpError status -> NOT_FOUND/UNAUTHORIZED/TRANSIENT_ERROR, unmapped/non-HttpError propagate). health_check/warmup parity preserved (customers().get). Per-call OAuth scope minimization covered by tests/unit/infrastructure/directory/test_google_scoped_service_contract.py (10 cases). classify_google_error covered by tests/unit/integrations/google_workspace/test_client.py. tests/integrations/ legacy count unchanged (33 files, untouched vs main).\n\nFixed two bugs found while finishing the session: (1) the TYPE_CHECKING stub import used a wrong path/name (googleapiclient._apis.admin_directory_v1.AdminDirectoryResource does not exist in google-api-python-client-stubs); corrected to googleapiclient._apis.admin.directory_v1.DirectoryResource, aliased locally as AdminDirectoryResource, across client.py/google.py/factory.py. (2) execute_batch_request called BatchHttpRequest.execute(num_retries=3), but BatchHttpRequest.execute only accepts an optional http argument at runtime/in the stubs -- would have raised TypeError in production; removed the invalid kwarg.\n\nTest evidence: tests/unit/infrastructure/directory + tests/unit/integrations/google_workspace = 71 passed. mypy clean on the three touched files (rm -rf .mypy_cache && uv run mypy .); ruff check . passes. Full uv run pytest tests --ignore=tests/smoke shows 5 pre-existing failures (2 in tests/integrations/aws/test_client_next.py, 3 in tests/modules/webhooks/test_webhooks_aws_sns.py) caused by structlog capture_logs cross-test pollution when running tests/integration and tests/modules in one process -- reproduced identically on main with these changes stashed, and make test (the project's split test-new/test-legacy runner) passes cleanly; unrelated to this task.\n\nDoD#1 left unchecked for human PR-time verification (behavior-neutral outcome + PR references to decisions/layers.md, decisions/outbound-clients.md, decisions/sdk-typing.md).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
