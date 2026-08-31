@@ -11,7 +11,7 @@ scope: The three-tier layer model, import direction, and the two integration pat
 
 Feature code changes when business requirements change; vendor code changes when providers or SDKs change. When the two are coupled, either change forces rewrites of the other. We also need one more distinction the old corpus missed: **some external systems are the app's front door** (Slack today, Teams likely tomorrow — the platform runtime lives *in our process* and drives the application), while **others are services we call at a boundary** (AWS, Google Workspace, MaxMind — invoked outbound, sometimes). Conflating these two produced the contradictory "shield" decisions.
 
-Current state: three generations of the client layer coexist (`app/clients/` empty, `app/infrastructure/clients/` deprecated, `app/integrations/` current with `_next.py` twins); `integrations/slack/` contains a full transport (Bolt runtime, parser, formatter), most of which belongs in `infrastructure/slack/` while the Web API client stays as the `integrations/` primitive; `integrations/` imports upward into `infrastructure` ~38 times.
+Current state: `app/integrations/` is the current client layer and still contains `_next.py` twins; `integrations/slack/` contains a full transport (Bolt runtime, parser, formatter), most of which belongs in `infrastructure/slack/` while the Web API client stays as the `integrations/` primitive; `integrations/` imports upward into `infrastructure` ~38 times.
 
 ## Decision
 
@@ -68,4 +68,4 @@ app/integrations/     Outbound clients. Thin, vendor-specific, raise SDK excepti
 
 ## Migration
 
-Ticket: architecture epic. Tolerated divergences until closed: `infrastructure/clients/` consumers (held by the deprecated-import guardrail baseline), `_next.py` twins, Slack content still in `integrations/slack/`, the upward imports from `integrations/` into `infrastructure/`, and the non-tier top-level directories listed above (each held by its own ticket).
+Ticket: architecture epic. Tolerated divergences until closed: `_next.py` twins, Slack content still in `integrations/slack/`, the upward imports from `integrations/` into `infrastructure/`, and the non-tier top-level directories listed above (each held by its own ticket).
