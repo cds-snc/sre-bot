@@ -15,7 +15,17 @@ if TYPE_CHECKING:
     from infrastructure.configuration.integrations.maxmind import MaxMindSettings
 
 logger = structlog.get_logger()
-MAXMIND_DB_PATH = get_maxmind_settings().MAXMIND_DB_PATH
+
+
+def classify_maxmind_error(exc: Exception) -> tuple[OperationStatus, str | None, int | None]:
+    """Classify known MaxMind exceptions into operation status metadata."""
+    if isinstance(exc, AddressNotFoundError):
+        return (OperationStatus.NOT_FOUND, "IP_NOT_FOUND", None)
+    if isinstance(exc, ValueError):
+        return (OperationStatus.PERMANENT_ERROR, "INVALID_IP_FORMAT", None)
+    if isinstance(exc, GeoIP2Error):
+        return (OperationStatus.TRANSIENT_ERROR, "GEOIP2_ERROR", None)
+    raise exc
 
 
 @dataclass
@@ -74,26 +84,31 @@ class MaxMindClient:
                 )
                 return OperationResult.success(data=location.to_dict(), message="IP geolocated successfully")
 
-            except AddressNotFoundError:
+            except AddressNotFoundError as e:
+                status, error_code, _ = classify_maxmind_error(e)
                 log.warning("ip_not_found")
                 return OperationResult(
-                    status=OperationStatus.NOT_FOUND,
+                    status=status,
                     message=f"IP address not found in database: {ip_address}",
-                    error_code="IP_NOT_FOUND",
+                    error_code=error_code,
                 )
 
             except ValueError as e:
+                status, error_code, _ = classify_maxmind_error(e)
                 log.warning("invalid_ip_format", error=str(e))
-                return OperationResult.permanent_error(
+                return OperationResult(
+                    status=status,
                     message=f"Invalid IP address format: {ip_address}",
-                    error_code="INVALID_IP_FORMAT",
+                    error_code=error_code,
                 )
 
             except GeoIP2Error as e:
+                status, error_code, _ = classify_maxmind_error(e)
                 log.error("geoip2_error", error=str(e))
-                return OperationResult.transient_error(
+                return OperationResult(
+                    status=status,
                     message=f"GeoIP2 database error: {str(e)}",
-                    error_code="GEOIP2_ERROR",
+                    error_code=error_code,
                 )
 
             finally:
@@ -138,53 +153,3 @@ class MaxMindClient:
 def get_maxmind_client() -> MaxMindClient:
     """Get singleton MaxMindClient instance."""
     return MaxMindClient(maxmind_settings=get_maxmind_settings())
-
-
-def geolocate(ip) -> tuple | str:
-    """Geolocate an IP address using Maxmind.
-
-    Args:
-        ip (str): The IP address to geolocate.
-
-    Returns:
-        tuple | str: A tuple containing the country code, city name, latitude, and longitude of the IP address. A string if the IP address is not found or invalid.
-    """
-    log = logger.bind(ip=ip)
-    try:
-        reader = geoip2.database.Reader(MAXMIND_DB_PATH)
-        try:
-            response = reader.city(ip)
-            return (
-                response.country.iso_code,
-                response.city.name,
-                response.location.latitude,
-                response.location.longitude,
-            )
-        except AddressNotFoundError:
-            return "IP address not found"
-        except ValueError:
-            return "Invalid IP address"
-        except GeoIP2Error as e:
-            log.error("maxmind_geolocate_error", error=str(e))
-            raise
-        finally:
-            reader.close()
-    except (OSError, FileNotFoundError) as e:
-        log.error("maxmind_infrastructure_error", error=str(e))
-        raise
-
-
-def healthcheck():
-    """Check if the bot can interact with Maxmind."""
-    healthy = False
-    try:
-        result = geolocate("8.8.8.8")
-        healthy = isinstance(result, tuple)
-        logger.info(
-            "maxmind_healthcheck_success",
-            result=result,
-            status="healthy" if healthy else "unhealthy",
-        )
-    except Exception as error:
-        logger.exception("maxmind_healthcheck_failed", error=str(error))
-    return healthy

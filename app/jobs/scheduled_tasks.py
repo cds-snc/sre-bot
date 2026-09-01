@@ -123,7 +123,7 @@ def integration_healthchecks():
     logger.info("running_integration_healthchecks", module="scheduled_tasks", time=time.ctime())
     healthchecks: dict[str, Callable[[], bool]] = {
         "google_drive": google_drive.healthcheck,
-        "maxmind": maxmind.healthcheck,
+        "maxmind": lambda: maxmind.get_maxmind_client().healthcheck().is_success,
         "opsgenie": opsgenie.healthcheck,
         "aws": identity_store.healthcheck,
     }

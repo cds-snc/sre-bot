@@ -3,10 +3,11 @@ id: TASK-25.3
 title: >-
   Unify MaxMind client onto one factory + classify_maxmind_error; migrate legacy
   tuple consumers
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@me'
 created_date: '2026-08-05 16:13'
-updated_date: '2026-09-01 14:17'
+updated_date: '2026-09-01 14:59'
 labels:
   - clients
   - phase-3
@@ -27,10 +28,10 @@ ordinal: 122000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/maxmind exports exactly one client construction path + classify_maxmind_error(exc) -> (OperationStatus, error_code, retry_after) mapping AddressNotFoundError/ValueError/GeoIP2Error; the legacy module-level geolocate(ip)->tuple|str and healthcheck()->bool functions are deleted
-- [ ] #2 api/v1/routes/geolocate.py and jobs/scheduled_tasks.py (the two legacy tuple/bool consumers) are migrated to call the classify boundary and consume OperationResult, not tuple|str/bool
-- [ ] #3 packages/geolocate's existing OperationResult-based path (adapters/maxmind.py, service.py) is unchanged/behavior-neutral
-- [ ] #4 classify_maxmind_error has unit test coverage: each mapped exception family -> expected status/error_code/retry_after; one unmapped exception propagates
+- [x] #1 integrations/maxmind exports exactly one client construction path + classify_maxmind_error(exc) -> (OperationStatus, error_code, retry_after) mapping AddressNotFoundError/ValueError/GeoIP2Error; the legacy module-level geolocate(ip)->tuple|str and healthcheck()->bool functions are deleted
+- [x] #2 api/v1/routes/geolocate.py and jobs/scheduled_tasks.py (the two legacy tuple/bool consumers) are migrated to call the classify boundary and consume OperationResult, not tuple|str/bool
+- [x] #3 packages/geolocate's existing OperationResult-based path (adapters/maxmind.py, service.py) is unchanged/behavior-neutral
+- [x] #4 classify_maxmind_error has unit test coverage: each mapped exception family -> expected status/error_code/retry_after; one unmapped exception propagates
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -179,6 +180,12 @@ BLAST RADIUS / ROLLBACK
   one vendor/subsystem, no terraform/CI, no mixed refactor+unrelated-behavior). No decomposition
   needed.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented unified MaxMind client surface: added classify_maxmind_error and removed legacy module-level geolocate/healthcheck APIs; migrated API route and scheduled healthcheck to get_maxmind_client() OperationResult paths; preserved packages/geolocate adapter/service unchanged. Evidence: focused MaxMind/API/scheduled-task suite passed (24 tests); ruff check . passed; full suite passed via manual make test. Full mypy remains blocked by pre-existing repository-wide errors; changed route passes uv run mypy --no-incremental api/v1/routes/geolocate.py.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
