@@ -8,6 +8,7 @@ import re
 import time
 
 import pytz
+from googleapiclient.errors import HttpError
 from slack_bolt import Ack
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web import WebClient
@@ -334,7 +335,15 @@ def get_incidents_from_sheet(days=0) -> list:
     """Get incidents from Google Sheet"""
     date_lookback = datetime.datetime.now() - datetime.timedelta(days=days)
     date_lookback_str = date_lookback.strftime("%Y-%m-%d")
-    incidents = sheets.get_sheet(INCIDENT_LIST, "Sheet1", includeGridData=True)
+    incidents: dict | None
+    try:
+        incidents = sheets.get_sheet(INCIDENT_LIST, "Sheet1", includeGridData=True)
+    except HttpError as exc:
+        # Non-critical: an unparseable range means there is nothing to read.
+        if "Unable to parse range" not in str(exc):
+            raise
+        logger.warning("get_incidents_from_sheet_unable_to_parse_range", error=str(exc))
+        incidents = None
     if incidents and isinstance(incidents, dict):
         row_data = incidents.get("sheets")[0].get("data")[0].get("rowData")
         incidents_details = []

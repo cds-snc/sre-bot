@@ -194,6 +194,12 @@ def _install_fake_build(
             "v1",
             "https://www.googleapis.com/auth/documents",
         ),
+        (
+            "get_sheets_service",
+            "sheets",
+            "v4",
+            "https://www.googleapis.com/auth/spreadsheets",
+        ),
     ],
 )
 def test_service_factories_build_with_static_discovery_and_no_cache(
@@ -223,7 +229,10 @@ def test_service_factories_build_with_static_discovery_and_no_cache(
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("factory_name", ["get_calendar_service", "get_meet_service", "get_docs_service"])
+@pytest.mark.parametrize(
+    "factory_name",
+    ["get_calendar_service", "get_meet_service", "get_docs_service", "get_sheets_service"],
+)
 def test_service_factories_use_explicit_delegated_user_email(
     monkeypatch: pytest.MonkeyPatch,
     google_client_module: Any,
