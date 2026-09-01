@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 15:31'
-updated_date: '2026-09-01 17:13'
+updated_date: '2026-09-01 17:30'
 labels:
   - clients
   - phase-3
@@ -20,6 +20,8 @@ dependencies:
 references:
   - decisions/outbound-clients.md
   - app/integrations/google_workspace/client.py
+  - app/integrations/google_workspace/google_docs.py
+  - app/packages/incident_draft/adapters/google_docs.py
 parent_task_id: TASK-25.1
 priority: medium
 ordinal: 128000
@@ -41,6 +43,23 @@ Reconciliation must correct this deviation, not ratify it as permanent. Once all
 - [ ] #2 Every call site already in a real packages/<feature>/adapters/ or infrastructure/ file has its own inline try/except + classify_google_error + raise, and no longer depends on execute_google_api_request
 - [ ] #3 Every remaining legacy app/modules/* call site either has its own real per-feature adapter built and inlined, or a follow-up task migrating it there is filed/linked here; execute_google_api_request is deleted from client.py once zero call sites depend on it
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+CALL-SITE INVENTORY — TASK-25.1.2 (Docs) contribution, recorded 2026-09-01 at implementation time:
+
+app/integrations/google_workspace/google_docs.py now has 3 execute_google_api_request call sites (all added by TASK-25.1.2, none pre-existing):
+- create() -> service.documents().create(body=...)
+- batch_update() -> service.documents().batchUpdate(documentId=..., body=...)
+- get_document() -> service.documents().get(documentId=...)
+
+AC#1 classification for these 3: NONE live in a real packages/<feature>/adapters/ or infrastructure/ file. google_docs.py is the vendor module itself, and its downstream production consumers are:
+- app/modules/incident/incident_document.py, incident_status.py, incident_conversation.py, information_update.py — legacy app/modules/* with no adapter tier and no try/except around any google_docs call (AC#3 bucket).
+- app/packages/incident_draft/adapters/google_docs.py — real adapters/ file, already named in comment #2 above (AC#2 bucket); it calls google_docs.get_document/batch_update rather than execute_google_api_request directly, so reconciling it means pointing it at get_docs_service + its own inline try/except, which then removes 2 of the 3 sites' reason to exist for that path.
+
+So after TASK-25.1.2 the helper's known call sites are: TASK-25.1.1's (Calendar/Meet) + these 3 (Docs). Siblings .3/.4/.5 still to report.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

@@ -1,10 +1,11 @@
 ---
 id: TASK-25.1.2
 title: Migrate Google Docs integration off execute_google_api_call
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-31 18:32'
-updated_date: '2026-09-01 17:12'
+updated_date: '2026-09-01 17:29'
 labels:
   - clients
   - phase-3
@@ -28,9 +29,9 @@ Slice 2 of TASK-25.1. Migrate integrations/google_workspace/google_docs.py off g
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/google_workspace/google_docs.py no longer calls execute_google_api_call; routes through a factory-built, stub-typed Resource + classify_google_error, raising/classifying per the outbound-clients.md contract
-- [ ] #2 The 5 identified consumer files (app/modules/incident/{incident_document,incident_status,incident_conversation,information_update}.py and app/packages/incident_draft/adapters/google_docs.py) behave identically for their Docs-related calls (existing tests pass, behavior-neutral)
-- [ ] #3 classify_google_error gains any Docs-specific mapped families with unit coverage under tests/unit/integrations/google_workspace/
+- [x] #1 integrations/google_workspace/google_docs.py no longer calls execute_google_api_call; routes through a factory-built, stub-typed Resource + classify_google_error, raising/classifying per the outbound-clients.md contract
+- [x] #2 The 5 identified consumer files (app/modules/incident/{incident_document,incident_status,incident_conversation,information_update}.py and app/packages/incident_draft/adapters/google_docs.py) behave identically for their Docs-related calls (existing tests pass, behavior-neutral)
+- [x] #3 classify_google_error gains any Docs-specific mapped families with unit coverage under tests/unit/integrations/google_workspace/
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -82,6 +83,34 @@ Contained to integrations/google_workspace/{client.py,google_docs.py} (edits) an
 
 SIZE GATE: fits comfortably in one PR, smaller than the already-approved TASK-25.1.1 precedent. Production diff: 2 files (client.py ~15-20 new LOC for 1 factory; google_docs.py ~30-40 LOC net changed, no new file). Test diff: 1 file reworked + extended with new failure-path cases (test_google_docs.py), 1 file extended with 2 new parametrize entries (test_client.py). Single subsystem (Google Workspace vendor client), no cross-cutting refactor, no packages/ changes.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTED 2026-09-01.
+
+Production changes:
+- integrations/google_workspace/client.py: added get_docs_service(scopes, delegated_user_email=None) -> DocsResource (build('docs','v1')) + DocsResource TYPE_CHECKING import; module docstring rewritten (was Directory-only framing, now describes the generic Google Workspace vendor client covering Directory/Calendar/Meet/Docs factories + shared classification). No behavior change to classify_google_error / execute_google_api_request.
+- integrations/google_workspace/google_docs.py: create/batch_update/get_document rewired off google_service.execute_google_api_call onto get_docs_service + execute_google_api_request, with DOCS_SCOPES module constant and cast('Document')/cast('BatchUpdateDocumentRequest') bodies. Removed the google_service import, the handle_google_api_errors re-export and its decorators. extract_google_doc_id untouched. Results bound to 'result: dict' before return (mirrors meet.py) to avoid no-any-return leakage from execute_google_api_request's Any.
+- bin/baselines/sdk_typing_antipatterns.txt: pruned the google_docs.py entry (15 baselined files remain).
+
+AC#3: no new classify_google_error family was needed. Failure-path tests exercised 429/404 (already mapped), 418 (unmapped) and a non-HttpError; all propagate with unchanged exception identity through the existing table, so no speculative mapping was added (plan Step 1 / doubt (b) resolution). Coverage for those paths lives in tests/integrations/google_workspace/test_google_docs.py plus the pre-existing tests/unit/integrations/google_workspace/test_client.py classification tests.
+
+Test evidence:
+- tests/integrations/google_workspace/test_google_docs.py reworked onto a docs_client fixture patching client.get_docs_service: happy path x3 (same return shapes + call kwargs asserted), delegated_user_email default(None)/explicit-override x3, error propagation x5 (429 create, 429 batch_update, 404/418/RuntimeError get_document), plus a guard that google_docs no longer exposes google_service. extract_google_doc_id tests unchanged.
+- tests/unit/integrations/google_workspace/test_client.py: get_docs_service added to both factory parametrizations (docs/v1/auth-documents; cache_discovery=False, static_discovery=True, delegation).
+- Targeted run green: tests/integrations/google_workspace tests/unit/integrations/google_workspace tests/modules/incident tests/unit/packages/incident_draft -> 645 passed. All 5 consumers (modules/incident/{incident_document,incident_status,incident_conversation,information_update}.py and packages/incident_draft/adapters/google_docs.py) green with ZERO edits, proving AC#2 behavior neutrality.
+- mypy: 99 errors / 34 files, all pre-existing elsewhere; zero in client.py or google_docs.py (an initial 3 no-any-return errors from the rewire were fixed, not baselined).
+- ruff check: clean. bin/check_sdk_typing.py: OK. bin/check_deprecated_infra_client_imports.py: OK. grep for execute_google_api_call in google_docs.py: zero hits.
+- User confirmed a full local 'make test' run green after these changes.
+
+Deviations from plan: none material. Plan Step 4 said to patch google_docs.google_service_client.get_docs_service; tests patch client.get_docs_service instead (same object, matches the existing test_google_calendar.py calendar_client fixture precedent).
+
+Deferred / left for human verification:
+- bin/generate_client_usage_matrix.sh was not re-run (plan Step 7); the two python guard checks were.
+- packages/incident_draft/adapters/google_docs.py deliberately NOT migrated onto get_docs_service (plan doubt (e) / TASK-25.1.6).
+- TASK-25.1.6 still needs its call-site inventory updated with this slice's 3 new execute_google_api_request call sites in google_docs.py (per the 2026-09-01 tracking comment on this task).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

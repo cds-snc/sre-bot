@@ -15,7 +15,6 @@ integrations/aws/security_hub.py
 integrations/aws/sqs.py
 integrations/aws/sso_admin.py
 integrations/google_workspace/google_directory.py
-integrations/google_workspace/google_docs.py
 integrations/google_workspace/google_drive.py
 integrations/google_workspace/google_service.py
 integrations/google_workspace/sheets.py
