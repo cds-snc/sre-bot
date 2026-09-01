@@ -1,12 +1,15 @@
 """Google Meet API integration module."""
 
-from integrations.google_workspace.google_service import (
-    execute_google_api_call,
-    handle_google_api_errors,
-)
+from typing import TYPE_CHECKING, cast
+
+from integrations.google_workspace import client as google_service_client
+
+if TYPE_CHECKING:
+    from googleapiclient._apis.meet.v2 import Space  # pyright: ignore[reportMissingModuleSource]
+
+MEET_SCOPES = ["https://www.googleapis.com/auth/meetings.space.created"]
 
 
-@handle_google_api_errors
 def create_space(**kwargs) -> dict:
     """Creates a new and empty space in Google Meet.
 
@@ -17,12 +20,10 @@ def create_space(**kwargs) -> dict:
         dict: The response from the Google Meet API containing the space details.
     """
     config = {"accessType": "TRUSTED", "entryPointAccess": "ALL"}
-    return execute_google_api_call(
-        "meet",
-        "v2",
-        "spaces",
-        "create",
-        scopes=["https://www.googleapis.com/auth/meetings.space.created"],
-        body={"config": config},
-        **kwargs,
+    service = google_service_client.get_meet_service(
+        scopes=MEET_SCOPES,
+        delegated_user_email=kwargs.pop("delegated_user_email", None),
     )
+    body = cast("Space", {"config": config})
+    result: dict = google_service_client.execute_google_api_request(service.spaces().create(body=body))
+    return result

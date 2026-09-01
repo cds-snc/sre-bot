@@ -6,7 +6,7 @@ exceptions; adapters (infrastructure/directory/google.py) classify them.
 """
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from google.oauth2 import service_account
@@ -18,7 +18,11 @@ from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
 
 if TYPE_CHECKING:
-    from googleapiclient._apis.admin.directory_v1 import DirectoryResource as AdminDirectoryResource
+    from googleapiclient._apis.admin.directory_v1 import (  # pyright: ignore[reportMissingModuleSource]
+        DirectoryResource as AdminDirectoryResource,
+    )
+    from googleapiclient._apis.calendar.v3 import CalendarResource  # pyright: ignore[reportMissingModuleSource]
+    from googleapiclient._apis.meet.v2 import MeetResource  # pyright: ignore[reportMissingModuleSource]
 
 logger = structlog.get_logger()
 
@@ -38,6 +42,31 @@ def get_admin_directory_service(
     Raises on credential/build failure; callers classify errors raised from
     the returned Resource's calls with classify_google_error.
     """
+    return cast("AdminDirectoryResource", _build_service("admin", "directory_v1", scopes, delegated_user_email))
+
+
+def get_calendar_service(
+    scopes: list[str],
+    delegated_user_email: str | None = None,
+) -> CalendarResource:
+    """Build an authenticated Calendar API service resource."""
+    return cast("CalendarResource", _build_service("calendar", "v3", scopes, delegated_user_email))
+
+
+def get_meet_service(
+    scopes: list[str],
+    delegated_user_email: str | None = None,
+) -> MeetResource:
+    """Build an authenticated Meet API service resource."""
+    return cast("MeetResource", _build_service("meet", "v2", scopes, delegated_user_email))
+
+
+def _build_service(
+    api_name: str,
+    api_version: str,
+    scopes: list[str],
+    delegated_user_email: str | None,
+) -> Any:
     settings = get_google_workspace_settings()
 
     try:
@@ -57,8 +86,8 @@ def get_admin_directory_service(
 
     # Use bundled discovery docs to avoid remote discovery fetches.
     return build(
-        "admin",
-        "directory_v1",
+        api_name,
+        api_version,
         credentials=creds,
         cache_discovery=False,
         static_discovery=True,
@@ -88,6 +117,25 @@ def classify_google_error(exc: Exception) -> tuple[OperationStatus, str | None, 
         return OperationStatus.UNAUTHORIZED, error_code, None
 
     raise exc
+
+
+def execute_google_api_request(request: Any) -> Any:
+    """Execute a Google API request, logging classified failures and re-raising them.
+
+    Temporary shared primitive: TASK-25.1.6 decides whether to inline this per
+    call site or formalize it in decisions/outbound-clients.md.
+    """
+    try:
+        return request.execute()
+    except Exception as exc:
+        status, error_code, retry_after = classify_google_error(exc)
+        logger.warning(
+            "google_api_request_failed",
+            status=status.value,
+            error_code=error_code,
+            retry_after=retry_after,
+        )
+        raise
 
 
 def execute_batch_request(

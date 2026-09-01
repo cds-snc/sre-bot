@@ -1,10 +1,11 @@
 ---
 id: TASK-25.1.1
 title: Migrate Google Calendar + Meet integrations off execute_google_api_call
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-31 18:32'
-updated_date: '2026-09-01 15:32'
+updated_date: '2026-09-01 16:12'
 labels:
   - clients
   - phase-3
@@ -29,10 +30,10 @@ Slice 1 of TASK-25.1 (smallest, done first to prove the extraction pattern befor
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/google_workspace/google_calendar.py and meet.py no longer call execute_google_api_call; both route through a factory-built, stub-typed Resource + classify_google_error, raising/classifying per the outbound-clients.md contract
-- [ ] #2 modules/incident/schedule_retro.py (Calendar) and the Meet-related calls in modules/incident/core.py behave identically (existing tests pass, behavior-neutral)
-- [ ] #3 gmail.py is deleted (gmail_next.py was already deleted by TASK-23.1, Done 2026-08-31 -- no double-deletion risk); classify_google_error gains any Calendar/Meet-specific mapped families with unit coverage under tests/unit/integrations/google_workspace/
-- [ ] #4 New unit test coverage exists for meet.py's create_space under tests/integrations/google_workspace/test_meet.py (previously untested; test_google_meet.py covers only the unrelated google_meet.py URL-builder module), covering success, delegated_user_email pass-through, and HttpError propagation
+- [x] #1 integrations/google_workspace/google_calendar.py and meet.py no longer call execute_google_api_call; both route through a factory-built, stub-typed Resource + classify_google_error, raising/classifying per the outbound-clients.md contract
+- [x] #2 modules/incident/schedule_retro.py (Calendar) and the Meet-related calls in modules/incident/core.py behave identically (existing tests pass, behavior-neutral)
+- [x] #3 gmail.py is deleted (gmail_next.py was already deleted by TASK-23.1, Done 2026-08-31 -- no double-deletion risk); classify_google_error gains any Calendar/Meet-specific mapped families with unit coverage under tests/unit/integrations/google_workspace/
+- [x] #4 New unit test coverage exists for meet.py's create_space under tests/integrations/google_workspace/test_meet.py (previously untested; test_google_meet.py covers only the unrelated google_meet.py URL-builder module), covering success, delegated_user_email pass-through, and HttpError propagation
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -100,6 +101,31 @@ Contained to integrations/google_workspace/{client.py,google_calendar.py,meet.py
 
 SIZE GATE: fits comfortably in one PR. Production diff: 4 files (client.py ~60-90 new LOC for 2 factories + 1 shared helper; google_calendar.py ~30 LOC net changed; meet.py ~15 LOC net changed; gmail.py ~90 LOC deleted). Test diff: 1 file deleted (test_gmail.py), 1 file reworked (test_google_calendar.py, mechanical mock-target change across 9 tests), 1 new file (test_meet.py, ~60-80 LOC), 1 file extended (test_client.py, ~60-80 LOC). Single subsystem (Google Workspace vendor client), no cross-cutting refactor, no packages/ changes -- smaller than TASK-22.4's already-approved single-PR precedent.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented (2026-09-01).
+
+CHANGES
+- integrations/google_workspace/client.py: added get_calendar_service (calendar/v3) and get_meet_service (meet/v2) mirroring get_admin_directory_service; extracted shared _build_service for credential/delegation/build logic (cache_discovery=False, static_discovery=True). Added execute_google_api_request(request) shared primitive: executes, classifies failures via classify_google_error, logs classified status/error_code/retry_after, always re-raises the original exception. Marked temporary in-code pending TASK-25.1.6's inline-vs-formalize decision. Stub imports (CalendarResource, MeetResource) added under TYPE_CHECKING; factory returns cast to their stub types (also removes a pre-existing no-any-return on the Directory factory).
+- google_calendar.py: get_freebusy/insert_event now build a stub-typed CalendarResource via the factory and call .freebusy().query()/.events().insert() through execute_google_api_request. Removed handle_google_api_errors decorators + the google_service import entirely. Deleted the dead isinstance(result, tuple) branch.
+- meet.py: create_space migrated the same way; no longer imports google_service.
+- Deleted integrations/google_workspace/gmail.py and tests/integrations/google_workspace/test_gmail.py (zero production consumers, re-grepped before deletion).
+- Pruned gmail.py/google_calendar.py/meet.py from bin/baselines/sdk_typing_antipatterns.txt (16 baselined files remain).
+- classify_google_error NOT extended: no Calendar/Meet status surfaced by the failure-path tests fell outside the existing 404/401/403/429/5xx table; unmapped statuses propagate per the existing contract.
+
+TEST EVIDENCE
+- tests/integrations/google_workspace + tests/unit/integrations/google_workspace + tests/modules/incident: 428 passed (includes pre-authored test_meet.py create_space coverage: success, delegated_user_email pass-through/default, HttpError propagation, non-HttpError propagation; and test_client.py factory-construction + execute_google_api_request coverage).
+- modules/incident/schedule_retro.py and core.py untouched; their suites green with zero edits (AC#2 behavior neutrality).
+- Full suite: 3014 passed. 3 failures in tests/modules/webhooks/test_webhooks_aws_sns.py are pre-existing cross-test pollution (file passes 12/12 in isolation) and unrelated to this change.
+- mypy: 100 errors / 35 files (down from 107 / 38 pre-change); zero in client.py, google_calendar.py, meet.py. ruff: clean. bin/check_sdk_typing.py and bin/check_deprecated_infra_client_imports.py: OK. bin/generate_client_usage_matrix.sh regenerated.
+
+FOR HUMAN VERIFICATION (DoD)
+- PR description must reference TASK-25.1.6 for the execute_google_api_request placement deviation from decisions/outbound-clients.md.
+- Confirm gmail.py removal is acceptable (no production consumers found).
+- Live-path smoke of Calendar retro scheduling / Meet space creation against real Google APIs (not covered by unit tests).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
