@@ -1,11 +1,11 @@
 ---
 id: TASK-25.1.1
 title: Migrate Google Calendar + Meet integrations off execute_google_api_call
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-31 18:32'
-updated_date: '2026-09-01 16:12'
+updated_date: '2026-09-01 16:22'
 labels:
   - clients
   - phase-3
