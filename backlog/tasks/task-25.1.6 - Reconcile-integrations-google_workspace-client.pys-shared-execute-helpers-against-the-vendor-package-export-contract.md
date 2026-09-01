@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 15:31'
-updated_date: '2026-09-01 17:30'
+updated_date: '2026-09-01 18:56'
 labels:
   - clients
   - phase-3
@@ -59,6 +59,24 @@ AC#1 classification for these 3: NONE live in a real packages/<feature>/adapters
 - app/packages/incident_draft/adapters/google_docs.py — real adapters/ file, already named in comment #2 above (AC#2 bucket); it calls google_docs.get_document/batch_update rather than execute_google_api_request directly, so reconciling it means pointing it at get_docs_service + its own inline try/except, which then removes 2 of the 3 sites' reason to exist for that path.
 
 So after TASK-25.1.2 the helper's known call sites are: TASK-25.1.1's (Calendar/Meet) + these 3 (Docs). Siblings .3/.4/.5 still to report.
+
+CALL-SITE INVENTORY — TASK-25.1.3 (Sheets) contribution, recorded 2026-09-01 at implementation time:
+
+app/integrations/google_workspace/sheets.py now has 5 execute_google_api_request call sites (all added by TASK-25.1.3, none pre-existing):
+- get_values() -> service.spreadsheets().values().get(spreadsheetId=..., range=..., fields=...)
+- get_sheet() -> service.spreadsheets().get(spreadsheetId=..., ranges=..., includeGridData=...)
+- batch_update() -> service.spreadsheets().batchUpdate(spreadsheetId=..., body=...)
+- batch_update_values() -> service.spreadsheets().values().batchUpdate(spreadsheetId=..., body=...)
+- append_values() -> service.spreadsheets().values().append(spreadsheetId=..., range=..., body=..., valueInputOption=..., insertDataOption=...)
+
+AC#1 classification for these 5: NONE live in a real packages/<feature>/adapters/ or infrastructure/ file. sheets.py is the vendor module itself; its production consumers are all legacy app/modules/* with no adapter tier (AC#3 bucket):
+- app/modules/incident/incident_folder.py — append_values, get_values, batch_update_values, get_sheet. NOTE: this file now owns the ONLY caller-side Google error handling in the Sheets path: TASK-25.1.3 relocated the 'Unable to parse range' non-critical swallow out of google_service.py's handle_google_api_errors decorator into get_incidents_from_sheet (try/except HttpError -> warn + return []; any other HttpError re-raised). When this file eventually gets a real adapter, that swallow is the business rule to carry across — it is caller-specific, must NOT move back into the vendor package, and is the concrete precedent for what 'inline try/except + classify_google_error at the call site' should look like here.
+- app/modules/reports/google_groups.py — get_sheet (wrapped in its own blanket 'except Exception: sheet = None', which is exactly the imprecise handling an adapter + classify_google_error should replace).
+- app/modules/aws/spending.py — Sheets values calls only; no get_sheet.
+
+TEST-COVERAGE GAP flagged for whoever picks this up (discovered during TASK-25.1.3): app/modules/reports/google_groups.py and app/modules/aws/spending.py have NO automated regression coverage for their Sheets call sites — before or after TASK-25.1.3. (app/tests/modules/aws/test_spending_handler.py covers a different function, not the Sheets call site.) TASK-25.1.3's behavior-neutrality for these two files rests solely on preserved public signatures/return shapes, not on a green test suite. Any reconciliation work that changes their error-handling shape (which is the whole point of AC#3 for them) is therefore UNGUARDED and must add characterization tests FIRST, before touching either file. Do not treat 'existing tests pass' as evidence of safety for these two.
+
+DECOMPOSITION NOTE (2026-09-01): with .1/.2/.3 reported, the known inventory is already Calendar/Meet + 3 Docs + 5 Sheets sites across 3 vendor modules and ~7 legacy app/modules/* consumer files, plus app/packages/incident_draft/adapters/google_docs.py — and .4/.5 (legacy Directory consumers, Drive) have yet to report. This task as scoped (inline everywhere + build/file adapters for every legacy consumer + delete the helper) will NOT fit a single reviewable PR. Expect to decompose it before implementation, roughly: (a) one task per real adapters/ file to inline (incident_draft/adapters/google_docs.py is already named in comment 2026-09-01 17:13); (b) one task per legacy feature area needing a new adapter (incident Docs/Drive/Calendar; incident Sheets incl. the relocated parse-range rule; reports/google_groups; aws/spending — each gated on adding characterization tests first where coverage is missing); (c) a final small task deleting execute_google_api_request from client.py once the call-site count reaches zero. Run this through the implementation-planning size gate rather than attempting it as one change.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -72,5 +90,11 @@ Corrected 2026-09-01 (task-planner, while planning TASK-25.1.2): the original 'i
 created: 2026-09-01 17:13
 ---
 Concrete instance for AC#2/#3 (2026-09-01, human-confirmed while planning TASK-25.1.2): app/packages/incident_draft/adapters/google_docs.py is a real packages/<feature>/adapters/ file (post-dates the original TASK-25.1 consumer inventory) that today calls google_docs.get_document/batch_update (the legacy module-level passthrough) with ZERO try/except of its own — target shape is to call integrations.google_workspace.client.get_docs_service directly and do its own inline try/except+classify_google_error. Deliberately deferred out of TASK-25.1.2 (not an oversight): its test file is 1704 lines with 44 patch(...) sites keyed to the current google_docs mock boundary, and building real classify-based error handling here is new business logic (OperationStatus-to-None/[]-on-failure mapping for read_sections/write_draft_document), not a mechanical rewire — combining it with 25.1.2's own work would exceed a reviewable single PR. When this task is picked up, treat this adapter as a named, already-identified item in the call-site inventory, not something to re-discover.
+---
+
+author: implementation
+created: 2026-09-01 18:56
+---
+TASK-25.1.3 (Sheets) implemented 2026-09-01: appended its 5 execute_google_api_request call sites to the inventory in Notes. Two things for whoever picks this task up: (1) modules/reports/google_groups.py and modules/aws/spending.py have ZERO test coverage of their Sheets call sites, so any error-handling change there is unguarded and needs characterization tests written first; (2) the accumulated inventory (.1/.2/.3 reported, .4/.5 outstanding) already exceeds a single reviewable PR — this task should be decomposed into per-adapter / per-legacy-feature-area subtasks plus a final helper-deletion task before any code is written.
 ---
 <!-- COMMENTS:END -->

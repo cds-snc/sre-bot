@@ -1,12 +1,19 @@
 """Google Sheets API calls."""
 
-from integrations.google_workspace.google_service import (
-    execute_google_api_call,
-    handle_google_api_errors,
-)
+from typing import TYPE_CHECKING, Literal, cast
+
+from integrations.google_workspace import client as google_service_client
+
+if TYPE_CHECKING:
+    from googleapiclient._apis.sheets.v4 import (  # pyright: ignore[reportMissingModuleSource]
+        BatchUpdateSpreadsheetRequest,
+        BatchUpdateValuesRequest,
+        ValueRange,
+    )
+
+SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
 
-@handle_google_api_errors
 def get_values(spreadsheetId: str, cell_range: str | None = None, fields=None, **kwargs) -> dict:
     """Gets the values from a Google Sheet.
 
@@ -20,20 +27,16 @@ def get_values(spreadsheetId: str, cell_range: str | None = None, fields=None, *
     Returns:
         dict: The response from the Google Sheets API.
     """
-    return execute_google_api_call(
-        "sheets",
-        "v4",
-        "spreadsheets.values",
-        "get",
-        scopes=["https://www.googleapis.com/auth/spreadsheets"],
-        spreadsheetId=spreadsheetId,
-        range=cell_range,
-        fields=fields,
-        **kwargs,
+    service = google_service_client.get_sheets_service(
+        scopes=SHEETS_SCOPES,
+        delegated_user_email=kwargs.pop("delegated_user_email", None),
     )
+    result: dict = google_service_client.execute_google_api_request(
+        service.spreadsheets().values().get(spreadsheetId=spreadsheetId, range=cast("str", cell_range), fields=fields)
+    )
+    return result
 
 
-@handle_google_api_errors
 def get_sheet(spreadsheetId: str, ranges: str, includeGridData: bool = False, **kwargs) -> dict:
     """Gets a Google Sheet.
 
@@ -48,20 +51,16 @@ def get_sheet(spreadsheetId: str, ranges: str, includeGridData: bool = False, **
     Reference:
     https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/get
     """
-    return execute_google_api_call(
-        "sheets",
-        "v4",
-        "spreadsheets",
-        "get",
-        scopes=["https://www.googleapis.com/auth/spreadsheets"],
-        spreadsheetId=spreadsheetId,
-        ranges=ranges,
-        includeGridData=includeGridData,
-        **kwargs,
+    service = google_service_client.get_sheets_service(
+        scopes=SHEETS_SCOPES,
+        delegated_user_email=kwargs.pop("delegated_user_email", None),
     )
+    result: dict = google_service_client.execute_google_api_request(
+        service.spreadsheets().get(spreadsheetId=spreadsheetId, ranges=ranges, includeGridData=includeGridData)
+    )
+    return result
 
 
-@handle_google_api_errors
 def batch_update(spreadsheetId: str, body: dict, **kwargs) -> dict:
     """Updates a Google Sheet.
 
@@ -72,19 +71,17 @@ def batch_update(spreadsheetId: str, body: dict, **kwargs) -> dict:
     Returns:
         dict: The response from the Google Sheets API.
     """
-    return execute_google_api_call(
-        "sheets",
-        "v4",
-        "spreadsheets",
-        "batchUpdate",
-        scopes=["https://www.googleapis.com/auth/spreadsheets"],
-        spreadsheetId=spreadsheetId,
-        body=body,
-        **kwargs,
+    service = google_service_client.get_sheets_service(
+        scopes=SHEETS_SCOPES,
+        delegated_user_email=kwargs.pop("delegated_user_email", None),
     )
+    body_typed = cast("BatchUpdateSpreadsheetRequest", body)
+    result: dict = google_service_client.execute_google_api_request(
+        service.spreadsheets().batchUpdate(spreadsheetId=spreadsheetId, body=body_typed)
+    )
+    return result
 
 
-@handle_google_api_errors
 def batch_update_values(
     spreadsheetId: str,
     cell_range: str,
@@ -104,21 +101,23 @@ def batch_update_values(
     Returns:
         dict: The response from the Google Sheets API.
     """
-    return execute_google_api_call(
-        "sheets",
-        "v4",
-        "spreadsheets.values",
-        "batchUpdate",
-        scopes=["https://www.googleapis.com/auth/spreadsheets"],
-        spreadsheetId=spreadsheetId,
-        body={
+    service = google_service_client.get_sheets_service(
+        scopes=SHEETS_SCOPES,
+        delegated_user_email=kwargs.pop("delegated_user_email", None),
+    )
+    body_typed = cast(
+        "BatchUpdateValuesRequest",
+        {
             "valueInputOption": valueInputOption,
             "data": [{"range": cell_range, "values": values}],
         },
     )
+    result: dict = google_service_client.execute_google_api_request(
+        service.spreadsheets().values().batchUpdate(spreadsheetId=spreadsheetId, body=body_typed)
+    )
+    return result
 
 
-@handle_google_api_errors
 def append_values(
     spreadsheetId: str,
     cell_range: str,
@@ -137,16 +136,20 @@ def append_values(
     Returns:
         dict: The response from the Google Sheets API.
     """
-    return execute_google_api_call(
-        "sheets",
-        "v4",
-        "spreadsheets.values",
-        "append",
-        scopes=["https://www.googleapis.com/auth/spreadsheets"],
-        spreadsheetId=spreadsheetId,
-        range=cell_range,
-        body=body,
-        valueInputOption=valueInputOption,
-        insertDataOption=insertDataOption,
-        **kwargs,
+    service = google_service_client.get_sheets_service(
+        scopes=SHEETS_SCOPES,
+        delegated_user_email=kwargs.pop("delegated_user_email", None),
     )
+    body_typed = cast("ValueRange", body)
+    result: dict = google_service_client.execute_google_api_request(
+        service.spreadsheets()
+        .values()
+        .append(
+            spreadsheetId=spreadsheetId,
+            range=cell_range,
+            body=body_typed,
+            valueInputOption=cast("Literal['INPUT_VALUE_OPTION_UNSPECIFIED', 'RAW', 'USER_ENTERED']", valueInputOption),
+            insertDataOption=cast("Literal['OVERWRITE', 'INSERT_ROWS']", insertDataOption),
+        )
+    )
+    return result

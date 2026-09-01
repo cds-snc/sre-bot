@@ -1,11 +1,11 @@
 ---
 id: TASK-25.1.2
 title: Migrate Google Docs integration off execute_google_api_call
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-31 18:32'
-updated_date: '2026-09-01 17:29'
+updated_date: '2026-09-01 18:54'
 labels:
   - clients
   - phase-3

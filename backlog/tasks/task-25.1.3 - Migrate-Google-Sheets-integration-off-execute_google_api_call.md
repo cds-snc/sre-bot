@@ -1,10 +1,11 @@
 ---
 id: TASK-25.1.3
 title: Migrate Google Sheets integration off execute_google_api_call
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@me'
 created_date: '2026-07-31 18:32'
-updated_date: '2026-09-01 18:31'
+updated_date: '2026-09-01 18:56'
 labels:
   - clients
   - phase-3
@@ -28,9 +29,9 @@ Slice 3 of TASK-25.1. Migrate integrations/google_workspace/sheets.py off google
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/google_workspace/sheets.py no longer calls execute_google_api_call; routes through a factory-built, stub-typed Resource + classify_google_error, raising/classifying per the outbound-clients.md contract
-- [ ] #2 The 3 identified consumer files behave identically for their Sheets-related calls (existing tests pass, behavior-neutral), including the get_sheet 'Unable to parse range' non-critical warning preserved
-- [ ] #3 classify_google_error gains any Sheets-specific mapped families with unit coverage under tests/unit/integrations/google_workspace/
+- [x] #1 integrations/google_workspace/sheets.py no longer calls execute_google_api_call; routes through a factory-built, stub-typed Resource + classify_google_error, raising/classifying per the outbound-clients.md contract
+- [x] #2 The 3 identified consumer files behave identically for their Sheets-related calls (existing tests pass, behavior-neutral), including the get_sheet 'Unable to parse range' non-critical warning preserved
+- [x] #3 classify_google_error gains any Sheets-specific mapped families with unit coverage under tests/unit/integrations/google_workspace/
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -84,6 +85,28 @@ Contained to integrations/google_workspace/{client.py,sheets.py} (edits), module
 
 SIZE GATE: fits comfortably in one PR, comparable to TASK-25.1.2. Production diff: 3 files (client.py ~15-20 new LOC for 1 factory; sheets.py ~50-70 LOC net changed, no new file; incident_folder.py ~10-12 LOC added for the relocated try/except). Test diff: test_sheets.py reworked, test_client.py extended with 1 parametrize entry, test_incident_folder.py gains ~4 new test functions. Single subsystem (Google Workspace vendor client) plus one small, tightly-scoped business-logic relocation into its sole dependent caller — no cross-cutting refactor, no packages/ changes.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTED (2026-09-01).
+
+Changes:
+- integrations/google_workspace/client.py: added get_sheets_service(scopes, delegated_user_email=None) -> SheetsResource (build('sheets','v4',...) via _build_service) + TYPE_CHECKING SheetsResource import. No other client.py behavior change; classify_google_error NOT extended (no failure-path test surfaced an unmapped status, per human-confirmed decision (b)).
+- integrations/google_workspace/sheets.py: all five functions (get_values, get_sheet, batch_update, batch_update_values, append_values) migrated off execute_google_api_call/handle_google_api_errors to factory-built stub-typed Resource chains + execute_google_api_request. Added module-level SHEETS_SCOPES. Typed bodies via cast to BatchUpdateSpreadsheetRequest / BatchUpdateValuesRequest / ValueRange; cast range to str (None still forwarded, behavior-preserving) and valueInputOption/insertDataOption to the stubs' Literal unions. batch_update_values now wires delegated_user_email (previously silently dropped; zero production callers pass it).
+- modules/incident/incident_folder.py: relocated the 'Unable to parse range' non-critical swallow out of the vendor client into get_incidents_from_sheet (try/except HttpError -> warn + incidents=None -> returns []; any other HttpError re-raised), per human-confirmed option B in the plan.
+- bin/baselines/sdk_typing_antipatterns.txt: pruned integrations/google_workspace/sheets.py entry (14 baselined files remain).
+
+Test evidence (user-run, all green):
+- pytest tests/integrations/google_workspace/test_sheets.py tests/unit/integrations/google_workspace tests/modules/incident -> 334 passed.
+- Full suite (tests, smoke ignored), ruff check, bin/check_sdk_typing.py, bin/check_deprecated_infra_client_imports.py all green.
+- mypy: 95 errors / 33 files, all pre-existing legacy modules; zero errors in the three touched files (baseline before this change was 95 for untouched code).
+
+Gaps / human verification:
+- modules/reports/google_groups.py and modules/aws/spending.py have NO automated regression coverage for their Sheets call sites (before or after). Behavior-neutrality rests on preserved public signatures/return shapes, not on tests. google_groups.py needed no edit (its blanket 'except Exception: sheet = None' already absorbs the parse-range case); spending.py never calls get_sheet.
+- TASK-25.1.6 should record sheets.py's five new execute_google_api_request call sites in its inline-vs-formalize inventory.
+- google_service.py stays alive for the remaining (Drive/Directory) consumers.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
