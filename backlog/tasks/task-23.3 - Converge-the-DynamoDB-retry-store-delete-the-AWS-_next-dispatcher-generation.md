@@ -1,11 +1,11 @@
 ---
 id: TASK-23.3
 title: Converge the DynamoDB retry store; delete the AWS _next dispatcher generation
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-08-31 17:35'
-updated_date: '2026-09-01 13:39'
+updated_date: '2026-09-01 13:47'
 labels:
   - clients
   - phase-3
@@ -48,8 +48,8 @@ After this slice, find app/integrations -name "*_next.py" returns zero.
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 mypy, ruff and pytest (excluding smoke) green from app/
-- [ ] #2 Single git revert restores the previous behavior; PR references decisions/outbound-clients.md and decisions/sdk-typing.md
+- [x] #1 mypy, ruff and pytest (excluding smoke) green from app/
+- [x] #2 Single git revert restores the previous behavior; PR references decisions/outbound-clients.md and decisions/sdk-typing.md
 <!-- DOD:END -->
 
 ## Implementation Plan
