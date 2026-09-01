@@ -4,6 +4,7 @@ title: Migrate Google Docs integration off execute_google_api_call
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:32'
+updated_date: '2026-09-01 15:34'
 labels:
   - clients
   - phase-3
@@ -31,3 +32,13 @@ Slice 2 of TASK-25.1. Migrate integrations/google_workspace/google_docs.py off g
 - [ ] #2 The 4 identified consumer files behave identically for their Docs-related calls (existing tests pass, behavior-neutral)
 - [ ] #3 classify_google_error gains any Docs-specific mapped families with unit coverage under tests/unit/integrations/google_workspace/
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: task-planner
+created: 2026-09-01 15:34
+---
+TRACKING NOTE (2026-09-01, task-planner): TASK-25.1.1 introduces a shared integrations/google_workspace/client.py::execute_google_api_request(request) helper (try/except + classify_google_error + log + raise) as a deliberate, TEMPORARY deviation from outbound-clients.md's exact vendor-package export contract, tracked by TASK-25.1.6. When implementing this slice, if google_docs.py's migrated call sites use execute_google_api_request (or you introduce an equivalent), update TASK-25.1.6's description/references with the exact files and call sites added here, so its eventual inline-vs-formalize decision is made against the full call-site inventory, not just TASK-25.1.1's.
+---
+<!-- COMMENTS:END -->

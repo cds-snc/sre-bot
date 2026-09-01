@@ -2,12 +2,41 @@
 
 import json
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 import pytz
+from googleapiclient.errors import HttpError
 
+from integrations.google_workspace import client as google_client
 from integrations.google_workspace import google_calendar
+
+CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"]
+
+
+def _http_error(status: int) -> HttpError:
+    class FakeResp(dict):
+        def __init__(self) -> None:
+            super().__init__()
+            self.status = status
+            self.reason = "boom"
+
+    return HttpError(resp=FakeResp(), content=b"{}")
+
+
+@pytest.fixture
+def calendar_client(monkeypatch):
+    """Patch the Calendar service factory and expose the mocked stub-typed Resource chain."""
+    if not hasattr(google_client, "get_calendar_service"):
+        pytest.fail("integrations.google_workspace.client.get_calendar_service is not implemented")
+
+    service = MagicMock()
+    factory = MagicMock(return_value=service)
+    monkeypatch.setattr(google_client, "get_calendar_service", factory)
+    if hasattr(google_calendar, "get_calendar_service"):
+        monkeypatch.setattr(google_calendar, "get_calendar_service", factory)
+    return SimpleNamespace(factory=factory, service=service)
 
 
 # Fixture to mock the event details JSON string
@@ -81,31 +110,42 @@ def time_range():
     }
 
 
-@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
-def test_get_freebusy_required_args_only(mock_execute_google_api_call, items):
-    mock_execute_google_api_call.return_value = {}
+def test_get_freebusy_required_args_only(calendar_client, items):
+    query = calendar_client.service.freebusy.return_value.query
+    query.return_value.execute.return_value = {}
     time_min = "2022-01-01T00:00:00Z"
     time_max = "2022-01-02T00:00:00Z"
 
     google_calendar.get_freebusy(time_min, time_max, items)
 
-    mock_execute_google_api_call.assert_called_once_with(
-        "calendar",
-        "v3",
-        "freebusy",
-        "query",
-        scopes=["https://www.googleapis.com/auth/calendar"],
+    calendar_client.factory.assert_called_once_with(scopes=CALENDAR_SCOPES, delegated_user_email=None)
+    query.assert_called_once_with(
         body={
             "timeMin": time_min,
             "timeMax": time_max,
             "items": [{"id": "calendar1"}, {"id": "calendar2"}],
         },
     )
+    query.return_value.execute.assert_called_once_with()
 
 
-@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
-def test_get_freebusy_optional_args(mock_execute_google_api_call, items):
-    mock_execute_google_api_call.return_value = {}
+def test_get_freebusy_passes_delegated_user_email(calendar_client, items):
+    query = calendar_client.service.freebusy.return_value.query
+    query.return_value.execute.return_value = {}
+
+    google_calendar.get_freebusy(
+        "2022-01-01T00:00:00Z",
+        "2022-01-02T00:00:00Z",
+        items,
+        delegated_user_email="custom@example.com",
+    )
+
+    calendar_client.factory.assert_called_once_with(scopes=CALENDAR_SCOPES, delegated_user_email="custom@example.com")
+
+
+def test_get_freebusy_optional_args(calendar_client, items):
+    query = calendar_client.service.freebusy.return_value.query
+    query.return_value.execute.return_value = {}
     time_min = "2022-01-01T00:00:00Z"
     time_max = "2022-01-02T00:00:00Z"
     time_zone = "America/Los_Angeles"
@@ -119,12 +159,7 @@ def test_get_freebusy_optional_args(mock_execute_google_api_call, items):
 
     google_calendar.get_freebusy(time_min, time_max, items, body_kwargs=body_kwargs)
 
-    mock_execute_google_api_call.assert_called_once_with(
-        "calendar",
-        "v3",
-        "freebusy",
-        "query",
-        scopes=["https://www.googleapis.com/auth/calendar"],
+    query.assert_called_once_with(
         body={
             "timeMin": time_min,
             "timeMax": time_max,
@@ -136,9 +171,8 @@ def test_get_freebusy_optional_args(mock_execute_google_api_call, items):
     )
 
 
-@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
-def test_get_freebusy_returns_object(mock_execute):
-    mock_execute.return_value = {}
+def test_get_freebusy_returns_object(calendar_client):
+    calendar_client.service.freebusy.return_value.query.return_value.execute.return_value = {}
     time_min = "2022-01-01T00:00:00Z"
     time_max = "2022-01-02T00:00:00Z"
     items = ["calendar1", "calendar2"]
@@ -148,15 +182,25 @@ def test_get_freebusy_returns_object(mock_execute):
     assert isinstance(result, dict)
 
 
-@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
+def test_get_freebusy_propagates_http_error(calendar_client, items):
+    error = _http_error(429)
+    calendar_client.service.freebusy.return_value.query.return_value.execute.side_effect = error
+
+    with pytest.raises(HttpError) as exc_info:
+        google_calendar.get_freebusy("2022-01-01T00:00:00Z", "2022-01-02T00:00:00Z", items)
+
+    assert exc_info.value is error
+
+
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
 @patch("integrations.google_workspace.google_calendar.generate_unique_id")
 def test_insert_event_no_kwargs_no_delegated_email(
     mock_unique_id,
     mock_convert_string_to_camel_case,
-    mock_execute_google_api_call,
+    calendar_client,
 ):
-    mock_execute_google_api_call.return_value = {
+    insert = calendar_client.service.events.return_value.insert
+    insert.return_value.execute.return_value = {
         "htmlLink": "test_link",
         "start": {
             "dateTime": "2024-07-25T13:30:00-04:00",
@@ -178,12 +222,9 @@ def test_insert_event_no_kwargs_no_delegated_email(
         "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
         "event_link": "test_link",
     }
-    mock_execute_google_api_call.assert_called_once_with(
-        "calendar",
-        "v3",
-        "events",
-        "insert",
-        scopes=["https://www.googleapis.com/auth/calendar"],
+    calendar_client.factory.assert_called_once_with(scopes=CALENDAR_SCOPES, delegated_user_email=None)
+    insert.assert_called_once_with(
+        calendarId="primary",
         body={
             "start": {"dateTime": start, "timeZone": "America/New_York"},
             "end": {"dateTime": end, "timeZone": "America/New_York"},
@@ -205,7 +246,6 @@ def test_insert_event_no_kwargs_no_delegated_email(
                 }
             },
         },
-        calendarId="primary",
         supportsAttachments=True,
         sendUpdates="all",
         conferenceDataVersion=1,
@@ -213,15 +253,15 @@ def test_insert_event_no_kwargs_no_delegated_email(
     assert not mock_convert_string_to_camel_case.called
 
 
-@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
 @patch("integrations.google_workspace.google_calendar.generate_unique_id")
 def test_insert_event_with_kwargs(
     mock_unique_id,
     mock_convert_string_to_camel_case,
-    mock_execute_google_api_call,
+    calendar_client,
 ):
-    mock_execute_google_api_call.return_value = {
+    insert = calendar_client.service.events.return_value.insert
+    insert.return_value.execute.return_value = {
         "htmlLink": "test_link",
         "start": {
             "dateTime": "2024-07-25T13:30:00-04:00",
@@ -271,13 +311,9 @@ def test_insert_event_with_kwargs(
         "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
         "event_link": "test_link",
     }
-    mock_execute_google_api_call.assert_called_once_with(
-        "calendar",
-        "v3",
-        "events",
-        "insert",
-        scopes=["https://www.googleapis.com/auth/calendar"],
-        delegated_user_email=delegated_user_email,
+    calendar_client.factory.assert_called_once_with(scopes=CALENDAR_SCOPES, delegated_user_email=delegated_user_email)
+    insert.assert_called_once_with(
+        calendarId="primary",
         body={
             "start": {"dateTime": start, "timeZone": "Magic/Time_Zone"},
             "end": {"dateTime": end, "timeZone": "Magic/Time_Zone"},
@@ -287,7 +323,6 @@ def test_insert_event_with_kwargs(
             "guestsCanInviteOthers": True,
             **body_kwargs,
         },
-        calendarId="primary",
         supportsAttachments=True,
         sendUpdates="all",
         conferenceDataVersion=1,
@@ -296,15 +331,15 @@ def test_insert_event_with_kwargs(
         mock_convert_string_to_camel_case.assert_any_call(key)
 
 
-@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
 @patch("integrations.google_workspace.google_calendar.generate_unique_id")
 def test_insert_event_with_no_document(
     mock_unique_id,
     mock_convert_string_to_camel_case,
-    mock_execute_google_api_call,
+    calendar_client,
 ):
-    mock_execute_google_api_call.return_value = {
+    insert = calendar_client.service.events.return_value.insert
+    insert.return_value.execute.return_value = {
         "htmlLink": "test_link",
         "start": {
             "dateTime": "2024-07-25T13:30:00-04:00",
@@ -347,13 +382,9 @@ def test_insert_event_with_no_document(
         "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
         "event_link": "test_link",
     }
-    mock_execute_google_api_call.assert_called_once_with(
-        "calendar",
-        "v3",
-        "events",
-        "insert",
-        scopes=["https://www.googleapis.com/auth/calendar"],
-        delegated_user_email=delegated_user_email,
+    calendar_client.factory.assert_called_once_with(scopes=CALENDAR_SCOPES, delegated_user_email=delegated_user_email)
+    insert.assert_called_once_with(
+        calendarId="primary",
         body={
             "start": {"dateTime": start, "timeZone": "Magic/Time_Zone"},
             "end": {"dateTime": end, "timeZone": "Magic/Time_Zone"},
@@ -363,7 +394,6 @@ def test_insert_event_with_no_document(
             "guestsCanInviteOthers": True,
             **body_kwargs,
         },
-        calendarId="primary",
         supportsAttachments=True,
         sendUpdates="all",
         conferenceDataVersion=1,
@@ -372,15 +402,15 @@ def test_insert_event_with_no_document(
         mock_convert_string_to_camel_case.assert_any_call(key)
 
 
-@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
 @patch("integrations.google_workspace.google_calendar.generate_unique_id")
 def test_insert_event_google_hangout_link_created(
     mock_unique_id,
     mock_convert_string_to_camel_case,
-    mock_execute_google_api_call,
+    calendar_client,
 ):
-    mock_execute_google_api_call.return_value = {
+    insert = calendar_client.service.events.return_value.insert
+    insert.return_value.execute.return_value = {
         "htmlLink": "test_link",
         "start": {
             "dateTime": "2024-07-25T13:30:00-04:00",
@@ -403,12 +433,8 @@ def test_insert_event_google_hangout_link_created(
         "event_info": "Retro has been scheduled for Thursday, July 25, 2024 at 01:30 PM EDT. Check your calendar for more details.",
         "event_link": "test_link",
     }
-    mock_execute_google_api_call.assert_called_once_with(
-        "calendar",
-        "v3",
-        "events",
-        "insert",
-        scopes=["https://www.googleapis.com/auth/calendar"],
+    insert.assert_called_once_with(
+        calendarId="primary",
         body={
             "start": {"dateTime": start, "timeZone": "America/New_York"},
             "end": {"dateTime": end, "timeZone": "America/New_York"},
@@ -430,39 +456,39 @@ def test_insert_event_google_hangout_link_created(
                 }
             },
         },
-        calendarId="primary",
         supportsAttachments=True,
         sendUpdates="all",
         conferenceDataVersion=1,
     )
     assert mock_unique_id.called
-    assert mock_execute_google_api_call.contains("conferenceData")
-    assert mock_execute_google_api_call.contains(mock_unique_id.return_value)
+    sent_body = insert.call_args.kwargs["body"]
+    assert sent_body["conferenceData"]["createRequest"]["requestId"] == mock_unique_id.return_value
 
 
-@patch("integrations.google_workspace.google_service.handle_google_api_errors")
-@patch("integrations.google_workspace.google_calendar.google_service.execute_google_api_call")
 @patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
-def test_insert_event_api_call_error(
-    mock_convert_string_to_camel_case,
-    mock_execute_google_api_call,
-    mock_handle_errors,
-    caplog,
-):
-    mock_execute_google_api_call.side_effect = Exception("API call error")
+def test_insert_event_propagates_http_error(mock_convert_string_to_camel_case, calendar_client):
+    error = _http_error(500)
+    calendar_client.service.events.return_value.insert.return_value.execute.side_effect = error
     start = datetime.now()
-    end = start
-    emails = ["test1@test.com", "test2@test.com"]
-    title = "Test Event"
-    document_id = "test_document_id"
-    with pytest.raises(Exception):
-        google_calendar.insert_event(start, end, emails, title, document_id)
-        assert (
-            "An unexpected error occurred in function 'integrations.google_workspace.google_calendar:insert_event': API call error"
-            in caplog.text
-        )
+
+    with pytest.raises(HttpError) as exc_info:
+        google_calendar.insert_event(start, start, ["test1@test.com"], "Test Event", "test_document_id")
+
+    assert exc_info.value is error
     assert not mock_convert_string_to_camel_case.called
-    assert not mock_handle_errors.called
+
+
+@patch("integrations.google_workspace.google_calendar.convert_string_to_camel_case")
+def test_insert_event_propagates_unclassified_error(mock_convert_string_to_camel_case, calendar_client):
+    error = RuntimeError("API call error")
+    calendar_client.service.events.return_value.insert.return_value.execute.side_effect = error
+    start = datetime.now()
+
+    with pytest.raises(RuntimeError) as exc_info:
+        google_calendar.insert_event(start, start, ["test1@test.com"], "Test Event", "test_document_id")
+
+    assert exc_info.value is error
+    assert not mock_convert_string_to_camel_case.called
 
 
 @patch("integrations.google_workspace.google_calendar.get_federal_holidays")

@@ -1,17 +1,21 @@
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, cast
 
 import pytz
 import requests
 import structlog
 
-from integrations.google_workspace import google_service
+from integrations.google_workspace import client as google_service_client
 from integrations.utils.api import convert_string_to_camel_case, generate_unique_id
 
+if TYPE_CHECKING:
+    from googleapiclient._apis.calendar.v3 import Event, FreeBusyRequest  # pyright: ignore[reportMissingModuleSource]
+
 logger = structlog.get_logger()
-handle_google_api_errors = google_service.handle_google_api_errors
+
+CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 
-@handle_google_api_errors
 def get_freebusy(time_min, time_max, items, body_kwargs=None, **kwargs):
     """Returns free/busy information for a set of calendars.
 
@@ -33,18 +37,13 @@ def get_freebusy(time_min, time_max, items, body_kwargs=None, **kwargs):
     if body_kwargs is not None and isinstance(body_kwargs, dict):
         body.update({convert_string_to_camel_case(k): v for k, v in body_kwargs.items()})
 
-    return google_service.execute_google_api_call(
-        "calendar",
-        "v3",
-        "freebusy",
-        "query",
-        scopes=["https://www.googleapis.com/auth/calendar"],
-        body=body,
-        **kwargs,
+    service = google_service_client.get_calendar_service(
+        scopes=CALENDAR_SCOPES,
+        delegated_user_email=kwargs.pop("delegated_user_email", None),
     )
+    return google_service_client.execute_google_api_request(service.freebusy().query(body=cast("FreeBusyRequest", body)))
 
 
-@handle_google_api_errors
 def insert_event(
     start,
     end,
@@ -108,26 +107,21 @@ def insert_event(
     if body_kwargs is not None and isinstance(body_kwargs, dict):
         body.update({convert_string_to_camel_case(k): v for k, v in body_kwargs.items()})
 
-    result = google_service.execute_google_api_call(
-        "calendar",
-        "v3",
-        "events",
-        "insert",
-        scopes=["https://www.googleapis.com/auth/calendar"],
-        body=body,
-        calendarId=calendar_id,
-        supportsAttachments=True,
-        sendUpdates="all",
-        conferenceDataVersion=1,
-        **kwargs,
+    service = google_service_client.get_calendar_service(
+        scopes=CALENDAR_SCOPES,
+        delegated_user_email=kwargs.pop("delegated_user_email", None),
     )
-    # Handle the instance differently if the result is a dictionary or a tuple and get the calendar link and start time
-    if isinstance(result, dict):
-        htmllink = result.get("htmlLink")
-        start_time = result.get("start").get("dateTime")
-    elif isinstance(result, tuple):
-        htmllink = result[0].get("htmlLink")
-        start_time = result[0].get("start").get("dateTime")
+    result = google_service_client.execute_google_api_request(
+        service.events().insert(
+            calendarId=calendar_id,
+            body=cast("Event", body),
+            supportsAttachments=True,
+            sendUpdates="all",
+            conferenceDataVersion=1,
+        )
+    )
+    htmllink = result.get("htmlLink")
+    start_time = result.get("start").get("dateTime")
 
     # Convert teh date to be more human readable
     datetime_obj = datetime.strptime(start_time, "%Y-%m-%dT%H:%M:%S%z")
