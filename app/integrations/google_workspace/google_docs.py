@@ -4,16 +4,23 @@ This module provides functions to create and manipulate Google Docs.
 """
 
 import re
+from typing import TYPE_CHECKING, cast
 
 import structlog
 
-from integrations.google_workspace import google_service
+from integrations.google_workspace import client as google_service_client
+
+if TYPE_CHECKING:
+    from googleapiclient._apis.docs.v1 import (  # pyright: ignore[reportMissingModuleSource]
+        BatchUpdateDocumentRequest,
+        Document,
+    )
 
 logger = structlog.get_logger()
-handle_google_api_errors = google_service.handle_google_api_errors
+
+DOCS_SCOPES = ["https://www.googleapis.com/auth/documents"]
 
 
-@handle_google_api_errors
 def create(title: str, **kwargs) -> dict:
     """Creates a new document in Google Docs.
 
@@ -24,18 +31,15 @@ def create(title: str, **kwargs) -> dict:
     Returns:
         dict: The response from the Google Docs API containing the document ID.
     """
-    return google_service.execute_google_api_call(
-        "docs",
-        "v1",
-        "documents",
-        "create",
-        scopes=["https://www.googleapis.com/auth/documents"],
-        body={"title": title},
-        **kwargs,
+    service = google_service_client.get_docs_service(
+        scopes=DOCS_SCOPES,
+        delegated_user_email=kwargs.pop("delegated_user_email", None),
     )
+    body = cast("Document", {"title": title})
+    result: dict = google_service_client.execute_google_api_request(service.documents().create(body=body))
+    return result
 
 
-@handle_google_api_errors
 def batch_update(document_id: str, requests: list, **kwargs) -> dict:
     """Applies a list of updates to a document in Google Docs.
 
@@ -47,19 +51,17 @@ def batch_update(document_id: str, requests: list, **kwargs) -> dict:
     Returns:
         dict: The response from the Google Docs API.
     """
-    return google_service.execute_google_api_call(
-        "docs",
-        "v1",
-        "documents",
-        "batchUpdate",
-        scopes=["https://www.googleapis.com/auth/documents"],
-        documentId=document_id,
-        body={"requests": requests},
-        **kwargs,
+    service = google_service_client.get_docs_service(
+        scopes=DOCS_SCOPES,
+        delegated_user_email=kwargs.pop("delegated_user_email", None),
     )
+    body = cast("BatchUpdateDocumentRequest", {"requests": requests})
+    result: dict = google_service_client.execute_google_api_request(
+        service.documents().batchUpdate(documentId=document_id, body=body)
+    )
+    return result
 
 
-@handle_google_api_errors
 def get_document(document_id: str, **kwargs) -> dict:
     """Gets a document from Google Docs.
 
@@ -70,15 +72,12 @@ def get_document(document_id: str, **kwargs) -> dict:
     Returns:
         dict: The document resource.
     """
-    return google_service.execute_google_api_call(
-        "docs",
-        "v1",
-        "documents",
-        "get",
-        scopes=["https://www.googleapis.com/auth/documents"],
-        documentId=document_id,
-        **kwargs,
+    service = google_service_client.get_docs_service(
+        scopes=DOCS_SCOPES,
+        delegated_user_email=kwargs.pop("delegated_user_email", None),
     )
+    result: dict = google_service_client.execute_google_api_request(service.documents().get(documentId=document_id))
+    return result
 
 
 def extract_google_doc_id(url):

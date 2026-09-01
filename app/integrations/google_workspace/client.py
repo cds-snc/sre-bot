@@ -1,8 +1,10 @@
-"""Google Workspace Admin SDK Directory vendor client.
+"""Google Workspace vendor client.
 
-Provides authenticated Directory API service construction and error
-classification per decisions/outbound-clients.md — clients raise typed SDK
-exceptions; adapters (infrastructure/directory/google.py) classify them.
+Provides authenticated Google API service construction (Admin SDK Directory,
+Calendar, Meet, Docs) and shared error classification per
+decisions/outbound-clients.md — clients raise typed SDK exceptions; adapters
+classify them. Each factory returns a stub-typed Resource built with the
+narrow OAuth scopes its caller needs.
 """
 
 import json
@@ -22,6 +24,7 @@ if TYPE_CHECKING:
         DirectoryResource as AdminDirectoryResource,
     )
     from googleapiclient._apis.calendar.v3 import CalendarResource  # pyright: ignore[reportMissingModuleSource]
+    from googleapiclient._apis.docs.v1 import DocsResource  # pyright: ignore[reportMissingModuleSource]
     from googleapiclient._apis.meet.v2 import MeetResource  # pyright: ignore[reportMissingModuleSource]
 
 logger = structlog.get_logger()
@@ -59,6 +62,14 @@ def get_meet_service(
 ) -> MeetResource:
     """Build an authenticated Meet API service resource."""
     return cast("MeetResource", _build_service("meet", "v2", scopes, delegated_user_email))
+
+
+def get_docs_service(
+    scopes: list[str],
+    delegated_user_email: str | None = None,
+) -> DocsResource:
+    """Build an authenticated Docs API service resource."""
+    return cast("DocsResource", _build_service("docs", "v1", scopes, delegated_user_email))
 
 
 def _build_service(
