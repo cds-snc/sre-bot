@@ -3,10 +3,10 @@ id: TASK-22
 title: >-
   Migrate the seven baselined consumers off infrastructure/clients/ and delete
   the deprecated trees
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-31 17:08'
+updated_date: '2026-09-01 14:26'
 labels:
   - clients
   - phase-3
@@ -37,17 +37,17 @@ Steps:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 make client-usage-matrix reports zero consumers of infrastructure/clients/
-- [ ] #2 app/infrastructure/clients/ and app/clients/ no longer exist; decisions/layers.md check "no directory named clients/ under app/" passes
-- [ ] #3 Deprecated-import baseline file is empty
-- [ ] #4 All tests pass after each per-consumer PR, not just the last one
-- [ ] #5 Across the sprint, legacy test counts under tests/modules/ and tests/integrations/ only decrease: every vendor test touched during a slice is relocated to tests/unit/ or tests/integration/ (never left in or added to the legacy trees)
+- [x] #1 make client-usage-matrix reports zero consumers of infrastructure/clients/
+- [x] #2 app/infrastructure/clients/ and app/clients/ no longer exist; decisions/layers.md check "no directory named clients/ under app/" passes
+- [x] #3 Deprecated-import baseline file is empty
+- [x] #4 All tests pass after each per-consumer PR, not just the last one
+- [x] #5 Across the sprint, legacy test counts under tests/modules/ and tests/integrations/ only decrease: every vendor test touched during a slice is relocated to tests/unit/ or tests/integration/ (never left in or added to the legacy trees)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Behavior-neutral: no functional change per migrated consumer (existing tests unchanged except import paths)
-- [ ] #2 PR series references decisions/layers.md
+- [x] #1 Behavior-neutral: no functional change per migrated consumer (existing tests unchanged except import paths)
+- [x] #2 PR series references decisions/layers.md
 <!-- DOD:END -->
 
 ## Implementation Plan
