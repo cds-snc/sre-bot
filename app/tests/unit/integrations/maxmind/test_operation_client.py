@@ -5,8 +5,9 @@ from unittest.mock import MagicMock, Mock
 import pytest
 from geoip2.errors import AddressNotFoundError, GeoIP2Error
 
+import integrations.maxmind as maxmind_package
 from infrastructure.operations import OperationStatus
-from integrations.maxmind.client import GeoLocationData, MaxMindClient
+from integrations.maxmind.client import GeoLocationData, MaxMindClient, classify_maxmind_error
 
 
 @pytest.fixture
@@ -134,3 +135,58 @@ def test_geolocation_data_to_dict() -> None:
     assert data["longitude"] == -122.0838
     assert data["postal_code"] == "94035"
     assert data["time_zone"] == "America/Los_Angeles"
+
+
+@pytest.mark.unit
+class TestClassifyMaxMindError:
+    """Classification boundary for MaxMind exceptions (AC#4)."""
+
+    def test_address_not_found_maps_to_not_found(self) -> None:
+        """AddressNotFoundError maps to NOT_FOUND/IP_NOT_FOUND with no retry hint."""
+        assert classify_maxmind_error(AddressNotFoundError("missing")) == (
+            OperationStatus.NOT_FOUND,
+            "IP_NOT_FOUND",
+            None,
+        )
+
+    def test_value_error_maps_to_permanent_error(self) -> None:
+        """ValueError maps to PERMANENT_ERROR/INVALID_IP_FORMAT with no retry hint."""
+        assert classify_maxmind_error(ValueError("invalid")) == (
+            OperationStatus.PERMANENT_ERROR,
+            "INVALID_IP_FORMAT",
+            None,
+        )
+
+    def test_geoip2_error_maps_to_transient_error(self) -> None:
+        """GeoIP2Error maps to TRANSIENT_ERROR/GEOIP2_ERROR with no retry hint."""
+        assert classify_maxmind_error(GeoIP2Error("db error")) == (
+            OperationStatus.TRANSIENT_ERROR,
+            "GEOIP2_ERROR",
+            None,
+        )
+
+    def test_unmapped_exception_propagates(self) -> None:
+        """Unmapped exception families are re-raised instead of classified."""
+        unmapped = RuntimeError("boom")
+
+        with pytest.raises(RuntimeError) as exc_info:
+            classify_maxmind_error(unmapped)
+
+        assert exc_info.value is unmapped
+
+
+@pytest.mark.unit
+class TestMaxMindPackageSurface:
+    """The package exposes one construction path and no legacy tuple/bool helpers (AC#1)."""
+
+    def test_exports_single_client_construction_path_and_classifier(self) -> None:
+        """get_maxmind_client and classify_maxmind_error are the exported entry points."""
+        assert "get_maxmind_client" in maxmind_package.__all__
+        assert "classify_maxmind_error" in maxmind_package.__all__
+
+    def test_legacy_module_level_functions_are_removed(self) -> None:
+        """Legacy geolocate()->tuple|str and healthcheck()->bool are deleted."""
+        assert not hasattr(maxmind_package, "geolocate")
+        assert not hasattr(maxmind_package, "healthcheck")
+        assert not hasattr(maxmind_package.client, "geolocate")
+        assert not hasattr(maxmind_package.client, "healthcheck")
