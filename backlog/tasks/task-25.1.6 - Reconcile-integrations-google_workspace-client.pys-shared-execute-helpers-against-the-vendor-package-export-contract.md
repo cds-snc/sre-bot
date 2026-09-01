@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 15:31'
+updated_date: '2026-09-01 17:13'
 labels:
   - clients
   - phase-3
@@ -27,18 +28,30 @@ ordinal: 128000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-decisions/outbound-clients.md's Checks require each vendor package to export exactly: factories, classify_<vendor>_error, settings. TASK-22.4 already added one deviation (execute_batch_request, needed for the Directory batch API). TASK-25.1.1 is planned to add a second, more general one (execute_google_api_request(request), a shared try/except+classify_google_error+log+raise helper reused across get_freebusy/insert_event/create_space, intended for reuse by TASK-25.1.2/.3/.5 too) as a deliberate, temporary, documented deviation -- not a silent violation. This task exists so that deviation does not become permanent by default.
+decisions/outbound-clients.md's Checks require each vendor package to export exactly: factories, classify_<vendor>_error, settings — "the adapter is the boundary", not the vendor client. TASK-22.4 already added one narrow deviation (execute_batch_request, needed only for the Directory batch API's per-item error-reporting shape). TASK-25.1.1 added a second, more general one: execute_google_api_request(request), a shared try/except+classify_google_error+log+raise helper in integrations/google_workspace/client.py, reused by TASK-25.1.1/.2/.3/.5's call sites.
 
-Once all of TASK-25.1's children (Calendar/Meet, Docs, Sheets, legacy Directory consumers, Drive) are Done and every call site's actual shape through execute_google_api_request is known, decide and execute ONE of:
-(a) Inline classify_google_error + logging directly into each adapter call site (per-call try/except, per outbound-clients.md's literal 'adapter is the boundary' wording) and delete execute_google_api_request entirely from client.py, accepting the repetition outbound-clients.md's cost tradeoff already names ('adapter authors write the try/except themselves... that is the price of not maintaining a wrapper layer'); or
-(b) Keep execute_google_api_request as a permanent, intentional shared primitive and update decisions/outbound-clients.md's Checks/Consequences to explicitly allow a thin shared execute-and-classify helper per vendor package (mirroring how sdk-typing.md was itself revised in place when new facts emerged), documenting why a 4th export is justified for this vendor (repeated Resource.execute() + classify + log + raise shape across many discovery-API call sites, unlike single-call-site vendors).
+CORRECTION (2026-09-01): this task's original framing — "decide between (a) inline per-adapter or (b) keep execute_google_api_request as a permanent, formalized shared primitive" — was inaccurate and is replaced. decisions/outbound-clients.md already decided the target shape (one adaptation tier: clients raise, adapters classify). execute_google_api_request performing classification inside the vendor package is a real, currently-necessary deviation from that decision, not a genuinely open two-way choice. It is tolerated only because today's actual Google Workspace call sites have no compliant adapter tier to inline the try/except into: TASK-25.1.1/.2's consumers are legacy app/modules/incident/*.py files with zero error handling of their own, plus app/packages/incident_draft/adapters/google_docs.py — a real packages/<feature>/adapters/ file (per decisions/feature-packages.md) that itself performs no try/except/classify today either.
 
-Do not let this decision default silently either way; it must be made explicitly with the full call-site inventory in hand, and decisions/outbound-clients.md updated if option (b) is chosen.
+Reconciliation must correct this deviation, not ratify it as permanent. Once all of TASK-25.1's children (Calendar/Meet, Docs, Sheets, legacy Directory consumers, Drive) are Done and the full execute_google_api_request call-site inventory is known, this task's job is to: (1) inline try/except + classify_google_error directly at every call site that already lives in a real packages/<feature>/adapters/ or infrastructure/ file, deleting that call site's dependency on execute_google_api_request; (2) for every remaining call site that is legacy app/modules/* code with no adapter tier, file (or point at) the follow-up work that migrates it onto a real per-feature adapter — this may itself need its own decomposition, since building a first adapter for app/modules/incident's Google Docs/Drive/Calendar usage is new architecture, not a mechanical inline; (3) delete execute_google_api_request from client.py entirely once no call site depends on it. Keeping it as a permanent vendor-package export is not an acceptable resolution of this task.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A decision (inline-per-adapter vs. formalize-as-shared-primitive) is made and recorded, citing the full call-site inventory across all TASK-25.1 children
-- [ ] #2 If inlined: execute_google_api_request no longer exists in integrations/google_workspace/client.py and every former call site has its own try/except + classify_google_error + raise
-- [ ] #3 If formalized: decisions/outbound-clients.md's Checks/Consequences are updated to explicitly permit a shared execute-and-classify helper per vendor package, with rationale
+- [ ] #1 The full execute_google_api_request call-site inventory across TASK-25.1.1/.2/.3/.4/.5 is enumerated, naming which call sites already live in a real packages/<feature>/adapters/ or infrastructure/ file vs. which are legacy app/modules/* code with no adapter tier
+- [ ] #2 Every call site already in a real packages/<feature>/adapters/ or infrastructure/ file has its own inline try/except + classify_google_error + raise, and no longer depends on execute_google_api_request
+- [ ] #3 Every remaining legacy app/modules/* call site either has its own real per-feature adapter built and inlined, or a follow-up task migrating it there is filed/linked here; execute_google_api_request is deleted from client.py once zero call sites depend on it
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-01 16:54
+---
+Corrected 2026-09-01 (task-planner, while planning TASK-25.1.2): the original 'inline vs. formalize-as-permanent' framing implied this was a fair two-option architectural choice. It is not — decisions/outbound-clients.md already decided the target (clients raise, adapters classify, one tier). execute_google_api_request is a tolerated, temporary deviation, not a candidate to become permanent. Description and ACs rewritten accordingly (bulk --acceptance-criteria replace). The real blocker to full reconciliation is that today's Google Workspace call sites (app/modules/incident/*.py, and app/packages/incident_draft/adapters/google_docs.py which is a real adapters/ file but performs no try/except/classify of its own) mostly have no compliant adapter to inline into — that gap may need its own follow-up task(s) once the full call-site inventory is known, not a unilateral 'keep the helper' decision.
+---
+
+created: 2026-09-01 17:13
+---
+Concrete instance for AC#2/#3 (2026-09-01, human-confirmed while planning TASK-25.1.2): app/packages/incident_draft/adapters/google_docs.py is a real packages/<feature>/adapters/ file (post-dates the original TASK-25.1 consumer inventory) that today calls google_docs.get_document/batch_update (the legacy module-level passthrough) with ZERO try/except of its own — target shape is to call integrations.google_workspace.client.get_docs_service directly and do its own inline try/except+classify_google_error. Deliberately deferred out of TASK-25.1.2 (not an oversight): its test file is 1704 lines with 44 patch(...) sites keyed to the current google_docs mock boundary, and building real classify-based error handling here is new business logic (OperationStatus-to-None/[]-on-failure mapping for read_sections/write_draft_document), not a mechanical rewire — combining it with 25.1.2's own work would exceed a reviewable single PR. When this task is picked up, treat this adapter as a named, already-identified item in the call-site inventory, not something to re-discover.
+---
+<!-- COMMENTS:END -->

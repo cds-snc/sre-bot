@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:32'
+updated_date: '2026-09-01 16:54'
 labels:
   - clients
   - phase-3
@@ -33,3 +34,12 @@ Coordinator for the Google-remainder slice of TASK-25. Confirmed via repo grep (
 - [ ] #2 Every one of the 16 identified legacy consumer files is migrated behavior-neutrally (existing tests pass with identical outcomes) onto a factory-built, stub-typed Resource (google-api-python-client-stubs, per decisions/sdk-typing.md item 3) + classify_google_error, per its owning child subtask
 - [ ] #3 gmail.py and gmail_next.py are deleted (zero production consumers, confirmed)
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-01 16:54
+---
+PLANNING NOTE (2026-09-01, task-planner, while planning TASK-25.1.2): this coordinator's Description undercounted the Docs consumer surface. Repo-wide 'import google_docs' grep found a 5th real production consumer never listed here or in TASK-25.1.2's original text: app/packages/incident_draft/adapters/google_docs.py (a real packages/<feature>/adapters/ file per decisions/feature-packages.md, calls google_docs.get_document/batch_update directly, registered/live via packages/incident_draft/providers.py). TASK-25.1.2's AC#2 has been corrected to name it explicitly (5 consumer files, not 4). Same lesson as prior AWS/Google-remainder passes: always re-grep a prose consumer list before trusting it, even one written from a 'grep-confirmed' claim.
+---
+<!-- COMMENTS:END -->
