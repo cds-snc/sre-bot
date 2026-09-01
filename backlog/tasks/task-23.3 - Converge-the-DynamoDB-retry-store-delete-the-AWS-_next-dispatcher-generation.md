@@ -1,10 +1,11 @@
 ---
 id: TASK-23.3
 title: Converge the DynamoDB retry store; delete the AWS _next dispatcher generation
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-08-31 17:35'
-updated_date: '2026-08-31 21:05'
+updated_date: '2026-09-01 13:39'
 labels:
   - clients
   - phase-3
@@ -38,11 +39,11 @@ After this slice, find app/integrations -name "*_next.py" returns zero.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 infrastructure/resilience/retry/dynamodb_store.py imports no symbol from integrations.aws.dynamodb_next; all 10 call sites use a boto3 DynamoDB client from integrations.aws.client.get_aws_client wrapped in try/except with classify_aws_error
-- [ ] #2 claim_record still returns False (not an exception) when the conditional write fails with ConditionalCheckFailedException, and still returns False and logs an error for any other classified failure
-- [ ] #3 fetch_due, get_stats and get_dlq_entries are covered by tests whose fakes return the real boto3 response shape (a dict with Items / Count), proving the previously list-shaped paginated result no longer breaks them
-- [ ] #4 find app/integrations -name '*_next.py' returns zero files; integrations/aws/dynamodb_next.py, client_next.py and identity_store_next.py and their tests are deleted, and the _next-generation execute_aws_api_call no longer exists (the separate non-_next execute_aws_api_call in integrations/aws/client.py stays - TASK-25.2 scope)
-- [ ] #5 The ENVIRONMENT-gated dynamodb-local endpoint matrix test still covers the surviving construction path: its client_next case is repointed to integrations.aws.client.get_aws_client rather than deleted
+- [x] #1 infrastructure/resilience/retry/dynamodb_store.py imports no symbol from integrations.aws.dynamodb_next; all 10 call sites use a boto3 DynamoDB client from integrations.aws.client.get_aws_client wrapped in try/except with classify_aws_error
+- [x] #2 claim_record still returns False (not an exception) when the conditional write fails with ConditionalCheckFailedException, and still returns False and logs an error for any other classified failure
+- [x] #3 fetch_due, get_stats and get_dlq_entries are covered by tests whose fakes return the real boto3 response shape (a dict with Items / Count), proving the previously list-shaped paginated result no longer breaks them
+- [x] #4 find app/integrations -name '*_next.py' returns zero files; integrations/aws/dynamodb_next.py, client_next.py and identity_store_next.py and their tests are deleted, and the _next-generation execute_aws_api_call no longer exists (the separate non-_next execute_aws_api_call in integrations/aws/client.py stays - TASK-25.2 scope)
+- [x] #5 The ENVIRONMENT-gated dynamodb-local endpoint matrix test still covers the surviving construction path: its client_next case is repointed to integrations.aws.client.get_aws_client rather than deleted
 <!-- AC:END -->
 
 ## Definition of Done
@@ -135,6 +136,12 @@ No integration/moto tier is added: there is no existing moto conformance suite f
 
 Production: 3 files modified (`retry/dynamodb_store.py` ~150 changed LOC, `retry/factory.py` ~8, `audit/service.py` 1 docstring line) + 3 deleted integration modules + 1 baseline file (-3 lines). Tests: 4 deletions, 4 rewrites/repoints. One subsystem (AWS DynamoDB access), no terraform/CI. The bulk of the diff is subtractive, matching the deletion-heavy precedent that reviews quickly. Verdict: fits a single reviewable PR; no decomposition required.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Migrated DynamoDBRetryStore to an injected typed DynamoDB client from integrations.aws.client, with classify_aws_error handling across all former dynamodb_next operations. Restored boto3 dict response handling for due/DLQ reads and paginator-based status totals. Repointed factory and endpoint matrix coverage, removed the three AWS _next dispatcher modules, and ratcheted their SDK typing baseline entries down. Evidence: focused retry and endpoint tests passed (115 passed); retry-store tests passed (31 passed); cache-free mypy on infrastructure/resilience/retry/dynamodb_store.py passed; ruff check passed; bin/check_sdk_typing.py passed; find integrations -name '*_next.py' returned no files; make test passed (user-verified). DoD remaining for human: review the diff and confirm CI quality gates/PR references to decisions/outbound-clients.md and decisions/sdk-typing.md.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

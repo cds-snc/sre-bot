@@ -1,7 +1,7 @@
 """Audit trail service for dependency injection.
 
 Wraps the DynamoDB audit storage operations with a service interface.
-Delegates all I/O to ``StorageService`` — no direct boto3 or dynamodb_next calls.
+Delegates all I/O to ``StorageService`` — no direct boto3 calls.
 """
 
 from datetime import UTC, datetime, timedelta
