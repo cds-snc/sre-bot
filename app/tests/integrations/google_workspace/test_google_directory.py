@@ -71,6 +71,8 @@ def test_list_users_returns_users(directory_client):
         customer="default_google_workspace_customer_id",
         maxResults=500,
         orderBy="email",
+        query=None,
+        fields=None,
     )
 
 
@@ -95,6 +97,8 @@ def test_list_users_uses_custom_delegated_user_email_and_customer_id_if_provided
         customer="custom_customer_id",
         maxResults=500,
         orderBy="email",
+        query=None,
+        fields=None,
     )
 
 
@@ -147,6 +151,8 @@ def test_list_groups_calls_directory_groups_list(directory_client):
         customer="default_google_workspace_customer_id",
         maxResults=200,
         orderBy="email",
+        query=None,
+        fields=None,
     )
 
 
@@ -171,15 +177,24 @@ def test_list_groups_uses_custom_delegated_user_email_and_customer_id_if_provide
         customer="custom_customer_id",
         maxResults=200,
         orderBy="email",
+        query=None,
+        fields=None,
     )
 
 
-def test_list_groups_converts_residual_kwargs_to_camel_case(directory_client):
+def test_list_groups_forwards_query_and_fields_verbatim(directory_client):
     _set_pages(directory_client.groups, [{"groups": []}])
 
-    google_directory.list_groups(customer="custom_customer_id", max_results=10)
+    google_directory.list_groups(query="email:prefix-*", fields="groups(email)")
 
-    assert directory_client.groups.list.call_args.kwargs["maxResults"] == 10
+    call_kwargs = directory_client.groups.list.call_args.kwargs
+    assert call_kwargs["query"] == "email:prefix-*"
+    assert call_kwargs["fields"] == "groups(email)"
+
+
+def test_list_groups_rejects_unsupported_keyword(directory_client):
+    with pytest.raises(TypeError):
+        google_directory.list_groups(max_results=10)
 
 
 def test_list_groups_concatenates_pages(directory_client):

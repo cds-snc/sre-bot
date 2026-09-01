@@ -3,10 +3,11 @@ id: TASK-25.1.4
 title: >-
   Migrate legacy modules/ Directory consumers off
   integrations/google_workspace/google_directory.py
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-31 18:33'
-updated_date: '2026-09-01 19:51'
+updated_date: '2026-09-01 21:17'
 labels:
   - clients
   - phase-3
@@ -31,11 +32,11 @@ Slice 4 of TASK-25.1. A SEPARATE consumer path from TASK-22.4 (which only covers
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/google_workspace/google_directory.py's list_users, list_groups and list_group_members no longer call execute_google_api_call; they route through TASK-22.4's get_admin_directory_service factory plus classify_google_error/execute_google_api_request, so modules/permissions/handler.py, modules/provisioning/users.py, modules/provisioning/groups.py and modules/reports/google_groups.py no longer reach any dispatcher-backed Directory call
-- [ ] #2 All 4 consumers behave identically for their Directory-related calls (existing tests pass, behavior-neutral); they keep their current google_directory imports, and the only consumer edit is deleting the unreachable return_dataframe branch in modules/provisioning/groups.py - the DirectoryService/DirectoryProvider Protocol route is rejected because it returns canonical dataclasses that drop the raw Google fields these modules consume
-- [ ] #3 integrations/google_workspace/google_directory.py is itself migrated onto the factory+classify pattern and is pruned from app/bin/baselines/sdk_typing_antipatterns.txt; zero execute_google_api_call occurrences remain in that file
-- [ ] #4 get_user, get_group and add_users_to_group (zero production consumers, grep-verified) are deleted together with their tests rather than migrated, while list_groups_with_members and get_members_details are left untouched and their existing tests pass unchanged
-- [ ] #5 The dead pandas DataFrame path is removed end to end: get_groups_from_integration's return_dataframe parameter and both of its branches, google_directory.convert_google_groups_members_to_dataframe, identity_store.convert_aws_groups_members_to_dataframe, and the now-unused pandas imports in both integrations modules; repo-wide grep for return_dataframe and both convert_*_to_dataframe symbols returns zero, and pandas remains a dependency only for its live consumer modules/aws/spending.py
+- [x] #1 integrations/google_workspace/google_directory.py's list_users, list_groups and list_group_members no longer call execute_google_api_call; they route through TASK-22.4's get_admin_directory_service factory plus classify_google_error/execute_google_api_request, so modules/permissions/handler.py, modules/provisioning/users.py, modules/provisioning/groups.py and modules/reports/google_groups.py no longer reach any dispatcher-backed Directory call
+- [x] #2 All 4 consumers behave identically for their Directory-related calls (existing tests pass, behavior-neutral); they keep their current google_directory imports, and the only consumer edit is deleting the unreachable return_dataframe branch in modules/provisioning/groups.py - the DirectoryService/DirectoryProvider Protocol route is rejected because it returns canonical dataclasses that drop the raw Google fields these modules consume
+- [x] #3 integrations/google_workspace/google_directory.py is itself migrated onto the factory+classify pattern and is pruned from app/bin/baselines/sdk_typing_antipatterns.txt; zero execute_google_api_call occurrences remain in that file
+- [x] #4 get_user, get_group and add_users_to_group (zero production consumers, grep-verified) are deleted together with their tests rather than migrated, while list_groups_with_members and get_members_details are left untouched and their existing tests pass unchanged
+- [x] #5 The dead pandas DataFrame path is removed end to end: get_groups_from_integration's return_dataframe parameter and both of its branches, google_directory.convert_google_groups_members_to_dataframe, identity_store.convert_aws_groups_members_to_dataframe, and the now-unused pandas imports in both integrations modules; repo-wide grep for return_dataframe and both convert_*_to_dataframe symbols returns zero, and pandas remains a dependency only for its live consumer modules/aws/spending.py
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -138,6 +139,22 @@ Production files changed: 3 (integrations/google_workspace/google_directory.py -
 SIZE GATE VERDICT
 Fits one PR: roughly 120-150 changed production LOC in 1 file plus about 90 deleted LOC across 2 more files (all subtractive), 1 baseline line, 1 test file reworked (about 5 tests deleted, 6 rewritten, 6 added, 1 trimmed). Deletion-heavy slices do not trip the gate the way net-new-logic slices do. No decomposition required.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Migrated google_directory.py off execute_google_api_call onto get_admin_directory_service and execute_google_api_request with pagination helper _list_all. Removed zero-consumer functions get_user, get_group, add_users_to_group and convert_google_groups_members_to_dataframe. Removed dead return_dataframe parameter and branches from modules/provisioning/groups.py and orphaned convert_aws_groups_members_to_dataframe from identity_store.py. Pruned google_directory.py from sdk_typing_antipatterns.txt. All unit and integration tests pass green, lint and mypy checks pass. DoD items left for human verification: code review and merge approval.
+
+FOLLOW-ON 2026-09-01 (human-directed, post-implementation): resolved plan doubt (a) in the opposite direction and went further. The original slice kept `**kwargs` + `convert_kwargs_to_camel_case` and passed a `dict[str, Any]` into `_list_all(resource, ...)` with `resource` un-annotated -- so every `.list(**list_kwargs)` was typed `Any` and the googleapiclient-stubs adopted in TASK-70/22.4 bought this module nothing, contradicting decisions/sdk-typing.md item 3 ('calls ... directly with real method/parameter/return-shape completion AND checking').
+
+Changes: (1) integrations/google_workspace/google_directory.py -- `list_users`/`list_groups`/`list_group_members` now take explicit typed parameters (customer/query/fields/delegated_user_email; group_key/fields/delegated_user_email) instead of `**kwargs`; `convert_kwargs_to_camel_case` is gone from this module; page sizes are named constants (_USERS_PAGE_SIZE=500, _GROUPS_PAGE_SIZE=200, _MEMBERS_PAGE_SIZE=200); `_list_all` became `_collect_pages(resource, request, response_key)` which takes the ALREADY-BUILT request, so the `.list(...)` call itself stays at the call site and is stub-checked. (2) infrastructure/directory/google.py -- `_paginate` had the identical untyped hole (`resource: Any`, `list_kwargs: dict[str, Any]`); it now takes the built request too, and all four call sites (list_users, get_group_members, list_groups x2 branches, get_user_groups) build their request via a typed resource local.
+
+Behaviour parity: googleapiclient/discovery.py:1108-1112 deletes None-valued kwargs before building the request, so always passing `query=None`/`fields=None` is identical to omitting them. Verified typing now bites -- a probe passing orderBy='not-a-valid-literal' and maxResults='two-hundred' produces mypy arg-type errors that the previous dict-splat swallowed. Unknown parameter NAMES still pass mypy (stubs end in `**kwargs: typing.Any`) but now raise TypeError at the SDK, covered by a new test.
+
+Tests: test_google_directory.py list-call assertions extended with query=None/fields=None; `test_list_groups_converts_residual_kwargs_to_camel_case` replaced by `test_list_groups_forwards_query_and_fields_verbatim` + `test_list_groups_rejects_unsupported_keyword`. tests/unit/infrastructure/directory/test_google.py needed no edits. `make test` green; ruff and mypy clean on the touched files.
+
+Scope note: infrastructure/directory/google.py was explicitly out of scope in the original plan ('zero changes to ... infrastructure/directory/**'). Included on human direction because it carried the same defect on the same API surface; reviewer may split it out.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

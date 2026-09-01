@@ -1,172 +1,135 @@
 """Google Directory module to interact with the Google Workspace Directory API."""
 
-import pandas as pd
+from typing import Any
+
 import structlog
 
-from integrations.google_workspace import google_service
-from integrations.utils.api import convert_string_to_camel_case, retry_request
+from infrastructure.configuration.integrations.google import get_google_workspace_settings
+from integrations.google_workspace import client as google_service_client
+from integrations.utils.api import retry_request
 from utils import filters
 
-GOOGLE_WORKSPACE_CUSTOMER_ID = google_service.GOOGLE_WORKSPACE_CUSTOMER_ID
+GOOGLE_WORKSPACE_CUSTOMER_ID = get_google_workspace_settings().GOOGLE_WORKSPACE_CUSTOMER_ID
+DIRECTORY_USER_READONLY_SCOPES = ["https://www.googleapis.com/auth/admin.directory.user.readonly"]
+DIRECTORY_GROUP_READONLY_SCOPES = ["https://www.googleapis.com/auth/admin.directory.group.readonly"]
+
+_USERS_PAGE_SIZE = 500
+_GROUPS_PAGE_SIZE = 200
+_MEMBERS_PAGE_SIZE = 200
 
 logger = structlog.get_logger()
-handle_google_api_errors = google_service.handle_google_api_errors
 
 
-@handle_google_api_errors
-def get_user(user_key, fields=None, **kwargs):
-    """Get a user by user key in the Google Workspace domain.
+def _collect_pages(resource: Any, request: Any, response_key: str) -> list[dict]:
+    """Aggregate every page of an already-built Directory list request.
+
+    Takes the built request rather than call parameters so the ``list(...)``
+    call itself stays type-checked against the stub at each call site.
+    """
+    items: list[dict] = []
+    while request is not None:
+        response = google_service_client.execute_google_api_request(request)
+        items.extend(response.get(response_key, []))
+        request = resource.list_next(request, response)
+    return items
+
+
+def list_users(
+    customer: str | None = None,
+    query: str | None = None,
+    fields: str | None = None,
+    delegated_user_email: str | None = None,
+) -> list[dict]:
+    """List all users in the Google Workspace domain.
 
     Args:
-        user_key (str): The user's primary email address, alias email address, or unique user ID.
-        fields (list, optional): A list of fields to include in the response.
-        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
-
-    Returns:
-        dict: A user object.
-
-    Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/users/get
-    """
-
-    return google_service.execute_google_api_call(
-        "admin",
-        "directory_v1",
-        "users",
-        "get",
-        scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
-        userKey=user_key,
-        fields=fields,
-        **kwargs,
-    )
-
-
-@handle_google_api_errors
-def list_users(
-    customer=None,
-    **kwargs,
-):
-    """List all users in the Google Workspace domain.
+        customer: The unique ID for the Google Workspace customer. Defaults to
+            the configured customer ID.
+        query: Directory API query filtering the results.
+        fields: Partial-response projection, e.g. ``users(primaryEmail, name)``.
+        delegated_user_email: Account to impersonate for this call.
 
     Returns:
         list: A list of user objects.
+
+    Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/users/list
     """
-
-    if not customer:
-        customer = GOOGLE_WORKSPACE_CUSTOMER_ID
-    return google_service.execute_google_api_call(
-        "admin",
-        "directory_v1",
-        "users",
-        "list",
-        scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
-        paginate=True,
-        customer=customer,
-        maxResults=500,
+    users = google_service_client.get_admin_directory_service(
+        scopes=DIRECTORY_USER_READONLY_SCOPES,
+        delegated_user_email=delegated_user_email,
+    ).users()
+    request = users.list(
+        customer=customer or GOOGLE_WORKSPACE_CUSTOMER_ID,
+        maxResults=_USERS_PAGE_SIZE,
         orderBy="email",
-        **kwargs,
+        query=query,
+        fields=fields,
     )
+    return _collect_pages(users, request, "users")
 
 
-@handle_google_api_errors
 def list_groups(
-    customer=None,
-    **kwargs,
-):
-    """List all groups in the Google Workspace domain. A query can be provided to filter the results (e.g. query="email:prefix-*" will filter for all groups where the email starts with 'prefix-').
+    customer: str | None = None,
+    query: str | None = None,
+    fields: str | None = None,
+    delegated_user_email: str | None = None,
+) -> list[dict]:
+    """List all groups in the Google Workspace domain.
 
     Args:
-        customer (str): The unique ID for the Google Workspace customer. If not provided, it will use the default customer ID from the environment variable.
-        **kwargs: Additional keyword arguments to pass to the API call. e.g., `query`, `fields`.
+        customer: The unique ID for the Google Workspace customer. Defaults to
+            the configured customer ID.
+        query: Directory API query filtering the results, e.g.
+            ``email:prefix-*`` for all groups whose email starts with ``prefix-``.
+        fields: Partial-response projection, e.g. ``groups(email, name)``.
+        delegated_user_email: Account to impersonate for this call.
+
     Returns:
         list: A list of group objects.
 
     Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/groups/list
     """
-    if not customer:
-        customer = GOOGLE_WORKSPACE_CUSTOMER_ID
-
-    kwargs = {convert_string_to_camel_case(k): v for k, v in kwargs.items()}
-    return google_service.execute_google_api_call(
-        "admin",
-        "directory_v1",
-        "groups",
-        "list",
-        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        paginate=True,
-        customer=customer,
-        maxResults=200,
+    groups = google_service_client.get_admin_directory_service(
+        scopes=DIRECTORY_GROUP_READONLY_SCOPES,
+        delegated_user_email=delegated_user_email,
+    ).groups()
+    request = groups.list(
+        customer=customer or GOOGLE_WORKSPACE_CUSTOMER_ID,
+        maxResults=_GROUPS_PAGE_SIZE,
         orderBy="email",
-        **kwargs,
+        query=query,
+        fields=fields,
     )
+    return _collect_pages(groups, request, "groups")
 
 
-@handle_google_api_errors
-def list_group_members(group_key, fields=None, **kwargs):
-    """List all group members in the Google Workspace domain.
+def list_group_members(
+    group_key: str,
+    fields: str | None = None,
+    delegated_user_email: str | None = None,
+) -> list[dict]:
+    """List all members of a Google Workspace group.
 
     Args:
-        group_key (str): The group's email address or unique group ID.
-        fields (list, optional): A list of fields to include in the response.
-        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
+        group_key: The group's email address or unique group ID.
+        fields: Partial-response projection, e.g. ``members(email, role)``.
+        delegated_user_email: Account to impersonate for this call.
 
     Returns:
         list: A list of group member objects.
 
     Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/members/list
     """
-
-    return google_service.execute_google_api_call(
-        "admin",
-        "directory_v1",
-        "members",
-        "list",
-        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        paginate=True,
+    members = google_service_client.get_admin_directory_service(
+        scopes=DIRECTORY_GROUP_READONLY_SCOPES,
+        delegated_user_email=delegated_user_email,
+    ).members()
+    request = members.list(
         groupKey=group_key,
-        maxResults=200,
+        maxResults=_MEMBERS_PAGE_SIZE,
         fields=fields,
-        **kwargs,
     )
-
-
-@handle_google_api_errors
-def get_group(group_key, fields=None, **kwargs):
-    """Get a group by group key in the Google Workspace domain.
-    Args:
-        group_key (str): The group's email address or unique group ID.
-        fields (list, optional): A list of fields to include in the response.
-        **kwargs: Additional keyword arguments to pass to the API call. e.g., `delegated_user_email`.
-    Returns:
-        dict: A group object.
-    Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/groups/get
-    """
-    return google_service.execute_google_api_call(
-        "admin",
-        "directory_v1",
-        "groups",
-        "get",
-        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        groupKey=group_key,
-        fields=fields,
-        **kwargs,
-    )
-
-
-def add_users_to_group(group, group_key):
-    """Add users to a group in the Google Workspace domain.
-
-    Args:
-        group_key (str): The group's email address or unique group ID.
-
-    Returns:
-        list: A list of user objects.
-
-    Ref: https://developers.google.com/admin-sdk/directory/reference/rest/v1/members/insert
-    """
-    result = list_group_members(group_key)
-    if result:
-        group["members"] = result
-    return group
+    return _collect_pages(members, request, "members")
 
 
 def list_groups_with_members(
@@ -264,46 +227,3 @@ def get_members_details(members: list[dict], users: list[dict], tolerate_errors=
         if user_details:
             member.update(user_details)
     return members if not error_occured or tolerate_errors else []
-
-
-def convert_google_groups_members_to_dataframe(groups):
-    """Converts a list of Google groups with members to a DataFrame.
-
-    Args:
-        groups (list): A list of group objects with members.
-
-    Returns:
-        DataFrame: A DataFrame with group members.
-    """
-    flattened_data = []
-    for group in groups:
-        group_email = group.get("email")
-        group_name = group.get("name")
-        group_direct_members_count = group.get("directMembersCount")
-        group_description = group.get("description")
-
-        for member in group.get("members", []):
-            member_email = member.get("email")
-            member_role = member.get("role")
-            member_type = member.get("type")
-            member_status = member.get("status")
-            member_primary_email = member.get("primaryEmail")
-            member_given_name = member.get("name", {}).get("givenName")
-            member_family_name = member.get("name", {}).get("familyName")
-
-            flattened_record = {
-                "group_email": group_email,
-                "group_name": group_name,
-                "group_direct_members_count": group_direct_members_count,
-                "group_description": group_description,
-                "member_email": member_email,
-                "member_role": member_role,
-                "member_type": member_type,
-                "member_status": member_status,
-                "member_primary_email": member_primary_email,
-                "member_given_name": member_given_name,
-                "member_family_name": member_family_name,
-            }
-            flattened_data.append(flattened_record)
-
-    return pd.DataFrame(flattened_data)
