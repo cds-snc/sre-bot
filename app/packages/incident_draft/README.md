@@ -93,15 +93,29 @@ machine wrote.
 
 ### Pull-request links
 
-The model writes "PR 1898" in prose, having summarised away the link somebody
-posted. Those references are hyperlinked back to the real URL: PR links are
-harvested from the raw channel messages into a `number -> url` map, and every
-`PR 1898` / `PR #1898` reference written into the document — including in the
-report's timeline — is linked over exactly that text.
+Every pull request the report names must be openable from the report. The model
+writes "PR 1898" in prose, having summarised away the link somebody posted, so
+the references are hyperlinked back to a real URL. PR links are harvested from
+the raw channel messages into a `number -> url` map, and every form the model
+writes is linked over exactly its own text — `PR 1898`, `PR #1898`, `PRs 1898`,
+`pull request 1898`, a bare `#1898`, and a full URL copied through (which links
+to itself), including inside the timeline.
 
-A number nobody posted a link for is left as plain text. A bare PR number does
-not identify a repository, so the alternative would be guessing one, and a link
-to the wrong repository is worse than no link at all.
+A number nobody posted a link for is resolved against the repository the channel
+was discussing: when every PR link in the transcript belongs to one repository,
+`PR 2001` becomes that repository's `/pull/2001`. Two things deliberately stay
+unlinked, because a wrong link is worse than none: any reference at all when the
+channel spanned more than one repository, and a bare `#2001` nobody linked —
+that may be an issue number, and `/pull/<issue>` is a dead link.
+
+Each PR is named **once**. The model is asked for the short `PR 1898` form and
+told not to paste the URL beside it, since the document links that text itself —
+writing both produced `Opened PR 1898, https://…/pull/1898, to add error
+handling`, the same reference printed twice. Whatever it writes anyway is
+collapsed: a URL naming the PR beside it is dropped along with its separator,
+and a URL standing alone becomes `PR <number>`. Collapsing runs *after* link
+resolution, so a URL only the model supplied is harvested into the link map
+before it is removed from the text.
 
 ### Pre-filled metadata is never overwritten
 
@@ -138,8 +152,28 @@ further down is never mistaken for a field).
 | `Facilitators` | Anyone the transcript identifies as coordinating the incident or its review. Blank unless stated. |
 | `Name`, `Team`, `Date`, `Slack channel`, `Status` | Already filled by `modules/incident` at creation; left alone. The template styles several of these as headings, so they are recognised as labelled values rather than draftable sections — otherwise each value was written in again beneath itself. |
 
-Because the date matters for these fields, transcript timestamps carry the full
-`YYYY-MM-DD HH:MM`, while timeline entries still render just the clock time.
+`_DRAFT_INSTRUCTIONS` is organised into labelled blocks (`## SOURCES`,
+`## OUTPUT`, `## WRITING`, `## TIMELINE`, …) rather than one run-on paragraph,
+and each behaviour is governed by exactly one rule. It was previously a single
+4.5k-character string in which selectivity ("be highly selective", "not a log",
+"merge closely related messages") was asserted five ways while the entry count
+was asserted once, and a global "1-4 sentences per section" quietly capped the
+list sections; the model resolved the contradiction toward brevity and returned
+one or two timeline entries. Keep new rules in the block they belong to, and
+check a rule does not contradict one already stated elsewhere.
+
+Transcript lines are stamped `YYYY-MM-DD HH:MM ZZZ` in the configured zone
+(`INCIDENT_DRAFT__TIMEZONE`, default `America/Toronto`), and the prompt tells the
+model to copy that stamp verbatim into each timeline entry. An incident can span
+days or a daylight-saving boundary, so a bare clock time is ambiguous; the zone
+abbreviation follows DST because the setting names a zone rather than an offset.
+
+The timeline answer is normalised before it is written, because "one event per
+line" is an instruction models reshape: a JSON array (or an array of
+`{"time": …, "text": …}` objects) is joined back into lines, and a timeline run
+together into one paragraph is re-split at each timestamp. Without this a
+whole incident arrived as a single entry, or — for array answers — was dropped
+by the string-only parse and left the section looking unanswered.
 
 These label lines are normalised to **ordinary body text** — the six fields
 above plus the Impact section's `End-users`, `CDS Staff`,
@@ -214,7 +248,7 @@ rest.
 | `INCIDENT_DRAFT__DEFAULT_HISTORY_LIMIT` | 500 | Messages fetched when `--limit` is absent |
 | `INCIDENT_DRAFT__MAX_HISTORY_LIMIT` | 1000 | Hard cap on `--limit` |
 | `INCIDENT_DRAFT__DEFAULT_SINCE_HOURS` | 24 | Fallback window when the channel creation time can't be read |
-| `INCIDENT_DRAFT__MAX_OUTPUT_TOKENS` | 8000 | Completion budget for the draft. One response covers every section, so it needs far more than the vendor default, which truncates the JSON mid-object. |
+| `INCIDENT_DRAFT__MAX_OUTPUT_TOKENS` | 4000 | Completion budget for the draft. One response covers every section, so it needs far more than the vendor default, which truncates the JSON mid-object. |
 
 Vendor settings live in `integrations.openai`. Two matter here:
 `OPENAI_MAX_OUTPUT_TOKENS` (the fallback budget, overridden per call by the

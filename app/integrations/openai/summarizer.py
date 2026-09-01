@@ -100,6 +100,15 @@ class OpenAISummarizer:
 
         summary = _extract_summary(body)
         finish_reason = _finish_reason(body)
+        usage = _usage(body)
+        logger.info(
+            "openai_summarize_usage",
+            model=payload["model"],
+            finish_reason=finish_reason,
+            max_completion_tokens=payload["max_completion_tokens"],
+            summary_length=len(summary),
+            **usage,
+        )
         if finish_reason == "length":
             # The completion budget ran out mid-response, so the text is cut
             # off. Callers parsing structured output need to know this.
@@ -107,6 +116,7 @@ class OpenAISummarizer:
                 "openai_summarize_truncated",
                 max_completion_tokens=payload["max_completion_tokens"],
                 summary_length=len(summary),
+                **usage,
             )
         elif not summary:
             logger.warning("openai_summarize_empty_content", finish_reason=finish_reason)
@@ -145,6 +155,23 @@ def _finish_reason(body: dict) -> str | None:
         return None
     reason = choices[0].get("finish_reason")
     return str(reason) if reason is not None else None
+
+
+def _usage(body: dict) -> dict[str, int]:
+    """Return the response's token counts, including reasoning tokens.
+
+    ``max_completion_tokens`` bounds reasoning *plus* visible output on
+    reasoning models, so a prompt that provokes more deliberation silently
+    leaves less room for the answer. Without ``reasoning_tokens`` a short
+    response is indistinguishable from the model simply having little to say.
+    """
+    usage = body.get("usage") or {}
+    counts = {
+        "prompt_tokens": usage.get("prompt_tokens"),
+        "completion_tokens": usage.get("completion_tokens"),
+        "reasoning_tokens": (usage.get("completion_tokens_details") or {}).get("reasoning_tokens"),
+    }
+    return {key: int(value) for key, value in counts.items() if isinstance(value, int)}
 
 
 @lru_cache(maxsize=1)

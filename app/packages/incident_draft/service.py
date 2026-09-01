@@ -6,9 +6,8 @@ reads those heading/guidance pairs through the ``IncidentDocumentPort``, treats
 the guidance as per-section drafting instructions, answers each one from the
 incident channel transcript via the ``Summarizer`` port
 (``integrations.openai``), and writes the answers into a new draft document on
-each run (a fresh copy of the incident report template). The one exception is
-the incident report's own timeline section: the drafted timeline is written back
-there, replacing the entries beneath the bot's generated-timeline marker.
+each run (a fresh copy of the incident report template). The incident report
+created at channel creation is only ever read, never modified.
 
 This module is deliberately free of Slack, HTTP, and Google SDK imports: it
 consumes domain values and Protocols and returns an ``OperationResult`` so any
@@ -20,6 +19,8 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
+from itertools import pairwise
 from typing import Any, Protocol, runtime_checkable
 
 import structlog
@@ -45,67 +46,99 @@ DRAFT_UNPARSEABLE_CODE = "DRAFT_UNPARSEABLE"
 NO_ANSWERS_CODE = "NO_ANSWERS"
 CREATE_FAILED_CODE = "CREATE_FAILED"
 
-_DRAFT_INSTRUCTIONS = (
-    "You are an incident-response scribe filling in an incident report. You "
-    "are given the report's sections -- each a heading followed by the "
-    "template's instructions for what belongs under it -- and the chat "
-    "transcript of the incident channel. For every heading, follow that "
-    "section's instructions and write the section's content using ONLY facts "
-    "stated in the transcript. The instructions tell you what to write; the "
-    "transcript is your only source of facts. Be concise and factual, in "
-    "complete sentences and past tense; 1-4 sentences per section unless its "
-    "instructions ask for a list. Never invent details, names, times, or "
-    "causes that are not in the transcript. Do not repeat the instructions "
-    "back. Answer the specific questions a section's instructions ask -- if it "
-    "asks for severity and how long impact lasted, give them. Never write "
-    "about what the transcript does not contain: omit an unsupported detail "
-    "instead of writing that it was not stated, not provided, or not "
-    "confirmed. Do not restate the same point in two sentences, and do not add "
-    "a closing sentence that recaps what you just wrote. "
-    "Respond with a single JSON object and nothing else: keys are the "
-    "section headings EXACTLY as given, values are the section's content as "
-    "plain text (no markdown). Use an empty string for any section the "
-    "transcript does not support. For a section whose heading refers to a "
-    "timeline, instead write one event per line, each line starting with "
-    "'- ' and formatted 'HH:MM Name: what happened', in chronological order, "
-    "using the timestamps given in the transcript. Be highly selective: a "
-    "timeline is a short record of moments that changed the incident, NOT a "
-    "log of the conversation. Include only events such as first detection or "
-    "alert, confirmation of impact, key diagnostic findings, decisions taken, "
-    "mitigation and rollback actions, recovery, and resolution. Exclude "
-    "greetings, acknowledgements ('ok', 'thanks', 'on it'), speculation that "
-    "led nowhere, status pings, and routine chatter. Prefer roughly 10-15 "
-    "entries for a typical incident; merge closely related messages into one "
-    "entry rather than listing each message. "
-    "For a "
-    "section about action items, follow-ups or next steps, write one item per "
-    "line, each starting with '- ', phrased as a concrete task and naming an "
-    "owner when the transcript identifies one -- never as a prose paragraph. "
-    "When a section's instructions list labelled groups -- Impact's "
-    "'End-users', 'CDS Staff', 'Other government department(s)' and 'Other', "
-    "for example -- answer each on its own line as 'Label: value', using the "
-    "labels exactly as given and keeping each to one or two sentences. Do not "
-    "run them together into a paragraph, and do not add a separate summary "
-    "paragraph repeating them. "
-    "Ignore automated bot activity "
-    "entirely: channel setup, topic or description changes, severity-warning "
-    "posts, hangout/meeting links, and 'an incident report has been created' "
-    "notices are tooling scaffolding, not incident events. Never list them in "
-    "the timeline, never describe them as things the team did, and never "
-    "create an action item about work a bot performed automatically -- action "
-    "items are tasks for people. You are also given a 'Metadata fields' list; "
-    "include each of those labels as a key too. Fill each one only when the "
-    "transcript establishes it, and use an empty string otherwise -- a blank "
-    "field is expected and fine, a wrong one is not. Times "
-    "('Start-of-impact time', 'Detection time', 'End-of-impact time') take the "
-    "'YYYY-MM-DD HH:MM' timestamp of the message that evidences impact "
-    "starting, the problem first being noticed, and impact ending; never "
-    "estimate a time no message supports. 'On-call' takes the name of whoever "
-    "the transcript says was on call or was paged; do not assume the first "
-    "person to speak was on call. 'Facilitators' takes the name of anyone the "
-    "transcript identifies as running or coordinating the incident or its "
-    "review. Names must appear in the transcript."
-)
+_DRAFT_INSTRUCTIONS = """\
+You are an incident-response scribe filling in an incident report.
+
+## SOURCES
+You are given the report's sections -- each a heading followed by the template's
+instructions for what belongs under it -- a list of metadata field labels, and the
+incident channel's transcript. Every transcript line begins with its timestamp in
+square brackets: "[YYYY-MM-DD HH:MM ZZZ] Name: message".
+The section instructions tell you WHAT to write. The transcript is your ONLY
+source of facts. Never invent a detail, name, time or cause it does not state.
+
+## OUTPUT
+Return one JSON object and nothing else. Keys are the section headings exactly as
+given, plus every label in the metadata list. Values are plain text -- no
+markdown. Use an empty string for anything the transcript does not support: a
+blank value is expected and fine, a wrong one is not. Where a value runs to
+several lines, separate them with newline characters inside that one string.
+Never return an array.
+
+## WRITING
+Write in past tense, in complete sentences, factually.
+A prose section is 1-4 sentences. That limit does NOT apply to list sections
+(timeline, action items, follow-ups, next steps), which run as long as the
+transcript supports.
+Answer the specific questions a section's instructions ask -- if it asks for
+severity and how long impact lasted, give both.
+When you mention a pull request, write it as "PR <number>" and nothing else --
+never paste its URL beside it. The report turns "PR 1898" into a link on its
+own, so a URL in your text only prints the same reference twice.
+Omit an unsupported detail rather than writing that it was not stated, not
+provided or not confirmed. Do not repeat the instructions back, do not restate a
+point in two sentences, and do not close a section by recapping it.
+
+## TIMELINE (any section whose heading refers to a timeline)
+This section is a LIST of the incident's significant moments, and it MUST hold
+10-15 entries. Returning one entry, or a paragraph, is a failure of the task.
+Rank the transcript's messages by how much each changed the incident and write
+the top 10-15 as lines, in chronological order. Significant means: the first
+alert or detection, confirmation of impact, each diagnostic finding that changed
+what the team understood, each decision, each fix attempted and whether it
+worked, escalations, customer or status communications, recovery, and
+resolution.
+List every one of them only if the incident genuinely produced fewer than 10
+such moments; a long transcript always produces more.
+Merge two messages only when they describe the same moment. Skip greetings,
+acknowledgements ("ok", "thanks", "on it"), status pings and routine chatter.
+Before you answer, count the lines you have written for this section. If there
+are fewer than 10 and the transcript still holds significant messages you left
+out, add them until you reach at least 10.
+Every line takes this shape, in chronological order:
+- YYYY-MM-DD HH:MM ZZZ Name: what happened
+Each line MUST open with the full YYYY-MM-DD HH:MM timestamp, copied from the
+front of that transcript line exactly as written, including the timezone that
+follows it. A bare clock time such as "19:25" is wrong, and a missing date is
+wrong.
+Worked example -- these transcript lines:
+[2026-09-01 19:25 EDT] Jane: pipeline alert just fired
+[2026-09-01 19:31 EDT] John: confirmed, checkout is down for everyone
+[2026-09-01 19:40 EDT] Jane: rolling back the 19:10 deploy
+produce exactly this value:
+"- 2026-09-01 19:25 EDT Jane: Pipeline alert fired.\\n- 2026-09-01 19:31 EDT \
+John: Confirmed checkout was down for all users.\\n- 2026-09-01 19:40 EDT \
+Jane: Rolled back the 19:10 deploy."
+
+## ACTION ITEMS (action items, follow-ups, next steps)
+One item per line, each starting with "- ", phrased as a concrete task, naming an
+owner when the transcript identifies one. Never a prose paragraph.
+
+## LABELLED GROUPS
+When a section's instructions list labelled groups -- Impact's "End-users",
+"CDS Staff", "Other government department(s)" and "Other", for example -- answer
+each on its own line as "Label: value", using the labels exactly as given, one or
+two sentences each. Do not run them together into a paragraph, and do not add a
+summary paragraph repeating them.
+
+## BOT ACTIVITY
+Channel setup, topic and description changes, severity-warning posts,
+hangout/meeting links and "an incident report has been created" notices are
+tooling scaffolding, not incident events. Never place them in the timeline, never
+describe them as things the team did, and never raise an action item about work a
+bot performed automatically -- action items are tasks for people.
+
+## METADATA FIELDS
+Fill each label only when the transcript establishes it, otherwise use "".
+"Start-of-impact time", "Detection time", "End-of-impact time" take the
+YYYY-MM-DD HH:MM timestamp of the message evidencing impact starting, the problem
+first being noticed, and impact ending. Never estimate a time no message supports.
+"On-call" takes whoever the transcript says was on call or was paged; do not
+assume the first person to speak was on call.
+"Facilitators" takes anyone the transcript identifies as running or coordinating
+the incident or its review.
+Names must appear in the transcript.\
+"""
 
 # Metadata fields the model is asked to fill from the transcript. Each is left
 # blank unless a message actually establishes it -- a wrong on-call name or
@@ -121,8 +154,25 @@ _AUTHORS_FIELD_LABEL = "Author(s)"
 
 # Pull-request links as they appear in Slack messages. The model writes "PR
 # 1898" in prose, so the number is mapped back to the URL somebody actually
-# posted -- inferring a repository from a bare number would be a guess.
-_PR_URL_PATTERN = re.compile(r"https?://(?:www\.)?github\.com/[\w.-]+/[\w.-]+/pull/(\d+)")
+# posted. Group 1 is the repository, kept so a PR the channel discussed without
+# posting its link can still be resolved against that repository.
+_PR_URL_PATTERN = re.compile(r"(https?://(?:www\.)?github\.com/[\w.-]+/[\w.-]+)/pull/(\d+)")
+
+# "PR 1898, https://github.com/org/repo/pull/1898" -- the reference and its URL
+# printed side by side. The URL is dropped, keeping the short form the document
+# hyperlinks; any separator between them ("," ";" "(") goes with it.
+_PR_REFERENCE_WITH_URL_PATTERN = re.compile(
+    r"\bPR\s*#?(?P<number>\d+)\b[\s,;:-]*[(\[]?\s*"
+    r"(?P<url>https?://(?:www\.)?github\.com/[\w.-]+/[\w.-]+/pull/(?P<url_number>\d+))"
+    r"(?:\s*[)\]])?",
+    re.IGNORECASE,
+)
+
+# An explicit pull-request mention in drafted prose: "PR 1898", "PR #1898",
+# "pull request 1898". Only these wordings are resolved against the channel's
+# repository -- a bare "#123" may be an issue, and a /pull/ URL built for an
+# issue number is a broken link.
+_PR_MENTION_PATTERN = re.compile(r"\b(?:PRs?|pull requests?)\s*#?(\d+)\b", re.IGNORECASE)
 
 # Sections left for humans: a five-whys chain and a retrospective are
 # judgement calls the team makes together, not something to be pre-filled from
@@ -136,6 +186,10 @@ _HUMAN_ONLY_HEADING_MARKERS = (
 
 # Sections that read as lists rather than prose: every line is bulleted, even
 # when the model returns them unmarked.
+# The stamp every timeline entry must open with, e.g. "2026-09-01 19:25 EDT".
+# Used to re-split a timeline the model ran together into one paragraph.
+_TIMELINE_STAMP_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?:\s+[A-Z]{2,5})?\b")
+
 _LIST_HEADING_MARKERS = (
     "action item",
     "follow-up",
@@ -268,6 +322,7 @@ async def draft_incident_document(
 
     drafts = _build_drafts(sections, answers)
     _log_answer_coverage(log, sections, answers, drafts)
+    _log_timeline_shape(log, answers, drafts, raw)
     if not any(draft.is_drafted for draft in drafts):
         log.info("incident_draft_no_answers")
         return OperationResult.permanent_error(
@@ -276,7 +331,10 @@ async def draft_incident_document(
         )
 
     fields = _build_fields(answers, messages)
-    links = _extract_pr_links(messages)
+    # Links are resolved before the URLs are collapsed away, so a URL only the
+    # model supplied still ends up hyperlinking its "PR <number>".
+    links = _resolve_pr_links(messages, drafts)
+    drafts = _collapse_pr_references(drafts)
     written = documents.write_draft_document(document_id, drafts, fields, links)
     if written is None:
         log.warning("incident_draft_write_failed", section_count=len(drafts))
@@ -295,7 +353,6 @@ async def draft_incident_document(
     log.info(
         "incident_draft_generated",
         draft_document_id=written.document_id,
-        created=written.created,
         drafted=len(outcome.drafted_headings),
         unanswered=len(outcome.unanswered_headings),
     )
@@ -304,6 +361,37 @@ async def draft_incident_document(
         provider="openai",
         operation="draft_incident_document",
     )
+
+
+def _log_timeline_shape(
+    log: Any,
+    answers: dict[str, str],
+    drafts: Sequence[SectionDraft],
+    raw: str,
+) -> None:
+    """Log how many timeline entries the model returned, and what they were.
+
+    A one-entry timeline in the finished document has three possible causes
+    that are indistinguishable from the document itself: the model returned one
+    entry, it returned many that something here collapsed, or the running
+    process is not executing the current prompt. ``model_entries`` versus
+    ``written_entries`` separates the first two, and the preview shows which
+    prompt the answer was actually shaped by.
+    """
+    for draft in drafts:
+        if "timeline" not in draft.heading.lower() or not draft.is_drafted:
+            continue
+
+        answer = _match_answer(draft.heading, answers, {_normalize_heading(k): v for k, v in answers.items()}) or ""
+        written = len(draft.content.splitlines())
+        log.info(
+            "incident_draft_timeline_shape",
+            heading=draft.heading,
+            model_entries=len(answer.splitlines()),
+            written_entries=written,
+            model_chars=len(answer),
+            raw_preview=raw[:400] if written < 10 else None,
+        )
 
 
 def _log_answer_coverage(
@@ -382,9 +470,59 @@ def _parse_answers(raw: str) -> tuple[dict[str, str] | None, bool]:
         parsed = None
 
     if isinstance(parsed, dict):
-        return {str(key): str(value) for key, value in parsed.items() if isinstance(value, str)}, False
+        return {str(key): text for key, value in parsed.items() if (text := _coerce_answer(value))}, False
 
     return _salvage_pairs(text) or None, True
+
+
+def _coerce_answer(value: object) -> str:
+    """Normalise one JSON value into section text, or ``""`` if unusable.
+
+    Asking for "one event per line" reliably tempts a model into answering with
+    a JSON array instead of a newline-joined string; the list-shaped sections
+    (timeline, action items) are exactly the ones it does this to. Those values
+    used to be discarded silently, which read in the document as the model
+    having nothing to say. Lists are joined back into lines instead, and dict
+    entries (``{"time": ..., "text": ...}``) are flattened in field order.
+    """
+    if isinstance(value, str):
+        return value
+    if isinstance(value, list):
+        return "\n".join(line for item in value if (line := _coerce_answer(item).strip()))
+    if isinstance(value, dict):
+        return " ".join(str(item).strip() for item in value.values() if str(item).strip())
+    return ""
+
+
+def _split_run_on_timeline(content: str) -> str:
+    """Break a timeline the model ran together into one entry per line.
+
+    The other way a timeline collapses is a single paragraph holding every
+    event, which renders as one bullet containing the whole incident. Every
+    entry is required to open with a stamp, so a stamp appearing mid-line marks
+    the start of the next entry. Content that is already one-per-line, and
+    prose with no stamps at all, pass through untouched.
+    """
+    lines: list[str] = []
+    for raw_line in content.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        starts = [match.start() for match in _TIMELINE_STAMP_PATTERN.finditer(line)]
+        if len(starts) < 2:
+            lines.append(line)
+            continue
+
+        # Cut before every stamp but the first, so any bullet marker or prose
+        # ahead of the opening stamp stays with the entry it introduces. The
+        # marker preceding a later stamp is left trailing on the previous
+        # slice, and stripped there.
+        bounds = [0, *starts[1:], len(line)]
+        for begin, end in pairwise(bounds):
+            if entry := line[begin:end].strip().rstrip("-*•").strip():
+                lines.append(entry)
+    return "\n".join(lines)
 
 
 def _first_json_object(text: str) -> str | None:
@@ -452,6 +590,8 @@ def _build_drafts(
     drafts: list[SectionDraft] = []
     for section in sections:
         answer = _match_answer(section.heading, answers, lookup)
+        if answer and "timeline" in section.heading.lower():
+            answer = _split_run_on_timeline(answer)
         drafts.append(
             SectionDraft(
                 heading=section.heading,
@@ -513,8 +653,86 @@ def _extract_pr_links(messages: Sequence[TranscriptMessage]) -> dict[str, str]:
     links: dict[str, str] = {}
     for message in messages:
         for match in _PR_URL_PATTERN.finditer(message.text):
-            links.setdefault(match.group(1), match.group(0))
+            links.setdefault(match.group(2), match.group(0))
     return links
+
+
+def _channel_repository(messages: Sequence[TranscriptMessage]) -> str | None:
+    """Return the repository the channel's pull-request links point at.
+
+    ``None`` when the channel referenced more than one repository, because a
+    number could then belong to either and a wrong link is worse than none.
+    """
+    repositories = {match.group(1) for message in messages for match in _PR_URL_PATTERN.finditer(message.text)}
+    return repositories.pop() if len(repositories) == 1 else None
+
+
+def _resolve_pr_links(
+    messages: Sequence[TranscriptMessage],
+    drafts: Sequence[SectionDraft],
+) -> dict[str, str]:
+    """Map every pull request the draft cites to a URL.
+
+    A reference is linkable when the channel posted its URL, or when the model
+    wrote the URL into the draft itself -- that one is harvested here because
+    the draft's copy is about to be collapsed to "PR <number>", and it would
+    otherwise be the only record of where the PR lives. Failing both, but with
+    every pull-request link in the channel belonging to one repository, the URL
+    is built from that repository and the cited number: a report that names a PR
+    without linking it makes the reader search for it by hand.
+    """
+    links = _extract_pr_links(messages)
+    for draft in drafts:
+        for match in _PR_URL_PATTERN.finditer(draft.content):
+            links.setdefault(match.group(2), match.group(0))
+
+    repository = _channel_repository(messages)
+    if repository is None:
+        return links
+
+    for draft in drafts:
+        for match in _PR_MENTION_PATTERN.finditer(draft.content):
+            links.setdefault(match.group(1), f"{repository}/pull/{match.group(1)}")
+    return links
+
+
+def _collapse_pr_references(drafts: Sequence[SectionDraft]) -> list[SectionDraft]:
+    """Reduce every pull-request mention to a single "PR <number>".
+
+    The model is told to write the short form alone, but it still pastes the URL
+    beside it often enough to matter: "Opened PR 1898,
+    https://github.com/org/repo/pull/1898, to add error handling" prints the
+    same reference twice, once as a link and once as raw URL text. The short
+    form is kept because the document hyperlinks it, so dropping the URL loses
+    nothing. A URL standing on its own becomes "PR <number>" for the same
+    reason -- it is the only mention, and it reads better short.
+    """
+    collapsed: list[SectionDraft] = []
+    for draft in drafts:
+        if not draft.is_drafted:
+            collapsed.append(draft)
+            continue
+
+        content = _PR_REFERENCE_WITH_URL_PATTERN.sub(_drop_duplicate_url, draft.content)
+        content = _PR_URL_PATTERN.sub(lambda match: f"PR {match.group(2)}", content)
+        collapsed.append(replace(draft, content=_tidy_spacing(content)))
+    return collapsed
+
+
+def _drop_duplicate_url(match: re.Match[str]) -> str:
+    """Keep "PR <number>", dropping the URL only when it names that same PR."""
+    if match.group("number") != match.group("url_number"):
+        # Two different pull requests side by side; neither is redundant, so
+        # only the URL is shortened.
+        return f"PR {match.group('number')}, PR {match.group('url_number')}"
+    return f"PR {match.group('number')}"
+
+
+def _tidy_spacing(text: str) -> str:
+    """Repair the spacing a removed URL leaves behind."""
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r"[ \t]+([,.;:])", r"\1", text)
+    return re.sub(r"\(\s*\)", "", text).strip()
 
 
 def _is_human_only(heading: str) -> bool:

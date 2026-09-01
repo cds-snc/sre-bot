@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -389,3 +390,30 @@ class TestPartialDraftMessage:
         response = self._run(partial=False)
 
         assert "later sections are missing" not in response.message
+
+
+class TestTimestampFormatting:
+    """Entries carry the date as well as the time — a clock alone is ambiguous."""
+
+    @staticmethod
+    def _stamp(tzname: str, ts: str = "1755450120") -> str:
+        client = _client([{"user": "U1", "text": "prod is down", "ts": ts}])
+        return _fetch_transcript(client, "C123", limit=10, oldest=0.0, log=structlog.get_logger(), tzname=tzname)[0].timestamp
+
+    def test_slack_timestamps_carry_date_time_and_zone(self):
+        stamp = self._stamp("America/Toronto")
+
+        assert re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2} E[DS]T", stamp), stamp
+
+    def test_the_zone_follows_daylight_saving(self):
+        summer = self._stamp("America/Toronto", ts="1755450120")
+        winter = self._stamp("America/Toronto", ts="1739450120")
+
+        assert {summer.split()[-1], winter.split()[-1]} == {"EDT", "EST"}
+
+    def test_an_unknown_zone_falls_back_to_utc(self):
+        """A bad config value must not cost the timeline its timestamps."""
+        assert self._stamp("Not/AZone") == self._stamp("UTC")
+
+    def test_a_malformed_timestamp_yields_no_time(self):
+        assert self._stamp("America/Toronto", ts="not-a-time") == ""

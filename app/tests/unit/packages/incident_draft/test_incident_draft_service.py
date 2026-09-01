@@ -20,7 +20,9 @@ from packages.incident_draft.service import (
     DRAFT_UNPARSEABLE_CODE,
     EMPTY_HISTORY_CODE,
     NO_ANSWERS_CODE,
+    _collapse_pr_references,
     _parse_answers,
+    _resolve_pr_links,
     draft_incident_document,
 )
 
@@ -173,7 +175,7 @@ class TestDraftIncidentDocument:
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
 
-        assert summarizer.received_max_output_tokens == 8000
+        assert summarizer.received_max_output_tokens == 4000
 
     @pytest.mark.asyncio
     async def test_json_wrapped_in_prose_is_parsed(self):
@@ -585,3 +587,272 @@ class TestHumanOnlySections:
         instructions = summarizer.received_instructions or ""
         for gone in ("five whys", "What went wrong", "Where we got lucky", "root-cause section"):
             assert gone not in instructions
+
+
+class TestTimelineNeverCollapsesToOneEntry:
+    """A timeline the model shapes differently must still be one entry per line.
+
+    Asking for "one event per line" reliably tempts a model into answering with
+    a JSON array, or into running every event together in a single paragraph.
+    Both used to reach the document as a single entry (or as nothing at all),
+    which read as though the transcript held one event.
+    """
+
+    _ENTRIES = (
+        "2026-09-01 19:25 EDT Ada: Alert fired",
+        "2026-09-01 19:31 EDT Sylvia: Confirmed impact",
+        "2026-09-01 19:40 EDT Ada: Rolled back the deploy",
+    )
+
+    @staticmethod
+    async def _timeline_written(value):
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="Detailed Timeline", instructions="List events.\n")])
+        summarizer = _StubSummarizer(OperationResult.success(data=json.dumps({"Detailed Timeline": value})))
+
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        drafts = {d.heading: d for d in (documents.created_drafts or [])}
+        return drafts["Detailed Timeline"].content.splitlines()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "value",
+        [
+            pytest.param(list(_ENTRIES), id="json_array"),
+            pytest.param([f"- {entry}" for entry in _ENTRIES], id="json_array_of_bullets"),
+            pytest.param("\n".join(f"- {entry}" for entry in _ENTRIES), id="newline_joined"),
+            pytest.param(" ".join(f"- {entry}" for entry in _ENTRIES), id="run_on_bulleted"),
+            pytest.param(" ".join(_ENTRIES), id="run_on_paragraph"),
+        ],
+    )
+    async def test_every_shape_yields_one_line_per_event(self, value):
+        lines = await self._timeline_written(value)
+
+        assert len(lines) == len(self._ENTRIES)
+        for line, entry in zip(lines, self._ENTRIES, strict=True):
+            assert line.lstrip("- ") == entry
+
+    @pytest.mark.asyncio
+    async def test_entries_given_as_objects_are_flattened(self):
+        lines = await self._timeline_written([{"time": "2026-09-01 19:25 EDT", "event": "Ada: Alert fired"}])
+
+        assert lines == ["2026-09-01 19:25 EDT Ada: Alert fired"]
+
+    @pytest.mark.asyncio
+    async def test_prose_without_timestamps_is_left_alone(self):
+        """Only a timeline is re-split; ordinary sentences must survive intact."""
+        lines = await self._timeline_written("The team could not establish an order of events.")
+
+        assert lines == ["The team could not establish an order of events."]
+
+    @pytest.mark.asyncio
+    async def test_a_list_answer_is_not_silently_discarded(self):
+        """A non-string value used to be dropped, leaving the section empty."""
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="Action Items", instructions="List tasks.\n")])
+        answers = {"Action Items": ["Ada to add an alert", "Sylvia to document the rollback"]}
+        summarizer = _StubSummarizer(OperationResult.success(data=json.dumps(answers)))
+
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        drafts = {d.heading: d for d in (documents.created_drafts or [])}
+        assert drafts["Action Items"].is_drafted
+        assert drafts["Action Items"].content.splitlines() == [
+            "Ada to add an alert",
+            "Sylvia to document the rollback",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_the_prompt_forbids_both_collapsing_shapes(self):
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
+
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        instructions = summarizer.received_instructions or ""
+        assert "Never return an array." in instructions
+        assert "separate them with newline characters" in instructions
+
+    @pytest.mark.asyncio
+    async def test_the_prompt_leads_with_coverage_not_formatting(self):
+        """Format rules crowding out the coverage rule collapsed the timeline.
+
+        The model satisfied the hard formatting constraints and skimped on the
+        soft one, so coverage now comes first and the worked example shows
+        several entries rather than one.
+        """
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
+
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        instructions = summarizer.received_instructions or ""
+        timeline_clause = instructions[instructions.index("## TIMELINE") : instructions.index("## ACTION ITEMS")]
+        assert timeline_clause.index("MUST hold") < timeline_clause.index("exactly as written")
+        assert "10-15 entries" in timeline_clause
+        # A self-check the model can act on before answering.
+        assert "count the lines you have written" in timeline_clause
+        # A single-entry example anchored the model to a single-entry answer, so
+        # the worked example must keep showing several (whatever names it uses).
+        assert timeline_clause.count("- 2026-09-01") >= 3
+
+    @pytest.mark.asyncio
+    async def test_the_prompt_requires_a_full_date_stamp_on_every_entry(self):
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
+
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        instructions = summarizer.received_instructions or ""
+        timeline_clause = instructions[instructions.index("## TIMELINE") : instructions.index("## ACTION ITEMS")]
+        assert "- YYYY-MM-DD HH:MM ZZZ Name: what happened" in timeline_clause
+        assert "MUST open with the full YYYY-MM-DD HH:MM timestamp" in timeline_clause
+        assert 'A bare clock time such as "19:25" is wrong' in timeline_clause
+
+    @pytest.mark.asyncio
+    async def test_the_sentence_limit_does_not_apply_to_list_sections(self):
+        """The global "1-4 sentences" rule silently capped the timeline."""
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
+
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        instructions = summarizer.received_instructions or ""
+        assert "That limit does NOT apply to list sections" in instructions
+        # The old selectivity language fought the entry count; it must stay gone.
+        for gone in ("Be highly selective", "NOT a log", "merge closely related messages"):
+            assert gone not in instructions
+
+
+class TestEveryCitedPullRequestGetsAUrl:
+    """A PR named in the report must be openable, not a number to go hunt for."""
+
+    @staticmethod
+    def _messages():
+        return [
+            TranscriptMessage(author="Ada", text="fix up: https://github.com/cds-snc/sre-bot/pull/1898"),
+            TranscriptMessage(author="Bob", text="and https://github.com/cds-snc/sre-bot/pull/1900"),
+        ]
+
+    @staticmethod
+    def _draft(content):
+        return [SectionDraft(heading="Summary", content=content, is_drafted=True)]
+
+    @pytest.mark.parametrize(
+        "content",
+        [
+            pytest.param("Rolled back PR 2001.", id="pr_number"),
+            pytest.param("Rolled back PR #2001.", id="pr_hash"),
+            pytest.param("Reverted in pull request 2001.", id="spelled_out"),
+        ],
+    )
+    def test_a_pr_the_channel_never_linked_resolves_to_the_channels_repository(self, content):
+        links = _resolve_pr_links(self._messages(), self._draft(content))
+
+        assert links["2001"] == "https://github.com/cds-snc/sre-bot/pull/2001"
+
+    def test_posted_links_still_win_over_the_inferred_form(self):
+        links = _resolve_pr_links(self._messages(), self._draft("PR 1898 landed."))
+
+        assert links["1898"] == "https://github.com/cds-snc/sre-bot/pull/1898"
+
+    def test_two_repositories_in_one_channel_are_never_guessed_between(self):
+        """A number could belong to either repository; a wrong link is worse than none."""
+        messages = [
+            *self._messages(),
+            TranscriptMessage(author="Cid", text="see https://github.com/cds-snc/notification/pull/5"),
+        ]
+
+        links = _resolve_pr_links(messages, self._draft("Rolled back PR 2001."))
+
+        assert "2001" not in links
+
+    def test_a_bare_issue_reference_is_not_turned_into_a_pull_request_url(self):
+        """ "#2001" may be an issue, and /pull/<issue> is a broken link."""
+        links = _resolve_pr_links(self._messages(), self._draft("Tracked in #2001."))
+
+        assert "2001" not in links
+
+    def test_a_url_only_the_model_supplied_is_still_harvested(self):
+        """It is collapsed out of the text, so it must be captured first."""
+        drafts = self._draft("Reverted by https://github.com/cds-snc/other/pull/77.")
+
+        links = _resolve_pr_links([], drafts)
+
+        assert links["77"] == "https://github.com/cds-snc/other/pull/77"
+
+
+class TestAPullRequestIsNamedOnce:
+    """ "PR 1898, https://.../pull/1898" prints the same reference twice."""
+
+    @staticmethod
+    def _collapse(content: str) -> str:
+        drafts = [SectionDraft(heading="Summary", content=content, is_drafted=True)]
+        return _collapse_pr_references(drafts)[0].content
+
+    @pytest.mark.parametrize(
+        ("content", "expected"),
+        [
+            pytest.param(
+                "Opened PR 1898, https://github.com/cds-snc/sre-bot/pull/1898, to add error handling.",
+                "Opened PR 1898, to add error handling.",
+                id="comma_separated",
+            ),
+            pytest.param(
+                "Reverted by PR 1898 (https://github.com/cds-snc/sre-bot/pull/1898).",
+                "Reverted by PR 1898.",
+                id="parenthesised",
+            ),
+            pytest.param(
+                "See PR #1898 https://github.com/cds-snc/sre-bot/pull/1898 for the fix.",
+                "See PR 1898 for the fix.",
+                id="bare_adjacent",
+            ),
+        ],
+    )
+    def test_the_duplicate_url_is_dropped_and_the_short_form_kept(self, content, expected):
+        assert self._collapse(content) == expected
+
+    def test_a_url_with_no_reference_beside_it_becomes_the_short_form(self):
+        """It is the only mention, so it reads better short -- and still links."""
+        content = "Fix shipped in https://github.com/cds-snc/sre-bot/pull/2001 later that day."
+
+        assert self._collapse(content) == "Fix shipped in PR 2001 later that day."
+
+    def test_two_different_pull_requests_are_both_kept(self):
+        """Only a URL naming the *same* PR is redundant."""
+        content = "PR 1898, https://github.com/cds-snc/sre-bot/pull/2001 — different PRs."
+
+        assert self._collapse(content) == "PR 1898, PR 2001 — different PRs."
+
+    def test_text_without_pull_requests_is_untouched(self):
+        content = "No pull requests were referenced during the incident."
+
+        assert self._collapse(content) == content
+
+    def test_an_undrafted_section_keeps_its_template_guidance_verbatim(self):
+        drafts = [SectionDraft(heading="Summary", content="See https://github.com/o/r/pull/5", is_drafted=False)]
+
+        assert _collapse_pr_references(drafts)[0].content == "See https://github.com/o/r/pull/5"
+
+    @pytest.mark.asyncio
+    async def test_the_url_still_resolves_to_a_link_after_being_collapsed(self):
+        """Links are resolved before collapsing, so the short form stays clickable."""
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        answer = "Reverted by PR 1898, https://github.com/cds-snc/sre-bot/pull/1898."
+        summarizer = _StubSummarizer(OperationResult.success(data=json.dumps({"Summary": answer})))
+
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        assert documents.created_drafts[0].content == "Reverted by PR 1898."
+        assert documents.written_links["1898"] == "https://github.com/cds-snc/sre-bot/pull/1898"
+
+    @pytest.mark.asyncio
+    async def test_the_prompt_asks_for_the_short_form_only(self):
+        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
+
+        await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        instructions = summarizer.received_instructions or ""
+        assert "never paste its URL beside it" in instructions
+        assert "include its\nfull URL" not in instructions
