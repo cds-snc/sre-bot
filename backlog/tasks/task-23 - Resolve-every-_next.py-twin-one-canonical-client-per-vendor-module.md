@@ -1,10 +1,10 @@
 ---
 id: TASK-23
 title: 'Resolve every _next.py twin: one canonical client per vendor module'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-08-31 17:37'
+updated_date: '2026-09-01 14:19'
 labels:
   - clients
   - phase-3
@@ -33,16 +33,16 @@ Steps:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All three subtasks are Done: TASK-23.1 (Google _next deletion), TASK-23.2 (idempotency store convergence), TASK-23.3 (retry store convergence + AWS _next deletion)
-- [ ] #2 find app/integrations -name '*_next.py' returns zero files
-- [ ] #3 The _next-suffixed generation's string-dispatchers are gone: integrations/aws/client_next.py::execute_aws_api_call and integrations/google_workspace/google_service_next.py::execute_google_api_call no longer exist. Explicitly NOT in scope: the separate non-_next execute_aws_api_call (integrations/aws/client.py, TASK-25.2) and execute_google_api_call (integrations/google_workspace/google_service.py, TASK-25.1), each with many live consumers, and the get_google_api_command_parameters docstring scraper, which exists only in google_service.py (TASK-25.1). decisions/sdk-typing.md's repo-wide dispatcher and scraper checks pass only once TASK-25.1 and TASK-25.2 are also Done
-- [ ] #4 The two remaining _next consumers (infrastructure/idempotency/dynamodb.py, infrastructure/resilience/retry/dynamodb_store.py) call a boto3 client from integrations.aws.client.get_aws_client inside try/except with classify_aws_error; claim/lease/dedup outcomes are unchanged and unmapped SDK exceptions propagate instead of being swallowed
+- [x] #1 All three subtasks are Done: TASK-23.1 (Google _next deletion), TASK-23.2 (idempotency store convergence), TASK-23.3 (retry store convergence + AWS _next deletion)
+- [x] #2 find app/integrations -name '*_next.py' returns zero files
+- [x] #3 The _next-suffixed generation's string-dispatchers are gone: integrations/aws/client_next.py::execute_aws_api_call and integrations/google_workspace/google_service_next.py::execute_google_api_call no longer exist. Explicitly NOT in scope: the separate non-_next execute_aws_api_call (integrations/aws/client.py, TASK-25.2) and execute_google_api_call (integrations/google_workspace/google_service.py, TASK-25.1), each with many live consumers, and the get_google_api_command_parameters docstring scraper, which exists only in google_service.py (TASK-25.1). decisions/sdk-typing.md's repo-wide dispatcher and scraper checks pass only once TASK-25.1 and TASK-25.2 are also Done
+- [x] #4 The two remaining _next consumers (infrastructure/idempotency/dynamodb.py, infrastructure/resilience/retry/dynamodb_store.py) call a boto3 client from integrations.aws.client.get_aws_client inside try/except with classify_aws_error; claim/lease/dedup outcomes are unchanged and unmapped SDK exceptions propagate instead of being swallowed
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 No behavior change observable from feature code (existing tests green)
-- [ ] #2 PR series references decisions/outbound-clients.md and decisions/sdk-typing.md
+- [x] #1 No behavior change observable from feature code (existing tests green)
+- [x] #2 PR series references decisions/outbound-clients.md and decisions/sdk-typing.md
 <!-- DOD:END -->
 
 ## Implementation Plan

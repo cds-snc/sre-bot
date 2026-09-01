@@ -1,11 +1,10 @@
 """MaxMind integration package."""
 
-from .client import GeoLocationData, MaxMindClient, geolocate, get_maxmind_client, healthcheck
+from .client import GeoLocationData, MaxMindClient, classify_maxmind_error, get_maxmind_client
 
 __all__ = [
     "MaxMindClient",
     "GeoLocationData",
     "get_maxmind_client",
-    "geolocate",
-    "healthcheck",
+    "classify_maxmind_error",
 ]

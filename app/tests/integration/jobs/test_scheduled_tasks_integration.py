@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from infrastructure.operations import OperationResult
 from jobs import scheduled_tasks
 
 
@@ -104,7 +105,9 @@ class TestIntegrationHealthchecksWorkflow:
         - Healthy status is reported
         """
         mock_google_drive.healthcheck.return_value = True
-        mock_maxmind.healthcheck.return_value = True
+        mock_maxmind.get_maxmind_client.return_value.healthcheck.return_value = OperationResult.success(
+            data={"status": "healthy"}, message="MaxMind database is accessible"
+        )
         mock_opsgenie.healthcheck.return_value = True
         mock_identity_store.healthcheck.return_value = True
 
@@ -112,7 +115,7 @@ class TestIntegrationHealthchecksWorkflow:
 
         # Verify all healthchecks were called
         assert mock_google_drive.healthcheck.call_count == 1
-        assert mock_maxmind.healthcheck.call_count == 1
+        assert mock_maxmind.get_maxmind_client.return_value.healthcheck.call_count == 1
         assert mock_opsgenie.healthcheck.call_count == 1
         assert mock_identity_store.healthcheck.call_count == 1
 
@@ -141,7 +144,9 @@ class TestIntegrationHealthchecksWorkflow:
         - Error messages include integration name
         """
         mock_google_drive.healthcheck.return_value = False
-        mock_maxmind.healthcheck.return_value = True
+        mock_maxmind.get_maxmind_client.return_value.healthcheck.return_value = OperationResult.permanent_error(
+            message="MaxMind healthcheck failed", error_code="HEALTHCHECK_FAILED"
+        )
         mock_opsgenie.healthcheck.return_value = False
         mock_identity_store.healthcheck.return_value = True
 
@@ -149,13 +154,14 @@ class TestIntegrationHealthchecksWorkflow:
 
         # All checks should be called
         assert mock_google_drive.healthcheck.call_count == 1
-        assert mock_maxmind.healthcheck.call_count == 1
+        assert mock_maxmind.get_maxmind_client.return_value.healthcheck.call_count == 1
         assert mock_opsgenie.healthcheck.call_count == 1
         assert mock_identity_store.healthcheck.call_count == 1
 
         # Errors should be logged for unhealthy checks
         error_logs = [call for call in mock_logger.mock_calls if "error" in str(call).lower()]
-        assert len(error_logs) >= 2
+        assert len(error_logs) >= 3
+        assert any("maxmind" in str(call) for call in error_logs)
 
 
 @pytest.mark.integration
