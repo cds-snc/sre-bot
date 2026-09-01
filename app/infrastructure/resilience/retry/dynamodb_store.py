@@ -7,13 +7,18 @@ AWS DynamoDB for shared state across multiple application instances.
 import json
 import time
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
+from botocore.exceptions import BotoCoreError, ClientError
 
 from infrastructure.resilience.retry.config import RetryConfig
 from infrastructure.resilience.retry.models import RetryRecord
-from integrations.aws import dynamodb_next
+from integrations.aws.client import classify_aws_error
+
+if TYPE_CHECKING:
+    from types_boto3_dynamodb.client import DynamoDBClient
+    from types_boto3_dynamodb.type_defs import AttributeValueTypeDef
 
 logger = structlog.get_logger()
 
@@ -35,6 +40,7 @@ class DynamoDBRetryStore:
         GSI: status-next_retry_at-index (status + next_retry_at)
 
     Args:
+        dynamodb: DynamoDB client
         config: Retry configuration (backoff, max attempts, etc.)
         table_name: DynamoDB table name
         ttl_days: Days until records auto-expire (default: 30)
@@ -42,11 +48,13 @@ class DynamoDBRetryStore:
 
     def __init__(
         self,
+        dynamodb: DynamoDBClient,
         config: RetryConfig,
         table_name: str,
         ttl_days: int = 30,
     ):
         """Initialize DynamoDB retry store."""
+        self._dynamodb = dynamodb
         self.config = config
         self.table_name = table_name
         self.ttl_days = ttl_days
@@ -69,7 +77,7 @@ class DynamoDBRetryStore:
             Assigned record ID
 
         Raises:
-            ClientError: If DynamoDB operation fails
+            RuntimeError: If the DynamoDB write fails with a classified error
         """
         # Generate ID if not present
         if not record.id:
@@ -88,59 +96,42 @@ class DynamoDBRetryStore:
         # Calculate TTL (30 days from now)
         ttl_timestamp = int(time.time()) + (self.ttl_days * 24 * 60 * 60)
 
-        # Prepare DynamoDB item
-        item = {
-            "record_id": record.id,
-            "operation_type": record.operation_type,
-            "payload": record.payload,
-            "attempts": record.attempts,
-            "created_at": record.created_at.isoformat(),
-            "updated_at": record.updated_at.isoformat(),
-            "next_retry_at": int(record.next_retry_at.timestamp()),
-            "status": "ACTIVE",
-            "ttl": ttl_timestamp,
+        dynamodb_item: dict[str, AttributeValueTypeDef] = {
+            "record_id": {"S": record.id},
+            "operation_type": {"S": record.operation_type},
+            "payload": {"S": str(record.payload)},
+            "attempts": {"N": str(record.attempts)},
+            "created_at": {"S": record.created_at.isoformat()},
+            "updated_at": {"S": record.updated_at.isoformat()},
+            "next_retry_at": {"N": str(int(record.next_retry_at.timestamp()))},
+            "status": {"S": "ACTIVE"},
+            "ttl": {"N": str(ttl_timestamp)},
         }
 
-        # Add optional fields
         if record.last_error:
-            item["last_error"] = {"S": record.last_error}
+            dynamodb_item["last_error"] = {"S": record.last_error}
 
-        # Convert to DynamoDB format
-        dynamodb_item = {
-            "record_id": {"S": item["record_id"]},
-            "operation_type": {"S": item["operation_type"]},
-            "payload": {"S": str(item["payload"])},
-            "attempts": {"N": str(item["attempts"])},
-            "created_at": {"S": item["created_at"]},
-            "updated_at": {"S": item["updated_at"]},
-            "next_retry_at": {"N": str(item["next_retry_at"])},
-            "status": {"S": item["status"]},
-            "ttl": {"N": str(item["ttl"])},
-        }
-
-        if "last_error" in item:
-            dynamodb_item["last_error"] = item["last_error"]
-
-        result = dynamodb_next.put_item(
-            table_name=self.table_name,
-            Item=dynamodb_item,
-        )
-
-        if result.is_success:
-            self.log.debug(
-                "retry_record_saved",
-                record_id=record.id,
-                operation_type=record.operation_type,
+        try:
+            self._dynamodb.put_item(
+                TableName=self.table_name,
+                Item=dynamodb_item,
             )
-            return record.id
-        else:
+        except (ClientError, BotoCoreError) as exc:
+            _, error_code, _ = classify_aws_error(exc)
             self.log.error(
                 "dynamodb_save_failed",
                 record_id=record.id,
-                error=result.message,
-                error_code=result.error_code,
+                error=str(exc),
+                error_code=error_code,
             )
-            raise RuntimeError(f"Failed to save retry record: {result.message}")
+            raise RuntimeError(f"Failed to save retry record: {exc}") from exc
+
+        self.log.debug(
+            "retry_record_saved",
+            record_id=record.id,
+            operation_type=record.operation_type,
+        )
+        return record.id
 
     def fetch_due(self, limit: int = 10) -> list[RetryRecord]:
         """Fetch retry records that are due for processing.
@@ -156,27 +147,28 @@ class DynamoDBRetryStore:
         """
         now = int(time.time())
 
-        result = dynamodb_next.query(
-            table_name=self.table_name,
-            IndexName="status-next_retry_at-index",
-            KeyConditionExpression="#status = :status AND next_retry_at <= :now",
-            ExpressionAttributeNames={"#status": "status"},
-            ExpressionAttributeValues={
-                ":status": {"S": "ACTIVE"},
-                ":now": {"N": str(now)},
-            },
-            Limit=limit * 2,  # Query extra to account for filtering
-        )
-
-        if not result.is_success:
+        try:
+            response = self._dynamodb.query(
+                TableName=self.table_name,
+                IndexName="status-next_retry_at-index",
+                KeyConditionExpression="#status = :status AND next_retry_at <= :now",
+                ExpressionAttributeNames={"#status": "status"},
+                ExpressionAttributeValues={
+                    ":status": {"S": "ACTIVE"},
+                    ":now": {"N": str(now)},
+                },
+                Limit=limit * 2,  # Query extra to account for filtering
+            )
+        except (ClientError, BotoCoreError) as exc:
+            _, error_code, _ = classify_aws_error(exc)
             self.log.error(
                 "dynamodb_fetch_due_failed",
-                error=result.message,
-                error_code=result.error_code,
+                error=str(exc),
+                error_code=error_code,
             )
             return []
 
-        items = result.data.get("Items", []) if result.data else []
+        items = response.get("Items", [])
 
         # Filter out claimed records
         due_records = []
@@ -216,43 +208,43 @@ class DynamoDBRetryStore:
         now = int(time.time())
         expires_at = now + lease_seconds
 
-        result = dynamodb_next.update_item(
-            table_name=self.table_name,
-            Key={"record_id": {"S": record_id}},
-            UpdateExpression="SET claim_worker = :worker, claim_expires_at = :expires",
-            ConditionExpression="attribute_not_exists(claim_worker) OR claim_expires_at < :now",
-            ExpressionAttributeValues={
-                ":worker": {"S": worker_id},
-                ":expires": {"N": str(expires_at)},
-                ":now": {"N": str(now)},
-            },
-        )
-
-        if result.is_success:
-            self.log.debug(
-                "retry_record_claimed",
-                record_id=record_id,
-                worker=worker_id,
-                expires_at=expires_at,
+        try:
+            self._dynamodb.update_item(
+                TableName=self.table_name,
+                Key={"record_id": {"S": record_id}},
+                UpdateExpression="SET claim_worker = :worker, claim_expires_at = :expires",
+                ConditionExpression="attribute_not_exists(claim_worker) OR claim_expires_at < :now",
+                ExpressionAttributeValues={
+                    ":worker": {"S": worker_id},
+                    ":expires": {"N": str(expires_at)},
+                    ":now": {"N": str(now)},
+                },
             )
-            return True
-        else:
+        except (ClientError, BotoCoreError) as exc:
+            _, error_code, _ = classify_aws_error(exc)
             # Conditional check failure means already claimed
-            if result.error_code == "ConditionalCheckFailedException":
+            if error_code == "ConditionalCheckFailedException":
                 self.log.debug(
                     "retry_claim_failed_already_claimed",
                     record_id=record_id,
                     worker=worker_id,
                 )
-                return False
             else:
                 self.log.error(
                     "dynamodb_claim_failed",
                     record_id=record_id,
-                    error=result.message,
-                    error_code=result.error_code,
+                    error=str(exc),
+                    error_code=error_code,
                 )
-                return False
+            return False
+
+        self.log.debug(
+            "retry_record_claimed",
+            record_id=record_id,
+            worker=worker_id,
+            expires_at=expires_at,
+        )
+        return True
 
     def mark_success(self, record_id: str) -> None:
         """Mark a record as successfully processed (remove from table).
@@ -260,21 +252,22 @@ class DynamoDBRetryStore:
         Args:
             record_id: ID of record to mark as successful
         """
-        result = dynamodb_next.delete_item(
-            table_name=self.table_name,
-            Key={"record_id": {"S": record_id}},
-        )
-
-        if result.is_success:
-            self.log.debug("retry_record_success", record_id=record_id)
-        else:
+        try:
+            self._dynamodb.delete_item(
+                TableName=self.table_name,
+                Key={"record_id": {"S": record_id}},
+            )
+        except (ClientError, BotoCoreError) as exc:
+            _, error_code, _ = classify_aws_error(exc)
             self.log.error(
                 "dynamodb_mark_success_failed",
                 record_id=record_id,
-                error=result.message,
-                error_code=result.error_code,
+                error=str(exc),
+                error_code=error_code,
             )
-            raise RuntimeError(f"Failed to mark success: {result.message}")
+            raise RuntimeError(f"Failed to mark success: {exc}") from exc
+
+        self.log.debug("retry_record_success", record_id=record_id)
 
     def mark_permanent_failure(self, record_id: str, last_error: str | None = None) -> None:
         """Mark a record as permanently failed (move to DLQ).
@@ -299,35 +292,36 @@ class DynamoDBRetryStore:
         update_expr += " REMOVE claim_worker, claim_expires_at"
 
         # Convert to DynamoDB format
-        dynamodb_expr_values = {}
+        dynamodb_expr_values: dict[str, AttributeValueTypeDef] = {}
         for key, value in expr_values.items():
             if isinstance(value, str):
                 dynamodb_expr_values[key] = {"S": value}
             else:
                 dynamodb_expr_values[key] = {"S": str(value)}
 
-        result = dynamodb_next.update_item(
-            table_name=self.table_name,
-            Key={"record_id": {"S": record_id}},
-            UpdateExpression=update_expr,
-            ExpressionAttributeNames=expr_names,
-            ExpressionAttributeValues=dynamodb_expr_values,
-        )
-
-        if result.is_success:
-            self.log.info(
-                "retry_record_moved_to_dlq",
-                record_id=record_id,
-                last_error=last_error,
+        try:
+            self._dynamodb.update_item(
+                TableName=self.table_name,
+                Key={"record_id": {"S": record_id}},
+                UpdateExpression=update_expr,
+                ExpressionAttributeNames=expr_names,
+                ExpressionAttributeValues=dynamodb_expr_values,
             )
-        else:
+        except (ClientError, BotoCoreError) as exc:
+            _, error_code, _ = classify_aws_error(exc)
             self.log.error(
                 "dynamodb_mark_permanent_failure_failed",
                 record_id=record_id,
-                error=result.message,
-                error_code=result.error_code,
+                error=str(exc),
+                error_code=error_code,
             )
-            raise RuntimeError(f"Failed to mark permanent failure: {result.message}")
+            raise RuntimeError(f"Failed to mark permanent failure: {exc}") from exc
+
+        self.log.info(
+            "retry_record_moved_to_dlq",
+            record_id=record_id,
+            last_error=last_error,
+        )
 
     def increment_attempt(self, record_id: str, last_error: str | None = None) -> None:
         """Increment attempt counter and reschedule for retry.
@@ -337,20 +331,31 @@ class DynamoDBRetryStore:
             last_error: Optional error message from failed attempt
         """
         # First, get current record to check attempts
-        get_result = dynamodb_next.get_item(
-            table_name=self.table_name,
-            Key={"record_id": {"S": record_id}},
-        )
-
-        if not get_result.is_success or not get_result.data or "Item" not in get_result.data:
+        try:
+            get_response = self._dynamodb.get_item(
+                TableName=self.table_name,
+                Key={"record_id": {"S": record_id}},
+            )
+        except (ClientError, BotoCoreError) as exc:
+            _, error_code, _ = classify_aws_error(exc)
             self.log.warning(
                 "retry_record_not_found_for_increment",
                 record_id=record_id,
-                error=(get_result.message if not get_result.is_success else "Item not found"),
+                error=str(exc),
+                error_code=error_code,
             )
             return
 
-        item = get_result.data["Item"]
+        item = get_response.get("Item")
+        if item is None:
+            self.log.warning(
+                "retry_record_not_found_for_increment",
+                record_id=record_id,
+                error="Item not found",
+                error_code=None,
+            )
+            return
+
         current_attempts_attr = item.get("attempts", {})
         current_attempts = int(current_attempts_attr.get("N", 0)) if isinstance(current_attempts_attr, dict) else 0
         new_attempts = current_attempts + 1
@@ -373,7 +378,7 @@ class DynamoDBRetryStore:
         # Update record
         update_expr = "SET attempts = :attempts, updated_at = :now, next_retry_at = :next_retry"
         update_expr += " REMOVE claim_worker, claim_expires_at"  # Release claim
-        expr_values = {
+        expr_values: dict[str, AttributeValueTypeDef] = {
             ":attempts": {"N": str(new_attempts)},
             ":now": {"S": now.isoformat()},
             ":next_retry": {"N": str(next_retry_at)},
@@ -383,28 +388,61 @@ class DynamoDBRetryStore:
             update_expr += ", last_error = :error"
             expr_values[":error"] = {"S": last_error}
 
-        result = dynamodb_next.update_item(
-            table_name=self.table_name,
-            Key={"record_id": {"S": record_id}},
-            UpdateExpression=update_expr,
-            ExpressionAttributeValues=expr_values,
-        )
-
-        if result.is_success:
-            self.log.info(
-                "retry_attempt_incremented",
-                record_id=record_id,
-                attempts=new_attempts,
-                next_retry_seconds=delay_seconds,
+        try:
+            self._dynamodb.update_item(
+                TableName=self.table_name,
+                Key={"record_id": {"S": record_id}},
+                UpdateExpression=update_expr,
+                ExpressionAttributeValues=expr_values,
             )
-        else:
+        except (ClientError, BotoCoreError) as exc:
+            _, error_code, _ = classify_aws_error(exc)
             self.log.error(
                 "dynamodb_increment_attempt_failed",
                 record_id=record_id,
-                error=result.message,
-                error_code=result.error_code,
+                error=str(exc),
+                error_code=error_code,
             )
-            raise RuntimeError(f"Failed to increment attempt: {result.message}")
+            raise RuntimeError(f"Failed to increment attempt: {exc}") from exc
+
+        self.log.info(
+            "retry_attempt_incremented",
+            record_id=record_id,
+            attempts=new_attempts,
+            next_retry_seconds=delay_seconds,
+        )
+
+    def _count_by_status(self, status: str) -> int | None:
+        """Count records with the given status, aggregating across result pages.
+
+        Args:
+            status: Record status to count (ACTIVE or DLQ)
+
+        Returns:
+            Record count, or None if the query failed with a classified error
+        """
+        try:
+            paginator = self._dynamodb.get_paginator("query")
+            return sum(
+                page.get("Count", 0)
+                for page in paginator.paginate(
+                    TableName=self.table_name,
+                    IndexName="status-next_retry_at-index",
+                    KeyConditionExpression="#status = :status",
+                    ExpressionAttributeNames={"#status": "status"},
+                    ExpressionAttributeValues={":status": {"S": status}},
+                    Select="COUNT",
+                )
+            )
+        except (ClientError, BotoCoreError) as exc:
+            _, error_code, _ = classify_aws_error(exc)
+            self.log.error(
+                "dynamodb_get_stats_failed",
+                record_status=status,
+                error=str(exc),
+                error_code=error_code,
+            )
+            return None
 
     def get_stats(self) -> dict[str, int]:
         """Get current retry queue statistics.
@@ -412,47 +450,14 @@ class DynamoDBRetryStore:
         Returns:
             Dictionary with active_records, claimed_records, dlq_records counts
         """
-        # Count ACTIVE records
-        active_result = dynamodb_next.query(
-            table_name=self.table_name,
-            IndexName="status-next_retry_at-index",
-            KeyConditionExpression="#status = :status",
-            ExpressionAttributeNames={"#status": "status"},
-            ExpressionAttributeValues={":status": {"S": "ACTIVE"}},
-            Select="COUNT",
-        )
-        active_count = 0
-        if active_result.is_success and active_result.data:
-            active_count = active_result.data.get("Count", 0)
-
-        # Count DLQ records
-        dlq_result = dynamodb_next.query(
-            table_name=self.table_name,
-            IndexName="status-next_retry_at-index",
-            KeyConditionExpression="#status = :status",
-            ExpressionAttributeNames={"#status": "status"},
-            ExpressionAttributeValues={":status": {"S": "DLQ"}},
-            Select="COUNT",
-        )
-        dlq_count = 0
-        if dlq_result.is_success and dlq_result.data:
-            dlq_count = dlq_result.data.get("Count", 0)
-
-        # Count claimed records (approximate - would need scan)
-        # For performance, we'll skip this in DynamoDB implementation
-        claimed_count = 0
-
-        if not active_result.is_success or not dlq_result.is_success:
-            self.log.error(
-                "dynamodb_get_stats_failed",
-                active_error=(active_result.message if not active_result.is_success else None),
-                dlq_error=dlq_result.message if not dlq_result.is_success else None,
-            )
+        active_count = self._count_by_status("ACTIVE")
+        dlq_count = self._count_by_status("DLQ")
 
         return {
-            "active_records": active_count,
-            "claimed_records": claimed_count,  # Not calculated in DynamoDB
-            "dlq_records": dlq_count,
+            "active_records": active_count or 0,
+            # Claimed records would require a scan; not calculated in DynamoDB
+            "claimed_records": 0,
+            "dlq_records": dlq_count or 0,
         }
 
     def get_dlq_entries(self, limit: int = 100) -> list[RetryRecord]:
@@ -464,25 +469,25 @@ class DynamoDBRetryStore:
         Returns:
             List of permanently failed retry records
         """
-        result = dynamodb_next.query(
-            table_name=self.table_name,
-            IndexName="status-next_retry_at-index",
-            KeyConditionExpression="#status = :status",
-            ExpressionAttributeNames={"#status": "status"},
-            ExpressionAttributeValues={":status": {"S": "DLQ"}},
-            Limit=limit,
-        )
-
-        if not result.is_success:
+        try:
+            response = self._dynamodb.query(
+                TableName=self.table_name,
+                IndexName="status-next_retry_at-index",
+                KeyConditionExpression="#status = :status",
+                ExpressionAttributeNames={"#status": "status"},
+                ExpressionAttributeValues={":status": {"S": "DLQ"}},
+                Limit=limit,
+            )
+        except (ClientError, BotoCoreError) as exc:
+            _, error_code, _ = classify_aws_error(exc)
             self.log.error(
                 "dynamodb_get_dlq_entries_failed",
-                error=result.message,
-                error_code=result.error_code,
+                error=str(exc),
+                error_code=error_code,
             )
             return []
 
-        items = result.data.get("Items", []) if result.data else []
-        return [self._item_to_record(item) for item in items]
+        return [self._item_to_record(item) for item in response.get("Items", [])]
 
     def _calculate_retry_delay(self, attempts: int) -> int:
         """Calculate exponential backoff delay.
@@ -493,8 +498,10 @@ class DynamoDBRetryStore:
         Returns:
             Delay in seconds
         """
-        delay = self.config.base_delay_seconds * (2**attempts)
-        return min(delay, self.config.max_delay_seconds)
+        base_delay_seconds = cast(int, self.config.base_delay_seconds)
+        max_delay_seconds = cast(int, self.config.max_delay_seconds)
+        delay = base_delay_seconds * (2**attempts)
+        return cast(int, min(delay, max_delay_seconds))
 
     def _item_to_record(self, item: dict[str, Any]) -> RetryRecord:
         """Convert DynamoDB item to RetryRecord.
@@ -507,22 +514,21 @@ class DynamoDBRetryStore:
         """
 
         # Helper to extract value from DynamoDB format
-        def get_value(attr, default=None):
+        def get_value(attr: object, default: str | None = None) -> str | None:
             if isinstance(attr, dict):
-                if "S" in attr:
-                    return attr["S"]
-                elif "N" in attr:
-                    return attr["N"]
+                value = attr.get("S", attr.get("N", default))
+                if isinstance(value, str):
+                    return value
             return default
 
-        record_id = get_value(item.get("record_id"))
-        operation_type = get_value(item.get("operation_type"))
+        record_id = get_value(item.get("record_id")) or ""
+        operation_type = get_value(item.get("operation_type")) or ""
         payload_str = get_value(item.get("payload"))
-        attempts = int(get_value(item.get("attempts", {}), 0))
+        attempts = int(get_value(item.get("attempts", {}), "0") or "0")
         last_error = get_value(item.get("last_error"))
         created_at_str = get_value(item.get("created_at"))
         updated_at_str = get_value(item.get("updated_at"))
-        next_retry_at_ts = int(get_value(item.get("next_retry_at"), 0))
+        next_retry_at_ts = int(get_value(item.get("next_retry_at"), "0") or "0")
 
         # Parse payload (stored as string)
         try:

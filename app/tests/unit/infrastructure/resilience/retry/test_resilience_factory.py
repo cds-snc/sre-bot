@@ -1,11 +1,14 @@
 """Unit tests for retry store factory."""
 
+from unittest.mock import MagicMock
+
 import pytest
 
 from infrastructure.resilience.retry import (
     InMemoryRetryStore,
     create_retry_store,
 )
+from infrastructure.resilience.retry import factory as retry_factory
 from infrastructure.resilience.retry.dynamodb_store import DynamoDBRetryStore
 
 
@@ -33,13 +36,15 @@ class TestCreateRetryStore:
         self,
         retry_config_factory,
         mock_settings_with_dynamodb,
-        mock_dynamodb_next,
+        mock_dynamodb_client,
         monkeypatch,
     ):
         """Test DynamoDB store creation from settings."""
         monkeypatch.setattr(
-            "infrastructure.resilience.retry.dynamodb_store.dynamodb_next",
-            mock_dynamodb_next,
+            retry_factory,
+            "get_aws_client",
+            lambda *args, **kwargs: mock_dynamodb_client,
+            raising=False,
         )
 
         config = retry_config_factory()
@@ -54,7 +59,7 @@ class TestCreateRetryStore:
         self,
         retry_config_factory,
         mock_settings,
-        mock_dynamodb_next,
+        mock_dynamodb_client,
         monkeypatch,
     ):
         """Test explicit DynamoDB store creation."""
@@ -65,8 +70,10 @@ class TestCreateRetryStore:
         mock_settings.dynamodb_table_name = "explicit-table"
 
         monkeypatch.setattr(
-            "infrastructure.resilience.retry.dynamodb_store.dynamodb_next",
-            mock_dynamodb_next,
+            retry_factory,
+            "get_aws_client",
+            lambda *args, **kwargs: mock_dynamodb_client,
+            raising=False,
         )
 
         store = create_retry_store(config, mock_settings, backend="dynamodb")
@@ -95,13 +102,15 @@ class TestCreateRetryStore:
         self,
         retry_config_factory,
         mock_settings_with_dynamodb,
-        mock_dynamodb_next,
+        mock_dynamodb_client,
         monkeypatch,
     ):
         """Test that created DynamoDB store uses provided config."""
         monkeypatch.setattr(
-            "infrastructure.resilience.retry.dynamodb_store.dynamodb_next",
-            mock_dynamodb_next,
+            retry_factory,
+            "get_aws_client",
+            lambda *args, **kwargs: mock_dynamodb_client,
+            raising=False,
         )
 
         config = retry_config_factory(
@@ -113,6 +122,22 @@ class TestCreateRetryStore:
 
         assert store.config.max_attempts == 7
         assert store.config.base_delay_seconds == 45
+
+    def test_create_dynamodb_store_injects_client(
+        self,
+        retry_config_factory,
+        mock_settings_with_dynamodb,
+        monkeypatch,
+    ):
+        """The DynamoDB backend obtains one shared client and injects it into the store."""
+        dynamodb_client = MagicMock()
+        get_aws_client = MagicMock(return_value=dynamodb_client)
+        monkeypatch.setattr(retry_factory, "get_aws_client", get_aws_client, raising=False)
+
+        store = create_retry_store(retry_config_factory(), mock_settings_with_dynamodb)
+
+        get_aws_client.assert_called_once_with("dynamodb")
+        assert store._dynamodb is dynamodb_client
 
     def test_factory_respects_backend_parameter_over_settings(self, retry_config_factory, mock_settings_with_dynamodb):
         """Test that backend parameter overrides settings."""
