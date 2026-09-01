@@ -1,5 +1,8 @@
 from unittest.mock import ANY, MagicMock, patch
 
+import pytest
+from googleapiclient.errors import HttpError
+
 from modules.incident import incident_folder
 
 
@@ -380,3 +383,96 @@ def test_fetch_updates(mock_scan_item):
     updates = incident_folder.fetch_updates("incident_id")
     assert updates == []
     assert mock_scan_item.call_count == 2
+
+
+def _sheet_http_error(reason: str) -> HttpError:
+    class FakeResp(dict):
+        def __init__(self) -> None:
+            super().__init__()
+            self.status = 400
+            self.reason = reason
+
+    return HttpError(resp=FakeResp(), content=b"{}")
+
+
+def _incident_row_data() -> dict:
+    return {
+        "sheets": [
+            {
+                "data": [
+                    {
+                        "rowData": [
+                            {"values": [{"formattedValue": "header"}]},
+                            {
+                                "values": [
+                                    {"formattedValue": "2024-01-01"},
+                                    {
+                                        "formattedValue": "Incident name",
+                                        "hyperlink": "https://report.example.com/doc",
+                                    },
+                                    {"formattedValue": "Team A"},
+                                    {"formattedValue": "Closed"},
+                                    {
+                                        "formattedValue": "#incident-2024-01-01-test",
+                                        "hyperlink": "https://gcdigital.slack.com/archives/C0123456789",
+                                    },
+                                ]
+                            },
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+
+
+@patch("modules.incident.incident_folder.sheets")
+def test_get_incidents_from_sheet_returns_parsed_incidents(mock_sheets):
+    mock_sheets.get_sheet.return_value = _incident_row_data()
+
+    incidents = incident_folder.get_incidents_from_sheet()
+
+    assert incidents == [
+        {
+            "channel_id": "C0123456789",
+            "channel_name": "incident-2024-01-01-test",
+            "name": "Incident name",
+            "user_id": "",
+            "teams": ["Team A"],
+            "report_url": "https://report.example.com/doc",
+            "status": "Closed",
+            "created_at": "2024-01-01",
+            "meet_url": "TBC",
+        }
+    ]
+
+
+@patch("modules.incident.incident_folder.logger")
+@patch("modules.incident.incident_folder.sheets")
+def test_get_incidents_from_sheet_swallows_unable_to_parse_range(mock_sheets, mock_logger):
+    mock_sheets.get_sheet.side_effect = _sheet_http_error("Unable to parse range: Sheet1")
+
+    assert incident_folder.get_incidents_from_sheet() == []
+    mock_logger.warning.assert_called_once()
+
+
+@patch("modules.incident.incident_folder.sheets")
+def test_get_incidents_from_sheet_propagates_other_http_error(mock_sheets):
+    error = _sheet_http_error("Internal error")
+    mock_sheets.get_sheet.side_effect = error
+
+    with pytest.raises(HttpError) as exc_info:
+        incident_folder.get_incidents_from_sheet()
+
+    assert exc_info.value is error
+
+
+@patch("modules.incident.incident_folder.sheets")
+def test_get_incidents_from_sheet_propagates_non_http_error(mock_sheets):
+    error = ValueError("Unable to parse range")
+    mock_sheets.get_sheet.side_effect = error
+
+    with pytest.raises(ValueError) as exc_info:
+        incident_folder.get_incidents_from_sheet()
+
+    assert exc_info.value is error
