@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 15:31'
-updated_date: '2026-09-01 18:56'
+updated_date: '2026-09-01 19:47'
 labels:
   - clients
   - phase-3
   - cleanup
+milestone: m-3
 dependencies:
   - TASK-25.1.1
   - TASK-25.1.2
@@ -96,5 +97,10 @@ author: implementation
 created: 2026-09-01 18:56
 ---
 TASK-25.1.3 (Sheets) implemented 2026-09-01: appended its 5 execute_google_api_request call sites to the inventory in Notes. Two things for whoever picks this task up: (1) modules/reports/google_groups.py and modules/aws/spending.py have ZERO test coverage of their Sheets call sites, so any error-handling change there is unguarded and needs characterization tests written first; (2) the accumulated inventory (.1/.2/.3 reported, .4/.5 outstanding) already exceeds a single reviewable PR — this task should be decomposed into per-adapter / per-legacy-feature-area subtasks plus a final helper-deletion task before any code is written.
+---
+
+created: 2026-09-01 19:42
+---
+CALL-SITE INVENTORY UPDATE from TASK-25.1.4 planning (2026-09-01, per the tracking note on that task): TASK-25.1.4 DOES reuse integrations/google_workspace/client.py::execute_google_api_request. Its planned new call sites are inside integrations/google_workspace/google_directory.py, all funnelled through one module-private pagination helper _list_all(resource, response_key, **list_kwargs) that calls execute_google_api_request once per page, used by list_users, list_groups and list_group_members. No new shared primitive is added to client.py by that slice, so this task's deviation surface does not grow beyond the existing helper. Two additional items for this task's reconciliation, found while planning 25.1.4 and deliberately left in place there: (a) google_directory.py's list_groups_with_members / get_members_details / convert_google_groups_members_to_dataframe are business logic inside a vendor package, which decisions/outbound-clients.md forbids - they need a home outside integrations/ (or to die with the modules-strangler); (b) integrations/utils/api.py::retry_request, called from list_groups_with_members, is a time.sleep retry loop inside app/integrations/ and directly trips outbound-clients.md's Checks line, the correct replacement being the SDK-native num_retries= argument that execute_google_api_request currently does not pass.
 ---
 <!-- COMMENTS:END -->
