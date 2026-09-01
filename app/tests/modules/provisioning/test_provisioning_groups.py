@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock, call, patch
 
+import pytest
+
 from modules.provisioning import groups
 
 
@@ -170,6 +172,11 @@ def test_get_groups_from_integration_filters_returns_subset(
     mock_aws_list_groups_with_memberships.assert_called_once_with(groups_filters=[])
 
     assert not mock_google_list_groups_with_members.called
+
+
+def test_get_groups_from_integration_rejects_return_dataframe():
+    with pytest.raises(TypeError):
+        groups.get_groups_from_integration("google_groups", return_dataframe=True)
 
 
 @patch("modules.provisioning.groups.logger")

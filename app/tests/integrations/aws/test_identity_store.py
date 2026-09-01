@@ -885,3 +885,7 @@ def test_list_groups_with_memberships_filtered(
     assert result == expected_output
     assert mock_list_group_memberships.call_count == 2
     assert mock_list_users.call_count == 1
+
+
+def test_convert_aws_groups_members_to_dataframe_is_deleted():
+    assert not hasattr(identity_store, "convert_aws_groups_members_to_dataframe")
