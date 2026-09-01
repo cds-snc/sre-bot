@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:33'
+updated_date: '2026-09-01 15:35'
 labels:
   - clients
   - phase-3
@@ -34,3 +35,13 @@ Slice 4 of TASK-25.1. A SEPARATE consumer path from TASK-22.4 (which only covers
 - [ ] #2 All 4 consumers behave identically for their Directory-related calls (existing tests pass, behavior-neutral)
 - [ ] #3 integrations/google_workspace/google_directory.py (the non-facade, non-_next original) has zero remaining production consumers once this slice lands, or is itself migrated onto the same factory+classify pattern if a shared implementation is chosen
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: task-planner
+created: 2026-09-01 15:35
+---
+TRACKING NOTE (2026-09-01, task-planner): TASK-25.1.1 introduces a shared integrations/google_workspace/client.py::execute_google_api_request(request) helper (try/except + classify_google_error + log + raise) as a deliberate, TEMPORARY deviation from outbound-clients.md's exact vendor-package export contract, tracked by TASK-25.1.6. This slice reuses TASK-22.4's AdminDirectoryResource factory + classify_google_error, so it may not touch execute_google_api_request at all -- if it does (or introduces an equivalent for these 4 legacy consumers), update TASK-25.1.6's description/references with the exact files and call sites added here, so its eventual inline-vs-formalize decision is made against the full call-site inventory, not just TASK-25.1.1's.
+---
+<!-- COMMENTS:END -->
