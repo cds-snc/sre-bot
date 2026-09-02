@@ -277,9 +277,7 @@ def _copy_source_document(source_document_id: str, draft_title: str, folder: str
     service = google_workspace_client.get_drive_service(scopes=google_drive.DRIVE_SCOPES)
     body = cast("File", {"name": draft_title, "parents": [folder]})
     try:
-        copied = (
-            service.files().copy(fileId=source_document_id, body=body, supportsAllDrives=True, fields="id").execute()
-        )
+        copied = service.files().copy(fileId=source_document_id, body=body, supportsAllDrives=True, fields="id").execute()
     except HttpError as exc:
         status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
         logger.warning(
