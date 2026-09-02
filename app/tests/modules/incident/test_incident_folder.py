@@ -28,6 +28,20 @@ def test_list_incident_folders_sorted(google_drive_mock):
     google_drive_mock.list_folders_in_folder.assert_called_once_with("SRE_INCIDENT_FOLDER", "not name contains 'Templates'")
 
 
+@patch("modules.incident.incident_folder.SRE_INCIDENT_FOLDER", "SRE_INCIDENT_FOLDER")
+@patch("modules.incident.incident_folder.google_drive")
+def test_list_incident_folders_truncates_to_the_display_limit(google_drive_mock):
+    """Drive listings are unbounded now, so the Slack option limit is enforced here."""
+    limit = incident_folder.LEGACY_FOLDER_DISPLAY_LIMIT
+    google_drive_mock.list_folders_in_folder.return_value = [{"id": str(i), "name": f"folder-{i:03d}"} for i in range(limit + 10)]
+
+    result = incident_folder.list_incident_folders()
+
+    assert len(result) == limit
+    assert result[0]["name"] == "folder-000"
+    assert result[-1]["name"] == f"folder-{limit - 1:03d}"
+
+
 @patch("modules.incident.incident_folder.google_drive.list_folders_in_folder")
 @patch("modules.incident.incident_folder.folder_item")
 def test_list_folders_view(folder_item_mock, list_folders_in_folder_mock):
@@ -41,6 +55,22 @@ def test_list_folders_view(folder_item_mock, list_folders_in_folder_mock):
     folder_item_mock.assert_called_once_with({"id": "foo", "name": "bar"})
     ack.assert_called_once()
     client.views_open.assert_called_once_with(trigger_id="foo", view=ANY)
+
+
+@patch("modules.incident.incident_folder.google_drive.list_folders_in_folder")
+@patch("modules.incident.incident_folder.folder_item")
+def test_list_folders_view_truncates_to_the_display_limit(folder_item_mock, list_folders_in_folder_mock):
+    """folder_item emits three blocks per folder, so the modal must stay under Slack's 100-block cap."""
+    limit = incident_folder.LEGACY_FOLDER_DISPLAY_LIMIT
+    client = MagicMock()
+    ack = MagicMock()
+    list_folders_in_folder_mock.return_value = [{"id": str(i), "name": f"folder-{i:03d}"} for i in range(limit + 10)]
+    folder_item_mock.return_value = [{"type": "section"}, {"type": "actions"}, {"type": "divider"}]
+
+    incident_folder.list_folders_view(client, {"trigger_id": "foo"}, ack)
+
+    assert folder_item_mock.call_count == limit
+    assert len(client.views_open.call_args.kwargs["view"]["blocks"]) == limit * 3
 
 
 @patch("modules.incident.incident_folder.logger")
@@ -120,7 +150,7 @@ def test_get_folder_metadata(google_drive_mock):
     }
     google_drive_mock.list_metadata.return_value = metadata
     assert incident_folder.get_folder_metadata("foo") == metadata
-    google_drive_mock.list_metadata.assert_called_once_with("foo")
+    google_drive_mock.list_metadata.assert_called_once_with("foo", fields="id, name, appProperties")
 
 
 @patch("modules.incident.incident_folder.google_drive.list_metadata")
@@ -137,7 +167,7 @@ def test_view_folder_metadata_open(metadata_items_mock, list_metadata_mock):
     metadata_items_mock.return_value = [["metadata item"]]
     incident_folder.view_folder_metadata(client, body, ack)
     ack.assert_called_once()
-    list_metadata_mock.assert_called_once_with("foo")
+    list_metadata_mock.assert_called_once_with("foo", fields="id, name, appProperties")
     metadata_items_mock.assert_called_once_with({"name": "folder", "appProperties": [{"key": "key", "value": "value"}]})
     client.views_open(trigger_id="trigger_id", view=ANY)
 
@@ -156,7 +186,7 @@ def test_view_folder_metadata_update(metadata_items_mock, list_metadata_mock):
     metadata_items_mock.return_value = [["metadata item"]]
     incident_folder.view_folder_metadata(client, body, ack)
     ack.assert_called_once()
-    list_metadata_mock.assert_called_once_with("foo")
+    list_metadata_mock.assert_called_once_with("foo", fields="id, name, appProperties")
     metadata_items_mock.assert_called_once_with({"name": "folder", "appProperties": [{"key": "key", "value": "value"}]})
     client.views_update(view_id="view_id", view=ANY)
 

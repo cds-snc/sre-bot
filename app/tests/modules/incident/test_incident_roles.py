@@ -17,7 +17,9 @@ def test_manage_roles(get_document_by_channel_name_mock):
     get_document_by_channel_name_mock.return_value = [{"id": "file_id", "appProperties": {"ic_id": "ic_id", "ol_id": "ol_id"}}]
     incident_helper.manage_roles(client, body, ack, respond)
     ack.assert_called_once()
-    get_document_by_channel_name_mock.assert_called_once_with("channel_name")
+    get_document_by_channel_name_mock.assert_called_once_with(
+        "channel_name", fields="nextPageToken, files(appProperties, id, name)"
+    )
     client.views_open.assert_called_once_with(trigger_id="trigger_id", view=ANY)
 
 
@@ -52,7 +54,9 @@ def test_manage_roles_with_dev_prefix(get_document_by_channel_name_mock):
     get_document_by_channel_name_mock.return_value = [{"id": "file_id", "appProperties": {"ic_id": "ic_id", "ol_id": "ol_id"}}]
     incident_helper.manage_roles(client, body, ack, respond)
     ack.assert_called_once()
-    get_document_by_channel_name_mock.assert_called_once_with("channel_name")
+    get_document_by_channel_name_mock.assert_called_once_with(
+        "channel_name", fields="nextPageToken, files(appProperties, id, name)"
+    )
     client.views_open.assert_called_once_with(trigger_id="trigger_id", view=ANY)
 
 
