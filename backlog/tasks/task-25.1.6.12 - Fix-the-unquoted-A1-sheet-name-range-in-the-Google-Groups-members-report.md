@@ -1,11 +1,11 @@
 ---
 id: TASK-25.1.6.12
 title: Fix the unquoted A1 sheet-name range in the Google Groups members report
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-02 18:52'
-updated_date: '2026-09-02 19:59'
+updated_date: '2026-09-02 20:00'
 labels:
   - reports
   - phase-3
