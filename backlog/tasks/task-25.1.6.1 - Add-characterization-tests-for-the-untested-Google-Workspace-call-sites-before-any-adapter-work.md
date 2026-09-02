@@ -3,10 +3,11 @@ id: TASK-25.1.6.1
 title: >-
   Add characterization tests for the untested Google Workspace call sites before
   any adapter work
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@me'
 created_date: '2026-09-02 14:58'
-updated_date: '2026-09-02 18:54'
+updated_date: '2026-09-02 19:17'
 labels:
   - clients
   - phase-3
@@ -40,13 +41,13 @@ Write characterization tests FIRST that pin today's observable behaviour, includ
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/tests/unit/modules/reports/test_google_groups_report.py exists (unit layer per decisions/testing.md, NOT the legacy app/tests/modules tree) and pins today request arguments at all seven Google call sites in app/modules/reports/google_groups.py: google_drive.find_files_by_name, google_drive.create_file, google_directory.list_groups, google_directory.list_group_members, sheets.get_sheet, sheets.batch_update (the addSheet request) and sheets.batch_update_values
-- [ ] #2 Assertions are split into a BEHAVIOUR group (what the module computes and emits: respond strings for the unset-folder, no-groups and success branches; the AWS- name exclusion; the 50-character sheet-name truncation; the {name}!A1 range; the header-plus-members values matrix) and a BOUNDARY group (arguments handed to the vendor modules), so later slices can translate the boundary group while the behaviour group must keep passing unchanged
-- [ ] #3 Failure and partial-result paths are pinned for google_groups.py, not just happy paths: the blanket except around sheets.get_sheet yielding sheet=None and the addSheet fallback; a raising sheets.batch_update being swallowed while batch_update_values still runs; a raising Drive or Directory call propagating uncaught; and the observable partial state after a mid-loop failure (file already created, N sheets already written)
-- [ ] #4 app/tests/unit/modules/aws/test_spending_handler.py is EXTENDED (not duplicated) to close its real gap: the exact values matrix crossing sheets.batch_update_values (header row plus DataFrame rows), the empty-DataFrame case, spreadsheet_id="" skipping the call, and a raising Sheets call propagating out of update_spending_data
-- [ ] #5 Tests obey decisions/testing.md: marked unit, deterministic (freezegun for the date-derived filename, time.sleep patched so the per-group 1.1s pause does not enter the runtime budget), no network, and no docstring references to task ids or plan steps
-- [ ] #6 No production file is modified by this task (git diff touches app/tests/** only)
-- [ ] #7 Seam-churn control is implemented so the three sibling rewires are cheap: ONE fixture owns all patching, no test reads mock.call_args directly (all assertions go through named accessor helpers that normalise the seam), and the three respond() message literals live in single module-level constants
+- [x] #1 app/tests/unit/modules/reports/test_google_groups_report.py exists (unit layer per decisions/testing.md, NOT the legacy app/tests/modules tree) and pins today request arguments at all seven Google call sites in app/modules/reports/google_groups.py: google_drive.find_files_by_name, google_drive.create_file, google_directory.list_groups, google_directory.list_group_members, sheets.get_sheet, sheets.batch_update (the addSheet request) and sheets.batch_update_values
+- [x] #2 Assertions are split into a BEHAVIOUR group (what the module computes and emits: respond strings for the unset-folder, no-groups and success branches; the AWS- name exclusion; the 50-character sheet-name truncation; the {name}!A1 range; the header-plus-members values matrix) and a BOUNDARY group (arguments handed to the vendor modules), so later slices can translate the boundary group while the behaviour group must keep passing unchanged
+- [x] #3 Failure and partial-result paths are pinned for google_groups.py, not just happy paths: the blanket except around sheets.get_sheet yielding sheet=None and the addSheet fallback; a raising sheets.batch_update being swallowed while batch_update_values still runs; a raising Drive or Directory call propagating uncaught; and the observable partial state after a mid-loop failure (file already created, N sheets already written)
+- [x] #4 app/tests/unit/modules/aws/test_spending_handler.py is EXTENDED (not duplicated) to close its real gap: the exact values matrix crossing sheets.batch_update_values (header row plus DataFrame rows), the empty-DataFrame case, spreadsheet_id="" skipping the call, and a raising Sheets call propagating out of update_spending_data
+- [x] #5 Tests obey decisions/testing.md: marked unit, deterministic (freezegun for the date-derived filename, time.sleep patched so the per-group 1.1s pause does not enter the runtime budget), no network, and no docstring references to task ids or plan steps
+- [x] #6 No production file is modified by this task (git diff touches app/tests/** only)
+- [x] #7 Seam-churn control is implemented so the three sibling rewires are cheap: ONE fixture owns all patching, no test reads mock.call_args directly (all assertions go through named accessor helpers that normalise the seam), and the three respond() message literals live in single module-level constants
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -290,6 +291,37 @@ nothing else. No terraform, CI, settings or migration ordering.
 SIZE GATE VERDICT: FITS ONE PR. Production diff is 0 files / 0 LOC, one subsystem (tests), no
 mechanical-plus-behaviour mixing, revert-safe. No decomposition required.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTED 2026-09-02. Tests-only, as specified; zero production files touched.
+
+WHAT LANDED
+- app/tests/unit/modules/reports/__init__.py (empty) and app/tests/unit/modules/reports/test_google_groups_report.py (~310 LOC, 21 tests). Collection is clean with an __init__.py only in reports/, matching the sibling child packages; the plan's fallback was not needed.
+- app/tests/unit/modules/aws/test_spending_handler.py extended with 4 appended tests (values matrix, header-only empty DataFrame, spreadsheet_id='' skip, RuntimeError propagation). Existing tests untouched.
+
+STRUCTURE (AC#2, AC#7)
+Three classes: TestGenerateGroupMembersReportBehaviour (8 tests, must survive .4/.8/.10 unchanged), TestGenerateGroupMembersReportBoundary (5 tests, translated when the seam moves), TestGenerateGroupMembersReportFailureModes (7 tests). One report_deps fixture owns every patch (google_directory, google_drive, sheets, time.sleep, FOLDER_REPORTS_GOOGLE_GROUPS) and every default return; no test patches anything itself except the unset-folder test, which must override the constant. Boundary reads go through seven accessors: _file_lookup, _file_created, _groups_listed, _members_requested, _sheets_read, _sheets_created/_sheet_create_requests, _sheet_writes (plus _sleep_delays). No test in the report file reads mock.call_args directly. Three respond() literals are module constants _MSG_FOLDER_UNSET / _MSG_NO_GROUPS / _MSG_SUCCESS, asserted with assert_called_once_with.
+
+DEVIATIONS FROM THE PLAN
+1. The plan listed five accessors; seven were written. _file_created was split out of _file_lookup because the create-before-empty-check ordering wart needs a call-list, not a single call; _sheets_created (title only) and _sheet_create_requests (full request dict) were split because the behaviour group wants the title while the boundary group must pin the exact addSheet dict.
+2. The spending extension keeps that file's existing house style (module-level @patch decorators, direct call_args reads) rather than the accessor pattern. Plan step 3 forbade restructuring the existing tests, and a lone Sheets call site does not carry the seam-churn cost the report file does. AC#7's accessor requirement is satisfied where it was scoped: the report file.
+
+DEFECT PROBE PINNED, NOT FIXED (AC#6)
+test_should_leave_sheet_names_containing_spaces_unquoted_in_ranges asserts today's UNQUOTED 'SRE Team!A1' range and 'SRE Team' get_sheet range, with a one-line comment marking it pinned-not-endorsed and naming TASK-25.1.6.12. TASK-25.1.6.12 AC#5 flips exactly this assertion. test_should_propagate_a_mid_loop_write_failure_leaving_the_first_sheet_written pins the abort-with-no-respond shape that defect takes in production.
+
+TEST EVIDENCE
+- uv run pytest tests/unit/modules/reports tests/unit/modules/aws/test_spending_handler.py -q --durations=5 -> 32 passed in 1.56s; slowest 0.11s (freeze_time). time.sleep is patched, so the 1.1s per-group pause never enters the budget.
+- uv run ruff check . -> All checks passed.
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> 94 pre-existing errors in 31 files, all on main before this branch; zero in tests/unit/modules/reports or tests/unit/modules/aws (verified by grep).
+- Full suite green (make test, run by the human 2026-09-02).
+- git status confirms exactly three paths, all under app/tests/**.
+
+LEFT FOR HUMAN VERIFICATION
+- That the pinned behaviours are an accurate record rather than an endorsement: the blanket excepts, file-created-before-the-empty-groups-check, the 1.1s sleep, the unquoted A1 range and the 50-char truncation are all deliberately locked in as-is.
+- Plan step 5 (re-confirm the pre-registered comments on TASK-25.1.6.4, .8 and .10 name the right file path, class names and accessor helpers) is a post-merge action and has not been done; note the two extra accessors above when doing it.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
