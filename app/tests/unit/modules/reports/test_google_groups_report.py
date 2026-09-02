@@ -1,14 +1,15 @@
 """Characterization tests for the Google Groups members report.
 
 These tests pin the behaviour the module has today, including its rough edges
-(blanket excepts, unquoted A1 ranges). They are a change detector, not an
-endorsement.
+(blanket excepts). They are a change detector, not an endorsement. A1 ranges
+and derived sheet titles are asserted at their TASK-25.1.6.12 target shape.
 
 Stub strategy: the vendor modules are patched as bound in the module under test
 by a single fixture, and every boundary assertion goes through an accessor
 helper so the seam can be moved in one place.
 """
 
+import hashlib
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -28,6 +29,24 @@ _MSG_SUCCESS = "Google Groups Members report generated."
 
 _FOLDER_ID = "FOLDER1"
 _FILE_ID = "FILE1"
+
+_TITLE_MAX_LENGTH = 50
+_TITLE_DIGEST_LENGTH = 6
+
+
+def _expected_title(group_name: str) -> str:
+    """Expected sheet title, derived here independently of the module under test."""
+    sanitised = group_name.replace("'", "")
+    if sanitised == group_name and len(sanitised) <= _TITLE_MAX_LENGTH:
+        return sanitised
+    digest = hashlib.sha256(group_name.encode("utf-8")).hexdigest()[:_TITLE_DIGEST_LENGTH]
+    keep = _TITLE_MAX_LENGTH - _TITLE_DIGEST_LENGTH - 1
+    return f"{sanitised[:keep]}-{digest}"
+
+
+def _expected_range(sheet_title: str, cell: str = "") -> str:
+    quoted = "'{}'".format(sheet_title.replace("'", "''"))
+    return f"{quoted}!{cell}" if cell else quoted
 
 
 def _member(email: str, role: str) -> dict[str, str]:
@@ -144,7 +163,7 @@ class TestGenerateGroupMembersReportBehaviour:
         google_groups.generate_group_members_report([], report_deps.respond)
 
         assert _members_requested(report_deps) == ["one@test.com"]
-        assert [write[1] for write in _sheet_writes(report_deps)] == ["GroupOne!A1"]
+        assert [write[1] for write in _sheet_writes(report_deps)] == ["'GroupOne'!A1"]
 
     def test_should_respond_no_groups_after_creating_the_file_when_all_groups_excluded(self, report_deps):
         report_deps.directory.list_groups.return_value = [_group("AWS-Admins", "aws@test.com")]
@@ -155,16 +174,18 @@ class TestGenerateGroupMembersReportBehaviour:
         assert len(_file_created(report_deps)) == 1
         assert _sheet_writes(report_deps) == []
 
-    def test_should_truncate_sheet_name_to_fifty_characters_in_cell_and_range(self, report_deps):
+    def test_should_derive_a_bounded_sheet_title_for_an_overlong_group_name(self, report_deps):
         long_name = "G" * 60
         report_deps.directory.list_groups.return_value = [_group(long_name, "long@test.com")]
 
         google_groups.generate_group_members_report([], report_deps.respond)
 
-        truncated = "G" * 50
+        expected = _expected_title(long_name)
+        assert len(expected) == 50
         _, cell_range, values = _sheet_writes(report_deps)[0]
-        assert cell_range == f"{truncated}!A1"
-        assert values[0] == ["Group Name", truncated]
+        assert cell_range == _expected_range(expected, "A1")
+        assert values[0] == ["Group Name", expected]
+        assert [created[1] for created in _sheets_created(report_deps)] == [expected]
 
     def test_should_write_header_rows_followed_by_members_in_order(self, report_deps):
         report_deps.directory.list_groups.return_value = [_group("GroupOne", "one@test.com")]
@@ -184,14 +205,64 @@ class TestGenerateGroupMembersReportBehaviour:
 
         assert _sleep_delays(report_deps) == [1.1, 1.1]
 
-    def test_should_leave_sheet_names_containing_spaces_unquoted_in_ranges(self, report_deps):
-        # Pinned, not endorsed: unquoted A1 ranges are the defect TASK-25.1.6.12 fixes.
+    def test_should_quote_sheet_names_containing_spaces_in_ranges(self, report_deps):
         report_deps.directory.list_groups.return_value = [_group("SRE Team", "sre@test.com")]
 
         google_groups.generate_group_members_report([], report_deps.respond)
 
-        assert _sheets_read(report_deps) == [(_FILE_ID, "SRE Team")]
-        assert [write[1] for write in _sheet_writes(report_deps)] == ["SRE Team!A1"]
+        assert _sheets_read(report_deps) == [(_FILE_ID, "'SRE Team'")]
+        assert [write[1] for write in _sheet_writes(report_deps)] == ["'SRE Team'!A1"]
+        # Quoting belongs to the range only; the sheet title itself stays bare.
+        assert [created[1] for created in _sheets_created(report_deps)] == ["SRE Team"]
+
+    def test_should_strip_apostrophes_from_the_title_google_receives(self, report_deps):
+        report_deps.directory.list_groups.return_value = [_group("Jon's Team", "jon@test.com")]
+
+        google_groups.generate_group_members_report([], report_deps.respond)
+
+        expected = _expected_title("Jon's Team")
+        assert "'" not in expected
+        assert [created[1] for created in _sheets_created(report_deps)] == [expected]
+        _, cell_range, values = _sheet_writes(report_deps)[0]
+        assert values[0] == ["Group Name", expected]
+        assert cell_range == f"'{expected}'!A1"
+
+    def test_should_derive_distinct_titles_for_group_names_sharing_a_fifty_character_prefix(self, report_deps):
+        shared = "P" * 55
+        report_deps.directory.list_groups.return_value = [
+            _group(f"{shared}-alpha", "alpha@test.com"),
+            _group(f"{shared}-beta", "beta@test.com"),
+        ]
+
+        google_groups.generate_group_members_report([], report_deps.respond)
+
+        titles = [created[1] for created in _sheets_created(report_deps)]
+        ranges = [write[1] for write in _sheet_writes(report_deps)]
+        assert len(set(titles)) == 2
+        assert len(set(ranges)) == 2
+
+    def test_should_derive_distinct_titles_when_apostrophe_removal_would_collide(self, report_deps):
+        report_deps.directory.list_groups.return_value = [
+            _group("Jon's Team", "jon@test.com"),
+            _group("Jons Team", "jons@test.com"),
+        ]
+
+        google_groups.generate_group_members_report([], report_deps.respond)
+
+        titles = [created[1] for created in _sheets_created(report_deps)]
+        assert len(set(titles)) == 2
+
+    def test_should_derive_the_same_title_on_every_run_for_the_same_group_name(self, report_deps):
+        # Same-process double invocation: PYTHONHASHSEED is fixed within one process,
+        # so this guards against a per-run derivation, not against the salted builtin hash().
+        report_deps.directory.list_groups.return_value = [_group("G" * 60, "long@test.com")]
+
+        google_groups.generate_group_members_report([], report_deps.respond)
+        google_groups.generate_group_members_report([], report_deps.respond)
+
+        ranges = [write[1] for write in _sheet_writes(report_deps)]
+        assert len(ranges) == 2
+        assert ranges[0] == ranges[1]
 
 
 @pytest.mark.unit
@@ -231,7 +302,7 @@ class TestGenerateGroupMembersReportBoundary:
 
         google_groups.generate_group_members_report([], report_deps.respond)
 
-        assert _sheets_read(report_deps) == [(_FILE_ID, "GroupOne")]
+        assert _sheets_read(report_deps) == [(_FILE_ID, "'GroupOne'")]
         assert _sheet_create_requests(report_deps) == [{"requests": [{"addSheet": {"properties": {"title": "GroupOne"}}}]}]
 
     def test_should_write_values_positionally_with_file_id_and_range(self, report_deps):
@@ -241,7 +312,7 @@ class TestGenerateGroupMembersReportBoundary:
 
         spreadsheet_id, cell_range, values = _sheet_writes(report_deps)[0]
         assert spreadsheet_id == _FILE_ID
-        assert cell_range == "GroupOne!A1"
+        assert cell_range == "'GroupOne'!A1"
         assert values[1] == ["Email", "Role"]
 
 
@@ -313,5 +384,5 @@ class TestGenerateGroupMembersReportFailureModes:
         with pytest.raises(RuntimeError):
             google_groups.generate_group_members_report([], report_deps.respond)
 
-        assert [write[1] for write in _sheet_writes(report_deps)] == ["GroupOne!A1", "GroupTwo!A1"]
+        assert [write[1] for write in _sheet_writes(report_deps)] == ["'GroupOne'!A1", "'GroupTwo'!A1"]
         report_deps.respond.assert_not_called()

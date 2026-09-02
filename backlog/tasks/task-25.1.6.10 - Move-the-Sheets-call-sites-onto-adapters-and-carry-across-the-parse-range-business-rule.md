@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:03'
-updated_date: '2026-09-02 18:52'
+updated_date: '2026-09-02 19:47'
 labels:
   - clients
   - phase-3
@@ -80,5 +80,29 @@ WHAT .12 DELIBERATELY LEAVES FOR YOU, so the two tasks do not collide:
 - .12 migrates nothing. Both Sheets call sites in that file are still on integrations.google_workspace.sheets when you pick this up.
 
 WHAT CHANGES UNDER YOU: the range handed to batch_update_values and the ranges handed to get_sheet will be single-quoted (with embedded quotes doubled) through one shared helper, and sheet-title truncation will be collision-safe. TASK-25.1.6.1 defect-probe test asserts the quoted form by then, so treat the quoted range as the expected input shape for your adapter method.
+---
+
+created: 2026-09-02 19:40
+---
+REGISTERED FROM TASK-25.1.6.12 PLANNING 2026-09-02 (task-planner). Three things land in this task's scope when .12 ships. .10 already depends on .12, so nothing new blocks here.
+
+1. TWO HELPERS TRAVEL WITH THE CALL SITE, they do not get re-inlined and they do not move into integrations/. TASK-25.1.6.12 adds `_sheet_title(group_name) -> str` and `_a1_range(sheet_title, cell="") -> str` as module-private helpers in app/modules/reports/google_groups.py. When .10 moves the Sheets call sites onto an adapter, both must move with them into the adapter (or into a shared A1 utility outside the vendor package). Putting A1 range formatting into integrations/google_workspace/sheets.py would be a NEW instance of exactly the business-logic-in-the-vendor-package deviation that TASK-25.1.6 exists to close - do not "helpfully" push it down a layer. _a1_range implements gspread's absolute_range_name semantics: unconditional single quotes, embedded quotes doubled. _sheet_title strips apostrophes and appends a deterministic sha256-derived suffix whenever the title had to be derived (over 50 chars, or an apostrophe removed). Never swap that sha256 for the builtin hash(); str.__hash__ is salted per process, so the sheet title would change on every container restart.
+
+2. THE BOUNDARY ASSERTIONS .10 WILL BE TRANSLATING HAVE MOVED. In app/tests/unit/modules/reports/test_google_groups_report.py, every A1 range assertion becomes the quoted form ("'GroupOne'!A1", "'SRE Team'!A1", read range "'GroupOne'"), while the addSheet request title assertion stays BARE ("GroupOne") - a sheet title is a literal title, not A1 notation. Two tests are renamed: test_should_truncate_sheet_name_to_fifty_characters_in_cell_and_range becomes test_should_derive_a_bounded_sheet_title_for_an_overlong_group_name, and test_should_leave_sheet_names_containing_spaces_unquoted_in_ranges becomes test_should_quote_sheet_names_containing_spaces_in_ranges. Four tests are added (apostrophe handling, two collision cases, determinism across two invocations). The respond-message, values-matrix, call-count and call-ordering assertions are untouched, so .10's "characterization tests pass unchanged or each change is named" bar is unaffected by .12.
+
+3. WHAT .12 DELIBERATELY LEFT FOR THIS TASK, unchanged from the existing scope fence: the blanket "except Exception: sheet = None" around get_sheet and the blanket except around the addSheet batch_update are still there for .10 AC#3 to replace with classify_google_error-based handling; and batch_update_values is still unwrapped, so one bad group still aborts the whole report with no respond() to the user. Quoting removes the main CAUSE of that abort but not the fragility - skip-and-report resilience remains .10's call, since .10 is rewriting that error handling anyway.
+
+ONE OPEN QUESTION HANDED OVER RATHER THAN DECIDED IN .12: the Group Name cell (:96 today) carries the DERIVED sheet title, so for an overlong or apostrophe-bearing group the human-readable cell now shows a hash suffix. Putting the full group["name"] in that cell and keeping the derived value only for the title and the range would be strictly more useful, but it is an unrequested behaviour change. If it is not taken as a two-line follow-up before .10, fold it in here.
+---
+
+created: 2026-09-02 19:47
+---
+FORWARD NOTE FROM TASK-25.1.6.12's APPROVAL 2026-09-02 (human). TASK-25.1.6.12 is approved as planned, with an attached instruction to reassess its fix once app/modules/reports/google_groups.py's consumer moves to the app/packages/<feature>/ architecture. That migration has no owning task today, so the note is registered here as the nearest downstream owner of this call site.
+
+Two items to carry, extending the earlier "the two helpers travel with the call site" comment on this task:
+
+1. In the package endstate, _a1_range and _sheet_title belong in the feature's Sheets adapter under app/packages/<feature>/adapters/, next to the try/except plus classify_google_error boundary this task builds. _a1_range is the piece worth lifting to a shared primitive if a second feature ever needs A1 quoting; _sheet_title is report-specific domain logic and stays with the feature. Neither goes into app/integrations/google_workspace/ at any point.
+
+2. The 50-character bound, the sha256 suffix and the apostrophe strip all exist because a user-controlled Google Group display name is being used as a sheet identifier. A feature package with a real domain type for a group could carry a stable identifier separately from the display label, removing the need for the suffix and freeing the Group Name cell to show the full untruncated name. That is the same open question already flagged on this task; it resolves cleanly at the package boundary rather than in a legacy module.
 ---
 <!-- COMMENTS:END -->
