@@ -1,3 +1,4 @@
+import hashlib
 import time
 from datetime import datetime
 
@@ -13,6 +14,27 @@ from integrations.google_workspace import (
 FOLDER_REPORTS_GOOGLE_GROUPS = get_google_resources_config().google_groups_reports_folder_id
 
 logger = get_logger()
+
+_SHEET_TITLE_MAX_LENGTH = 50
+_SHEET_TITLE_DIGEST_LENGTH = 6
+
+
+def _sheet_title(group_name: str) -> str:
+    """Derive a bounded, collision-safe sheet title from a group display name."""
+    # Apostrophes are stripped so no title can carry the A1 quote character.
+    sanitised = group_name.replace("'", "")
+    if sanitised == group_name and len(sanitised) <= _SHEET_TITLE_MAX_LENGTH:
+        return sanitised
+    # sha256, never the salted builtin hash(), so titles are stable across processes.
+    digest = hashlib.sha256(group_name.encode("utf-8")).hexdigest()[:_SHEET_TITLE_DIGEST_LENGTH]
+    keep = _SHEET_TITLE_MAX_LENGTH - _SHEET_TITLE_DIGEST_LENGTH - 1
+    return f"{sanitised[:keep]}-{digest}"
+
+
+def _a1_range(sheet_title: str, cell: str = "") -> str:
+    """Quote a sheet title for A1 notation, doubling any embedded single quote."""
+    quoted = "'{}'".format(sheet_title.replace("'", "''"))
+    return f"{quoted}!{cell}" if cell else quoted
 
 
 def generate_report(args, respond):
@@ -63,13 +85,11 @@ def generate_group_members_report(args, respond):
         groups_with_members.append(group)
 
     for group in groups_with_members:
-        group_sheet_name = f"{group['name']}"
-        log.info("processing_group_sheet", group=group_sheet_name)
-        if len(group_sheet_name) > 50:
-            group_sheet_name = group_sheet_name[:50]
+        sheet_title = _sheet_title(group["name"])
+        log.info("processing_group_sheet", group=sheet_title)
 
         try:
-            sheet = sheets.get_sheet(file["id"], group_sheet_name)
+            sheet = sheets.get_sheet(file["id"], _a1_range(sheet_title))
         except Exception:
             sheet = None
         if sheet:
@@ -81,7 +101,7 @@ def generate_group_members_report(args, respond):
                         {
                             "addSheet": {
                                 "properties": {
-                                    "title": group_sheet_name,
+                                    "title": sheet_title,
                                 }
                             }
                         }
@@ -89,21 +109,20 @@ def generate_group_members_report(args, respond):
                 }
                 sheet = sheets.batch_update(file["id"], request)
                 if sheet:
-                    log.info("sheet_created", sheet=group_sheet_name)
+                    log.info("sheet_created", sheet=sheet_title)
             except Exception as e:
                 log.error("sheet_creation_failed", error=str(e))
 
-        values = [["Group Name", group_sheet_name], ["Email", "Role"]]
-        group_sheet_name = f"{group_sheet_name}!A1"
+        values = [["Group Name", sheet_title], ["Email", "Role"]]
         for member in group["members"]:
             values.append([member["email"], member["role"]])
         updated_sheet = sheets.batch_update_values(
             file["id"],
-            group_sheet_name,
+            _a1_range(sheet_title, "A1"),
             values,
         )
         if updated_sheet:
-            log.info("sheet_updated", sheet=group_sheet_name)
+            log.info("sheet_updated", sheet=sheet_title)
 
         time.sleep(1.1)
 

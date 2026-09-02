@@ -1,10 +1,11 @@
 ---
 id: TASK-25.1.6.12
 title: Fix the unquoted A1 sheet-name range in the Google Groups members report
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-02 18:52'
-updated_date: '2026-09-02 19:45'
+updated_date: '2026-09-02 19:59'
 labels:
   - reports
   - phase-3
@@ -51,13 +52,13 @@ GUARDED BY TASK-25.1.6.1, which is a hard dependency. That task pins todays unqu
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The quoting rule and the failure mode are confirmed before any production edit, and the task notes record what was verified and how
-- [ ] #2 The A1 range passed to sheets.batch_update_values wraps the sheet name in single quotes with embedded single quotes doubled, so a group named with spaces, a leading digit or an apostrophe produces a valid range
-- [ ] #3 The ranges argument passed to sheets.get_sheet is quoted by the same rule and through the same single helper, so the two call sites cannot drift apart
-- [ ] #4 The derived sheet title has apostrophes removed, so no title Google receives can contain the A1 quote character; the addSheet title and the Group Name cell carry that same derived title unquoted
-- [ ] #5 Derived sheet titles are collision-safe and deterministic across processes: two group names that would reduce to the same title, whether by length truncation or by apostrophe removal, resolve to different titles, and the same group name resolves to the same title on every run
-- [ ] #6 The characterization tests are updated only where an A1 range or a derived sheet title is asserted, each change is named in the task notes, and the assertions about respond messages, the values matrix, call counts and call ordering are untouched
-- [ ] #7 The blanket excepts around get_sheet and the addSheet batch_update are untouched, and no call site is migrated onto an adapter, leaving TASK-25.1.6.10 scope intact
+- [x] #1 The quoting rule and the failure mode are confirmed before any production edit, and the task notes record what was verified and how
+- [x] #2 The A1 range passed to sheets.batch_update_values wraps the sheet name in single quotes with embedded single quotes doubled, so a group named with spaces, a leading digit or an apostrophe produces a valid range
+- [x] #3 The ranges argument passed to sheets.get_sheet is quoted by the same rule and through the same single helper, so the two call sites cannot drift apart
+- [x] #4 The derived sheet title has apostrophes removed, so no title Google receives can contain the A1 quote character; the addSheet title and the Group Name cell carry that same derived title unquoted
+- [x] #5 Derived sheet titles are collision-safe and deterministic across processes: two group names that would reduce to the same title, whether by length truncation or by apostrophe removal, resolve to different titles, and the same group name resolves to the same title on every run
+- [x] #6 The characterization tests are updated only where an A1 range or a derived sheet title is asserted, each change is named in the task notes, and the assertions about respond messages, the values matrix, call counts and call ordering are untouched
+- [x] #7 The blanket excepts around get_sheet and the addSheet batch_update are untouched, and no call site is migrated onto an adapter, leaving TASK-25.1.6.10 scope intact
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -270,6 +271,108 @@ SIZE GATE VERDICT: FITS ONE PR. One production file, one subsystem, well under t
 and 10 file thresholds, no mechanical migration mixed in with the behaviour change (that
 separation is exactly why this task exists apart from TASK-25.1.6.10). No decomposition.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTED as planned. One production file changed: app/modules/reports/google_groups.py.
+
+AC#1 VERIFICATION RECORD (re-run at implementation time, 2026-09-02)
+- Installed stubs, .venv/lib/python3.14/site-packages/googleapiclient-stubs/_apis/sheets/v4/resources.pyi:
+  values().get/update type the parameter as `range: str` (line ~133) and spreadsheets().get types
+  `ranges: str | _list[str] | None = ...` (line ~186). Confirmed by grep against the installed venv,
+  not from memory. There is no A1 builder, quoter or escaper anywhere in googleapiclient or its stubs,
+  so quoting is entirely caller-side. "Defer to an SDK helper" is not an available option.
+- Sheets API concepts page: "Single quotes are required for sheet names with spaces or special
+  characters" ('My Custom Sheet'!A:A); 'Sheet1' is the precise SHEET reference while bare Sheet1 can
+  resolve to a named range. The same page writes 'Jon's_Data'!A1:D5 with the apostrophe NOT doubled,
+  i.e. Google's docs are internally inconsistent on exactly the apostrophe case.
+- gspread (not installed in this venv; evidence is the upstream source cited in the task references)
+  settles it: absolute_range_name() quotes UNCONDITIONALLY and doubles embedded quotes, doctests pin
+  "'Sheet1'!A1" and "'Sheet''1'", and its parser mirrors that with '((?:[^']|'')+)'! plus
+  .replace("''", "'").
+- CONCLUSION UNCHANGED: quote unconditionally. Not verified and not verifiable from here: that a live
+  400 "Unable to parse range" occurs for a specific tenant group name. The fix is valid A1 notation
+  either way.
+
+PRODUCTION CHANGE
+- New import: hashlib. New constants _SHEET_TITLE_MAX_LENGTH = 50, _SHEET_TITLE_DIGEST_LENGTH = 6.
+- New module-private _sheet_title(group_name): strips apostrophes; returns the name byte-for-byte when
+  it was already apostrophe-free and <= 50 chars; otherwise truncates to 43 and appends "-" plus the
+  6-hex sha256 prefix of the FULL original name. sha256 not builtin hash(), which is PYTHONHASHSEED
+  salted and would yield a different title after every container restart.
+- New module-private _a1_range(sheet_title, cell=""): wraps in single quotes, doubling embedded quotes,
+  and appends "!<cell>" when a cell is given.
+- Rewired the six uses of the old dual-purpose group_sheet_name variable: title derivation replaces the
+  f-string + len>50 truncate block; get_sheet takes _a1_range(sheet_title); the addSheet properties
+  title and the "Group Name" cell carry the bare derived title; batch_update_values takes
+  _a1_range(sheet_title, "A1"), replacing the in-place reassignment to an A1 range. sheet_updated now
+  logs the title rather than the range (no test asserts it).
+
+AC#7 HELD: both blanket excepts are byte-identical to before; no call site moved onto an adapter.
+TASK-25.1.6.10 scope intact.
+
+AC#6 TEST DELTA, app/tests/unit/modules/reports/test_google_groups_report.py
+CHANGED (6, all A1-range or derived-title assertions only)
+ 1. Behaviour::test_should_exclude_groups_whose_name_contains_aws_prefix - write range
+    "GroupOne!A1" -> "'GroupOne'!A1".
+ 2. Behaviour::test_should_truncate_sheet_name_to_fifty_characters_in_cell_and_range renamed to
+    test_should_derive_a_bounded_sheet_title_for_an_overlong_group_name - 60-G name now yields
+    43 Gs + "-" + 6 hex; digest computed in-test with hashlib, not hardcoded.
+ 3. Behaviour::test_should_leave_sheet_names_containing_spaces_unquoted_in_ranges renamed to
+    test_should_quote_sheet_names_containing_spaces_in_ranges - the defect probe flips to
+    read (_FILE_ID, "'SRE Team'") and write "'SRE Team'!A1", plus a new assertion that the addSheet
+    title is still the bare "SRE Team". Pinned-not-endorsed comment dropped.
+ 4. Boundary::test_should_read_and_create_sheets_with_the_group_sheet_name - read range -> "'GroupOne'";
+    _sheet_create_requests assertion unchanged, title still "GroupOne".
+ 5. Boundary::test_should_write_values_positionally_with_file_id_and_range - "'GroupOne'!A1".
+ 6. FailureModes::test_should_propagate_a_mid_loop_write_failure_leaving_the_first_sheet_written -
+    ranges -> ["'GroupOne'!A1", "'GroupTwo'!A1"].
+ADDED (4)
+ 7. test_should_strip_apostrophes_from_the_title_google_receives - "Jon's Team": apostrophe absent from
+    addSheet title and from the Group Name cell, range quoted.
+ 8. test_should_derive_distinct_titles_for_group_names_sharing_a_fifty_character_prefix - AC#5 length
+    collision: two distinct titles and two distinct ranges.
+ 9. test_should_derive_distinct_titles_when_apostrophe_removal_would_collide - "Jon's Team" vs
+    "Jons Team" resolve to two distinct titles.
+10. test_should_derive_the_same_title_on_every_run_for_the_same_group_name - same-process double
+    invocation yields identical ranges. Docstring states the limitation: PYTHONHASHSEED is fixed within
+    one process, so this guards against a per-run derivation, not against the salted builtin hash().
+UNTOUCHED as required: the three respond-message assertions, the values-matrix ordering test, the sleep
+test, the file lookup/creation/reuse tests, the list-groups call-count test, and the six failure-mode
+behaviours other than item 6.
+
+TEST EVIDENCE
+- uv run pytest tests/unit/modules/reports -q: 25 passed.
+- uv run ruff check .: All checks passed.
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)': zero errors matching reports/google_groups (grep -c
+  returned 0). The repo carries a pre-existing ~94-error baseline elsewhere; that baseline is unchanged.
+- make test (whole suite, run manually by the human): green.
+
+LEFT FOR HUMAN VERIFICATION / DoD
+- Reviewer confirmation via git diff that AC#7 holds (excepts untouched, no adapter migration).
+- The plan's OPEN question, deliberately not decided: the "Group Name" cell now shows the DERIVED title,
+  so for an overlong or apostrophe-bearing group it carries a hash suffix, which reads worse than
+  today's plain truncation. Putting the full group["name"] in that cell while keeping the derived value
+  for the sheet title and range is a two-line follow-up if wanted; it is registered on TASK-25.1.6.10.
+- Post-merge, update the two pre-registered sibling comments if reviewers rename _sheet_title/_a1_range.
+- No behaviour confirmed against live Google; this was not exercised against the real Sheets API.
+
+CLARIFICATION ON THE gspread EVIDENCE (added after review, to prevent confusion in this codebase)
+gspread is a THIRD-PARTY, community-maintained Sheets client (burnash/gspread). It is NOT the Google
+Python API client (google-api-python-client / googleapiclient) and NOT googleapiclient-stubs. This
+repository does NOT depend on gspread, does not import it, and this task adds no such dependency; it
+is not installed in the venv. It was cited purely as CORROBORATING PRIOR ART for the A1 quoting rule -
+a widely used library that quotes unconditionally and doubles embedded quotes against live Google -
+because the official Google documentation is self-contradictory on the apostrophe case and the
+official client we DO use exposes no A1 helper at all.
+
+The binding evidence for our implementation is therefore: (1) the installed googleapiclient-stubs
+signatures showing `range: str` / `ranges: str | list[str] | None`, i.e. no SDK-side quoting exists,
+and (2) the Sheets API concepts page requiring single quotes. gspread's absolute_range_name() is
+referenced as a sanity check on the escape form only. Our _a1_range() is our own implementation in
+app/modules/reports/google_groups.py; it is not copied from, vendored from, or coupled to gspread.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
