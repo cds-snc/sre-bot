@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:00'
+updated_date: '2026-09-02 17:16'
 labels:
   - clients
   - phase-3
@@ -53,3 +54,22 @@ GUARDED BY: TASK-25.1.6.1's characterization tests, which must be in place for m
 - [ ] #6 TASK-25.1.6.1's characterization tests for modules/reports/google_groups.py pass unchanged, or every intentional behaviour change is named in the task notes
 - [ ] #7 integrations/google_workspace/google_directory.py still exists after this task (TASK-25.1.6.5 deletes it) but has exactly one remaining production consumer: modules/provisioning/groups.py
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @task-planner
+created: 2026-09-02 17:16
+---
+PRE-REGISTERED BY TASK-25.1.6.1 PLANNING (2026-09-02, task-planner). Your AC#6 says "TASK-25.1.6.1 characterization tests for modules/reports/google_groups.py pass unchanged, or every intentional behaviour change is named in the task notes". Here is what you will actually be looking at.
+
+FILE: app/tests/unit/modules/reports/test_google_groups_report.py (NOT app/tests/modules/... -- TASK-25.1.6.1 AC#1 was corrected to the unit tree per decisions/testing.md).
+
+STRUCTURE: three classes, deliberately split by lifetime.
+- TestGenerateGroupMembersReportBehaviour -- respond strings, the AWS- name exclusion, sheet-name truncation, values matrix, control flow. These MUST keep passing after your migration; if one goes red, you changed observable behaviour.
+- TestGenerateGroupMembersReportBoundary -- the arguments handed to google_directory.list_groups()/list_group_members(). These are EXPECTED to be translated by you, not deleted: the seam moves from patch("modules.reports.google_groups.google_directory") to a DirectoryProvider double obtained via get_directory_provider(). Translating them is normal; silently dropping them is not.
+- TestGenerateGroupMembersReportFailureModes -- includes two cases that are directly your problem: (a) list_groups raising propagates uncaught today and create_file has ALREADY run, so a failed Directory call leaves an empty spreadsheet behind; (b) list_group_members raising on the second group propagates with ZERO sheet writes done. Under OperationResult these exceptions no longer cross the boundary, so both of these tests WILL need rewriting -- that rewrite is your AC#4 error-branch handling, and the notes must name it.
+
+ALSO INHERITED: the tests monkeypatch modules.reports.google_groups.FOLDER_REPORTS_GOOGLE_GROUPS because GOOGLE_RESOURCES is not in the pytest env block, and they patch time.sleep (the module sleeps 1.1s per group). Keep both when you rework them.
+---
+<!-- COMMENTS:END -->

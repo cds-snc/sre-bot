@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:02'
+updated_date: '2026-09-02 17:16'
 labels:
   - clients
   - phase-3
@@ -48,3 +49,23 @@ SIZE: this touches eight consumer files plus the adapter and is the most likely 
 - [ ] #6 modules/reports/google_groups.py's Drive call sites are migrated and TASK-25.1.6.1's characterization tests for that file pass, or each intentional change is named in the notes
 - [ ] #7 Pagination behaviour established by TASK-25.1.5 (list_next drained to exhaustion, nextPageToken in the projection) is preserved through the move, proven by a multi-page test at the adapter boundary
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @task-planner
+created: 2026-09-02 17:16
+---
+PRE-REGISTERED BY TASK-25.1.6.1 PLANNING (2026-09-02, task-planner). Your AC#6 depends on TASK-25.1.6.1 characterization tests for modules/reports/google_groups.py. What lands:
+
+FILE: app/tests/unit/modules/reports/test_google_groups_report.py (unit tree, per the AC correction on TASK-25.1.6.1 -- not app/tests/modules/).
+
+WHAT COVERS YOUR TWO DRIVE SITES: TestGenerateGroupMembersReportBoundary pins google_drive.find_files_by_name("groups_report_<YYYY-MM-DD>", folder_id) under freeze_time, google_drive.create_file(filename, folder_id, "spreadsheet") when the lookup returns [], and create_file NOT being called plus files[0]["id"] being reused as the spreadsheet id when it returns a hit. Those assertions are yours to TRANSLATE onto the incident Drive adapter seam, not to delete.
+
+TWO THINGS THE TESTS DELIBERATELY PIN THAT YOU MAY WANT TO CHANGE -- if you do, name it in your notes:
+- The spreadsheet is created BEFORE the empty-groups check, so a run with zero groups still leaves an empty spreadsheet in Drive. TestGenerateGroupMembersReportBehaviour asserts that ordering explicitly.
+- find_files_by_name raising propagates uncaught out of generate_group_members_report today, with respond() never called. TestGenerateGroupMembersReportFailureModes asserts that. Once the adapter classifies into OperationResult that exception stops crossing the boundary, so this test will need rewriting -- that is an intentional change, not a regression.
+
+NOTE ON create_file: the file_type-to-mimeType map and its ValueError live in google_drive.create_file and your AC#2 moves them into the adapter. The reports call passes the literal "spreadsheet"; the characterization tests assert the string that is passed, not the mimeType, so the map move is invisible to them.
+---
+<!-- COMMENTS:END -->

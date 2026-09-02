@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 15:31'
-updated_date: '2026-09-02 16:38'
+updated_date: '2026-09-02 18:54'
 labels:
   - clients
   - phase-3
@@ -55,8 +55,9 @@ FOUR LIVE DEVIATIONS TO CLOSE.
 
 DIRECTORY DUPLICATION - DECIDED (2026-09-02, human). infrastructure/directory/{provider,google,factory}.py::DirectoryProvider / GoogleDirectoryProvider IS THE WAY FORWARD. It survives; integrations/google_workspace/google_directory.py is deleted; the four legacy app/modules/* consumers (permissions/handler.py, provisioning/users.py, provisioning/groups.py, reports/google_groups.py) migrate onto the DirectoryProvider Protocol. This closes the duplicated-boundary investigation recorded in this task's 2026-09-01 comment - both sides build the same Resource from the same factory, hardcode the same scopes, resolve the same customer id and run structurally identical pagination, and the provider is additionally the better of the two (get_group_members_batch does in one batched request what the legacy path does in N behind time.sleep retries). No further analysis is required; the work is migration, owned by TASK-25.1.6.3/.4/.5.
 
-DECOMPOSED (2026-09-02) - this task is now a coordinator and contains NO implementation. Eleven children, ordered:
+DECOMPOSED (2026-09-02) - this task is now a coordinator and contains NO implementation. Twelve children, ordered:
 - TASK-25.1.6.1 - characterization tests for the untested call sites (GATE; modules/reports/google_groups.py has no test file, modules/aws/spending.py has no Sheets coverage).
+- TASK-25.1.6.12 - fix the unquoted A1 sheet-name range in modules/reports/google_groups.py (BUG, found while planning .1; blocks .10 so the Sheets migration repoints correct code rather than carrying a live defect across the seam).
 - TASK-25.1.6.2 - relocate the pure-domain helpers out of integrations/google_workspace (independent, can run first).
 - TASK-25.1.6.3 - close the DirectoryProvider capability gaps (unbounded list-users, unbounded list-groups, silent group dropping, batched groups-with-members).
 - TASK-25.1.6.4 - migrate permissions/handler.py, provisioning/users.py and reports/google_groups.py Directory calls onto DirectoryProvider.
@@ -68,12 +69,12 @@ DECOMPOSED (2026-09-02) - this task is now a coordinator and contains NO impleme
 - TASK-25.1.6.10 - move the Sheets call sites onto adapters, carrying the caller-specific parse-range rule across.
 - TASK-25.1.6.11 - delete execute_google_api_request, resolve execute_batch_request, add a CI guardrail against the vendor package regrowing.
 
-This task closes when all eleven are Done. Its own remaining direct work is nil.
+This task closes when all twelve are Done. Its own remaining direct work is nil.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All eleven children (TASK-25.1.6.1 through .11) are Done
+- [ ] #1 All twelve children (TASK-25.1.6.1 through .12) are Done
 - [ ] #2 app/integrations/google_workspace/ contains only client.py (per-API stub-typed factories plus classify_google_error) and settings; the six per-method mirror modules and google_service.py no longer exist
 - [ ] #3 Every Google Workspace call site in the repo lives in a packages/<feature>/adapters/ file or an infrastructure/ capability, builds its Resource from a client.py factory, performs its own try/except plus classify_google_error, and returns typed domain values rather than raw SDK dicts
 - [ ] #4 The Directory duplication is resolved as decided: GoogleDirectoryProvider survives, integrations/google_workspace/google_directory.py is deleted, and all four legacy app/modules/* consumers use the DirectoryProvider Protocol
@@ -223,5 +224,19 @@ Neither site uses execute_google_api_request or a google_drive passthrough any m
 Reusable test helper left behind for TASK-25.1.6.6's Docs half, in app/tests/unit/packages/incident_draft/test_incident_draft_adapter.py:
   _drive_resource_fake(*, copy_response=None, copy_error=None, get_response=None, get_error=None) -> MagicMock
 plus an autouse `drive_service` fixture patching packages.incident_draft.adapters.google_docs.google_workspace_client and a _copy_request(drive_service) accessor. Reuse these rather than reinventing the Resource mock chain.
+---
+
+author: @task-planner
+created: 2026-09-02 18:54
+---
+TWELFTH CHILD ADDED 2026-09-02 (task-planner, human-approved). TASK-25.1.6.12 - "Fix the unquoted A1 sheet-name range in the Google Groups members report" - was found while planning TASK-25.1.6.1 and is a genuine production bug, not refactor work.
+
+WHY IT IS A CHILD OF THIS COORDINATOR RATHER THAN A LOOSE TASK. It was surfaced by this decomposition, it sits in a file three other children touch (modules/reports/google_groups.py: Directory sites in .4, Drive sites in .8, Sheets sites in .10), and TASK-25.1.6.10 now depends on it. Making it a child adds no extra blocking, since .10 was already a child and already gates on it.
+
+WHY IT IS NOT FOLDED INTO .10, WHICH OWNS THAT CALL SITE. The implementation-planning size gate separates mechanical migration diffs (reviewed for completeness) from behaviour diffs (reviewed for correctness). Folding a user-facing bug fix into a seam migration makes both harder to review, and would leave a live defect in place until a Medium-priority downstream slice ships.
+
+DEPENDENCY WIRING APPLIED: .12 depends on .1 (the characterization gate pins todays unquoted output as a defect probe that .12 then flips); .10 now depends on TASK-25.1.6.7 AND TASK-25.1.6.12. Ordinal 132500 places it immediately after the gate task. AC#1 and the Description child list were updated from eleven to twelve; the other six acceptance criteria are unchanged, re-emitted only because the CLI replaces the set as a whole.
+
+SCOPE FENCE BETWEEN .12 AND .10, recorded on both: .12 quotes the sheet name in the batch_update_values range and the get_sheet ranges through one shared helper and makes 50-char truncation collision-safe. It does NOT touch the two blanket excepts (.10 AC#3 owns those), does NOT add skip-instead-of-abort resilience around batch_update_values (left to .10, which is rewriting that error handling anyway), and migrates nothing.
 ---
 <!-- COMMENTS:END -->
