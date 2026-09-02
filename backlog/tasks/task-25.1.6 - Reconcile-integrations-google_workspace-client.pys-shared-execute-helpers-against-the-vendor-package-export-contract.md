@@ -1,12 +1,12 @@
 ---
 id: TASK-25.1.6
 title: >-
-  Reconcile integrations/google_workspace/client.py's shared execute helpers
-  against the vendor-package export contract
+  Retire the Google Workspace vendor mirror layer: adapters own construction and
+  classification
 status: To Do
 assignee: []
 created_date: '2026-09-01 15:31'
-updated_date: '2026-09-01 21:21'
+updated_date: '2026-09-02 15:05'
 labels:
   - clients
   - phase-3
@@ -21,35 +21,65 @@ dependencies:
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
+  - decisions/feature-packages.md
   - app/integrations/google_workspace/client.py
   - app/integrations/google_workspace/google_docs.py
   - app/integrations/google_workspace/google_directory.py
+  - app/integrations/google_workspace/google_calendar.py
+  - app/integrations/google_workspace/meet.py
+  - app/integrations/google_workspace/sheets.py
+  - app/integrations/google_workspace/google_drive.py
+  - app/integrations/utils/api.py
+  - app/infrastructure/directory/provider.py
   - app/infrastructure/directory/google.py
   - app/packages/incident_draft/adapters/google_docs.py
 parent_task_id: TASK-25.1
-priority: medium
+priority: high
 ordinal: 128000
 ---
 
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-decisions/outbound-clients.md's Checks require each vendor package to export exactly: factories, classify_<vendor>_error, settings — "the adapter is the boundary", not the vendor client. TASK-22.4 already added one narrow deviation (execute_batch_request, needed only for the Directory batch API's per-item error-reporting shape). TASK-25.1.1 added a second, more general one: execute_google_api_request(request), a shared try/except+classify_google_error+log+raise helper in integrations/google_workspace/client.py, reused by TASK-25.1.1/.2/.3/.5's call sites.
+COORDINATOR (re-scoped and retitled 2026-09-02, human-directed, after an assessment of the shipped TASK-25.1.1/.2/.3/.4/.5 slices against decisions/outbound-clients.md and decisions/sdk-typing.md). The previous title - "Reconcile client.py's shared execute helpers against the vendor-package export contract" - described one symptom. The task is the whole retirement.
 
-CORRECTION (2026-09-01): this task's original framing — "decide between (a) inline per-adapter or (b) keep execute_google_api_request as a permanent, formalized shared primitive" — was inaccurate and is replaced. decisions/outbound-clients.md already decided the target shape (one adaptation tier: clients raise, adapters classify). execute_google_api_request performing classification inside the vendor package is a real, currently-necessary deviation from that decision, not a genuinely open two-way choice. It is tolerated only because today's actual Google Workspace call sites have no compliant adapter tier to inline the try/except into: TASK-25.1.1/.2's consumers are legacy app/modules/incident/*.py files with zero error handling of their own, plus app/packages/incident_draft/adapters/google_docs.py — a real packages/<feature>/adapters/ file (per decisions/feature-packages.md) that itself performs no try/except/classify today either.
+WHAT THE SLICES ACTUALLY SHIPPED. TASK-25.1.1 through .5 removed the execute_google_api_call dispatcher, which was half the job. They kept the other half: a per-method wrapper module per Google surface (google_calendar.py, meet.py, google_docs.py, sheets.py, google_drive.py, google_directory.py), whose functions are mostly 1:1 SDK passthroughs returning raw dicts. decisions/sdk-typing.md item 1 retires "the generic dispatcher AND the per-method wrapper module" and names "google_directory.py etc. wrapping each method again" as half the anti-pattern; item 2 says "no per-service client class, no facade". decisions/outbound-clients.md says integrations/<vendor>/ provides EXACTLY factories + classify_<vendor>_error, that clients contain no business logic, and that "the adapter is the boundary". The mirror layer is none of those things.
 
-Reconciliation must correct this deviation, not ratify it as permanent. Once all of TASK-25.1's children (Calendar/Meet, Docs, Sheets, legacy Directory consumers, Drive) are Done and the full execute_google_api_request call-site inventory is known, this task's job is to: (1) inline try/except + classify_google_error directly at every call site that already lives in a real packages/<feature>/adapters/ or infrastructure/ file, deleting that call site's dependency on execute_google_api_request; (2) for every remaining call site that is legacy app/modules/* code with no adapter tier, file (or point at) the follow-up work that migrates it onto a real per-feature adapter — this may itself need its own decomposition, since building a first adapter for app/modules/incident's Google Docs/Drive/Calendar usage is new architecture, not a mechanical inline; (3) delete execute_google_api_request from client.py entirely once no call site depends on it. Keeping it as a permanent vendor-package export is not an acceptable resolution of this task.
+That sequencing was correct, not a mistake: 16 legacy app/modules/* consumers have no adapter tier, so inlining classification would have meant building six feature adapters inside a dispatcher-removal PR. What is wrong is that nothing marked the modules themselves as temporary, so the current shape reads as the destination. TASK-25.1's Description now carries the explicit endstate; this task owns reaching it.
 
-SCOPE ADDITION (2026-09-01, human-directed): (4) investigate and resolve DUPLICATED CONCERNS between the vendor modules and their infrastructure/ or packages/ counterparts on the same API surface — the shared-helper question above is only one symptom of a broader "two implementations of the same boundary" problem. The named, confirmed example is app/integrations/google_workspace/google_directory.py versus app/infrastructure/directory/google.py::GoogleDirectoryProvider: both build the SAME Admin Directory Resource from the SAME factory (integrations.google_workspace.client.get_admin_directory_service), both hardcode the same OAuth readonly scope strings, both resolve the same GOOGLE_WORKSPACE_CUSTOMER_ID, both implement a near-identical list/list_next pagination loop, and both cover the same three calls (users.list, groups.list, members.list) — differing only in that the provider classifies into OperationResult + typed dataclasses while the vendor module raises + returns raw dicts. The split is legacy-vs-target, not a real separation: google_directory.py exists only for its four legacy app/modules/* consumers (permissions/handler.py, provisioning/users.py, provisioning/groups.py, reports/google_groups.py) while GoogleDirectoryProvider already serves app/packages/access. Under decisions/outbound-clients.md ("one adaptation tier") and decisions/sdk-typing.md (one construction path per vendor) exactly one of these should survive. This is an INVESTIGATE-AND-DECOMPOSE item, not something to implement inside this task; it is deliberately out of scope for TASK-25.1.4, which migrated google_directory.py in place and explicitly rejected the DirectoryProvider route to keep that slice behaviour-neutral. NOTE: the task title now under-describes this scope.
+FOUR LIVE DEVIATIONS TO CLOSE.
+1. Classification inside the vendor package. client.py::execute_google_api_request (added by TASK-25.1.1, reused by .2/.3/.4/.5) does try/except + classify + log + raise inside integrations/. Its known call-site inventory - Calendar/Meet, 3 Docs, 5 Sheets, ~12 Drive, plus google_directory.py's _list_all - is recorded in this task's Notes. Also client.py::execute_batch_request, which returns OperationResult from a vendor package (TASK-25 AC#2 forbids it).
+2. Per-method mirror modules returning raw dicts. No frozen-dataclass translation happens at any Google boundary except infrastructure/directory/google.py, so sdk-typing.md item 3 is unimplemented for five of six surfaces.
+3. Business logic inside app/integrations/. google_directory.py's list_groups_with_members / get_members_details / convert_google_groups_members_to_dataframe; google_calendar.py's four pure helpers (one of which makes an HTTP call to a NON-Google holidays API from inside the Google vendor package); google_docs.py's extract_google_doc_id; google_drive.py's q-DSL builders, mimeType map, copy-then-move composition and healthcheck.
+4. integrations/utils/api.py::retry_request - a time.sleep retry loop inside app/integrations/, called from google_directory.py. Trips decisions/outbound-clients.md's Checks line and TASK-25's AC#5 directly.
+
+DIRECTORY DUPLICATION - DECIDED (2026-09-02, human). infrastructure/directory/{provider,google,factory}.py::DirectoryProvider / GoogleDirectoryProvider IS THE WAY FORWARD. It survives; integrations/google_workspace/google_directory.py is deleted; the four legacy app/modules/* consumers (permissions/handler.py, provisioning/users.py, provisioning/groups.py, reports/google_groups.py) migrate onto the DirectoryProvider Protocol. This closes the duplicated-boundary investigation recorded in this task's 2026-09-01 comment - both sides build the same Resource from the same factory, hardcode the same scopes, resolve the same customer id and run structurally identical pagination, and the provider is additionally the better of the two (get_group_members_batch does in one batched request what the legacy path does in N behind time.sleep retries). No further analysis is required; the work is migration, owned by TASK-25.1.6.3/.4/.5.
+
+DECOMPOSED (2026-09-02) - this task is now a coordinator and contains NO implementation. Eleven children, ordered:
+- TASK-25.1.6.1 - characterization tests for the untested call sites (GATE; modules/reports/google_groups.py has no test file, modules/aws/spending.py has no Sheets coverage).
+- TASK-25.1.6.2 - relocate the pure-domain helpers out of integrations/google_workspace (independent, can run first).
+- TASK-25.1.6.3 - close the DirectoryProvider capability gaps (unbounded list-users, unbounded list-groups, silent group dropping, batched groups-with-members).
+- TASK-25.1.6.4 - migrate permissions/handler.py, provisioning/users.py and reports/google_groups.py Directory calls onto DirectoryProvider.
+- TASK-25.1.6.5 - migrate provisioning/groups.py onto the batched path, delete google_directory.py, retire retry_request.
+- TASK-25.1.6.6 - inline Docs construction/classification in packages/incident_draft/adapters/google_docs.py (pairs with TASK-25.1.5.1's Drive half).
+- TASK-25.1.6.7 - build the incident Google Docs adapter; MAKES the boundary-placement decision the next three inherit.
+- TASK-25.1.6.8 - move the eight legacy Drive consumers onto the incident Drive adapter; retire LEGACY_FOLDER_DISPLAY_LIMIT.
+- TASK-25.1.6.9 - move the Calendar and Meet call sites onto the adapter.
+- TASK-25.1.6.10 - move the Sheets call sites onto adapters, carrying the caller-specific parse-range rule across.
+- TASK-25.1.6.11 - delete execute_google_api_request, resolve execute_batch_request, add a CI guardrail against the vendor package regrowing.
+
+This task closes when all eleven are Done. Its own remaining direct work is nil.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The full execute_google_api_request call-site inventory across TASK-25.1.1/.2/.3/.4/.5 is enumerated, naming which call sites already live in a real packages/<feature>/adapters/ or infrastructure/ file vs. which are legacy app/modules/* code with no adapter tier
-- [ ] #2 Every call site already in a real packages/<feature>/adapters/ or infrastructure/ file has its own inline try/except + classify_google_error + raise, and no longer depends on execute_google_api_request
-- [ ] #3 Every remaining legacy app/modules/* call site either has its own real per-feature adapter built and inlined, or a follow-up task migrating it there is filed/linked here; execute_google_api_request is deleted from client.py once zero call sites depend on it
-- [ ] #4 Duplicated-concern inventory produced for the Google Workspace surface: for each vendor module in app/integrations/google_workspace/, its infrastructure/ or packages/ counterpart (if any) is named, the overlapping API calls and duplicated mechanics (service construction, scopes, customer id, pagination, retry, error handling) are listed, and a single survivor is chosen per surface with the losing side's consumers enumerated
-- [ ] #5 The google_directory.py vs infrastructure/directory/google.py::GoogleDirectoryProvider duplication specifically has a written decision (which survives, how the four legacy app/modules/* consumers move, what happens to list_groups_with_members/get_members_details and their time.sleep retry_request loop) and follow-up subtasks filed for the migration; no implementation is done inside this task
+- [ ] #1 All eleven children (TASK-25.1.6.1 through .11) are Done
+- [ ] #2 app/integrations/google_workspace/ contains only client.py (per-API stub-typed factories plus classify_google_error) and settings; the six per-method mirror modules and google_service.py no longer exist
+- [ ] #3 Every Google Workspace call site in the repo lives in a packages/<feature>/adapters/ file or an infrastructure/ capability, builds its Resource from a client.py factory, performs its own try/except plus classify_google_error, and returns typed domain values rather than raw SDK dicts
+- [ ] #4 The Directory duplication is resolved as decided: GoogleDirectoryProvider survives, integrations/google_workspace/google_directory.py is deleted, and all four legacy app/modules/* consumers use the DirectoryProvider Protocol
+- [ ] #5 No business logic remains under app/integrations/google_workspace/, and grep -rn 'time.sleep' app/integrations returns zero hits (TASK-25 AC#5)
+- [ ] #6 execute_google_api_request is deleted and execute_batch_request is either relocated to the provider or covered by a written amendment to decisions/outbound-clients.md
+- [ ] #7 A CI guardrail prevents app/integrations/<vendor>/ from regrowing non-factory/non-classification/non-settings modules, so this convention is machine-enforced rather than remembered
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -131,5 +161,53 @@ CONSUMER SPLIT (the reason both still exist) — google_directory.py: modules/pe
 LIKELY RESOLUTION (to be confirmed by whoever plans this, not decided here): GoogleDirectoryProvider survives; the four legacy consumers move onto the DirectoryProvider Protocol; google_directory.py's three list functions are deleted; list_groups_with_members/get_members_details either die or are rebuilt on get_group_members_batch outside integrations/ (they are business logic in a vendor package, already flagged in the 2026-09-01 19:42 comment). That also retires this surface's dependency on execute_google_api_request, which is AC#2/#3's job — the two threads converge. Sizing: this is multi-PR work (4 consumer modules, 2 of which have thin or no coverage — modules/reports/google_groups.py has NO test file at all per TASK-25.1.4 notes), so run it through the implementation-planning size gate and decompose before writing code.
 
 NOT DONE HERE and explicitly out of scope of TASK-25.1.4.
+---
+
+created: 2026-09-02 13:30
+---
+INVENTORY + SHIM REGISTRATION from TASK-25.1.5 planning (2026-09-02, task-planner). Two items land in this task's scope.
+
+1. execute_google_api_request call sites. TASK-25.1.5 as planned adds about 12 more in integrations/google_workspace/google_drive.py (add_metadata, delete_metadata, list_metadata, get_file_by_id, create_folder, create_file, create_file_from_template, copy_file_to_folder x2, and one per page inside the shared _collect_files pagination helper used by find_files_by_name / list_folders_in_folder / list_files_in_folder). AC#1 classification: NONE live in a real packages/<feature>/adapters/ or infrastructure/ file. Eight of the nine downstream consumers are legacy app/modules/* or app/jobs/* with no adapter tier (AC#3 bucket): modules/incident/{incident_document,incident_helper,incident_folder,core,incident_roles}.py, modules/role/role.py, modules/reports/google_groups.py, jobs/scheduled_tasks.py. The ninth, packages/incident_draft/adapters/google_docs.py, is a real adapters/ file and belongs to the AC#2 bucket - but it is now owned by the new TASK-25.1.5.1, which repoints its two Drive call sites onto get_drive_service with an inline try/except and deletes google_drive.get_file_by_id. When TASK-25.1.5.1 lands, remove those two sites from this task's outstanding scope; its remaining google_drive.find_files_by_name call and all its google_docs calls stay here.
+
+2. NEW TEMPORARY SHIM to retire. TASK-25.1.5 fixes the Drive list pagination that fields="files(...)" had silently disabled, which makes modules/incident/incident_folder.py's folder listings unbounded. Slack cannot take that: folder_item emits three blocks per folder against a 100-block modal limit, and list_incident_folders() feeds four static_select option lists against a 100-option limit. The slice therefore adds a named constant (LEGACY_FOLDER_DISPLAY_LIMIT) applied in list_incident_folders() and list_folders_view(). It is a display shim, not a fix - the real answer is pagination or search in the Slack UI, a product change. Fold its retirement into whichever follow-up builds a real adapter for modules/incident's Drive usage.
+---
+
+created: 2026-09-02 14:06
+---
+TASK-25.1.5 adds integrations/google_workspace/google_drive.py call sites to the temporary execute_google_api_request helper: add_metadata, delete_metadata, list_metadata, create_folder, create_file_from_template, create_file, get_file_by_id, find_files_by_name, list_folders_in_folder, list_files_in_folder, and both copy_file_to_folder requests. It also adds the temporary LEGACY_FOLDER_DISPLAY_LIMIT Slack display shim in modules/incident/incident_folder.py.
+---
+
+created: 2026-09-02 14:30
+---
+TASK-25.1.5 now uses integrations/google_workspace/client.py::execute_google_api_request at every migrated google_drive.py request boundary (single calls, pagination collector, and copy/move composition). It also adds modules/incident/incident_folder.py::LEGACY_FOLDER_DISPLAY_LIMIT = 25 as the temporary Slack block/option-limit shim while Drive folder pagination is unbounded.
+---
+
+created: 2026-09-02 15:05
+---
+RE-SCOPED AND RETITLED 2026-09-02 (human-directed). Title changed from "Reconcile integrations/google_workspace/client.py's shared execute helpers against the vendor-package export contract" to "Retire the Google Workspace vendor mirror layer". Priority medium -> high. The five previous acceptance criteria were REPLACED (not quietly reworded) with seven coordinator-level ones; the old AC#1/#2/#3 (execute_google_api_request call-site inventory and inlining) are now owned by the children, and the old AC#4/#5 (duplicated-concern inventory and the google_directory decision) are DISCHARGED - the inventory is in this task's Notes and the 2026-09-01 21:21 comment, and the decision is made below. Recording the replacement explicitly per the backlog-task-workflow rule against silently reshaping ACs.
+---
+
+created: 2026-09-02 15:05
+---
+DIRECTORY DECISION - MADE 2026-09-02 (human). AC#5 of the previous AC set asked for "a written decision (which survives, how the four legacy app/modules/* consumers move, what happens to list_groups_with_members/get_members_details and their time.sleep retry_request loop)". Here it is.
+
+SURVIVES: infrastructure/directory/{provider,google,factory}.py - the DirectoryProvider Protocol and GoogleDirectoryProvider. app/integrations/google_workspace/google_directory.py is DELETED.
+
+RATIONALE: the 2026-09-01 21:21 evidence comment established that the two sides are not a real separation - same factory (client.get_admin_directory_service), same hardcoded readonly scopes, same GOOGLE_WORKSPACE_CUSTOMER_ID, structurally identical pagination, same three calls (users.list/groups.list/members.list). The split is purely legacy-vs-target. The provider is additionally the better of the two: it classifies into OperationResult and translates into DirectoryUser/DirectoryGroup/DirectoryMember dataclasses (which is what decisions/sdk-typing.md item 3 asks for), it passes SDK-native num_retries in _paginate, and get_group_members_batch does in ONE batched request what google_directory.list_groups_with_members does in N behind a time.sleep loop. Keeping the vendor module would mean keeping the inferior implementation and the forbidden retry loop.
+
+HOW THE FOUR CONSUMERS MOVE: via infrastructure/directory/factory.py::get_directory_provider(), per decisions/dependency-injection.md - never by constructing GoogleDirectoryProvider directly. modules/permissions/handler.py (2x list_group_members), modules/provisioning/users.py (list_users) and modules/reports/google_groups.py (list_groups + list_group_members) are TASK-25.1.6.4. modules/provisioning/groups.py (list_groups_with_members) is TASK-25.1.6.5, and moves onto the batched capability rather than a like-for-like port.
+
+WHAT HAPPENS TO THE BUSINESS LOGIC: list_groups_with_members is rebuilt on get_group_members_batch OUTSIDE app/integrations/ (TASK-25.1.6.3 builds the capability). get_members_details and convert_google_groups_members_to_dataframe die with the module unless a consumer still needs them, decided per function in TASK-25.1.6.5. integrations/utils/api.py::retry_request is deleted - google_directory.py is its only production caller (the identically-named symbols in packages/access/request/{http,service}.py are unrelated domain methods). That satisfies TASK-25's AC#5 for the Google vendor.
+
+BLOCKER FOUND WHILE WRITING THIS, now TASK-25.1.6.3: the Protocol cannot express two of the four call sites as-is. DirectoryProvider.list_users(query="", limit=100) truncates twice (maxResults=limit, then data[:limit]) where legacy list_users() paginates the whole domain - repointing provisioning/users.py blind would silently sync only 100 users. DirectoryProvider.list_groups(query) is required-argument and rewrites bare strings to email:{query}*, where reports/google_groups.py calls list_groups() expecting everything. Capability parity lands before any consumer moves.
+---
+
+created: 2026-09-02 15:05
+---
+ARGUMENT FOR DELETING execute_google_api_request THAT WAS NOT YET RECORDED (2026-09-02): it defeats the stated benefit of the stub adoption that TASK-70 paid for.
+
+Its signature is execute_google_api_request(request: Any) -> Any. Every migrated call site hands it a stub-typed request object and gets back Any. google_drive.py compounds this with two module-private helpers of the same shape - _execute_file_request(request: Any) -> dict[str, Any] and _collect_files(files_resource: Any, request: Any). So the precisely-typed return of files().list() / documents().get() / spreadsheets().values().get() is laundered to Any (or a hand-written dict[str, Any]) at the exact seam where decisions/sdk-typing.md wanted the types to reach the caller. Item 3 of that record says the adapter "calls service.users().get(userKey=...).execute() directly with real method/parameter/return-shape completion and checking" - "directly" is doing real work in that sentence, and routing through an Any -> Any helper is not it.
+
+This is a stronger argument than the export-contract one alone: the helper is not merely an extra symbol in the vendor package, it actively cancels the type resolution the stub packages were adopted to provide. Inlining try/except + classify_google_error at each adapter call site restores the SDK's own return type at the call site, which is the point. Recorded here so TASK-25.1.6.11 does not have to rediscover it.
 ---
 <!-- COMMENTS:END -->

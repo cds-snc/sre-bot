@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     )
     from googleapiclient._apis.calendar.v3 import CalendarResource  # pyright: ignore[reportMissingModuleSource]
     from googleapiclient._apis.docs.v1 import DocsResource  # pyright: ignore[reportMissingModuleSource]
+    from googleapiclient._apis.drive.v3 import DriveResource  # pyright: ignore[reportMissingModuleSource]
     from googleapiclient._apis.meet.v2 import MeetResource  # pyright: ignore[reportMissingModuleSource]
     from googleapiclient._apis.sheets.v4 import SheetsResource  # pyright: ignore[reportMissingModuleSource]
 
@@ -71,6 +72,14 @@ def get_docs_service(
 ) -> DocsResource:
     """Build an authenticated Docs API service resource."""
     return cast("DocsResource", _build_service("docs", "v1", scopes, delegated_user_email))
+
+
+def get_drive_service(
+    scopes: list[str],
+    delegated_user_email: str | None = None,
+) -> DriveResource:
+    """Build an authenticated Google Drive API service resource."""
+    return cast("DriveResource", _build_service("drive", "v3", scopes, delegated_user_email))
 
 
 def get_sheets_service(

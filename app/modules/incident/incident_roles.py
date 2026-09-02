@@ -1,5 +1,6 @@
 import json
 import re
+from typing import Any
 
 from slack_sdk.web import WebClient
 from structlog import get_logger
@@ -59,7 +60,10 @@ def manage_roles(client: WebClient, body, ack, respond):
     channel_name = body["channel_name"]
     channel_name = channel_name[channel_name.startswith("incident-") and len("incident-") :]
     channel_name = channel_name[channel_name.startswith("dev-") and len("dev-") :]
-    documents = google_drive.find_files_by_name(channel_name)
+    documents = google_drive.find_files_by_name(
+        channel_name,
+        fields="nextPageToken, files(appProperties, id, name)",
+    )
 
     if len(documents) == 0:
         log.warning("no_incident_document_found", channel_name=channel_name)
@@ -74,7 +78,7 @@ def manage_roles(client: WebClient, body, ack, respond):
         document["appProperties"]["ol_id"] if "appProperties" in document and "ol_id" in document["appProperties"] else False
     )
 
-    ic_element = {
+    ic_element: dict[str, Any] = {
         "type": "users_select",
         "placeholder": {
             "type": "plain_text",
@@ -85,7 +89,7 @@ def manage_roles(client: WebClient, body, ack, respond):
     if current_ic:
         ic_element["initial_user"] = current_ic
 
-    ol_element = {
+    ol_element: dict[str, Any] = {
         "type": "users_select",
         "placeholder": {
             "type": "plain_text",

@@ -25,17 +25,21 @@ INCIDENT_LIST = google_resources.incident_list_id
 
 logger = get_logger()
 
+# Temporary TASK-25.1.6 shim for Slack's modal block and option-list limits.
+LEGACY_FOLDER_DISPLAY_LIMIT = 25
+
 
 def list_incident_folders():
     folders = google_drive.list_folders_in_folder(SRE_INCIDENT_FOLDER, "not name contains 'Templates'")
     folders.sort(key=lambda x: x["name"])
-    return folders
+    return folders[:LEGACY_FOLDER_DISPLAY_LIMIT]
 
 
 def list_folders_view(client: WebClient, body, ack: Ack):
     ack()
     folders = google_drive.list_folders_in_folder(SRE_INCIDENT_FOLDER, "not name contains 'Templates'")
     folders.sort(key=lambda x: x["name"])
+    folders = folders[:LEGACY_FOLDER_DISPLAY_LIMIT]
     blocks = {
         "type": "modal",
         "callback_id": "list_folders_view",
@@ -80,7 +84,7 @@ def save_metadata(client: WebClient, body, ack, view):
 
 def get_folder_metadata(folder_id) -> dict:
     """Get metadata for a folder."""
-    return google_drive.list_metadata(folder_id)
+    return google_drive.list_metadata(folder_id, fields="id, name, appProperties")
 
 
 def view_folder_metadata(client, body, ack):
@@ -90,7 +94,7 @@ def view_folder_metadata(client, body, ack):
         "view_folder_metadata",
         folder_id=folder_id,
     )
-    folder = google_drive.list_metadata(folder_id)
+    folder = google_drive.list_metadata(folder_id, fields="id, name, appProperties")
     blocks = {
         "type": "modal",
         "callback_id": "view_folder_metadata_modal",
