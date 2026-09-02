@@ -20,7 +20,7 @@ from packages.oncall_sync.ports import (
     UserGroupSyncTarget,
 )
 from packages.oncall_sync.service import OnCallSyncService
-from packages.oncall_sync.settings import get_oncall_schedules
+from packages.oncall_sync.settings import get_oncall_schedules, get_oncall_sync_settings
 
 
 @lru_cache(maxsize=1)
@@ -36,7 +36,10 @@ def get_user_group_sync_target() -> UserGroupSyncTarget:
             "SLACK_USER_TOKEN is required to sync on-call rotations into Slack user groups "
             "(usergroups.* writes cannot use the shared inbound bot token)."
         )
-    return SlackUserGroupTarget(WebClient(token=settings.USER_TOKEN))
+    return SlackUserGroupTarget(
+        WebClient(token=settings.USER_TOKEN),
+        approved_domains=frozenset(get_oncall_sync_settings().APPROVED_EMAIL_DOMAINS),
+    )
 
 
 @lru_cache(maxsize=1)

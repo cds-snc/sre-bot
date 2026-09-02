@@ -8,6 +8,7 @@ multi-user schedule aggregate groups.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Sequence
 
 import structlog
@@ -19,11 +20,17 @@ from packages.oncall_sync.ports import OnCallSyncError
 logger = structlog.get_logger()
 
 
+def _fingerprint_email(email: str) -> str:
+    """Privacy-safe, stable identifier for correlating repeated mismatches."""
+    return hashlib.sha256(email.strip().lower().encode("utf-8")).hexdigest()
+
+
 class SlackUserGroupTarget:
     """Mirror on-call membership into Slack user groups."""
 
-    def __init__(self, client: WebClient) -> None:
+    def __init__(self, client: WebClient, *, approved_domains: frozenset[str] = frozenset()) -> None:
         self._client = client
+        self._approved_domains = approved_domains
 
     def sync_user_group(
         self,
@@ -50,6 +57,12 @@ class SlackUserGroupTarget:
         log.info("oncall_sync_usergroup_updated", usergroup_id=usergroup_id)
 
     def _resolve_user_id(self, email: str, log) -> str | None:
+        if self._approved_domains and not self._is_approved_domain(email):
+            log.info(
+                "oncall_sync_participant_email_domain_mismatch",
+                email_fingerprint=_fingerprint_email(email),
+            )
+            return None
         try:
             resp = self._client.users_lookupByEmail(email=email)
         except SlackApiError as exc:
@@ -63,6 +76,10 @@ class SlackUserGroupTarget:
             user_id: str = resp["user"]["id"]
             return user_id
         return None
+
+    def _is_approved_domain(self, email: str) -> bool:
+        domain = email.rsplit("@", 1)[-1].strip().lower() if "@" in email else ""
+        return domain in self._approved_domains
 
     def _find_or_create_usergroup(self, handle: str, name: str, description: str, log) -> str:
         existing = self._lookup_usergroup(handle)
