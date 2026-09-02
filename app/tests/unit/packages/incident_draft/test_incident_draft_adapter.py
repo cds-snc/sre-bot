@@ -3,17 +3,67 @@
 from __future__ import annotations
 
 import re
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
+from googleapiclient.errors import HttpError
 
+from infrastructure.operations.status import OperationStatus
 from packages.incident_draft.adapters.google_docs import GoogleDocsIncidentDocument
 from packages.incident_draft.domain import DocumentField, DocumentSection, SectionDraft
 
 pytestmark = pytest.mark.unit
 
 _DOCS = "packages.incident_draft.adapters.google_docs.google_docs"
-_DRIVE = "packages.incident_draft.adapters.google_docs.google_drive"
+_CLIENT = "packages.incident_draft.adapters.google_docs.google_workspace_client"
+_RESOURCES = "packages.incident_draft.adapters.google_docs.get_google_resources_config"
+
+
+def _http_error(status: int) -> HttpError:
+    """An ``HttpError`` carrying the status the Drive API would have returned."""
+
+    class FakeResp(dict):
+        def __init__(self) -> None:
+            super().__init__()
+            self.status = status
+            self.reason = "boom"
+
+    return HttpError(resp=FakeResp(), content=b"{}")
+
+
+def _drive_resource_fake(*, copy_response=None, copy_error=None, get_response=None, get_error=None) -> MagicMock:
+    """A Drive Resource whose ``files().copy``/``files().get`` return or raise as given."""
+    service = MagicMock()
+    files = service.files.return_value
+
+    if copy_error is not None:
+        files.copy.return_value.execute.side_effect = copy_error
+    else:
+        files.copy.return_value.execute.return_value = copy_response
+
+    if get_error is not None:
+        files.get.return_value.execute.side_effect = get_error
+    else:
+        files.get.return_value.execute.return_value = get_response
+
+    return service
+
+
+@pytest.fixture(autouse=True)
+def drive_service():
+    """Serve every Drive call from an in-memory Resource copying "D1" into "NEW1"."""
+    with patch(_CLIENT) as mock_client:
+        service = _drive_resource_fake(
+            copy_response={"id": "NEW1"},
+            get_response={"name": "testing draft functionality", "parents": ["FOLDER1"]},
+        )
+        mock_client.get_drive_service.return_value = service
+        yield service
+
+
+def _copy_request(drive_service: MagicMock):
+    """The kwargs of the single ``files().copy`` call made by the run."""
+    return drive_service.files.return_value.copy.call_args.kwargs
 
 
 def _paragraph(text: str, style: str = "NORMAL_TEXT") -> dict:
@@ -133,15 +183,10 @@ def _template_document() -> dict:
     )
 
 
-def _write(mock_docs, mock_drive, drafts, *, existing: bool = False, fields=()):
+def _write(mock_docs, drafts, *, fields=()):
     """Run write_draft_document against a copied template and return requests."""
     mock_docs.get_document.return_value = _template_document()
     mock_docs.batch_update.return_value = {}
-    mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-    mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-    mock_drive.find_files_by_name.return_value = (
-        [{"id": "OLD1", "name": "testing draft functionality - AI draft"}] if existing else []
-    )
     written = GoogleDocsIncidentDocument().write_draft_document("D1", drafts, fields)
     # The first batch is the content fill; a second, cosmetic batch shrinks the
     # metadata labels afterwards.
@@ -171,22 +216,56 @@ def _style_of(requests, text: str):
 class TestWriteDraftDocument:
     """The draft is a filled-in copy of the report, preserving its format."""
 
-    def test_copies_the_source_report_rather_than_building_a_blank_doc(self):
+    def test_copies_the_source_report_rather_than_building_a_blank_doc(self, drive_service):
         drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            written, _ = _write(mock_docs, mock_drive, drafts)
+        with patch(_DOCS) as mock_docs:
+            written, _ = _write(mock_docs, drafts)
 
         assert written is not None
         assert written.document_id == "NEW1"
         assert written.created is True
         # Copied from the source so the template's tables, metadata block and
         # guidance survive; never created as an empty document.
-        name, folder, template = mock_drive.create_file_from_template.call_args.args
-        assert name.startswith("testing draft functionality - AI draft ")
-        assert folder == "FOLDER1"
-        assert template == "D1"
-        mock_drive.create_file.assert_not_called()
+        request = _copy_request(drive_service)
+        assert request["body"]["name"].startswith("testing draft functionality - AI draft ")
+        assert request["body"]["parents"][0] == "FOLDER1"
+        assert request["fileId"] == "D1"
+        assert request["fields"] == "id"
+        assert request["supportsAllDrives"] is True
+
+    def test_drive_copy_failure_writes_nothing(self, drive_service):
+        """A copy that never happened leaves no document to fill."""
+        drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
+
+        with patch(_CLIENT) as mock_client, patch(_DOCS) as mock_docs:
+            mock_client.get_drive_service.return_value = _drive_resource_fake(
+                copy_error=_http_error(503),
+                get_response={"name": "testing draft functionality", "parents": ["FOLDER1"]},
+            )
+            mock_client.classify_google_error.return_value = (OperationStatus.TRANSIENT_ERROR, "503", None)
+            mock_docs.get_document.return_value = _template_document()
+            mock_docs.batch_update.return_value = {}
+            written = GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+
+        assert written is None
+        mock_docs.batch_update.assert_not_called()
+
+    def test_metadata_failure_still_copies_into_the_configured_folder(self):
+        """An unreadable source still yields a draft responders can find."""
+        drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
+
+        with patch(_CLIENT) as mock_client, patch(_DOCS) as mock_docs, patch(_RESOURCES) as mock_resources:
+            service = _drive_resource_fake(copy_response={"id": "NEW1"}, get_error=_http_error(404))
+            mock_client.get_drive_service.return_value = service
+            mock_client.classify_google_error.return_value = (OperationStatus.NOT_FOUND, "404", None)
+            mock_resources.return_value.incident_folder_id = "FALLBACK_FOLDER"
+            mock_docs.get_document.return_value = _template_document()
+            mock_docs.batch_update.return_value = {}
+            written = GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+
+        assert written is not None
+        assert _copy_request(service)["body"]["parents"] == ["FALLBACK_FOLDER"]
 
     def test_guidance_is_kept_and_content_goes_below_it(self):
         """The template's italic guidance stays; the draft lands under it."""
@@ -198,8 +277,8 @@ class TestWriteDraftDocument:
             SectionDraft(heading="Action Items:", content="Guidance text", is_drafted=False),
         ]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            _, requests = _write(mock_docs, mock_drive, drafts)
+        with patch(_DOCS) as mock_docs:
+            _, requests = _write(mock_docs, drafts)
 
         # Nothing in the template is removed on a first run.
         assert not any("deleteContentRange" in r for r in requests)
@@ -215,8 +294,8 @@ class TestWriteDraftDocument:
     def test_generated_content_is_marked_with_a_named_range(self):
         drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            _, requests = _write(mock_docs, mock_drive, drafts)
+        with patch(_DOCS) as mock_docs:
+            _, requests = _write(mock_docs, drafts)
 
         created = [r["createNamedRange"] for r in requests if "createNamedRange" in r]
         assert len(created) == 1
@@ -228,8 +307,8 @@ class TestWriteDraftDocument:
         """They keep the template's own guidance — no rewriting needed."""
         drafts = [SectionDraft(heading="Summary", content="Template guidance", is_drafted=False)]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            written, _ = _write(mock_docs, mock_drive, drafts)
+        with patch(_DOCS) as mock_docs:
+            written, _ = _write(mock_docs, drafts)
 
         assert written is None
         mock_docs.batch_update.assert_not_called()
@@ -241,8 +320,8 @@ class TestWriteDraftDocument:
             SectionDraft(heading="Lessons Learned", content="Add a canary.", is_drafted=True, as_list=True),
         ]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            _, requests = _write(mock_docs, mock_drive, drafts)
+        with patch(_DOCS) as mock_docs:
+            _, requests = _write(mock_docs, drafts)
 
         deletes = [r["deleteContentRange"]["range"]["startIndex"] for r in requests if "deleteContentRange" in r]
         assert deletes == sorted(deletes, reverse=True)
@@ -250,42 +329,42 @@ class TestWriteDraftDocument:
     def test_banner_is_inserted_last_so_it_cannot_shift_other_edits(self):
         drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            _, requests = _write(mock_docs, mock_drive, drafts)
+        with patch(_DOCS) as mock_docs:
+            _, requests = _write(mock_docs, drafts)
 
         inserts = [r["insertText"] for r in requests if "insertText" in r]
         assert inserts[-1]["location"]["index"] == 1
         assert inserts[-1]["text"].startswith("AI draft · generated ")
 
-    def test_every_run_starts_from_a_fresh_copy(self):
+    def test_every_run_starts_from_a_fresh_copy(self, drive_service):
         """A pristine document cannot inherit the previous run's output."""
         drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            written, requests = _write(mock_docs, mock_drive, drafts, existing=True)
+        with patch(_DOCS) as mock_docs:
+            written, requests = _write(mock_docs, drafts)
 
         assert written is not None
         assert written.document_id == "NEW1"
         assert written.created is True
-        mock_drive.create_file_from_template.assert_called_once()
+        drive_service.files.return_value.copy.assert_called_once()
         # Nothing to sweep on a clean copy, so nothing is deleted.
         assert not any("deleteContentRange" in r for r in requests)
 
-    def test_each_run_gets_its_own_name(self):
+    def test_each_run_gets_its_own_name(self, drive_service):
         """Otherwise the folder fills with identically titled documents."""
         drafts = [SectionDraft(heading="Summary", content="x", is_drafted=True)]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            _write(mock_docs, mock_drive, drafts)
+        with patch(_DOCS) as mock_docs:
+            _write(mock_docs, drafts)
 
-        name = mock_drive.create_file_from_template.call_args.args[0]
+        name = _copy_request(drive_service)["body"]["name"]
         assert re.fullmatch(r"testing draft functionality - AI draft \d{4}-\d{2}-\d{2} \d{2}:\d{2}", name)
 
     def test_source_document_is_never_written_to(self):
         drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            _write(mock_docs, mock_drive, drafts)
+        with patch(_DOCS) as mock_docs:
+            _write(mock_docs, drafts)
 
         written_ids = {call.args[0] for call in mock_docs.batch_update.call_args_list}
         assert written_ids == {"NEW1"}
@@ -296,8 +375,8 @@ class TestSectionFormatting:
 
     def _requests_for(self, heading: str, content: str, *, as_list: bool = False):
         drafts = [SectionDraft(heading=heading, content=content, is_drafted=True, as_list=as_list)]
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            _, requests = _write(mock_docs, mock_drive, drafts)
+        with patch(_DOCS) as mock_docs:
+            _, requests = _write(mock_docs, drafts)
         return requests
 
     def test_retrospective_labels_become_subheadings_with_bullets(self):
@@ -329,8 +408,8 @@ class TestMetadataFields:
         detection = next(e for e in document["body"]["content"] if _paragraph_text_of(e).startswith("Detection time:"))
         fields = [DocumentField(label="Detection time", value="2026-08-17 10:46")]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            _, requests = _write(mock_docs, mock_drive, [], fields=fields)
+        with patch(_DOCS) as mock_docs:
+            _, requests = _write(mock_docs, [], fields=fields)
 
         insert = next(
             r["insertText"] for r in requests if "insertText" in r and r["insertText"]["text"].strip() == "2026-08-17 10:46"
@@ -342,8 +421,8 @@ class TestMetadataFields:
     def test_fields_are_written_even_with_no_answered_sections(self):
         fields = [DocumentField(label="Author(s)", value="Sylvia, Pat, Guillaume")]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            written, requests = _write(mock_docs, mock_drive, [], fields=fields)
+        with patch(_DOCS) as mock_docs:
+            written, requests = _write(mock_docs, [], fields=fields)
 
         assert written is not None
         assert "Sylvia, Pat, Guillaume" in _inserted_text(requests)
@@ -354,8 +433,8 @@ class TestMetadataFields:
             DocumentField(label="Nonexistent Field", value="x"),
         ]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            written, _ = _write(mock_docs, mock_drive, [], fields=fields)
+        with patch(_DOCS) as mock_docs:
+            written, _ = _write(mock_docs, [], fields=fields)
 
         assert written is None
         mock_docs.batch_update.assert_not_called()
@@ -366,12 +445,9 @@ class TestMetadataFields:
         document["body"]["content"].append(_paragraph("Note: this is prose in a section\n"))
         fields = [DocumentField(label="Note", value="should not be written")]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             written = GoogleDocsIncidentDocument().write_draft_document("D1", [], fields)
 
         assert written is None
@@ -381,8 +457,8 @@ class TestRegularTextLabels:
     """Metadata labels render as ordinary body text, not headings."""
 
     def _styling_requests(self):
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            _write(mock_docs, mock_drive, [SectionDraft(heading="Summary", content="x", is_drafted=True)])
+        with patch(_DOCS) as mock_docs:
+            _write(mock_docs, [SectionDraft(heading="Summary", content="x", is_drafted=True)])
             calls = mock_docs.batch_update.call_args_list
             return calls[0].args[1] if calls else []
 
@@ -431,12 +507,9 @@ class TestRegularTextLabels:
 
     def test_styling_failure_does_not_fail_the_draft(self):
         """The pass is cosmetic; a draft that exists beats one that errored."""
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = _template_document()
             mock_docs.batch_update.side_effect = [{}, None]
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             written = GoogleDocsIncidentDocument().write_draft_document(
                 "D1", [SectionDraft(heading="Summary", content="x", is_drafted=True)]
             )
@@ -464,12 +537,9 @@ class TestBannerAccumulation:
 
     def _run_against(self, document):
         drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
             return mock_docs.batch_update.call_args_list[0].args[1]
 
@@ -530,12 +600,9 @@ class TestInlineLabelValues:
     def _run(self, content: str):
         drafts = [SectionDraft(heading="Impact", content=content, is_drafted=True)]
         document = self._impact_template()
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
         return document, mock_docs.batch_update.call_args_list[0].args[1]
 
@@ -612,12 +679,9 @@ class TestEmptyImpactLabels:
 
     def _run(self, drafts, document=None):
         document = document or self._impact_document()
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
         calls = mock_docs.batch_update.call_args_list
         return document, (calls[0].args[1] if calls else [])
@@ -677,12 +741,9 @@ class TestPullRequestHyperlinks:
     def _run(self, content: str, links=...):
         links = self._LINKS if links is ... else links
         drafts = [SectionDraft(heading="Summary", content=content, is_drafted=True)]
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = _template_document()
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts, (), links)
         return mock_docs.batch_update.call_args_list[0].args[1]
 
@@ -761,12 +822,9 @@ class TestEnsuredGuidance:
         )
 
     def _run(self, document, drafts):
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
         return mock_docs.batch_update.call_args_list[0].args[1]
 
@@ -849,12 +907,9 @@ class TestPreFilledMetadataIsNotDuplicated:
     def _run(self, content: str):
         document = self._document()
         drafts = [SectionDraft(heading="Impact", content=content, is_drafted=True)]
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
         calls = mock_docs.batch_update.call_args_list
         return document, (calls[0].args[1] if calls else [])
@@ -898,12 +953,9 @@ class TestPreFilledMetadataIsNotDuplicated:
         }
         drafts = [SectionDraft(heading="Impact", content="End-users: A newer value.\n", is_drafted=True)]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
 
         requests = mock_docs.batch_update.call_args_list[0].args[1]
@@ -950,12 +1002,9 @@ class TestStaleSectionContentSweep:
 
     def _run(self, document):
         drafts = [SectionDraft(heading="Summary", content="A newer, tighter summary.", is_drafted=True)]
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
         return mock_docs.batch_update.call_args_list[0].args[1]
 
@@ -1045,12 +1094,9 @@ class TestLabelHeadingsAreNotSections:
             )
         ]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
 
         requests = mock_docs.batch_update.call_args_list[0].args[1]
@@ -1065,12 +1111,9 @@ class TestLabelHeadingsAreNotSections:
 
     def test_labels_styled_as_headings_are_restyled_to_body_text(self):
         """Otherwise "Other:" looms over "End-users:" beside it."""
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = self._document()
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document(
                 "D1", [SectionDraft(heading="Summary", content="x", is_drafted=True)]
             )
@@ -1105,12 +1148,9 @@ class TestMetadataBlockBelowLabelHeadings:
             DocumentField(label="Detection time", value="2026-08-17 10:46"),
         ]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", [], (), {})
             requests = mock_docs.batch_update.call_args_list[0].args[1] if mock_docs.batch_update.call_args_list else []
             assert requests == []  # nothing to write without fields
@@ -1134,12 +1174,9 @@ class TestMetadataBlockBelowLabelHeadings:
             ]
         )
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             written = GoogleDocsIncidentDocument().write_draft_document(
                 "D1", [], [DocumentField(label="Note", value="should not be written")], {}
             )
@@ -1161,12 +1198,9 @@ class TestDoubledValueRepair:
         )
 
     def _run(self, document):
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             # A real run always carries at least one drafted section.
             drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts, (), {})
@@ -1261,12 +1295,9 @@ class TestEditsNeverOverlap:
             SectionDraft(heading="Lessons Learned", content="What went wrong:\n- New point\n", is_drafted=True, as_list=True),
             SectionDraft(heading="Summary", content="A new summary.", is_drafted=True),
         ]
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = self._accumulated_draft()
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts, (), {})
         return mock_docs.batch_update.call_args_list[0].args[1]
 
@@ -1342,12 +1373,9 @@ class TestTemplateNoiseRemoved:
 
     def _run(self, drafts):
         document = self._document()
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
         return document, mock_docs.batch_update.call_args_list[0].args[1]
 
@@ -1451,12 +1479,9 @@ class TestActionItemsTable:
     def _run(self, content: str, extra_rows: int = 3):
         document = self._document(extra_rows)
         drafts = [SectionDraft(heading="Action Items:", content=content, is_drafted=True, as_list=True)]
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
         return document, mock_docs.batch_update.call_args_list[0].args[1]
 
@@ -1512,12 +1537,9 @@ class TestActionItemsTable:
         )
         drafts = [SectionDraft(heading="Action Items:", content="- A new item\n", is_drafted=True, as_list=True)]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
 
         requests = mock_docs.batch_update.call_args_list[0].args[1]
@@ -1540,12 +1562,9 @@ class TestActionItemsTable:
         )
         drafts = [SectionDraft(heading="Lessons Learned", content="- A point\n", is_drafted=True, as_list=True)]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
 
         requests = mock_docs.batch_update.call_args_list[0].args[1]
@@ -1555,35 +1574,27 @@ class TestActionItemsTable:
 class TestRoundTripCount:
     """Network round trips dominate the run; each one removed is real time."""
 
-    def test_writing_a_draft_makes_the_minimum_calls(self):
+    def test_writing_a_draft_makes_the_minimum_calls(self, drive_service):
         drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            _write(mock_docs, mock_drive, drafts)
+        with patch(_DOCS) as mock_docs:
+            _write(mock_docs, drafts)
 
         # One metadata lookup for name and folder together, one copy.
-        assert mock_drive.get_file_by_id.call_count == 1
-        assert mock_drive.create_file_from_template.call_count == 1
+        files = drive_service.files.return_value
+        assert files.get.call_count == 1
+        assert files.copy.call_count == 1
         # The source is never fetched just to read its title.
         assert mock_docs.get_document.call_count == 1
         # Content and label styling share a single batch.
         assert mock_docs.batch_update.call_count == 1
 
-    def test_the_existing_draft_lookup_is_gone(self):
-        """Every run copies, so searching Drive for a previous draft is waste."""
-        drafts = [SectionDraft(heading="Summary", content="x", is_drafted=True)]
-
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            _write(mock_docs, mock_drive, drafts)
-
-        mock_drive.find_files_by_name.assert_not_called()
-
     def test_label_styling_leads_the_batch(self):
         """It changes no lengths, so it is valid against the same snapshot."""
         drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            _, requests = _write(mock_docs, mock_drive, drafts)
+        with patch(_DOCS) as mock_docs:
+            _, requests = _write(mock_docs, drafts)
 
         first_edit = next(i for i, r in enumerate(requests) if "insertText" in r or "deleteContentRange" in r)
         styling = [i for i, r in enumerate(requests) if r.get("updateTextStyle", {}).get("fields") == "bold,fontSize"]
@@ -1593,7 +1604,7 @@ class TestRoundTripCount:
 class TestReportIsReadOnly:
     """The incident report is never written to — only ever read."""
 
-    def test_no_write_ever_targets_the_source_document(self):
+    def test_no_write_ever_targets_the_source_document(self, drive_service):
         drafts = [
             SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True),
             SectionDraft(
@@ -1604,14 +1615,16 @@ class TestReportIsReadOnly:
             ),
         ]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
-            _write(mock_docs, mock_drive, drafts)
+        with patch(_DOCS) as mock_docs:
+            _write(mock_docs, drafts)
 
         written_ids = {call.args[0] for call in mock_docs.batch_update.call_args_list}
         assert written_ids == {"NEW1"}, "the report id must never be written to"
         # The source is touched only through read-only calls: Drive metadata to
         # name and place the copy, and the copy itself for the fill.
-        assert mock_drive.get_file_by_id.call_args.args[0] == "D1"
+        metadata_request = drive_service.files.return_value.get.call_args.kwargs
+        assert metadata_request["fileId"] == "D1"
+        assert metadata_request["fields"] == "id, name, parents"
         assert "D1" not in {call.args[0] for call in mock_docs.get_document.call_args_list}
 
     def test_the_timeline_is_drafted_into_the_copy_like_any_other_section(self):
@@ -1632,20 +1645,14 @@ class TestReportIsReadOnly:
             )
         ]
 
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = document
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "doc", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
 
         document_id, requests = mock_docs.batch_update.call_args_list[0].args
         assert document_id == "NEW1"
         assert "14:02 Ada: alert fired" in _inserted_text(requests)
-
-    def test_the_port_no_longer_offers_a_timeline_write(self):
-        """Removed deliberately: 💾-curated entries are the report's own."""
-        assert not hasattr(GoogleDocsIncidentDocument(), "replace_timeline")
 
 
 class TestEveryPullRequestFormIsLinked:
@@ -1658,12 +1665,9 @@ class TestEveryPullRequestFormIsLinked:
 
     def _linked_urls(self, content: str) -> list[str]:
         drafts = [SectionDraft(heading="Summary", content=content, is_drafted=True)]
-        with patch(_DOCS) as mock_docs, patch(_DRIVE) as mock_drive:
+        with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = _template_document()
             mock_docs.batch_update.return_value = {}
-            mock_drive.get_file_by_id.return_value = {"name": "testing draft functionality", "parents": ["FOLDER1"]}
-            mock_drive.create_file_from_template.return_value = {"id": "NEW1"}
-            mock_drive.find_files_by_name.return_value = []
             GoogleDocsIncidentDocument().write_draft_document("D1", drafts, (), self._LINKS)
         requests = mock_docs.batch_update.call_args_list[0].args[1]
         return [

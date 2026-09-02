@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 15:31'
-updated_date: '2026-09-02 15:05'
+updated_date: '2026-09-02 16:38'
 labels:
   - clients
   - phase-3
@@ -209,5 +209,19 @@ ARGUMENT FOR DELETING execute_google_api_request THAT WAS NOT YET RECORDED (2026
 Its signature is execute_google_api_request(request: Any) -> Any. Every migrated call site hands it a stub-typed request object and gets back Any. google_drive.py compounds this with two module-private helpers of the same shape - _execute_file_request(request: Any) -> dict[str, Any] and _collect_files(files_resource: Any, request: Any). So the precisely-typed return of files().list() / documents().get() / spreadsheets().values().get() is laundered to Any (or a hand-written dict[str, Any]) at the exact seam where decisions/sdk-typing.md wanted the types to reach the caller. Item 3 of that record says the adapter "calls service.users().get(userKey=...).execute() directly with real method/parameter/return-shape completion and checking" - "directly" is doing real work in that sentence, and routing through an Any -> Any helper is not it.
 
 This is a stronger argument than the export-contract one alone: the helper is not merely an extra symbol in the vendor package, it actively cancels the type resolution the stub packages were adopted to provide. Inlining try/except + classify_google_error at each adapter call site restores the SDK's own return type at the call site, which is the point. Recorded here so TASK-25.1.6.11 does not have to rediscover it.
+---
+
+created: 2026-09-02 16:38
+---
+CALL-SITE INVENTORY UPDATE (TASK-25.1.5.1, 2026-09-02): the two Drive call sites in packages/incident_draft/adapters/google_docs.py are DISCHARGED from this task's outstanding AC#2 scope.
+
+- _copy_source_document now builds integrations.google_workspace.client.get_drive_service(scopes=google_drive.DRIVE_SCOPES) and calls service.files().copy(...).execute() inside its own try/except HttpError -> classify_google_error -> logs incident_draft_copy_failed and returns None.
+- _source_name_and_folder does the same with service.files().get(fileId=..., fields="id, name, parents", supportsAllDrives=True).execute(), logging incident_draft_metadata_lookup_failed and falling back to get_google_resources_config().incident_folder_id.
+
+Neither site uses execute_google_api_request or a google_drive passthrough any more; the adapter imports google_drive solely for its DRIVE_SCOPES constant. integrations/google_workspace/google_drive.py::get_file_by_id was deleted (zero callers repo-wide). create_file_from_template stays for its legacy modules/incident/incident_document.py caller and remains in this task's scope.
+
+Reusable test helper left behind for TASK-25.1.6.6's Docs half, in app/tests/unit/packages/incident_draft/test_incident_draft_adapter.py:
+  _drive_resource_fake(*, copy_response=None, copy_error=None, get_response=None, get_error=None) -> MagicMock
+plus an autouse `drive_service` fixture patching packages.incident_draft.adapters.google_docs.google_workspace_client and a _copy_request(drive_service) accessor. Reuse these rather than reinventing the Resource mock chain.
 ---
 <!-- COMMENTS:END -->

@@ -1,7 +1,6 @@
 """Unit tests for the google_drive module."""
 
 import inspect
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call
 
@@ -45,19 +44,12 @@ def drive_client(monkeypatch):
     return SimpleNamespace(factory=factory, service=service, files=service.files.return_value)
 
 
-# AC#1/#7: the dispatcher is gone from this module.
-def test_module_does_not_reference_the_legacy_dispatcher():
-    assert not hasattr(google_drive, "google_service")
-    assert "execute_google_api_call" not in Path(google_drive.__file__).read_text()
-
-
 def test_module_hardcodes_no_field_projection():
     """appProperties is a caller convention, not an SDK default, so the projection belongs to consumers."""
     functions = (
         google_drive.add_metadata,
         google_drive.delete_metadata,
         google_drive.list_metadata,
-        google_drive.get_file_by_id,
         google_drive.create_folder,
         google_drive.create_file,
         google_drive.create_file_from_template,
@@ -183,38 +175,6 @@ def test_list_metadata_propagates_http_error(drive_client):
 
     with pytest.raises(HttpError) as exc_info:
         google_drive.list_metadata("file_id")
-
-    assert exc_info.value is error
-
-
-# --- get_file_by_id ----------------------------------------------------- AC#1, AC#5
-
-
-def test_get_file_by_id_calls_files_get(drive_client):
-    get_call = drive_client.files.get
-    get_call.return_value.execute.return_value = {
-        "name": "test_document",
-        "id": "test_document_id",
-        "appProperties": {},
-    }
-
-    result = google_drive.get_file_by_id("test_document_id")
-
-    drive_client.factory.assert_called_once_with(scopes=DRIVE_SCOPES, delegated_user_email=None)
-    get_call.assert_called_once_with(
-        fileId="test_document_id",
-        fields=None,
-        supportsAllDrives=True,
-    )
-    assert result == {"name": "test_document", "id": "test_document_id", "appProperties": {}}
-
-
-def test_get_file_by_id_propagates_http_error(drive_client):
-    error = _http_error(404)
-    drive_client.files.get.return_value.execute.side_effect = error
-
-    with pytest.raises(HttpError) as exc_info:
-        google_drive.get_file_by_id("test_document_id")
 
     assert exc_info.value is error
 

@@ -133,17 +133,6 @@ def create_file(
     return _execute_file_request(service.files().create(body=body, supportsAllDrives=True, fields=fields))
 
 
-def get_file_by_id(
-    file_id: str,
-    *,
-    fields: str | None = None,
-    delegated_user_email: str | None = None,
-) -> dict[str, Any]:
-    """Get a Drive file by id."""
-    service = google_service_client.get_drive_service(scopes=DRIVE_SCOPES, delegated_user_email=delegated_user_email)
-    return _execute_file_request(service.files().get(fileId=file_id, fields=fields, supportsAllDrives=True))
-
-
 def find_files_by_name(
     name: str,
     folder_id: str | None = None,

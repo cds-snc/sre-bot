@@ -3,10 +3,11 @@ id: TASK-25.1.5.1
 title: >-
   Repoint incident_draft's Drive calls onto get_drive_service with an inline
   adapter boundary
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-02 13:26'
-updated_date: '2026-09-02 16:05'
+updated_date: '2026-09-02 16:39'
 labels:
   - clients
   - phase-3
@@ -43,11 +44,11 @@ SIZE WARNING for whoever plans this: app/tests/unit/packages/incident_draft/test
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 packages/incident_draft/adapters/google_docs.py builds its Drive calls from integrations.google_workspace.client.get_drive_service and wraps them in its own try/except + classify_google_error; neither Drive call site depends on execute_google_api_request or on a google_drive passthrough
-- [ ] #2 integrations/google_workspace/google_drive.py::get_file_by_id is deleted, grep-verified zero callers repo-wide
-- [ ] #3 create_file_from_template is left in place in google_drive.py for its remaining legacy modules/incident/incident_document.py caller; the adapter does not call google_drive.find_files_by_name today (repo-wide grep confirms zero calls under app/packages/incident_draft -- the task description's premise was incorrect) and this slice does not add one
-- [ ] #4 tests/unit/packages/incident_draft/test_incident_draft_adapter.py is reworked onto the split mock boundary with a single shared DriveResource fake helper; every existing behavioral assertion is preserved or has a documented equivalent, and error-classification coverage is added for the two repointed call sites
-- [ ] #5 TASK-25.1.6's call-site inventory is updated to record that these two sites are discharged (AC#2 bucket) and to remove them from its outstanding scope
+- [x] #1 packages/incident_draft/adapters/google_docs.py builds its Drive calls from integrations.google_workspace.client.get_drive_service and wraps them in its own try/except + classify_google_error; neither Drive call site depends on execute_google_api_request or on a google_drive passthrough
+- [x] #2 integrations/google_workspace/google_drive.py::get_file_by_id is deleted, grep-verified zero callers repo-wide
+- [x] #3 create_file_from_template is left in place in google_drive.py for its remaining legacy modules/incident/incident_document.py caller; the adapter does not call google_drive.find_files_by_name today (repo-wide grep confirms zero calls under app/packages/incident_draft -- the task description's premise was incorrect) and this slice does not add one
+- [x] #4 tests/unit/packages/incident_draft/test_incident_draft_adapter.py is reworked onto the split mock boundary with a single shared DriveResource fake helper; every existing behavioral assertion is preserved or has a documented equivalent, and error-classification coverage is added for the two repointed call sites
+- [x] #5 TASK-25.1.6's call-site inventory is updated to record that these two sites are discharged (AC#2 bucket) and to remove them from its outstanding scope
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -249,6 +250,65 @@ BLAST RADIUS AND ROLLBACK
   of every other TASK-25.1.6.* sibling except its own explicit pairing note with TASK-25.1.6.6 (which
   depends on this task only to reuse its test helper, not for correctness).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+WHAT CHANGED
+
+Production (2 files):
+- app/packages/incident_draft/adapters/google_docs.py: both Drive call sites repointed onto
+  google_workspace_client.get_drive_service(scopes=google_drive.DRIVE_SCOPES) with their own
+  try/except HttpError -> classify_google_error.
+  * _copy_source_document -> service.files().copy(fileId=..., body={"name","parents"},
+    supportsAllDrives=True, fields="id").execute(); on classified HttpError logs
+    incident_draft_copy_failed (status/error_code/retry_after) and returns None.
+  * _source_name_and_folder -> service.files().get(fileId=..., fields="id, name, parents",
+    supportsAllDrives=True).execute(); on classified HttpError logs a new
+    incident_draft_metadata_lookup_failed event and leaves metadata None so the pre-existing
+    fallback to get_google_resources_config().incident_folder_id runs unchanged.
+  Imports gained TYPE_CHECKING/cast, HttpError, and client as google_workspace_client; google_drive
+  is now imported only for DRIVE_SCOPES.
+- app/integrations/google_workspace/google_drive.py: get_file_by_id deleted (zero callers).
+
+BEHAVIOR CHANGE (intended, per plan): HttpErrors from these two Drive calls no longer propagate
+uncaught out of write_draft_document; they degrade gracefully, making the function's long-standing
+"Returns None on any failure" docstring true. Unmapped statuses still propagate raw via
+classify_google_error's own re-raise.
+
+Tests:
+- app/tests/unit/packages/incident_draft/test_incident_draft_adapter.py reworked onto the split mock
+  boundary: _DRIVE module patch removed entirely, replaced by _CLIENT patch + one shared
+  _drive_resource_fake(*, copy_response, copy_error, get_response, get_error) helper, an autouse
+  drive_service fixture, and a _copy_request(drive_service) accessor. All call-shape assertions
+  rewritten onto files().copy/files().get kwargs; field projections ("id" and "id, name, parents")
+  and supportsAllDrives now asserted here, preserving the coverage removed from the vendor tests.
+  Two new failure tests added: test_drive_copy_failure_writes_nothing and
+  test_metadata_failure_still_copies_into_the_configured_folder.
+- app/tests/integrations/google_workspace/test_google_drive.py: deleted the two get_file_by_id tests
+  and dropped it from test_module_hardcodes_no_field_projection.
+
+TRANSITIVE TEST CLEANUP (requested by reviewer, beyond the plan): deleted three absence-guard tests
+whose subjects no longer exist -- test_the_existing_draft_lookup_is_gone,
+test_the_port_no_longer_offers_a_timeline_write, and
+test_module_does_not_reference_the_legacy_dispatcher (which also removed the last pathlib import
+from the vendor test file).
+
+TEST EVIDENCE
+- uv run pytest tests/unit/packages/incident_draft/test_incident_draft_adapter.py -q -> 87 passed.
+- uv run ruff check . -> All checks passed.
+- uv run mypy . (excluding .venv) -> 94 pre-existing errors in legacy app/modules/*; zero in any
+  file touched by this task (grep-filtered on incident_draft|google_workspace: no matches).
+- Full suite: `make test` run manually by the human -> all green.
+- AC#2 grep: no get_file_by_id references remain anywhere under app/; only backlog/ task prose.
+
+LEFT FOR HUMAN VERIFICATION
+- DoD/code review of the behavior change (uncaught HttpError -> graceful degrade) on both paths.
+- No DoD items are defined on this task; no terraform/CI/settings changes were made.
+
+FOLLOW-UP NOTED, NOT FIXED (pre-existing, out of scope): the "copy response has no id" and
+"metadata succeeded but has no parents" warning branches still have no direct test coverage.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
