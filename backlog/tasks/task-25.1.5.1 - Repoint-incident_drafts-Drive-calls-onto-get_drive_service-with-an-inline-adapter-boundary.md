@@ -3,11 +3,11 @@ id: TASK-25.1.5.1
 title: >-
   Repoint incident_draft's Drive calls onto get_drive_service with an inline
   adapter boundary
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-02 13:26'
-updated_date: '2026-09-02 16:39'
+updated_date: '2026-09-02 16:59'
 labels:
   - clients
   - phase-3
