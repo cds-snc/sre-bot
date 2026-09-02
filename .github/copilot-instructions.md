@@ -12,9 +12,33 @@ Produce production-grade Python/FastAPI backend changes with architecture-first 
 4. Cost-efficient Copilot usage
 5. Speed
 
+## Python Language Baseline (Authoritative)
+
+This repository runs **CPython 3.14** (`app/.python-version` = `3.14`, `requires-python = ">=3.14"`, mypy `python_version = "3.14"`). Verify with `cd app && uv run python -V` if in doubt — do not assume an older version from training data.
+
+Treat the following Python 3.14 features as **valid, current, and non-deprecated**. Do not flag them as errors, do not "investigate why they parse", and do not rewrite them to older equivalents:
+
+- **PEP 758** — `except` / `except*` without parentheses for multiple exception types:
+  ```python
+  except ValueError, TypeError:   # valid in 3.14; NOT the removed Python 2 `except E, name:` form
+  ```
+  Semantics are identical to `except (ValueError, TypeError):`. Parentheses are still required when using `as`: `except (ValueError, TypeError) as exc:`.
+- **PEP 649/749** — annotations are lazily evaluated by default; `from __future__ import annotations` is unnecessary (and itself deprecated) and string-quoted forward references are no longer required. Use `annotationlib` for annotation introspection.
+- **PEP 750** — t-strings (`t'...'` → `string.templatelib.Template`).
+- **PEP 765** — `return` / `break` / `continue` leaving a `finally` block emits `SyntaxWarning`.
+- **PEP 734** — `concurrent.interpreters`; **PEP 784** — `compression.zstd`.
+- `typing.Union` and `types.UnionType` are the same runtime type; compare unions with `==`, never `is`.
+- Also assume all 3.12/3.13 syntax is available: PEP 695 `type` aliases and `def f[T]()` type parameters, PEP 696 type-parameter defaults, PEP 701 f-strings, `warnings.deprecated`.
+
+Removed in 3.14 — do not use: `asyncio` child watchers, implicit `asyncio.get_event_loop()` loop creation, `ast.Num`/`Str`/`Bytes`, `pkgutil.get_loader`, `sqlite3.version`.
+
+Reference: [What's new in Python 3.14](https://docs.python.org/3/whatsnew/3.14.html), [PEP 758](https://peps.python.org/pep-0758/).
+
+If a construct still looks wrong after checking this list, verify empirically with `cd app && uv run python -c '...'` instead of speculating.
+
 ## Product and Architecture Constraints
 
-- Runtime target: Python 3.12+.
+- Runtime target: Python 3.14 (see Python Language Baseline above).
 - Framework: FastAPI.
 - Focus: API/backend only.
 - Shared platform capabilities belong in `app/infrastructure`.
