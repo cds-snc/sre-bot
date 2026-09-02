@@ -1,253 +1,295 @@
-"""Unit tests for google_directory module."""
+"""Unit tests for google_directory module (factory-built, stub-typed Resource path)."""
 
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
-import pandas as pd
+import pytest
+from googleapiclient.errors import HttpError
 
+from integrations.google_workspace import client as google_client
 from integrations.google_workspace import google_directory
 
+USER_READONLY_SCOPES = ["https://www.googleapis.com/auth/admin.directory.user.readonly"]
+GROUP_READONLY_SCOPES = ["https://www.googleapis.com/auth/admin.directory.group.readonly"]
 
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
-def test_get_user_returns_user(execute_google_api_call_mock):
-    execute_google_api_call_mock.return_value = {
-        "id": "test_user_id",
-        "name": "test_user",
-        "email": "user.name@domain.com",
-    }
 
-    assert google_directory.get_user("test_user_id") == {
-        "id": "test_user_id",
-        "name": "test_user",
-        "email": "user.name@domain.com",
-    }
+def _http_error(status: int, reason: str = "boom") -> HttpError:
+    class FakeResp(dict):
+        def __init__(self) -> None:
+            super().__init__()
+            self.status = status
+            self.reason = reason
 
-    execute_google_api_call_mock.assert_called_once_with(
-        "admin",
-        "directory_v1",
-        "users",
-        "get",
-        scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
-        userKey="test_user_id",
+    return HttpError(resp=FakeResp(), content=b"{}")
+
+
+@pytest.fixture
+def directory_client(monkeypatch):
+    """Patch the Admin Directory factory and expose the mocked Resource chain."""
+    service = MagicMock()
+    factory = MagicMock(return_value=service)
+    monkeypatch.setattr(google_client, "get_admin_directory_service", factory)
+    users = service.users.return_value
+    groups = service.groups.return_value
+    members = service.members.return_value
+    for resource in (users, groups, members):
+        resource.list_next.return_value = None
+    return SimpleNamespace(
+        factory=factory,
+        service=service,
+        users=users,
+        groups=groups,
+        members=members,
+    )
+
+
+def _set_pages(resource, pages: list[dict]) -> list[MagicMock]:
+    """Wire resource.list/list_next so each page is returned by a distinct request mock."""
+    requests = [MagicMock(name=f"request_{index}") for index in range(len(pages))]
+    for request, page in zip(requests, pages, strict=True):
+        request.execute.return_value = page
+    resource.list.return_value = requests[0]
+    resource.list_next.side_effect = list(requests[1:]) + [None]
+    return requests
+
+
+@patch(
+    "integrations.google_workspace.google_directory.GOOGLE_WORKSPACE_CUSTOMER_ID",
+    new="default_google_workspace_customer_id",
+)
+def test_list_users_returns_users(directory_client):
+    users = [
+        {"id": "test_user_id", "name": "test_user", "email": "email@domain.com"},
+        {"id": "test_user_id2", "name": "test_user2", "email": "email2@domain.com"},
+    ]
+    _set_pages(directory_client.users, [{"users": users}])
+
+    assert google_directory.list_users() == users
+
+    directory_client.factory.assert_called_once_with(scopes=USER_READONLY_SCOPES, delegated_user_email=None)
+    directory_client.users.list.assert_called_once_with(
+        customer="default_google_workspace_customer_id",
+        maxResults=500,
+        orderBy="email",
+        query=None,
         fields=None,
     )
 
 
-@patch(
-    "integrations.google_workspace.google_directory.GOOGLE_WORKSPACE_CUSTOMER_ID",
-    new="default_google_workspace_customer_id",
-)
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
-def test_list_users_returns_users(execute_google_api_call_mock):
-    # Mock the results
-    results = [
+def test_list_users_uses_custom_delegated_user_email_and_customer_id_if_provided(directory_client):
+    users = [
         {"id": "test_user_id", "name": "test_user", "email": "email@domain.com"},
         {"id": "test_user_id2", "name": "test_user2", "email": "email2@domain.com"},
     ]
+    _set_pages(directory_client.users, [{"users": users}])
 
-    execute_google_api_call_mock.return_value = results
+    result = google_directory.list_users(
+        delegated_user_email="custom.email@domain.com",
+        customer="custom_customer_id",
+    )
 
-    assert google_directory.list_users() == results
-
-    execute_google_api_call_mock.assert_called_once_with(
-        "admin",
-        "directory_v1",
-        "users",
-        "list",
-        scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
-        paginate=True,
-        customer="default_google_workspace_customer_id",
+    assert result == users
+    directory_client.factory.assert_called_once_with(
+        scopes=USER_READONLY_SCOPES,
+        delegated_user_email="custom.email@domain.com",
+    )
+    directory_client.users.list.assert_called_once_with(
+        customer="custom_customer_id",
         maxResults=500,
         orderBy="email",
+        query=None,
+        fields=None,
     )
 
 
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
-def test_list_users_uses_custom_delegated_user_email_and_customer_id_if_provided(
-    execute_google_api_call_mock,
-):
-    # Mock the results
-    results = [
-        {"id": "test_user_id", "name": "test_user", "email": "email@domain.com"},
-        {"id": "test_user_id2", "name": "test_user2", "email": "email2@domain.com"},
-    ]
-
-    execute_google_api_call_mock.return_value = results
-
-    custom_delegated_user_email = "custom.email@domain.com"
-    custom_customer_id = "custom_customer_id"
-
-    assert (
-        google_directory.list_users(
-            delegated_user_email=custom_delegated_user_email,
-            customer=custom_customer_id,
-        )
-        == results
+def test_list_users_concatenates_pages(directory_client):
+    _set_pages(
+        directory_client.users,
+        [
+            {"users": [{"id": "user1"}], "nextPageToken": "token"},
+            {"users": [{"id": "user2"}]},
+        ],
     )
 
-    execute_google_api_call_mock.assert_called_once_with(
-        "admin",
-        "directory_v1",
-        "users",
-        "list",
-        scopes=["https://www.googleapis.com/auth/admin.directory.user.readonly"],
-        paginate=True,
-        delegated_user_email=custom_delegated_user_email,
-        customer=custom_customer_id,
-        maxResults=500,
-        orderBy="email",
+    assert google_directory.list_users() == [{"id": "user1"}, {"id": "user2"}]
+    assert directory_client.users.list.call_count == 1
+
+
+def test_list_users_skips_page_without_response_key(directory_client):
+    _set_pages(
+        directory_client.users,
+        [
+            {"nextPageToken": "token"},
+            {"users": [{"id": "user2"}]},
+        ],
     )
+
+    assert google_directory.list_users() == [{"id": "user2"}]
+
+
+def test_list_users_propagates_http_error(directory_client):
+    error = _http_error(429)
+    directory_client.users.list.return_value.execute.side_effect = error
+
+    with pytest.raises(HttpError) as exc_info:
+        google_directory.list_users()
+
+    assert exc_info.value is error
 
 
 @patch(
     "integrations.google_workspace.google_directory.GOOGLE_WORKSPACE_CUSTOMER_ID",
     new="default_google_workspace_customer_id",
 )
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
-def test_list_groups_calls_execute_google_api_call(
-    mock_execute_google_api_call,
-):
-    google_directory.list_groups()
-    mock_execute_google_api_call.assert_called_once_with(
-        "admin",
-        "directory_v1",
-        "groups",
-        "list",
-        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        paginate=True,
+def test_list_groups_calls_directory_groups_list(directory_client):
+    _set_pages(directory_client.groups, [{"groups": [{"id": "test_group_id"}]}])
+
+    assert google_directory.list_groups() == [{"id": "test_group_id"}]
+
+    directory_client.factory.assert_called_once_with(scopes=GROUP_READONLY_SCOPES, delegated_user_email=None)
+    directory_client.groups.list.assert_called_once_with(
         customer="default_google_workspace_customer_id",
         maxResults=200,
         orderBy="email",
+        query=None,
+        fields=None,
     )
 
 
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
-def test_list_groups_uses_custom_delegated_user_email_and_customer_id_if_provided(
-    execute_google_api_call_mock,
-):
-    # Mock the results
-    results = [
+def test_list_groups_uses_custom_delegated_user_email_and_customer_id_if_provided(directory_client):
+    groups = [
         {"id": "test_group_id", "name": "test_group", "email": "email@domain.com"},
         {"id": "test_group_id2", "name": "test_group2", "email": "email2@domain.com"},
     ]
+    _set_pages(directory_client.groups, [{"groups": groups}])
 
-    execute_google_api_call_mock.return_value = results
-
-    custom_delegated_user_email = "custom.email@domain.com"
-    custom_customer_id = "custom_customer_id"
-
-    assert (
-        google_directory.list_groups(
-            delegated_user_email=custom_delegated_user_email,
-            customer=custom_customer_id,
-        )
-        == results
+    result = google_directory.list_groups(
+        delegated_user_email="custom.email@domain.com",
+        customer="custom_customer_id",
     )
 
-    execute_google_api_call_mock.assert_called_once_with(
-        "admin",
-        "directory_v1",
-        "groups",
-        "list",
-        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        paginate=True,
-        delegatedUserEmail=custom_delegated_user_email,
-        customer=custom_customer_id,
+    assert result == groups
+    directory_client.factory.assert_called_once_with(
+        scopes=GROUP_READONLY_SCOPES,
+        delegated_user_email="custom.email@domain.com",
+    )
+    directory_client.groups.list.assert_called_once_with(
+        customer="custom_customer_id",
         maxResults=200,
         orderBy="email",
+        query=None,
+        fields=None,
     )
 
 
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
-def test_list_group_members_calls_execute_google_api_call_with_correct_args(
-    mock_execute_google_api_call,
-):
-    group_key = "test_group_key"
-    google_directory.list_group_members(group_key)
-    mock_execute_google_api_call.assert_called_once_with(
-        "admin",
-        "directory_v1",
-        "members",
-        "list",
-        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        paginate=True,
-        groupKey=group_key,
+def test_list_groups_forwards_query_and_fields_verbatim(directory_client):
+    _set_pages(directory_client.groups, [{"groups": []}])
+
+    google_directory.list_groups(query="email:prefix-*", fields="groups(email)")
+
+    call_kwargs = directory_client.groups.list.call_args.kwargs
+    assert call_kwargs["query"] == "email:prefix-*"
+    assert call_kwargs["fields"] == "groups(email)"
+
+
+def test_list_groups_rejects_unsupported_keyword(directory_client):
+    with pytest.raises(TypeError):
+        google_directory.list_groups(max_results=10)
+
+
+def test_list_groups_concatenates_pages(directory_client):
+    _set_pages(
+        directory_client.groups,
+        [
+            {"groups": [{"id": "group1"}], "nextPageToken": "token"},
+            {"groups": [{"id": "group2"}]},
+        ],
+    )
+
+    assert google_directory.list_groups() == [{"id": "group1"}, {"id": "group2"}]
+
+
+def test_list_groups_propagates_http_error(directory_client):
+    error = _http_error(403)
+    directory_client.groups.list.return_value.execute.side_effect = error
+
+    with pytest.raises(HttpError) as exc_info:
+        google_directory.list_groups()
+
+    assert exc_info.value is error
+
+
+def test_list_group_members_calls_directory_members_list_with_correct_args(directory_client):
+    _set_pages(directory_client.members, [{"members": [{"id": "test_member_id"}]}])
+
+    assert google_directory.list_group_members("test_group_key") == [{"id": "test_member_id"}]
+
+    directory_client.factory.assert_called_once_with(scopes=GROUP_READONLY_SCOPES, delegated_user_email=None)
+    directory_client.members.list.assert_called_once_with(
+        groupKey="test_group_key",
         maxResults=200,
         fields=None,
     )
 
 
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
-def test_list_group_members_uses_custom_delegated_user_email_if_provided(
-    execute_google_api_call_mock,
-):
-    # Mock the results
-    results = [
+def test_list_group_members_uses_custom_delegated_user_email_and_fields_if_provided(directory_client):
+    members = [
         {"id": "test_member_id", "email": "member@domain.com"},
         {"id": "test_member_id2", "email": "member2@domain.com"},
     ]
+    _set_pages(directory_client.members, [{"members": members}])
 
-    execute_google_api_call_mock.return_value = results
+    result = google_directory.list_group_members(
+        "test_group_key",
+        fields="members(email)",
+        delegated_user_email="custom.email@domain.com",
+    )
 
-    group_key = "test_group_key"
-    custom_delegated_user_email = "custom.email@domain.com"
-
-    assert google_directory.list_group_members(group_key, delegated_user_email=custom_delegated_user_email) == results
-
-    execute_google_api_call_mock.assert_called_once_with(
-        "admin",
-        "directory_v1",
-        "members",
-        "list",
-        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        delegated_user_email=custom_delegated_user_email,
-        paginate=True,
-        groupKey=group_key,
+    assert result == members
+    directory_client.factory.assert_called_once_with(
+        scopes=GROUP_READONLY_SCOPES,
+        delegated_user_email="custom.email@domain.com",
+    )
+    directory_client.members.list.assert_called_once_with(
+        groupKey="test_group_key",
         maxResults=200,
-        fields=None,
+        fields="members(email)",
     )
 
 
-@patch("integrations.google_workspace.google_directory.google_service.execute_google_api_call")
-def test_get_group_calls_execute_google_api_call_with_correct_args(
-    mock_execute_google_api_call,
-):
-    group_key = "test_group_key"
-    google_directory.get_group(group_key)
-    mock_execute_google_api_call.assert_called_once_with(
-        "admin",
-        "directory_v1",
-        "groups",
-        "get",
-        scopes=["https://www.googleapis.com/auth/admin.directory.group.readonly"],
-        groupKey=group_key,
-        fields=None,
+def test_list_group_members_concatenates_pages(directory_client):
+    _set_pages(
+        directory_client.members,
+        [
+            {"members": [{"id": "member1"}], "nextPageToken": "token"},
+            {"members": [{"id": "member2"}]},
+        ],
     )
 
-
-@patch("integrations.google_workspace.google_directory.list_group_members")
-def test_add_users_to_group_calls_list_group_members(mock_list_group_members):
-    group = {"id": "test_group_id"}
-    group_key = "test_group_id"
-    google_directory.add_users_to_group(group, group_key)
-    mock_list_group_members.assert_called_once_with(group_key)
+    assert google_directory.list_group_members("test_group_key") == [{"id": "member1"}, {"id": "member2"}]
 
 
-@patch("integrations.google_workspace.google_directory.list_group_members")
-def test_add_users_to_group_adds_members(mock_list_group_members):
-    mock_list_group_members.return_value = [{"id": "test_member_id"}]
-    group = {"id": "test_group_id"}
-    group_key = "test_group_id"
-    google_directory.add_users_to_group(group, group_key)
-    assert group["members"] == [{"id": "test_member_id"}]
+def test_list_group_members_propagates_http_error(directory_client):
+    error = _http_error(404)
+    directory_client.members.list.return_value.execute.side_effect = error
+
+    with pytest.raises(HttpError) as exc_info:
+        google_directory.list_group_members("test_group_key")
+
+    assert exc_info.value is error
 
 
-@patch("integrations.google_workspace.google_directory.list_group_members")
-def test_add_users_to_group_skips_when_no_members(mock_list_group_members):
-    mock_list_group_members.return_value = []
-    group = {"id": "test_group_id"}
-    group_key = "test_group_id"
-    google_directory.add_users_to_group(group, group_key)
-    assert group.get("members") is None
+@pytest.mark.parametrize(
+    "removed",
+    [
+        "get_user",
+        "get_group",
+        "add_users_to_group",
+        "convert_google_groups_members_to_dataframe",
+    ],
+)
+def test_removed_directory_functions_are_deleted(removed):
+    assert not hasattr(google_directory, removed)
 
 
 @patch("integrations.google_workspace.google_directory.list_users")
@@ -506,7 +548,7 @@ def test_list_groups_with_members_skips_when_no_groups(mock_list_groups):
 @patch("integrations.google_workspace.google_directory.list_users")
 @patch("integrations.google_workspace.google_directory.retry_request")
 @patch("integrations.google_workspace.google_directory.list_groups")
-def test_list_groups_with_members_filtered_dataframe(
+def test_list_groups_with_members_applies_groups_filters(
     mock_list_groups,
     mock_retry_request,
     mock_list_users,
@@ -531,24 +573,8 @@ def test_list_groups_with_members_filtered_dataframe(
     mock_filter_by_condition.return_value = groups[:2]
     groups_filters = [lambda group: "test-" in group["name"]]
 
-    groups_result = google_directory.list_groups_with_members(groups_filters=groups_filters)
-    result = google_directory.convert_google_groups_members_to_dataframe(groups_result)
-
-    assert isinstance(result, pd.DataFrame)
-    assert not result.empty
-    assert set(result.columns) == {
-        "group_email",
-        "group_name",
-        "group_direct_members_count",
-        "group_description",
-        "member_email",
-        "member_role",
-        "member_type",
-        "member_status",
-        "member_primary_email",
-        "member_given_name",
-        "member_family_name",
-    }
+    assert google_directory.list_groups_with_members(groups_filters=groups_filters) == groups_with_users
+    mock_filter_by_condition.assert_called_once_with(groups, groups_filters[0])
 
 
 def test_get_members_details_breaks_on_error():

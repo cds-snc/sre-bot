@@ -1,6 +1,5 @@
 """AWS Identity Store module"""
 
-import pandas as pd
 import structlog
 
 from infrastructure.configuration.integrations.aws import get_aws_settings
@@ -378,43 +377,3 @@ def list_groups_with_memberships(
         count=len(groups_with_memberships),
     )
     return groups_with_memberships
-
-
-def convert_aws_groups_members_to_dataframe(groups):
-    """Converts a list of AWS groups with members to a DataFrame.
-
-    Args:
-        groups (list): A list of group objects with members.
-
-    Returns:
-        DataFrame: A DataFrame with group members.
-    """
-    flattened_data = []
-    for group in groups:
-        group_id = group.get("GroupId")
-        group_name = group.get("DisplayName")
-        group_description = group.get("Description")
-        group_identity_store_id = group.get("IdentityStoreId")
-
-        for membership in group.get("GroupMemberships", []):
-            member = membership.get("MemberId", {})
-            member_user_id = member.get("UserId")
-            member_email = member.get("UserName")
-            member_given_name = member.get("Name", {}).get("GivenName")
-            member_family_name = member.get("Name", {}).get("FamilyName")
-            member_display_name = member.get("DisplayName")
-
-            flattened_record = {
-                "group_id": group_id,
-                "group_name": group_name,
-                "group_description": group_description,
-                "group_identity_store_id": group_identity_store_id,
-                "member_user_id": member_user_id,
-                "member_email": member_email,
-                "member_given_name": member_given_name,
-                "member_family_name": member_family_name,
-                "member_display_name": member_display_name,
-            }
-            flattened_data.append(flattened_record)
-
-    return pd.DataFrame(flattened_data)

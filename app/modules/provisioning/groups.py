@@ -12,7 +12,6 @@ def get_groups_from_integration(
     pre_processing_filters: list | None = None,
     post_processing_filters: list | None = None,
     query: str | None = None,
-    return_dataframe: bool = False,
 ) -> list:
     """Retrieve the users from an integration group source.
     Supported sources are:
@@ -24,7 +23,6 @@ def get_groups_from_integration(
         pre_processing_filters (list, optional): A list of filters to apply before processing the groups. Defaults to [].
         post_processing_filters (list, optional): A list of filters to apply after processing the groups. Defaults to [].
         query (str, optional): A query to filter the groups. Defaults to None.
-        return_dataframe (bool, optional): Return the groups as a DataFrame. Defaults to False.
 
     Returns:
         list: A list of groups with members, empty list if no groups are found.
@@ -42,7 +40,6 @@ def get_groups_from_integration(
     members = None
     members_display_key = None
     integration_name = integration_source
-    groups_dataframe = None
     match integration_source:
         case "google_groups":
             log.info(
@@ -54,8 +51,6 @@ def get_groups_from_integration(
                 groups_filters=pre_processing_filters,
                 query=query,
             )
-            if return_dataframe:
-                groups_dataframe = google_directory.convert_google_groups_members_to_dataframe(groups)
             integration_name = "Google"
             group_display_key = "name"
             members = "members"
@@ -68,8 +63,6 @@ def get_groups_from_integration(
             groups = identity_store.list_groups_with_memberships(
                 groups_filters=pre_processing_filters,
             )
-            if return_dataframe:
-                groups_dataframe = identity_store.convert_aws_groups_members_to_dataframe(groups)
             integration_name = "AWS"
             group_display_key = "DisplayName"
             members = "GroupMemberships"
@@ -87,7 +80,7 @@ def get_groups_from_integration(
         members_display_key=members_display_key,
         integration_name=integration_name,
     )
-    return groups_dataframe if groups_dataframe is not None else groups
+    return groups
 
 
 def log_groups(

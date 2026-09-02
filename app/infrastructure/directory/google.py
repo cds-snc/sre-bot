@@ -81,18 +81,22 @@ class GoogleDirectoryProvider:
         self,
         operation: str,
         resource: Any,
-        list_kwargs: dict[str, Any],
+        request: Any,
         response_key: str,
     ) -> OperationResult[list[dict[str, Any]]]:
-        """Execute a paginated Directory list call, aggregating all pages."""
+        """Aggregate every page of an already-built Directory list request.
+
+        Takes the built request rather than call parameters so each
+        ``list(...)`` call stays type-checked against the stub at its call site.
+        """
 
         def run() -> list[dict[str, Any]]:
             items: list[dict[str, Any]] = []
-            request = resource.list(**list_kwargs)
-            while request is not None:
-                response = request.execute(num_retries=_NUM_RETRIES)
+            next_request = request
+            while next_request is not None:
+                response = next_request.execute(num_retries=_NUM_RETRIES)
                 items.extend(response.get(response_key, []))
-                request = resource.list_next(request, response)
+                next_request = resource.list_next(next_request, response)
             return items
 
         return self._call(operation, run)
@@ -393,12 +397,14 @@ class GoogleDirectoryProvider:
         if limit <= 0:
             return OperationResult.success(data=[])
 
-        list_kwargs: dict[str, Any] = {"customer": self._customer_id, "maxResults": limit}
-        if query:
-            list_kwargs["query"] = query
-
         service = self._get_service(["https://www.googleapis.com/auth/admin.directory.user.readonly"])
-        result = self._paginate("list_users", service.users(), list_kwargs, "users")
+        users_resource = service.users()
+        result = self._paginate(
+            "list_users",
+            users_resource,
+            users_resource.list(customer=self._customer_id, maxResults=limit, query=query or None),
+            "users",
+        )
         if not result.is_success:
             return self._typed_error(result)
 
@@ -447,10 +453,11 @@ class GoogleDirectoryProvider:
         """
         normalized_group_key = self._normalize_email(group_key)
         service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.member.readonly"])
+        members_resource = service.members()
         result = self._paginate(
             "get_group_members",
-            service.members(),
-            {"groupKey": normalized_group_key, "includeDerivedMembership": True},
+            members_resource,
+            members_resource.list(groupKey=normalized_group_key, includeDerivedMembership=True),
             "members",
         )
         if not result.is_success:
@@ -742,6 +749,7 @@ class GoogleDirectoryProvider:
         """
         managed_prefix = self._managed_group_query_prefix(query)
         service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.readonly"])
+        groups_resource = service.groups()
         if managed_prefix is not None:
             self._logger.info(
                 "listing_groups_alias_aware",
@@ -750,16 +758,16 @@ class GoogleDirectoryProvider:
             )
             result = self._paginate(
                 "list_groups",
-                service.groups(),
-                {"customer": self._customer_id},
+                groups_resource,
+                groups_resource.list(customer=self._customer_id),
                 "groups",
             )
         else:
             google_query = f"email:{query}*" if ":" not in query and "=" not in query else query
             result = self._paginate(
                 "list_groups",
-                service.groups(),
-                {"customer": self._customer_id, "query": google_query},
+                groups_resource,
+                groups_resource.list(customer=self._customer_id, query=google_query),
                 "groups",
             )
         if not result.is_success:
@@ -815,10 +823,11 @@ class GoogleDirectoryProvider:
         log = self._logger.bind(operation="get_user_groups", user_email=user_email)
         normalized_email = self._normalize_email(user_email)
         service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.readonly"])
+        groups_resource = service.groups()
         result = self._paginate(
             "list_user_groups",
-            service.groups(),
-            {"userKey": normalized_email},
+            groups_resource,
+            groups_resource.list(userKey=normalized_email),
             "groups",
         )
         log.debug(
