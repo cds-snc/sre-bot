@@ -1,5 +1,5 @@
 {
-  "approved_email_domains": [],
+  "approved_email_domains": ["cds-snc.ca"],
   "schedules": [
     {
       "opsgenie_schedule_id": "657ce41a-2ff6-4d23-b2a2-53571995d710",
