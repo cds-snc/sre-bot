@@ -6,12 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:03'
+updated_date: '2026-09-02 18:52'
 labels:
   - clients
   - phase-3
 milestone: m-3
 dependencies:
   - TASK-25.1.6.7
+  - TASK-25.1.6.12
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
@@ -49,3 +51,34 @@ NOTE: app/tests/integrations/google_workspace/test_sheets.py:250 contains a hasa
 - [ ] #5 app/integrations/google_workspace/sheets.py is deleted with its test file, grep-verified zero references repo-wide outside backlog/ and tmp/
 - [ ] #6 After this task, grep for execute_google_api_call repo-wide matches only bin/check_sdk_typing.py's own detection regex
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @task-planner
+created: 2026-09-02 17:17
+---
+PRE-REGISTERED BY TASK-25.1.6.1 PLANNING (2026-09-02, task-planner). Three items land in your scope.
+
+1. CORRECTION TO YOUR PREMISE FOR modules/aws/spending.py. Your description says it "has no coverage of its Sheets sites at all". It has exactly ONE Sheets call site (sheets.batch_update_values:190 in update_spending_data) and app/tests/unit/modules/aws/test_spending_handler.py:102-133 already asserts spreadsheetId, cell_range, valueInputOption and the skip-when-id-falsy branch. TASK-25.1.3 notes looked at app/tests/modules/aws/, which does not exist. TASK-25.1.6.1 extends that existing file rather than creating a new one; it adds the exact values matrix (header row plus DataFrame rows), the empty-DataFrame case, spreadsheet_id="" skipping the call, and a raising Sheets call propagating out of update_spending_data (there is no try/except today). Your AC#4 should be read against that file, in place.
+
+2. WHAT GUARDS modules/reports/google_groups.py Sheets sites. New file app/tests/unit/modules/reports/test_google_groups_report.py (unit tree, per the AC correction on TASK-25.1.6.1). TestGenerateGroupMembersReportBoundary pins all three Sheets calls positionally: get_sheet(file_id, sheet_name), batch_update(file_id, exact addSheet request dict), batch_update_values(file_id, "{name}!A1", values). TestGenerateGroupMembersReportBehaviour pins the 50-character sheet-name truncation applied to BOTH the "Group Name" cell and the range, and the exact values matrix. Those behaviour assertions must survive your migration.
+
+Your AC#3 targets the blanket "except Exception: sheet = None". The characterization tests pin its consequences precisely, so you can see what you are changing: get_sheet raising is swallowed, sheet becomes None, the addSheet batch_update path runs, and the report still completes with its success respond(). A separate test pins that a raising batch_update is ALSO swallowed (logged only) while batch_update_values still runs. Replacing either with classification-based handling is an intentional behaviour change to name in your notes.
+
+3. FOLLOW-UP REGISTERED HERE, FOUND WHILE PLANNING TASK-25.1.6.1, NOT FIXED THERE (tests-only task). modules/aws/spending.py::update_spending_data declares spreadsheet_id=SPENDING_SHEET_ID as a DEFAULT ARGUMENT, evaluated at import time. The sheet id is therefore frozen at process start and unaffected by any later config resolution, and patching the module attribute in tests does not change it (which is why every test must pass spreadsheet_id explicitly). execute_spending_data_update_job calls update_spending_data(spending_data) with no id, so it always uses that frozen value. You own this call site -- fix it when you migrate it (read the config inside the function, or take the id from the adapter/settings slice) rather than carrying the import-time binding across.
+---
+
+author: @task-planner
+created: 2026-09-02 18:52
+---
+DEPENDENCY ADDED 2026-09-02 (task-planner): now also depends on TASK-25.1.6.12, the A1 sheet-name quoting fix in modules/reports/google_groups.py, which was found while planning TASK-25.1.6.1. It lands before this migration so you repoint already-correct range construction rather than carrying a live defect across a seam change.
+
+WHAT .12 DELIBERATELY LEAVES FOR YOU, so the two tasks do not collide:
+- The blanket "except Exception: sheet = None" around get_sheet and the blanket except around the addSheet batch_update are UNTOUCHED by .12. Your AC#3 still owns replacing them with classification-based handling.
+- Resilience around batch_update_values is also left to you. Today nothing wraps it, so one failing group aborts the whole report with no respond() at all. Quoting removes the main cause of that abort but not the fragility; when you rewrite this function error handling, decide explicitly whether a failing group should be skipped and reported rather than aborting the run, and record the decision.
+- .12 migrates nothing. Both Sheets call sites in that file are still on integrations.google_workspace.sheets when you pick this up.
+
+WHAT CHANGES UNDER YOU: the range handed to batch_update_values and the ranges handed to get_sheet will be single-quoted (with embedded quotes doubled) through one shared helper, and sheet-title truncation will be collision-safe. TASK-25.1.6.1 defect-probe test asserts the quoted form by then, so treat the quoted range as the expected input shape for your adapter method.
+---
+<!-- COMMENTS:END -->
