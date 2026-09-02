@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 15:31'
-updated_date: '2026-09-01 21:21'
+updated_date: '2026-09-02 13:30'
 labels:
   - clients
   - phase-3
@@ -131,5 +131,14 @@ CONSUMER SPLIT (the reason both still exist) — google_directory.py: modules/pe
 LIKELY RESOLUTION (to be confirmed by whoever plans this, not decided here): GoogleDirectoryProvider survives; the four legacy consumers move onto the DirectoryProvider Protocol; google_directory.py's three list functions are deleted; list_groups_with_members/get_members_details either die or are rebuilt on get_group_members_batch outside integrations/ (they are business logic in a vendor package, already flagged in the 2026-09-01 19:42 comment). That also retires this surface's dependency on execute_google_api_request, which is AC#2/#3's job — the two threads converge. Sizing: this is multi-PR work (4 consumer modules, 2 of which have thin or no coverage — modules/reports/google_groups.py has NO test file at all per TASK-25.1.4 notes), so run it through the implementation-planning size gate and decompose before writing code.
 
 NOT DONE HERE and explicitly out of scope of TASK-25.1.4.
+---
+
+created: 2026-09-02 13:30
+---
+INVENTORY + SHIM REGISTRATION from TASK-25.1.5 planning (2026-09-02, task-planner). Two items land in this task's scope.
+
+1. execute_google_api_request call sites. TASK-25.1.5 as planned adds about 12 more in integrations/google_workspace/google_drive.py (add_metadata, delete_metadata, list_metadata, get_file_by_id, create_folder, create_file, create_file_from_template, copy_file_to_folder x2, and one per page inside the shared _collect_files pagination helper used by find_files_by_name / list_folders_in_folder / list_files_in_folder). AC#1 classification: NONE live in a real packages/<feature>/adapters/ or infrastructure/ file. Eight of the nine downstream consumers are legacy app/modules/* or app/jobs/* with no adapter tier (AC#3 bucket): modules/incident/{incident_document,incident_helper,incident_folder,core,incident_roles}.py, modules/role/role.py, modules/reports/google_groups.py, jobs/scheduled_tasks.py. The ninth, packages/incident_draft/adapters/google_docs.py, is a real adapters/ file and belongs to the AC#2 bucket - but it is now owned by the new TASK-25.1.5.1, which repoints its two Drive call sites onto get_drive_service with an inline try/except and deletes google_drive.get_file_by_id. When TASK-25.1.5.1 lands, remove those two sites from this task's outstanding scope; its remaining google_drive.find_files_by_name call and all its google_docs calls stay here.
+
+2. NEW TEMPORARY SHIM to retire. TASK-25.1.5 fixes the Drive list pagination that fields="files(...)" had silently disabled, which makes modules/incident/incident_folder.py's folder listings unbounded. Slack cannot take that: folder_item emits three blocks per folder against a 100-block modal limit, and list_incident_folders() feeds four static_select option lists against a 100-option limit. The slice therefore adds a named constant (LEGACY_FOLDER_DISPLAY_LIMIT) applied in list_incident_folders() and list_folders_view(). It is a display shim, not a fix - the real answer is pagination or search in the Slack UI, a product change. Fold its retirement into whichever follow-up builds a real adapter for modules/incident's Drive usage.
 ---
 <!-- COMMENTS:END -->

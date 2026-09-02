@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:32'
-updated_date: '2026-09-01 16:54'
+updated_date: '2026-09-02 13:30'
 labels:
   - clients
   - phase-3
@@ -41,5 +41,14 @@ Coordinator for the Google-remainder slice of TASK-25. Confirmed via repo grep (
 created: 2026-09-01 16:54
 ---
 PLANNING NOTE (2026-09-01, task-planner, while planning TASK-25.1.2): this coordinator's Description undercounted the Docs consumer surface. Repo-wide 'import google_docs' grep found a 5th real production consumer never listed here or in TASK-25.1.2's original text: app/packages/incident_draft/adapters/google_docs.py (a real packages/<feature>/adapters/ file per decisions/feature-packages.md, calls google_docs.get_document/batch_update directly, registered/live via packages/incident_draft/providers.py). TASK-25.1.2's AC#2 has been corrected to name it explicitly (5 consumer files, not 4). Same lesson as prior AWS/Google-remainder passes: always re-grep a prose consumer list before trusting it, even one written from a 'grep-confirmed' claim.
+---
+
+created: 2026-09-02 13:30
+---
+PLANNING NOTE (2026-09-02, task-planner, while planning TASK-25.1.5). Two corrections to this coordinator.
+
+AC#1 IS STALE: it says google_service.py and google_service_next.py are "both slated for TASK-23 deletion once this coordinator's children land". google_service_next.py was indeed deleted by TASK-23.1, but TASK-23 shipped Done with its AC#3 explicitly EXCLUDING the non-_next google_service.py and the get_google_api_command_parameters docstring scraper, deferring both back to TASK-25.1 - so the two tasks pointed at each other and nobody owned the deletion. Filed as the new TASK-25.1.7 (child of this coordinator, dep TASK-25.1.5): pure deletion of google_service.py plus its 482-line test file, plus the baseline prune. This coordinator now has seven children; AC#1's parenthetical should be read as "deleted by TASK-25.1.7", not TASK-23.
+
+CONSUMER COUNT: the Description says 16 legacy consumer files. Drive's share is nine, not the eight listed - packages/incident_draft/adapters/google_docs.py also calls google_drive.create_file_from_template, get_file_by_id and find_files_by_name. That is the same file the 2026-09-01 note already added for Docs; it is a Drive consumer too. Its Drive calls are owned by the new TASK-25.1.5.1 (child of TASK-25.1.5), which was split out of TASK-25.1.5 on size grounds.
 ---
 <!-- COMMENTS:END -->
