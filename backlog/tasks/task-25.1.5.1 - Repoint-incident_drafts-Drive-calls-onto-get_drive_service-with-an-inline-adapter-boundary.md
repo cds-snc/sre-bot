@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 13:26'
+updated_date: '2026-09-02 15:06'
 labels:
   - clients
   - phase-3
@@ -48,3 +49,14 @@ SIZE WARNING for whoever plans this: app/tests/unit/packages/incident_draft/test
 - [ ] #4 tests/unit/packages/incident_draft/test_incident_draft_adapter.py is reworked onto the split mock boundary with a single shared DriveResource fake helper; every existing behavioral assertion is preserved or has a documented equivalent, and error-classification coverage is added for the two repointed call sites
 - [ ] #5 TASK-25.1.6's call-site inventory is updated to record that these two sites are discharged (AC#2 bucket) and to remove them from its outstanding scope
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-02 15:06
+---
+PAIRS WITH TASK-25.1.6.6 (created 2026-09-02). This task repoints packages/incident_draft/adapters/google_docs.py's two DRIVE call sites onto get_drive_service with an inline try/except; TASK-25.1.6.6 does the same for that adapter's DOCS call sites (google_docs.get_document / batch_update). Together they make this file the first fully compliant Google boundary in the repo, per decisions/outbound-clients.md.
+
+Leave behind a SHARED, REUSABLE Resource-fake helper when reworking app/tests/unit/packages/incident_draft/test_incident_draft_adapter.py (1704 lines, 135 mock_drive references). TASK-25.1.6.6 is explicitly instructed to reuse it rather than reinvent the mock chain, so the shape you choose here determines whether that follow-up is cheap or expensive.
+---
+<!-- COMMENTS:END -->
