@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@me'
 created_date: '2026-09-02 14:58'
-updated_date: '2026-09-02 19:17'
+updated_date: '2026-09-02 19:40'
 labels:
   - clients
   - phase-3
@@ -380,5 +380,21 @@ WIRING APPLIED: TASK-25.1.6.12 depends on THIS task, and TASK-25.1.6.10 now depe
 WHAT THIS MEANS FOR THIS TASK: nothing changes in its scope. It stays tests-only and AC#6 still forbids production edits. The defect probe in TestGenerateGroupMembersReportBehaviour must still pin todays UNQUOTED range ("SRE Team!A1"), because TASK-25.1.6.12 depends on this task landing first and its AC#5 is defined as flipping exactly that one assertion. Do not pre-emptively assert the quoted form.
 
 Resolves the "awaiting human approval to create" note in FOLLOW-UPS item 2 of the implementation plan.
+---
+
+created: 2026-09-02 19:40
+---
+DEFECT PROBE IS BEING FLIPPED 2026-09-02 (task-planner, while planning TASK-25.1.6.12). This task stays Done; recording what .12 does to the harness it shipped, so the "Behaviour class must survive the adapter migrations unchanged" framing in its Notes is amended once, deliberately, rather than eroding quietly.
+
+SIX ASSERTIONS IN test_google_groups_report.py CHANGE, all of them A1-range or derived-title shaped, none of them behaviour-shaped:
+- test_should_leave_sheet_names_containing_spaces_unquoted_in_ranges -> renamed test_should_quote_sheet_names_containing_spaces_in_ranges; "SRE Team!A1" becomes "'SRE Team'!A1" and the read range becomes "'SRE Team'". This is the flip .12 AC#6 exists for, exactly as pre-registered.
+- test_should_truncate_sheet_name_to_fifty_characters_in_cell_and_range -> renamed test_should_derive_a_bounded_sheet_title_for_an_overlong_group_name; the 60-G name no longer yields 50 Gs but 43 Gs plus a hyphen plus a 6-hex sha256 prefix, because .12 also makes truncation collision-safe.
+- test_should_exclude_groups_whose_name_contains_aws_prefix, test_should_read_and_create_sheets_with_the_group_sheet_name, test_should_write_values_positionally_with_file_id_and_range and test_should_propagate_a_mid_loop_write_failure_leaving_the_first_sheet_written each gain quotes on their range strings, because .12 quotes UNCONDITIONALLY rather than only when the name looks special.
+
+WHY UNCONDITIONAL, since it costs four more assertion edits than the minimum: googleapiclient and its stubs provide no A1 helper at all (the sheets/v4 stub types the parameter as plain str), the Sheets docs document `'Sheet1'` as the PRECISE sheet reference while bare `Sheet1` can resolve to a named range instead, and gspread's absolute_range_name quotes every name unconditionally and doubles embedded quotes. A conditional "does this need quoting" predicate would have been our own guess at Google's unenumerated special-character set.
+
+WHAT DOES NOT CHANGE, and this is the part that keeps this task's guarantee intact: the three respond-message constants and their assertions, the values-matrix ordering test, the sleep test, the file lookup and creation tests, the list-groups call-count test, all seven accessors, the report_deps fixture, and the addSheet request title assertion (a sheet title is a literal title, not A1 notation, so it stays bare "GroupOne"). The spending_handler additions are untouched entirely.
+
+The pinned-not-endorsed comment naming TASK-25.1.6.12 is removed by .12 along with the assertion it guarded, which is the intended lifecycle for a defect probe.
 ---
 <!-- COMMENTS:END -->
