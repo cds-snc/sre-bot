@@ -21,6 +21,16 @@ def _provider_cache_isolation() -> Iterator[None]:
     providers.get_user_group_sync_target.cache_clear()
 
 
+@pytest.fixture(autouse=True)
+def _default_oncall_sync_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        providers,
+        "get_oncall_sync_settings",
+        lambda: SimpleNamespace(APPROVED_EMAIL_DOMAINS=[]),
+        raising=False,
+    )
+
+
 def test_get_user_group_sync_target_builds_client_with_user_token(monkeypatch: pytest.MonkeyPatch) -> None:
     web_client = MagicMock(token="xoxp-user-token")
     web_client_ctor = MagicMock(return_value=web_client)
@@ -67,3 +77,18 @@ def test_get_user_group_sync_target_is_singleton(monkeypatch: pytest.MonkeyPatch
 
     assert first is second
     web_client_ctor.assert_called_once_with(token="xoxp-user-token")
+
+
+def test_get_user_group_sync_target_passes_approved_domains(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(providers, "get_slack_settings", lambda: SimpleNamespace(USER_TOKEN="xoxp-user-token"))
+    monkeypatch.setattr(providers, "WebClient", MagicMock(return_value=MagicMock()))
+    monkeypatch.setattr(
+        providers,
+        "get_oncall_sync_settings",
+        lambda: SimpleNamespace(APPROVED_EMAIL_DOMAINS=["example.com"]),
+        raising=False,
+    )
+
+    target = providers.get_user_group_sync_target()
+
+    assert target._approved_domains == frozenset({"example.com"})
