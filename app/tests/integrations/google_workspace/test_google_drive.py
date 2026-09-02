@@ -1,5 +1,6 @@
 """Unit tests for the google_drive module."""
 
+import inspect
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call
@@ -52,7 +53,19 @@ def test_module_does_not_reference_the_legacy_dispatcher():
 
 def test_module_hardcodes_no_field_projection():
     """appProperties is a caller convention, not an SDK default, so the projection belongs to consumers."""
-    assert "appProperties" not in Path(google_drive.__file__).read_text()
+    functions = (
+        google_drive.add_metadata,
+        google_drive.delete_metadata,
+        google_drive.list_metadata,
+        google_drive.get_file_by_id,
+        google_drive.create_folder,
+        google_drive.create_file,
+        google_drive.create_file_from_template,
+        google_drive.find_files_by_name,
+        google_drive.list_folders_in_folder,
+        google_drive.list_files_in_folder,
+    )
+    assert all(inspect.signature(function).parameters["fields"].default is None for function in functions)
 
 
 # --- add_metadata ------------------------------------------------------- AC#1, AC#2
@@ -276,7 +289,7 @@ def test_create_file_with_valid_type_calls_files_create(drive_client):
             "mimeType": "application/vnd.google-apps.document",
         },
         supportsAllDrives=True,
-        fields="id, name",
+        fields=None,
     )
     assert result == {"id": "test_document_id"}
 

@@ -1,10 +1,11 @@
 ---
 id: TASK-25.1.5
 title: Migrate Google Drive integration off execute_google_api_call
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-31 18:33'
-updated_date: '2026-09-02 13:30'
+updated_date: '2026-09-02 14:31'
 labels:
   - clients
   - phase-3
@@ -37,13 +38,13 @@ KEY CORRECTION found during planning: the hardcoded fields= projections in this 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/google_workspace/google_drive.py no longer calls execute_google_api_call: every Drive call is built from a new integrations/google_workspace/client.py::get_drive_service factory returning a stub-typed DriveResource (googleapiclient._apis.drive.v3), and failures are classified by classify_google_error per the outbound-clients.md contract
-- [ ] #2 No Drive SDK parameter is guessed or hidden from callers: fields and pageSize are exposed as SDK-named, stub-typed parameters with today's values as defaults where they are load-bearing; supportsAllDrives=True is retained as a deliberate product decision with a one-line rationale; the files().update move call passes the body the stub requires
-- [ ] #3 Pagination is correct against the real SDK: find_files_by_name, list_folders_in_folder and list_files_in_folder include nextPageToken in their projection and loop files().list_next() to exhaustion, and the previously-latent truncation is documented in the task notes
-- [ ] #4 The Slack folder views keep a named, commented display cap in modules/incident/incident_folder.py so views_open stays inside Slack's 100-block and 100-option limits now that folder listings are unbounded; the cap is registered as a temporary shim with TASK-25.1.6
-- [ ] #5 All nine production consumers keep working (existing tests pass). The only intended behavior changes are the pagination fix and the removed truncation, each named explicitly in the task notes; no consumer loses a response field it reads today
-- [ ] #6 classify_google_error is verified against the Drive surface: it either gains a Drive-specific mapped family with unit coverage under tests/unit/integrations/google_workspace/, or the task records that Drive raises only HttpError statuses already covered by the existing table, backed by an error-propagation test per migrated function
-- [ ] #7 execute_google_api_call has zero remaining callers repo-wide (grep-verified, feeding TASK-25.1 AC#1), and integrations/google_workspace/google_drive.py is pruned from app/bin/baselines/sdk_typing_antipatterns.txt with python3 bin/check_sdk_typing.py passing
+- [x] #1 integrations/google_workspace/google_drive.py no longer calls execute_google_api_call: every Drive call is built from a new integrations/google_workspace/client.py::get_drive_service factory returning a stub-typed DriveResource (googleapiclient._apis.drive.v3), and failures are classified by classify_google_error per the outbound-clients.md contract
+- [x] #2 No Drive SDK parameter is guessed or hidden from callers: fields and pageSize are exposed as SDK-named, stub-typed parameters with today's values as defaults where they are load-bearing; supportsAllDrives=True is retained as a deliberate product decision with a one-line rationale; the files().update move call passes the body the stub requires
+- [x] #3 Pagination is correct against the real SDK: find_files_by_name, list_folders_in_folder and list_files_in_folder include nextPageToken in their projection and loop files().list_next() to exhaustion, and the previously-latent truncation is documented in the task notes
+- [x] #4 The Slack folder views keep a named, commented display cap in modules/incident/incident_folder.py so views_open stays inside Slack's 100-block and 100-option limits now that folder listings are unbounded; the cap is registered as a temporary shim with TASK-25.1.6
+- [x] #5 All nine production consumers keep working (existing tests pass). The only intended behavior changes are the pagination fix and the removed truncation, each named explicitly in the task notes; no consumer loses a response field it reads today
+- [x] #6 classify_google_error is verified against the Drive surface: it either gains a Drive-specific mapped family with unit coverage under tests/unit/integrations/google_workspace/, or the task records that Drive raises only HttpError statuses already covered by the existing table, backed by an error-propagation test per migrated function
+- [x] #7 execute_google_api_call has zero remaining callers repo-wide (grep-verified, feeding TASK-25.1 AC#1), and integrations/google_workspace/google_drive.py is pruned from app/bin/baselines/sdk_typing_antipatterns.txt with python3 bin/check_sdk_typing.py passing
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -137,6 +138,12 @@ SIZE GATE VERDICT
 Fits one PR: roughly 230 changed production LOC across 3 files (one of them a genuinely mechanical, repeated 12-call-site transformation), 1 baseline line, one 457-line test file rewritten, and small additive tests in one consumer test file. The two items that would have pushed it over - the incident_draft adapter repoint with its 1704-line, 135-mock-reference test file, and the google_service.py deletion with its 482-line test file - were split into TASK-25.1.5.1 and TASK-25.1.7 respectively. No further decomposition required.
 <!-- SECTION:PLAN:END -->
 
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented the Drive dispatcher migration. integrations/google_workspace/client.py provides a stub-typed get_drive_service factory; integrations/google_workspace/google_drive.py now builds typed files().get/create/copy/update/list requests, executes them through execute_google_api_request (and its classify_google_error handling), passes the required empty update body for copy-then-move, and drains files().list_next() to exhaustion. Drive functions expose SDK-named fields: str | None = None and pageSize: int = 100 rather than embedding projections. modules/incident/incident_folder.py explicitly requests id, name, appProperties where its Slack metadata views need them and caps display at LEGACY_FOLDER_DISPLAY_LIMIT = 25; modules/incident/incident_roles.py explicitly requests nextPageToken, files(appProperties, id, name). This resolves plan doubt (a): default Drive response fields are irrelevant because consumers declare their projections. Pagination now prevents incident-folder scans from truncating after 25 files, avoiding the prior duplicate-document risk; vendor listing is intentionally unbounded, with the Slack-only cap tracked on TASK-25.1.6. modules/reports/google_groups.py remains without dedicated automated coverage; preserved signatures/return shapes are its compatibility evidence. Drive HttpError statuses use the existing classifier table; no Drive-specific family was needed. Validation: 80 focused Drive/incident tests passed; targeted mypy passed for integrations/google_workspace/google_drive.py and modules/incident/incident_roles.py; python3 bin/check_sdk_typing.py passed; user verified make test, make fmt, and make lint all green. Full-tree mypy remains blocked by pre-existing unrelated errors/cache failure. Human DoD remaining: review/CI and deployment verification; task intentionally remains In Progress.
+<!-- SECTION:NOTES:END -->
+
 ## Comments
 
 <!-- COMMENTS:BEGIN -->
@@ -155,5 +162,10 @@ DECOMPOSITION: TASK-25.1.5.1 (new child, dep this task) owns repointing packages
 CONSUMER COUNT CORRECTED: nine production files, not eight. packages/incident_draft/adapters/google_docs.py calls google_drive.create_file_from_template (:272), get_file_by_id (:1245) and find_files_by_name - it post-dates this task's original scoping, the same concurrent-work drift TASK-25.1.2 found for Docs.
 
 TWO SUBSTANTIVE FINDINGS the reviewer should check first. (1) The hardcoded fields= projections are NOT uniformly guessed parameters: on files.get/files.update they are load-bearing, because appProperties is not in the Drive v3 default response field set, so removing them would silently strip the metadata the incident-folder Slack UI reads. On the three files.list calls they are harmful, because fields="files(...)" omits nextPageToken and kills list_next. The plan treats the two groups oppositely and flags the appProperties claim as doubt (a), to be verified against Google's reference before coding. (2) Fixing pagination is a real bug fix, not cosmetics: modules/incident/core.py:170 scans only the first 25 files of an incident folder before concluding no incident document exists and creating a duplicate. But it also needs the shim - modules/incident/incident_folder.py::folder_item emits three Slack blocks per folder, so today's 25-folder cap yields 75 blocks and an uncapped listing breaks views_open past 33 folders, and list_incident_folders() feeds four Slack option lists bounded at 100 options.
+---
+
+created: 2026-09-02 14:06
+---
+Implementation direction updated: all Google Drive vendor functions now expose fields: str | None = None with no projection defaults. The two incident-folder metadata reads explicitly request fields="id, name, appProperties"; incident-role lookup explicitly requests fields="nextPageToken, files(appProperties, id, name)". This resolves plan doubt (a): appProperties default response behavior is irrelevant because consumers now declare their required projection.
 ---
 <!-- COMMENTS:END -->

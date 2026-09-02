@@ -14,5 +14,4 @@ integrations/aws/organizations.py
 integrations/aws/security_hub.py
 integrations/aws/sqs.py
 integrations/aws/sso_admin.py
-integrations/google_workspace/google_drive.py
 integrations/google_workspace/google_service.py
