@@ -3,11 +3,11 @@ id: TASK-25.1.4
 title: >-
   Migrate legacy modules/ Directory consumers off
   integrations/google_workspace/google_directory.py
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-31 18:33'
-updated_date: '2026-09-01 21:17'
+updated_date: '2026-09-02 14:32'
 labels:
   - clients
   - phase-3

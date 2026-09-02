@@ -1,11 +1,11 @@
 ---
 id: TASK-25.1.5
 title: Migrate Google Drive integration off execute_google_api_call
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-31 18:33'
-updated_date: '2026-09-02 14:31'
+updated_date: '2026-09-02 14:32'
 labels:
   - clients
   - phase-3
