@@ -17,11 +17,13 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
+from googleapiclient.errors import HttpError
 
 from infrastructure.configuration.integrations.google import get_google_resources_config
+from integrations.google_workspace import client as google_workspace_client
 from integrations.google_workspace import google_docs, google_drive
 from packages.incident_draft.domain import (
     DocumentField,
@@ -29,6 +31,9 @@ from packages.incident_draft.domain import (
     DraftWriteResult,
     SectionDraft,
 )
+
+if TYPE_CHECKING:
+    from googleapiclient._apis.drive.v3 import File  # pyright: ignore[reportMissingModuleSource]
 
 logger = structlog.get_logger()
 
@@ -269,7 +274,21 @@ def _regular_label_requests(document: dict) -> list[dict[str, Any]]:
 
 def _copy_source_document(source_document_id: str, draft_title: str, folder: str) -> str | None:
     """Copy the incident report into ``folder`` as the draft; return its id."""
-    copied = google_drive.create_file_from_template(draft_title, folder, source_document_id, fields="id")
+    service = google_workspace_client.get_drive_service(scopes=google_drive.DRIVE_SCOPES)
+    body = cast("File", {"name": draft_title, "parents": [folder]})
+    try:
+        copied = service.files().copy(fileId=source_document_id, body=body, supportsAllDrives=True, fields="id").execute()
+    except HttpError as exc:
+        status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
+        logger.warning(
+            "incident_draft_copy_failed",
+            source_document_id=source_document_id,
+            status=status.value,
+            error_code=error_code,
+            retry_after=retry_after,
+        )
+        return None
+
     document_id = _created_file_id(copied)
     if not document_id:
         logger.warning("incident_draft_copy_failed", source_document_id=source_document_id)
@@ -1242,7 +1261,20 @@ def _source_name_and_folder(document_id: str) -> tuple[str, str]:
     Falls back to the configured incident folder when the metadata lookup
     fails, so a draft still lands somewhere responders can find it.
     """
-    metadata = google_drive.get_file_by_id(document_id, fields="id, name, parents")
+    service = google_workspace_client.get_drive_service(scopes=google_drive.DRIVE_SCOPES)
+    metadata: Any = None
+    try:
+        metadata = service.files().get(fileId=document_id, fields="id, name, parents", supportsAllDrives=True).execute()
+    except HttpError as exc:
+        status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
+        logger.warning(
+            "incident_draft_metadata_lookup_failed",
+            document_id=document_id,
+            status=status.value,
+            error_code=error_code,
+            retry_after=retry_after,
+        )
+
     name, folder = "Incident report", ""
     if isinstance(metadata, dict):
         name = str(metadata.get("name") or name)
