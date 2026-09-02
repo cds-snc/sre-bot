@@ -134,6 +134,67 @@ def test_should_skip_update_when_spreadsheet_id_not_set(mock_sheets):
 
 
 @pytest.mark.unit
+@patch("modules.aws.spending.sheets")
+def test_should_send_header_row_followed_by_dataframe_rows_to_sheets(mock_sheets):
+    """Test the exact values matrix crossing the Sheets boundary."""
+    # Arrange
+    df = pd.DataFrame({"Account": ["123456789012", "210987654321"], "Cost": [100.00, 250.50]})
+
+    # Act
+    spending.update_spending_data(df, spreadsheet_id="test_sheet_id")
+
+    # Assert
+    call_kwargs = mock_sheets.batch_update_values.call_args[1]
+    assert call_kwargs["values"] == [
+        ["Account", "Cost"],
+        ["123456789012", 100.00],
+        ["210987654321", 250.50],
+    ]
+
+
+@pytest.mark.unit
+@patch("modules.aws.spending.sheets")
+def test_should_send_header_row_only_when_dataframe_has_no_rows(mock_sheets):
+    """Test that an empty but columned DataFrame sends just the header."""
+    # Arrange
+    df = pd.DataFrame(columns=["Account", "Cost"])
+
+    # Act
+    spending.update_spending_data(df, spreadsheet_id="test_sheet_id")
+
+    # Assert
+    call_kwargs = mock_sheets.batch_update_values.call_args[1]
+    assert call_kwargs["values"] == [["Account", "Cost"]]
+
+
+@pytest.mark.unit
+@patch("modules.aws.spending.sheets")
+def test_should_skip_update_when_spreadsheet_id_is_empty_string(mock_sheets):
+    """Test that update is skipped when the spreadsheet ID is an empty string."""
+    # Arrange
+    df = pd.DataFrame({"Account": ["123456789012"], "Cost": [100.00]})
+
+    # Act
+    spending.update_spending_data(df, spreadsheet_id="")
+
+    # Assert
+    mock_sheets.batch_update_values.assert_not_called()
+
+
+@pytest.mark.unit
+@patch("modules.aws.spending.sheets")
+def test_should_propagate_error_when_sheets_update_fails(mock_sheets):
+    """Test that a failing Sheets write propagates out of update_spending_data."""
+    # Arrange
+    df = pd.DataFrame({"Account": ["123456789012"], "Cost": [100.00]})
+    mock_sheets.batch_update_values.side_effect = RuntimeError("sheets down")
+
+    # Act / Assert
+    with pytest.raises(RuntimeError):
+        spending.update_spending_data(df, spreadsheet_id="test_sheet_id")
+
+
+@pytest.mark.unit
 @patch("modules.aws.spending.generate_spending_data")
 @patch("modules.aws.spending.update_spending_data")
 def test_should_execute_and_update_spending_job_successfully(mock_update, mock_generate):
