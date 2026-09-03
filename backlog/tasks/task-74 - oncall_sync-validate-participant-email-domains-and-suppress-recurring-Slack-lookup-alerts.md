@@ -1,11 +1,11 @@
 ---
 id: TASK-74
 title: 'oncall_sync: validate participant email domains before Slack lookup'
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-02 20:17'
-updated_date: '2026-09-02 20:50'
+updated_date: '2026-09-03 16:50'
 labels:
   - oncall-sync
   - slack

@@ -21,9 +21,13 @@ The shipped code walks `app/packages/` with `pkgutil.walk_packages`, imports eve
 
 ```toml
 [project.entry-points."sre_bot"]
-access    = "packages.access"
-geolocate = "packages.geolocate"
+"access.catalog" = "packages.access.catalog"
+"access.request" = "packages.access.request"
+"access.sync"    = "packages.access.sync"
+geolocate        = "packages.geolocate"
 ```
+
+An umbrella feature's own package is never an entry point — it holds no hookimpls ([feature-packages.md](feature-packages.md)). Subdomain entry-point names carry the dotted `<feature>.<subdomain>` prefix so the flat per-group name registry cannot collide.
 
 This is why pytest — the canonical pluggy host — uses an explicit builtin list plus the `pytest11` entry-point group, never a scan; declarative registration is the documented pluggy posture.
 

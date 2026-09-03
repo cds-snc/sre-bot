@@ -28,7 +28,26 @@ app/packages/<feature>/
 └── locales/           # EN/FR catalogues (see i18n.md)
 ```
 
-A complex feature holds subdomains (`access/{catalog,request,sync}/`), each shaped like the above, plus a `common/` shared kernel that is not itself a plugin. Names outside this table need a one-line justification in the PR; the table grows by amending this record.
+Names outside this table need a one-line justification in the PR; the table grows by amending this record. A complex feature holds subdomains, each shaped like the table above — see the next section.
+
+### Complex features: an umbrella directory, never a flat prefix
+
+A feature too large for one `service.py` becomes an umbrella: one directory per bounded context, one subdirectory per subdomain, plus `common/`. `access/{catalog,request,sync}` + `access/common` is the shipped instance.
+
+```text
+app/packages/<feature>/
+├── __init__.py      # EMPTY — namespace only: no hookimpls, no re-exports, no entry-point line
+├── common/          # shared kernel: domain vocabulary + the settings tree, no I/O
+└── <subdomain>/     # shaped like the layout table above; each is a plugin
+```
+
+Three rules keep the umbrella from becoming a god package:
+
+1. **The umbrella holds no code.** The plugin unit stays the subdomain, so registration granularity, feature-flag blast radius, and strangler increments are identical to a flat layout — [plugins.md](plugins.md) already permits subdomain plugins, and `packages/access/__init__.py` is already empty.
+2. **`common/` admits only types and values with two or more subdomain consumers and no I/O.** The moment an item there calls a backing service it is either a subdomain service or an infrastructure promotion candidate ([layers.md](layers.md)). `common/` is the staging area that makes promotion visible, not the thing that prevents it.
+3. **Entry-point names carry the dotted prefix**: `"incident.draft" = "packages.incident.draft"`, never `"draft"`. Entry-point names form a flat registry per group, so the bare last path component collides the day a second feature grows a `summary`. Django hits the identical wall — `AppConfig.label` defaults to the last component of the dotted path and must be unique project-wide.
+
+**Flat `<feature>_<subfeature>` naming is rejected.** It is the convention for *separately distributed* components: the Python modular-monolith reference implementations go flat precisely because each component is its own installable distribution and the dependency resolver enforces the graph. We ship one wheel from one `pyproject.toml`, so flat naming costs without enforcing. Concretely it (a) declares subdomains to be separate features, which makes shared feature vocabulary illegal under "features never import other features" and forces either duplication or premature promotion of domain types into infrastructure, and (b) cannot be expressed as an import-linter `containers` contract, so the sibling-independence and exhaustiveness guards in Checks are unavailable. Nesting stops at two levels — `packages/<feature>/<subdomain>/`, no deeper.
 
 ### Handler discipline
 
@@ -42,11 +61,16 @@ A handler (any platform) does five things and nothing else: receive the platform
 
 ## Consequences
 
-- A new contributor can copy `geolocate/` as a template and be productive in an afternoon — that is this record's success criterion.
+- A new contributor can copy `geolocate/` as a template and be productive in an afternoon — that is this record's success criterion. For a complex feature the template is `access/`.
 - Reconciling with shipped code means the standard is enforceable from today rather than aspirational; known deviations (direct `integrations.slack` imports in two interaction files, sync handlers) are small fix-PRs, not rewrites.
+- Cost, accepted: the umbrella rule makes `packages/incident_draft` and `packages/incident_summary` deviations that must be relocated under `packages/incident/`. That is an import-path and entry-point-name change with no runtime surface change, owned by TASK-38.
 
 ## Checks
 
 - Feature independence and adapters-only import rules verified in review; mechanically enforced once [toolchain.md](toolchain.md)'s import-linter lands.
 - New feature PRs match the layout table (review).
 - Handler tests stub the service and assert rendering; service tests use Protocol fakes.
+- Umbrella `__init__.py` files are empty and have no entry-point line; every subdomain entry-point name is `<feature>.<subdomain>` (grep + review).
+- Each umbrella carries an import-linter `layers` contract with `containers = ["packages.<feature>"]`, subdomains as pipe-separated independent siblings above `common`, and `exhaustive = true` so an undeclared subdirectory fails CI (owned by TASK-18; until it lands, review).
+
+**Change note (2026-09-03, post-acceptance):** added the umbrella rule for complex features, resolving the shape/naming question [migration.md](migration.md) rule 5 had left open. Grounded in the shipped `access/` layout, [plugins.md](plugins.md)'s subdomain-plugin allowance, and import-linter's `containers`/`exhaustive` support, which makes the umbrella mechanically checkable and the flat alternative not.
