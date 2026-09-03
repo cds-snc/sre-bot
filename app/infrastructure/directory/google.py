@@ -9,12 +9,15 @@ from googleapiclient.errors import HttpError
 from infrastructure.configuration.infrastructure import DirectorySettings
 from infrastructure.directory.models import (
     DirectoryGroup,
+    DirectoryGroupFailure,
+    DirectoryGroupsWithMembers,
+    DirectoryGroupWithMembers,
     DirectoryMember,
     DirectoryUser,
     MembershipCheckResult,
 )
 from infrastructure.operations import OperationResult
-from integrations.google_workspace.client import classify_google_error, execute_batch_request
+from integrations.google_workspace.client import classify_google_error
 
 if TYPE_CHECKING:
     from googleapiclient._apis.admin.directory_v1 import (
@@ -28,6 +31,9 @@ T = TypeVar("T")
 _NUM_RETRIES = 3
 _USERS_PAGE_SIZE = 500
 _GROUPS_PAGE_SIZE = 200
+_MEMBERS_PAGE_SIZE = 200
+# googleapiclient raises BatchError past MAX_BATCH_LIMIT (1000); stay well under it.
+_BATCH_MAX_REQUESTS = 100
 
 
 class GoogleDirectoryProvider:
@@ -107,6 +113,100 @@ class GoogleDirectoryProvider:
             return items
 
         return self._call(operation, run)
+
+    def _execute_batch_round(
+        self,
+        service: AdminDirectoryResource,
+        requests: dict[str, Any],
+    ) -> tuple[dict[str, Any], dict[str, HttpError]]:
+        """Run one batch round, returning per-key responses and per-key errors.
+
+        Chunked because BatchHttpRequest.add raises BatchError past MAX_BATCH_LIMIT.
+        Callers pick their own failure policy — nothing is classified here.
+        """
+        responses: dict[str, Any] = {}
+        errors: dict[str, HttpError] = {}
+
+        # response is Any because the stub types this parameter HttpRequest, not the payload.
+        def callback(request_id: str, response: Any, exception: HttpError | None) -> None:
+            if exception is not None:
+                errors[request_id] = exception
+            else:
+                responses[request_id] = response
+
+        keys = list(requests)
+        for start in range(0, len(keys), _BATCH_MAX_REQUESTS):
+            batch = service.new_batch_http_request(callback=callback)
+            for key in keys[start : start + _BATCH_MAX_REQUESTS]:
+                batch.add(requests[key], request_id=key)
+            batch.execute()
+
+        return responses, errors
+
+    def _batch_list_members(
+        self,
+        service: AdminDirectoryResource,
+        group_keys: list[str],
+    ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, HttpError]]:
+        """Fetch every member page for each group, re-batching only unfinished groups."""
+        members_resource = service.members()
+        raw_members: dict[str, list[dict[str, Any]]] = {key: [] for key in group_keys}
+        errors: dict[str, HttpError] = {}
+        pending: dict[str, Any] = {key: members_resource.list(groupKey=key, maxResults=_MEMBERS_PAGE_SIZE) for key in group_keys}
+
+        while pending:
+            responses, round_errors = self._execute_batch_round(service, pending)
+            errors.update(round_errors)
+            next_pending: dict[str, Any] = {}
+            for key, response in responses.items():
+                raw_members[key].extend(response.get("members", []) or [])
+                next_request = members_resource.list_next(pending[key], response)
+                if next_request is not None:
+                    next_pending[key] = next_request
+            pending = next_pending
+
+        return raw_members, errors
+
+    def _normalize_member_types(self, include_member_types: set[str] | None) -> OperationResult[set[str] | None]:
+        """Normalise and validate the requested member-type filter."""
+        if include_member_types is None:
+            return OperationResult.success(data=None)
+
+        allowed = {str(member_type).strip().upper() for member_type in include_member_types if str(member_type).strip()}
+        if not allowed:
+            return OperationResult.permanent_error(
+                message="include_member_types must contain at least one type",
+                error_code="DIRECTORY_MEMBER_TYPES_INVALID",
+            )
+
+        return OperationResult.success(data=allowed)
+
+    def _map_members(self, items: list[dict[str, Any]], allowed: set[str] | None) -> list[DirectoryMember]:
+        """Map raw member payloads into canonical members, applying the type filter."""
+        members: list[DirectoryMember] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+
+            member_type = str(item.get("type") or "").strip().upper()
+            if allowed is not None and member_type and member_type not in allowed:
+                continue
+
+            member = self._build_directory_member(item)
+            if member is not None:
+                members.append(member)
+
+        return members
+
+    def _build_group_failure(self, group_email: str, exc: HttpError) -> DirectoryGroupFailure:
+        """Classify a per-group batch error into a typed failure entry."""
+        status, error_code, _retry_after = classify_google_error(exc)
+        return DirectoryGroupFailure(
+            group_email=group_email,
+            status=status,
+            error_code=error_code,
+            message=str(exc),
+        )
 
     def _normalize_email(self, value: str) -> str:
         """Normalize email-form identifiers used by the shared contract.
@@ -563,8 +663,9 @@ class GoogleDirectoryProvider:
     ) -> OperationResult[dict[str, list[DirectoryMember]]]:
         """Return the member list for multiple groups in a single batch call.
 
-        Uses the Google Admin batch API so cost is one network round-trip
-        regardless of the number of groups.
+        Uses the Google Admin batch API so cost is one batched round-trip per
+        chunk of groups per member-page depth, rather than one call per group.
+        Fails as a whole when any group's batch item fails.
 
         Args:
             group_keys: Canonical managed-group emails — normalised to lowercase.
@@ -578,55 +679,20 @@ class GoogleDirectoryProvider:
         if not group_keys:
             return OperationResult.success(data={})
 
-        normalized_keys = [self._normalize_email(k) for k in group_keys]
+        member_types_result = self._normalize_member_types(include_member_types)
+        if not member_types_result.is_success:
+            return self._typed_error(member_types_result)
+
+        normalized_keys = [self._normalize_email(key) for key in group_keys]
         service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.readonly"])
-        members_resource = service.members()
-        batch_requests = [(key, members_resource.list(groupKey=key)) for key in normalized_keys]
-        batch_result = execute_batch_request(service, batch_requests)
-        if not batch_result.is_success:
-            return self._typed_error(batch_result)
+        raw_members, errors = self._batch_list_members(service, normalized_keys)
 
-        raw_results = batch_result.data.get("results", {}) if isinstance(batch_result.data, dict) else {}
-        members_by_group_response: dict[str, Any] = {}
-        for group_key in normalized_keys:
-            group_response = raw_results.get(group_key)
-            members_by_group_response[group_key] = group_response.get("members", []) if isinstance(group_response, dict) else []
+        if errors:
+            first_error = next(iter(errors.values()))
+            return self._typed_error(self._map_sdk_exception(first_error, "get_group_members_batch"))
 
-        result = OperationResult.success(data=members_by_group_response)
-        if not result.is_success:
-            return self._typed_error(result)
-
-        if not isinstance(result.data, dict):
-            return OperationResult.permanent_error(
-                message="Batch directory members payload is not a dict",
-                error_code="DIRECTORY_BATCH_MEMBERS_PAYLOAD_INVALID",
-            )
-
-        allowed_member_types = None
-        if include_member_types is not None:
-            allowed_member_types = {str(t).strip().upper() for t in include_member_types if str(t).strip()}
-            if not allowed_member_types:
-                return OperationResult.permanent_error(
-                    message="include_member_types must contain at least one type",
-                    error_code="DIRECTORY_MEMBER_TYPES_INVALID",
-                )
-
-        batch_members: dict[str, list[DirectoryMember]] = {}
-        for group_key, raw_members in result.data.items():
-            members: list[DirectoryMember] = []
-            if isinstance(raw_members, list):
-                for item in raw_members:
-                    if not isinstance(item, dict):
-                        continue
-                    member_type = str(item.get("type") or "").strip().upper()
-                    if allowed_member_types is not None and member_type and member_type not in allowed_member_types:
-                        continue
-                    member = self._build_directory_member(item)
-                    if member is not None:
-                        members.append(member)
-            batch_members[group_key] = members
-
-        return OperationResult.success(data=batch_members)
+        allowed = member_types_result.data
+        return OperationResult.success(data={key: self._map_members(items, allowed) for key, items in raw_members.items()})
 
     def get_group(self, group_key: str) -> OperationResult[DirectoryGroup]:
         """Return a canonical managed group by key.
@@ -909,6 +975,72 @@ class GoogleDirectoryProvider:
         )
 
         return OperationResult.success(data=groups[:limit] if limit is not None else groups)
+
+    def list_groups_with_members(
+        self,
+        query: str = "",
+        limit: int | None = None,
+        include_member_types: set[str] | None = None,
+    ) -> OperationResult[DirectoryGroupsWithMembers]:
+        """List groups together with their members in one batched composition.
+
+        Groups whose members could not be fetched are returned in ``failures``
+        rather than failing the whole result; groups with zero members are
+        included.
+
+        Args:
+            query: Google Admin Directory search clause(s), as for ``list_groups``.
+            limit: Maximum number of groups to return, or None for all groups.
+            include_member_types: Optional set of member types to include
+                (for example ``{"USER"}``). Defaults to no filtering.
+
+        Returns:
+            OperationResult: success with the DirectoryGroupsWithMembers payload.
+        """
+        groups_result = self.list_groups(query=query, limit=limit)
+        if not groups_result.is_success:
+            return self._typed_error(groups_result)
+
+        if not groups_result.data:
+            return OperationResult.success(data=DirectoryGroupsWithMembers())
+
+        member_types_result = self._normalize_member_types(include_member_types)
+        if not member_types_result.is_success:
+            return self._typed_error(member_types_result)
+
+        allowed = member_types_result.data
+        group_by_email = {group.group_email: group for group in groups_result.data}
+
+        service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.member.readonly"])
+        raw_members, errors = self._batch_list_members(service, list(group_by_email))
+
+        groups_with_members: list[DirectoryGroupWithMembers] = []
+        failures: list[DirectoryGroupFailure] = []
+        for group_email, group in group_by_email.items():
+            error = errors.get(group_email)
+            if error is not None:
+                failures.append(self._build_group_failure(group_email, error))
+                continue
+
+            groups_with_members.append(
+                DirectoryGroupWithMembers(
+                    group=group,
+                    members=tuple(self._map_members(raw_members.get(group_email, []), allowed)),
+                )
+            )
+
+        self._logger.info(
+            "directory_groups_with_members_listed",
+            returned=len(groups_with_members),
+            failed=len(failures),
+        )
+
+        return OperationResult.success(
+            data=DirectoryGroupsWithMembers(
+                groups=tuple(groups_with_members),
+                failures=tuple(failures),
+            )
+        )
 
     def get_user_groups(self, user_email: str) -> OperationResult[list[DirectoryGroup]]:
         """Return all managed groups the user is a direct member of.

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:04'
-updated_date: '2026-09-03 18:02'
+updated_date: '2026-09-03 20:08'
 labels:
   - clients
   - phase-3
@@ -67,5 +67,17 @@ GREP-CONFIRMED 2026-09-03: execute_batch_request has exactly one consumer repo-w
 So once TASK-25.1.6.3.1 merges, your item collapses from a design decision to a straight deletion of a zero-consumer function plus its tests. No amendment to decisions/outbound-clients.md is needed - the deviation is removed rather than legalised. Note TASK-25.1.6.3.1 deliberately LEAVES the dead function in place rather than deleting it, because its AC#7 confines that PR's diff to app/infrastructure/directory/**; the deletion is yours.
 
 Worth folding into your AC#7 CI guardrail: a vendor package exporting an OperationResult-returning orchestration helper is exactly the regrowth shape the guardrail should catch, since decisions/outbound-clients.md says app/integrations/<vendor>/ provides exactly factories, classify_<vendor>_error and settings.
+---
+
+author: @task-planner
+created: 2026-09-03 20:08
+---
+TWO RESIDUALS ADDED TO YOUR SWEEP 2026-09-03 (task-planner, human-approved while planning TASK-25.1.6.3.1). Both are inside app/infrastructure/directory/google.py, deliberately left there because fixing them in TASK-25.1.6.3.1 would have mixed a mechanical refactor of out-of-scope methods into a behaviour PR (implementation-planning size-gate trigger #3).
+
+R1. DUPLICATED MEMBER MAPPING. TASK-25.1.6.3.1 extracts _normalize_member_types and _map_members and uses them from the batch path and the new groups-with-members composition, but leaves get_group_members (today google.py:499-557) with its own inline copy of the same type-filter + _build_directory_member loop. Three call sites, two implementations. Collapsing it is a pure refactor with no behaviour change.
+
+R2. INCONSISTENT OAUTH SCOPE FOR THE SAME CALL. get_group_members and the new composition request https://www.googleapis.com/auth/admin.directory.group.member.readonly; get_group_members_batch requests the broader https://www.googleapis.com/auth/admin.directory.group.readonly (today google.py:583). Same underlying members.list call, two scopes. TASK-25.1.6.3.1's AC#3 forbade changing it (it is a live path used by packages/access/sync/desired_state.py:160 and an OAuth scope change is not a no-op). Converging on the narrower member.readonly scope is safe - the delegation grant demonstrably exists, since get_group_members uses it in production - but it deserves its own small PR.
+
+ALSO CONFIRMING YOUR AC#2: after TASK-25.1.6.3.1 merges, integrations/google_workspace/client.py::execute_batch_request has ZERO consumers repo-wide and is a straight delete. The 'relocated to the provider' branch of your AC#2 is satisfied and no amendment to decisions/outbound-clients.md is needed. One thing to carry into the PR description when you delete it: the provider's replacement does NOT reproduce execute_batch_request's blanket PERMANENT_ERROR/BATCH_ERRORS - it classifies per-item HttpErrors via classify_google_error, which is why the vendor helper could not simply move.
 ---
 <!-- COMMENTS:END -->

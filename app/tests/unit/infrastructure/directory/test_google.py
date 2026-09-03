@@ -9,6 +9,8 @@ import pytest
 from googleapiclient.errors import HttpError
 from structlog.testing import capture_logs
 
+from infrastructure.directory import google as google_module
+from infrastructure.directory import models as directory_models
 from infrastructure.directory.google import GoogleDirectoryProvider
 from infrastructure.directory.models import (
     DirectoryGroup,
@@ -18,6 +20,10 @@ from infrastructure.directory.models import (
 )
 from infrastructure.directory.provider import DirectoryProvider
 from infrastructure.operations.status import OperationStatus
+
+# Contract values asserted by the batch tests; the provider owns the constants.
+_MEMBERS_PAGE_SIZE = 200
+_BATCH_MAX_REQUESTS = 100
 
 
 def _request(payload: Any) -> MagicMock:
@@ -48,32 +54,72 @@ def _install_pages(resource: MagicMock, response_key: str, pages: list[list[Any]
     return requests
 
 
-def _install_fake_batch(service: MagicMock, responses: dict[str, Any]) -> None:
-    """Configure new_batch_http_request to synchronously invoke callback per added request.
+def _install_paged_batch(
+    service: MagicMock,
+    pages_by_key: dict[str, list[list[dict[str, Any]]]],
+    errors_by_key: dict[str, Exception] | None = None,
+) -> list[list[str]]:
+    """Wire members.list/list_next plus a batch double that pages per group key.
 
-    Requests whose request_id is missing from responses invoke the callback
-    with an exception, mirroring a per-item Admin SDK batch failure.
+    ``pages_by_key`` maps a group key to its ordered member pages, so a key with
+    more than one page proves the provider re-batches until the pages are
+    exhausted. Returns the per-``new_batch_http_request``-call list of added
+    request ids, which tests assert on to prove chunking and re-batching.
     """
+    errors = errors_by_key or {}
+    rounds: list[list[str]] = []
+    members_resource = service.members.return_value
+
+    requests_by_key: dict[str, list[MagicMock]] = {}
+    payload_by_request: dict[int, dict[str, Any]] = {}
+    position_by_request: dict[int, tuple[str, int]] = {}
+
+    for key in {**pages_by_key, **dict.fromkeys(errors, [[]])}:
+        pages = pages_by_key.get(key) or [[]]
+        page_requests: list[MagicMock] = []
+        for index, page in enumerate(pages):
+            request = MagicMock(name=f"{key}-page-{index}")
+            payload: dict[str, Any] = {"members": page}
+            if index + 1 < len(pages):
+                payload["nextPageToken"] = f"{key}-token-{index}"
+            payload_by_request[id(request)] = payload
+            position_by_request[id(request)] = (key, index)
+            page_requests.append(request)
+        requests_by_key[key] = page_requests
+
+    members_resource.list.side_effect = lambda groupKey, **_kwargs: requests_by_key[groupKey][0]
+
+    def list_next(previous_request: MagicMock, _previous_response: Any) -> MagicMock | None:
+        key, index = position_by_request[id(previous_request)]
+        page_requests = requests_by_key[key]
+        return page_requests[index + 1] if index + 1 < len(page_requests) else None
+
+    members_resource.list_next.side_effect = list_next
 
     def new_batch_http_request(callback):
-        added: list[tuple[str, Any]] = []
+        added: list[tuple[str, MagicMock]] = []
+        round_ids: list[str] = []
+        rounds.append(round_ids)
         batch = MagicMock()
 
         def add(request, request_id):
             added.append((request_id, request))
+            round_ids.append(request_id)
 
-        def execute(**kwargs):
-            for request_id, _request_obj in added:
-                if request_id in responses:
-                    callback(request_id, responses[request_id], None)
+        def execute(**_kwargs):
+            for request_id, request in added:
+                error = errors.get(request_id)
+                if error is not None:
+                    callback(request_id, None, error)
                 else:
-                    callback(request_id, None, RuntimeError(f"missing response for {request_id}"))
+                    callback(request_id, payload_by_request[id(request)], None)
 
         batch.add.side_effect = add
         batch.execute.side_effect = execute
         return batch
 
     service.new_batch_http_request.side_effect = new_batch_http_request
+    return rounds
 
 
 @pytest.fixture
@@ -1283,15 +1329,11 @@ class TestDirectoryProviderProtocolSignatures:
 class TestGetGroupMembersBatch:
     def test_returns_members_for_each_group(self, provider, google_service):
         # Arrange
-        _install_fake_batch(
+        _install_paged_batch(
             google_service,
             {
-                "sg-aws-admin@example.com": {
-                    "members": [{"email": "alice@example.com", "type": "USER", "id": "m1"}],
-                },
-                "sg-aws-read@example.com": {
-                    "members": [{"email": "bob@example.com", "type": "USER", "id": "m2"}],
-                },
+                "sg-aws-admin@example.com": [[{"email": "alice@example.com", "type": "USER", "id": "m1"}]],
+                "sg-aws-read@example.com": [[{"email": "bob@example.com", "type": "USER", "id": "m2"}]],
             },
         )
 
@@ -1321,32 +1363,17 @@ class TestGetGroupMembersBatch:
         assert result.data == {}
         google_service.new_batch_http_request.assert_not_called()
 
-    def test_propagates_batch_failure(self, provider, google_service):
-        # Arrange
-        _install_fake_batch(google_service, {})
-
-        # Act
-        result = provider.get_group_members_batch(["sg-aws-admin@example.com"])
-
-        # Assert
-        assert not result.is_success
-        assert result.status == OperationStatus.PERMANENT_ERROR
-
     def test_filters_to_requested_member_types(self, provider, google_service):
         # Arrange
-        _install_fake_batch(
+        _install_paged_batch(
             google_service,
             {
-                "sg-aws-admin@example.com": {
-                    "members": [
+                "sg-aws-admin@example.com": [
+                    [
                         {"email": "alice@example.com", "type": "USER", "id": "m1"},
-                        {
-                            "email": "nested-group@example.com",
-                            "type": "GROUP",
-                            "id": "m2",
-                        },
-                    ],
-                },
+                        {"email": "nested-group@example.com", "type": "GROUP", "id": "m2"},
+                    ]
+                ],
             },
         )
 
@@ -1362,12 +1389,367 @@ class TestGetGroupMembersBatch:
         assert len(members) == 1
         assert members[0].email == "alice@example.com"
 
+    def test_empty_member_types_returns_error_without_issuing_a_request(self, provider, google_service):
+        # Arrange
+        _install_paged_batch(google_service, {"sg-aws-admin@example.com": [[]]})
+
+        # Act
+        result = provider.get_group_members_batch(["sg-aws-admin@example.com"], include_member_types=set())
+
+        # Assert
+        assert not result.is_success
+        assert result.error_code == "DIRECTORY_MEMBER_TYPES_INVALID"
+        google_service.new_batch_http_request.assert_not_called()
+
     def test_normalises_group_keys_to_lowercase(self, provider, google_service):
         # Arrange
-        _install_fake_batch(google_service, {"sg-aws-admin@example.com": {"members": []}})
+        _install_paged_batch(google_service, {"sg-aws-admin@example.com": [[]]})
 
         # Act
         provider.get_group_members_batch(["SG-AWS-Admin@EXAMPLE.COM"])
 
         # Assert
-        google_service.members.return_value.list.assert_called_once_with(groupKey="sg-aws-admin@example.com")
+        google_service.members.return_value.list.assert_called_once_with(
+            groupKey="sg-aws-admin@example.com",
+            maxResults=_MEMBERS_PAGE_SIZE,
+        )
+
+    def test_batched_list_requests_use_the_members_page_size(self, provider, google_service):
+        # Arrange
+        _install_paged_batch(
+            google_service,
+            {"sg-a@example.com": [[]], "sg-b@example.com": [[]]},
+        )
+
+        # Act
+        provider.get_group_members_batch(["sg-a@example.com", "sg-b@example.com"])
+
+        # Assert
+        page_sizes = {call.kwargs["maxResults"] for call in google_service.members.return_value.list.call_args_list}
+        assert page_sizes == {_MEMBERS_PAGE_SIZE}
+
+    def test_vendor_batch_helper_is_not_imported(self):
+        # Assert
+        assert not hasattr(google_module, "execute_batch_request")
+
+    def test_surfaces_per_key_response_and_error(self, provider, google_service):
+        # Arrange
+        _install_paged_batch(
+            google_service,
+            {"sg-a@example.com": [[{"email": "alice@example.com", "type": "USER", "id": "m1"}]]},
+            errors_by_key={"sg-b@example.com": _http_error(429)},
+        )
+        members_resource = google_service.members()
+        requests = {
+            key: members_resource.list(groupKey=key, maxResults=_MEMBERS_PAGE_SIZE)
+            for key in ("sg-a@example.com", "sg-b@example.com")
+        }
+
+        # Act
+        responses, errors = provider._execute_batch_round(google_service, requests)
+
+        # Assert
+        assert responses["sg-a@example.com"]["members"][0]["email"] == "alice@example.com"
+        assert "sg-b@example.com" not in responses
+        assert isinstance(errors["sg-b@example.com"], HttpError)
+        assert "sg-a@example.com" not in errors
+
+    def test_paginates_members_across_batch_rounds(self, provider, google_service):
+        # Arrange
+        _install_paged_batch(
+            google_service,
+            {
+                "sg-aws-admin@example.com": [
+                    [{"email": "alice@example.com", "type": "USER", "id": "m1"}],
+                    [{"email": "bob@example.com", "type": "USER", "id": "m2"}],
+                ]
+            },
+        )
+
+        # Act
+        result = provider.get_group_members_batch(["sg-aws-admin@example.com"])
+
+        # Assert
+        assert result.is_success
+        assert [member.email for member in result.data["sg-aws-admin@example.com"]] == [
+            "alice@example.com",
+            "bob@example.com",
+        ]
+
+    def test_second_round_rebatches_only_unfinished_groups(self, provider, google_service):
+        # Arrange
+        rounds = _install_paged_batch(
+            google_service,
+            {
+                "sg-paged@example.com": [
+                    [{"email": "alice@example.com", "type": "USER", "id": "m1"}],
+                    [{"email": "bob@example.com", "type": "USER", "id": "m2"}],
+                ],
+                "sg-done@example.com": [[{"email": "carol@example.com", "type": "USER", "id": "m3"}]],
+            },
+        )
+
+        # Act
+        result = provider.get_group_members_batch(["sg-paged@example.com", "sg-done@example.com"])
+
+        # Assert
+        assert result.is_success
+        assert len(rounds) == 2
+        assert set(rounds[0]) == {"sg-paged@example.com", "sg-done@example.com"}
+        assert rounds[1] == ["sg-paged@example.com"]
+
+    def test_chunks_batch_rounds_at_the_request_limit(self, provider, google_service):
+        # Arrange
+        group_keys = [f"sg-{index}@example.com" for index in range(150)]
+        rounds = _install_paged_batch(
+            google_service,
+            {key: [[{"email": f"user-{key}", "type": "USER", "id": key}]] for key in group_keys},
+        )
+
+        # Act
+        result = provider.get_group_members_batch(group_keys)
+
+        # Assert
+        assert result.is_success
+        assert len(rounds) == 2
+        assert [len(round_ids) for round_ids in rounds] == [_BATCH_MAX_REQUESTS, 50]
+        assert set(result.data.keys()) == set(group_keys)
+
+    def test_one_failing_group_fails_the_whole_batch_with_a_classified_status(self, provider, google_service):
+        # Arrange
+        _install_paged_batch(
+            google_service,
+            {"sg-ok@example.com": [[{"email": "alice@example.com", "type": "USER", "id": "m1"}]]},
+            errors_by_key={"sg-bad@example.com": _http_error(429)},
+        )
+
+        # Act
+        result = provider.get_group_members_batch(["sg-ok@example.com", "sg-bad@example.com"])
+
+        # Assert
+        assert not result.is_success
+        assert result.status == OperationStatus.TRANSIENT_ERROR
+        assert result.error_code == "429"
+
+    def test_signature_is_unchanged(self):
+        # Assert
+        parameters = signature(GoogleDirectoryProvider.get_group_members_batch).parameters
+        assert list(parameters) == ["self", "group_keys", "include_member_types"]
+        assert parameters["include_member_types"].default is None
+
+
+class TestListGroupsWithMembers:
+    @staticmethod
+    def _install_groups(google_service, emails: list[str]) -> None:
+        """Wire groups.list to return one canonical group per email."""
+        google_service.groups.return_value.list.return_value = _request(
+            {"groups": [{"email": email, "id": f"group-{index}", "name": email} for index, email in enumerate(emails)]}
+        )
+
+    def test_protocol_declares_the_composition(self):
+        # Assert
+        parameters = signature(DirectoryProvider.list_groups_with_members).parameters
+        assert list(parameters) == ["self", "query", "limit", "include_member_types"]
+        assert parameters["query"].default == ""
+        assert parameters["limit"].default is None
+        assert parameters["include_member_types"].default is None
+
+    def test_returns_typed_groups_with_members(self, provider, google_service):
+        # Arrange
+        self._install_groups(google_service, ["sg-a@example.com", "sg-b@example.com"])
+        _install_paged_batch(
+            google_service,
+            {
+                "sg-a@example.com": [[{"email": "alice@example.com", "type": "USER", "id": "m1"}]],
+                "sg-b@example.com": [[{"email": "bob@example.com", "type": "USER", "id": "m2"}]],
+            },
+        )
+
+        # Act
+        result = provider.list_groups_with_members()
+
+        # Assert
+        assert result.is_success
+        payload = result.data
+        assert isinstance(payload, directory_models.DirectoryGroupsWithMembers)
+        assert payload.failures == ()
+        assert isinstance(payload.groups, tuple)
+        by_email = {entry.group.group_email: entry for entry in payload.groups}
+        assert set(by_email) == {"sg-a@example.com", "sg-b@example.com"}
+        entry = by_email["sg-a@example.com"]
+        assert isinstance(entry, directory_models.DirectoryGroupWithMembers)
+        assert isinstance(entry.group, DirectoryGroup)
+        assert entry.members == (
+            DirectoryMember(
+                email="alice@example.com",
+                membership_id="m1",
+                provider_user_id=None,
+                member_type="USER",
+                role=None,
+                provider="google",
+            ),
+        )
+
+    def test_issues_one_batched_round_trip_per_page_depth(self, provider, google_service):
+        # Arrange
+        self._install_groups(google_service, ["sg-a@example.com", "sg-b@example.com"])
+        rounds = _install_paged_batch(
+            google_service,
+            {"sg-a@example.com": [[]], "sg-b@example.com": [[]]},
+        )
+
+        # Act
+        result = provider.list_groups_with_members()
+
+        # Assert
+        assert result.is_success
+        assert len(rounds) == 1
+        assert set(rounds[0]) == {"sg-a@example.com", "sg-b@example.com"}
+
+    def test_group_requiring_a_second_page_returns_every_member_in_order(self, provider, google_service):
+        # Arrange
+        self._install_groups(google_service, ["sg-a@example.com"])
+        _install_paged_batch(
+            google_service,
+            {
+                "sg-a@example.com": [
+                    [{"email": "alice@example.com", "type": "USER", "id": "m1"}],
+                    [{"email": "bob@example.com", "type": "USER", "id": "m2"}],
+                ]
+            },
+        )
+
+        # Act
+        result = provider.list_groups_with_members()
+
+        # Assert
+        assert result.is_success
+        assert [member.email for member in result.data.groups[0].members] == [
+            "alice@example.com",
+            "bob@example.com",
+        ]
+
+    def test_failed_group_is_carried_in_failures_with_classified_status(self, provider, google_service):
+        # Arrange
+        self._install_groups(google_service, ["sg-ok@example.com", "sg-bad@example.com"])
+        _install_paged_batch(
+            google_service,
+            {"sg-ok@example.com": [[{"email": "alice@example.com", "type": "USER", "id": "m1"}]]},
+            errors_by_key={"sg-bad@example.com": _http_error(429)},
+        )
+
+        # Act
+        result = provider.list_groups_with_members()
+
+        # Assert
+        assert result.is_success
+        payload = result.data
+        assert [entry.group.group_email for entry in payload.groups] == ["sg-ok@example.com"]
+        assert len(payload.failures) == 1
+        failure = payload.failures[0]
+        assert isinstance(failure, directory_models.DirectoryGroupFailure)
+        assert failure.group_email == "sg-bad@example.com"
+        assert failure.status == OperationStatus.TRANSIENT_ERROR
+        assert failure.error_code == "429"
+        assert failure.message
+
+    def test_unmapped_per_group_http_error_propagates(self, provider, google_service):
+        # Arrange
+        self._install_groups(google_service, ["sg-bad@example.com"])
+        _install_paged_batch(
+            google_service,
+            {},
+            errors_by_key={"sg-bad@example.com": _http_error(400)},
+        )
+
+        # Act / Assert
+        with pytest.raises(HttpError):
+            provider.list_groups_with_members()
+
+    def test_empty_group_list_returns_empty_payload_without_batching(self, provider, google_service):
+        # Arrange
+        self._install_groups(google_service, [])
+        _install_paged_batch(google_service, {})
+
+        # Act
+        result = provider.list_groups_with_members()
+
+        # Assert
+        assert result.is_success
+        assert result.data.groups == ()
+        assert result.data.failures == ()
+        google_service.new_batch_http_request.assert_not_called()
+
+    def test_group_set_spanning_more_than_one_chunk_is_merged(self, provider, google_service):
+        # Arrange
+        emails = [f"sg-{index}@example.com" for index in range(150)]
+        self._install_groups(google_service, emails)
+        rounds = _install_paged_batch(
+            google_service,
+            {email: [[{"email": f"user-{email}", "type": "USER", "id": email}]] for email in emails},
+        )
+
+        # Act
+        result = provider.list_groups_with_members()
+
+        # Assert
+        assert result.is_success
+        assert len(rounds) == 2
+        assert [len(round_ids) for round_ids in rounds] == [_BATCH_MAX_REQUESTS, 50]
+        assert {entry.group.group_email for entry in result.data.groups} == set(emails)
+
+    def test_zero_member_group_is_included(self, provider, google_service):
+        # Arrange
+        self._install_groups(google_service, ["sg-empty@example.com"])
+        _install_paged_batch(google_service, {"sg-empty@example.com": [[]]})
+
+        # Act
+        result = provider.list_groups_with_members()
+
+        # Assert
+        assert result.is_success
+        assert len(result.data.groups) == 1
+        assert result.data.groups[0].group.group_email == "sg-empty@example.com"
+        assert result.data.groups[0].members == ()
+
+    def test_members_are_not_merged_with_user_records(self, provider, google_service):
+        # Arrange
+        self._install_groups(google_service, ["sg-a@example.com"])
+        _install_paged_batch(
+            google_service,
+            {"sg-a@example.com": [[{"email": "alice@example.com", "type": "USER", "id": "m1"}]]},
+        )
+
+        # Act
+        result = provider.list_groups_with_members()
+
+        # Assert
+        assert result.is_success
+        assert all(isinstance(member, DirectoryMember) for member in result.data.groups[0].members)
+        google_service.users.assert_not_called()
+
+    def test_propagates_list_groups_error_without_batching(self, provider, google_service):
+        # Arrange
+        google_service.groups.return_value.list.return_value.execute.side_effect = _http_error(503)
+        _install_paged_batch(google_service, {})
+
+        # Act
+        result = provider.list_groups_with_members()
+
+        # Assert
+        assert not result.is_success
+        assert result.status == OperationStatus.TRANSIENT_ERROR
+        google_service.new_batch_http_request.assert_not_called()
+
+    def test_empty_member_types_returns_error_without_batching(self, provider, google_service):
+        # Arrange
+        self._install_groups(google_service, ["sg-a@example.com"])
+        _install_paged_batch(google_service, {"sg-a@example.com": [[]]})
+
+        # Act
+        result = provider.list_groups_with_members(include_member_types=set())
+
+        # Assert
+        assert not result.is_success
+        assert result.error_code == "DIRECTORY_MEMBER_TYPES_INVALID"
+        google_service.new_batch_http_request.assert_not_called()

@@ -2,10 +2,15 @@
 
 from dataclasses import dataclass
 
+from infrastructure.operations.status import OperationStatus
+
 __all__ = [
     "DirectoryUser",
     "DirectoryMember",
     "DirectoryGroup",
+    "DirectoryGroupWithMembers",
+    "DirectoryGroupFailure",
+    "DirectoryGroupsWithMembers",
     "MembershipCheckResult",
 ]
 
@@ -45,6 +50,36 @@ class DirectoryGroup:
     name: str | None = None
     description: str | None = None
     provider: str | None = None
+
+
+@dataclass(frozen=True)
+class DirectoryGroupWithMembers:
+    """Canonical group paired with its resolved members."""
+
+    group: DirectoryGroup
+    members: tuple[DirectoryMember, ...] = ()
+
+
+@dataclass(frozen=True)
+class DirectoryGroupFailure:
+    """Per-group failure carried inside a successful composition result."""
+
+    group_email: str
+    status: OperationStatus
+    error_code: str | None
+    message: str
+
+
+@dataclass(frozen=True)
+class DirectoryGroupsWithMembers:
+    """Groups-with-members composition payload.
+
+    Per-group failures live here rather than in the result status because the
+    OperationStatus set is closed (decisions/operation-result.md).
+    """
+
+    groups: tuple[DirectoryGroupWithMembers, ...] = ()
+    failures: tuple[DirectoryGroupFailure, ...] = ()
 
 
 @dataclass(frozen=True)

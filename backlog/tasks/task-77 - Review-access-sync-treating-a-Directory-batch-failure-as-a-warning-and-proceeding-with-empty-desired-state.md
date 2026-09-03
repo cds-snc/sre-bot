@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-03 18:03'
+updated_date: '2026-09-03 20:09'
 labels:
   - reliability
 dependencies: []
@@ -48,3 +49,23 @@ INTERACTION WITH THE 25.1.6 WORK: TASK-25.1.6.3.1 fixes a separate defect in the
 - [ ] #3 A test proves that a failing get_group_members_batch does not result in a desired state that a caller could mistake for 'no members'
 - [ ] #4 The distinct warning-and-continue at desired_state.py:150-156 (group not found for a rule) is evaluated separately and either left intentionally unchanged with a recorded rationale, or fixed on its own merits
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @task-planner
+created: 2026-09-03 20:09
+---
+TWO OF YOUR PREMISES MOVE WHEN TASK-25.1.6.3.1 MERGES (task-planner, 2026-09-03, human-approved while planning it). Re-read this before you plan; your description currently cites integrations/google_workspace/client.py:193-199 as the source of the all-or-nothing behaviour, and that code will be dead.
+
+1. THE SOURCE OF TRUTH MOVES. execute_batch_request's blanket 'PERMANENT_ERROR for the WHOLE batch as soon as ONE group's request fails' will no longer live in the vendor package. The orchestration moves into GoogleDirectoryProvider (app/infrastructure/directory/google.py), because decisions/outbound-clients.md makes the adapter the classification boundary. Cite the provider, not client.py.
+
+2. THE STATUS BECOMES CLASSIFIED, WHICH SHARPENS YOUR EXPOSURE ARGUMENT RATHER THAN WEAKENING IT. The batch failure will be classified by classify_google_error, so a 429 or 503 on ONE group now yields TRANSIENT_ERROR (with retry_after when Google supplies it) for the whole batch, not PERMANENT_ERROR. packages/access/sync/desired_state.py:163 only reads is_success, so its behaviour is bit-for-bit unchanged - it still logs build_desired_state_batch_members_failed and proceeds with an empty desired state. But you now have a typed, correct signal available at that call site to branch on, which is exactly what a fix needs.
+
+3. STILL TRUE AND UNCHANGED: get_group_members_batch remains ALL-OR-NOTHING by explicit human decision. TASK-25.1.6.3.1 deliberately does not change its return contract, so one bad group key can still empty the desired state for every entitlement in the batch. Your AC#3 stands as written.
+
+4. NEW OPTION AVAILABLE TO YOU. TASK-25.1.6.3.1 also adds a per-group-failure-tolerant surface on the same provider - list_groups_with_members returns success carrying a failures tuple of DirectoryGroupFailure(group_email, status, error_code, message) alongside the groups that succeeded. If your fix wants 'proceed with the groups that worked, and never silently present a partial result as complete', the mechanism now exists in infrastructure and you would not be inventing it. Whether desired_state should move onto it, or get_group_members_batch should gain the same shape, is your call - do not assume either.
+
+5. UNRELATED DEFECT ALSO CLOSED BY .3.1, worth knowing since it touches the same call: get_group_members_batch ignores nextPageToken today and silently truncates any group past the first member page. Fixed there. It can only ever return MORE members, so it does not interact with your failure-handling scope.
+---
+<!-- COMMENTS:END -->
