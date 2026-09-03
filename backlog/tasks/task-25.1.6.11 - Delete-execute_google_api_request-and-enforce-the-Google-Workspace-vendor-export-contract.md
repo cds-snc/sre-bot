@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:04'
+updated_date: '2026-09-03 18:02'
 labels:
   - clients
   - phase-3
@@ -50,3 +51,21 @@ THEN: TASK-25.1's AC#1 and TASK-25's AC#1/#2 become provable for the Google vend
 - [ ] #5 A CI guardrail fails the build when app/integrations/<vendor>/ gains a non-factory/non-classification/non-settings module, and it is proven by a deliberately failing fixture in the check's own tests
 - [ ] #6 app/bin/baselines/sdk_typing_antipatterns.txt has zero remaining google_workspace entries and python3 bin/check_sdk_typing.py passes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @task-planner
+created: 2026-09-03 18:02
+---
+execute_batch_request WILL ALREADY BE DEAD WHEN YOU GET HERE (2026-09-03, task-planner, human-approved while planning TASK-25.1.6.3).
+
+Your scope says 'resolve execute_batch_request' - either relocate it to the provider or write an amendment to decisions/outbound-clients.md. The first option is now taken by the new TASK-25.1.6.3.1, which moves the batch orchestration into GoogleDirectoryProvider (the adapter is the boundary, per decisions/outbound-clients.md) so it can add cross-round pagination and per-group failure reporting that the current all-or-nothing helper cannot express.
+
+GREP-CONFIRMED 2026-09-03: execute_batch_request has exactly one consumer repo-wide - infrastructure/directory/google.py:17 (import) and :525 (call). Definition at integrations/google_workspace/client.py:170. Nothing else.
+
+So once TASK-25.1.6.3.1 merges, your item collapses from a design decision to a straight deletion of a zero-consumer function plus its tests. No amendment to decisions/outbound-clients.md is needed - the deviation is removed rather than legalised. Note TASK-25.1.6.3.1 deliberately LEAVES the dead function in place rather than deleting it, because its AC#7 confines that PR's diff to app/infrastructure/directory/**; the deletion is yours.
+
+Worth folding into your AC#7 CI guardrail: a vendor package exporting an OperationResult-returning orchestration helper is exactly the regrowth shape the guardrail should catch, since decisions/outbound-clients.md says app/integrations/<vendor>/ provides exactly factories, classify_<vendor>_error and settings.
+---
+<!-- COMMENTS:END -->

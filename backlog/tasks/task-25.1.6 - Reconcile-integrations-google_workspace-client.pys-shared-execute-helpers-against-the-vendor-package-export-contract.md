@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 15:31'
-updated_date: '2026-09-03 15:10'
+updated_date: '2026-09-03 18:03'
 labels:
   - clients
   - phase-3
@@ -248,5 +248,24 @@ GAP FLAGGED WHILE PLANNING TASK-25.1.6.2 (2026-09-03, task-planner). That slice'
 created: 2026-09-03 15:10
 ---
 LOCATION UPDATE for the 2026-09-03 gap comment above (task-planner). TASK-25.1.6.2's destination changed during planning from app/modules/incident/utils.py to a new app/packages/incident_scheduling/ package (no hookimpls/entry-point yet), authorized by a new coexistence rule 5 added to decisions/migration.md to permit relocating host-surface-free pure logic out of a frozen module ahead of its full migration. get_federal_holidays now lives at app/packages/incident_scheduling/availability.py. The outbound-clients.md compliance gap flagged in the prior comment is unchanged in substance (still no dedicated canada_holidays vendor client + classify function) - only the location reference moves.
+---
+
+author: @task-planner
+created: 2026-09-03 18:03
+---
+TASK-25.1.6.3 SPLIT INTO TWO (2026-09-03, task-planner, human-approved during planning). Your AC#1 counts twelve children; that count is unchanged - the new task is a GRANDCHILD under TASK-25.1.6.3, not a thirteenth child. TASK-25.1.6.3 is not Done until it is Done.
+
+- TASK-25.1.6.3 (Slice A, retitled 'Make DirectoryProvider list-all generic and unbounded, and close the mapping gaps blocking the legacy consumers') - list-all semantics, generic/managed group-mapping split, observable drops, DirectoryUser.given_name/family_name, field inventory. Unblocks TASK-25.1.6.4 on its own.
+- TASK-25.1.6.3.1 (Slice B, NEW) - batch orchestration moved into GoogleDirectoryProvider, batch pagination, groups-with-members composition. TASK-25.1.6.5 now depends on it as well as on .4.
+
+Rationale: gate trigger #3 - the combined scope mixed a mechanical mapping/pagination change with a behavioural rearchitecture of the Google batch surface. Combined estimate was ~295 production LOC over 3 files, under the 400 LOC threshold, so this is a deliberate reviewability split rather than a hard-gate requirement.
+
+THREE FINDINGS FROM THAT PLANNING THAT AFFECT THIS COORDINATOR.
+
+1. YOUR AC#6 GETS EASIER. execute_batch_request has exactly ONE consumer repo-wide (infrastructure/directory/google.py:17 and :525). TASK-25.1.6.3.1 relocates that orchestration into the provider, so by the time TASK-25.1.6.11 runs, AC#6's 'relocated to the provider' branch is already satisfied and no amendment to decisions/outbound-clients.md is needed. Comment left on .11.
+
+2. TWO DEFECTS FOUND IN THE SURVIVING PROVIDER, i.e. in the side this coordinator decided keeps living. (a) list_users' limit is a post-hoc slice applied after walking EVERY page (google.py:402 then :418), so list_users(limit=3) pulls the whole directory today; fixed by Slice A. (b) get_group_members_batch ignores nextPageToken and silently truncates any group past the first page; fixed by Slice B. Both predate this work and neither is caused by the mirror retirement - worth knowing that 'the provider is the better of the two' (your 2026-09-02 Directory decision) was true but not defect-free.
+
+3. TWO FOLLOW-UPS CREATED OUTSIDE THIS COORDINATOR'S TREE, both deliberately NOT children of TASK-25.1.6 because neither is Google vendor-mirror work: TASK-76 (relocate managed-group prefix/domain policy out of infrastructure/directory into packages/access - the layering correction behind Slice A's mapper split, gated on TASK-25.1.6.3) and TASK-77 (safety review of packages/access/sync/desired_state.py:163 swallowing an IDP batch failure and returning an empty desired state).
 ---
 <!-- COMMENTS:END -->

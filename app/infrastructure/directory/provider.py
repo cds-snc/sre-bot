@@ -50,7 +50,7 @@ class DirectoryProvider(Protocol):
         """
         ...
 
-    def list_users(self, query: str = "", limit: int = 100) -> OperationResult[list[DirectoryUser]]:
+    def list_users(self, query: str = "", limit: int | None = None) -> OperationResult[list[DirectoryUser]]:
         """Return canonical users for a directory query.
 
         Args:
@@ -58,9 +58,9 @@ class DirectoryProvider(Protocol):
                 this into backend-specific filter/search parameters when
                 supported. Empty string requests an unfiltered list where
                 supported.
-            limit: Maximum number of canonical users to return. Implementors
-                should enforce this at the API layer when possible and
-                truncate locally when provider pagination semantics differ.
+            limit: Maximum number of canonical users to return. None or not
+                provided requests all users (unbounded pagination).
+                Implementors should stop paginating as soon as limit is reached.
 
         Returns:
             OperationResult: success with the canonical DirectoryUser list.
@@ -146,12 +146,15 @@ class DirectoryProvider(Protocol):
         """
         ...
 
-    def list_groups(self, query: str) -> OperationResult[list[DirectoryGroup]]:
+    def list_groups(self, query: str = "", limit: int | None = None) -> OperationResult[list[DirectoryGroup]]:
         """List groups matching a query expression.
 
         Args:
             query: Provider-agnostic query expression translated by each
-                implementor into backend-specific list parameters.
+                implementor into backend-specific list parameters. Empty
+                string requests an unfiltered list of all groups.
+            limit: Maximum number of canonical groups to return. None or not
+                provided requests all groups (unbounded pagination).
 
         Returns:
             OperationResult: success with the matching DirectoryGroup list.

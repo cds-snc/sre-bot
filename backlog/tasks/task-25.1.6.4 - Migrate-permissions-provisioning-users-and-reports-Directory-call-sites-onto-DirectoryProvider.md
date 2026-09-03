@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:00'
-updated_date: '2026-09-02 17:16'
+updated_date: '2026-09-03 18:02'
 labels:
   - clients
   - phase-3
@@ -71,5 +71,23 @@ STRUCTURE: three classes, deliberately split by lifetime.
 - TestGenerateGroupMembersReportFailureModes -- includes two cases that are directly your problem: (a) list_groups raising propagates uncaught today and create_file has ALREADY run, so a failed Directory call leaves an empty spreadsheet behind; (b) list_group_members raising on the second group propagates with ZERO sheet writes done. Under OperationResult these exceptions no longer cross the boundary, so both of these tests WILL need rewriting -- that rewrite is your AC#4 error-branch handling, and the notes must name it.
 
 ALSO INHERITED: the tests monkeypatch modules.reports.google_groups.FOLDER_REPORTS_GOOGLE_GROUPS because GOOGLE_RESOURCES is not in the pytest env block, and they patch time.sleep (the module sleeps 1.1s per group). Keep both when you rework them.
+---
+
+author: @task-planner
+created: 2026-09-03 18:02
+---
+API SHAPE AND FIELD INVENTORY PRE-REGISTERED BY TASK-25.1.6.3 PLANNING (2026-09-03, task-planner). TASK-25.1.6.3 was split; you depend only on Slice A (TASK-25.1.6.3 itself), which is unblocked for you as soon as it merges. The new TASK-25.1.6.3.1 is Slice B and gates TASK-25.1.6.5, not you.
+
+WHAT SLICE A HANDS YOU.
+- list_users(query: str = '', limit: int | None = None). limit=None (the NEW DEFAULT) means every user in the domain. Your AC#2 is therefore satisfied by calling list_users() with no arguments - there is no magic number to pass. Related defect fixed in the same slice: today's limit is a post-hoc slice applied AFTER walking every page (google.py:402 then :418), so list_users(limit=3) currently pulls the whole directory; after Slice A the pagination stops early.
+- list_groups(query: str = '', limit: int | None = None). An EMPTY query means every group in the domain, mapped by a new generic mapper that does NOT apply managed-alias preference or managed-domain enforcement. modules/reports/google_groups.py:69 calls list_groups() with no arguments today, so this is the direct replacement. Do not pass a wildcard.
+- DirectoryUser gains given_name and family_name.
+- Unmappable group entries are logged at warning and counted rather than dropped silently; result contents are unchanged.
+
+FIELD MAPPING FOR YOUR THREE FILES (AC#5). modules/permissions/handler.py reads user['email'] at :20 and :36 -> DirectoryMember.email. modules/provisioning/users.py:26 returns raw user dicts consumed downstream as primaryEmail / name.givenName / name.familyName by modules/aws/identity_center.py:145-149 and :316-321 -> DirectoryUser.email / .given_name / .family_name. modules/reports/google_groups.py reads group['name'] at :70 and :87, group['email'] at :83, member['email'] and member['role'] at :117 -> DirectoryGroup.name / .group_email and DirectoryMember.email / .role.
+
+FIELDS THAT DO NOT SURVIVE, decided in Slice A rather than left for you: group directMembersCount and member status are NOT carried on the dataclasses (grep-confirmed zero downstream reads). DirectoryMember.provider_user_id is hardcoded None (google.py:257) - the Google member id is mapped to membership_id instead - so do not read provider_user_id expecting a value.
+
+ONE THING TO WATCH THAT IS YOURS, NOT SLICE A'S: modules/provisioning/users.py:36 applies utils.filters.filter_by_condition to the returned users, and modules/aws/identity_center.py:137 compares on the 'primaryEmail' dict key. Those helpers operate on dict keys, not dataclass attributes. Repointing users.py is therefore not a pure swap - decide explicitly whether the filter contract moves to attribute access or the consumer adapts, and cover it with a test.
 ---
 <!-- COMMENTS:END -->
