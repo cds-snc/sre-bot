@@ -4,7 +4,7 @@ title: Relocate the pure-domain helpers out of app/integrations/google_workspace
 status: To Do
 assignee: []
 created_date: '2026-09-02 14:59'
-updated_date: '2026-09-03 15:11'
+updated_date: '2026-09-03 16:15'
 labels:
   - clients
   - phase-3
@@ -99,5 +99,24 @@ BLAST RADIUS / ROLLBACK: pure code relocation, no schema/deployment/feature-flag
 created: 2026-09-03 15:11
 ---
 RE-SCOPED 2026-09-03 (live planning session, human-directed). Original plan (destination: app/modules/incident/utils.py) was rejected: increases debt in a frozen legacy module. First replacement idea (a minimal app/packages/incident/ foothold) was also rejected on closer reading of decisions/migration.md: the per-module recipe's "no zombie halves" guard reads as requiring the FULL incident migration (multi-PR series, already queued 2nd, largest user surface) before any packages/incident/ can exist alongside app/modules/incident/. Resolved by amending decisions/migration.md with a new coexistence rule 5 (via the architecture agent), explicitly permitting relocation of host-surface-free pure logic (no hookimpl, no entry-point) out of a frozen module into a real packages/<concern>/ home ahead of full migration - grounded in the already-shipped packages/incident_draft/packages/incident_summary precedent. Final destination: new app/packages/incident_scheduling/ package for the 4 Calendar-availability helpers, following that same incident_<concern> naming convention. extract_google_doc_id has no cohesion with that concern and is deferred to TASK-25.1.6.7 (which already owns deciding the incident Google-boundary package shape) rather than inventing a second new package name here. Acceptance criteria replaced in full to reflect this (bulk --acceptance-criteria); see decisions/migration.md's new rule 5 and change note for the authorizing amendment.
+---
+
+created: 2026-09-03 16:15
+---
+DESTINATION PATH CHANGE PROPOSED (2026-09-03, architecture review - needs human approval before this task's ACs are reworded).
+
+decisions/feature-packages.md gained a "Complex features: an umbrella directory, never a flat prefix" rule this session, and decisions/migration.md rule 5 was amended so relocations land in their FINAL umbrella position rather than a flat placeholder. Under the amended rules this task's destination becomes:
+
+  app/packages/incident_scheduling/availability.py  ->  app/packages/incident/scheduling/availability.py
+
+with tests moving to app/tests/{unit,integration}/packages/incident/scheduling/.
+
+WHY NOW: this is free today and not free later. The production package does not exist yet - a repo scan finds only app/tests/unit/packages/incident_scheduling/ and app/tests/integration/packages/incident_scheduling/ (tests-first, per this task's plan). Choosing the umbrella path costs one directory name; choosing the flat path costs a rename PR that TASK-38 would otherwise inherit alongside incident_draft and incident_summary.
+
+NOTHING ELSE ABOUT THIS TASK CHANGES. app/packages/incident/__init__.py is created empty (namespace only) and app/packages/incident/scheduling/ still ships no hookimpls and no pyproject.toml entry-point line, so AC#6's bright line (migration.md rule 5's lighter path, not capability migration) holds exactly as written. The 4 relocated Calendar-availability helpers, the tier split between unit/ and integration/, and the outbound-clients.md debt flagged in AC#3 are all unaffected.
+
+ACs AFFECTED IF APPROVED: #1 and #6 name app/packages/incident_scheduling/ literally; #3 names app/packages/incident_scheduling/availability.py. Not reworded here - human call.
+
+TASK-38 has been updated to own the umbrella and the reconciliation of the already-shipped flat packages (incident_draft, incident_summary), and records this task as the third relocation if it is not redirected now.
 ---
 <!-- COMMENTS:END -->
