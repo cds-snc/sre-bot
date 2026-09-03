@@ -6,13 +6,15 @@ from structlog import get_logger
 
 from infrastructure.configuration.integrations.google import get_google_resources_config
 from integrations.google_workspace.google_calendar import (
-    find_first_available_slot,
     get_freebusy,
-    identify_unavailable_users,
     insert_event,
 )
 from integrations.slack import channels as slack_channels
 from modules.incident import incident_conversation
+from packages.incident.scheduling.availability import (
+    find_first_available_slot,
+    identify_unavailable_users,
+)
 
 google_resources = get_google_resources_config()
 
