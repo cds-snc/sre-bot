@@ -4,6 +4,7 @@ from typing import Protocol, runtime_checkable
 
 from infrastructure.directory.models import (
     DirectoryGroup,
+    DirectoryGroupsWithMembers,
     DirectoryMember,
     DirectoryUser,
     MembershipCheckResult,
@@ -158,6 +159,32 @@ class DirectoryProvider(Protocol):
 
         Returns:
             OperationResult: success with the matching DirectoryGroup list.
+        """
+        ...
+
+    def list_groups_with_members(
+        self,
+        query: str = "",
+        limit: int | None = None,
+        include_member_types: set[str] | None = None,
+    ) -> OperationResult[DirectoryGroupsWithMembers]:
+        """List groups together with their members in one composition.
+
+        Implementors should use a provider-native batch API so the cost stays
+        proportional to the number of member pages rather than the number of
+        groups.  Groups whose members could not be fetched are returned in
+        ``failures`` rather than failing the whole result, because the
+        OperationStatus set is closed (decisions/operation-result.md).  Groups
+        with zero members are included.
+
+        Args:
+            query: Provider-agnostic query expression, as for ``list_groups``.
+            limit: Maximum number of groups to return, or None for all groups.
+            include_member_types: Optional set of member types to include
+                (for example ``{"USER"}``). If not provided, return all types.
+
+        Returns:
+            OperationResult: success with the DirectoryGroupsWithMembers payload.
         """
         ...
 

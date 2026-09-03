@@ -1583,7 +1583,7 @@ class TestListGroupsWithMembers:
             DirectoryMember(
                 email="alice@example.com",
                 membership_id="m1",
-                provider_user_id="m1",
+                provider_user_id=None,
                 member_type="USER",
                 role=None,
                 provider="google",
