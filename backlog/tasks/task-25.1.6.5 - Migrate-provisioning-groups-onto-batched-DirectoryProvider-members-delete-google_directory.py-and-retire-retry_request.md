@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:01'
-updated_date: '2026-09-03 18:00'
+updated_date: '2026-09-03 20:08'
 labels:
   - clients
   - phase-3
@@ -71,5 +71,35 @@ THREE THINGS THAT CHANGE YOUR PLANNING:
 2. THE COMPOSITION WILL NOT APPLY groups_filters EITHER. modules/provisioning/groups.py passes pre_processing_filters straight through to list_groups_with_members today, where they run via utils.filters.filter_by_condition against raw dicts. Those filters operate on dict keys ('name', 'email'), not dataclass attributes - so repointing is not a pass-through and you will need to decide whether the filters move to attribute access, or the consumer converts, or the filter contract changes. Budget for that; it is not covered by any earlier slice. Concretely: modules/aws/identity_center.py:56-60 supplies pre_processing_filters and a post-filter lambda group: 'AWS-' in group['name'] (identity_center.py:55), and modules/aws/groups.py:81 supplies more.
 
 3. PARTIAL FAILURE IS NOW EXPRESSED IN THE PAYLOAD, NOT THE STATUS. decisions/operation-result.md fixes a closed status set with no PARTIAL, so TASK-25.1.6.3.1's composition returns success with per-group failures carried as typed values inside data. Your AC#6 (name the failure-profile change explicitly) should describe the delta as: legacy retried each failing group with time.sleep and then skipped it silently, whereas the new path surfaces the failed group keys as typed failures the consumer must decide about. That is strictly more observable, not merely different.
+---
+
+author: @task-planner
+created: 2026-09-03 20:08
+---
+COMPOSITION CONTRACT FIXED 2026-09-03 (task-planner, human-approved while planning TASK-25.1.6.3.1). Plan against this exact shape:
+
+    def list_groups_with_members(
+        self,
+        query: str = '',
+        limit: int | None = None,
+        include_member_types: set[str] | None = None,
+    ) -> OperationResult[DirectoryGroupsWithMembers]
+
+New frozen dataclasses in app/infrastructure/directory/models.py:
+    DirectoryGroupWithMembers(group: DirectoryGroup, members: tuple[DirectoryMember, ...])
+    DirectoryGroupFailure(group_email: str, status: OperationStatus, error_code: str | None, message: str)
+    DirectoryGroupsWithMembers(groups: tuple[DirectoryGroupWithMembers, ...], failures: tuple[DirectoryGroupFailure, ...])
+
+FOUR THINGS THAT CHANGE YOUR PLANNING (in addition to the three already recorded on 2026-09-03 18:00):
+
+4. ZERO-MEMBER GROUPS ARE NOW RETURNED, NOT DROPPED. Legacy list_groups_with_members skipped any group whose member list came back empty (integrations/google_workspace/google_directory.py:187-190 - 'if members:'). The composition deliberately does not, because that is consumer business logic. If modules/provisioning/groups.py or its downstream (modules/aws/identity_center.py, modules/aws/groups.py) depends on empty groups being absent, YOU add the filter at the consumer. Pin it with a test either way - it is a real behavioural delta at your boundary, not at the provider's.
+
+5. THE LEGACY fields= PROJECTION IS GONE. Legacy requested groups(email, name, directMembersCount, description) and members(email, role, type, status). The canonical dataclasses carry neither directMembersCount nor member status; TASK-25.1.6.3's field inventory grep-confirmed zero downstream reads of both. If your migration surfaces a reader, that is a new finding, not a regression to paper over.
+
+6. FAILED GROUPS COME BACK AS DATA, AND FAILURE IS PER GROUP. failures carries a DirectoryGroupFailure per group whose members could not be fetched, with a status already classified by classify_google_error. The overall result is still SUCCESS. Your AC#6 should assert what modules/provisioning/groups.py does with a non-empty failures tuple - silently skipping it would be strictly worse than the legacy retry-then-skip, because now you were told. NOTE: an UNMAPPED HttpError status (e.g. 400) propagates as an exception rather than becoming a failure entry, by design per decisions/outbound-clients.md.
+
+7. BATCH ROUNDS ARE CHUNKED AT 100 REQUESTS. So 'one batched round-trip' in your AC#1 is precisely 'ceil(groups/100) batch requests per member-page depth', not literally one. Word AC#1's evidence accordingly - the claim to prove is 'not one members.list per group', not 'exactly one HTTP round-trip'.
+
+TWO RESIDUALS TASK-25.1.6.3.1 LEAVES FOR LATER (both recorded on TASK-25.1.6.11, neither blocks you): get_group_members keeps its own inline member-mapping loop, and get_group_members_batch keeps the admin.directory.group.readonly scope while get_group_members and the new composition use admin.directory.group.member.readonly.
 ---
 <!-- COMMENTS:END -->
