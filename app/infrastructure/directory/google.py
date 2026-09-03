@@ -17,13 +17,17 @@ from infrastructure.operations import OperationResult
 from integrations.google_workspace.client import classify_google_error, execute_batch_request
 
 if TYPE_CHECKING:
-    from googleapiclient._apis.admin.directory_v1 import DirectoryResource as AdminDirectoryResource
+    from googleapiclient._apis.admin.directory_v1 import (
+        DirectoryResource as AdminDirectoryResource,  # pyright: ignore[reportMissingModuleSource]
+    )
 
 logger = structlog.get_logger()
 
 T = TypeVar("T")
 
 _NUM_RETRIES = 3
+_USERS_PAGE_SIZE = 500
+_GROUPS_PAGE_SIZE = 200
 
 
 class GoogleDirectoryProvider:
@@ -83,6 +87,7 @@ class GoogleDirectoryProvider:
         resource: Any,
         request: Any,
         response_key: str,
+        limit: int | None = None,
     ) -> OperationResult[list[dict[str, Any]]]:
         """Aggregate every page of an already-built Directory list request.
 
@@ -96,6 +101,8 @@ class GoogleDirectoryProvider:
             while next_request is not None:
                 response = next_request.execute(num_retries=_NUM_RETRIES)
                 items.extend(response.get(response_key, []))
+                if limit is not None and len(items) >= limit:
+                    return items[:limit]
                 next_request = resource.list_next(next_request, response)
             return items
 
@@ -199,8 +206,9 @@ class GoogleDirectoryProvider:
     def _matches_managed_group_prefix(self, item: dict[str, Any], prefix: str) -> bool:
         """Return whether the group's primary email or aliases match a prefix."""
 
-        candidates = [self._extract_email(item, "email", "groupEmail")]
-        candidates.extend(self._extract_group_aliases(item))
+        candidates = [c for c in [self._extract_email(item, "email", "groupEmail")] + self._extract_group_aliases(item) if c]
+        if not candidates:
+            return True
         normalized_prefix = prefix.strip().lower()
         return any(candidate.startswith(normalized_prefix) for candidate in candidates)
 
@@ -235,6 +243,17 @@ class GoogleDirectoryProvider:
 
         return None
 
+    def _extract_name_parts(self, item: dict[str, Any]) -> tuple[str | None, str | None]:
+        """Extract (given_name, family_name) from provider payload variants."""
+
+        name = item.get("name")
+        if isinstance(name, dict):
+            given_name = str(name.get("givenName") or "").strip() or None
+            family_name = str(name.get("familyName") or "").strip() or None
+            return given_name, family_name
+
+        return None, None
+
     def _typed_error(self, result: OperationResult[Any]) -> OperationResult[T]:
         """Rebox an error result without leaking provider-native payload data."""
 
@@ -264,6 +283,7 @@ class GoogleDirectoryProvider:
             )
 
         display_name = self._extract_display_name(item)
+        given_name, family_name = self._extract_name_parts(item)
 
         is_active = None
         if "suspended" in item:
@@ -274,6 +294,8 @@ class GoogleDirectoryProvider:
                 email=email,
                 provider_user_id=provider_user_id,
                 display_name=display_name,
+                given_name=given_name,
+                family_name=family_name,
                 is_active=is_active,
                 provider="google",
             )
@@ -295,9 +317,44 @@ class GoogleDirectoryProvider:
             provider="google",
         )
 
-    def _build_directory_group(self, item: dict[str, Any]) -> OperationResult[DirectoryGroup | None]:
-        """Convert a Google group record into a canonical directory group."""
+    def _build_group(self, item: dict[str, Any]) -> OperationResult[DirectoryGroup]:
+        """Convert a Google group record into a generic canonical directory group.
 
+        Extracts canonical email and provider group ID without applying managed-group
+        alias preference or domain filtering.
+        """
+        group_email = self._extract_email(item, "email", "groupEmail")
+        if not group_email:
+            return OperationResult.permanent_error(
+                message="Directory group is missing email",
+                error_code="DIRECTORY_GROUP_EMAIL_REQUIRED",
+            )
+
+        provider_group_id = str(item.get("id") or item.get("groupId") or "").strip()
+        if not provider_group_id:
+            return OperationResult.permanent_error(
+                message="Directory group is missing provider group ID",
+                error_code="DIRECTORY_GROUP_ID_REQUIRED",
+            )
+
+        local_part, _, _ = group_email.partition("@")
+
+        return OperationResult.success(
+            data=DirectoryGroup(
+                group_email=group_email,
+                group_slug=local_part,
+                provider_group_id=provider_group_id,
+                name=item.get("name") or item.get("displayName"),
+                description=item.get("description"),
+                provider="google",
+            )
+        )
+
+    def _build_managed_group(self, item: dict[str, Any]) -> OperationResult[DirectoryGroup | None]:
+        """Convert a Google group record into a canonical managed directory group.
+
+        Applies managed-group alias preference and domain enforcement policies.
+        """
         group_email = self._extract_managed_group_email(item)
         if not group_email:
             if self._directory_settings.enforce_managed_group_email:
@@ -391,19 +448,22 @@ class GoogleDirectoryProvider:
 
         return OperationResult.success(data=user_result.data)
 
-    def list_users(self, query: str = "", limit: int = 100) -> OperationResult[list[DirectoryUser]]:
+    def list_users(self, query: str = "", limit: int | None = None) -> OperationResult[list[DirectoryUser]]:
         """Return canonical users matching a query."""
 
-        if limit <= 0:
+        if limit is not None and limit <= 0:
             return OperationResult.success(data=[])
+
+        max_results = min(limit, _USERS_PAGE_SIZE) if limit is not None else _USERS_PAGE_SIZE
 
         service = self._get_service(["https://www.googleapis.com/auth/admin.directory.user.readonly"])
         users_resource = service.users()
         result = self._paginate(
             "list_users",
             users_resource,
-            users_resource.list(customer=self._customer_id, maxResults=limit, query=query or None),
+            users_resource.list(customer=self._customer_id, maxResults=max_results, query=query or None),
             "users",
+            limit=limit,
         )
         if not result.is_success:
             return self._typed_error(result)
@@ -415,7 +475,7 @@ class GoogleDirectoryProvider:
             )
 
         users: list[DirectoryUser] = []
-        for item in result.data[:limit]:
+        for item in result.data:
             if not isinstance(item, dict):
                 return OperationResult.permanent_error(
                     message="Directory users payload contains an invalid entry",
@@ -594,7 +654,7 @@ class GoogleDirectoryProvider:
                 error_code="DIRECTORY_GROUP_PAYLOAD_INVALID",
             )
 
-        group_result = self._build_directory_group(result.data)
+        group_result = self._build_managed_group(result.data)
         if not group_result.is_success:
             return self._typed_error(group_result)
 
@@ -736,40 +796,64 @@ class GoogleDirectoryProvider:
         )
         return OperationResult.success(data=membership)
 
-    def list_groups(self, query: str) -> OperationResult[list[DirectoryGroup]]:
+    def list_groups(self, query: str = "", limit: int | None = None) -> OperationResult[list[DirectoryGroup]]:
         """List groups matching a Google Admin Directory query.
 
         Args:
-            query: Google Admin Directory search clause(s).  Bare strings
-                without a field operator are translated to ``email:{query}*``.
-                Queries containing ``:`` or ``=`` are passed through unchanged.
+            query: Google Admin Directory search clause(s). Empty string lists all
+                groups without query filtering. Bare strings without a field operator
+                are translated to ``email:{query}*``. Queries containing ``:`` or ``=``
+                are passed through unchanged.
+            limit: Maximum number of groups to return, or None for all groups.
 
         Returns:
             OperationResult: success with the matching DirectoryGroup list.
         """
-        managed_prefix = self._managed_group_query_prefix(query)
+        if limit is not None and limit <= 0:
+            return OperationResult.success(data=[])
+
+        max_results = min(limit, _GROUPS_PAGE_SIZE) if limit is not None else _GROUPS_PAGE_SIZE
+
         service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.readonly"])
         groups_resource = service.groups()
-        if managed_prefix is not None:
-            self._logger.info(
-                "listing_groups_alias_aware",
-                query=query,
-                managed_prefix=managed_prefix,
-            )
+
+        query_str = query.strip()
+        if not query_str:
             result = self._paginate(
                 "list_groups",
                 groups_resource,
-                groups_resource.list(customer=self._customer_id),
+                groups_resource.list(customer=self._customer_id, maxResults=max_results),
                 "groups",
+                limit=limit,
             )
+            map_fn = self._build_group
+            managed_prefix = None
         else:
-            google_query = f"email:{query}*" if ":" not in query and "=" not in query else query
-            result = self._paginate(
-                "list_groups",
-                groups_resource,
-                groups_resource.list(customer=self._customer_id, query=google_query),
-                "groups",
-            )
+            managed_prefix = self._managed_group_query_prefix(query_str)
+            if managed_prefix is not None:
+                self._logger.info(
+                    "listing_groups_alias_aware",
+                    query=query_str,
+                    managed_prefix=managed_prefix,
+                )
+                result = self._paginate(
+                    "list_groups",
+                    groups_resource,
+                    groups_resource.list(customer=self._customer_id, maxResults=max_results),
+                    "groups",
+                    limit=limit,
+                )
+            else:
+                google_query = f"email:{query_str}*" if ":" not in query_str and "=" not in query_str else query_str
+                result = self._paginate(
+                    "list_groups",
+                    groups_resource,
+                    groups_resource.list(customer=self._customer_id, maxResults=max_results, query=google_query),
+                    "groups",
+                    limit=limit,
+                )
+            map_fn = self._build_managed_group
+
         if not result.is_success:
             return self._typed_error(result)
 
@@ -786,6 +870,7 @@ class GoogleDirectoryProvider:
             ]
 
         groups: list[DirectoryGroup] = []
+        skipped_count = 0
         for item in raw_groups:
             if not isinstance(item, dict):
                 return OperationResult.permanent_error(
@@ -793,14 +878,37 @@ class GoogleDirectoryProvider:
                     error_code="DIRECTORY_GROUPS_PAYLOAD_INVALID",
                 )
 
-            group_result = self._build_directory_group(item)
+            group_result = map_fn(item)
             if not group_result.is_success:
-                return self._typed_error(group_result)
+                if group_result.error_code == "DIRECTORY_GROUP_DOMAIN_MISMATCH":
+                    return self._typed_error(group_result)
+                provider_group_id = str(item.get("id") or item.get("groupId") or "").strip() or "<unknown>"
+                self._logger.warning(
+                    "directory_group_skipped",
+                    provider_group_id=provider_group_id,
+                    error_code=group_result.error_code,
+                )
+                skipped_count += 1
+                continue
 
-            if group_result.data is not None:
-                groups.append(group_result.data)
+            if group_result.data is None:
+                provider_group_id = str(item.get("id") or item.get("groupId") or "").strip() or "<unknown>"
+                self._logger.warning(
+                    "directory_group_skipped",
+                    provider_group_id=provider_group_id,
+                )
+                skipped_count += 1
+                continue
 
-        return OperationResult.success(data=groups)
+            groups.append(group_result.data)
+
+        self._logger.info(
+            "directory_groups_listed",
+            returned=len(groups),
+            skipped=skipped_count,
+        )
+
+        return OperationResult.success(data=groups[:limit] if limit is not None else groups)
 
     def get_user_groups(self, user_email: str) -> OperationResult[list[DirectoryGroup]]:
         """Return all managed groups the user is a direct member of.
@@ -854,7 +962,7 @@ class GoogleDirectoryProvider:
                     error_code="DIRECTORY_USER_GROUPS_PAYLOAD_INVALID",
                 )
 
-            group_result = self._build_directory_group(item)
+            group_result = self._build_managed_group(item)
             if not group_result.is_success:
                 return self._typed_error(group_result)
 

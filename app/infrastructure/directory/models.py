@@ -17,6 +17,8 @@ class DirectoryUser:
     email: str
     provider_user_id: str
     display_name: str | None = None
+    given_name: str | None = None
+    family_name: str | None = None
     is_active: bool | None = None
     provider: str | None = None
 

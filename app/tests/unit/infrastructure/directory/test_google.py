@@ -203,6 +203,26 @@ class TestGetUser:
             provider="google",
         )
 
+    def test_name_parts_are_none_when_name_is_string_or_absent(self, provider, google_service):
+        """Verify given_name and family_name remain None when name is a bare string or missing."""
+        # Arrange
+        google_service.users.return_value.get.return_value = _request(
+            {
+                "primaryEmail": "user@example.com",
+                "id": "user-789",
+                "name": "Bare Name String",
+            }
+        )
+
+        # Act
+        result = provider.get_user("user@example.com")
+
+        # Assert
+        assert result.is_success
+        assert result.data.given_name is None
+        assert result.data.family_name is None
+        assert result.data.display_name == "Bare Name String"
+
     def test_propagates_get_user_error(self, provider, google_service):
         # Arrange
         google_service.users.return_value.get.return_value.execute.side_effect = _http_error(404)
@@ -976,7 +996,7 @@ class TestListGroups:
                 provider="google",
             ),
         ]
-        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer")
+        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", maxResults=200)
 
     def test_uses_group_alias_fields_when_standard_keys_are_missing(self, provider, google_service):
         # Arrange
@@ -994,7 +1014,7 @@ class TestListGroups:
 
         # Assert
         assert result.is_success
-        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer")
+        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", maxResults=200)
         assert result.data == [
             DirectoryGroup(
                 group_email="sg-ops@example.com",
@@ -1026,7 +1046,7 @@ class TestListGroups:
 
         # Assert
         assert result.is_success
-        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer")
+        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", maxResults=200)
         assert result.data == [
             DirectoryGroup(
                 group_email="sg-aws-finops@example.com",
@@ -1048,7 +1068,7 @@ class TestListGroups:
         # Assert
         assert result.is_success
         assert result.data == []
-        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer")
+        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", maxResults=200)
 
     def test_returns_error_when_managed_group_domain_mismatches(self, provider, google_service):
         # Arrange
@@ -1069,7 +1089,9 @@ class TestListGroups:
 
         # Assert
         # name:Admins is a Google query expression — passed through unchanged
-        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", query="name:Admins")
+        google_service.groups.return_value.list.assert_called_once_with(
+            customer="my_customer", maxResults=200, query="name:Admins"
+        )
         assert not result.is_success
         assert result.error_code == "DIRECTORY_GROUP_DOMAIN_MISMATCH"
 
