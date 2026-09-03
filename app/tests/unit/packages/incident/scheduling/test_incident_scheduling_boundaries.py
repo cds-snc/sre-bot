@@ -4,9 +4,9 @@ import tomllib
 from pathlib import Path
 
 import pytest
-from packages.incident.scheduling import availability
 
 from integrations.google_workspace import google_calendar, google_docs
+from packages.incident.scheduling import availability
 
 APP_ROOT = Path(__file__).resolve().parents[5]
 RELOCATED_NAMES = (

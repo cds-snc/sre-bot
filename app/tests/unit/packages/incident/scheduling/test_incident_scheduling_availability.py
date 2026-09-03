@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 import pytz
+
 from packages.incident.scheduling import availability
 
 
