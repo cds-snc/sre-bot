@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 15:31'
-updated_date: '2026-09-02 18:54'
+updated_date: '2026-09-03 15:10'
 labels:
   - clients
   - phase-3
@@ -238,5 +238,15 @@ WHY IT IS NOT FOLDED INTO .10, WHICH OWNS THAT CALL SITE. The implementation-pla
 DEPENDENCY WIRING APPLIED: .12 depends on .1 (the characterization gate pins todays unquoted output as a defect probe that .12 then flips); .10 now depends on TASK-25.1.6.7 AND TASK-25.1.6.12. Ordinal 132500 places it immediately after the gate task. AC#1 and the Description child list were updated from eleven to twelve; the other six acceptance criteria are unchanged, re-emitted only because the CLI replaces the set as a whole.
 
 SCOPE FENCE BETWEEN .12 AND .10, recorded on both: .12 quotes the sheet name in the batch_update_values range and the get_sheet ranges through one shared helper and makes 50-char truncation collision-safe. It does NOT touch the two blanket excepts (.10 AC#3 owns those), does NOT add skip-instead-of-abort resilience around batch_update_values (left to .10, which is rewriting that error handling anyway), and migrates nothing.
+---
+
+created: 2026-09-03 14:21
+---
+GAP FLAGGED WHILE PLANNING TASK-25.1.6.2 (2026-09-03, task-planner). That slice's plan relocates get_federal_holidays (the non-Google canada-holidays.ca HTTP call) out of app/integrations/google_workspace/ into app/modules/incident/utils.py, which satisfies TASK-25.1.6.2's own AC#3 literally ("no longer made from inside app/integrations/google_workspace/"). It does NOT make that HTTP call decisions/outbound-clients.md-compliant: that record wants any outbound boundary call behind a dedicated app/integrations/<vendor>/ client + classify_<vendor>_error, which a plain function in a legacy modules/incident/ file is not. None of this coordinator's twelve children currently own building that (a canada_holidays vendor tier). Not fixed by TASK-25.1.6.2 itself — building a vendor tier there would exceed a pure-function-relocation slice's scope and mix mechanical move with new-pattern establishment. Left as accepted, tracked debt; flagging here so it isn't lost. If desired, a follow-up task (sibling to these twelve, or its own ticket) should be created to give canada-holidays.ca a proper vendor client.
+---
+
+created: 2026-09-03 15:10
+---
+LOCATION UPDATE for the 2026-09-03 gap comment above (task-planner). TASK-25.1.6.2's destination changed during planning from app/modules/incident/utils.py to a new app/packages/incident_scheduling/ package (no hookimpls/entry-point yet), authorized by a new coexistence rule 5 added to decisions/migration.md to permit relocating host-surface-free pure logic out of a frozen module ahead of its full migration. get_federal_holidays now lives at app/packages/incident_scheduling/availability.py. The outbound-clients.md compliance gap flagged in the prior comment is unchanged in substance (still no dedicated canada_holidays vendor client + classify function) - only the location reference moves.
 ---
 <!-- COMMENTS:END -->

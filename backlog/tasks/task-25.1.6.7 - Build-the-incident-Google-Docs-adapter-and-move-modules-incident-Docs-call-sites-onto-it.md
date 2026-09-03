@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:02'
+updated_date: '2026-09-03 15:10'
 labels:
   - clients
   - phase-3
@@ -47,3 +48,22 @@ DO NOT reproduce the vendor module's create/batch_update/get_document signatures
 - [ ] #5 app/integrations/google_workspace/google_docs.py is deleted with its test file, grep-verified zero references repo-wide outside backlog/ and tmp/
 - [ ] #6 Existing incident tests pass, with any intentional behaviour change (in particular what each consumer now does on a classified Docs failure, which today is an unhandled propagation) named explicitly in the notes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-03 14:21
+---
+SCOPE NARROWING from TASK-25.1.6.2 planning (2026-09-03, task-planner). TASK-25.1.6.2's plan removes the `from integrations.google_workspace import google_docs` import from incident_conversation.py, incident_status.py and information_update.py entirely — grep-confirmed each file's ONLY use of google_docs was extract_google_doc_id (now relocated to modules/incident/utils.py), none of the three calls create/batch_update/get_document. So once TASK-25.1.6.2 lands, this task's AC#4 ("none imports integrations.google_workspace") is already true for 3 of the 4 named consumers before this task starts — only incident_document.py will still import google_docs (for batch_update/get_document), and it is therefore the only file this task's adapter migration needs to repoint for the "none imports" half of AC#4. The adapter itself, its try/except+classify_google_error, and the create/batchUpdate/get typed-result work are unaffected and still needed exactly as scoped.
+---
+
+created: 2026-09-03 15:10
+---
+CORRECTION to the 2026-09-03 comment above (task-planner). That comment claimed TASK-25.1.6.2 would remove the google_docs import from incident_conversation.py, incident_status.py and information_update.py entirely. That is no longer accurate: TASK-25.1.6.2 was re-scoped mid-planning to defer extract_google_doc_id's relocation to THIS task, specifically because this task is the one deciding where the incident feature's Google-boundary package lives, and creating a second, unrelated new package name for extract_google_doc_id in TASK-25.1.6.2 risked colliding with that undecided shape. TASK-25.1.6.2 now only relocates the 4 Calendar-availability helpers (to a new app/packages/incident_scheduling/ package, per decisions/migration.md's new rule 5). extract_google_doc_id stays in app/integrations/google_workspace/google_docs.py untouched, and all 4 named consumers (incident_document.py, incident_status.py, incident_conversation.py, information_update.py) still import google_docs exactly as today. This task's own scope (AC#4/#5) is unchanged by TASK-25.1.6.2 after all — disregard the narrowing claimed in the prior comment.
+---
+
+created: 2026-09-03 15:10
+---
+ACTIONABLE FOR THIS TASK: extract_google_doc_id itself is not a Google SDK call (pure regex over a URL string) - it does not belong in whatever adapter this task builds for create/batchUpdate/get. When this task deletes google_docs.py, it must also decide extract_google_doc_id's destination. It qualifies for decisions/migration.md's new rule 5 lighter path (no hookimpl/entry-point needed) the same way TASK-25.1.6.2's app/packages/incident_scheduling/ does - likely its own small package or a domain.py inside whichever package this task creates for the incident Docs boundary.
+---
+<!-- COMMENTS:END -->
