@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:04'
-updated_date: '2026-09-03 20:08'
+updated_date: '2026-09-03 21:30'
 labels:
   - clients
   - phase-3
@@ -79,5 +79,19 @@ R1. DUPLICATED MEMBER MAPPING. TASK-25.1.6.3.1 extracts _normalize_member_types 
 R2. INCONSISTENT OAUTH SCOPE FOR THE SAME CALL. get_group_members and the new composition request https://www.googleapis.com/auth/admin.directory.group.member.readonly; get_group_members_batch requests the broader https://www.googleapis.com/auth/admin.directory.group.readonly (today google.py:583). Same underlying members.list call, two scopes. TASK-25.1.6.3.1's AC#3 forbade changing it (it is a live path used by packages/access/sync/desired_state.py:160 and an OAuth scope change is not a no-op). Converging on the narrower member.readonly scope is safe - the delegation grant demonstrably exists, since get_group_members uses it in production - but it deserves its own small PR.
 
 ALSO CONFIRMING YOUR AC#2: after TASK-25.1.6.3.1 merges, integrations/google_workspace/client.py::execute_batch_request has ZERO consumers repo-wide and is a straight delete. The 'relocated to the provider' branch of your AC#2 is satisfied and no amendment to decisions/outbound-clients.md is needed. One thing to carry into the PR description when you delete it: the provider's replacement does NOT reproduce execute_batch_request's blanket PERMANENT_ERROR/BATCH_ERRORS - it classifies per-item HttpErrors via classify_google_error, which is why the vendor helper could not simply move.
+---
+
+author: @task-planner
+created: 2026-09-03 21:30
+---
+BEHAVIOURAL DELTA FOUND IN THE SURVIVING PROVIDER - TASK-25.1.6.4 PLANNING (2026-09-03, task-planner). Recording here because .11 is the final sweep over this surface and .3/.3.1 are already Done.
+
+LOST orderBy="email". The legacy vendor module passed orderBy="email" on both list calls (integrations/google_workspace/google_directory.py:64 users.list, :98 groups.list). GoogleDirectoryProvider does NOT: infrastructure/directory/google.py's list_users builds users_resource.list(customer=..., maxResults=..., query=...) and list_groups builds groups_resource.list(customer=..., maxResults=...), neither with orderBy.
+
+CONSEQUENCE. After TASK-25.1.6.4 repoints the legacy consumers, modules/reports/google_groups.py iterates groups in whatever order the Admin Directory API returns, so the sheet-creation order in the Google Groups members report changes. No correctness impact on modules/provisioning/users.py or modules/aws/identity_center.py, which filter by email membership.
+
+HUMAN DECISION (2026-09-03): NOT fixed in .4 - that slice touches app/modules/ only and does not modify the provider. Recorded as a finding, named in .4's PR, and left for this sweep to decide: either add orderBy="email" to the provider's two list builders for parity, or accept API order and delete this note. If you add it, verify against the Admin SDK docs which orderBy values each endpoint accepts rather than assuming symmetry between users.list and groups.list.
+
+ALSO, SMALLER: this task's AC#6 branch about execute_batch_request was already discharged by TASK-25.1.6.3.1 (the orchestration moved into the provider), per the note left on this task on 2026-09-03.
 ---
 <!-- COMMENTS:END -->
