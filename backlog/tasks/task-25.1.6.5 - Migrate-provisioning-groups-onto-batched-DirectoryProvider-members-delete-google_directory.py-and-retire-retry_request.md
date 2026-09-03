@@ -6,12 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:01'
+updated_date: '2026-09-03 18:00'
 labels:
   - clients
   - phase-3
 milestone: m-3
 dependencies:
   - TASK-25.1.6.4
+  - TASK-25.1.6.3.1
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
@@ -51,3 +53,23 @@ AFTER THIS TASK: app/integrations/google_workspace/ contains no Directory module
 - [ ] #6 The failure-profile change (per-group retry-with-sleep and continue, versus per-request errors surfaced by the batch callback) is named explicitly in the PR description and covered by a test asserting what modules/provisioning/groups.py now does when one group's members cannot be fetched
 - [ ] #7 app/bin/baselines/sdk_typing_antipatterns.txt is pruned of google_directory.py and python3 bin/check_sdk_typing.py passes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @task-planner
+created: 2026-09-03 18:00
+---
+DEPENDENCY REPOINTED 2026-09-03 (task-planner, human-approved while planning TASK-25.1.6.3). Now depends on TASK-25.1.6.4 AND the new TASK-25.1.6.3.1.
+
+WHY: TASK-25.1.6.3 was split under the implementation-planning size gate. Slice A (TASK-25.1.6.3) delivers the list-all semantics, the generic/managed group-mapping split, observable drops and DirectoryUser.given_name/family_name - that is what TASK-25.1.6.4 needs. Slice B (TASK-25.1.6.3.1) delivers the batch rearchitecture and the groups-with-members composition - that is what YOUR AC#1 needs. Depending only on .4 would have left you blocked on a capability nobody was building.
+
+THREE THINGS THAT CHANGE YOUR PLANNING:
+
+1. THE COMPOSITION WILL NOT MERGE USER RECORDS INTO MEMBERS. Legacy list_groups_with_members called get_members_details, which merged the whole Google user record into each member dict - which is how modules/aws/identity_center.py obtains primaryEmail, name.givenName and name.familyName from group members. TASK-25.1.6.3.1's composition deliberately does NOT do this: it is consumer business logic and decisions/outbound-clients.md keeps it out of the provider. YOU own that join. TASK-25.1.6.3 adds given_name/family_name to DirectoryUser precisely so you can do it with list_users() plus a match on email.
+
+2. THE COMPOSITION WILL NOT APPLY groups_filters EITHER. modules/provisioning/groups.py passes pre_processing_filters straight through to list_groups_with_members today, where they run via utils.filters.filter_by_condition against raw dicts. Those filters operate on dict keys ('name', 'email'), not dataclass attributes - so repointing is not a pass-through and you will need to decide whether the filters move to attribute access, or the consumer converts, or the filter contract changes. Budget for that; it is not covered by any earlier slice. Concretely: modules/aws/identity_center.py:56-60 supplies pre_processing_filters and a post-filter lambda group: 'AWS-' in group['name'] (identity_center.py:55), and modules/aws/groups.py:81 supplies more.
+
+3. PARTIAL FAILURE IS NOW EXPRESSED IN THE PAYLOAD, NOT THE STATUS. decisions/operation-result.md fixes a closed status set with no PARTIAL, so TASK-25.1.6.3.1's composition returns success with per-group failures carried as typed values inside data. Your AC#6 (name the failure-profile change explicitly) should describe the delta as: legacy retried each failing group with time.sleep and then skipped it silently, whereas the new path surfaces the failed group keys as typed failures the consumer must decide about. That is strictly more observable, not merely different.
+---
+<!-- COMMENTS:END -->
