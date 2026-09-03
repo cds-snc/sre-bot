@@ -4,12 +4,16 @@ import json
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from packages.oncall_sync import settings as settings_module
 from packages.oncall_sync.settings import (
     OnCallRotationConfig,
     OnCallScheduleConfig,
+    OnCallSyncSettings,
+    get_oncall_sync_settings,
     load_schedules,
+    load_sync_settings,
 )
 
 _VALID_ROTATION = {
@@ -137,6 +141,83 @@ def test_load_schedules_rejects_handle_collision_between_schedule_and_rotation(m
 
     with pytest.raises(ValueError, match="duplicate slack_handle"):
         load_schedules()
+
+
+# ---------------------------------------------------------------------------
+# Approved participant email domains (feature-owned settings slice)
+# ---------------------------------------------------------------------------
+
+
+def _write_rotations(monkeypatch, tmp_path: Path, payload: dict) -> None:
+    (tmp_path / "rotations.json").write_text(json.dumps(payload))
+    monkeypatch.setattr(settings_module, "files", lambda _pkg: _FakeResources(tmp_path))
+
+
+@pytest.mark.unit
+def test_approved_email_domains_defaults_to_empty(monkeypatch, tmp_path) -> None:
+    _write_rotations(monkeypatch, tmp_path, {"schedules": [_VALID_SCHEDULE]})
+
+    assert load_sync_settings().APPROVED_EMAIL_DOMAINS == []
+
+
+@pytest.mark.unit
+def test_approved_email_domains_default_to_empty_when_resource_missing(monkeypatch) -> None:
+    class _MissingResource:
+        @staticmethod
+        def joinpath(_: str) -> _MissingResource:
+            return _MissingResource()
+
+        @staticmethod
+        def is_file() -> bool:
+            return False
+
+    monkeypatch.setattr(settings_module, "files", lambda _pkg: _MissingResource())
+
+    assert load_sync_settings().APPROVED_EMAIL_DOMAINS == []
+
+
+@pytest.mark.unit
+def test_approved_email_domains_loaded_from_rotations_resource(monkeypatch, tmp_path) -> None:
+    _write_rotations(
+        monkeypatch,
+        tmp_path,
+        {"approved_email_domains": ["example.com", "other.org"], "schedules": [_VALID_SCHEDULE]},
+    )
+
+    assert load_sync_settings().APPROVED_EMAIL_DOMAINS == ["example.com", "other.org"]
+
+
+@pytest.mark.unit
+def test_approved_email_domains_are_normalized(monkeypatch, tmp_path) -> None:
+    _write_rotations(
+        monkeypatch,
+        tmp_path,
+        {"approved_email_domains": ["Example.COM", " Other.Org ", "", "  "], "schedules": []},
+    )
+
+    assert load_sync_settings().APPROVED_EMAIL_DOMAINS == ["example.com", "other.org"]
+
+
+@pytest.mark.unit
+def test_approved_email_domains_reject_malformed_domain(monkeypatch, tmp_path) -> None:
+    _write_rotations(monkeypatch, tmp_path, {"approved_email_domains": ["not a domain"], "schedules": []})
+
+    with pytest.raises(ValidationError, match="invalid approved email domain"):
+        load_sync_settings()
+
+
+@pytest.mark.unit
+def test_approved_email_domains_accept_name_or_alias() -> None:
+    assert OnCallSyncSettings(APPROVED_EMAIL_DOMAINS=["Example.com"]).APPROVED_EMAIL_DOMAINS == ["example.com"]
+
+
+@pytest.mark.unit
+def test_get_oncall_sync_settings_is_singleton() -> None:
+    get_oncall_sync_settings.cache_clear()
+    try:
+        assert get_oncall_sync_settings() is get_oncall_sync_settings()
+    finally:
+        get_oncall_sync_settings.cache_clear()
 
 
 class _FakeResources:

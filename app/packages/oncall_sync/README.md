@@ -8,6 +8,8 @@ Synced rotations are defined in [rotations.json](./rotations.json).
 
 Every 5 minutes, SRE Bot will fetch the current on-call individual for each rotation and update the linked Slack UserGroup if necessary. SRE Bot will also update the schedule-level UserGroup to contain all folks on-call for the nested rotations.
 
+The optional top-level `approved_email_domains` list in [rotations.json](./rotations.json) restricts which participant emails are looked up in Slack. Emails outside those domains are skipped without calling Slack and logged with a hashed fingerprint instead of the raw address. Leaving the list empty disables the filtering.
+
 ## Getting started
 
 1. Figure out your OpsGenie schedule ID and rotation names. To find the schedule ID, navigate to OpsGenie, click "Who is on-call" at the top, click on your schedule, then grab the ID from the URL. The rotation names are copied directly from this schedule view.
