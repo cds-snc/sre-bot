@@ -3,11 +3,11 @@ id: TASK-25.1.6.3.1
 title: >-
   Rearchitect Directory batch orchestration into the provider and add a
   paginated groups-with-members composition
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-03 17:57'
-updated_date: '2026-09-03 20:35'
+updated_date: '2026-09-03 20:42'
 labels:
   - architecture
 milestone: m-3

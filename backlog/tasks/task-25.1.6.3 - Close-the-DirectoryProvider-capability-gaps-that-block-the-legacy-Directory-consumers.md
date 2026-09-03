@@ -3,11 +3,11 @@ id: TASK-25.1.6.3
 title: >-
   Make DirectoryProvider list-all generic and unbounded, and close the mapping
   gaps blocking the legacy consumers
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-02 15:00'
-updated_date: '2026-09-03 18:41'
+updated_date: '2026-09-03 20:22'
 labels:
   - clients
   - phase-3
