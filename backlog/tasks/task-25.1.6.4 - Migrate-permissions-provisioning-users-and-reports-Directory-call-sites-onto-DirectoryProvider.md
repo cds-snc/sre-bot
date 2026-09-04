@@ -3,11 +3,11 @@ id: TASK-25.1.6.4
 title: >-
   Migrate permissions, provisioning-users and reports Directory call sites onto
   DirectoryProvider
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-02 15:00'
-updated_date: '2026-09-03 23:57'
+updated_date: '2026-09-04 00:02'
 labels:
   - clients
   - phase-3
