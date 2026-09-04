@@ -4,6 +4,7 @@ All functions are pure — no mocks required for entitlement-mode and
 approval-count tests.  DirectoryProvider tests use simple in-memory stubs.
 """
 
+from dataclasses import replace
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
@@ -12,6 +13,7 @@ import pytest
 from infrastructure.directory.models import DirectoryGroup, DirectoryMember
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig, PlatformPolicy
+from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.request.domain import AccessRequest, ApprovalDecision
 from packages.access.request.policies import (
     check_entitlement_mode,
@@ -202,6 +204,51 @@ def test_resolve_approver_candidates_returns_empty_on_directory_error():
     group = make_directory_group()
     result = resolve_approver_candidates(group, "sg-org-admins", directory)
     assert result == []
+
+
+@pytest.mark.unit
+def test_resolve_approver_candidates_resolves_owners_via_canonical_alias_email():
+    directory = MagicMock()
+    directory.get_group_members.return_value = OperationResult.success(data=[make_member("owner@example.com", role="OWNER")])
+    group = make_directory_group(
+        group_email="legacy-admins@example.com",
+        group_slug="legacy-admins",
+    )
+    group = replace(group, aliases=("sg-aws-admins@example.com",))
+
+    result = resolve_approver_candidates(
+        group,
+        "sg-org-admins",
+        directory,
+        ManagedGroupPolicy(prefix="sg-", domain="example.com"),
+    )
+
+    assert result == ["owner@example.com"]
+    assert directory.get_group_members.call_args.kwargs["group_key"] == "sg-aws-admins@example.com"
+
+
+@pytest.mark.unit
+def test_resolve_approver_candidates_composes_fallback_slug_through_policy():
+    directory = MagicMock()
+    fallback_keys: list[str] = []
+
+    def get_group_members(group_key, include_member_types=None):
+        fallback_keys.append(group_key)
+        if group_key == "sg-aws-admins@example.com":
+            return OperationResult.success(data=[make_member("member@example.com", role="MEMBER")])
+        return OperationResult.success(data=[make_member("admin@example.com", role="OWNER")])
+
+    directory.get_group_members.side_effect = get_group_members
+
+    result = resolve_approver_candidates(
+        make_directory_group(),
+        "sg-org-admins",
+        directory,
+        ManagedGroupPolicy(prefix="sg-", domain="example.com"),
+    )
+
+    assert result == ["admin@example.com"]
+    assert fallback_keys[-1] == "sg-org-admins@example.com"
 
 
 # ---------------------------------------------------------------------------

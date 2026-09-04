@@ -15,6 +15,7 @@ from packages.access.common.config import (
     InlineJsonConfigLoader,
     PlatformPolicy,
 )
+from packages.access.common.group_policy import ManagedGroupPolicy
 
 # ---------------------------------------------------------------------------
 # Stub helpers
@@ -479,3 +480,108 @@ def test_list_entitlements_should_return_empty_list_when_no_groups_discovered():
     # Assert
     assert result.is_success
     assert result.data == []
+
+
+# ---------------------------------------------------------------------------
+# ManagedGroupPolicy cut-over (TASK-76.3)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _GenericFakeDirectory:
+    """Stub for the generic (unqueried) listing path; records every query used."""
+
+    groups_result: OperationResult = field(default_factory=lambda: OperationResult.success(data=[]))
+    memberships: dict[str, OperationResult] = field(default_factory=dict)
+    queries: list[str] = field(default_factory=list)
+
+    def list_groups(self, query: str = "", limit: int | None = None) -> OperationResult:
+        self.queries.append(query)
+        return self.groups_result
+
+    def check_membership(self, group_email: str, user_email: str) -> OperationResult:
+        return self.memberships.get(
+            group_email,
+            OperationResult.success(
+                data=MembershipCheckResult(
+                    group_email=group_email,
+                    group_slug="",
+                    provider_group_id=None,
+                    user_email=user_email,
+                    is_member=False,
+                )
+            ),
+        )
+
+
+def make_policy_service(directory: _GenericFakeDirectory) -> CatalogService:
+    return CatalogService(
+        runtime_config=make_runtime_config(),
+        directory=directory,
+        parsers={},
+        policy=ManagedGroupPolicy(prefix="sg-", domain="example.com"),
+    )
+
+
+def test_list_entitlements_should_discover_groups_without_a_prefix_query():
+    directory = _GenericFakeDirectory(
+        groups_result=OperationResult.success(data=[make_group(slug="sg-aws-admin")]),
+    )
+    service = make_policy_service(directory)
+
+    result = service.list_entitlements(platform="aws", user_email="u@x.com")
+
+    assert result.is_success
+    assert directory.queries == [""]
+
+
+def test_list_entitlements_should_use_alias_preferred_canonical_email_and_slug():
+    group = DirectoryGroup(
+        group_email="legacy-admin@example.com",
+        group_slug="legacy-admin",
+        provider_group_id="gid-001",
+        aliases=("sg-aws-admin@example.com",),
+    )
+    directory = _GenericFakeDirectory(groups_result=OperationResult.success(data=[group]))
+    service = make_policy_service(directory)
+
+    result = service.list_entitlements(platform="aws", user_email="u@x.com")
+
+    assert result.is_success
+    assert [(e.token, e.group_slug, e.group_email) for e in result.data] == [
+        ("admin", "sg-aws-admin", "sg-aws-admin@example.com")
+    ]
+
+
+def test_list_entitlements_should_exclude_group_not_matching_platform_prefix():
+    directory = _GenericFakeDirectory(
+        groups_result=OperationResult.success(
+            data=[
+                make_group(slug="sg-aws-admin"),
+                make_group(slug="sg-gcp-admin", email="sg-gcp-admin@example.com"),
+            ]
+        ),
+    )
+    service = make_policy_service(directory)
+
+    result = service.list_entitlements(platform="aws", user_email="u@x.com")
+
+    assert result.is_success
+    assert [e.group_slug for e in result.data] == ["sg-aws-admin"]
+
+
+def test_list_entitlements_should_omit_out_of_domain_group_without_failing_listing():
+    directory = _GenericFakeDirectory(
+        groups_result=OperationResult.success(
+            data=[
+                make_group(slug="sg-aws-admin"),
+                make_group(slug="sg-aws-external", email="sg-aws-external@other-tenant.com"),
+            ]
+        ),
+    )
+    service = make_policy_service(directory)
+
+    result = service.list_entitlements(platform="aws", user_email="u@x.com")
+
+    assert result.is_success
+    assert [e.group_slug for e in result.data] == ["sg-aws-admin"]
