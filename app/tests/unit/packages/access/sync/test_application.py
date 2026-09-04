@@ -6,6 +6,8 @@ Covers:
   F-03  POLICY_NOT_FOUND and ADAPTER_NOT_FOUND errors surface correctly
   F-04  dry_run returns planned actions without executing them
   F-05  UNSUPPORTED_OPERATION from adapter sets requires_manual_action
+  F-06  A group-discovery IDP failure aborts sync instead of syncing an
+        empty rule set (TASK-78)
 """
 
 from typing import Any
@@ -219,11 +221,13 @@ class FakeDirectory:
         is_member: bool = True,
         groups: set[str] | None = None,
         user_group_slugs: set[str] | None = None,
+        list_groups_result: OperationResult | None = None,
     ) -> None:
         self._is_member = is_member
         self._per_group: dict[str, bool] = {}
         self._groups: set[str] = groups or set()
         self._user_group_slugs: set[str] | None = user_group_slugs
+        self._list_groups_result = list_groups_result
 
     def set_membership(self, group_slug: str, value: bool) -> None:
         self._per_group[group_slug] = value
@@ -287,6 +291,8 @@ class FakeDirectory:
         return OperationResult.success(data=mapping)
 
     def list_groups(self, query: str = "") -> OperationResult:
+        if self._list_groups_result is not None:
+            return self._list_groups_result
         matching = [
             DirectoryGroup(
                 group_email=f"{slug}@example.com",
@@ -307,6 +313,7 @@ def make_coordinator(
     user_exists: bool = True,
     adapter: FakeAdapter | None = None,
     discovered_groups: set[str] | None = None,
+    list_groups_result: OperationResult | None = None,
 ) -> tuple:
     if adapter is None:
         adapter = FakeAdapter(current_entitlement_ids=current_ids or set(), user_exists=user_exists)
@@ -325,6 +332,7 @@ def make_coordinator(
         is_member=is_member,
         groups=discovered_groups or set(),
         user_group_slugs=user_group_slugs,
+        list_groups_result=list_groups_result,
     )
     directory_provider: Any = directory
     coordinator = AccessSyncApplicationService(
@@ -461,3 +469,42 @@ def test_sync_platform_unknown_platform_returns_error():
     result = coordinator.sync_platform("nonexistent")
     assert not result.is_success
     assert result.error_code == "POLICY_NOT_FOUND"
+
+
+# ---------------------------------------------------------------------------
+# F-06 Group-discovery IDP failure aborts sync
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_sync_user_propagates_error_when_group_discovery_fails():
+    coordinator, adapter = make_coordinator(
+        discovered_groups={"sg-aws-admin"},
+        list_groups_result=OperationResult.error(
+            OperationStatus.TRANSIENT_ERROR,
+            message="rate limited",
+            error_code="429",
+        ),
+    )
+    result = coordinator.sync_user("alice@example.com", "aws")
+    assert not result.is_success
+    assert result.status == OperationStatus.TRANSIENT_ERROR
+    assert result.error_code == "429"
+    assert adapter.calls == []
+
+
+@pytest.mark.unit
+def test_sync_platform_propagates_error_when_group_discovery_fails():
+    coordinator, adapter = make_coordinator(
+        discovered_groups={"sg-aws-admin"},
+        list_groups_result=OperationResult.error(
+            OperationStatus.TRANSIENT_ERROR,
+            message="rate limited",
+            error_code="429",
+        ),
+    )
+    result = coordinator.sync_platform("aws")
+    assert not result.is_success
+    assert result.status == OperationStatus.TRANSIENT_ERROR
+    assert result.error_code == "429"
+    assert adapter.calls == []
