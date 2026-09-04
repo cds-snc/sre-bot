@@ -42,7 +42,18 @@ class DirectoryMember:
 
 @dataclass(frozen=True)
 class DirectoryGroup:
-    """Canonical managed group returned by all directory providers."""
+    """Canonical managed group returned by all directory providers.
+
+    ``aliases`` holds the secondary addresses the identity provider reports as
+    routing to this group. It is a vendor-neutral fact, not a policy decision:
+    consumers decide which address is canonical, never this model. It never
+    repeats ``group_email``, and it is empty when the provider has no such
+    concept, so no consumer may treat a non-empty tuple as guaranteed.
+
+    Per-provider source: Google merges ``aliases[]`` and ``nonEditableAliases[]``;
+    Entra ID maps ``proxyAddresses`` with the primary ``SMTP:`` entry dropped and
+    the scheme prefix stripped.
+    """
 
     group_email: str
     group_slug: str
@@ -50,6 +61,7 @@ class DirectoryGroup:
     name: str | None = None
     description: str | None = None
     provider: str | None = None
+    aliases: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

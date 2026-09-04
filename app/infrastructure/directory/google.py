@@ -447,6 +447,7 @@ class GoogleDirectoryProvider:
                 name=item.get("name") or item.get("displayName"),
                 description=item.get("description"),
                 provider="google",
+                aliases=tuple(self._extract_group_aliases(item)),
             )
         )
 
@@ -486,6 +487,7 @@ class GoogleDirectoryProvider:
                 name=item.get("name") or item.get("displayName"),
                 description=item.get("description"),
                 provider="google",
+                aliases=tuple(self._extract_group_aliases(item)),
             )
         )
 

@@ -1,10 +1,11 @@
 ---
 id: TASK-76.1
 title: Expose IDP-reported group aliases on the canonical DirectoryGroup model
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-04 14:17'
-updated_date: '2026-09-04 14:42'
+updated_date: '2026-09-04 14:57'
 labels:
   - layering
 milestone: m-3
@@ -35,12 +36,12 @@ TESTING (decisions/testing.md). Unit tests over recorded Google group payload di
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 DirectoryGroup carries aliases as an immutable tuple field defaulting to empty, and remains a frozen dataclass
-- [ ] #2 Both _build_group and _build_managed_group populate aliases from the provider payload using the existing extraction helper, with identical normalization to the current alias logic
-- [ ] #3 Unit tests at the mapper seam cover a group with aliases, a group without aliases, and confirm no other DirectoryGroup field changed
-- [ ] #4 No managed-group policy or setting is added, removed or relocated by this slice, and no file under app/packages/ is modified
-- [ ] #5 mypy, ruff and the full non-smoke pytest run are green
-- [ ] #6 DirectoryGroup.aliases is documented as a vendor-neutral fact with its per-IDP source named (Google aliases[] + nonEditableAliases[]; Entra proxyAddresses minus the primary SMTP: entry; empty tuple when the IDP has no such concept) and stated never to repeat group_email, so a future entra_id provider inherits a stated obligation rather than a Google-shaped signature
+- [x] #1 DirectoryGroup carries aliases as an immutable tuple field defaulting to empty, and remains a frozen dataclass
+- [x] #2 Both _build_group and _build_managed_group populate aliases from the provider payload using the existing extraction helper, with identical normalization to the current alias logic
+- [x] #3 Unit tests at the mapper seam cover a group with aliases, a group without aliases, and confirm no other DirectoryGroup field changed
+- [x] #4 No managed-group policy or setting is added, removed or relocated by this slice, and no file under app/packages/ is modified
+- [x] #5 mypy, ruff and the full non-smoke pytest run are green
+- [x] #6 DirectoryGroup.aliases is documented as a vendor-neutral fact with its per-IDP source named (Google aliases[] + nonEditableAliases[]; Entra proxyAddresses minus the primary SMTP: entry; empty tuple when the IDP has no such concept) and stated never to repeat group_email, so a future entra_id provider inherits a stated obligation rather than a Google-shaped signature
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -134,3 +135,24 @@ Approximately 6 production LOC across 2 files (models.py, google.py); roughly 70
 - TASK-76.4 - must relocate the existing managed-path assertions listed in F-a to the feature boundary, and its D2 removal of _normalize_email's completion branch also changes how aliases are normalized (a no-op while the managed domain is empty).
 - TASK-25.1.6.5 - no impact (F-f); no advisory needed.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTED (2026-09-04). Slice 1 of TASK-76: additive only, no behaviour change.
+
+PRODUCTION CHANGES (2 files, 4 LOC):
+- infrastructure/directory/models.py: DirectoryGroup gains 'aliases: tuple[str, ...] = ()' as the last field (keeps all existing keyword constructions valid, dataclass stays frozen/hashable). Docstring extended with the vendor-neutral contract: secondary routing addresses reported by the IDP, never repeating group_email, empty when the provider has no such concept; per-provider source named for Google (aliases[] + nonEditableAliases[]) and Entra (proxyAddresses minus the primary SMTP: entry).
+- infrastructure/directory/google.py: both _build_group and _build_managed_group now pass aliases=tuple(self._extract_group_aliases(item)). The helper is untouched, so ordering, dedup and normalization are byte-identical to what the managed-group policy consumes today.
+
+TEST EVIDENCE (tests were pre-authored on the branch):
+- tests/unit/infrastructure/directory/test_google.py TestGetGroup: merged-both-alias-lists, empty-when-no-alias-keys, malformed-payload-values-ignored (_build_managed_group seam).
+- TestListGroups::test_empty_query_returns_group_aliases asserts full DirectoryGroup equality on the empty-query path, proving _build_group populates aliases and no other field changed.
+- Existing test_prefers_managed_alias_when_primary_email_uses_old_pattern updated to expect aliases=('sg-aws-finops@example.com',).
+
+VALIDATION: tests/unit/infrastructure/directory -> 103 passed. ruff check . -> All checks passed. mypy infrastructure/directory -> 1 error, PRE-EXISTING and unrelated (google.py:923 map_fn reassignment variance between _build_group and _build_managed_group return types; not introduced by this slice). Full 'make test' run by the human -> all green.
+
+BOUNDARY CHECK (AC#4): no settings added/removed/relocated, no managed-group policy moved, nothing under app/packages/ touched.
+
+FOR HUMAN VERIFICATION (DoD): confirm the aliases contract wording in the DirectoryGroup docstring is the obligation you want a future entra_id provider to inherit; nothing consumes the field yet (first consumer lands in TASK-76.2).
+<!-- SECTION:NOTES:END -->
