@@ -3,10 +3,11 @@ id: TASK-78
 title: >-
   Review access sync discover_group_slugs IDP failure silently emptying
   effective policy before reconciliation
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-04 12:38'
-updated_date: '2026-09-04 13:14'
+updated_date: '2026-09-04 13:37'
 labels:
   - reliability
 dependencies: []
@@ -36,9 +37,9 @@ Do not assume TASK-77's fix pattern transfers directly -- confirm the actual cal
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 It is determined and recorded whether discover_group_slugs' empty-set-on-IDP-failure fallback was a deliberate product decision or an oversight, citing the exact reasoning
-- [ ] #2 If it is the same defect class as TASK-77, a fix is proposed that propagates the list_groups failure to both sync_user and sync_platform callers without silently emptying effective policy, with the signature change reviewed for both call sites
-- [ ] #3 A test proves that a list_groups failure during group discovery does not result in a platform sync that treats the platform as having zero managed groups
+- [x] #1 It is determined and recorded whether discover_group_slugs' empty-set-on-IDP-failure fallback was a deliberate product decision or an oversight, citing the exact reasoning
+- [x] #2 If it is the same defect class as TASK-77, a fix is proposed that propagates the list_groups failure to both sync_user and sync_platform callers without silently emptying effective policy, with the signature change reviewed for both call sites
+- [x] #3 A test proves that a list_groups failure during group discovery does not result in a platform sync that treats the platform as having zero managed groups
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -106,3 +107,23 @@ ASSUMPTIONS / OPEN QUESTIONS FOR REVIEWER
 BLAST RADIUS / ROLLBACK
 Blast radius: discover_group_slugs()'s failure handling in packages/access/sync/desired_state.py, and _resolve()'s handling of that result in packages/access/sync/application.py -- consumed only by AccessSyncApplicationService.sync_user() and .sync_platform(). No schema, API, or adapter changes. Behaviourally, an IDP outage during group discovery now correctly aborts sync_user/sync_platform (surfacing as an error result, already logged/dispatched via existing error-handling paths) instead of silently proceeding with an effective policy that has zero entitlement rules for that platform. Rollback is a straight revert of the two production files + their tests; no data migration or dual-write concerns.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTED (2026-09-04).
+
+AC#1 verdict: OVERSIGHT, same defect class as TASK-77. DirectoryMembershipBuilder's own class docstring states all public methods return OperationResult; discover_group_slugs was the sole violator. list_groups already distinguishes a zero-match query (success with data=[]) from a classified failure, so the empty-set fallback conflated 'IDP outage' with 'platform declares zero groups' -- exactly the ambiguity decisions/operation-result.md exists to prevent. Blast-radius correction from the plan stands: actual effect was silent SKIP of entitlement grant/revoke enforcement (stale access persists, new access not granted), not active mass removal, because plan_actions' removal branch requires ent_id in sync_managed_by_id which is empty when rules are empty.
+
+AC#2 changes (production, 2 files):
+- packages/access/sync/desired_state.py: discover_group_slugs now returns OperationResult[set[str]]; on list_groups failure it keeps the discover_groups_failed warning and returns OperationResult.error propagating status/message/error_code/retry_after; success wraps the discovered set. Method and module docstrings updated to the propagate-on-failure contract.
+- packages/access/sync/application.py: _resolve() returns (None, None, discovered_result) when discovery fails, else resolves effective policy from discovered_result.data. No changes needed in sync_user()/sync_platform() -- both already short-circuit on the shared error tuple, confirming the single choke point reviewed for both call sites.
+
+AC#3 test evidence (test scaffolding was already present on the branch):
+- tests/integration/packages/access/sync/test_desired_state.py section C: test_should_discover_matching_group_slugs (happy path, prefix filtering) and test_should_propagate_error_when_group_discovery_fails (TRANSIENT_ERROR/429/retry_after=30 propagated, data is None).
+- tests/unit/packages/access/sync/test_application.py: sync_user and sync_platform discovery-failure tests assert an error result and that the adapter is never invoked -- proving no sync proceeds as if the platform had zero managed groups.
+
+VALIDATION: mypy on both changed files -> no new errors (only pre-existing integrations/slack/help.py:125). ruff check . -> All checks passed. Targeted access sync suites: 181 passed. Full 'make test' run by the human -> all green.
+
+FOR HUMAN VERIFICATION (DoD): review the behaviour change that an IDP list_groups outage now aborts sync_user/sync_platform with an error result (surfaced through existing error dispatch/logging) instead of silently no-op'ing enforcement; confirm alerting/runbook expectations for that new error path.
+<!-- SECTION:NOTES:END -->

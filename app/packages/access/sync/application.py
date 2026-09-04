@@ -109,8 +109,10 @@ class AccessSyncApplicationService:
                     error_code="ADAPTER_NOT_FOUND",
                 ),
             )
-        discovered = self._membership_builder.discover_group_slugs(self._config, platform)
-        effective = resolve_effective_policy(self._config, platform, discovered)
+        discovered_result = self._membership_builder.discover_group_slugs(self._config, platform)
+        if not discovered_result.is_success:
+            return None, None, discovered_result
+        effective = resolve_effective_policy(self._config, platform, discovered_result.data or set())
         return adapter, effective, None
 
     def _persist(

@@ -9,7 +9,8 @@ The coordinator resolves effective policy once per run via
 ``build_user_state_from_effective`` (single-user) or
 ``build_platform_state_from_effective`` (batch reconciliation).  Discovery
 of IDP groups is handled by ``discover_group_slugs`` which queries the
-directory with the platform prefix and returns matching slugs.
+directory with the platform prefix and returns matching slugs, propagating
+any directory failure to the caller.
 """
 
 from typing import TYPE_CHECKING
@@ -206,12 +207,14 @@ class DirectoryMembershipBuilder:
         self,
         config: AccessRuntimeConfig,
         platform: str,
-    ) -> set[str]:
+    ) -> OperationResult[set[str]]:
         """Discover IDP group slugs for a platform by querying with the platform prefix.
 
         Uses ``config.group_prefix(platform)`` as the query and filters results
-        to slugs that start with that prefix.  Returns an empty set on IDP
-        failure (non-fatal; the coordinator proceeds with an empty rule set).
+        to slugs that start with that prefix.  An IDP failure is propagated as
+        an error result: a caller must never be able to mistake an unreachable
+        directory for "this platform declares no managed groups", since an
+        empty rule set silently disables entitlement enforcement.
         """
         prefix = config.group_prefix(platform)
         log = logger.bind(platform=platform, group_prefix=prefix)
@@ -221,7 +224,12 @@ class DirectoryMembershipBuilder:
                 "discover_groups_failed",
                 error=list_result.message,
             )
-            return set()
+            return OperationResult.error(
+                list_result.status,
+                message=list_result.message,
+                error_code=list_result.error_code,
+                retry_after=list_result.retry_after,
+            )
 
         groups = list_result.data if isinstance(list_result.data, list) else []
         discovered = {
@@ -236,7 +244,7 @@ class DirectoryMembershipBuilder:
             discovered_count=len(discovered),
             discovered_group_slugs=sorted(discovered),
         )
-        return discovered
+        return OperationResult.success(data=discovered)
 
     def _check_group_membership(
         self,
