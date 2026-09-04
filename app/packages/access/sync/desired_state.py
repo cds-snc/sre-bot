@@ -116,7 +116,14 @@ class DirectoryMembershipBuilder:
         self,
         effective: EffectivePlatformPolicy,
     ) -> OperationResult[DesiredPlatformState]:
-        """Batch-read authn and entitlement groups into platform-shaped state."""
+        """Batch-read authn and entitlement groups into platform-shaped state.
+
+        Any IDP failure is propagated as an error result: a caller must never be
+        able to mistake an unreachable directory for "these entitlements have no
+        members", since reconciliation removes memberships absent from the
+        desired state.  The single exception is a ``NOT_FOUND`` on a rule's own
+        group, which is legitimate absence and skips only that entitlement.
+        """
         log = logger.bind(platform=effective.platform)
 
         authn_group_result = self._directory.get_group(effective.authn_group_slug)
@@ -145,6 +152,13 @@ class DirectoryMembershipBuilder:
         email_to_rule: dict[str, EntitlementRule] = {}
         for rule in effective.sync_managed_rules():
             group_result = self._directory.get_group(rule.group_slug)
+            if not group_result.is_success and group_result.status != OperationStatus.NOT_FOUND:
+                return OperationResult.error(
+                    group_result.status,
+                    message=group_result.message,
+                    error_code=group_result.error_code,
+                    retry_after=group_result.retry_after,
+                )
             if not group_result.is_success or not group_result.data:
                 log.warning(
                     "build_desired_state_group_not_found",
@@ -166,14 +180,19 @@ class DirectoryMembershipBuilder:
                     "build_desired_state_batch_members_failed",
                     error=batch_result.message,
                 )
-            else:
-                for group_email, members in (batch_result.data or {}).items():
-                    matched_rule = email_to_rule.get(group_email)
-                    if matched_rule is None:
-                        continue
-                    desired_members_by_entitlement.setdefault(matched_rule.entitlement_id, set()).update(
-                        member.email.lower() for member in members if member.email.lower() in desired_users
-                    )
+                return OperationResult.error(
+                    batch_result.status,
+                    message=batch_result.message,
+                    error_code=batch_result.error_code,
+                    retry_after=batch_result.retry_after,
+                )
+            for group_email, members in (batch_result.data or {}).items():
+                matched_rule = email_to_rule.get(group_email)
+                if matched_rule is None:
+                    continue
+                desired_members_by_entitlement.setdefault(matched_rule.entitlement_id, set()).update(
+                    member.email.lower() for member in members if member.email.lower() in desired_users
+                )
 
         return OperationResult.success(
             data=DesiredPlatformState(

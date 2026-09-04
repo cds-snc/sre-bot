@@ -3,10 +3,11 @@ id: TASK-77
 title: >-
   Review access sync treating a Directory batch failure as a warning and
   proceeding with empty desired state
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-03 18:03'
-updated_date: '2026-09-04 12:39'
+updated_date: '2026-09-04 12:54'
 labels:
   - reliability
 dependencies: []
@@ -44,11 +45,11 @@ INTERACTION WITH THE 25.1.6 WORK: TASK-25.1.6.3.1 fixes a separate defect in the
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 It is determined and recorded in the task notes whether any consumer of DesiredPlatformState acts destructively on an empty desired_members_by_entitlement, citing the exact reconciliation call sites read
-- [ ] #2 If an existing guard prevents destructive action, a regression test pins it and this task closes with that evidence; if no guard exists, the IDP failure is propagated rather than swallowed at desired_state.py:163
-- [ ] #3 A test proves that a failing get_group_members_batch does not result in a desired state that a caller could mistake for 'no members'
-- [ ] #4 The distinct warning-and-continue at desired_state.py:150-156 (group not found for a rule) is evaluated separately and either left intentionally unchanged with a recorded rationale, or fixed on its own merits
-- [ ] #5 When a per-rule get_group call fails with a non-NOT_FOUND status (TRANSIENT_ERROR, UNAUTHORIZED, or any other classified failure), build_platform_state_from_effective propagates that failure instead of silently excluding the entitlement; a NOT_FOUND result continues to be treated as legitimate absence (skip only that one entitlement), each branch covered by its own test
+- [x] #1 It is determined and recorded in the task notes whether any consumer of DesiredPlatformState acts destructively on an empty desired_members_by_entitlement, citing the exact reconciliation call sites read
+- [x] #2 If an existing guard prevents destructive action, a regression test pins it and this task closes with that evidence; if no guard exists, the IDP failure is propagated rather than swallowed at desired_state.py:163
+- [x] #3 A test proves that a failing get_group_members_batch does not result in a desired state that a caller could mistake for 'no members'
+- [x] #4 The distinct warning-and-continue at desired_state.py:150-156 (group not found for a rule) is evaluated separately and either left intentionally unchanged with a recorded rationale, or fixed on its own merits
+- [x] #5 When a per-rule get_group call fails with a non-NOT_FOUND status (TRANSIENT_ERROR, UNAUTHORIZED, or any other classified failure), build_platform_state_from_effective propagates that failure instead of silently excluding the entitlement; a NOT_FOUND result continues to be treated as legitimate absence (skip only that one entitlement), each branch covered by its own test
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -160,6 +161,26 @@ ASSUMPTIONS / OPEN QUESTIONS FOR REVIEWER
 BLAST RADIUS / ROLLBACK
 Blast radius: single method's failure-handling in `packages/access/sync/desired_state.py`, consumed only by `AccessSyncApplicationService.sync_platform`. No schema, API, or adapter changes. Behaviourally, IDP outages during platform sync now correctly abort the sync run (surfacing as a sync_platform error, already logged/dispatched via SYNC_FAILED-equivalent handling in application.py) instead of silently reconciling against an empty desired state. Rollback is a straight revert of the one file + its tests; no data migration or dual-write concerns.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTED (implementation agent, 2026-09-04). Production change confined to app/packages/access/sync/desired_state.py:build_platform_state_from_effective.
+
+AC#1 — NO GUARD EXISTS; the swallowed batch failure is genuinely destructive. Call sites read end to end: packages/access/sync/application.py:237-239 (sync_platform aborts on 'not desired_result.is_success' — the only guard, and it never fired because desired_state.py masked the failure as success); adapters/aws_identity_center.py:908-923 (_build_canonical_platform_state seeds desired_members_by_entitlement from policy rules, then overlays desired data — an empty overlay is indistinguishable from legitimate emptiness); aws_identity_center.py:1094-1096 (managed_entitlement_ids taken from canonical desired keys, so CURRENT members are still fetched for every managed entitlement); policies.py:293-320 (PlatformReconciliationPlanner: members_to_remove = current_members - desired_members, i.e. ALL current members when desired is empty). Non-dry-run then executes that plan.
+
+AC#2/#3 — get_group_members_batch failure now returns OperationResult.error propagating status, message, error_code and retry_after instead of logging a warning and falling through. The existing warning log is retained for operator visibility. application.py:237 needed no change; it now aborts correctly.
+
+AC#4/#5 — the per-rule get_group loop now branches on status: a non-NOT_FOUND failure propagates and fails the whole build; NOT_FOUND (and the pre-existing success-but-no-data edge case) still logs build_desired_state_group_not_found and skips only that entitlement.
+
+TEST EVIDENCE — new section B in app/tests/integration/packages/access/sync/test_desired_state.py (this method had zero coverage before): test_should_build_platform_state_from_authn_and_entitlement_groups (happy-path regression), test_should_propagate_error_when_batch_members_fetch_fails (AC#2/#3: TRANSIENT_ERROR, error_code 429, retry_after 30, data is None), test_should_skip_entitlement_when_group_not_found (AC#5 NOT_FOUND branch), test_should_propagate_error_when_group_lookup_transiently_fails (AC#5 non-NOT_FOUND branch). FakeDirectory in that package's conftest.py gained optional batch_members_result and group_result_by_slug injection, defaulting to prior always-succeed behaviour so every pre-existing test is untouched and still green.
+
+VALIDATION — 'make test' green. Targeted run: tests/integration/packages/access/sync + tests/unit/packages/access = 316 passed. ruff check clean. mypy reports only pre-existing repo-wide errors; none in the touched files.
+
+NOT DONE HERE — the partial-tolerant list_groups_with_members 'failures' composition was deliberately not adopted (see plan's considered-and-rejected). discover_group_slugs' identical swallow-on-failure shape remains open as TASK-78.
+
+LEFT FOR HUMAN VERIFICATION — DoD sign-off and moving this task to Done; also confirm the operational consequence is acceptable: an IDP outage during platform sync now aborts the sync run (surfaced as a sync_platform error) rather than silently reconciling against an empty desired state.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
