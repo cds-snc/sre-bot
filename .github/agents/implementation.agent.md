@@ -1,7 +1,7 @@
 ---
 name: implementation
 description: Implementation mode for features with pre-authored failing tests and approved architecture decisions.
-tools: ["search", "edit/editFiles", "execute/getTerminalOutput", "execute/runInTerminal", "read/terminalLastCommand", "read/terminalSelection", "execute/createAndRunTask", "agent"]
+tools: [vscode/askQuestions, vscode/memory, vscode/resolveMemoryFileUri, vscode/toolSearch, execute/getTerminalOutput, execute/createAndRunTask, execute/runInTerminal, read/terminalSelection, read/terminalLastCommand, read/readFile, agent, vscodeTasks/createAndRunTask, vscodeGeneral/usages, vscodeGeneral/toolSearch, edit/editFiles, search, web, todo]
 model: Auto (copilot)
 handoffs:
   - label: Return to Feature Architecture

@@ -793,6 +793,68 @@ class TestGetGroup:
         assert not result.is_success
         assert result.error_code == "DIRECTORY_GROUP_PAYLOAD_INVALID"
 
+    def test_returns_merged_group_aliases_from_both_google_alias_fields(self, provider, google_service):
+        # Arrange
+        google_service.groups.return_value.get.return_value = _request(
+            {
+                "email": "sg-admin@example.com",
+                "id": "group-1",
+                "name": "Admins",
+                "aliases": ["Admin-Alias@Example.com", "admin-alias@example.com"],
+                "nonEditableAliases": [
+                    "admin-alias@example.com.test-google-a.com",
+                    "Legacy-Admins@Example.com",
+                ],
+            }
+        )
+
+        # Act
+        result = provider.get_group("sg-admin@example.com")
+
+        # Assert
+        assert result.is_success
+        assert result.data.aliases == (
+            "admin-alias@example.com",
+            "admin-alias@example.com.test-google-a.com",
+            "legacy-admins@example.com",
+        )
+        assert result.data.group_email == "sg-admin@example.com"
+
+    def test_returns_empty_aliases_when_payload_has_no_alias_fields(self, provider, google_service):
+        # Arrange
+        google_service.groups.return_value.get.return_value = _request(
+            {
+                "email": "sg-admin@example.com",
+                "id": "group-1",
+                "name": "Admins",
+            }
+        )
+
+        # Act
+        result = provider.get_group("sg-admin@example.com")
+
+        # Assert
+        assert result.is_success
+        assert result.data.aliases == ()
+
+    def test_ignores_malformed_alias_payload_values(self, provider, google_service):
+        # Arrange
+        google_service.groups.return_value.get.return_value = _request(
+            {
+                "email": "sg-admin@example.com",
+                "id": "group-1",
+                "aliases": "admin-alias@example.com",
+                "nonEditableAliases": [123, None, "  Ops-Alias@Example.com  "],
+            }
+        )
+
+        # Act
+        result = provider.get_group("sg-admin@example.com")
+
+        # Assert
+        assert result.is_success
+        assert result.data.aliases == ("ops-alias@example.com",)
+
 
 class TestAddGroupMember:
     def test_adds_member_and_returns_canonical_member(self, provider, google_service):
@@ -1101,6 +1163,7 @@ class TestListGroups:
                 name="FinOps",
                 description=None,
                 provider="google",
+                aliases=("sg-aws-finops@example.com",),
             )
         ]
 
@@ -1244,6 +1307,44 @@ class TestListGroups:
         assert result.is_success
         assert result.data[0].group_email == "aws-finops@example.com"
         assert result.data[0].group_slug == "aws-finops"
+
+    def test_empty_query_returns_group_aliases(self, provider, google_service):
+        # Arrange
+        _install_pages(
+            google_service.groups.return_value,
+            "groups",
+            [
+                [
+                    {
+                        "email": "aws-finops@example.com",
+                        "aliases": ["sg-aws-finops@example.com"],
+                        "nonEditableAliases": ["aws-finops@example.com.test-google-a.com"],
+                        "id": "group-10",
+                        "name": "FinOps",
+                    }
+                ]
+            ],
+        )
+
+        # Act
+        result = provider.list_groups(query="")
+
+        # Assert
+        assert result.is_success
+        assert result.data == [
+            DirectoryGroup(
+                group_email="aws-finops@example.com",
+                group_slug="aws-finops",
+                provider_group_id="group-10",
+                name="FinOps",
+                description=None,
+                provider="google",
+                aliases=(
+                    "sg-aws-finops@example.com",
+                    "aws-finops@example.com.test-google-a.com",
+                ),
+            )
+        ]
 
     def test_returns_empty_list_when_groups_key_is_empty(self, provider, google_service):
         # Arrange
