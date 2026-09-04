@@ -5,10 +5,10 @@ from __future__ import annotations
 from functools import cache, partial
 from typing import TYPE_CHECKING
 
-from infrastructure.configuration.infrastructure.directory import get_directory_settings
 from infrastructure.configuration.integrations.google import get_google_workspace_settings
 from infrastructure.directory.google import GoogleDirectoryProvider
 from infrastructure.directory.provider import DirectoryProvider
+from infrastructure.directory.settings import get_directory_settings
 from integrations.google_workspace.client import get_admin_directory_service
 
 if TYPE_CHECKING:
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
     from googleapiclient._apis.admin.directory_v1 import DirectoryResource as AdminDirectoryResource
 
-    from infrastructure.configuration.infrastructure import DirectorySettings
+    from infrastructure.directory.settings import DirectorySettings
 
 
 def build_google_directory_provider(

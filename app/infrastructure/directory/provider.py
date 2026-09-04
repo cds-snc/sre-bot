@@ -80,7 +80,7 @@ class DirectoryProvider(Protocol):
         """Return all members of a group.
 
         Args:
-            group_key: Canonical managed-group email (normalised to lowercase).
+            group_key: Fully-qualified group email (normalised to lowercase).
             include_member_types: Optional set of member types to include
                 (for example ``{"USER"}``, ``{"GROUP"}``, or both). If not
                 provided, providers should return all member types.
@@ -91,11 +91,10 @@ class DirectoryProvider(Protocol):
         ...
 
     def get_group(self, group_key: str) -> OperationResult[DirectoryGroup]:
-        """Return a canonical managed group by key.
+        """Return a canonical group by key.
 
         Args:
-            group_key: Canonical managed-group email or provider-agnostic
-                managed-group slug (for example, ``sg-aws-authn``).
+            group_key: Fully-qualified group email (normalised to lowercase).
 
         Returns:
             OperationResult: success with the canonical DirectoryGroup.
@@ -108,11 +107,10 @@ class DirectoryProvider(Protocol):
         user_email: str,
         role: str = "MEMBER",
     ) -> OperationResult[DirectoryMember]:
-        """Add a user membership to a managed group.
+        """Add a user membership to a group.
 
         Args:
-            group_key: Canonical managed-group email or provider-agnostic
-                managed-group slug (for example, ``sg-aws-authn``).
+            group_key: Fully-qualified group email (normalised to lowercase).
             user_email: User email to add (normalised to lowercase).
             role: Provider-agnostic membership role hint (default: MEMBER).
 
@@ -126,11 +124,10 @@ class DirectoryProvider(Protocol):
         group_key: str,
         user_email: str,
     ) -> OperationResult[None]:
-        """Remove a user membership from a managed group.
+        """Remove a user membership from a group.
 
         Args:
-            group_key: Canonical managed-group email or provider-agnostic
-                managed-group slug (for example, ``sg-aws-authn``).
+            group_key: Fully-qualified group email (normalised to lowercase).
             user_email: User email to remove (normalised to lowercase).
 
         Returns:
@@ -142,8 +139,7 @@ class DirectoryProvider(Protocol):
         """Check whether a user is a member of a group.
 
         Args:
-            group_key: Canonical managed-group email or provider-agnostic
-                managed-group slug (for example, ``sg-aws-authn``).
+            group_key: Fully-qualified group email (normalised to lowercase).
             user_email: User email to check (compared case-insensitively).
 
         Returns:
@@ -200,8 +196,7 @@ class DirectoryProvider(Protocol):
         single-user sync path.
 
         Note: Returns direct memberships only — transitive membership through
-        nested sub-groups is not expanded.  Managed ``sg-*`` security groups
-        use flat membership, making this safe for the single-user sync hot path.
+        nested sub-groups is not expanded.
 
         Args:
             user_email: Canonical user email, normalised to lowercase.
@@ -225,7 +220,7 @@ class DirectoryProvider(Protocol):
         batching.
 
         Args:
-            group_keys: Canonical managed-group emails (normalised to lowercase).
+            group_keys: Fully-qualified group emails (normalised to lowercase).
             include_member_types: Optional set of member types to include
                 (for example ``{"USER"}``). If not provided, return all types.
 

@@ -42,7 +42,7 @@ class DirectoryMember:
 
 @dataclass(frozen=True)
 class DirectoryGroup:
-    """Canonical managed group returned by all directory providers.
+    """Canonical group returned by all directory providers.
 
     ``aliases`` holds the secondary addresses the identity provider reports as
     routing to this group. It is a vendor-neutral fact, not a policy decision:

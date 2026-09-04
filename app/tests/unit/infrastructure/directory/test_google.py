@@ -1,6 +1,7 @@
 """Unit tests for GoogleDirectoryProvider."""
 
 from inspect import signature
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -135,11 +136,19 @@ def google_service() -> MagicMock:
 @pytest.fixture
 def mock_directory_settings():
     """Directory settings fixture for provider construction."""
-    settings = MagicMock()
-    settings.managed_group_domain = "example.com"
-    settings.managed_group_prefix = "sg-"
-    settings.enforce_managed_group_email = True
-    return settings
+    return MagicMock()
+
+
+@pytest.fixture
+def directory_settings() -> SimpleNamespace:
+    """Directory settings exposing only the fields the service still owns."""
+    return SimpleNamespace(
+        provider="google",
+        require_startup_warmup=False,
+        startup_preload_groups=[],
+        cache_ttl_seconds=60,
+        startup_warmup_timeout_seconds=2,
+    )
 
 
 @pytest.fixture
@@ -730,18 +739,37 @@ class TestGetGroupMembers:
         assert not result.is_success
         assert result.status == OperationStatus.TRANSIENT_ERROR
 
-    def test_composes_group_email_from_slug(self, provider, google_service):
+    def test_bare_group_key_is_forwarded_stripped_and_lowercased(self, provider, google_service):
+        """An unqualified group key reaches the API unchanged apart from strip/lowercase."""
         # Arrange
         google_service.members.return_value.list.return_value = _request({"members": []})
 
         # Act
-        provider.get_group_members("sg-admin")
+        provider.get_group_members("  SG-Admin ")
 
         # Assert
         google_service.members.return_value.list.assert_called_once_with(
-            groupKey="sg-admin@example.com",
+            groupKey="sg-admin",
             includeDerivedMembership=True,
         )
+
+
+class TestNormalizeEmail:
+    def test_bare_value_is_lowercased_without_domain_completion(self, provider):
+        """A value with no '@' stays bare instead of being composed into an address."""
+        # Act
+        normalized = provider._normalize_email("  SG-Team  ")
+
+        # Assert
+        assert normalized == "sg-team"
+
+    def test_qualified_value_is_stripped_and_lowercased(self, provider):
+        """A fully-qualified address is normalised without any domain rewriting."""
+        # Act
+        normalized = provider._normalize_email("  SG-Team@Other.Org ")
+
+        # Assert
+        assert normalized == "sg-team@other.org"
 
 
 class TestGetGroup:
@@ -854,6 +882,103 @@ class TestGetGroup:
         # Assert
         assert result.is_success
         assert result.data.aliases == ("ops-alias@example.com",)
+
+    def test_returns_a_group_from_any_email_domain(self, provider, google_service):
+        """A group email is returned unchanged whatever its domain."""
+        # Arrange
+        google_service.groups.return_value.get.return_value = _request(
+            {
+                "email": "platform-admins@other.example",
+                "id": "group-1",
+                "name": "Admins",
+            }
+        )
+
+        # Act
+        result = provider.get_group("platform-admins@other.example")
+
+        # Assert
+        assert result.is_success
+        assert result.data == DirectoryGroup(
+            group_email="platform-admins@other.example",
+            group_slug="platform-admins",
+            provider_group_id="group-1",
+            name="Admins",
+            description=None,
+            provider="google",
+        )
+
+    def test_returns_the_primary_email_when_the_payload_also_carries_aliases(self, provider, google_service):
+        """The canonical email is the payload's primary email, never a preferred alias."""
+        # Arrange
+        google_service.groups.return_value.get.return_value = _request(
+            {
+                "email": "aws-finops@example.com",
+                "aliases": ["sg-aws-finops@example.com"],
+                "id": "group-10",
+                "name": "FinOps",
+            }
+        )
+
+        # Act
+        result = provider.get_group("aws-finops@example.com")
+
+        # Assert
+        assert result.is_success
+        assert result.data.group_email == "aws-finops@example.com"
+        assert result.data.group_slug == "aws-finops"
+        assert result.data.aliases == ("sg-aws-finops@example.com",)
+
+    def test_returns_email_required_error_when_payload_has_no_email(self, provider, google_service):
+        """A group with no resolvable email is a hard error, never a silent empty success."""
+        # Arrange
+        google_service.groups.return_value.get.return_value = _request({"id": "group-1", "name": "No Email"})
+
+        # Act
+        result = provider.get_group("ghost@example.com")
+
+        # Assert
+        assert not result.is_success
+        assert result.error_code == "DIRECTORY_GROUP_EMAIL_REQUIRED"
+
+    def test_bare_alias_values_are_not_completed_into_addresses(self, provider, google_service):
+        """An alias without '@' is kept bare rather than composed into an address."""
+        # Arrange
+        google_service.groups.return_value.get.return_value = _request(
+            {
+                "email": "sg-admin@example.com",
+                "id": "group-1",
+                "aliases": ["Sg-Team", "team@other.org"],
+            }
+        )
+
+        # Act
+        result = provider.get_group("sg-admin@example.com")
+
+        # Assert
+        assert result.is_success
+        assert result.data.aliases == ("sg-team", "team@other.org")
+
+
+class TestProviderIgnoresManagedGroupSettings:
+    def test_operates_with_settings_exposing_only_service_fields(self, google_service, directory_settings):
+        """The provider reads no managed-group configuration from its settings slice."""
+        # Arrange
+        provider = GoogleDirectoryProvider(
+            get_service=lambda scopes: google_service,
+            directory_settings=directory_settings,
+            customer_id="my_customer",
+        )
+        google_service.groups.return_value.get.return_value = _request(
+            {"email": "sg-admin@example.com", "id": "group-1", "name": "Admins"}
+        )
+
+        # Act
+        result = provider.get_group("sg-admin@example.com")
+
+        # Assert
+        assert result.is_success
+        assert result.data.group_email == "sg-admin@example.com"
 
 
 class TestAddGroupMember:
@@ -1104,7 +1229,9 @@ class TestListGroups:
                 provider="google",
             ),
         ]
-        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", maxResults=200)
+        google_service.groups.return_value.list.assert_called_once_with(
+            customer="my_customer", maxResults=200, query="email:sg-*"
+        )
 
     def test_uses_group_alias_fields_when_standard_keys_are_missing(self, provider, google_service):
         # Arrange
@@ -1122,7 +1249,9 @@ class TestListGroups:
 
         # Assert
         assert result.is_success
-        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", maxResults=200)
+        google_service.groups.return_value.list.assert_called_once_with(
+            customer="my_customer", maxResults=200, query="email:sg-*"
+        )
         assert result.data == [
             DirectoryGroup(
                 group_email="sg-ops@example.com",
@@ -1134,7 +1263,50 @@ class TestListGroups:
             ),
         ]
 
-    def test_prefers_managed_alias_when_primary_email_uses_old_pattern(self, provider, google_service):
+    def test_bare_query_is_translated_and_sent_in_one_request(self, provider, google_service):
+        """Any bare query becomes an email prefix search issued as a single list call."""
+        # Arrange
+        google_service.groups.return_value.list.return_value = _request(
+            {"groups": [{"email": "sg-admin@example.com", "id": "group-1", "name": "Admins"}]}
+        )
+
+        # Act
+        result = provider.list_groups(query="sg-")
+
+        # Assert
+        assert result.is_success
+        google_service.groups.return_value.list.assert_called_once_with(
+            customer="my_customer", maxResults=200, query="email:sg-*"
+        )
+
+    def test_query_results_outside_any_particular_domain_are_returned(self, provider, google_service):
+        """A queried group is mapped whatever its email domain."""
+        # Arrange
+        google_service.groups.return_value.list.return_value = _request(
+            {"groups": [{"email": "platform-admins@other.example", "id": "group-1", "name": "Admins"}]}
+        )
+
+        # Act
+        result = provider.list_groups(query="name:Admins")
+
+        # Assert
+        google_service.groups.return_value.list.assert_called_once_with(
+            customer="my_customer", maxResults=200, query="name:Admins"
+        )
+        assert result.is_success
+        assert result.data == [
+            DirectoryGroup(
+                group_email="platform-admins@other.example",
+                group_slug="platform-admins",
+                provider_group_id="group-1",
+                name="Admins",
+                description=None,
+                provider="google",
+            )
+        ]
+
+    def test_queried_group_keeps_its_primary_email_over_an_alias(self, provider, google_service):
+        """Query results map to the payload's primary email, never to a preferred alias."""
         # Arrange
         google_service.groups.return_value.list.return_value = _request(
             {
@@ -1154,55 +1326,33 @@ class TestListGroups:
 
         # Assert
         assert result.is_success
-        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", maxResults=200)
-        assert result.data == [
-            DirectoryGroup(
-                group_email="sg-aws-finops@example.com",
-                group_slug="sg-aws-finops",
-                provider_group_id="group-10",
-                name="FinOps",
-                description=None,
-                provider="google",
-                aliases=("sg-aws-finops@example.com",),
-            )
-        ]
+        google_service.groups.return_value.list.assert_called_once_with(
+            customer="my_customer", maxResults=200, query="email:sg-aws-*"
+        )
+        assert result.data[0].group_email == "aws-finops@example.com"
+        assert result.data[0].group_slug == "aws-finops"
 
-    def test_skips_groups_when_email_is_missing_for_alias_aware_discovery(self, provider, google_service):
-        # Arrange
-        google_service.groups.return_value.list.return_value = _request({"groups": [{"id": "group-1", "name": "Admins"}]})
-
-        # Act
-        result = provider.list_groups(query="sg-")
-
-        # Assert
-        assert result.is_success
-        assert result.data == []
-        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", maxResults=200)
-
-    def test_returns_error_when_managed_group_domain_mismatches(self, provider, google_service):
+    def test_queried_group_without_email_is_skipped_and_counted(self, provider, google_service):
+        """An email-less group is skipped with a warning rather than failing the listing."""
         # Arrange
         google_service.groups.return_value.list.return_value = _request(
             {
                 "groups": [
-                    {
-                        "email": "platform-admins@other.example",
-                        "id": "group-1",
-                        "name": "Admins",
-                    }
+                    {"id": "group-broken", "name": "No Email"},
+                    {"email": "sg-admin@example.com", "id": "group-1"},
                 ]
             }
         )
 
         # Act
-        result = provider.list_groups(query="name:Admins")
+        with capture_logs() as entries:
+            result = provider.list_groups(query="sg-")
 
         # Assert
-        # name:Admins is a Google query expression — passed through unchanged
-        google_service.groups.return_value.list.assert_called_once_with(
-            customer="my_customer", maxResults=200, query="name:Admins"
-        )
-        assert not result.is_success
-        assert result.error_code == "DIRECTORY_GROUP_DOMAIN_MISMATCH"
+        assert result.is_success
+        assert [group.group_email for group in result.data] == ["sg-admin@example.com"]
+        completed = [entry for entry in entries if entry["event"] == "directory_groups_listed"]
+        assert completed and completed[0]["skipped"] == 1
 
     def test_propagates_directory_error(self, provider, google_service):
         # Arrange
@@ -1237,7 +1387,8 @@ class TestListGroups:
         ]
         google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", maxResults=200)
 
-    def test_empty_query_does_not_apply_the_managed_prefix_filter(self, provider, google_service):
+    def test_unfiltered_listing_returns_every_group(self, provider, google_service):
+        """An empty query returns all groups with no client-side filtering."""
         # Arrange
         _install_pages(
             google_service.groups.return_value,
@@ -1260,7 +1411,8 @@ class TestListGroups:
             "marketing@example.com",
         ]
 
-    def test_empty_query_accepts_a_group_outside_the_managed_domain(self, provider, google_service):
+    def test_group_from_any_email_domain_is_mapped(self, provider, google_service):
+        """A listed group is mapped whatever its email domain."""
         # Arrange
         _install_pages(
             google_service.groups.return_value,
@@ -1284,7 +1436,8 @@ class TestListGroups:
             )
         ]
 
-    def test_empty_query_ignores_managed_alias_preference(self, provider, google_service):
+    def test_listed_group_keeps_its_primary_email_over_an_alias(self, provider, google_service):
+        """The canonical email is the payload's primary email, never a preferred alias."""
         # Arrange
         _install_pages(
             google_service.groups.return_value,
@@ -1308,7 +1461,8 @@ class TestListGroups:
         assert result.data[0].group_email == "aws-finops@example.com"
         assert result.data[0].group_slug == "aws-finops"
 
-    def test_empty_query_returns_group_aliases(self, provider, google_service):
+    def test_returns_group_aliases(self, provider, google_service):
+        """Editable and non-editable aliases are both carried onto the canonical group."""
         # Arrange
         _install_pages(
             google_service.groups.return_value,
@@ -1386,20 +1540,66 @@ class TestListGroups:
         assert completed[0]["skipped"] == 1
         assert completed[0]["returned"] == 1
 
-    def test_managed_path_skip_is_logged_and_counted(self, google_service, mock_directory_settings):
+
+class TestGetUserGroups:
+    def test_returns_every_group_the_user_belongs_to_across_pages(self, provider, google_service):
+        """Every group returned by the inverse lookup is mapped, whatever its domain."""
         # Arrange
-        mock_directory_settings.enforce_managed_group_email = False
-        provider = GoogleDirectoryProvider(
-            get_service=lambda scopes: google_service,
-            directory_settings=mock_directory_settings,
-            customer_id="my_customer",
+        _install_pages(
+            google_service.groups.return_value,
+            "groups",
+            [
+                [{"email": "sg-admin@example.com", "id": "group-1", "name": "Admins"}],
+                [{"email": "platform-admins@other.example", "id": "group-2", "name": "Platform"}],
+            ],
         )
+
+        # Act
+        result = provider.get_user_groups("User@Example.com")
+
+        # Assert
+        assert result.is_success
+        assert result.data == [
+            DirectoryGroup(
+                group_email="sg-admin@example.com",
+                group_slug="sg-admin",
+                provider_group_id="group-1",
+                name="Admins",
+                description=None,
+                provider="google",
+            ),
+            DirectoryGroup(
+                group_email="platform-admins@other.example",
+                group_slug="platform-admins",
+                provider_group_id="group-2",
+                name="Platform",
+                description=None,
+                provider="google",
+            ),
+        ]
+        google_service.groups.return_value.list.assert_called_once_with(userKey="user@example.com")
+
+    def test_propagates_directory_error(self, provider, google_service):
+        """An upstream directory failure is surfaced with its classified status."""
+        # Arrange
+        google_service.groups.return_value.list.return_value.execute.side_effect = _http_error(503)
+
+        # Act
+        result = provider.get_user_groups("user@example.com")
+
+        # Assert
+        assert not result.is_success
+        assert result.status == OperationStatus.TRANSIENT_ERROR
+
+    def test_unmappable_group_is_skipped_with_a_warning(self, provider, google_service):
+        """A group missing its provider group ID is skipped, not fatal to the lookup."""
+        # Arrange
         _install_pages(
             google_service.groups.return_value,
             "groups",
             [
                 [
-                    {"id": "group-broken", "name": "No Email"},
+                    {"email": "sg-broken@example.com", "name": "No ID"},
                     {"email": "sg-admin@example.com", "id": "group-1"},
                 ]
             ],
@@ -1407,14 +1607,14 @@ class TestListGroups:
 
         # Act
         with capture_logs() as entries:
-            result = provider.list_groups(query="sg-")
+            result = provider.get_user_groups("user@example.com")
 
         # Assert
         assert result.is_success
         assert [group.group_email for group in result.data] == ["sg-admin@example.com"]
-        assert any(entry["event"] == "directory_group_skipped" for entry in entries)
-        completed = [entry for entry in entries if entry["event"] == "directory_groups_listed"]
-        assert completed and completed[0]["skipped"] == 1
+        skipped = [entry for entry in entries if entry["event"] == "directory_group_skipped"]
+        assert len(skipped) == 1
+        assert skipped[0]["log_level"] == "warning"
 
 
 class TestDirectoryProviderProtocolSignatures:

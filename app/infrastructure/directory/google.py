@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, TypeVar
 import structlog
 from googleapiclient.errors import HttpError
 
-from infrastructure.configuration.infrastructure import DirectorySettings
 from infrastructure.directory.models import (
     DirectoryGroup,
     DirectoryGroupFailure,
@@ -16,6 +15,7 @@ from infrastructure.directory.models import (
     DirectoryUser,
     MembershipCheckResult,
 )
+from infrastructure.directory.settings import DirectorySettings
 from infrastructure.operations import OperationResult
 from integrations.google_workspace.client import classify_google_error
 
@@ -64,8 +64,6 @@ class GoogleDirectoryProvider:
         self._get_service = get_service
         self._directory_settings = directory_settings
         self._customer_id = customer_id or "my_customer"
-        self._managed_group_domain = directory_settings.managed_group_domain.strip().lower()
-        self._managed_group_prefix = directory_settings.managed_group_prefix.strip().lower()
         self._logger = logger.bind(provider="google")
 
     def _map_sdk_exception(self, exc: Exception, operation: str) -> OperationResult[Any]:
@@ -211,14 +209,10 @@ class GoogleDirectoryProvider:
     def _normalize_email(self, value: str) -> str:
         """Normalize email-form identifiers used by the shared contract.
 
-        Group-key values that do not contain ``@`` are treated as
-        managed-group slugs and composed into ``{slug}@{domain}`` when
-        ``DIRECTORY_MANAGED_GROUP_DOMAIN`` is configured.
+        Values are stripped and lowercased only — callers supply fully-qualified
+        keys.
         """
-        normalized = value.strip().lower()
-        if normalized and "@" not in normalized and self._managed_group_domain:
-            return f"{normalized}@{self._managed_group_domain}"
-        return normalized
+        return value.strip().lower()
 
     def _extract_email(self, item: dict[str, Any], *keys: str) -> str:
         """Extract and normalize the first available email-like value."""
@@ -265,52 +259,6 @@ class GoogleDirectoryProvider:
                 if normalized_alias and normalized_alias not in aliases:
                     aliases.append(normalized_alias)
         return aliases
-
-    def _extract_managed_group_email(self, item: dict[str, Any]) -> str:
-        """Return the canonical managed-group email, preferring managed-prefix aliases."""
-
-        primary_email = self._extract_email(item, "email", "groupEmail")
-        aliases = self._extract_group_aliases(item)
-
-        if self._managed_group_prefix:
-            for alias in aliases:
-                local_part, _, domain = alias.partition("@")
-                if not local_part.startswith(self._managed_group_prefix):
-                    continue
-                if self._managed_group_domain and domain != self._managed_group_domain:
-                    continue
-                return alias
-
-        return primary_email
-
-    def _managed_group_query_prefix(self, query: str) -> str | None:
-        """Return a managed-group prefix for alias-aware discovery queries.
-
-        Returns a prefix string when the query looks like a managed-group prefix
-        search (triggering a full-list + client-side alias filter instead of an
-        email-field query).  Returns ``None`` when no prefix is configured or the
-        query does not match the configured prefix.
-        """
-        if not self._managed_group_prefix:
-            return None
-        normalized_query = query.strip().lower()
-        if not normalized_query:
-            return None
-        if ":" not in normalized_query and "=" not in normalized_query:
-            return normalized_query if normalized_query.startswith(self._managed_group_prefix) else None
-        if normalized_query.startswith("email:") and normalized_query.endswith("*"):
-            prefix = normalized_query[len("email:") : -1]
-            return prefix if prefix.startswith(self._managed_group_prefix) else None
-        return None
-
-    def _matches_managed_group_prefix(self, item: dict[str, Any], prefix: str) -> bool:
-        """Return whether the group's primary email or aliases match a prefix."""
-
-        candidates = [c for c in [self._extract_email(item, "email", "groupEmail")] + self._extract_group_aliases(item) if c]
-        if not candidates:
-            return True
-        normalized_prefix = prefix.strip().lower()
-        return any(candidate.startswith(normalized_prefix) for candidate in candidates)
 
     def _extract_display_name(self, item: dict[str, Any]) -> str | None:
         """Extract a stable display name from provider payload variants."""
@@ -418,11 +366,7 @@ class GoogleDirectoryProvider:
         )
 
     def _build_group(self, item: dict[str, Any]) -> OperationResult[DirectoryGroup]:
-        """Convert a Google group record into a generic canonical directory group.
-
-        Extracts canonical email and provider group ID without applying managed-group
-        alias preference or domain filtering.
-        """
+        """Convert a Google group record into a canonical directory group."""
         group_email = self._extract_email(item, "email", "groupEmail")
         if not group_email:
             return OperationResult.permanent_error(
@@ -438,46 +382,6 @@ class GoogleDirectoryProvider:
             )
 
         local_part, _, _ = group_email.partition("@")
-
-        return OperationResult.success(
-            data=DirectoryGroup(
-                group_email=group_email,
-                group_slug=local_part,
-                provider_group_id=provider_group_id,
-                name=item.get("name") or item.get("displayName"),
-                description=item.get("description"),
-                provider="google",
-                aliases=tuple(self._extract_group_aliases(item)),
-            )
-        )
-
-    def _build_managed_group(self, item: dict[str, Any]) -> OperationResult[DirectoryGroup | None]:
-        """Convert a Google group record into a canonical managed directory group.
-
-        Applies managed-group alias preference and domain enforcement policies.
-        """
-        group_email = self._extract_managed_group_email(item)
-        if not group_email:
-            if self._directory_settings.enforce_managed_group_email:
-                return OperationResult.permanent_error(
-                    message="Managed directory group is missing provider-returned email",
-                    error_code="DIRECTORY_GROUP_EMAIL_REQUIRED",
-                )
-            return OperationResult.success(data=None)
-
-        local_part, _, domain = group_email.partition("@")
-        if self._managed_group_domain and domain != self._managed_group_domain:
-            return OperationResult.permanent_error(
-                message="Managed directory group email does not match configured domain",
-                error_code="DIRECTORY_GROUP_DOMAIN_MISMATCH",
-            )
-
-        provider_group_id = str(item.get("id") or item.get("groupId") or "").strip()
-        if not provider_group_id:
-            return OperationResult.permanent_error(
-                message="Managed directory group is missing provider group ID",
-                error_code="DIRECTORY_GROUP_ID_REQUIRED",
-            )
 
         return OperationResult.success(
             data=DirectoryGroup(
@@ -605,7 +509,7 @@ class GoogleDirectoryProvider:
         """Return the member list for a group.
 
         Args:
-            group_key: Canonical managed-group email — normalised to lowercase.
+            group_key: Fully-qualified group email — normalised to lowercase.
             include_member_types: Optional set of member types to include
                 (for example {"USER"}, {"GROUP"}, or both). Defaults to no
                 filtering.
@@ -670,7 +574,7 @@ class GoogleDirectoryProvider:
         Fails as a whole when any group's batch item fails.
 
         Args:
-            group_keys: Canonical managed-group emails — normalised to lowercase.
+            group_keys: Fully-qualified group emails — normalised to lowercase.
             include_member_types: Optional set of member types to include
                 (for example ``{"USER"}``). Defaults to no filtering.
 
@@ -697,12 +601,10 @@ class GoogleDirectoryProvider:
         return OperationResult.success(data={key: self._map_members(items, allowed) for key, items in raw_members.items()})
 
     def get_group(self, group_key: str) -> OperationResult[DirectoryGroup]:
-        """Return a canonical managed group by key.
+        """Return a canonical group by key.
 
         Args:
-            group_key: Canonical managed-group email or managed-group slug.
-                Slugs are composed into canonical email form using
-                ``DIRECTORY_MANAGED_GROUP_DOMAIN``.
+            group_key: Fully-qualified group email — normalised to lowercase.
 
         Returns:
             OperationResult: success with the canonical DirectoryGroup.
@@ -722,15 +624,9 @@ class GoogleDirectoryProvider:
                 error_code="DIRECTORY_GROUP_PAYLOAD_INVALID",
             )
 
-        group_result = self._build_managed_group(result.data)
+        group_result = self._build_group(result.data)
         if not group_result.is_success:
             return self._typed_error(group_result)
-
-        if group_result.data is None:
-            return OperationResult.permanent_error(
-                message="Managed directory group is missing provider-returned email",
-                error_code="DIRECTORY_GROUP_EMAIL_REQUIRED",
-            )
 
         return OperationResult.success(data=group_result.data)
 
@@ -740,10 +636,10 @@ class GoogleDirectoryProvider:
         user_email: str,
         role: str = "MEMBER",
     ) -> OperationResult[DirectoryMember]:
-        """Add a membership to a managed group.
+        """Add a membership to a group.
 
         Args:
-            group_key: Canonical managed-group email — normalised to lowercase.
+            group_key: Fully-qualified group email — normalised to lowercase.
             user_email: User email to add — normalised to lowercase.
             role: Membership role hint (default: MEMBER, valid values: MEMBER, MANAGER, OWNER).
 
@@ -793,10 +689,10 @@ class GoogleDirectoryProvider:
         group_key: str,
         user_email: str,
     ) -> OperationResult[None]:
-        """Remove a membership from a managed group.
+        """Remove a membership from a group.
 
         Args:
-            group_key: Canonical managed-group email — normalised to lowercase.
+            group_key: Fully-qualified group email — normalised to lowercase.
             user_email: User email to remove — normalised to lowercase.
 
         Returns:
@@ -827,7 +723,7 @@ class GoogleDirectoryProvider:
         are correctly resolved as members).
 
         Args:
-            group_key: Canonical managed-group email — normalised to lowercase.
+            group_key: Fully-qualified group email — normalised to lowercase.
             user_email: User email to check.
 
         Returns:
@@ -887,40 +783,18 @@ class GoogleDirectoryProvider:
 
         query_str = query.strip()
         if not query_str:
-            result = self._paginate(
-                "list_groups",
-                groups_resource,
-                groups_resource.list(customer=self._customer_id, maxResults=max_results),
-                "groups",
-                limit=limit,
-            )
-            map_fn = self._build_group
-            managed_prefix = None
+            request = groups_resource.list(customer=self._customer_id, maxResults=max_results)
         else:
-            managed_prefix = self._managed_group_query_prefix(query_str)
-            if managed_prefix is not None:
-                self._logger.info(
-                    "listing_groups_alias_aware",
-                    query=query_str,
-                    managed_prefix=managed_prefix,
-                )
-                result = self._paginate(
-                    "list_groups",
-                    groups_resource,
-                    groups_resource.list(customer=self._customer_id, maxResults=max_results),
-                    "groups",
-                    limit=limit,
-                )
-            else:
-                google_query = f"email:{query_str}*" if ":" not in query_str and "=" not in query_str else query_str
-                result = self._paginate(
-                    "list_groups",
-                    groups_resource,
-                    groups_resource.list(customer=self._customer_id, maxResults=max_results, query=google_query),
-                    "groups",
-                    limit=limit,
-                )
-            map_fn = self._build_managed_group
+            google_query = f"email:{query_str}*" if ":" not in query_str and "=" not in query_str else query_str
+            request = groups_resource.list(customer=self._customer_id, maxResults=max_results, query=google_query)
+
+        result = self._paginate(
+            "list_groups",
+            groups_resource,
+            request,
+            "groups",
+            limit=limit,
+        )
 
         if not result.is_success:
             return self._typed_error(result)
@@ -931,39 +805,22 @@ class GoogleDirectoryProvider:
                 error_code="DIRECTORY_GROUPS_PAYLOAD_INVALID",
             )
 
-        raw_groups = result.data
-        if managed_prefix is not None:
-            raw_groups = [
-                item for item in raw_groups if isinstance(item, dict) and self._matches_managed_group_prefix(item, managed_prefix)
-            ]
-
         groups: list[DirectoryGroup] = []
         skipped_count = 0
-        for item in raw_groups:
+        for item in result.data:
             if not isinstance(item, dict):
                 return OperationResult.permanent_error(
                     message="Directory groups payload contains an invalid entry",
                     error_code="DIRECTORY_GROUPS_PAYLOAD_INVALID",
                 )
 
-            group_result = map_fn(item)
-            if not group_result.is_success:
-                if group_result.error_code == "DIRECTORY_GROUP_DOMAIN_MISMATCH":
-                    return self._typed_error(group_result)
+            group_result = self._build_group(item)
+            if not group_result.is_success or group_result.data is None:
                 provider_group_id = str(item.get("id") or item.get("groupId") or "").strip() or "<unknown>"
                 self._logger.warning(
                     "directory_group_skipped",
                     provider_group_id=provider_group_id,
                     error_code=group_result.error_code,
-                )
-                skipped_count += 1
-                continue
-
-            if group_result.data is None:
-                provider_group_id = str(item.get("id") or item.get("groupId") or "").strip() or "<unknown>"
-                self._logger.warning(
-                    "directory_group_skipped",
-                    provider_group_id=provider_group_id,
                 )
                 skipped_count += 1
                 continue
@@ -1045,22 +902,19 @@ class GoogleDirectoryProvider:
         )
 
     def get_user_groups(self, user_email: str) -> OperationResult[list[DirectoryGroup]]:
-        """Return all managed groups the user is a direct member of.
+        """Return all groups the user is a direct member of.
 
         Uses ``groups.list(userKey=...)`` — the inverse group lookup — to fetch
         every group the user belongs to in a single paginated call instead of
-        calling ``hasMember`` once per candidate group.
-
-        Only groups whose email matches the configured managed-group domain are
-        included in the result, so callers can safely compare ``group_slug``
-        values against effective policy slugs without domain-filtering.
+        calling ``hasMember`` once per candidate group.  No domain or naming
+        filtering is applied; callers decide which groups are in scope.
 
         Args:
             user_email: Canonical user email, normalised to lowercase.
 
         Returns:
-            OperationResult: success with the list of managed DirectoryGroup
-            the user belongs to.
+            OperationResult: success with the list of DirectoryGroup the user
+            belongs to.
         """
         log = self._logger.bind(operation="get_user_groups", user_email=user_email)
         normalized_email = self._normalize_email(user_email)
@@ -1096,11 +950,16 @@ class GoogleDirectoryProvider:
                     error_code="DIRECTORY_USER_GROUPS_PAYLOAD_INVALID",
                 )
 
-            group_result = self._build_managed_group(item)
-            if not group_result.is_success:
-                return self._typed_error(group_result)
+            group_result = self._build_group(item)
+            if not group_result.is_success or group_result.data is None:
+                provider_group_id = str(item.get("id") or item.get("groupId") or "").strip() or "<unknown>"
+                log.warning(
+                    "directory_group_skipped",
+                    provider_group_id=provider_group_id,
+                    error_code=group_result.error_code,
+                )
+                continue
 
-            if group_result.data is not None:
-                groups.append(group_result.data)
+            groups.append(group_result.data)
 
         return OperationResult.success(data=groups)
