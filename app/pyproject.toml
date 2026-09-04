@@ -182,7 +182,7 @@ dev = [
     "freezegun==1.5.5",
     "requests-mock==1.12.1",
     "checkov",
-    "setuptools==78.1.1",
+    "setuptools==83.0.0",
     "moto[dynamodb]>=5.2.2",
     "types-boto3[ce,config,dynamodb,guardduty,identitystore,lambda,organizations,securityhub,sqs,sso-admin]>=1.43.63",
     "google-api-python-client-stubs>=1.39.0",
