@@ -1,11 +1,11 @@
 ---
 id: TASK-76.1
 title: Expose IDP-reported group aliases on the canonical DirectoryGroup model
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-04 14:17'
-updated_date: '2026-09-04 14:57'
+updated_date: '2026-09-04 15:02'
 labels:
   - layering
 milestone: m-3
