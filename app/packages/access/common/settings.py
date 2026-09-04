@@ -24,7 +24,7 @@ not part of this env-var settings consolidation.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -73,17 +73,25 @@ class AccessRequestsSettings(BaseModel):
 
     Env vars:
         ACCESS_REQUESTS_ENABLED                 — master on/off switch
-        ACCESS_REQUESTS_MANAGER_GROUP_SLUG      — IDP group whose members may submit delegated requests
-        ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG  — org-level approver fallback group slug
+        ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG  — org-level approver fallback group slug;
+                                                  required whenever enabled, no default
         ACCESS_REQUESTS_MIN_APPROVER_COUNT      — minimum affirmative decisions to approve
         ACCESS_REQUESTS_REQUEST_TTL_HOURS       — hours before a pending request expires
     """
 
     enabled: bool = False
-    manager_group_slug: str = "sg-managers"
-    fallback_approver_slug: str = "sg-org-admins"
+    fallback_approver_slug: str = ""
     min_approver_count: int = 1
     request_ttl_hours: int = 72
+
+    @model_validator(mode="after")
+    def _validate_fallback_approver_slug(self) -> AccessRequestsSettings:
+        # Settings are constructed on every boot, so the requirement only applies when enabled.
+        if not self.enabled:
+            return self
+        if not self.fallback_approver_slug.strip():
+            raise ValueError("ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG must be set when ACCESS_REQUESTS_ENABLED is true")
+        return self
 
 
 class AccessCatalogSettings(BaseModel):

@@ -121,7 +121,8 @@ class AccessRequestService:
         dispatcher: Event dispatcher for publishing domain events.
         policy: Managed-group policy owning canonical address, managed-domain
             and group-key decisions the directory provider no longer makes.
-        fallback_approver_slug: Org-level fallback approver group slug.
+        fallback_approver_slug: Org-level fallback approver group slug; required,
+            no default — construction fails without it.
         min_approver_count: Minimum number of approvals required.
     """
 
@@ -132,7 +133,7 @@ class AccessRequestService:
         runtime_config: AccessRuntimeConfig,
         dispatcher: EventDispatcher,
         policy: ManagedGroupPolicy,
-        fallback_approver_slug: str = "sg-org-admins",
+        fallback_approver_slug: str,
         min_approver_count: int = 1,
     ) -> None:
         self._repo = repository

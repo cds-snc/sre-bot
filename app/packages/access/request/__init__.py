@@ -52,7 +52,6 @@ def startup_warmup(logger) -> None:
     logger.info(
         "access_requests_settings_loaded",
         enabled=settings.enabled,
-        manager_group_slug=settings.manager_group_slug,
         fallback_approver_slug=settings.fallback_approver_slug,
         min_approver_count=settings.min_approver_count,
         request_ttl_hours=settings.request_ttl_hours,

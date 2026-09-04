@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-03 18:02'
-updated_date: '2026-09-04 15:46'
+updated_date: '2026-09-04 23:06'
 labels:
   - layering
 milestone: m-3
@@ -49,12 +49,12 @@ NOT IN SCOPE: any Google vendor-mirror work; changing the DirectoryProvider Prot
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 GoogleDirectoryProvider contains no managed-group prefix, alias-preference or managed-domain logic; grep for _managed_group_prefix, _managed_group_domain, _managed_group_query_prefix, _matches_managed_group_prefix and _extract_managed_group_email returns zero hits under app/infrastructure/, and _normalize_email no longer completes bare values with a group domain
-- [ ] #2 DIRECTORY_MANAGED_GROUP_PREFIX, DIRECTORY_MANAGED_GROUP_DOMAIN and DIRECTORY_ENFORCE_MANAGED_GROUP_EMAIL no longer exist anywhere: per plan decision D3 the prefix is derived from AccessRuntimeConfig naming rather than re-homed, the domain is owned by packages/access as AccessRuntimeConfig.dir_domain, and enforce_managed_group_email is deleted outright - with no duplicate second home created for any of them
-- [ ] #3 The chosen mechanism - feature-side filtering of generic results, or an injected policy strategy - is stated in the task notes with its rationale, rather than the branching simply moving up one layer
-- [ ] #4 packages/access/catalog, packages/access/sync and packages/access/request retain their current observable behaviour, proven by their existing test suites plus the new characterization tests the slices add (the managed path has no existing coverage - see plan fact F4)
-- [ ] #5 A group outside the managed domain is returned unchanged by the generic provider and rejected (or ignored) by the feature, with a test at the feature boundary rather than the infrastructure one
-- [ ] #6 All five subtasks TASK-76.1 through TASK-76.5 are Done and the DIRECTORY_MANAGED / MANAGED_GROUP grep across terraform, Makefile and app config returns zero hits at close
+- [x] #1 GoogleDirectoryProvider contains no managed-group prefix, alias-preference or managed-domain logic; grep for _managed_group_prefix, _managed_group_domain, _managed_group_query_prefix, _matches_managed_group_prefix and _extract_managed_group_email returns zero hits under app/infrastructure/, and _normalize_email no longer completes bare values with a group domain
+- [x] #2 DIRECTORY_MANAGED_GROUP_PREFIX, DIRECTORY_MANAGED_GROUP_DOMAIN and DIRECTORY_ENFORCE_MANAGED_GROUP_EMAIL no longer exist anywhere: per plan decision D3 the prefix is derived from AccessRuntimeConfig naming rather than re-homed, the domain is owned by packages/access as AccessRuntimeConfig.dir_domain, and enforce_managed_group_email is deleted outright - with no duplicate second home created for any of them
+- [x] #3 The chosen mechanism - feature-side filtering of generic results, or an injected policy strategy - is stated in the task notes with its rationale, rather than the branching simply moving up one layer
+- [x] #4 packages/access/catalog, packages/access/sync and packages/access/request retain their current observable behaviour, proven by their existing test suites plus the new characterization tests the slices add (the managed path has no existing coverage - see plan fact F4)
+- [x] #5 A group outside the managed domain is returned unchanged by the generic provider and rejected (or ignored) by the feature, with a test at the feature boundary rather than the infrastructure one
+- [x] #6 All five subtasks TASK-76.1 through TASK-76.5 are Done and the DIRECTORY_MANAGED / MANAGED_GROUP grep across terraform, Makefile and app config returns zero hits at close
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -117,6 +117,28 @@ No temporary shims are required: because the provider keeps both mappers until T
 - TASK-25.1.6.4 and TASK-22.4 are DONE. No advisory belongs on completed work; the constraints that concerned them are carried forward here as F7 and enforced by TASK-76.4's own acceptance criteria instead.
 - TASK-79 (new) carries the IDP-authoritative owned-domains capability from D4.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+COORDINATOR CLOSE-OUT VERIFICATION 2026-09-04. No code landed on TASK-76 itself; all work shipped in TASK-76.1 through TASK-76.5, which are all Done. Every parent AC re-verified empirically against the merged tree rather than inferred from child completion.
+
+AC#1 — grep across app/infrastructure/ for _managed_group_prefix, _managed_group_domain, _managed_group_query_prefix, _matches_managed_group_prefix and _extract_managed_group_email returns ZERO hits. google.py::_normalize_email (line 209-215) is now strip+lowercase only, with a docstring stating callers supply fully-qualified keys — D2's strict-provider cut is in place and the bare-value domain completion is gone.
+
+AC#2 — grep for DIRECTORY_MANAGED / MANAGED_GROUP / ENFORCE_MANAGED across app/, terraform/, Makefile, backlog/docs and decisions/ (all .py/.tf/.toml/.md/Makefile) returns ZERO hits. Confirmed no second home was created: dir_domain lives once on AccessRuntimeConfig (packages/access/common/config/settings.py:72, with the D6 __post_init__ rejecting blank values at line 84-85); the org-wide prefix is DERIVED via AccessGroupNaming.managed_prefix (common/naming.py:19) and consumed through ManagedGroupPolicy.from_config (common/group_policy.py:49) rather than configured; enforce_managed_group_email is deleted outright with no replacement.
+
+AC#3 — mechanism is D1, FEATURE-SIDE FILTERING, not an injected policy strategy: the provider is unconditionally generic and packages/access owns ManagedGroupPolicy (common/group_policy.py:16), a value object built from the runtime config. Rationale recorded in the plan: an injected strategy would have left the branching inside infrastructure and merely renamed the coupling, whereas decisions/layers.md requires a portable capability's Protocol to stay capability-shaped and vendor-neutral. The enabler was exposing IDP-reported aliases on DirectoryGroup as a vendor-neutral FACT (TASK-76.1) so the feature could reproduce alias preference itself.
+
+AC#4 — full non-smoke suite green (make test, user-run 2026-09-04) with catalog, sync and request behaviour pinned by the relocated and newly added tests. Note the correction to plan fact F4 already recorded in the 14:42 comment: the managed path DID have provider-level coverage, so the slices relocated those assertions to the feature boundary rather than authoring characterization tests from scratch.
+
+AC#5 — feature-boundary rejection is proven at the feature, not the provider: request/test_service.py:1095 (test_submit_request_should_reject_group_outside_managed_domain) and sync/test_desired_state.py:236/299/318 all assert DIRECTORY_GROUP_DOMAIN_MISMATCH, plus common/test_access_group_policy.py:82/90 covering is_managed on the canonical value including the managed-alias-rescues-foreign-primary case.
+
+AC#6 — TASK-76.1, 76.2, 76.3, 76.4 and 76.5 all report Status: Done; the DIRECTORY_MANAGED / MANAGED_GROUP grep returns zero as recorded under AC#2. F2's standing instruction to re-run the environment grep before each merge was honoured on the final slice: zero ACCESS_* and zero DIRECTORY_MANAGED* hits in terraform/, Makefile and app/Makefile, so no environment's configuration or boot changes.
+
+CARRIED FORWARD, not regressions: TASK-79 holds D4's IDP-authoritative owned-domains capability (list_domains / primary_domain), which eventually replaces dir_domain as feature-owned configuration; D7 keeps single-domain strict case-insensitive matching until then. TASK-25.1.6.5 keeps its advisory to pass fully-qualified keys and not expect managed-domain filtering from get_user_groups. AWS_ADMIN_GROUPS remains the one LIVE organization-specific default, deliberately excluded from TASK-76.5 because removing it needs a deployment step and its consumer is frozen under decisions/migration.md rule 1 — it still needs its own task.
+
+LEFT FOR HUMAN DoD VERIFICATION: this task is a coordinator with no diff of its own, so closing it is a confirmation that the five child PRs together satisfy the intent. Two child decisions were explicitly flagged for reviewer challenge and remain open for review — TASK-76.2's D7 single-domain assumption, and TASK-76.5's D3 (fallback_approver_slug staying an ACCESS_REQUESTS_ env var rather than moving to AccessRuntimeConfig). Status left To Do for a human to close.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

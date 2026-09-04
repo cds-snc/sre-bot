@@ -43,13 +43,46 @@ def test_access_sync_settings_defaults():
 
 @pytest.mark.unit
 def test_access_requests_settings_defaults():
-    """AccessRequestsSettings must provide correct defaults with no env vars."""
+    """AccessRequestsSettings must default to disabled with no organization-specific group names."""
     s = AccessRequestsSettings()
     assert s.enabled is False
-    assert s.manager_group_slug == "sg-managers"
-    assert s.fallback_approver_slug == "sg-org-admins"
+    assert not hasattr(s, "manager_group_slug")
+    assert s.fallback_approver_slug == ""
     assert s.min_approver_count == 1
     assert s.request_ttl_hours == 72
+
+
+@pytest.mark.unit
+def test_access_requests_settings_requires_fallback_approver_slug_when_enabled():
+    """Enabling the feature without a fallback approver slug must fail with a named error."""
+    with pytest.raises((ValueError, ValidationError)) as exc_info:
+        AccessRequestsSettings(enabled=True)
+
+    assert "ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG" in str(exc_info.value)
+
+
+@pytest.mark.unit
+def test_access_requests_settings_enabled_with_fallback_slug_constructs():
+    """An explicitly configured fallback approver slug must satisfy the enabled contract."""
+    s = AccessRequestsSettings(enabled=True, fallback_approver_slug="sg-org-admins")
+    assert s.enabled is True
+    assert s.fallback_approver_slug == "sg-org-admins"
+
+
+@pytest.mark.unit
+def test_access_requests_settings_disabled_ignores_missing_fallback_slug():
+    """Leaving the feature disabled must not require access request configuration."""
+    s = AccessRequestsSettings(enabled=False)
+    assert s.enabled is False
+    assert s.fallback_approver_slug == ""
+
+
+@pytest.mark.unit
+def test_access_settings_constructs_when_requests_disabled_and_unconfigured():
+    """The root settings object must build with no ACCESS_ env vars set (boot safety)."""
+    s = AccessSettings(_env_file=None)
+    assert s.requests.enabled is False
+    assert s.requests.fallback_approver_slug == ""
 
 
 @pytest.mark.unit
@@ -106,14 +139,12 @@ def test_access_settings_reads_config_flat_env_vars(monkeypatch):
 def test_access_settings_reads_requests_flat_env_vars(monkeypatch):
     """AccessSettings must resolve ACCESS_REQUESTS_* flat env vars into the requests slice."""
     monkeypatch.setenv("ACCESS_REQUESTS_ENABLED", "true")
-    monkeypatch.setenv("ACCESS_REQUESTS_MANAGER_GROUP_SLUG", "sg-leads")
     monkeypatch.setenv("ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG", "sg-admins")
     monkeypatch.setenv("ACCESS_REQUESTS_MIN_APPROVER_COUNT", "2")
     monkeypatch.setenv("ACCESS_REQUESTS_REQUEST_TTL_HOURS", "48")
 
     s = AccessSettings(_env_file=None).requests
     assert s.enabled is True
-    assert s.manager_group_slug == "sg-leads"
     assert s.fallback_approver_slug == "sg-admins"
     assert s.min_approver_count == 2
     assert s.request_ttl_hours == 48
@@ -152,11 +183,12 @@ def test_access_settings_accepts_requests_json_blob(monkeypatch):
     """ACCESS_REQUESTS may be set as a JSON blob to configure the entire requests slice."""
     monkeypatch.setenv(
         "ACCESS_REQUESTS",
-        '{"enabled": true, "min_approver_count": 3, "request_ttl_hours": 24}',
+        '{"enabled": true, "fallback_approver_slug": "sg-org-admins", "min_approver_count": 3, "request_ttl_hours": 24}',
     )
 
     s = AccessSettings(_env_file=None).requests
     assert s.enabled is True
+    assert s.fallback_approver_slug == "sg-org-admins"
     assert s.min_approver_count == 3
     assert s.request_ttl_hours == 24
 
