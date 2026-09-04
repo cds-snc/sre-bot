@@ -26,10 +26,20 @@ Scenarios covered:
   A5  User is in authn but get_user_groups returns a group that is NOT
       in the effective policy (e.g. a foreign-platform group).
       Required entitlements must remain empty.
+
+  B1  Platform-state build happy path.
+
+  B2  IDP batch-membership failure must propagate, never surface as a
+      success carrying an empty desired membership map (TASK-77).
+
+  B3  A per-rule NOT_FOUND group lookup remains a legitimate skip.
+
+  B4  A per-rule non-NOT_FOUND group lookup failure must propagate.
 """
 
 import pytest
 
+from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 from packages.access.common.config import PlatformPolicy
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
@@ -282,3 +292,156 @@ def test_should_not_include_entitlement_for_group_outside_effective_policy():
     assert result.is_success
     assert result.data.user_should_exist is True
     assert result.data.required_entitlements == []
+
+
+# ---------------------------------------------------------------------------
+# B: build_platform_state_from_effective
+# ---------------------------------------------------------------------------
+
+
+def _make_platform_builder_and_effective(
+    *,
+    discovered_slugs: set,
+    group_members: dict | None = None,
+    batch_members_result: OperationResult | None = None,
+    group_result_by_slug: dict | None = None,
+    platform: str = "aws",
+) -> tuple:
+    """Return (DirectoryMembershipBuilder, EffectivePlatformPolicy) for platform builds."""
+    config = AccessSyncRuntimeConfig(
+        dir_prefix="sg",
+        platforms={
+            platform: PlatformPolicy(
+                authn_token="authn",
+                authn_removal_mode="delete",
+                mode_overrides={},
+            )
+        },
+    )
+    directory = FakeDirectory(
+        discovered_slugs=discovered_slugs,
+        group_members=group_members or {},
+        batch_members_result=batch_members_result,
+        group_result_by_slug=group_result_by_slug,
+    )
+    builder = DirectoryMembershipBuilder(directory)
+    effective = resolve_effective_policy(config, platform, discovered_slugs)
+    return builder, effective
+
+
+@pytest.mark.integration
+def test_should_build_platform_state_from_authn_and_entitlement_groups():
+    """Happy path: desired members are authn members present in each entitlement group."""
+    # Arrange
+    builder, effective = _make_platform_builder_and_effective(
+        discovered_slugs={"sg-aws-admin", "sg-aws-readonly"},
+        group_members={
+            "sg-aws-authn": ["alice@example.com", "bob@example.com"],
+            "sg-aws-admin": ["alice@example.com", "ghost@example.com"],
+            "sg-aws-readonly": ["bob@example.com"],
+        },
+    )
+
+    # Act
+    result = builder.build_platform_state_from_effective(effective)
+
+    # Assert
+    assert result.is_success
+    assert result.data is not None
+    assert result.data.desired_users == {"alice@example.com", "bob@example.com"}
+    assert result.data.desired_members_by_entitlement == {
+        "admin": {"alice@example.com"},
+        "readonly": {"bob@example.com"},
+    }
+    assert result.data.entitlement_slug_by_id == {
+        "admin": "sg-aws-admin",
+        "readonly": "sg-aws-readonly",
+    }
+
+
+@pytest.mark.integration
+def test_should_propagate_error_when_batch_members_fetch_fails():
+    """A failing get_group_members_batch must not surface as success with empty members."""
+    # Arrange
+    builder, effective = _make_platform_builder_and_effective(
+        discovered_slugs={"sg-aws-admin", "sg-aws-readonly"},
+        group_members={
+            "sg-aws-authn": ["alice@example.com"],
+            "sg-aws-admin": ["alice@example.com"],
+        },
+        batch_members_result=OperationResult.error(
+            OperationStatus.TRANSIENT_ERROR,
+            message="rate limited",
+            error_code="429",
+            retry_after=30,
+        ),
+    )
+
+    # Act
+    result = builder.build_platform_state_from_effective(effective)
+
+    # Assert
+    assert not result.is_success
+    assert result.status == OperationStatus.TRANSIENT_ERROR
+    assert result.error_code == "429"
+    assert result.retry_after == 30
+    assert result.data is None
+
+
+@pytest.mark.integration
+def test_should_skip_entitlement_when_group_not_found():
+    """NOT_FOUND on a rule's group is legitimate absence: skip only that entitlement."""
+    # Arrange
+    builder, effective = _make_platform_builder_and_effective(
+        discovered_slugs={"sg-aws-admin", "sg-aws-readonly"},
+        group_members={
+            "sg-aws-authn": ["alice@example.com", "bob@example.com"],
+            "sg-aws-readonly": ["bob@example.com"],
+        },
+        group_result_by_slug={
+            "sg-aws-admin": OperationResult.error(
+                OperationStatus.NOT_FOUND,
+                message="group not found",
+                error_code="GROUP_NOT_FOUND",
+            )
+        },
+    )
+
+    # Act
+    result = builder.build_platform_state_from_effective(effective)
+
+    # Assert
+    assert result.is_success
+    assert result.data is not None
+    assert "admin" not in result.data.desired_members_by_entitlement
+    assert result.data.desired_members_by_entitlement["readonly"] == {"bob@example.com"}
+
+
+@pytest.mark.integration
+def test_should_propagate_error_when_group_lookup_transiently_fails():
+    """A non-NOT_FOUND per-rule failure must fail the whole build, not skip the rule."""
+    # Arrange
+    builder, effective = _make_platform_builder_and_effective(
+        discovered_slugs={"sg-aws-admin", "sg-aws-readonly"},
+        group_members={
+            "sg-aws-authn": ["alice@example.com", "bob@example.com"],
+            "sg-aws-readonly": ["bob@example.com"],
+        },
+        group_result_by_slug={
+            "sg-aws-admin": OperationResult.error(
+                OperationStatus.TRANSIENT_ERROR,
+                message="backend error",
+                error_code="503",
+                retry_after=15,
+            )
+        },
+    )
+
+    # Act
+    result = builder.build_platform_state_from_effective(effective)
+
+    # Assert
+    assert not result.is_success
+    assert result.status == OperationStatus.TRANSIENT_ERROR
+    assert result.error_code == "503"
+    assert result.data is None
