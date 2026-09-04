@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from packages.access.common.config import EntitlementMode
+from packages.access.common.group_policy import ManagedGroupPolicy
 
 if TYPE_CHECKING:
     from infrastructure.directory.models import DirectoryGroup
@@ -71,6 +72,7 @@ def resolve_approver_candidates(
     directory_group: DirectoryGroup,
     fallback_slug: str,
     directory: DirectoryProvider,
+    policy: ManagedGroupPolicy,
 ) -> list[str]:
     """Resolve an ordered list of eligible approver emails for a target group.
 
@@ -86,12 +88,13 @@ def resolve_approver_candidates(
         directory_group: Resolved canonical group from the IDP.
         fallback_slug: Org-level fallback group slug (e.g. ``"sg-org-admins"``).
         directory: IDP directory provider; read-only calls only.
+        policy: Managed-group policy composing canonical addresses and keys.
 
     Returns:
         Ordered list of approver email strings; may be empty.
     """
     members_result = directory.get_group_members(
-        group_key=directory_group.group_email,
+        group_key=policy.canonical_email(directory_group),
         include_member_types={"USER"},
     )
     if members_result.is_success and members_result.data:
@@ -100,7 +103,7 @@ def resolve_approver_candidates(
             return owners
 
     fallback_result = directory.get_group_members(
-        group_key=fallback_slug,
+        group_key=policy.group_key(fallback_slug),
         include_member_types={"USER"},
     )
     if fallback_result.is_success and fallback_result.data:

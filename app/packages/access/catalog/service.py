@@ -19,6 +19,7 @@ from packages.access.catalog.domain import (
     PlatformSummary,
 )
 from packages.access.catalog.parsers import CatalogSlugParser, FallbackCatalogSlugParser
+from packages.access.common.group_policy import ManagedGroupPolicy
 
 if TYPE_CHECKING:
     from infrastructure.directory.provider import DirectoryProvider
@@ -50,6 +51,8 @@ class CatalogService:
         directory: IDP directory provider for group discovery and membership checks.
         parsers: Mapping of platform key → ``CatalogSlugParser``.
             Platforms without an entry fall back to ``FallbackCatalogSlugParser``.
+        policy: Managed-group policy owning canonical address, slug and
+            managed-domain decisions the directory provider no longer makes.
         display_names: Optional mapping of platform key → human-readable name.
     """
 
@@ -58,11 +61,13 @@ class CatalogService:
         runtime_config: AccessRuntimeConfig,
         directory: DirectoryProvider,
         parsers: dict[str, CatalogSlugParser],
+        policy: ManagedGroupPolicy,
         display_names: dict[str, str] | None = None,
     ) -> None:
         self._config = runtime_config
         self._directory = directory
         self._parsers = parsers
+        self._policy = policy
         self._display_names = display_names or {}
         self._fallback_parser = FallbackCatalogSlugParser()
         self.logger = logger
@@ -140,8 +145,8 @@ class CatalogService:
         prefix = self._config.group_prefix(normalized)
         parser = self._parsers.get(normalized, self._fallback_parser)
 
-        # Discover IDP groups matching the platform prefix.
-        discovery_result = self._directory.list_groups(query=prefix)
+        # Discover IDP groups generically; managed-group policy is applied here.
+        discovery_result = self._directory.list_groups()
         if not discovery_result.is_success or discovery_result.data is None:
             log.error(
                 "catalog_group_discovery_failed",
@@ -161,7 +166,18 @@ class CatalogService:
         provisioned_count = 0
 
         for group in sorted(groups, key=lambda g: g.group_slug):
-            slug = group.group_slug.strip().lower()
+            if not self._policy.matches_prefix(group, prefix):
+                continue
+            # A listing must not fail because one unrelated group is out of domain.
+            if not self._policy.is_managed(group):
+                log.warning(
+                    "catalog_group_outside_managed_domain",
+                    group_slug=group.group_slug,
+                )
+                continue
+
+            slug = self._policy.canonical_slug(group)
+            group_email = self._policy.canonical_email(group)
 
             # Skip the authn lifecycle group — it's not a requestable entitlement.
             if slug == authn_slug.lower():
@@ -182,7 +198,7 @@ class CatalogService:
             parsed_token = parser.parse(token)
 
             already_provisioned = self._check_membership(
-                group_email=group.group_email,
+                group_email=group_email,
                 user_email=user_email,
                 log=log,
                 token=token,
@@ -191,7 +207,7 @@ class CatalogService:
             entry = EntitlementEntry(
                 token=token,
                 group_slug=slug,
-                group_email=group.group_email,
+                group_email=group_email,
                 mode=mode,  # type: ignore[arg-type]
                 requestable=requestable,
                 already_provisioned=already_provisioned,

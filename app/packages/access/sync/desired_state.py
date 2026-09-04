@@ -8,9 +8,9 @@ The coordinator resolves effective policy once per run via
 ``resolve_effective_policy`` and passes the result to
 ``build_user_state_from_effective`` (single-user) or
 ``build_platform_state_from_effective`` (batch reconciliation).  Discovery
-of IDP groups is handled by ``discover_group_slugs`` which queries the
-directory with the platform prefix and returns matching slugs, propagating
-any directory failure to the caller.
+of IDP groups is handled by ``discover_group_slugs`` which lists the
+directory generically and applies the platform prefix and managed-group
+policy locally, propagating any directory failure to the caller.
 """
 
 from typing import TYPE_CHECKING
@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from infrastructure.operations import OperationResult, OperationStatus
+from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.sync.domain import DesiredPlatformState, DesiredUserState
 from packages.access.sync.policies import EffectivePlatformPolicy, EntitlementRule
 
@@ -39,8 +40,9 @@ class DirectoryMembershipBuilder:
     failures through the standard result contract without catching exceptions.
     """
 
-    def __init__(self, directory: DirectoryProvider) -> None:
+    def __init__(self, directory: DirectoryProvider, policy: ManagedGroupPolicy) -> None:
         self._directory = directory
+        self._policy = policy
 
     def build_user_state_from_effective(
         self,
@@ -91,9 +93,18 @@ class DirectoryMembershipBuilder:
                     error_code=user_groups_result.error_code,
                 )
 
-            user_group_slugs: set[str] = {
-                group.group_slug.lower() for group in (user_groups_result.data or []) if group.group_slug
-            }
+            user_group_slugs: set[str] = set()
+            for group in user_groups_result.data or []:
+                # A listing must not fail because one group is out of domain.
+                if not self._policy.is_managed(group):
+                    log.warning(
+                        "user_group_outside_managed_domain",
+                        group_slug=group.group_slug,
+                    )
+                    continue
+                slug = self._policy.canonical_slug(group)
+                if slug:
+                    user_group_slugs.add(slug)
 
             required_entitlements = [
                 rule for rule in effective.sync_managed_rules() if rule.group_slug.lower() in user_group_slugs
@@ -127,7 +138,7 @@ class DirectoryMembershipBuilder:
         """
         log = logger.bind(platform=effective.platform)
 
-        authn_group_result = self._directory.get_group(effective.authn_group_slug)
+        authn_group_result = self._directory.get_group(self._policy.group_key(effective.authn_group_slug))
         if not authn_group_result.is_success or not authn_group_result.data:
             return OperationResult.error(
                 OperationStatus.NOT_FOUND,
@@ -135,7 +146,14 @@ class DirectoryMembershipBuilder:
                 error_code="GROUP_NOT_FOUND",
             )
 
-        authn_email = authn_group_result.data.group_email
+        if not self._policy.is_managed(authn_group_result.data):
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR,
+                message=f"Authn group outside managed domain: {effective.authn_group_slug}",
+                error_code="DIRECTORY_GROUP_DOMAIN_MISMATCH",
+            )
+
+        authn_email = self._policy.canonical_email(authn_group_result.data)
         authn_members_result = self._directory.get_group_members(
             authn_email,
             include_member_types={"USER"},
@@ -152,7 +170,7 @@ class DirectoryMembershipBuilder:
 
         email_to_rule: dict[str, EntitlementRule] = {}
         for rule in effective.sync_managed_rules():
-            group_result = self._directory.get_group(rule.group_slug)
+            group_result = self._directory.get_group(self._policy.group_key(rule.group_slug))
             if not group_result.is_success and group_result.status != OperationStatus.NOT_FOUND:
                 return OperationResult.error(
                     group_result.status,
@@ -166,7 +184,14 @@ class DirectoryMembershipBuilder:
                     group_slug=rule.group_slug,
                 )
                 continue
-            email_to_rule[group_result.data.group_email] = rule
+            # An explicitly configured group out of domain is a configuration fault.
+            if not self._policy.is_managed(group_result.data):
+                return OperationResult.error(
+                    OperationStatus.PERMANENT_ERROR,
+                    message=f"Group outside managed domain: {rule.group_slug}",
+                    error_code="DIRECTORY_GROUP_DOMAIN_MISMATCH",
+                )
+            email_to_rule[self._policy.canonical_email(group_result.data)] = rule
 
         desired_members_by_entitlement: dict[str, set[str]] = {}
         entitlement_slug_by_id: dict[str, str] = {rule.entitlement_id: rule.group_slug for rule in effective.sync_managed_rules()}
@@ -208,17 +233,17 @@ class DirectoryMembershipBuilder:
         config: AccessRuntimeConfig,
         platform: str,
     ) -> OperationResult[set[str]]:
-        """Discover IDP group slugs for a platform by querying with the platform prefix.
+        """Discover IDP group slugs for a platform via a generic directory listing.
 
-        Uses ``config.group_prefix(platform)`` as the query and filters results
-        to slugs that start with that prefix.  An IDP failure is propagated as
-        an error result: a caller must never be able to mistake an unreachable
-        directory for "this platform declares no managed groups", since an
-        empty rule set silently disables entitlement enforcement.
+        Results are filtered client-side to ``config.group_prefix(platform)``
+        and to the managed domain.  An IDP failure is propagated as an error
+        result: a caller must never be able to mistake an unreachable directory
+        for "this platform declares no managed groups", since an empty rule set
+        silently disables entitlement enforcement.
         """
         prefix = config.group_prefix(platform)
         log = logger.bind(platform=platform, group_prefix=prefix)
-        list_result = self._directory.list_groups(query=prefix)
+        list_result = self._directory.list_groups()
         if not list_result.is_success:
             log.warning(
                 "discover_groups_failed",
@@ -232,13 +257,20 @@ class DirectoryMembershipBuilder:
             )
 
         groups = list_result.data if isinstance(list_result.data, list) else []
-        discovered = {
-            group.group_slug.strip().lower()
-            for group in groups
-            if group.group_slug
-            and isinstance(group.group_slug, str)
-            and group.group_slug.strip().lower().startswith(prefix.lower())
-        }
+        discovered: set[str] = set()
+        for group in groups:
+            if not self._policy.matches_prefix(group, prefix):
+                continue
+            # Discovery must not be taken down by one out-of-domain group.
+            if not self._policy.is_managed(group):
+                log.warning(
+                    "discover_groups_outside_managed_domain",
+                    group_slug=group.group_slug,
+                )
+                continue
+            slug = self._policy.canonical_slug(group)
+            if slug.startswith(prefix.lower()):
+                discovered.add(slug)
         log.info(
             "discover_groups_completed",
             discovered_count=len(discovered),
@@ -251,8 +283,8 @@ class DirectoryMembershipBuilder:
         group_slug: str,
         user_email: str,
     ) -> OperationResult[bool]:
-        """Resolve group slug to email and check user membership."""
-        group_result = self._directory.get_group(group_slug)
+        """Resolve group slug to its canonical email and check user membership."""
+        group_result = self._directory.get_group(self._policy.group_key(group_slug))
         if not group_result.is_success:
             return OperationResult.error(
                 group_result.status,
@@ -268,8 +300,16 @@ class DirectoryMembershipBuilder:
                 error_code="GROUP_NOT_FOUND",
             )
 
+        # An explicitly requested group out of domain is a configuration fault.
+        if not self._policy.is_managed(group):
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR,
+                message=f"Group outside managed domain: {group_slug}",
+                error_code="DIRECTORY_GROUP_DOMAIN_MISMATCH",
+            )
+
         membership_result = self._directory.check_membership(
-            group.group_email,
+            self._policy.canonical_email(group),
             user_email,
         )
         if not membership_result.is_success:

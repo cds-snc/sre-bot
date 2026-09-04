@@ -21,6 +21,7 @@ from infrastructure.directory.models import (
 )
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig, PlatformPolicy
+from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.sync.application import AccessSyncApplicationService
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
 from packages.access.sync.domain import (
@@ -248,7 +249,8 @@ class FakeDirectory:
             ]
         )
 
-    def get_group(self, slug: str) -> OperationResult:
+    def get_group(self, group_key: str) -> OperationResult:
+        slug = group_key.partition("@")[0]
         return OperationResult.success(
             data=DirectoryGroup(
                 group_email=f"{slug}@example.com",
@@ -339,7 +341,7 @@ def make_coordinator(
     coordinator = AccessSyncApplicationService(
         adapters={platform: adapter},
         config=config,
-        membership_builder=DirectoryMembershipBuilder(directory_provider),
+        membership_builder=DirectoryMembershipBuilder(directory_provider, ManagedGroupPolicy.from_config(config)),
     )
     return coordinator, adapter
 
@@ -410,7 +412,7 @@ def test_sync_user_adapter_not_found():
     coordinator = AccessSyncApplicationService(
         adapters={},
         config=config,
-        membership_builder=DirectoryMembershipBuilder(directory_provider),
+        membership_builder=DirectoryMembershipBuilder(directory_provider, ManagedGroupPolicy.from_config(config)),
     )
     result = coordinator.sync_user("alice@example.com", "aws")
     assert not result.is_success

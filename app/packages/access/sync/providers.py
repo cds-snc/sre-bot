@@ -4,6 +4,7 @@ from infrastructure.directory import get_directory_provider
 from infrastructure.events import get_event_dispatcher
 from infrastructure.idempotency import IdempotencyStore, build_idempotency_store
 from infrastructure.storage import get_storage_service
+from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.common.providers import get_access_runtime_config
 from packages.access.common.settings import AccessSyncSettings, get_access_settings
 from packages.access.sync.adapters import AccessSyncAdapter
@@ -58,10 +59,14 @@ def get_access_sync_job_status_store() -> JobStatusStore:
 @functools.lru_cache(maxsize=1)
 def get_access_sync_coordinator() -> AccessSyncApplicationService:
     """Return the singleton AccessSyncApplicationService instance."""
+    config = get_access_runtime_config()
     return AccessSyncApplicationService(
         adapters=get_access_sync_adapters(),
-        config=get_access_runtime_config(),
-        membership_builder=DirectoryMembershipBuilder(directory=get_directory_provider()),
+        config=config,
+        membership_builder=DirectoryMembershipBuilder(
+            directory=get_directory_provider(),
+            policy=ManagedGroupPolicy.from_config(config),
+        ),
         repository=get_sync_run_repository(),
         dispatcher=get_event_dispatcher(),
     )

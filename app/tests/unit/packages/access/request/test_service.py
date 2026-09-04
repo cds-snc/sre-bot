@@ -19,6 +19,7 @@ from infrastructure.events import Event
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig, PlatformPolicy
 from packages.access.common.events import SYNC_COMPLETED, SYNC_FAILED
+from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.request.domain import AccessRequest, ApprovalDecision
 from packages.access.request.service import AccessRequestService
 
@@ -145,6 +146,7 @@ def make_service(
         directory=directory,
         runtime_config=config or make_config(),
         dispatcher=dispatcher,  # type: ignore[arg-type]
+        policy=ManagedGroupPolicy(prefix="sg-", domain="example.com"),
         fallback_approver_slug=fallback_approver_slug,
         min_approver_count=min_approver_count,
     )
@@ -1031,3 +1033,79 @@ def test_revoke_request_type_in_approved_event_metadata():
 
     approved_event = next(e for e in dispatcher.dispatched if e.event_type == "access_request_approved")
     assert approved_event.metadata["request_type"] == "revoke"
+
+
+# ---------------------------------------------------------------------------
+# ManagedGroupPolicy cut-over (TASK-76.3)
+# ---------------------------------------------------------------------------
+
+
+def make_policy_service(directory: MagicMock) -> AccessRequestService:
+    return AccessRequestService(
+        repository=FakeRepository(),  # type: ignore[arg-type]
+        directory=directory,
+        runtime_config=make_config(),
+        dispatcher=FakeDispatcher(),  # type: ignore[arg-type]
+        policy=ManagedGroupPolicy(prefix="sg-", domain="example.com"),
+    )
+
+
+def submit(service: AccessRequestService):
+    return service.submit_request(
+        user_email="user@example.com",
+        actor_email="user@example.com",
+        actor_type="self",
+        request_type="grant",
+        platform="aws",
+        group_slug="sg-aws-admins",
+        entitlement_type="group",
+        justification="Need access.",
+    )
+
+
+@pytest.mark.unit
+def test_submit_request_should_resolve_group_by_composed_group_key():
+    directory = MagicMock()
+    directory.get_group.return_value = OperationResult.success(data=make_directory_group())
+    directory.check_membership.return_value = OperationResult.success(data=make_membership(is_member=False))
+    directory.get_group_members.return_value = OperationResult.success(
+        data=[DirectoryMember(email="approver@example.com", role="OWNER")]
+    )
+
+    submit(make_policy_service(directory))
+
+    assert directory.get_group.call_args.args[0] == "sg-aws-admins@example.com"
+
+
+@pytest.mark.unit
+def test_submit_request_should_reject_group_outside_managed_domain():
+    directory = MagicMock()
+    directory.get_group.return_value = OperationResult.success(data=make_directory_group(email="sg-aws-admins@other-tenant.com"))
+    directory.check_membership.return_value = OperationResult.success(data=make_membership(is_member=False))
+
+    result = submit(make_policy_service(directory))
+
+    assert not result.is_success
+    assert result.error_code == "DIRECTORY_GROUP_DOMAIN_MISMATCH"
+
+
+@pytest.mark.unit
+def test_submit_request_should_persist_canonical_alias_group_email():
+    directory = MagicMock()
+    directory.get_group.return_value = OperationResult.success(
+        data=replace(
+            make_directory_group(email="legacy-admins@example.com", slug="legacy-admins"),
+            aliases=("sg-aws-admins@example.com",),
+        )
+    )
+    directory.check_membership.return_value = OperationResult.success(data=make_membership(is_member=False))
+    directory.get_group_members.return_value = OperationResult.success(
+        data=[DirectoryMember(email="approver@example.com", role="OWNER")]
+    )
+
+    result = submit(make_policy_service(directory))
+
+    assert result.is_success
+    assert result.data is not None
+    assert result.data.group_email == "sg-aws-admins@example.com"
+    assert directory.check_membership.call_args.args[0] == "sg-aws-admins@example.com"

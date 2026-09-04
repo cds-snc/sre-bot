@@ -51,6 +51,7 @@ from infrastructure.directory.models import (
 from infrastructure.operations import OperationResult
 from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 from packages.access.common.config import PlatformPolicy
+from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
 from packages.access.sync.application import AccessSyncApplicationService
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
@@ -129,9 +130,10 @@ class FakeDirectory:
             provider_group_id=f"gid-{slug}",
         )
 
-    def get_group(self, slug: str) -> OperationResult:
+    def get_group(self, group_key: str) -> OperationResult:
         # Groups always exist in the IDP directory unless a per-slug result is injected;
         # the membership question is answered by check_membership / get_user_groups.
+        slug = group_key.partition("@")[0]
         if slug in self._group_result_by_slug:
             return self._group_result_by_slug[slug]
         return OperationResult.success(data=self._make_group(slug))
@@ -485,7 +487,7 @@ def make_coordinator(make_sync_config):
         coordinator = AccessSyncApplicationService(
             adapters={platform: adapter},
             config=config,
-            membership_builder=DirectoryMembershipBuilder(directory_provider),
+            membership_builder=DirectoryMembershipBuilder(directory_provider, ManagedGroupPolicy.from_config(config)),
         )
         return coordinator, adapter
 

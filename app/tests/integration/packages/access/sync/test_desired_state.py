@@ -36,6 +36,9 @@ Scenarios covered:
 
   B4  A per-rule non-NOT_FOUND group lookup failure must propagate.
 
+  B5  A per-rule group outside the managed domain must propagate as a
+      hard error rather than being silently skipped.
+
   C1  Group discovery returns the platform-prefixed slugs and filters out
       foreign-platform groups.
 
@@ -45,9 +48,11 @@ Scenarios covered:
 
 import pytest
 
+from infrastructure.directory.models import DirectoryGroup
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 from packages.access.common.config import PlatformPolicy
+from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.sync.desired_state import DirectoryMembershipBuilder
 from packages.access.sync.policies import resolve_effective_policy
 
@@ -86,7 +91,7 @@ def _make_builder_and_effective(
         transitive_membership_slugs=transitive_membership_slugs,
         user_direct_group_slugs=user_direct_group_slugs,
     )
-    builder = DirectoryMembershipBuilder(directory)
+    builder = DirectoryMembershipBuilder(directory, ManagedGroupPolicy.from_config(config))
     effective = resolve_effective_policy(config, platform, discovered_slugs)
     return builder, effective
 
@@ -332,7 +337,7 @@ def _make_platform_builder_and_effective(
         batch_members_result=batch_members_result,
         group_result_by_slug=group_result_by_slug,
     )
-    builder = DirectoryMembershipBuilder(directory)
+    builder = DirectoryMembershipBuilder(directory, ManagedGroupPolicy.from_config(config))
     effective = resolve_effective_policy(config, platform, discovered_slugs)
     return builder, effective
 
@@ -455,6 +460,35 @@ def test_should_propagate_error_when_group_lookup_transiently_fails():
     assert result.data is None
 
 
+@pytest.mark.integration
+def test_should_propagate_error_when_rule_group_is_outside_managed_domain():
+    """An explicitly configured out-of-domain group is a fault, not a silent skip."""
+    # Arrange
+    builder, effective = _make_platform_builder_and_effective(
+        discovered_slugs={"sg-aws-admin", "sg-aws-readonly"},
+        group_members={
+            "sg-aws-authn": ["alice@example.com", "bob@example.com"],
+            "sg-aws-readonly": ["bob@example.com"],
+        },
+        group_result_by_slug={
+            "sg-aws-admin": OperationResult.success(
+                data=DirectoryGroup(
+                    group_email="sg-aws-admin@other-tenant.com",
+                    group_slug="sg-aws-admin",
+                    provider_group_id="gid-sg-aws-admin",
+                )
+            )
+        },
+    )
+
+    # Act
+    result = builder.build_platform_state_from_effective(effective)
+
+    # Assert
+    assert not result.is_success
+    assert result.error_code == "DIRECTORY_GROUP_DOMAIN_MISMATCH"
+
+
 # ---------------------------------------------------------------------------
 # C: discover_group_slugs
 # ---------------------------------------------------------------------------
@@ -482,7 +516,7 @@ def _make_discovery_builder(
         discovered_slugs=discovered_slugs,
         list_groups_result=list_groups_result,
     )
-    return DirectoryMembershipBuilder(directory), config
+    return DirectoryMembershipBuilder(directory, ManagedGroupPolicy.from_config(config)), config
 
 
 @pytest.mark.integration
