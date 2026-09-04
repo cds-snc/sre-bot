@@ -136,11 +136,7 @@ def google_service() -> MagicMock:
 @pytest.fixture
 def mock_directory_settings():
     """Directory settings fixture for provider construction."""
-    settings = MagicMock()
-    settings.managed_group_domain = "example.com"
-    settings.managed_group_prefix = "sg-"
-    settings.enforce_managed_group_email = True
-    return settings
+    return MagicMock()
 
 
 @pytest.fixture
@@ -1233,7 +1229,9 @@ class TestListGroups:
                 provider="google",
             ),
         ]
-        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", maxResults=200)
+        google_service.groups.return_value.list.assert_called_once_with(
+            customer="my_customer", maxResults=200, query="email:sg-*"
+        )
 
     def test_uses_group_alias_fields_when_standard_keys_are_missing(self, provider, google_service):
         # Arrange
@@ -1251,7 +1249,9 @@ class TestListGroups:
 
         # Assert
         assert result.is_success
-        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", maxResults=200)
+        google_service.groups.return_value.list.assert_called_once_with(
+            customer="my_customer", maxResults=200, query="email:sg-*"
+        )
         assert result.data == [
             DirectoryGroup(
                 group_email="sg-ops@example.com",
@@ -1354,76 +1354,6 @@ class TestListGroups:
         completed = [entry for entry in entries if entry["event"] == "directory_groups_listed"]
         assert completed and completed[0]["skipped"] == 1
 
-    def test_prefers_managed_alias_when_primary_email_uses_old_pattern(self, provider, google_service):
-        # Arrange
-        google_service.groups.return_value.list.return_value = _request(
-            {
-                "groups": [
-                    {
-                        "email": "aws-finops@example.com",
-                        "aliases": ["sg-aws-finops@example.com"],
-                        "id": "group-10",
-                        "name": "FinOps",
-                    }
-                ]
-            }
-        )
-
-        # Act
-        result = provider.list_groups(query="sg-aws-")
-
-        # Assert
-        assert result.is_success
-        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", maxResults=200)
-        assert result.data == [
-            DirectoryGroup(
-                group_email="sg-aws-finops@example.com",
-                group_slug="sg-aws-finops",
-                provider_group_id="group-10",
-                name="FinOps",
-                description=None,
-                provider="google",
-                aliases=("sg-aws-finops@example.com",),
-            )
-        ]
-
-    def test_skips_groups_when_email_is_missing_for_alias_aware_discovery(self, provider, google_service):
-        # Arrange
-        google_service.groups.return_value.list.return_value = _request({"groups": [{"id": "group-1", "name": "Admins"}]})
-
-        # Act
-        result = provider.list_groups(query="sg-")
-
-        # Assert
-        assert result.is_success
-        assert result.data == []
-        google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", maxResults=200)
-
-    def test_returns_error_when_managed_group_domain_mismatches(self, provider, google_service):
-        # Arrange
-        google_service.groups.return_value.list.return_value = _request(
-            {
-                "groups": [
-                    {
-                        "email": "platform-admins@other.example",
-                        "id": "group-1",
-                        "name": "Admins",
-                    }
-                ]
-            }
-        )
-
-        # Act
-        result = provider.list_groups(query="name:Admins")
-
-        # Assert
-        # name:Admins is a Google query expression — passed through unchanged
-        google_service.groups.return_value.list.assert_called_once_with(
-            customer="my_customer", maxResults=200, query="name:Admins"
-        )
-        assert not result.is_success
-        assert result.error_code == "DIRECTORY_GROUP_DOMAIN_MISMATCH"
-
     def test_propagates_directory_error(self, provider, google_service):
         # Arrange
         google_service.groups.return_value.list.return_value.execute.side_effect = _http_error(503)
@@ -1457,7 +1387,8 @@ class TestListGroups:
         ]
         google_service.groups.return_value.list.assert_called_once_with(customer="my_customer", maxResults=200)
 
-    def test_empty_query_does_not_apply_the_managed_prefix_filter(self, provider, google_service):
+    def test_unfiltered_listing_returns_every_group(self, provider, google_service):
+        """An empty query returns all groups with no client-side filtering."""
         # Arrange
         _install_pages(
             google_service.groups.return_value,
@@ -1480,7 +1411,8 @@ class TestListGroups:
             "marketing@example.com",
         ]
 
-    def test_empty_query_accepts_a_group_outside_the_managed_domain(self, provider, google_service):
+    def test_group_from_any_email_domain_is_mapped(self, provider, google_service):
+        """A listed group is mapped whatever its email domain."""
         # Arrange
         _install_pages(
             google_service.groups.return_value,
@@ -1504,7 +1436,8 @@ class TestListGroups:
             )
         ]
 
-    def test_empty_query_ignores_managed_alias_preference(self, provider, google_service):
+    def test_listed_group_keeps_its_primary_email_over_an_alias(self, provider, google_service):
+        """The canonical email is the payload's primary email, never a preferred alias."""
         # Arrange
         _install_pages(
             google_service.groups.return_value,
@@ -1528,7 +1461,8 @@ class TestListGroups:
         assert result.data[0].group_email == "aws-finops@example.com"
         assert result.data[0].group_slug == "aws-finops"
 
-    def test_empty_query_returns_group_aliases(self, provider, google_service):
+    def test_returns_group_aliases(self, provider, google_service):
+        """Editable and non-editable aliases are both carried onto the canonical group."""
         # Arrange
         _install_pages(
             google_service.groups.return_value,
@@ -1605,36 +1539,6 @@ class TestListGroups:
         assert len(completed) == 1
         assert completed[0]["skipped"] == 1
         assert completed[0]["returned"] == 1
-
-    def test_managed_path_skip_is_logged_and_counted(self, google_service, mock_directory_settings):
-        # Arrange
-        mock_directory_settings.enforce_managed_group_email = False
-        provider = GoogleDirectoryProvider(
-            get_service=lambda scopes: google_service,
-            directory_settings=mock_directory_settings,
-            customer_id="my_customer",
-        )
-        _install_pages(
-            google_service.groups.return_value,
-            "groups",
-            [
-                [
-                    {"id": "group-broken", "name": "No Email"},
-                    {"email": "sg-admin@example.com", "id": "group-1"},
-                ]
-            ],
-        )
-
-        # Act
-        with capture_logs() as entries:
-            result = provider.list_groups(query="sg-")
-
-        # Assert
-        assert result.is_success
-        assert [group.group_email for group in result.data] == ["sg-admin@example.com"]
-        assert any(entry["event"] == "directory_group_skipped" for entry in entries)
-        completed = [entry for entry in entries if entry["event"] == "directory_groups_listed"]
-        assert completed and completed[0]["skipped"] == 1
 
 
 class TestGetUserGroups:

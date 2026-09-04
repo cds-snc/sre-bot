@@ -1,6 +1,6 @@
 """Unit tests for DirectorySettings configuration."""
 
-from infrastructure.directory.settings import DirectorySettings
+from infrastructure.directory.settings import DirectorySettings, get_directory_settings
 
 
 class TestDirectorySettings:
@@ -41,3 +41,22 @@ class TestDirectorySettings:
         assert settings.require_startup_warmup is True
         assert settings.cache_ttl_seconds == 300
         assert settings.startup_warmup_timeout_seconds == 5
+
+
+class TestDirectorySettingsSingleton:
+    """The accessor caches a single settings instance."""
+
+    def test_singleton_returns_same_instance(self):
+        # Arrange
+        get_directory_settings.cache_clear()
+
+        # Act / Assert
+        assert get_directory_settings() is get_directory_settings()
+
+    def test_has_required_model_config(self):
+        # Act
+        config = DirectorySettings.model_config
+
+        # Assert
+        assert config.get("env_file") == ".env"
+        assert config.get("extra") == "ignore"

@@ -3,10 +3,6 @@
 import pytest
 from pydantic import ValidationError
 
-from infrastructure.configuration.infrastructure.directory import (
-    DirectorySettings,
-    get_directory_settings,
-)
 from infrastructure.configuration.infrastructure.platforms import (
     PlatformsSettings,
     get_platforms_settings,
@@ -84,22 +80,6 @@ class TestPlatformsSettingsSingleton:
     def test_default_providers_disabled(self):
         settings = PlatformsSettings()
         assert settings.slack.ENABLED is False
-
-
-class TestDirectorySettingsSingleton:
-    def test_singleton_returns_same_instance(self):
-        get_directory_settings.cache_clear()
-        assert get_directory_settings() is get_directory_settings()
-
-    def test_has_required_model_config(self):
-        config = DirectorySettings.model_config
-        assert config.get("env_file") == ".env"
-        assert config.get("extra") == "ignore"
-
-    def test_reads_from_env(self, monkeypatch):
-        monkeypatch.setenv("DIRECTORY_PROVIDER", "entra_id")
-        settings = DirectorySettings()
-        assert settings.provider == "entra_id"
 
 
 class TestServerSettingsIssuerConfigValidation:

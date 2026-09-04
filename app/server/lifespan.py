@@ -15,15 +15,15 @@ from infrastructure.configuration.features.sre_ops import (
     SreOpsSettings,
     get_sre_ops_settings,
 )
-from infrastructure.configuration.infrastructure.directory import (
-    DirectorySettings,
-    get_directory_settings,
-)
 from infrastructure.configuration.infrastructure.server import (
     ServerSettings,
     get_server_settings,
 )
-from infrastructure.directory import get_directory_provider
+from infrastructure.directory import (
+    DirectorySettings,
+    get_directory_provider,
+    get_directory_settings,
+)
 from infrastructure.i18n import (
     I18nResourceRegistry,
     I18nResourceSpec,

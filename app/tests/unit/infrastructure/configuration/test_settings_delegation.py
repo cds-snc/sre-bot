@@ -15,7 +15,6 @@ from infrastructure.configuration.features import (
 )
 from infrastructure.configuration.infrastructure import (
     get_dev_settings,
-    get_directory_settings,
     get_platforms_settings,
     get_retry_settings,
     get_server_settings,
@@ -31,6 +30,7 @@ from infrastructure.configuration.integrations import (
     get_slack_settings,
     get_trello_settings,
 )
+from infrastructure.directory.settings import get_directory_settings
 from infrastructure.idempotency.settings import get_idempotency_settings
 
 

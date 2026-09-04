@@ -14,12 +14,15 @@ from infrastructure.directory.models import (
     MembershipCheckResult,
 )
 from infrastructure.directory.provider import DirectoryProvider
+from infrastructure.directory.settings import DirectorySettings, get_directory_settings
 
 __all__ = [
     "DirectoryGroup",
     "DirectoryMember",
     "DirectoryUser",
     "DirectoryProvider",
+    "DirectorySettings",
     "MembershipCheckResult",
     "get_directory_provider",
+    "get_directory_settings",
 ]

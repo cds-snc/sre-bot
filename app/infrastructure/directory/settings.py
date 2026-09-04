@@ -1,4 +1,4 @@
-"""Directory infrastructure settings."""
+"""Directory service settings."""
 
 from functools import lru_cache
 from typing import Literal
@@ -18,13 +18,11 @@ class DirectorySettings(InfrastructureSettings):
         DIRECTORY_PROVIDER: IDP backend to activate (default: google)
         DIRECTORY_REQUIRE_STARTUP_WARMUP: Fail startup if warmup fails (default: False)
         DIRECTORY_CACHE_TTL_SECONDS: In-process membership cache TTL (default: 60)
-        DIRECTORY_MANAGED_GROUP_DOMAIN: Authoritative domain for managed group emails
-        DIRECTORY_ENFORCE_MANAGED_GROUP_EMAIL: Reject managed groups missing email
         DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS: Startup warmup timeout in seconds
 
     Example:
         ```python
-        from infrastructure.configuration.infrastructure.directory import get_directory_settings
+        from infrastructure.directory.settings import get_directory_settings
 
         settings = get_directory_settings()
 
@@ -53,25 +51,6 @@ class DirectorySettings(InfrastructureSettings):
         default=60,
         alias="DIRECTORY_CACHE_TTL_SECONDS",
         description="In-process membership cache TTL in seconds",
-    )
-    managed_group_domain: str = Field(
-        default="",
-        alias="DIRECTORY_MANAGED_GROUP_DOMAIN",
-        description="Authoritative domain for managed group emails",
-    )
-    managed_group_prefix: str = Field(
-        default="",
-        alias="DIRECTORY_MANAGED_GROUP_PREFIX",
-        description=(
-            "Optional prefix that identifies managed security groups (e.g. 'sg-'). "
-            "When set, the provider prefers aliases starting with this prefix when "
-            "resolving canonical group emails and applies alias-aware group discovery."
-        ),
-    )
-    enforce_managed_group_email: bool = Field(
-        default=True,
-        alias="DIRECTORY_ENFORCE_MANAGED_GROUP_EMAIL",
-        description="Reject managed groups missing provider-returned email",
     )
     startup_warmup_timeout_seconds: int = Field(
         default=2,
