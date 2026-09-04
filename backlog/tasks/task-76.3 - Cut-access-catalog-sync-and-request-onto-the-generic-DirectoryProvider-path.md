@@ -1,10 +1,11 @@
 ---
 id: TASK-76.3
 title: 'Cut access catalog, sync and request onto the generic DirectoryProvider path'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-04 14:18'
-updated_date: '2026-09-04 16:48'
+updated_date: '2026-09-04 17:28'
 labels:
   - layering
 milestone: m-3
@@ -39,14 +40,14 @@ TESTING (decisions/testing.md). Protocol-conformant fakes for DirectoryProvider 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 catalog, sync and request obtain canonical group email, slug, prefix matching and group keys exclusively through ManagedGroupPolicy; no access-side call passes a bare slug to DirectoryProvider
-- [ ] #2 sync discover_group_slugs keeps the OperationResult failure-propagation contract introduced by TASK-78, with a test proving an IDP failure still propagates rather than yielding an empty set
-- [ ] #3 The error-versus-omission decision for out-of-domain groups is made per call-site shape, implemented, and recorded with its rationale in the task notes
-- [ ] #4 Every access-side consumer of get_user_groups applies the managed-domain filter feature-side, covered by tests
-- [ ] #5 The existing access catalog, sync and request suites pass, with any provider-side managed assertions relocated to the feature boundary rather than dropped
-- [ ] #6 No file under app/infrastructure/ and no file under app/modules/ is modified by this slice
+- [x] #1 catalog, sync and request obtain canonical group email, slug, prefix matching and group keys exclusively through ManagedGroupPolicy; no access-side call passes a bare slug to DirectoryProvider
+- [x] #2 sync discover_group_slugs keeps the OperationResult failure-propagation contract introduced by TASK-78, with a test proving an IDP failure still propagates rather than yielding an empty set
+- [x] #3 The error-versus-omission decision for out-of-domain groups is made per call-site shape, implemented, and recorded with its rationale in the task notes
+- [x] #4 Every access-side consumer of get_user_groups applies the managed-domain filter feature-side, covered by tests
+- [x] #5 The existing access catalog, sync and request suites pass, with any provider-side managed assertions relocated to the feature boundary rather than dropped
+- [x] #6 No file under app/infrastructure/ and no file under app/modules/ is modified by this slice
 - [ ] #7 mypy, ruff and the full non-smoke pytest run are green
-- [ ] #8 The single-user authn membership check in DirectoryMembershipBuilder._check_group_membership (desired_state.py) also composes its get_group call through policy.group_key and applies the same get-shaped domain-mismatch handling as build_platform_state_from_effective (found during planning; not named in the task description's enumerated call-site list)
+- [x] #8 The single-user authn membership check in DirectoryMembershipBuilder._check_group_membership (desired_state.py) also composes its get_group call through policy.group_key and applies the same get-shaped domain-mismatch handling as build_platform_state_from_effective (found during planning; not named in the task description's enumerated call-site list)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -177,6 +178,37 @@ Production: 7 files across catalog/sync/request (service + providers + policies)
 - TASK-78: discover_group_slugs' OperationResult propagation contract is read, not modified (F7).
 - TASK-76.4 (next slice): this slice's is_managed/canonical_email/canonical_slug/group_key calls are exactly what stays correct once the provider stops doing any of this itself — no call site here assumes the provider will keep applying managed policy.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTED 2026-09-04. Plan followed with no deviations. 7 production files, all under app/packages/access; zero files under app/infrastructure/ or app/modules/ touched (AC#6, verified via git status).
+
+PRODUCTION
+- catalog/service.py: CatalogService gains `policy: ManagedGroupPolicy`; list_groups() is now a generic listing, with matches_prefix / is_managed / canonical_slug / canonical_email applied feature-side; EntitlementEntry carries the canonical email.
+- catalog/providers.py, sync/providers.py, request/providers.py: policy built once per subdomain via ManagedGroupPolicy.from_config(runtime_config).
+- sync/desired_state.py: DirectoryMembershipBuilder gains `policy`; get_group calls compose policy.group_key(slug) in build_platform_state_from_effective (authn + per-rule) and in _check_group_membership (AC#8); get_user_groups results filtered feature-side; discover_group_slugs lists generically and filters client-side; check_membership / get_group_members / get_group_members_batch keyed by canonical_email.
+- request/service.py: AccessRequestService gains `policy`; get_group composed through group_key; a single canonical_email drives check_membership, the delegated-actor owner check, the persisted AccessRequest.group_email, and add/remove_group_member.
+- request/policies.py: resolve_approver_candidates takes `policy`; owners resolved via canonical_email, fallback via group_key.
+
+AC#3 DECISION (error vs omission), as planned and now implemented:
+- OMIT + warning log for list-shaped operations: catalog list_entitlements (catalog_group_outside_managed_domain), sync discover_group_slugs (discover_groups_outside_managed_domain), get_user_groups (user_group_outside_managed_domain). Rationale: one stray or foreign group must never take down a whole listing or silently disable entitlement enforcement by failing discovery.
+- ERROR (PERMANENT_ERROR / DIRECTORY_GROUP_DOMAIN_MISMATCH) for every get-shaped operation: build_platform_state_from_effective authn group and per-rule group, _check_group_membership, request submit_request. Rationale: an explicitly configured or explicitly requested group sitting outside the managed domain is a real configuration fault, consistent with the non-NOT_FOUND propagation already in that file.
+Prefix-mismatch (a foreign-platform group) is a silent skip everywhere - it is expected, not anomalous.
+
+AC#2: discover_group_slugs' TASK-78 failure-propagation branch is untouched; proven by test_discover_group_slugs_should_propagate_directory_failure against the new no-query call.
+AC#4: get_user_groups has exactly one access-side consumer (build_user_state_from_effective); it now applies is_managed feature-side, covered by two unit tests.
+
+TESTS
+- New app/tests/unit/packages/access/sync/test_desired_state.py (pre-authored) passes: Protocol-conformant DirectoryProvider fake, alias preference, domain mismatch, composed group keys, discovery filtering and failure propagation.
+- Pre-authored catalog / request / policies cases pass unchanged.
+- Mechanically updated existing suites: catalog _FakeDirectory restructured from groups_by_prefix (keyed by the now-absent query) to a single groups_result; policy= added at CatalogService / DirectoryMembershipBuilder / AccessRequestService / resolve_approver_candidates call sites (unit + integration); sync fakes' get_group now accepts a fully-qualified key.
+- Added one integration scenario (B5) asserting a per-rule out-of-domain group propagates DIRECTORY_GROUP_DOMAIN_MISMATCH.
+
+EVIDENCE: `make test` green (human-run). `make lint` / `uv run ruff check .` clean. Access suites: 386 passed.
+
+AC#7 LEFT UNCHECKED FOR HUMAN VERIFICATION: ruff and the full non-smoke pytest run are green. mypy reports one error in a touched file - packages/access/catalog/service.py `"object" has no attribute "warning"` on the pre-existing `log: object` parameter of _check_membership - confirmed PRE-EXISTING by running mypy on the stashed base revision (same error at the pre-change line number). No new mypy error is introduced by this slice; fixing that annotation is out of scope here.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

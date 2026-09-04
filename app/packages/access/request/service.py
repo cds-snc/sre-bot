@@ -31,6 +31,7 @@ from infrastructure.events import Event, EventDispatcher
 from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig
 from packages.access.common.events import SYNC_COMPLETED, SYNC_FAILED
+from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.request import events as request_events
 from packages.access.request.domain import (
     AccessRequest,
@@ -118,6 +119,8 @@ class AccessRequestService:
         runtime_config: Access runtime config shared with Access Sync —
             the single source of truth for entitlement mode semantics.
         dispatcher: Event dispatcher for publishing domain events.
+        policy: Managed-group policy owning canonical address, managed-domain
+            and group-key decisions the directory provider no longer makes.
         fallback_approver_slug: Org-level fallback approver group slug.
         min_approver_count: Minimum number of approvals required.
     """
@@ -128,6 +131,7 @@ class AccessRequestService:
         directory: DirectoryProvider,
         runtime_config: AccessRuntimeConfig,
         dispatcher: EventDispatcher,
+        policy: ManagedGroupPolicy,
         fallback_approver_slug: str = "sg-org-admins",
         min_approver_count: int = 1,
     ) -> None:
@@ -135,6 +139,7 @@ class AccessRequestService:
         self._directory = directory
         self._config = runtime_config
         self._dispatcher = dispatcher
+        self._policy = policy
         self._fallback_approver_slug = fallback_approver_slug
         self._min_approver_count = min_approver_count
         self.logger = logger
@@ -184,7 +189,7 @@ class AccessRequestService:
         log.info("access_request_intake_started")
 
         # Step 1: resolve group
-        group_result = self._directory.get_group(group_slug)
+        group_result = self._directory.get_group(self._policy.group_key(group_slug))
         if not group_result.is_success or group_result.data is None:
             log.warning(
                 "access_request_intake_rejected",
@@ -208,6 +213,20 @@ class AccessRequestService:
                 message="Managed group has no email address; cannot process request.",
                 error_code="DIRECTORY_GROUP_EMAIL_REQUIRED",
             )
+
+        # An explicitly requested group out of domain is a configuration fault.
+        if not self._policy.is_managed(directory_group):
+            log.warning(
+                "access_request_intake_rejected",
+                reason="directory_group_domain_mismatch",
+            )
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR,
+                message=f"Group outside managed domain: {group_slug}",
+                error_code="DIRECTORY_GROUP_DOMAIN_MISMATCH",
+            )
+
+        canonical_email = self._policy.canonical_email(directory_group)
 
         # Derive entitlement_id from the group slug by stripping the platform prefix.
         # For sg-aws-scratch with platform=aws and prefix sg-aws-, token is "scratch".
@@ -240,7 +259,7 @@ class AccessRequestService:
             )
 
         # Step 3: eligibility — direction-aware membership check
-        membership_result = self._directory.check_membership(directory_group.group_email, user_email)
+        membership_result = self._directory.check_membership(canonical_email, user_email)
         if membership_result.is_success and membership_result.data is not None:
             is_member = membership_result.data.is_member
             if request_type == "grant" and is_member:
@@ -268,7 +287,7 @@ class AccessRequestService:
         # of the specific target group, not a member of a global manager group.
         if actor_type == "delegated":
             members_result = self._directory.get_group_members(
-                group_key=directory_group.group_email,
+                group_key=canonical_email,
                 include_member_types={"USER"},
             )
             if not members_result.is_success:
@@ -302,6 +321,7 @@ class AccessRequestService:
             directory_group=directory_group,
             fallback_slug=self._fallback_approver_slug,
             directory=self._directory,
+            policy=self._policy,
         )
         if not approvers:
             log.error(
@@ -342,7 +362,7 @@ class AccessRequestService:
             request_type=request_type,  # type: ignore[arg-type]
             platform=platform,
             group_slug=group_slug,
-            group_email=directory_group.group_email,
+            group_email=canonical_email,
             provider_group_id=directory_group.provider_group_id,
             entitlement_type=entitlement_type,
             entitlement_id=entitlement_id,
@@ -371,9 +391,9 @@ class AccessRequestService:
         if auto_approved:
             idp_result: OperationResult[DirectoryMember] | OperationResult[None]
             if request_type == "grant":
-                idp_result = self._directory.add_group_member(directory_group.group_email, user_email)
+                idp_result = self._directory.add_group_member(canonical_email, user_email)
             else:
-                idp_result = self._directory.remove_group_member(directory_group.group_email, user_email)
+                idp_result = self._directory.remove_group_member(canonical_email, user_email)
             if not idp_result.is_success:
                 fail_now = datetime.now(tz=UTC)
                 failed = replace(request, status="failed", updated_at=fail_now)

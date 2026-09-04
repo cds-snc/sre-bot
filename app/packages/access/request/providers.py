@@ -14,6 +14,7 @@ from infrastructure.events import (
     get_event_dispatcher,
 )
 from infrastructure.storage import get_storage_service
+from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.common.providers import get_access_runtime_config
 from packages.access.common.settings import AccessRequestsSettings, get_access_settings
 from packages.access.request.service import AccessRequestService
@@ -39,11 +40,13 @@ def get_access_request_service() -> AccessRequestService:
     feature settings into a single fully-assembled service instance.
     """
     settings = get_access_request_settings()
+    runtime_config = get_access_runtime_config()
     return AccessRequestService(
         repository=get_access_request_repository(),
         directory=get_directory_provider(),
-        runtime_config=get_access_runtime_config(),
+        runtime_config=runtime_config,
         dispatcher=get_event_dispatcher(),
+        policy=ManagedGroupPolicy.from_config(runtime_config),
         fallback_approver_slug=settings.fallback_approver_slug,
         min_approver_count=settings.min_approver_count,
     )

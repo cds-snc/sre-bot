@@ -27,6 +27,8 @@ from packages.access.request.policies import (
 # Helpers / factories
 # ---------------------------------------------------------------------------
 
+_POLICY = ManagedGroupPolicy(prefix="sg-", domain="example.com")
+
 
 def make_config(
     platform: str = "aws",
@@ -164,7 +166,7 @@ def test_resolve_approver_candidates_returns_owners_first():
         ]
     )
     group = make_directory_group()
-    result = resolve_approver_candidates(group, "sg-org-admins", directory)
+    result = resolve_approver_candidates(group, "sg-org-admins", directory, _POLICY)
     assert "owner@example.com" in result
     assert "manager@example.com" in result
     assert "member@example.com" not in result
@@ -181,7 +183,7 @@ def test_resolve_approver_candidates_falls_back_to_org_admins():
 
     directory.get_group_members.side_effect = get_group_members
     group = make_directory_group()
-    result = resolve_approver_candidates(group, "sg-org-admins", directory)
+    result = resolve_approver_candidates(group, "sg-org-admins", directory, _POLICY)
     assert result == ["admin@example.com"]
 
 
@@ -190,7 +192,7 @@ def test_resolve_approver_candidates_returns_empty_when_all_fail():
     directory = MagicMock()
     directory.get_group_members.return_value = OperationResult.success(data=[])
     group = make_directory_group()
-    result = resolve_approver_candidates(group, "sg-org-admins", directory)
+    result = resolve_approver_candidates(group, "sg-org-admins", directory, _POLICY)
     assert result == []
 
 
@@ -202,7 +204,7 @@ def test_resolve_approver_candidates_returns_empty_on_directory_error():
         OperationStatus.TRANSIENT_ERROR, message="Directory unavailable"
     )
     group = make_directory_group()
-    result = resolve_approver_candidates(group, "sg-org-admins", directory)
+    result = resolve_approver_candidates(group, "sg-org-admins", directory, _POLICY)
     assert result == []
 
 

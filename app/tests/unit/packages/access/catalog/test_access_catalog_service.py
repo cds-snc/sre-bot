@@ -26,14 +26,11 @@ from packages.access.common.group_policy import ManagedGroupPolicy
 class _FakeDirectory:
     """Stub that lets each test declare its own IDP responses."""
 
-    groups_by_prefix: dict[str, OperationResult] = field(default_factory=dict)
+    groups_result: OperationResult = field(default_factory=lambda: OperationResult.success(data=[]))
     memberships: dict[str, OperationResult] = field(default_factory=dict)
 
-    def list_groups(self, query: str) -> OperationResult:
-        return self.groups_by_prefix.get(
-            query,
-            OperationResult.success(data=[]),
-        )
+    def list_groups(self, query: str = "", limit: int | None = None) -> OperationResult:
+        return self.groups_result
 
     def check_membership(self, group_email: str, user_email: str) -> OperationResult:
         return self.memberships.get(
@@ -101,6 +98,7 @@ def make_service(
         runtime_config=cfg,
         directory=directory or _FakeDirectory(),
         parsers=parsers or {},
+        policy=ManagedGroupPolicy.from_config(cfg),
         display_names=display_names,
     )
 
@@ -246,7 +244,7 @@ def test_list_entitlements_should_return_not_found_for_unknown_platform():
 
 def test_list_entitlements_should_normalize_platform_key_to_lowercase():
     # Arrange
-    directory = _FakeDirectory(groups_by_prefix={"sg-aws-": OperationResult.success(data=[])})
+    directory = _FakeDirectory(groups_result=OperationResult.success(data=[]))
     service = make_service(directory=directory)
 
     # Act — mixed case
@@ -264,12 +262,10 @@ def test_list_entitlements_should_normalize_platform_key_to_lowercase():
 def test_list_entitlements_should_return_error_when_group_discovery_fails():
     # Arrange
     directory = _FakeDirectory(
-        groups_by_prefix={
-            "sg-aws-": OperationResult.error(
-                OperationStatus.PERMANENT_ERROR,
-                message="IDP unavailable",
-            )
-        }
+        groups_result=OperationResult.error(
+            OperationStatus.PERMANENT_ERROR,
+            message="IDP unavailable",
+        )
     )
     service = make_service(directory=directory)
 
@@ -293,7 +289,7 @@ def test_list_entitlements_should_return_entry_for_each_entitlement_group():
         make_group(slug="sg-aws-readonly", email="sg-aws-readonly@example.com"),
     ]
     directory = _FakeDirectory(
-        groups_by_prefix={"sg-aws-": OperationResult.success(data=groups)},
+        groups_result=OperationResult.success(data=groups),
         memberships={
             "sg-aws-admin@example.com": OperationResult.success(
                 data=MembershipCheckResult(
@@ -332,7 +328,7 @@ def test_list_entitlements_should_exclude_authn_group():
         make_group(slug="sg-aws-admin", email="sg-aws-admin@example.com"),
     ]
     directory = _FakeDirectory(
-        groups_by_prefix={"sg-aws-": OperationResult.success(data=groups)},
+        groups_result=OperationResult.success(data=groups),
     )
     service = make_service(directory=directory)
 
@@ -351,7 +347,7 @@ def test_list_entitlements_should_annotate_membership_correctly():
         make_group(slug="sg-aws-admin", email="sg-aws-admin@example.com"),
     ]
     directory = _FakeDirectory(
-        groups_by_prefix={"sg-aws-": OperationResult.success(data=groups)},
+        groups_result=OperationResult.success(data=groups),
         memberships={
             "sg-aws-admin@example.com": OperationResult.success(
                 data=MembershipCheckResult(
@@ -377,7 +373,7 @@ def test_list_entitlements_should_set_membership_to_none_when_check_fails():
     # Arrange — membership check returns error
     groups = [make_group(slug="sg-aws-admin", email="sg-aws-admin@example.com")]
     directory = _FakeDirectory(
-        groups_by_prefix={"sg-aws-": OperationResult.success(data=groups)},
+        groups_result=OperationResult.success(data=groups),
         memberships={"sg-aws-admin@example.com": OperationResult.error(OperationStatus.PERMANENT_ERROR, message="IDP hiccup")},
     )
     service = make_service(directory=directory)
@@ -399,7 +395,7 @@ def test_list_entitlements_should_mark_sync_managed_token_as_requestable():
     # Arrange — no mode override; default is sync_managed
     groups = [make_group(slug="sg-aws-admin", email="sg-aws-admin@example.com")]
     directory = _FakeDirectory(
-        groups_by_prefix={"sg-aws-": OperationResult.success(data=groups)},
+        groups_result=OperationResult.success(data=groups),
     )
     service = make_service(directory=directory)
 
@@ -416,7 +412,7 @@ def test_list_entitlements_should_mark_deactivated_token_as_not_requestable():
     cfg = make_runtime_config(platform="aws", mode_overrides={"admin": "deactivated"})
     groups = [make_group(slug="sg-aws-admin", email="sg-aws-admin@example.com")]
     directory = _FakeDirectory(
-        groups_by_prefix={"sg-aws-": OperationResult.success(data=groups)},
+        groups_result=OperationResult.success(data=groups),
     )
     service = make_service(runtime_config=cfg, directory=directory)
 
@@ -432,7 +428,7 @@ def test_list_entitlements_should_use_registered_parser_for_platform():
     # Arrange
     groups = [make_group(slug="sg-aws-admin", email="sg-aws-admin@example.com")]
     directory = _FakeDirectory(
-        groups_by_prefix={"sg-aws-": OperationResult.success(data=groups)},
+        groups_result=OperationResult.success(data=groups),
     )
     service = make_service(
         directory=directory,
@@ -455,7 +451,7 @@ def test_list_entitlements_should_fall_back_to_fallback_parser_for_unknown_platf
     )
     groups = [make_group(slug="sg-custom-role1", email="sg-custom-role1@example.com")]
     directory = _FakeDirectory(
-        groups_by_prefix={"sg-custom-": OperationResult.success(data=groups)},
+        groups_result=OperationResult.success(data=groups),
     )
     service = make_service(runtime_config=cfg, directory=directory, parsers={})
 
@@ -470,7 +466,7 @@ def test_list_entitlements_should_fall_back_to_fallback_parser_for_unknown_platf
 def test_list_entitlements_should_return_empty_list_when_no_groups_discovered():
     # Arrange
     directory = _FakeDirectory(
-        groups_by_prefix={"sg-aws-": OperationResult.success(data=[])},
+        groups_result=OperationResult.success(data=[]),
     )
     service = make_service(directory=directory)
 

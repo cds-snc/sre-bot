@@ -146,6 +146,7 @@ def make_service(
         directory=directory,
         runtime_config=config or make_config(),
         dispatcher=dispatcher,  # type: ignore[arg-type]
+        policy=ManagedGroupPolicy(prefix="sg-", domain="example.com"),
         fallback_approver_slug=fallback_approver_slug,
         min_approver_count=min_approver_count,
     )

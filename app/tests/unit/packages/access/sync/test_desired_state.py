@@ -102,7 +102,9 @@ class FakeDirectory:
     def list_users(self, query: str = "", limit: int | None = None) -> OperationResult:  # pragma: no cover - unused
         raise NotImplementedError
 
-    def add_group_member(self, group_key: str, user_email: str, role: str = "MEMBER") -> OperationResult:  # pragma: no cover - unused
+    def add_group_member(
+        self, group_key: str, user_email: str, role: str = "MEMBER"
+    ) -> OperationResult:  # pragma: no cover - unused
         raise NotImplementedError
 
     def remove_group_member(self, group_key: str, user_email: str) -> OperationResult:  # pragma: no cover - unused
@@ -380,9 +382,7 @@ def test_build_platform_state_should_batch_members_by_canonical_alias_email():
 @pytest.mark.unit
 def test_discover_group_slugs_should_exclude_foreign_platform_group(make_runtime_config):
     directory = FakeDirectory(
-        list_groups_result=OperationResult.success(
-            data=[make_group("sg-aws-admins"), make_group("sg-gcp-admins")]
-        )
+        list_groups_result=OperationResult.success(data=[make_group("sg-aws-admins"), make_group("sg-gcp-admins")])
     )
     builder = make_builder(directory)
 
