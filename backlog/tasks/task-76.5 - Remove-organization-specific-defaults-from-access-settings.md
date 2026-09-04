@@ -1,11 +1,11 @@
 ---
 id: TASK-76.5
 title: Remove organization-specific defaults from access settings
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-04 15:46'
-updated_date: '2026-09-04 22:40'
+updated_date: '2026-09-04 23:04'
 labels:
   - layering
   - configuration
