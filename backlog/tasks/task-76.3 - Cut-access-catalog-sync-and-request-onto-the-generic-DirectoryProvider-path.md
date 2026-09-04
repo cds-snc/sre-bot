@@ -1,11 +1,11 @@
 ---
 id: TASK-76.3
 title: 'Cut access catalog, sync and request onto the generic DirectoryProvider path'
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-04 14:18'
-updated_date: '2026-09-04 17:28'
+updated_date: '2026-09-04 17:30'
 labels:
   - layering
 milestone: m-3
