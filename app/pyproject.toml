@@ -172,8 +172,8 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "ruff==0.15.7",
-    "mypy==1.19.1",
+    "ruff==0.16.5",
+    "mypy==1.20.2",
     "pytest==8.4.2",
     "pytest-asyncio==0.26.0",
     "pytest-env==0.8.2",
