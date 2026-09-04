@@ -33,8 +33,7 @@ settings.catalog.enabled        # ACCESS_CATALOG_ENABLED
 | `ACCESS_SYNC_JOB_TTL_SECONDS` | `settings.sync.job_ttl_seconds` | `86400` |
 | `ACCESS_SYNC_LOCK_STALE_SECONDS` | `settings.sync.lock_stale_seconds` | `14400` |
 | `ACCESS_REQUESTS_ENABLED` | `settings.requests.enabled` | `false` |
-| `ACCESS_REQUESTS_MANAGER_GROUP_SLUG` | `settings.requests.manager_group_slug` | `sg-managers` |
-| `ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG` | `settings.requests.fallback_approver_slug` | `sg-org-admins` |
+| `ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG` | `settings.requests.fallback_approver_slug` | none (required if enabled) |
 | `ACCESS_REQUESTS_MIN_APPROVER_COUNT` | `settings.requests.min_approver_count` | `1` |
 | `ACCESS_REQUESTS_REQUEST_TTL_HOURS` | `settings.requests.request_ttl_hours` | `72` |
 | `ACCESS_CATALOG_ENABLED` | `settings.catalog.enabled` | `false` |

@@ -8,7 +8,7 @@ Manages the full lifecycle of user access requests: submission, approval, reject
 
 1. User submits a request with `platform` and `group_slug` (e.g. `sg-aws-scratch`).
 2. The service resolves the group in the IDP and derives the `entitlement_id` token server-side (`scratch`).
-3. Approver candidates are resolved from the group's owners, falling back to `sg-org-admins`.
+3. Approver candidates are resolved from the group's owners, falling back to the configured `ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG` group.
 4. On approval threshold met, the service writes the membership directly to the IDP (Google Workspace) — the source of truth.
 5. An `access_request_approved` event is dispatched, triggering Access Sync to propagate the change to the external platform (e.g. AWS Identity Center).
 6. When Access Sync completes, the request transitions to `completed` (or `failed`).
@@ -76,8 +76,7 @@ All request settings are in `AccessRequestsSettings` (a slice of `AccessSettings
 | Env var | Default | Description |
 |---|---|---|
 | `ACCESS_REQUESTS_ENABLED` | `false` | Master on/off switch. All routes return `503` when disabled. |
-| `ACCESS_REQUESTS_MANAGER_GROUP_SLUG` | `sg-managers` | Primary approver group slug |
-| `ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG` | `sg-org-admins` | Fallback approver group slug |
+| `ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG` | none (required if enabled) | Fallback approver group slug (e.g. `sg-org-admins`) |
 | `ACCESS_REQUESTS_MIN_APPROVER_COUNT` | `1` | Approval threshold |
 | `ACCESS_REQUESTS_REQUEST_TTL_HOURS` | `72` | Hours before an open request expires |
 

@@ -1,10 +1,11 @@
 ---
 id: TASK-76.5
 title: Remove organization-specific defaults from access settings
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-04 15:46'
-updated_date: '2026-09-04 20:59'
+updated_date: '2026-09-04 22:40'
 labels:
   - layering
   - configuration
@@ -57,15 +58,15 @@ TESTING (decisions/testing.md). Unit tests at the settings/config boundary provi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No organization-specific group name remains as a default anywhere under app/packages: grep for 'sg-managers' and 'sg-org-admins' returns zero hits outside test fixtures and documentation examples
-- [ ] #2 The duplicated fallback_approver_slug default at app/packages/access/request/service.py:131 is removed so the value has exactly one owning home per decisions/configuration.md
-- [ ] #3 The owning home is decided and recorded with rationale - AccessRuntimeConfig runtime document versus ACCESS_REQUESTS_ env settings - rather than the literals simply moving; one convention is not split across both mechanisms
-- [ ] #4 The decision on whether the slugs are whole configured values or composed through AccessGroupNaming is recorded, and no new 'sg-' string literal is introduced either way
-- [ ] #5 A missing value produces a named configuration error consistent with the TASK-76.2 contract: enabling access requires its settings to be present, disabling it leaves the rest of the app unaffected, proven by a test
-- [ ] #6 Whatever shape the fallback slug takes still composes into a directory group key through ManagedGroupPolicy.group_key, so no bare slug reaches DirectoryProvider (TASK-76.2 decision D2)
-- [ ] #7 The existing access request suites pass with fixtures supplying explicit values, and no test depends on an implicit organization default
-- [ ] #8 No file under app/infrastructure/ or app/modules/ is modified, and AWS_ADMIN_GROUPS is left untouched
-- [ ] #9 mypy, ruff and the full non-smoke pytest run are green
+- [x] #1 No organization-specific group name remains as a default anywhere under app/packages: grep for 'sg-managers' and 'sg-org-admins' returns zero hits outside test fixtures and documentation examples
+- [x] #2 The duplicated fallback_approver_slug default at app/packages/access/request/service.py:131 is removed so the value has exactly one owning home per decisions/configuration.md
+- [x] #3 The owning home is decided and recorded with rationale - AccessRuntimeConfig runtime document versus ACCESS_REQUESTS_ env settings - rather than the literals simply moving; one convention is not split across both mechanisms
+- [x] #4 The decision on whether the slugs are whole configured values or composed through AccessGroupNaming is recorded, and no new 'sg-' string literal is introduced either way
+- [x] #5 A missing value produces a named configuration error consistent with the TASK-76.2 contract: enabling access requires its settings to be present, disabling it leaves the rest of the app unaffected, proven by a test
+- [x] #6 Whatever shape the fallback slug takes still composes into a directory group key through ManagedGroupPolicy.group_key, so no bare slug reaches DirectoryProvider (TASK-76.2 decision D2)
+- [x] #7 The existing access request suites pass with fixtures supplying explicit values, and no test depends on an implicit organization default
+- [x] #8 No file under app/infrastructure/ or app/modules/ is modified, and AWS_ADMIN_GROUPS is left untouched
+- [x] #9 mypy, ruff and the full non-smoke pytest run are green
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -158,6 +159,32 @@ Comfortably inside the single-PR gate: ~40-60 production LOC across 4 files (one
 - decisions/layers.md / migration.md: no file under `app/infrastructure/` or `app/modules/` is touched; `AWS_ADMIN_GROUPS` (the one LIVE org-specific default, frozen-module consumer) is explicitly out of scope and untouched, per the task's own NOT-IN-SCOPE section.
 - TASK-76 coordinator: this is the last open child (76.1-76.4 all Done); once this lands, parent AC#6 ("all five subtasks Done") can be verified.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTED 2026-09-04, plan followed as written with one addition found at test time.
+
+PRODUCTION (6 files, ~25 changed LOC):
+- packages/access/common/settings.py: deleted manager_group_slug field + its docstring line (D1); fallback_approver_slug default changed from 'sg-org-admins' to '' with a reworded docstring; added model_validator(mode='after') _validate_fallback_approver_slug raising ValueError naming ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG only when self.enabled (D4, mirroring SlackSettings._validate_transport_credentials).
+- packages/access/request/service.py: fallback_approver_slug is now a required constructor parameter (no default); Args docstring reworded.
+- packages/access/request/__init__.py: removed the manager_group_slug kwarg from the startup_warmup log call.
+- packages/access/README.md, common/README.md, request/README.md: MANAGER_GROUP_SLUG rows deleted; FALLBACK_APPROVER_SLUG default column now 'none (required if enabled)'. request/README.md 'How it works' step 3 also reworded from 'falling back to sg-org-admins' to the configured env var name (it read as a hardcoded fact, not an example).
+- providers.py unchanged as planned (F5).
+
+TESTS:
+- test_settings.py: defaults test asserts no manager_group_slug field and fallback == ''; flat-env-var test drops MANAGER_GROUP_SLUG; three new cases (enabled-without-slug raises naming the env var, enabled-with-slug constructs, disabled-without-slug constructs) plus a root AccessSettings boot-safety case.
+- test_access_request_package_init.py: manager_group_slug removed from both _Settings fixtures.
+- test_service.py: make_policy_service now passes fallback_approver_slug explicitly; new test_service_construction_should_require_explicit_fallback_approver_slug asserts TypeError without it.
+- NOT IN PLAN, found at test time: test_access_settings_accepts_requests_json_blob set ACCESS_REQUESTS='{"enabled": true, ...}' with no fallback slug and was relying on the removed implicit default (exactly the AC#7 anti-pattern). Blob updated to include fallback_approver_slug. This incidentally proves A3 — the nested model_validator does fire through pydantic-settings JSON-blob construction.
+- test_policies.py unchanged (F4/AC#6 pre-satisfied by TASK-76.3), re-run green.
+
+VERIFICATION: A1 re-verified — grep for ACCESS_REQUESTS/ACCESS_SYNC/ACCESS_CATALOG/ACCESS_CONFIG across terraform/, Makefile, app/Makefile returns zero hits, so no environment boot changes. A2 re-verified — AccessRequestService( has exactly two call sites (providers.py, already explicit; test_service.py, now explicit). AC#1 grep: remaining sg-org-admins hits are three documentation examples (two README table description columns, one policies.py docstring 'e.g.') and test fixture arguments, all inside the AC's carve-out; zero sg-managers hits anywhere. AC#8: git diff --stat main -- app/infrastructure app/modules is empty; aws_ops.py untouched.
+
+GATES: ruff clean; mypy shows zero errors in any touched file (the 94 repo-wide errors are the pre-existing baseline, all in app/modules and unrelated packages); full non-smoke suite green via make test (user-run).
+
+LEFT FOR HUMAN DoD VERIFICATION: review of decision D3 (fallback_approver_slug stays an ACCESS_REQUESTS_ env var rather than moving to AccessRuntimeConfig — flagged in the plan for reviewer challenge) and D4's empty-string sentinel; task left In Progress.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

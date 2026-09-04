@@ -30,8 +30,7 @@ All access feature settings are unified under a single `AccessSettings` object (
 | `ACCESS_SYNC_JOB_TTL_SECONDS` | `86400` | Retention for completed/failed sync records |
 | `ACCESS_SYNC_LOCK_STALE_SECONDS` | `14400` | Lock age before a running job is treated as stale |
 | `ACCESS_REQUESTS_ENABLED` | `false` | Enable the access requests feature |
-| `ACCESS_REQUESTS_MANAGER_GROUP_SLUG` | `sg-managers` | Primary approver group |
-| `ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG` | `sg-org-admins` | Fallback approver group |
+| `ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG` | none (required if enabled) | Fallback approver group (e.g. `sg-org-admins`) |
 | `ACCESS_REQUESTS_MIN_APPROVER_COUNT` | `1` | Approvals needed before a request is approved |
 | `ACCESS_REQUESTS_REQUEST_TTL_HOURS` | `72` | Hours before an open request expires |
 | `ACCESS_CATALOG_ENABLED` | `false` | Enable the catalog browse feature |

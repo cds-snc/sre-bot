@@ -183,11 +183,12 @@ def test_access_settings_accepts_requests_json_blob(monkeypatch):
     """ACCESS_REQUESTS may be set as a JSON blob to configure the entire requests slice."""
     monkeypatch.setenv(
         "ACCESS_REQUESTS",
-        '{"enabled": true, "min_approver_count": 3, "request_ttl_hours": 24}',
+        '{"enabled": true, "fallback_approver_slug": "sg-org-admins", "min_approver_count": 3, "request_ttl_hours": 24}',
     )
 
     s = AccessSettings(_env_file=None).requests
     assert s.enabled is True
+    assert s.fallback_approver_slug == "sg-org-admins"
     assert s.min_approver_count == 3
     assert s.request_ttl_hours == 24
 
