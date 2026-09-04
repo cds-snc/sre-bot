@@ -1,11 +1,11 @@
 ---
 id: TASK-76.4
 title: Strip managed-group policy and settings out of infrastructure directory
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-04 14:19'
-updated_date: '2026-09-04 18:47'
+updated_date: '2026-09-04 18:48'
 labels:
   - layering
 milestone: m-3
