@@ -35,6 +35,12 @@ Scenarios covered:
   B3  A per-rule NOT_FOUND group lookup remains a legitimate skip.
 
   B4  A per-rule non-NOT_FOUND group lookup failure must propagate.
+
+  C1  Group discovery returns the platform-prefixed slugs and filters out
+      foreign-platform groups.
+
+  C2  An IDP failure during group discovery must propagate, never surface
+      as a success carrying an empty slug set (TASK-78).
 """
 
 import pytest
@@ -444,4 +450,74 @@ def test_should_propagate_error_when_group_lookup_transiently_fails():
     assert not result.is_success
     assert result.status == OperationStatus.TRANSIENT_ERROR
     assert result.error_code == "503"
+    assert result.data is None
+
+
+# ---------------------------------------------------------------------------
+# C: discover_group_slugs
+# ---------------------------------------------------------------------------
+
+
+def _make_discovery_builder(
+    *,
+    discovered_slugs: set,
+    list_groups_result: OperationResult | None = None,
+    platform: str = "aws",
+) -> tuple:
+    """Return (DirectoryMembershipBuilder, AccessSyncRuntimeConfig) for discovery."""
+    config = AccessSyncRuntimeConfig(
+        dir_prefix="sg",
+        platforms={
+            platform: PlatformPolicy(
+                authn_token="authn",
+                authn_removal_mode="delete",
+                mode_overrides={},
+            )
+        },
+    )
+    directory = FakeDirectory(
+        discovered_slugs=discovered_slugs,
+        list_groups_result=list_groups_result,
+    )
+    return DirectoryMembershipBuilder(directory), config
+
+
+@pytest.mark.integration
+def test_should_discover_matching_group_slugs():
+    """Happy path: prefixed slugs are returned, non-matching slugs filtered out."""
+    # Arrange
+    builder, config = _make_discovery_builder(
+        discovered_slugs={"sg-aws-admin", "sg-aws-readonly", "sg-gcp-viewer"},
+    )
+
+    # Act
+    result = builder.discover_group_slugs(config, "aws")
+
+    # Assert
+    assert result.is_success
+    assert result.data == {"sg-aws-admin", "sg-aws-readonly"}
+
+
+@pytest.mark.integration
+def test_should_propagate_error_when_group_discovery_fails():
+    """A failing list_groups must not surface as success with an empty slug set."""
+    # Arrange
+    builder, config = _make_discovery_builder(
+        discovered_slugs={"sg-aws-admin"},
+        list_groups_result=OperationResult.error(
+            OperationStatus.TRANSIENT_ERROR,
+            message="rate limited",
+            error_code="429",
+            retry_after=30,
+        ),
+    )
+
+    # Act
+    result = builder.discover_group_slugs(config, "aws")
+
+    # Assert
+    assert not result.is_success
+    assert result.status == OperationStatus.TRANSIENT_ERROR
+    assert result.error_code == "429"
+    assert result.retry_after == 30
     assert result.data is None

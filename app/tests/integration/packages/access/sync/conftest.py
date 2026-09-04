@@ -112,6 +112,7 @@ class FakeDirectory:
         group_members: dict[str, list[str]] | None = None,
         batch_members_result: OperationResult | None = None,
         group_result_by_slug: dict[str, OperationResult] | None = None,
+        list_groups_result: OperationResult | None = None,
     ) -> None:
         self._discovered: set[str] = discovered_slugs or set()
         self._transitive: set[str] = transitive_membership_slugs or set()
@@ -119,6 +120,7 @@ class FakeDirectory:
         self._members: dict[str, list[str]] = group_members or {}
         self._batch_members_result = batch_members_result
         self._group_result_by_slug: dict[str, OperationResult] = group_result_by_slug or {}
+        self._list_groups_result = list_groups_result
 
     def _make_group(self, slug: str) -> DirectoryGroup:
         return DirectoryGroup(
@@ -174,6 +176,8 @@ class FakeDirectory:
         return OperationResult.success(data=result)
 
     def list_groups(self, query: str = "") -> OperationResult:
+        if self._list_groups_result is not None:
+            return self._list_groups_result
         matching = [self._make_group(slug) for slug in self._discovered if not query or slug.startswith(query)]
         return OperationResult.success(data=matching)
 
