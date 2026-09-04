@@ -3,13 +3,14 @@ id: TASK-77
 title: >-
   Review access sync treating a Directory batch failure as a warning and
   proceeding with empty desired state
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-03 18:03'
-updated_date: '2026-09-04 12:54'
+updated_date: '2026-09-04 12:55'
 labels:
   - reliability
+milestone: m-3
 dependencies: []
 references:
   - decisions/operation-result.md
