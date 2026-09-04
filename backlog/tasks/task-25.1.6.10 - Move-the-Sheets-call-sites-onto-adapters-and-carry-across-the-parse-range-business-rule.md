@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:03'
-updated_date: '2026-09-02 19:47'
+updated_date: '2026-09-03 21:30'
 labels:
   - clients
   - phase-3
@@ -104,5 +104,21 @@ Two items to carry, extending the earlier "the two helpers travel with the call 
 1. In the package endstate, _a1_range and _sheet_title belong in the feature's Sheets adapter under app/packages/<feature>/adapters/, next to the try/except plus classify_google_error boundary this task builds. _a1_range is the piece worth lifting to a shared primitive if a second feature ever needs A1 quoting; _sheet_title is report-specific domain logic and stays with the feature. Neither goes into app/integrations/google_workspace/ at any point.
 
 2. The 50-character bound, the sha256 suffix and the apostrophe strip all exist because a user-controlled Google Group display name is being used as a sheet identifier. A feature package with a real domain type for a group could carry a stable identifier separately from the display label, removing the need for the suffix and freeing the Group Name cell to show the full untruncated name. That is the same open question already flagged on this task; it resolves cleanly at the package boundary rather than in a legacy module.
+---
+
+author: @task-planner
+created: 2026-09-03 21:30
+---
+YOU INHERIT A time.sleep RATE-LIMITER - FINDING FROM TASK-25.1.6.4 PLANNING (2026-09-03, task-planner).
+
+modules/reports/google_groups.py:127 ends every group iteration with time.sleep(1.1). Facts established while planning .4:
+
+- IT PACES THE SHEETS CALLS, NOT THE DIRECTORY CALLS. The Directory member fetch is a separate earlier loop (:76-85) with no sleep at all. The sleep sits at the bottom of the sheet loop (:87-127), which issues sheets.get_sheet, optionally sheets.batch_update (addSheet) and sheets.batch_update_values per group. 1.1s per iteration is roughly 54 write requests/minute - a hand-rolled guard against the Sheets write quota.
+- THERE IS NO SDK-NATIVE RETRY BEHIND IT TODAY. integrations/google_workspace/client.py:154 execute_google_api_request calls request.execute() with NO num_retries argument. So those Sheets calls have zero backoff, and the sleep is currently the only 429 protection the report has.
+- .4 THEREFORE LEAVES IT IN PLACE (human decision, recorded as D6 in .4's plan and pinned by .4's AC#3). Removing it before the Sheets calls gain retry would be a regression, not a cleanup.
+
+WHAT THIS MEANS FOR YOU. When you move these Sheets call sites onto an adapter per decisions/outbound-clients.md ("SDK-native resilience configured once", "no hand-rolled retry loops"), pass num_retries at .execute() the way infrastructure/directory/google.py already does (google.py:108 and :503 etc. pass _NUM_RETRIES), and THEN delete the sleep in the same PR. Note that googleapiclient's num_retries is reactive exponential backoff on 429/5xx, which is a different mechanism from a proactive pacer - state that swap explicitly in the PR and confirm the report still completes for the real group count.
+
+TEST TO UPDATE WHEN YOU DO: app/tests/unit/modules/reports/test_google_groups_report.py patches modules.reports.google_groups.time.sleep and asserts test_should_pause_once_per_surviving_group. That assertion is the thing to delete when the sleep goes, not to weaken.
 ---
 <!-- COMMENTS:END -->

@@ -18,8 +18,12 @@ class DirectoryProvider(Protocol):
 
     All method arguments that represent canonical group emails or user emails
     are normalised to lowercase by implementors before calling the underlying
-    IDP. All return values are wrapped in OperationResult — no exceptions cross
-    the boundary.
+    IDP, and so are the emails carried on returned DirectoryUser,
+    DirectoryMember and DirectoryGroup values — the IDP's original casing is
+    not preserved. Consumers comparing returned emails against addresses
+    sourced elsewhere (Slack profiles, command arguments, records stored in
+    another system) must compare case-insensitively. All return values are
+    wrapped in OperationResult — no exceptions cross the boundary.
     """
 
     def warmup(self) -> OperationResult[None]:

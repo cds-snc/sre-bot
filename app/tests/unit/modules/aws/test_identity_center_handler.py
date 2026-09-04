@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from infrastructure.directory.models import DirectoryUser
 from modules.aws import identity_center
 
 
@@ -307,16 +308,19 @@ class TestProvisionAwsUsers:
         # Arrange
         user_emails = ["user1@example.com", "user2@example.com"]
         mock_users.get_users_from_integration.return_value = [
-            {
-                "primaryEmail": "user1@example.com",
-                "name": {"givenName": "User", "familyName": "One"},
-            },
-            {
-                "primaryEmail": "user2@example.com",
-                "name": {"givenName": "User", "familyName": "Two"},
-            },
+            DirectoryUser(
+                email="user1@example.com",
+                provider_user_id="id-1",
+                given_name="User",
+                family_name="One",
+            ),
+            DirectoryUser(
+                email="user2@example.com",
+                provider_user_id="id-2",
+                given_name="User",
+                family_name="Two",
+            ),
         ]
-        mock_filters.preformat_items.side_effect = lambda items, *args, **kwargs: items
         mock_entities.provision_entities.return_value = [
             {"UserId": "user-1"},
             {"UserId": "user-2"},
@@ -328,6 +332,54 @@ class TestProvisionAwsUsers:
         # Assert
         assert len(result) == 2
         mock_entities.provision_entities.assert_called_once()
+        mock_filters.preformat_items.assert_not_called()
+
+    def test_should_build_the_create_payload_from_directory_user_attributes(
+        self, mock_identity_store, mock_entities, mock_filters, mock_users
+    ):
+        """The create payload is built explicitly, not splatted from a Google dict."""
+        # Arrange
+        mock_users.get_users_from_integration.return_value = [
+            DirectoryUser(
+                email="user1@example.com",
+                provider_user_id="id-1",
+                given_name="User",
+                family_name="One",
+            ),
+        ]
+        mock_entities.provision_entities.return_value = [{"UserId": "user-1"}]
+
+        # Act
+        identity_center.provision_aws_users("create", ["user1@example.com"])
+
+        # Assert
+        items = mock_entities.provision_entities.call_args[0][1]
+        assert items == [
+            {
+                "primaryEmail": "user1@example.com",
+                "email": "user1@example.com",
+                "log_user_name": "user1@example.com",
+                "first_name": "User",
+                "family_name": "One",
+            }
+        ]
+
+    def test_should_match_requested_emails_case_insensitively_when_creating_users(
+        self, mock_identity_store, mock_entities, mock_filters, mock_users
+    ):
+        """The provider lowercases emails; requested addresses may not be."""
+        # Arrange
+        mock_users.get_users_from_integration.return_value = [
+            DirectoryUser(email="user1@example.com", provider_user_id="id-1"),
+        ]
+        mock_entities.provision_entities.return_value = [{"UserId": "user-1"}]
+
+        # Act
+        identity_center.provision_aws_users("create", ["User1@Example.com"])
+
+        # Assert
+        items = mock_entities.provision_entities.call_args[0][1]
+        assert [item["email"] for item in items] == ["user1@example.com"]
 
     def test_should_delete_users_successfully(self, mock_identity_store, mock_entities, mock_filters, mock_users):
         """Test provision_aws_users deletes users successfully."""
@@ -359,12 +411,11 @@ class TestProvisionAwsUsers:
         # Arrange
         user_emails = ["user1@example.com"]
         all_users = [
-            {"primaryEmail": "user1@example.com"},
-            {"primaryEmail": "user2@example.com"},
-            {"primaryEmail": "user3@example.com"},
+            DirectoryUser(email="user1@example.com", provider_user_id="id-1"),
+            DirectoryUser(email="user2@example.com", provider_user_id="id-2"),
+            DirectoryUser(email="user3@example.com", provider_user_id="id-3"),
         ]
         mock_users.get_users_from_integration.return_value = all_users
-        mock_filters.preformat_items.side_effect = lambda items, *args, **kwargs: items
         mock_entities.provision_entities.return_value = [{"UserId": "user-1"}]
 
         # Act

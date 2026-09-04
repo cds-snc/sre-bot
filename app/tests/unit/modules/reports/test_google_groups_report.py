@@ -16,9 +16,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 from freezegun import freeze_time
 
+from infrastructure.directory.models import DirectoryGroup, DirectoryMember
+from infrastructure.operations import OperationResult, OperationStatus
 from modules.reports import google_groups
 
-_DIRECTORY = "modules.reports.google_groups.google_directory"
 _DRIVE = "modules.reports.google_groups.google_drive"
 _SHEETS = "modules.reports.google_groups.sheets"
 _SLEEP = "modules.reports.google_groups.time.sleep"
@@ -32,6 +33,8 @@ _FILE_ID = "FILE1"
 
 _TITLE_MAX_LENGTH = 50
 _TITLE_DIGEST_LENGTH = 6
+
+_ERROR_CODE = "rateLimitExceeded"
 
 
 def _expected_title(group_name: str) -> str:
@@ -49,12 +52,56 @@ def _expected_range(sheet_title: str, cell: str = "") -> str:
     return f"{quoted}!{cell}" if cell else quoted
 
 
-def _member(email: str, role: str) -> dict[str, str]:
-    return {"email": email, "role": role}
+def _member(email: str, role: str | None) -> DirectoryMember:
+    return DirectoryMember(email=email, role=role)
 
 
-def _group(name: str, email: str) -> dict[str, str]:
-    return {"name": name, "email": email}
+def _group(name: str | None, email: str) -> DirectoryGroup:
+    return DirectoryGroup(
+        group_email=email,
+        group_slug=email.split("@")[0],
+        provider_group_id=f"id-{email}",
+        name=name,
+    )
+
+
+def _directory_failure() -> OperationResult:
+    return OperationResult.error(
+        status=OperationStatus.TRANSIENT_ERROR,
+        message="Google Directory is unavailable",
+        error_code=_ERROR_CODE,
+    )
+
+
+class FakeDirectory:
+    """Protocol-conformant double for the two Directory calls the report makes."""
+
+    def __init__(self) -> None:
+        self.groups_result: OperationResult = OperationResult.success(
+            [_group("GroupOne", "one@test.com"), _group("GroupTwo", "two@test.com")]
+        )
+        self.members_result: OperationResult = OperationResult.success(
+            [_member("member1@test.com", "MEMBER"), _member("member2@test.com", "OWNER")]
+        )
+        self.members_results: list[OperationResult] | None = None
+        self.list_groups_calls: list[tuple[tuple, dict]] = []
+        self.member_calls: list[str] = []
+
+    def set_groups(self, *groups: DirectoryGroup) -> None:
+        self.groups_result = OperationResult.success(list(groups))
+
+    def set_members(self, *members: DirectoryMember) -> None:
+        self.members_result = OperationResult.success(list(members))
+
+    def list_groups(self, *args, **kwargs) -> OperationResult:
+        self.list_groups_calls.append((args, kwargs))
+        return self.groups_result
+
+    def get_group_members(self, group_key: str, include_member_types: set[str] | None = None) -> OperationResult:
+        self.member_calls.append(group_key)
+        if self.members_results is not None:
+            return self.members_results[len(self.member_calls) - 1]
+        return self.members_result
 
 
 def _file_lookup(deps) -> tuple[str, str]:
@@ -69,12 +116,12 @@ def _file_created(deps) -> list[tuple[str, str, str]]:
 
 
 def _groups_listed(deps) -> int:
-    return deps.directory.list_groups.call_count
+    return len(deps.directory.list_groups_calls)
 
 
 def _members_requested(deps) -> list[str]:
     """Group keys passed to the Directory member lookup, in call order."""
-    return [call.args[0] for call in deps.directory.list_group_members.call_args_list]
+    return list(deps.directory.member_calls)
 
 
 def _sheets_read(deps) -> list[tuple[str, str]]:
@@ -106,8 +153,9 @@ def _sleep_delays(deps) -> list[float]:
 @pytest.fixture
 def report_deps():
     """Single owner of every patch and default return value for this module."""
+    directory = FakeDirectory()
     with (
-        patch(_DIRECTORY) as directory,
+        patch.object(google_groups, "get_directory_provider", lambda: directory),
         patch(_DRIVE) as drive,
         patch(_SHEETS) as sheets,
         patch(_SLEEP) as sleep,
@@ -115,14 +163,6 @@ def report_deps():
     ):
         drive.find_files_by_name.return_value = []
         drive.create_file.return_value = {"id": _FILE_ID}
-        directory.list_groups.return_value = [
-            _group("GroupOne", "one@test.com"),
-            _group("GroupTwo", "two@test.com"),
-        ]
-        directory.list_group_members.return_value = [
-            _member("member1@test.com", "MEMBER"),
-            _member("member2@test.com", "OWNER"),
-        ]
         # explicit falsy read so the addSheet branch is exercised by default
         sheets.get_sheet.return_value = {}
         sheets.batch_update.return_value = {}
@@ -146,7 +186,8 @@ class TestGenerateGroupMembersReportBehaviour:
 
         report_deps.respond.assert_called_once_with(_MSG_FOLDER_UNSET)
         assert report_deps.drive.mock_calls == []
-        assert report_deps.directory.mock_calls == []
+        assert _groups_listed(report_deps) == 0
+        assert _members_requested(report_deps) == []
         assert report_deps.sheets.mock_calls == []
 
     def test_should_respond_with_success_when_report_is_generated(self, report_deps):
@@ -155,10 +196,10 @@ class TestGenerateGroupMembersReportBehaviour:
         report_deps.respond.assert_called_once_with(_MSG_SUCCESS)
 
     def test_should_exclude_groups_whose_name_contains_aws_prefix(self, report_deps):
-        report_deps.directory.list_groups.return_value = [
+        report_deps.directory.set_groups(
             _group("AWS-Admins", "aws@test.com"),
             _group("GroupOne", "one@test.com"),
-        ]
+        )
 
         google_groups.generate_group_members_report([], report_deps.respond)
 
@@ -166,7 +207,7 @@ class TestGenerateGroupMembersReportBehaviour:
         assert [write[1] for write in _sheet_writes(report_deps)] == ["'GroupOne'!A1"]
 
     def test_should_respond_no_groups_after_creating_the_file_when_all_groups_excluded(self, report_deps):
-        report_deps.directory.list_groups.return_value = [_group("AWS-Admins", "aws@test.com")]
+        report_deps.directory.set_groups(_group("AWS-Admins", "aws@test.com"))
 
         google_groups.generate_group_members_report([], report_deps.respond)
 
@@ -176,7 +217,7 @@ class TestGenerateGroupMembersReportBehaviour:
 
     def test_should_derive_a_bounded_sheet_title_for_an_overlong_group_name(self, report_deps):
         long_name = "G" * 60
-        report_deps.directory.list_groups.return_value = [_group(long_name, "long@test.com")]
+        report_deps.directory.set_groups(_group(long_name, "long@test.com"))
 
         google_groups.generate_group_members_report([], report_deps.respond)
 
@@ -188,7 +229,7 @@ class TestGenerateGroupMembersReportBehaviour:
         assert [created[1] for created in _sheets_created(report_deps)] == [expected]
 
     def test_should_write_header_rows_followed_by_members_in_order(self, report_deps):
-        report_deps.directory.list_groups.return_value = [_group("GroupOne", "one@test.com")]
+        report_deps.directory.set_groups(_group("GroupOne", "one@test.com"))
 
         google_groups.generate_group_members_report([], report_deps.respond)
 
@@ -205,8 +246,27 @@ class TestGenerateGroupMembersReportBehaviour:
 
         assert _sleep_delays(report_deps) == [1.1, 1.1]
 
+    def test_should_title_a_group_without_a_name_by_its_email(self, report_deps):
+        report_deps.directory.set_groups(_group(None, "nameless@test.com"))
+
+        google_groups.generate_group_members_report([], report_deps.respond)
+
+        assert _members_requested(report_deps) == ["nameless@test.com"]
+        assert [created[1] for created in _sheets_created(report_deps)] == ["nameless@test.com"]
+        _, _, values = _sheet_writes(report_deps)[0]
+        assert values[0] == ["Group Name", "nameless@test.com"]
+
+    def test_should_write_an_empty_cell_for_a_member_without_a_role(self, report_deps):
+        report_deps.directory.set_groups(_group("GroupOne", "one@test.com"))
+        report_deps.directory.set_members(_member("member1@test.com", None))
+
+        google_groups.generate_group_members_report([], report_deps.respond)
+
+        _, _, values = _sheet_writes(report_deps)[0]
+        assert values[2] == ["member1@test.com", ""]
+
     def test_should_quote_sheet_names_containing_spaces_in_ranges(self, report_deps):
-        report_deps.directory.list_groups.return_value = [_group("SRE Team", "sre@test.com")]
+        report_deps.directory.set_groups(_group("SRE Team", "sre@test.com"))
 
         google_groups.generate_group_members_report([], report_deps.respond)
 
@@ -216,7 +276,7 @@ class TestGenerateGroupMembersReportBehaviour:
         assert [created[1] for created in _sheets_created(report_deps)] == ["SRE Team"]
 
     def test_should_strip_apostrophes_from_the_title_google_receives(self, report_deps):
-        report_deps.directory.list_groups.return_value = [_group("Jon's Team", "jon@test.com")]
+        report_deps.directory.set_groups(_group("Jon's Team", "jon@test.com"))
 
         google_groups.generate_group_members_report([], report_deps.respond)
 
@@ -229,10 +289,10 @@ class TestGenerateGroupMembersReportBehaviour:
 
     def test_should_derive_distinct_titles_for_group_names_sharing_a_fifty_character_prefix(self, report_deps):
         shared = "P" * 55
-        report_deps.directory.list_groups.return_value = [
+        report_deps.directory.set_groups(
             _group(f"{shared}-alpha", "alpha@test.com"),
             _group(f"{shared}-beta", "beta@test.com"),
-        ]
+        )
 
         google_groups.generate_group_members_report([], report_deps.respond)
 
@@ -242,10 +302,10 @@ class TestGenerateGroupMembersReportBehaviour:
         assert len(set(ranges)) == 2
 
     def test_should_derive_distinct_titles_when_apostrophe_removal_would_collide(self, report_deps):
-        report_deps.directory.list_groups.return_value = [
+        report_deps.directory.set_groups(
             _group("Jon's Team", "jon@test.com"),
             _group("Jons Team", "jons@test.com"),
-        ]
+        )
 
         google_groups.generate_group_members_report([], report_deps.respond)
 
@@ -255,7 +315,7 @@ class TestGenerateGroupMembersReportBehaviour:
     def test_should_derive_the_same_title_on_every_run_for_the_same_group_name(self, report_deps):
         # Same-process double invocation: PYTHONHASHSEED is fixed within one process,
         # so this guards against a per-run derivation, not against the salted builtin hash().
-        report_deps.directory.list_groups.return_value = [_group("G" * 60, "long@test.com")]
+        report_deps.directory.set_groups(_group("G" * 60, "long@test.com"))
 
         google_groups.generate_group_members_report([], report_deps.respond)
         google_groups.generate_group_members_report([], report_deps.respond)
@@ -294,11 +354,12 @@ class TestGenerateGroupMembersReportBoundary:
         google_groups.generate_group_members_report([], report_deps.respond)
 
         assert _groups_listed(report_deps) == 1
-        report_deps.directory.list_groups.assert_called_once_with()
+        # unbounded listing: no query, no limit
+        assert report_deps.directory.list_groups_calls == [((), {})]
         assert _members_requested(report_deps) == ["one@test.com", "two@test.com"]
 
     def test_should_read_and_create_sheets_with_the_group_sheet_name(self, report_deps):
-        report_deps.directory.list_groups.return_value = [_group("GroupOne", "one@test.com")]
+        report_deps.directory.set_groups(_group("GroupOne", "one@test.com"))
 
         google_groups.generate_group_members_report([], report_deps.respond)
 
@@ -306,7 +367,7 @@ class TestGenerateGroupMembersReportBoundary:
         assert _sheet_create_requests(report_deps) == [{"requests": [{"addSheet": {"properties": {"title": "GroupOne"}}}]}]
 
     def test_should_write_values_positionally_with_file_id_and_range(self, report_deps):
-        report_deps.directory.list_groups.return_value = [_group("GroupOne", "one@test.com")]
+        report_deps.directory.set_groups(_group("GroupOne", "one@test.com"))
 
         google_groups.generate_group_members_report([], report_deps.respond)
 
@@ -314,6 +375,9 @@ class TestGenerateGroupMembersReportBoundary:
         assert spreadsheet_id == _FILE_ID
         assert cell_range == "'GroupOne'!A1"
         assert values[1] == ["Email", "Role"]
+
+    def test_should_not_bind_the_google_workspace_directory_module(self, report_deps):
+        assert not hasattr(google_groups, "google_directory")
 
 
 @pytest.mark.unit
@@ -355,25 +419,27 @@ class TestGenerateGroupMembersReportFailureModes:
         assert _groups_listed(report_deps) == 0
         assert _sheet_writes(report_deps) == []
 
-    def test_should_propagate_a_failing_group_listing_after_the_file_was_created(self, report_deps):
-        report_deps.directory.list_groups.side_effect = RuntimeError("directory down")
+    def test_should_raise_on_a_failing_group_listing_after_the_file_was_created(self, report_deps):
+        report_deps.directory.groups_result = _directory_failure()
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(google_groups.DirectoryReportError) as excinfo:
             google_groups.generate_group_members_report([], report_deps.respond)
 
+        assert excinfo.value.error_code == _ERROR_CODE
         assert len(_file_created(report_deps)) == 1
         report_deps.respond.assert_not_called()
         assert _sheet_writes(report_deps) == []
 
-    def test_should_propagate_a_mid_loop_member_failure_before_any_sheet_is_written(self, report_deps):
-        report_deps.directory.list_group_members.side_effect = [
-            [_member("member1@test.com", "MEMBER")],
-            RuntimeError("members down"),
+    def test_should_raise_on_a_mid_loop_member_failure_before_any_sheet_is_written(self, report_deps):
+        report_deps.directory.members_results = [
+            OperationResult.success([_member("member1@test.com", "MEMBER")]),
+            _directory_failure(),
         ]
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(google_groups.DirectoryReportError) as excinfo:
             google_groups.generate_group_members_report([], report_deps.respond)
 
+        assert excinfo.value.error_code == _ERROR_CODE
         assert _members_requested(report_deps) == ["one@test.com", "two@test.com"]
         assert _sheet_writes(report_deps) == []
         report_deps.respond.assert_not_called()

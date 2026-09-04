@@ -311,15 +311,19 @@ def provision_aws_users(operation, users_emails):
 
     if operation == "create":
         source_users = users.get_users_from_integration("google_directory")
-        users_to_create = [user for user in source_users if user["primaryEmail"] in users_emails]
-        preformatting_keys = [
-            ("primaryEmail", "email"),
-            ("primaryEmail", "log_user_name"),
-            ("name.givenName", "first_name"),
-            ("name.familyName", "family_name"),
+        requested_emails = {email.lower() for email in users_emails}
+        # "primaryEmail" is our own payload key here, resolved by display_key for logging.
+        users_to_create = [
+            {
+                "primaryEmail": user.email,
+                "email": user.email,
+                "log_user_name": user.email,
+                "first_name": user.given_name,
+                "family_name": user.family_name,
+            }
+            for user in source_users
+            if user.email.lower() in requested_emails
         ]
-        for old_key, new_key in preformatting_keys:
-            users_to_create = filters.preformat_items(users_to_create, old_key, new_key)
 
         return entities.provision_entities(
             identity_store.create_user,

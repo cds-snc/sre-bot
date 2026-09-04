@@ -5,8 +5,8 @@ from datetime import datetime
 from structlog import get_logger
 
 from infrastructure.configuration.integrations.google import get_google_resources_config
+from infrastructure.directory import get_directory_provider
 from integrations.google_workspace import (
-    google_directory,
     google_drive,
     sheets,
 )
@@ -17,6 +17,15 @@ logger = get_logger()
 
 _SHEET_TITLE_MAX_LENGTH = 50
 _SHEET_TITLE_DIGEST_LENGTH = 6
+
+
+class DirectoryReportError(Exception):
+    """Raised when a directory lookup needed by the report fails."""
+
+    def __init__(self, message: str, error_code: str | None = None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.error_code = error_code
 
 
 def _sheet_title(group_name: str) -> str:
@@ -66,8 +75,16 @@ def generate_group_members_report(args, respond):
         log.info("file_found", filename=filename, file=file)
 
     log.info("getting_google_groups")
-    groups = google_directory.list_groups()
-    groups = [group for group in groups if not any(exclude in group["name"] for exclude in exclude_groups)]
+    directory = get_directory_provider()
+    groups_result = directory.list_groups()
+    if not groups_result.is_success:
+        log.error(
+            "list_groups_failed",
+            error_code=groups_result.error_code,
+            error=groups_result.message,
+        )
+        raise DirectoryReportError(groups_result.message, groups_result.error_code)
+    groups = [group for group in groups_result.data or [] if not any(exclude in (group.name or "") for exclude in exclude_groups)]
 
     if not groups:
         respond("No groups found.")
@@ -75,17 +92,24 @@ def generate_group_members_report(args, respond):
 
     log.info("groups_found", count=len(groups))
     groups_with_members = []
-    for _index, group in enumerate(groups):
+    for group in groups:
         log.info(
             "processing_group",
-            group_email=group["email"],
+            group_email=group.group_email,
         )
-        members = google_directory.list_group_members(group["email"])
-        group["members"] = members
-        groups_with_members.append(group)
+        members_result = directory.get_group_members(group.group_email)
+        if not members_result.is_success:
+            log.error(
+                "get_group_members_failed",
+                group_email=group.group_email,
+                error_code=members_result.error_code,
+                error=members_result.message,
+            )
+            raise DirectoryReportError(members_result.message, members_result.error_code)
+        groups_with_members.append((group, members_result.data or []))
 
-    for group in groups_with_members:
-        sheet_title = _sheet_title(group["name"])
+    for group, members in groups_with_members:
+        sheet_title = _sheet_title(group.name or group.group_email)
         log.info("processing_group_sheet", group=sheet_title)
 
         try:
@@ -114,8 +138,8 @@ def generate_group_members_report(args, respond):
                 log.error("sheet_creation_failed", error=str(e))
 
         values = [["Group Name", sheet_title], ["Email", "Role"]]
-        for member in group["members"]:
-            values.append([member["email"], member["role"]])
+        for member in members:
+            values.append([member.email, member.role or ""])
         updated_sheet = sheets.batch_update_values(
             file["id"],
             _a1_range(sheet_title, "A1"),

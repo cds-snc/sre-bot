@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:01'
-updated_date: '2026-09-03 20:08'
+updated_date: '2026-09-03 21:41'
 labels:
   - clients
   - phase-3
@@ -101,5 +101,31 @@ FOUR THINGS THAT CHANGE YOUR PLANNING (in addition to the three already recorded
 7. BATCH ROUNDS ARE CHUNKED AT 100 REQUESTS. So 'one batched round-trip' in your AC#1 is precisely 'ceil(groups/100) batch requests per member-page depth', not literally one. Word AC#1's evidence accordingly - the claim to prove is 'not one members.list per group', not 'exactly one HTTP round-trip'.
 
 TWO RESIDUALS TASK-25.1.6.3.1 LEAVES FOR LATER (both recorded on TASK-25.1.6.11, neither blocks you): get_group_members keeps its own inline member-mapping loop, and get_group_members_batch keeps the admin.directory.group.readonly scope while get_group_members and the new composition use admin.directory.group.member.readonly.
+---
+
+author: @task-planner
+created: 2026-09-03 21:30
+---
+FINDINGS FROM TASK-25.1.6.4 PLANNING (2026-09-03, task-planner). Four items, one of which makes an AC of yours vacuous as written.
+
+1. YOUR AC#7 IS ALREADY VACUOUS. It says "app/bin/baselines/sdk_typing_antipatterns.txt is pruned of google_directory.py". google_directory.py is NOT in that baseline (verified 2026-09-03; the file lists 11 integrations/aws/* modules plus integrations/google_workspace/google_service.py). TASK-25.1.4 already migrated google_directory.py off the string dispatcher. Either drop AC#7 or restate it as "check_sdk_typing.py still passes and no stale entry is introduced".
+
+2. WHAT .4 LEAVES YOU. After .4, integrations/google_workspace/google_directory.py has exactly one production consumer, modules/provisioning/groups.py (your AC#1). list_users, list_groups and list_group_members become dead except for list_groups_with_members's internal use of them. get_members_details' user-record merge is still live inside list_groups_with_members and is the join you own.
+
+3. THE USER-RECORD JOIN JUST GOT CHEAPER FOR YOU. .4 makes modules/provisioning/users.py's google branch return list[DirectoryUser] (with given_name/family_name from Slice A), and rewrites modules/aws/identity_center.py::provision_aws_users to build its identity_store.create_user payload explicitly from those attributes instead of via four filters.preformat_items calls on Google dict keys. When you do the members-to-users join that get_members_details did, use users.get_users_from_integration('google_directory') as your typed source and copy that explicit-payload pattern - do not reintroduce preformat_items over Google field names. NOTE the remaining asymmetry you inherit: identity_center.sync_users still compares source 'primaryEmail' (Google-cased, from the groups path) against AWS 'UserName'. The provider lowercases every email it returns (infrastructure/directory/google.py:211/:223), so when your slice moves the groups path onto the provider, sync_users' comparison keys change casing too. Decide explicitly and cover it - .4 mitigated its own half by comparing case-insensitively.
+
+4. FAIL-LOUD IS THE HOUSE STYLE FOR THIS FAMILY NOW. .4's human decision (recorded on that task) is that every migrated legacy call site converts a non-success OperationResult into a narrow, vendor-neutral, module-local exception carrying message and error_code, rather than degrading silently. Your AC#6 asks what modules/provisioning/groups.py does with a non-empty failures tuple; that is a different question (per-group failures inside a SUCCESS payload) and fail-loud does not automatically answer it - but the overall-result error branch should follow the same rule.
+---
+
+author: @task-planner
+created: 2026-09-03 21:41
+---
+ADDENDUM TO COMMENT #3, ITEM 3 (2026-09-03, task-planner, human-directed). The email-casing constraint now has a documented home instead of living only in task comments.
+
+TASK-25.1.6.4 Step 7 adds a docstring caveat to the DirectoryProvider Protocol (app/infrastructure/directory/provider.py) stating BOTH halves of the normalisation contract: today it promises only that method ARGUMENTS are lowercased by implementors, and is silent on the fact that emails carried on returned DirectoryUser/DirectoryMember/DirectoryGroup values are lowercased too. The added text tells consumers comparing provider emails against externally-sourced addresses (Slack profile emails, command arguments, values already stored in another system such as AWS 'UserName') to compare case-insensitively.
+
+READ THAT DOCSTRING BEFORE PLANNING YOUR sync_users CHANGE. It is the contract statement item 3 was paraphrasing. Human direction was explicitly that a task file is the wrong place for a durable API caveat.
+
+Also note: .4 mitigates by comparing case-insensitively, NOT by re-casing anything. Do the same - do not add a shim that restores Google's original casing on the way out of the provider.
 ---
 <!-- COMMENTS:END -->
