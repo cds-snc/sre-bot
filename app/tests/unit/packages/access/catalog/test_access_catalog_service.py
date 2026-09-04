@@ -61,10 +61,12 @@ def make_runtime_config(
     authn_token: str = "authn",
     mode_overrides: dict | None = None,
     dir_prefix: str = "sg",
+    dir_domain: str = "example.com",
     dir_separator: str = "-",
 ) -> AccessSyncRuntimeConfig:
     return AccessSyncRuntimeConfig(
         dir_prefix=dir_prefix,
+        dir_domain=dir_domain,
         dir_separator=dir_separator,
         platforms={
             platform: PlatformPolicy(
@@ -111,6 +113,7 @@ def test_list_platforms_should_return_summary_for_each_configured_platform():
     # Arrange
     cfg = AccessSyncRuntimeConfig(
         dir_prefix="sg",
+        dir_domain="example.com",
         dir_separator="-",
         platforms={
             "aws": PlatformPolicy(authn_token="authn"),
@@ -161,6 +164,7 @@ def test_list_platforms_should_use_display_name_from_runtime_extensions_via_prov
 ):
     payload = {
         "dir_prefix": "sg",
+        "dir_domain": "example.com",
         "dir_separator": "-",
         "platforms": {
             "aws": {
@@ -210,7 +214,7 @@ def test_list_platforms_should_derive_authn_group_slug_from_config():
 
 def test_list_platforms_should_return_empty_list_when_no_platforms_configured():
     # Arrange
-    cfg = AccessSyncRuntimeConfig(dir_prefix="sg", platforms={})
+    cfg = AccessSyncRuntimeConfig(dir_prefix="sg", dir_domain="example.com", platforms={})
     service = make_service(runtime_config=cfg)
 
     # Act
@@ -445,6 +449,7 @@ def test_list_entitlements_should_fall_back_to_fallback_parser_for_unknown_platf
     # Arrange — platform is "custom"; no parser registered
     cfg = AccessSyncRuntimeConfig(
         dir_prefix="sg",
+        dir_domain="example.com",
         platforms={"custom": PlatformPolicy(authn_token="authn")},
     )
     groups = [make_group(slug="sg-custom-role1", email="sg-custom-role1@example.com")]

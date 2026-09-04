@@ -72,6 +72,7 @@ def _make_builder_and_effective(
     """Return (DirectoryMembershipBuilder, EffectivePlatformPolicy)."""
     config = AccessSyncRuntimeConfig(
         dir_prefix="sg",
+        dir_domain="example.com",
         platforms={
             platform: PlatformPolicy(
                 authn_token="authn",
@@ -316,6 +317,7 @@ def _make_platform_builder_and_effective(
     """Return (DirectoryMembershipBuilder, EffectivePlatformPolicy) for platform builds."""
     config = AccessSyncRuntimeConfig(
         dir_prefix="sg",
+        dir_domain="example.com",
         platforms={
             platform: PlatformPolicy(
                 authn_token="authn",
@@ -467,6 +469,7 @@ def _make_discovery_builder(
     """Return (DirectoryMembershipBuilder, AccessSyncRuntimeConfig) for discovery."""
     config = AccessSyncRuntimeConfig(
         dir_prefix="sg",
+        dir_domain="example.com",
         platforms={
             platform: PlatformPolicy(
                 authn_token="authn",

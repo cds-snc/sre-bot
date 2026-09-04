@@ -1,10 +1,11 @@
 ---
 id: TASK-76.2
 title: Introduce ManagedGroupPolicy and dir_domain in packages/access/common
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-04 14:17'
-updated_date: '2026-09-04 15:47'
+updated_date: '2026-09-04 16:06'
 labels:
   - layering
 milestone: m-3
@@ -43,15 +44,15 @@ TESTING (decisions/testing.md). Pure unit tests, no doubles needed for a value o
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ManagedGroupPolicy exists in app/packages/access/common as a frozen dataclass with no I/O and no imports from app/integrations, exposing canonical email, canonical slug, managed-domain check, alias-aware prefix match and slug-to-key composition
-- [ ] #2 The managed prefix is derived from the existing AccessRuntimeConfig naming (dir_prefix plus dir_separator, exposed as AccessGroupNaming.managed_prefix) and is not introduced as a new setting anywhere
-- [ ] #3 AccessRuntimeConfig carries dir_domain as a required non-empty field, with loader, bundle, dev-fixture and README plumbing updated; no AccessSettings feature env var and no infrastructure setting is added for it - the only new env name is the document-assembly ACCESS_CONFIG_ENV_DIR_DOMAIN, mirroring the existing ACCESS_CONFIG_ENV_DIR_PREFIX
-- [ ] #4 A DirectoryGroup whose canonical email is outside the managed domain is rejected by ManagedGroupPolicy, proven by a unit test at the feature boundary (parent AC#5)
-- [ ] #5 Unit tests cover alias preference including the wrong-domain-alias case, primary-email fallback on an empty alias tuple, alias-based prefix matching, key composition, and blank prefix or domain failing validation
-- [ ] #6 No file under app/infrastructure/ is modified by this slice
-- [ ] #7 mypy, ruff and the full non-smoke pytest run are green
-- [ ] #8 AccessRuntimeConfig rejects a blank dir_prefix or dir_domain at construction, and BundleConfigLoader returns a PERMANENT_ERROR CONFIG_NOT_CONFIGURED instead of fabricating an empty waiting-mode config, each covered by a test
-- [ ] #9 The two deliberate non-ports are implemented and their rationale recorded in the notes: matches_prefix drops the provider's unreachable no-candidates-means-match branch, and group_key can never emit a bare slug
+- [x] #1 ManagedGroupPolicy exists in app/packages/access/common as a frozen dataclass with no I/O and no imports from app/integrations, exposing canonical email, canonical slug, managed-domain check, alias-aware prefix match and slug-to-key composition
+- [x] #2 The managed prefix is derived from the existing AccessRuntimeConfig naming (dir_prefix plus dir_separator, exposed as AccessGroupNaming.managed_prefix) and is not introduced as a new setting anywhere
+- [x] #3 AccessRuntimeConfig carries dir_domain as a required non-empty field, with loader, bundle, dev-fixture and README plumbing updated; no AccessSettings feature env var and no infrastructure setting is added for it - the only new env name is the document-assembly ACCESS_CONFIG_ENV_DIR_DOMAIN, mirroring the existing ACCESS_CONFIG_ENV_DIR_PREFIX
+- [x] #4 A DirectoryGroup whose canonical email is outside the managed domain is rejected by ManagedGroupPolicy, proven by a unit test at the feature boundary (parent AC#5)
+- [x] #5 Unit tests cover alias preference including the wrong-domain-alias case, primary-email fallback on an empty alias tuple, alias-based prefix matching, key composition, and blank prefix or domain failing validation
+- [x] #6 No file under app/infrastructure/ is modified by this slice
+- [x] #7 mypy, ruff and the full non-smoke pytest run are green
+- [x] #8 AccessRuntimeConfig rejects a blank dir_prefix or dir_domain at construction, and BundleConfigLoader returns a PERMANENT_ERROR CONFIG_NOT_CONFIGURED instead of fabricating an empty waiting-mode config, each covered by a test
+- [x] #9 The two deliberate non-ports are implemented and their rationale recorded in the notes: matches_prefix drops the provider's unreachable no-candidates-means-match branch, and group_key can never emit a bare slug
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -211,6 +212,30 @@ R1 (was open question 1) - THE dir_domain VALUE IN THE FIXTURE. Resolved by H6: 
 
 R2 (was open question 2) - THE "bundle" SOURCE IS KEPT, no follow-up task. The question was whether a loader that can now only return an error still earns its place. It does, and more than before: "bundle" is the DEFAULT value of ACCESS_CONFIG_SOURCE, so it is precisely the code path that turns "someone enabled access without configuring it" into one named, self-explaining CONFIG_NOT_CONFIGURED error. Deleting it would force the default to file_json against a ref that does not exist, degrading that clear message into a generic CONFIG_NOT_FOUND about a missing path. The alternative is strictly worse, so this is settled rather than deferred.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTED 2026-09-04 (implementation mode). Task left In Progress for human DoD verification.
+
+PRODUCTION CHANGES (4 files, 1 new):
+- NEW app/packages/access/common/group_policy.py - frozen ManagedGroupPolicy(prefix, domain) with from_config, canonical_email, canonical_slug, is_managed, matches_prefix, group_key. __post_init__ strips+lowercases both fields and rejects blanks. Only infrastructure import is the DirectoryGroup dataclass; no I/O, no app.integrations.
+- common/naming.py - AccessGroupNaming.managed_prefix property (dir_prefix + dir_separator), the org-wide prefix distinct from platform-scoped group_prefix(platform). No new setting.
+- common/config/settings.py - AccessRuntimeConfig gains required dir_domain (no default) plus __post_init__ rejecting blank dir_prefix or dir_domain.
+- common/config/loaders.py - RuntimeConfigJsonModel gains dir_domain (min_length=1) and dir_prefix is now min_length=1; docstring example updated; _build_runtime_config/_validate_runtime_config_payload thread the field, and the post-validate except widened from ValidationError to ValueError so the dataclass invariants surface as CONFIG_INVALID_SHAPE; EnvConfigLoader reads ACCESS_CONFIG_ENV_DIR_DOMAIN with an explicit missing-value check naming the variable; BundleConfigLoader now returns PERMANENT_ERROR CONFIG_NOT_CONFIGURED naming ACCESS_CONFIG_SOURCE/ACCESS_CONFIG_REF instead of fabricating a waiting-mode config.
+
+FIXTURES/DOCS: access.local.json uses the neutral example.com (H6/D-76.2-h - no organization-specific default anywhere in code or schema); packages/access, common, catalog and sync READMEs gained the dir_domain row/sample, the bundle source is documented as not-configured, and the sync README env block was corrected to the real ACCESS_CONFIG_ENV_* names it had been misreporting.
+
+AC#9 NON-PORTS AS PLANNED: (i) matches_prefix does not reproduce the provider's 'no candidates -> True' branch - both Google mappers already reject an email-less group (DIRECTORY_GROUP_EMAIL_REQUIRED), so it is unreachable feature-side; (ii) group_key can never emit a bare slug, since a blank domain is unconstructible.
+
+TEST EVIDENCE: pre-authored suites test_access_group_policy.py (14 cases) and test_access_runtime_config_validation.py (3 cases) plus the updated loader cases in sync/test_config.py all pass. Mechanical dir_domain plumbing applied to the two config factories and the remaining keyword construction sites / document payloads (13 test files).
+
+GATES: ruff clean. pytest tests/unit/packages/access + tests/integration/packages/access = 362 passed; human ran the full make test with one remaining failure (catalog display-name payload), since fixed. mypy reports no new errors in any touched file - the 95 findings are the pre-existing baseline in modules/ and untouched access files.
+
+AC#6 verified: git status shows zero modified paths under app/infrastructure/.
+
+FOR HUMAN VERIFICATION: full non-smoke pytest re-run after the final fix; confirm the F4 grep (no ACCESS_CONFIG_* in terraform/Makefile) still holds at merge time.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

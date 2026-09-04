@@ -103,6 +103,7 @@ def test_inline_json_config_loader_parses_platforms():
     payload = json.dumps(
         {
             "dir_prefix": "sg",
+            "dir_domain": "example.com",
             "dir_separator": "-",
             "platforms": {
                 "aws": {
@@ -127,6 +128,7 @@ def test_inline_json_loader_preserves_extensions_for_catalog():
     payload = json.dumps(
         {
             "dir_prefix": "sg",
+            "dir_domain": "example.com",
             "dir_separator": "-",
             "platforms": {
                 "aws": {

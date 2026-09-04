@@ -396,11 +396,13 @@ def make_sync_config():
         authn_removal_mode: str = "delete",
         mode_overrides: dict[str, Literal["sync_managed", "ephemeral", "deactivated"]] | None = None,
         dir_prefix: str = "sg",
+        dir_domain: str = "example.com",
         dir_separator: str = "-",
         adapter_type: str = "fake",
     ) -> AccessSyncRuntimeConfig:
         return AccessSyncRuntimeConfig(
             dir_prefix=dir_prefix,
+            dir_domain=dir_domain,
             dir_separator=dir_separator,
             platforms={
                 platform: PlatformPolicy(
@@ -522,6 +524,7 @@ def aws_config() -> AccessSyncRuntimeConfig:
     """
     return AccessSyncRuntimeConfig(
         dir_prefix="sg",
+        dir_domain="example.com",
         dir_separator="-",
         platforms={
             "aws": PlatformPolicy(

@@ -15,6 +15,14 @@ class AccessGroupNaming:
     dir_prefix: str
     dir_separator: str = "-"
 
+    @property
+    def managed_prefix(self) -> str:
+        """Return the organization-wide managed-group prefix (``sg-``).
+
+        Unlike :meth:`group_prefix`, this is not scoped to a platform.
+        """
+        return f"{self.dir_prefix}{self.dir_separator}"
+
     def group_prefix(self, platform: str) -> str:
         """Return the group slug prefix for a platform.
 

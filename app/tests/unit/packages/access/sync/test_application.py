@@ -319,6 +319,7 @@ def make_coordinator(
         adapter = FakeAdapter(current_entitlement_ids=current_ids or set(), user_exists=user_exists)
     config = AccessRuntimeConfig(
         dir_prefix="sg",
+        dir_domain="example.com",
         platforms={
             platform: PlatformPolicy(
                 authn_token="authn",
@@ -402,6 +403,7 @@ def test_sync_user_policy_not_found():
 def test_sync_user_adapter_not_found():
     config = AccessRuntimeConfig(
         dir_prefix="sg",
+        dir_domain="example.com",
         platforms={"aws": PlatformPolicy()},
     )
     directory_provider: Any = FakeDirectory()

@@ -113,6 +113,7 @@ def make_runtime_config(make_platform_policy):
     def _make(
         platform: str = "aws",
         dir_prefix: str = "sg",
+        dir_domain: str = "example.com",
         dir_separator: str = "-",
         platforms: dict | None = None,
         **policy_kwargs: object,
@@ -121,6 +122,7 @@ def make_runtime_config(make_platform_policy):
             platforms = {platform: make_platform_policy(**policy_kwargs)}  # type: ignore[arg-type]
         return AccessRuntimeConfig(
             dir_prefix=dir_prefix,
+            dir_domain=dir_domain,
             dir_separator=dir_separator,
             platforms=platforms,
         )

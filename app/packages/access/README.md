@@ -52,6 +52,7 @@ All sub-packages share a single `AccessRuntimeConfig` instance loaded once at st
 ```json
 {
   "dir_prefix": "sg",
+  "dir_domain": "example.com",
   "dir_separator": "-",
   "platforms": {
     "aws": {
@@ -109,6 +110,7 @@ The runtime config JSON is the single place you define the group naming conventi
 ```json
 {
   "dir_prefix": "sg",
+  "dir_domain": "example.com",
   "dir_separator": "-",
   "platforms": {
     "aws": {
@@ -122,6 +124,7 @@ The runtime config JSON is the single place you define the group naming conventi
 | Field | Type | Description |
 |---|---|---|
 | `dir_prefix` | string | Leading segment of every managed IDP group slug (e.g. `sg`) |
+| `dir_domain` | string | Email domain of managed IDP groups (e.g. `cds-snc.ca`). **Required, no default** — the application is agnostic of the organization running it |
 | `dir_separator` | string | Separator between naming segments (almost always `-`) |
 | `platforms` | object | One key per active platform; key is the `platform` value used in API calls |
 
@@ -141,6 +144,7 @@ By default every managed group is `sync_managed` — Access Sync will enforce it
 ```json
 {
   "dir_prefix": "sg",
+  "dir_domain": "example.com",
   "dir_separator": "-",
   "platforms": {
     "aws": {
@@ -177,6 +181,7 @@ Use `ACCESS_CONFIG_SOURCE=file_json` and point `ACCESS_CONFIG_REF` at a local fi
 ```json
 {
   "dir_prefix": "sg",
+  "dir_domain": "example.com",
   "dir_separator": "-",
   "platforms": {
     "aws": {
