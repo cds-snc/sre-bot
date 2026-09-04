@@ -102,6 +102,7 @@ def test_group_prefix_derives_from_dir_prefix_and_platform(make_runtime_config):
 def test_group_prefix_custom_separator():
     config = AccessSyncRuntimeConfig(
         dir_prefix="corp",
+        dir_domain="example.com",
         dir_separator=".",
         platforms={"gcp": PlatformPolicy()},
     )
@@ -118,6 +119,7 @@ def test_authn_group_slug_derives_correctly(make_runtime_config):
 def test_authn_group_slug_custom_token():
     config = AccessSyncRuntimeConfig(
         dir_prefix="sg",
+        dir_domain="example.com",
         dir_separator="-",
         platforms={"aws": PlatformPolicy(authn_token="login")},
     )

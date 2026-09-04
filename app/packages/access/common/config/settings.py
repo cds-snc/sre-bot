@@ -60,15 +60,29 @@ class EntitlementModeOverride:
 
 @dataclass(frozen=True)
 class AccessRuntimeConfig:
-    """Fully-resolved runtime configuration shared across access sub-packages."""
+    """Fully-resolved runtime configuration shared across access sub-packages.
+
+    ``dir_domain`` is the authoritative email domain of managed IDP groups. It is
+    required and has no default anywhere: this application must stay agnostic of
+    the organization running it, so an absent value is a startup error rather
+    than a silent fallback to someone else's directory.
+    """
 
     dir_prefix: str
+    dir_domain: str
     dir_separator: str = "-"
     platforms: dict[str, PlatformPolicy] = field(default_factory=dict)
     entitlement_mode_overrides: list[EntitlementModeOverride] = field(default_factory=list)
     # Typed extensions for catalog feature; empty dict when not present.
     extensions: dict[str, Any] = field(default_factory=dict)
     catalog_extensions: CatalogExtensions | None = None
+
+    def __post_init__(self) -> None:
+        """Reject a config the access feature cannot operate with."""
+        if not self.dir_prefix.strip():
+            raise ValueError("access_runtime_config_invalid: dir_prefix must be a non-empty value")
+        if not self.dir_domain.strip():
+            raise ValueError("access_runtime_config_invalid: dir_domain must be a non-empty value")
 
     def group_prefix(self, platform: str) -> str:
         """Return the IDP group slug prefix for a given platform."""

@@ -12,6 +12,7 @@ from packages.access.common.config import InlineJsonConfigLoader
 def _runtime_config_from_payload() -> object:
     payload = {
         "dir_prefix": "sg",
+        "dir_domain": "example.com",
         "dir_separator": "-",
         "platforms": {
             "aws": {

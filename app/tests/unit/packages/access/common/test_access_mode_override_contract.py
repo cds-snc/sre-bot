@@ -38,6 +38,7 @@ class _FakeDirectory:
 def _runtime_config(mode_overrides: dict[str, str]) -> AccessRuntimeConfig:
     return AccessRuntimeConfig(
         dir_prefix="sg",
+        dir_domain="example.com",
         dir_separator="-",
         platforms={
             "aws": PlatformPolicy(

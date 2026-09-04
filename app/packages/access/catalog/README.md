@@ -41,6 +41,7 @@ The `known_envs` set controls which segments are treated as environment qualifie
 ```json
 {
   "dir_prefix": "sg",
+  "dir_domain": "example.com",
   "dir_separator": "-",
   "platforms": {
     "aws": { "authn_token": "authn", "authn_removal_mode": "delete" }

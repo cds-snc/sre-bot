@@ -8,6 +8,7 @@ from packages.access.common.config import InlineJsonConfigLoader
 def test_runtime_config_extensions_catalog_is_typed_and_attribute_accessible():
     payload = {
         "dir_prefix": "sg",
+        "dir_domain": "example.com",
         "dir_separator": "-",
         "platforms": {
             "aws": {
@@ -39,6 +40,7 @@ def test_runtime_config_extensions_catalog_is_typed_and_attribute_accessible():
 def test_runtime_config_extensions_invalid_parser_known_envs_shape_fails():
     payload = {
         "dir_prefix": "sg",
+        "dir_domain": "example.com",
         "dir_separator": "-",
         "platforms": {
             "aws": {

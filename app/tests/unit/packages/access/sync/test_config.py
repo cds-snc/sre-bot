@@ -4,6 +4,7 @@ import json
 
 import pytest
 
+from infrastructure.operations import OperationStatus
 from packages.access.common.config import (
     BundleConfigLoader,
     EnvConfigLoader,
@@ -86,11 +87,14 @@ def test_get_access_config_loader_returns_file_json():
 
 
 @pytest.mark.unit
-def test_bundle_config_loader_load_returns_success():
-    """BundleConfigLoader.load() must return a successful OperationResult."""
-    loader = BundleConfigLoader()
-    result = loader.load("default")
-    assert result.is_success
+def test_bundle_config_loader_reports_not_configured():
+    """Access enabled without a configured source must fail loudly, not enter waiting mode."""
+    result = BundleConfigLoader().load("default")
+
+    assert not result.is_success
+    assert result.status is OperationStatus.PERMANENT_ERROR
+    assert result.error_code == "CONFIG_NOT_CONFIGURED"
+    assert "ACCESS_CONFIG_SOURCE" in (result.message or "")
 
 
 @pytest.mark.unit
@@ -99,6 +103,7 @@ def test_inline_json_config_loader_parses_platforms():
     payload = json.dumps(
         {
             "dir_prefix": "sg",
+            "dir_domain": "example.com",
             "dir_separator": "-",
             "platforms": {
                 "aws": {
@@ -123,6 +128,7 @@ def test_inline_json_loader_preserves_extensions_for_catalog():
     payload = json.dumps(
         {
             "dir_prefix": "sg",
+            "dir_domain": "example.com",
             "dir_separator": "-",
             "platforms": {
                 "aws": {
@@ -145,6 +151,7 @@ def test_inline_json_loader_preserves_extensions_for_catalog():
 @pytest.mark.unit
 def test_env_config_loader_reads_access_config_env_names(monkeypatch):
     monkeypatch.setenv("ACCESS_CONFIG_ENV_DIR_PREFIX", "sg")
+    monkeypatch.setenv("ACCESS_CONFIG_ENV_DIR_DOMAIN", "example.com")
     monkeypatch.setenv("ACCESS_CONFIG_ENV_DIR_SEPARATOR", "-")
     monkeypatch.setenv(
         "ACCESS_CONFIG_ENV_PLATFORMS_JSON",
@@ -156,7 +163,59 @@ def test_env_config_loader_reads_access_config_env_names(monkeypatch):
     assert result.is_success
     assert result.data is not None
     assert result.data.dir_prefix == "sg"
+    assert result.data.dir_domain == "example.com"
     assert "aws" in result.data.platforms
+
+
+@pytest.mark.unit
+def test_env_config_loader_requires_dir_domain(monkeypatch):
+    monkeypatch.delenv("ACCESS_CONFIG_ENV_DIR_DOMAIN", raising=False)
+    monkeypatch.setenv("ACCESS_CONFIG_ENV_DIR_PREFIX", "sg")
+
+    result = EnvConfigLoader().load("unused")
+
+    assert not result.is_success
+    assert result.error_code == "CONFIG_INVALID_SHAPE"
+    assert "ACCESS_CONFIG_ENV_DIR_DOMAIN" in (result.message or "")
+
+
+@pytest.mark.unit
+def test_inline_json_loader_requires_dir_domain():
+    payload = json.dumps({"dir_prefix": "sg", "dir_separator": "-", "platforms": {}})
+
+    result = InlineJsonConfigLoader().load(payload)
+
+    assert not result.is_success
+    assert result.error_code == "CONFIG_INVALID_SHAPE"
+
+
+@pytest.mark.unit
+def test_file_json_loader_requires_dir_domain(tmp_path):
+    path = tmp_path / "access.json"
+    path.write_text(json.dumps({"dir_prefix": "sg", "platforms": {}}), encoding="utf-8")
+
+    result = FileJsonConfigLoader().load(str(path))
+
+    assert not result.is_success
+    assert result.error_code == "CONFIG_INVALID_SHAPE"
+
+
+@pytest.mark.unit
+def test_inline_json_loader_carries_dir_domain_onto_runtime_config():
+    payload = json.dumps(
+        {
+            "dir_prefix": "sg",
+            "dir_domain": "example.com",
+            "dir_separator": "-",
+            "platforms": {},
+        }
+    )
+
+    result = InlineJsonConfigLoader().load(payload)
+
+    assert result.is_success
+    assert result.data is not None
+    assert result.data.dir_domain == "example.com"
 
 
 @pytest.mark.unit

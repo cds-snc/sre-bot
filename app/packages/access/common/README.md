@@ -57,6 +57,7 @@ Key fields:
 | Field | Example | Description |
 |---|---|---|
 | `dir_prefix` | `sg` | Org-wide IDP group prefix |
+| `dir_domain` | `cds-snc.ca` | Email domain of managed IDP groups; required, no default |
 | `dir_separator` | `-` | Segment separator |
 | `platforms` | `{"aws": PlatformPolicy(...)}` | Per-platform policy |
 
@@ -69,7 +70,7 @@ Key methods:
 
 ### `config/loaders.py`
 
-Config loader implementations. The source is selected by `ACCESS_CONFIG_SOURCE` (via `settings.config.source`). Supported sources: `bundle`, `file_json`, `inline_json`, `env`.
+Config loader implementations. The source is selected by `ACCESS_CONFIG_SOURCE` (via `settings.config.source`). Supported sources: `bundle`, `file_json`, `inline_json`, `env`. The default `bundle` source carries no configuration and reports `CONFIG_NOT_CONFIGURED`.
 
 ### `events.py`
 

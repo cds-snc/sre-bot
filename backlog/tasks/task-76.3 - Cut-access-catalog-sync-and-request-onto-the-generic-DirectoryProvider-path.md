@@ -4,7 +4,7 @@ title: 'Cut access catalog, sync and request onto the generic DirectoryProvider 
 status: To Do
 assignee: []
 created_date: '2026-09-04 14:18'
-updated_date: '2026-09-04 14:43'
+updated_date: '2026-09-04 15:32'
 labels:
   - layering
 milestone: m-3
@@ -56,5 +56,32 @@ created: 2026-09-04 14:43
 ADVISORY from TASK-76.1 planning (2026-09-04). Coordinator plan fact F4 is inaccurate (correction posted on TASK-76): the managed-group provider behaviour IS already pinned by app/tests/unit/infrastructure/directory/test_google.py, whose mock_directory_settings fixture (lines 135-142) runs the provider with managed_group_prefix='sg-' and managed_group_domain='example.com'. Managed-alias preference (line 1075), managed-domain mismatch (line 1119) and the alias-aware discovery skip (line 1108) are the exact behaviours your cut-over must reproduce at the feature boundary - read them as the specification instead of deriving one from scratch. What genuinely has no coverage is the packages/access side, so AC#4's 'existing test suites' still proves little there and your slice must add those tests.
 
 Enabler note: DirectoryGroup.aliases (TASK-76.1) is a tuple of IDP-reported secondary addresses, strip+lower normalized, empty when the IDP has no such concept - so any feature-side alias handling must tolerate () rather than requiring a non-empty tuple.
+---
+
+author: @task-planner
+created: 2026-09-04 15:32
+---
+ADVISORY from TASK-76.2 planning (2026-09-04). The API you cut over to is now frozen - write your call sites against exactly this.
+
+app/packages/access/common/group_policy.py, frozen dataclass ManagedGroupPolicy(prefix, domain):
+  ManagedGroupPolicy.from_config(config: AccessRuntimeConfig) -> ManagedGroupPolicy
+  canonical_email(group: DirectoryGroup) -> str
+  canonical_slug(group: DirectoryGroup) -> str
+  is_managed(group: DirectoryGroup) -> bool
+  matches_prefix(group: DirectoryGroup, prefix: str) -> bool
+  group_key(slug: str) -> str
+Not re-exported from packages.access.common.__init__ (which is deliberately export-free) - import the module path, as the code already does for common.naming.
+
+FOUR THINGS THAT AFFECT YOUR SLICE:
+
+1. is_managed and canonical_slug are evaluated on canonical_email(group), NOT on group.group_email, because that is the value the provider's domain check ran against (google.py:466-471 operates on _extract_managed_group_email's output). Do not re-derive slugs from group_email at your call sites.
+
+2. matches_prefix DELIBERATELY DOES NOT reproduce _matches_managed_group_prefix's 'no candidates -> True' branch (google.py:311). That branch kept a group with no resolvable email in the listing; feature-side it is unreachable because both provider mappers already reject an email-less group (DIRECTORY_GROUP_EMAIL_REQUIRED, google.py:427-431). If your cut-over relocates the existing provider test for that branch, relocate it as 'a group with no email never reaches the feature', not as a policy behaviour.
+
+3. THE PREFIX YOU PASS TO matches_prefix IS THE PLATFORM-SCOPED ONE. The policy's own prefix field is the ORG-WIDE 'sg-' (used only for alias preference); config.group_prefix(platform) is 'sg-aws-' and remains what catalog/service.py:140 and desired_state.py:219 pass as the match argument. The two are different values - coordinator D3 conflated them and has been corrected on TASK-76.
+
+4. CONFIG IS NOW STRICT, WHICH CHANGES YOUR TEST SETUP. AccessRuntimeConfig gains a required non-empty dir_domain and rejects a blank dir_prefix or dir_domain at construction, and BundleConfigLoader now returns PERMANENT_ERROR CONFIG_NOT_CONFIGURED instead of an empty 'waiting mode' config. Any test of yours that leaned on the hollow bundle must construct a config explicitly. TASK-76.2 adds a dir_domain parameter to both make_runtime_config (tests/unit/packages/access/sync/conftest.py) and make_sync_config (tests/integration/packages/access/sync/conftest.py), defaulting to example.com - use those factories rather than hand-rolling.
+
+Unchanged: your error-versus-omission decision (AC#3) is still yours to make and record; the policy returns a plain bool from is_managed precisely so each call site can choose.
 ---
 <!-- COMMENTS:END -->

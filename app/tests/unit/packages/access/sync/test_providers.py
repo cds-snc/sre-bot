@@ -17,6 +17,7 @@ def test_get_access_sync_adapters_registers_aws_and_fake(
     providers.get_access_sync_adapters.cache_clear()
     runtime_config = AccessSyncRuntimeConfig(
         dir_prefix="sg",
+        dir_domain="example.com",
         platforms={
             "aws": make_platform_policy(adapter_type="aws_identity_center"),
             "fake": make_platform_policy(adapter_type="fake"),
@@ -55,6 +56,7 @@ def test_get_access_sync_adapters_raises_for_unknown_adapter_type(
     providers.get_access_sync_adapters.cache_clear()
     runtime_config = AccessSyncRuntimeConfig(
         dir_prefix="sg",
+        dir_domain="example.com",
         platforms={
             "fake": make_platform_policy(adapter_type="fake"),
             "custom": make_platform_policy(adapter_type="custom_unsupported"),

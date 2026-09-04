@@ -5,10 +5,11 @@ AccessRuntimeConfig.  This module serves the entire access feature domain —
 sync, catalog, and request all share one runtime config loaded here.
 
 Config loader sources:
-    bundle      - Built-in empty bundle. Default for local development.
+    bundle      - No built-in configuration; reports CONFIG_NOT_CONFIGURED.
     inline_json - Parse ACCESS_CONFIG_REF as inline JSON text.
     file_json   - Read ACCESS_CONFIG_REF as a path to a local JSON file.
-    env         - Read from ACCESS_CONFIG_ENV_DIR_PREFIX / ACCESS_CONFIG_ENV_PLATFORMS_JSON.
+    env         - Read from ACCESS_CONFIG_ENV_DIR_PREFIX / ACCESS_CONFIG_ENV_DIR_DOMAIN /
+                  ACCESS_CONFIG_ENV_PLATFORMS_JSON.
 """
 
 from __future__ import annotations
@@ -90,6 +91,7 @@ class RuntimeConfigJsonModel(BaseModel):
 
         {
           "dir_prefix": "sg",
+          "dir_domain": "example.com",
           "dir_separator": "-",
           "platforms": {
             "aws": {
@@ -109,7 +111,8 @@ class RuntimeConfigJsonModel(BaseModel):
         }
     """
 
-    dir_prefix: str
+    dir_prefix: str = Field(min_length=1)
+    dir_domain: str = Field(min_length=1)
     dir_separator: str = "-"
     platforms: dict[str, PlatformPolicyConfigModel] = Field(default_factory=dict)
     extensions: dict[str, Any] = Field(default_factory=dict)
@@ -122,6 +125,7 @@ class RuntimeConfigJsonModel(BaseModel):
 
 def _build_runtime_config(
     dir_prefix: str,
+    dir_domain: str,
     dir_separator: str,
     platforms_model: dict[str, PlatformPolicyConfigModel],
     extensions: dict[str, Any] | None = None,
@@ -149,6 +153,7 @@ def _build_runtime_config(
 
     return AccessRuntimeConfig(
         dir_prefix=dir_prefix,
+        dir_domain=dir_domain,
         dir_separator=dir_separator,
         platforms=platforms,
         extensions=dict(extensions or {}),
@@ -172,11 +177,12 @@ def _validate_runtime_config_payload(
     try:
         config = _build_runtime_config(
             dir_prefix=validated.dir_prefix,
+            dir_domain=validated.dir_domain,
             dir_separator=validated.dir_separator,
             platforms_model=validated.platforms,
             extensions=validated.extensions,
         )
-    except ValidationError as exc:
+    except ValueError as exc:
         return OperationResult.error(
             status=OperationStatus.PERMANENT_ERROR,
             message=f"{error_prefix}_invalid_extensions: {exc}",
@@ -194,17 +200,20 @@ def _validate_runtime_config_payload(
 
 
 class BundleConfigLoader:
-    """Returns an empty bundle (no platforms configured).
+    """Reports that access is enabled but has no configuration source.
 
-    The feature enters "waiting mode": no adapters are registered and
-    sync_user returns POLICY_NOT_FOUND gracefully until a real source is set.
+    ``bundle`` is the default ACCESS_CONFIG_SOURCE, so this is the path taken
+    when the feature is switched on without being configured.
     """
 
     def load(self, ref: str) -> OperationResult[AccessRuntimeConfig]:
-        config = AccessRuntimeConfig(dir_prefix="", platforms={})
-        return OperationResult.success(
-            data=config,
-            message=f"bundle_config_loaded ref={ref} platforms=0 (waiting mode)",
+        return OperationResult.error(
+            status=OperationStatus.PERMANENT_ERROR,
+            message=(
+                f"bundle_config_not_configured ref={ref}: access is enabled but no runtime "
+                "configuration is available; set ACCESS_CONFIG_SOURCE and ACCESS_CONFIG_REF"
+            ),
+            error_code="CONFIG_NOT_CONFIGURED",
         )
 
 
@@ -231,12 +240,14 @@ class EnvConfigLoader:
 
     Reads:
         ACCESS_CONFIG_ENV_DIR_PREFIX     — IDP group prefix (e.g. ``sg``)
+        ACCESS_CONFIG_ENV_DIR_DOMAIN     — managed group email domain
         ACCESS_CONFIG_ENV_DIR_SEPARATOR  — segment separator; default ``-``
         ACCESS_CONFIG_ENV_PLATFORMS_JSON — platforms block as a JSON string
     """
 
     class _EnvModel(BaseSettings):
         dir_prefix: str = Field(default="", alias="ACCESS_CONFIG_ENV_DIR_PREFIX")
+        dir_domain: str = Field(default="", alias="ACCESS_CONFIG_ENV_DIR_DOMAIN")
         dir_separator: str = Field(default="-", alias="ACCESS_CONFIG_ENV_DIR_SEPARATOR")
         platforms_json: str = Field(default="{}", alias="ACCESS_CONFIG_ENV_PLATFORMS_JSON")
 
@@ -254,6 +265,12 @@ class EnvConfigLoader:
                 message="env_config_missing_dir_prefix: ACCESS_CONFIG_ENV_DIR_PREFIX must be set",
                 error_code="CONFIG_INVALID_SHAPE",
             )
+        if not env.dir_domain:
+            return OperationResult.error(
+                status=OperationStatus.PERMANENT_ERROR,
+                message="env_config_missing_dir_domain: ACCESS_CONFIG_ENV_DIR_DOMAIN must be set",
+                error_code="CONFIG_INVALID_SHAPE",
+            )
         try:
             platforms_payload = json.loads(env.platforms_json)
         except json.JSONDecodeError as exc:
@@ -265,6 +282,7 @@ class EnvConfigLoader:
         return _validate_runtime_config_payload(
             payload={
                 "dir_prefix": env.dir_prefix,
+                "dir_domain": env.dir_domain,
                 "dir_separator": env.dir_separator,
                 "platforms": platforms_payload,
             },

@@ -33,6 +33,7 @@ def make_config(
 ) -> AccessRuntimeConfig:
     return AccessRuntimeConfig(
         dir_prefix="sg",
+        dir_domain="example.com",
         dir_separator="-",
         platforms={
             platform: PlatformPolicy(

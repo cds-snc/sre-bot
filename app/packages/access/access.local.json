@@ -1,5 +1,6 @@
 {
   "dir_prefix": "sg",
+  "dir_domain": "example.com",
   "dir_separator": "-",
   "platforms": {
     "aws": {
