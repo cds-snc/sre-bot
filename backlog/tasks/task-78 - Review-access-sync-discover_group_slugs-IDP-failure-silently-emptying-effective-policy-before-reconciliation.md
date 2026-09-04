@@ -3,13 +3,14 @@ id: TASK-78
 title: >-
   Review access sync discover_group_slugs IDP failure silently emptying
   effective policy before reconciliation
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-04 12:38'
 updated_date: '2026-09-04 13:37'
 labels:
   - reliability
+milestone: m-3
 dependencies: []
 references:
   - decisions/operation-result.md
