@@ -1,11 +1,11 @@
 ---
 id: TASK-76.2
 title: Introduce ManagedGroupPolicy and dir_domain in packages/access/common
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-04 14:17'
-updated_date: '2026-09-04 16:06'
+updated_date: '2026-09-04 16:07'
 labels:
   - layering
 milestone: m-3
