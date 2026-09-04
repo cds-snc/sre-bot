@@ -110,11 +110,15 @@ class FakeDirectory:
         transitive_membership_slugs: set[str] | None = None,
         user_direct_group_slugs: set[str] | None = None,
         group_members: dict[str, list[str]] | None = None,
+        batch_members_result: OperationResult | None = None,
+        group_result_by_slug: dict[str, OperationResult] | None = None,
     ) -> None:
         self._discovered: set[str] = discovered_slugs or set()
         self._transitive: set[str] = transitive_membership_slugs or set()
         self._direct: set[str] = user_direct_group_slugs or set()
         self._members: dict[str, list[str]] = group_members or {}
+        self._batch_members_result = batch_members_result
+        self._group_result_by_slug: dict[str, OperationResult] = group_result_by_slug or {}
 
     def _make_group(self, slug: str) -> DirectoryGroup:
         return DirectoryGroup(
@@ -124,8 +128,10 @@ class FakeDirectory:
         )
 
     def get_group(self, slug: str) -> OperationResult:
-        # Groups always exist in the IDP directory; only membership is configurable.
-        # The membership question is answered by check_membership / get_user_groups.
+        # Groups always exist in the IDP directory unless a per-slug result is injected;
+        # the membership question is answered by check_membership / get_user_groups.
+        if slug in self._group_result_by_slug:
+            return self._group_result_by_slug[slug]
         return OperationResult.success(data=self._make_group(slug))
 
     def check_membership(self, group_email: str, user_email: str) -> OperationResult:
@@ -158,6 +164,8 @@ class FakeDirectory:
         group_emails: list[str],
         include_member_types: set[str] | None = None,
     ) -> OperationResult:
+        if self._batch_members_result is not None:
+            return self._batch_members_result
         result = {}
         for group_email in group_emails:
             slug = group_email.split("@")[0]
