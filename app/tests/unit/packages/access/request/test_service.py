@@ -1047,7 +1047,21 @@ def make_policy_service(directory: MagicMock) -> AccessRequestService:
         runtime_config=make_config(),
         dispatcher=FakeDispatcher(),  # type: ignore[arg-type]
         policy=ManagedGroupPolicy(prefix="sg-", domain="example.com"),
+        fallback_approver_slug="sg-org-admins",
     )
+
+
+@pytest.mark.unit
+def test_service_construction_should_require_explicit_fallback_approver_slug():
+    """The service must not supply an organization-specific fallback approver slug of its own."""
+    with pytest.raises(TypeError):
+        AccessRequestService(  # type: ignore[call-arg]
+            repository=FakeRepository(),  # type: ignore[arg-type]
+            directory=MagicMock(),
+            runtime_config=make_config(),
+            dispatcher=FakeDispatcher(),  # type: ignore[arg-type]
+            policy=ManagedGroupPolicy(prefix="sg-", domain="example.com"),
+        )
 
 
 def submit(service: AccessRequestService):
