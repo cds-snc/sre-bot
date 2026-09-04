@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-04 14:19'
+updated_date: '2026-09-04 15:33'
 labels:
   - layering
 milestone: m-3
@@ -48,3 +49,21 @@ Do the decision work before the code; this is architecture-mode work first. It i
 - [ ] #4 Each of the three existing hand-maintained domain constants is dispositioned as derived, retained-as-policy, or retired, with the disposition recorded
 - [ ] #5 mypy, ruff and the full non-smoke pytest run are green
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @task-planner
+created: 2026-09-04 15:33
+---
+ADVISORY from TASK-76.2 planning (2026-09-04). Your eventual replacement target now has a precise address.
+
+The hand-maintained owned-domain constant this task exists to retire lands, for the access feature, as AccessRuntimeConfig.dir_domain (app/packages/access/common/config/settings.py) - a REQUIRED, non-empty-validated field on the runtime config document, consumed only through ManagedGroupPolicy (app/packages/access/common/group_policy.py). It is a single domain with strict case-insensitive equality, a faithful port of the provider check at app/infrastructure/directory/google.py:466-471.
+
+Two consequences for your scope:
+- The multi-domain / subdomain gap is deliberately NOT closed in TASK-76, on the reasoning that owned-domain discovery is a new DirectoryProvider capability rather than a defect in the existing code. If that reasoning is wrong, TASK-76.2's plan flags it as assumption A3 for challenge.
+- When list_domains / primary_domain lands, the single feature-side seam to redirect is ManagedGroupPolicy.from_config, plus removing dir_domain from the runtime config document, its JSON schema (RuntimeConfigJsonModel), the ACCESS_CONFIG_ENV_DIR_DOMAIN assembly variable and packages/access/access.local.json. No other access file reads the domain directly.
+
+The other two hand-maintained copies named in TASK-76 decision D4 are unaffected by this slice: infrastructure/configuration/features/groups.py GROUP_DOMAIN (legacy) and TASK-74/75's approved-participant-domain, which is an allow-list policy rather than an identity fact.
+---
+<!-- COMMENTS:END -->

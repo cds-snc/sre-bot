@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-03 18:02'
-updated_date: '2026-09-04 14:42'
+updated_date: '2026-09-04 15:46'
 labels:
   - layering
 milestone: m-3
@@ -54,7 +54,7 @@ NOT IN SCOPE: any Google vendor-mirror work; changing the DirectoryProvider Prot
 - [ ] #3 The chosen mechanism - feature-side filtering of generic results, or an injected policy strategy - is stated in the task notes with its rationale, rather than the branching simply moving up one layer
 - [ ] #4 packages/access/catalog, packages/access/sync and packages/access/request retain their current observable behaviour, proven by their existing test suites plus the new characterization tests the slices add (the managed path has no existing coverage - see plan fact F4)
 - [ ] #5 A group outside the managed domain is returned unchanged by the generic provider and rejected (or ignored) by the feature, with a test at the feature boundary rather than the infrastructure one
-- [ ] #6 All four subtasks TASK-76.1 through TASK-76.4 are Done and the DIRECTORY_MANAGED / MANAGED_GROUP grep across terraform, Makefile and app config returns zero hits at close
+- [ ] #6 All five subtasks TASK-76.1 through TASK-76.5 are Done and the DIRECTORY_MANAGED / MANAGED_GROUP grep across terraform, Makefile and app config returns zero hits at close
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -151,5 +151,38 @@ WHAT THIS CHANGES FOR THE REMAINING SLICES:
 What F4 got right: there is no coverage of the managed path at the FEATURE boundary, and no coverage of DirectorySettings' managed fields beyond env loading. The gap is one of placement, not of existence.
 
 R1 RESEARCH OUTCOME feeding D1 (from TASK-76.1 planning, human-raised): group aliases are not a Google-only concept, so putting them on the canonical model does not couple infrastructure to one IDP. Google exposes aliases[]/nonEditableAliases[]; Microsoft Graph exposes proxyAddresses ('Email addresses for the group that direct to the same group mailbox', uppercase SMTP: marking the primary); an IDP without the concept returns empty. Full citations and the per-provider mapping obligation are in TASK-76.1's plan.
+---
+
+author: @task-planner
+created: 2026-09-04 15:32
+---
+PLAN CORRECTION AND DECISION EXTENSION from TASK-76.2 planning (2026-09-04).
+
+D3 IS FACTUALLY WRONG ON THE PREFIX. D3 states that managed_group_prefix is 'DELETED, not moved' because 'AccessRuntimeConfig.dir_prefix + dir_separator already produce this exact value through AccessGroupNaming.group_prefix'. They do not. group_prefix(platform) returns the PLATFORM-SCOPED prefix 'sg-aws-' (app/packages/access/common/naming.py:18-23), while DIRECTORY_MANAGED_GROUP_PREFIX is the ORG-WIDE 'sg-' that _extract_managed_group_email applies across all platforms (app/infrastructure/directory/google.py:277). The org-wide value has no accessor today.
+
+The conclusion survives, the mechanism changes: the value is still DERIVED from existing fields and still gets no setting, but TASK-76.2 must add AccessGroupNaming.managed_prefix (= dir_prefix + dir_separator) to expose it. Human-approved 2026-09-04. AC#2 on TASK-76.2 was reworded to name it.
+
+D6 (NEW, human-approved 2026-09-04) - THE ACCESS RUNTIME CONFIG ENFORCES ITS OWN INVARIANTS. Planning TASK-76.2 surfaced that BundleConfigLoader fabricates AccessRuntimeConfig(dir_prefix='', platforms={}) as a 'waiting mode' sentinel, i.e. the feature's own config type can represent a state the feature cannot operate in. That is the same class of latent defect D5 was written for. Human direction: 'if we state that for the feature to work, we need prefix, then we need the code to reflect the requirement... the feature is currently disabled, so it's best to fix as we make changes. we will have to take time to reassess the whole logic of the access business feature before enabling it.'
+
+So, in TASK-76.2:
+- AccessRuntimeConfig gains a __post_init__ rejecting blank dir_prefix and blank dir_domain, making an unusable config unconstructible rather than merely unloadable. This is the D3 dir_domain re-homing plus a correction to the pre-existing dir_prefix gap.
+- BundleConfigLoader returns PERMANENT_ERROR CONFIG_NOT_CONFIGURED instead of the hollow config. Verified safe: get_access_runtime_config() is only reached behind each sub-feature's enabled gate (sync/__init__.py:74-81, catalog/__init__.py:40, request/__init__.py:68; the only other caller, jobs/scheduled_tasks.py:186, is registered nowhere), so with every ACCESS_*_ENABLED false (F6) no environment loads this config at all.
+- The 'bundle' source itself is KEPT so ACCESS_CONFIG_SOURCE values, the loader factory and the READMEs are unchanged. Whether it still earns its place once it can only error is left as an open question on TASK-76.2 rather than decided.
+
+D7 (NEW) - MULTI-DOMAIN STAYS WITH TASK-79. D4 already parks dir_domain as feature-owned configuration. TASK-76.2 additionally confirms it as a SINGLE required domain with strict case-insensitive equality - a faithful port of google.py:466-471 - on the basis that multi-domain support is a new capability rather than a gap between code and intent. Flagged as an explicit assumption in TASK-76.2's plan for reviewer challenge.
+
+ALSO: F4 remains inaccurate as already noted in the 14:42 comment; TASK-76.2 needs no provider-test relocation itself, but TASK-76.3 and TASK-76.4 still do.
+---
+
+author: @task-planner
+created: 2026-09-04 15:46
+---
+NEW CHILD SLICE TASK-76.5 CREATED 2026-09-04 (human-directed, from a finding raised while planning TASK-76.2): 'Remove organization-specific defaults from access settings' (dep TASK-76.2, m-3).
+
+WHY IT SITS UNDER TASK-76. Confirming TASK-76.2's org-agnostic rule (no default for dir_domain anywhere; absent means a named startup error) surfaced the same defect class left behind in the same package: AccessRequestsSettings.manager_group_slug='sg-managers' and fallback_approver_slug='sg-org-admins' (packages/access/common/settings.py:83-84), the second duplicated as a constructor default at request/service.py:131. Each is wrong twice - an organization's own group names presented as universal defaults, and a literal re-encoding of the 'sg-' prefix that dir_prefix + dir_separator already own, which is the same second-home duplication D3 removed for the managed-group prefix.
+
+AC#6 AMENDED accordingly: the all-children bar now reads TASK-76.1 through TASK-76.5 rather than 76.1 through 76.4. The other five ACs are unchanged (restated verbatim, since --acceptance-criteria replaces the whole list). No plan rewrite: the slice sequence in the plan still describes the managed-group relocation itself, which TASK-76.5 does not change - it is adjacent cleanup parked here rather than a sixth step of the relocation.
+
+DELIBERATELY EXCLUDED FROM TASK-76.5, needs its own task with a deployment step: AWS_ADMIN_GROUPS=['sre-ifs@cds-snc.ca'] (infrastructure/configuration/features/aws_ops.py:28). Same defect class, different risk - plan fact F7 already grep-verified that no terraform or Makefile override exists, so that default is what every environment actually uses today at modules/permissions/handler.py:40. Removing it without first provisioning the value breaks a live feature, and its consumer sits in app/modules/, frozen under decisions/migration.md rule 1.
 ---
 <!-- COMMENTS:END -->
