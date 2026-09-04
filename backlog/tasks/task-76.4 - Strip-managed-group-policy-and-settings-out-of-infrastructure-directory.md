@@ -4,7 +4,7 @@ title: Strip managed-group policy and settings out of infrastructure directory
 status: To Do
 assignee: []
 created_date: '2026-09-04 14:19'
-updated_date: '2026-09-04 14:25'
+updated_date: '2026-09-04 14:43'
 labels:
   - layering
 milestone: m-3
@@ -52,3 +52,16 @@ TESTING. Provider unit tests asserting the generic contract: list_groups passes 
 - [ ] #9 The access suites from TASK-76.3 pass unmodified, and mypy, ruff and the full non-smoke pytest run are green
 - [ ] #10 The four live app/modules/ DirectoryProvider consumers enumerated in the parent plan's fact F7 (permissions/handler.py:40, reports/google_groups.py:100, dev/google.py:170-171, provisioning/users.py) are re-verified at merge time to pass fully-qualified keys, so removing the email-completion branch is a no-op for them; the verification is recorded in the task notes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-04 14:43
+---
+ADVISORY from TASK-76.1 planning (2026-09-04). Two items for your scope.
+
+1. EXISTING PROVIDER TESTS TO RELOCATE, NOT RE-AUTHOR. Coordinator plan fact F4 is wrong (correction posted on TASK-76): app/tests/unit/infrastructure/directory/test_google.py already pins the managed path, because its mock_directory_settings fixture (lines 135-142) sets managed_group_prefix='sg-' and managed_group_domain='example.com'. The assertions you must move to the feature boundary or delete with the code are: managed-alias preference (line 1075), managed-domain mismatch -> DIRECTORY_GROUP_DOMAIN_MISMATCH (line 1119), alias-aware discovery skipping an email-less group (line 1108), and the empty-query generic-mapping cases (lines 1200+, which stay and become the only behaviour). The fixture's managed settings themselves must go with the settings.
+
+2. ALIAS NORMALIZATION CHANGES UNDER YOUR D2 CUT. TASK-76.1 populates DirectoryGroup.aliases via _extract_group_aliases, which routes each alias through _normalize_email - including the bare-local-part -> {slug}@{domain} completion that D2 deletes. So removing that branch also changes how ALIASES are normalized, not just group/user keys. It is a no-op while the managed domain is empty (F2(iv)), but state it in the PR and cover it with a test: after the cut, an alias value is strip+lower only, and a bare local part stays bare. Re-run the F2 grep (DIRECTORY_MANAGED / DIRECTORY_ENFORCE / MANAGED_GROUP across terraform, Makefiles, pyproject) before merge - if any environment has set the domain, this stops being a no-op.
+---
+<!-- COMMENTS:END -->

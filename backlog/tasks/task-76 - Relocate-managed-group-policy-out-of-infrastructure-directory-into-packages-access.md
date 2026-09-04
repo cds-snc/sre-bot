@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-03 18:02'
-updated_date: '2026-09-04 14:25'
+updated_date: '2026-09-04 14:42'
 labels:
   - layering
 milestone: m-3
@@ -135,5 +135,21 @@ PLAN CORRECTED 2026-09-04. An earlier draft of this plan claimed D2's production
 What the mistake actually surfaced, now folded into the plan as fact F7: because TASK-25.1.6.4 is merged, app/modules/ consumers are ALREADY on DirectoryProvider, so D2's strict-key change has live production reach today and TASK-76.4 must verify it rather than defer it. All four live call sites were enumerated and verified to pass fully-qualified keys already (AWS_ADMIN_GROUPS has no terraform override and defaults to a full email; the other three use provider-returned emails or no key at all), which is belt-and-braces on top of F2(iv) - the completion branch is dead code while the domain is empty. A new acceptance criterion on TASK-76.4 makes that re-verification a merge-time requirement.
 
 TASK-25.1.6.5 remains To Do and keeps its advisory; it is legitimately forward-looking work.
+---
+
+created: 2026-09-04 14:42
+---
+PLAN FACT F4 IS INACCURATE - correction from planning TASK-76.1 (2026-09-04).
+
+F4 states there are NO existing tests covering the managed-group provider logic. There are. app/tests/unit/infrastructure/directory/test_google.py (1755 lines) exercises the managed path directly: the mock_directory_settings fixture (lines 135-142) sets managed_group_prefix='sg-' and managed_group_domain='example.com', so the provider fixture runs with managed policy ACTIVE, unlike every deployed environment (F2). Concretely covered today: managed-alias preference (line 1075), managed-domain mismatch returning DIRECTORY_GROUP_DOMAIN_MISMATCH (line 1119), alias-aware discovery skipping a group with no email (line 1108), and the generic empty-query mapping path including the outside-the-managed-domain case (lines 1200+).
+
+WHAT THIS CHANGES FOR THE REMAINING SLICES:
+- TASK-76.3 and TASK-76.4 must RELOCATE these existing assertions to the feature boundary (AC#5), not author characterization tests from scratch as F4 implies. The behaviour is already pinned; the question is where it is pinned.
+- TASK-76.1 must UPDATE an existing assertion, not only add new ones: test_google.py:1075 asserts full DirectoryGroup equality against a payload carrying aliases.
+- AC#4's reliance on 'existing test suites' is stronger than F4 credited for the provider half, and unchanged (weak) for the packages/access half.
+
+What F4 got right: there is no coverage of the managed path at the FEATURE boundary, and no coverage of DirectorySettings' managed fields beyond env loading. The gap is one of placement, not of existence.
+
+R1 RESEARCH OUTCOME feeding D1 (from TASK-76.1 planning, human-raised): group aliases are not a Google-only concept, so putting them on the canonical model does not couple infrastructure to one IDP. Google exposes aliases[]/nonEditableAliases[]; Microsoft Graph exposes proxyAddresses ('Email addresses for the group that direct to the same group mailbox', uppercase SMTP: marking the primary); an IDP without the concept returns empty. Full citations and the per-provider mapping obligation are in TASK-76.1's plan.
 ---
 <!-- COMMENTS:END -->

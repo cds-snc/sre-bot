@@ -4,6 +4,7 @@ title: 'Cut access catalog, sync and request onto the generic DirectoryProvider 
 status: To Do
 assignee: []
 created_date: '2026-09-04 14:18'
+updated_date: '2026-09-04 14:43'
 labels:
   - layering
 milestone: m-3
@@ -46,3 +47,14 @@ TESTING (decisions/testing.md). Protocol-conformant fakes for DirectoryProvider 
 - [ ] #6 No file under app/infrastructure/ and no file under app/modules/ is modified by this slice
 - [ ] #7 mypy, ruff and the full non-smoke pytest run are green
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-04 14:43
+---
+ADVISORY from TASK-76.1 planning (2026-09-04). Coordinator plan fact F4 is inaccurate (correction posted on TASK-76): the managed-group provider behaviour IS already pinned by app/tests/unit/infrastructure/directory/test_google.py, whose mock_directory_settings fixture (lines 135-142) runs the provider with managed_group_prefix='sg-' and managed_group_domain='example.com'. Managed-alias preference (line 1075), managed-domain mismatch (line 1119) and the alias-aware discovery skip (line 1108) are the exact behaviours your cut-over must reproduce at the feature boundary - read them as the specification instead of deriving one from scratch. What genuinely has no coverage is the packages/access side, so AC#4's 'existing test suites' still proves little there and your slice must add those tests.
+
+Enabler note: DirectoryGroup.aliases (TASK-76.1) is a tuple of IDP-reported secondary addresses, strip+lower normalized, empty when the IDP has no such concept - so any feature-side alias handling must tolerate () rather than requiring a non-empty tuple.
+---
+<!-- COMMENTS:END -->

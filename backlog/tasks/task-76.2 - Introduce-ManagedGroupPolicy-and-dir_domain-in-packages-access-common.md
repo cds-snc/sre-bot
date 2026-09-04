@@ -4,6 +4,7 @@ title: Introduce ManagedGroupPolicy and dir_domain in packages/access/common
 status: To Do
 assignee: []
 created_date: '2026-09-04 14:17'
+updated_date: '2026-09-04 14:42'
 labels:
   - layering
 milestone: m-3
@@ -50,3 +51,21 @@ TESTING (decisions/testing.md). Pure unit tests, no doubles needed for a value o
 - [ ] #6 No file under app/infrastructure/ is modified by this slice
 - [ ] #7 mypy, ruff and the full non-smoke pytest run are green
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-04 14:42
+---
+ADVISORY from TASK-76.1 planning (2026-09-04).
+
+The enabler you depend on is now specified. DirectoryGroup gains 'aliases: tuple[str, ...] = ()' - IDP-reported SECONDARY routing addresses, never repeating group_email, normalized strip+lower, in IDP-reported order with duplicates removed. It is populated by BOTH the generic and managed Google mappers, so ManagedGroupPolicy sees the same alias values _extract_managed_group_email and _matches_managed_group_prefix consume inside the provider today.
+
+THREE CONSTRAINTS FOR YOUR POLICY:
+1. Treat an empty tuple as legitimate, never as an error: an IDP with no alias concept (Okta) or a provider that has not implemented the mapping returns (). The policy must then fall back to the primary email, which is what today's _extract_managed_group_email does anyway when no alias matches the prefix.
+2. Alias ORDER is the IDP's, and Google's merge puts editable aliases[] before nonEditableAliases[]. If your alias-preference rule needs determinism beyond 'first match wins on the provider's order', state the ordering rule explicitly in the policy rather than relying on the tuple.
+3. nonEditableAliases (domain-mirror addresses outside the primary domain, e.g. the *.test-google-a.com forms) are merged into the same tuple. Your prefix+domain filter is what excludes them - a prefix-only match would let them through, which the provider's current logic also guards against by checking the domain.
+
+Also relevant to your dir_domain work: TASK-76.1's research confirmed both major IDPs expose group aliases (Google aliases[]/nonEditableAliases[]; Entra proxyAddresses), so the policy's alias handling is portable - but the OWNED-DOMAIN question remains hand-maintained configuration until TASK-79 lands, exactly as coordinator decision D4 records.
+---
+<!-- COMMENTS:END -->
