@@ -3,10 +3,11 @@ id: TASK-25.1.6.4
 title: >-
   Migrate permissions, provisioning-users and reports Directory call sites onto
   DirectoryProvider
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-02 15:00'
-updated_date: '2026-09-03 21:40'
+updated_date: '2026-09-03 23:57'
 labels:
   - clients
   - phase-3
@@ -54,15 +55,15 @@ TESTS: the two legacy files move into the unit tree per decisions/testing.md, an
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 modules/permissions/handler.py resolves DirectoryProvider via get_directory_provider() and uses get_group_members at its one surviving call site (is_user_member_of_groups); get_authorizers_from_groups is deleted with its tests as dead code; the module no longer imports integrations.google_workspace
-- [ ] #2 modules/provisioning/users.py calls the unbounded list_users() with no arguments and a test proves it returns more users than the retired 100-item default limit would have allowed (no silent truncation of the directory sync)
-- [ ] #3 modules/reports/google_groups.py's two Directory call sites use DirectoryProvider via get_directory_provider(); its Sheets and Drive call sites, and the time.sleep pacer that protects them, are untouched by this task
-- [ ] #4 Every migrated call site handles the OperationResult error branch explicitly and fail-loud - no bare is_success ignore, no blanket except Exception around a Directory call, no googleapiclient exception type crossing the boundary - and each error branch has a test asserting the module-local exception and its preserved error_code
-- [ ] #5 Google-shaped raw dicts no longer reach these three modules: they consume DirectoryUser/DirectoryGroup/DirectoryMember attributes, with field mappings verified against TASK-25.1.6.3's recorded field inventory, and None-valued name/role fields are handled explicitly
-- [ ] #6 TASK-25.1.6.1's characterization tests for modules/reports/google_groups.py pass with the mock seam translated to a DirectoryProvider double and no behavioural assertion weakened; every intentional behaviour change is named in the task notes and the PR
-- [ ] #7 integrations/google_workspace/google_directory.py still exists after this task (TASK-25.1.6.5 deletes it) but has exactly one remaining production consumer: modules/provisioning/groups.py
-- [ ] #8 modules/aws/identity_center.py::provision_aws_users builds its create_user payload explicitly from DirectoryUser attributes instead of via filters.preformat_items on Google dict keys, matches requested emails case-insensitively, and leaves its delete branch and synchronize()'s group-sourced user path unchanged
-- [ ] #9 The DirectoryProvider Protocol docstring documents both halves of the email-normalisation contract - that returned DirectoryUser/DirectoryMember/DirectoryGroup emails are lowercased, not just method arguments - and warns consumers comparing them against externally-sourced addresses to compare case-insensitively; the change to app/infrastructure/ is docstring-only, verified by git diff
+- [x] #1 modules/permissions/handler.py resolves DirectoryProvider via get_directory_provider() and uses get_group_members at its one surviving call site (is_user_member_of_groups); get_authorizers_from_groups is deleted with its tests as dead code; the module no longer imports integrations.google_workspace
+- [x] #2 modules/provisioning/users.py calls the unbounded list_users() with no arguments and a test proves it returns more users than the retired 100-item default limit would have allowed (no silent truncation of the directory sync)
+- [x] #3 modules/reports/google_groups.py's two Directory call sites use DirectoryProvider via get_directory_provider(); its Sheets and Drive call sites, and the time.sleep pacer that protects them, are untouched by this task
+- [x] #4 Every migrated call site handles the OperationResult error branch explicitly and fail-loud - no bare is_success ignore, no blanket except Exception around a Directory call, no googleapiclient exception type crossing the boundary - and each error branch has a test asserting the module-local exception and its preserved error_code
+- [x] #5 Google-shaped raw dicts no longer reach these three modules: they consume DirectoryUser/DirectoryGroup/DirectoryMember attributes, with field mappings verified against TASK-25.1.6.3's recorded field inventory, and None-valued name/role fields are handled explicitly
+- [x] #6 TASK-25.1.6.1's characterization tests for modules/reports/google_groups.py pass with the mock seam translated to a DirectoryProvider double and no behavioural assertion weakened; every intentional behaviour change is named in the task notes and the PR
+- [x] #7 integrations/google_workspace/google_directory.py still exists after this task (TASK-25.1.6.5 deletes it) but has exactly one remaining production consumer: modules/provisioning/groups.py
+- [x] #8 modules/aws/identity_center.py::provision_aws_users builds its create_user payload explicitly from DirectoryUser attributes instead of via filters.preformat_items on Google dict keys, matches requested emails case-insensitively, and leaves its delete branch and synchronize()'s group-sourced user path unchanged
+- [x] #9 The DirectoryProvider Protocol docstring documents both halves of the email-normalisation contract - that returned DirectoryUser/DirectoryMember/DirectoryGroup emails are lowercased, not just method arguments - and warns consumers comparing them against externally-sourced addresses to compare case-insensitively; the change to app/infrastructure/ is docstring-only, verified by git diff
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -200,6 +201,34 @@ Runtime surfaces affected: the /aws groups and /aws users Slack permission gate,
 Rollback: revert the single PR. google_directory.py still exists with all its functions, so nothing downstream is orphaned.
 SIZE GATE: approximately 100 production LOC across 4 behavioural files plus one docstring edit, in one subsystem -- comfortably inside a single reviewable PR. No decomposition required.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTED 2026-09-03. All quality gates green (ruff check, ruff format, mypy shows no errors in any touched file, full pytest suite via make test all green).
+
+PRODUCTION CHANGES (5 files, ~100 LOC):
+- modules/permissions/handler.py: get_authorizers_from_groups DELETED (zero production callers). is_user_member_of_groups now resolves get_directory_provider() and calls get_group_members per key, typed (list[str]) -> bool. New module-local PermissionCheckError(group_key, message, error_code). No integrations.google_workspace import remains.
+- modules/provisioning/users.py: google branch calls get_directory_provider().list_users() with NO arguments (unbounded) and returns list[DirectoryUser]; non-success raises module-local DirectoryUsersUnavailableError carrying error_code. aws branch, processing_filters loop and completion log untouched.
+- modules/aws/identity_center.py::provision_aws_users create branch: the four filters.preformat_items calls replaced by one explicit payload comprehension over DirectoryUser attributes; requested emails matched against a lowercased set. Delete branch and synchronize() untouched.
+- modules/reports/google_groups.py: google_directory dropped from the integrations import (google_drive/sheets untouched); provider resolved once; list_groups() unbounded; per-group get_group_members loop retained (no batching, per D4); (group, members) accumulated in a local list since DirectoryGroup is frozen; both error branches raise module-local DirectoryReportError. time.sleep(1.1) pacer left in place (D6, retires with TASK-25.1.6.10).
+- infrastructure/directory/provider.py: DOCSTRING ONLY. DirectoryProvider docstring now states both halves of the email-normalisation contract (returned emails are lowercased too) and tells consumers to compare case-insensitively. Verified docstring-only by git diff.
+
+INTENTIONAL BEHAVIOUR CHANGES (name these in the PR):
+1. is_user_member_of_groups short-circuits on the first match, so fewer Directory calls and a failure in a later group no longer aborts a check that already succeeded.
+2. The membership comparison is now case-insensitive (provider lowercases), fixing a latent casing bug.
+3. Vendor exceptions no longer cross these boundaries: PermissionCheckError / DirectoryUsersUnavailableError / DirectoryReportError replace googleapiclient HttpError propagation.
+4. A nameless group no longer raises KeyError; it is excluded-checked against '' and titled by its group_email (A3).
+5. A member with role=None writes an empty cell rather than raising (A2).
+6. Group ordering is now API order because the provider does not pass orderBy='email' (D7, recorded on TASK-25.1.6.11).
+7. AWS Identity Center create_user now receives lowercased emails (A1, mitigated by case-insensitive matching; residual legacy sync path closes in TASK-25.1.6.5).
+
+TEST EVIDENCE: tests/unit/modules/permissions/test_permissions_handler.py (new), tests/unit/modules/provisioning/test_provisioning_users.py (moved from tests/modules), tests/unit/modules/reports/test_google_groups_report.py (seam translated to a DirectoryProvider fake; TestGenerateGroupMembersReportBehaviour passes with fixture-shape changes only; the two Directory failure cases keep their pytest.raises shape with only the trigger translated), tests/unit/modules/aws/test_identity_center_handler.py (create-path cases now use DirectoryUser; added mixed-case match and explicit-payload cases). Legacy app/tests/modules/permissions/test_handler.py and app/tests/modules/provisioning/test_provisioning_users.py deleted; no new files under app/tests/modules/**.
+
+AC#7 GREP EVIDENCE: integrations/google_workspace/google_directory.py still exists; the only remaining production consumer is modules/provisioning/groups.py:4/:50 (TASK-25.1.6.5 deletes both).
+
+LEFT FOR HUMAN VERIFICATION: DoD sign-off, PR review, and moving the task to Done.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
