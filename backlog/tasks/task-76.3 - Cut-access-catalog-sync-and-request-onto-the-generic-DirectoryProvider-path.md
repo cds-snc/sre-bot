@@ -1,0 +1,48 @@
+---
+id: TASK-76.3
+title: 'Cut access catalog, sync and request onto the generic DirectoryProvider path'
+status: To Do
+assignee: []
+created_date: '2026-09-04 14:18'
+labels:
+  - layering
+milestone: m-3
+dependencies:
+  - TASK-76.2
+parent_task_id: TASK-76
+priority: medium
+ordinal: 150000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Slice 3 of TASK-76 (see the coordinator plan, decisions D1, D2, D5). The behaviour-bearing slice. Feature-only: after it, packages/access no longer relies on any managed-group behaviour from the provider, but the provider still carries that behaviour unused until TASK-76.4 deletes it. That is what keeps this PR green on its own without a shim.
+
+CALL SITES to move (plan fact F5), each through ManagedGroupPolicy from TASK-76.2:
+- app/packages/access/catalog/service.py:144 - list_groups(query=prefix) becomes a generic listing plus policy.matches_prefix filtering, with policy.canonical_slug driving the slug the entitlement derivation uses (service.py:157 onward). Note the prefix query path is inert today (plan fact F2) so the server-side-query-to-client-filter change is not a regression.
+- app/packages/access/sync/desired_state.py:221 discover_group_slugs - same treatment. Careful: TASK-78 recently changed this method to return OperationResult and propagate list_groups failures. Preserve that contract exactly; do not reintroduce an empty-set fallback.
+- app/packages/access/sync/desired_state.py:130 and :155 - get_group(slug) becomes get_group(policy.group_key(slug)).
+- app/packages/access/request/service.py:187 - same get_group key composition.
+- app/packages/access/request/policies.py:93 and :102 - get_group_members already passes a full group_email at :93; the fallback_slug at :102 must be composed through policy.group_key.
+- get_user_groups: the provider currently filters results to the managed domain via _build_managed_group (google.py:1097). That filter moves to the access consumer through policy.is_managed. Identify every access-side consumer of get_user_groups before changing it and cover each.
+
+DECISION TO MAKE AND RECORD IN NOTES: whether an out-of-domain group is an ERROR or an OMISSION at each feature call site. The provider today returns DIRECTORY_GROUP_DOMAIN_MISMATCH (a hard error) from the mapper, which for a LIST operation means one stray group fails the whole listing. Parent AC#5 explicitly allows either rejected or ignored. Recommended and to be confirmed during implementation: OMIT with a warning log for list-shaped operations (discovery must not be taken down by one unrelated group), ERROR for get-shaped operations (an explicitly requested group being out of domain is a real fault). State the choice and rationale in the notes.
+
+PERFORMANCE. Generic listing plus client-side filtering fetches every group and filters locally. This is not a regression: the managed path already did exactly that (full unfiltered list plus _matches_managed_group_prefix), and per plan fact F2 the server-side query path is the one in use today. If the unfiltered listing is judged too costly for catalog and sync, raise it as a follow-up rather than reintroducing provider-side policy.
+
+NOT IN SCOPE. Deleting anything under app/infrastructure/ (TASK-76.4). Touching app/modules/provisioning, which is frozen under decisions/migration.md rule 1.
+
+TESTING (decisions/testing.md). Protocol-conformant fakes for DirectoryProvider - not MagicMock - returning DirectoryGroup values including aliases and out-of-domain entries. Assertions at the feature boundary: catalog entitlement listing, sync discovery and platform state, request submission. Keep the existing access suites green; where an existing test asserted provider-side managed behaviour, move that assertion to the feature boundary rather than deleting it.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 catalog, sync and request obtain canonical group email, slug, prefix matching and group keys exclusively through ManagedGroupPolicy; no access-side call passes a bare slug to DirectoryProvider
+- [ ] #2 sync discover_group_slugs keeps the OperationResult failure-propagation contract introduced by TASK-78, with a test proving an IDP failure still propagates rather than yielding an empty set
+- [ ] #3 The error-versus-omission decision for out-of-domain groups is made per call-site shape, implemented, and recorded with its rationale in the task notes
+- [ ] #4 Every access-side consumer of get_user_groups applies the managed-domain filter feature-side, covered by tests
+- [ ] #5 The existing access catalog, sync and request suites pass, with any provider-side managed assertions relocated to the feature boundary rather than dropped
+- [ ] #6 No file under app/infrastructure/ and no file under app/modules/ is modified by this slice
+- [ ] #7 mypy, ruff and the full non-smoke pytest run are green
+<!-- AC:END -->
