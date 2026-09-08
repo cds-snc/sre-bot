@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:32'
-updated_date: '2026-09-02 15:06'
+updated_date: '2026-09-08 14:44'
 labels:
   - clients
   - phase-3
@@ -69,5 +69,15 @@ Do not add new functions to those six modules, and do not extend them beyond wha
 AC#1's parenthetical remains stale in the same way the 2026-09-02 13:30 comment describes: read "both slated for TASK-23 deletion" as "google_service.py is deleted by TASK-25.1.7".
 
 TASK-25.1.6 is now the retirement coordinator (retitled, raised to high) with eleven children covering the characterization-test gate, the pure-helper relocation, the three Directory slices, the incident_draft Docs half, the four legacy-incident adapter slices, and the final helper-deletion plus CI guardrail. This coordinator therefore still has seven direct children; the growth is all under .6.
+---
+
+created: 2026-09-08 14:37
+---
+COORDINATOR ORDER UPDATE (2026-09-08): the surface migrations .1.1-.1.5 and .1.5.1 are complete. The remaining closeout is governed by TASK-25.1.6: .6.6 -> .6.7 -> .6.8 -> .6.9 -> .6.10 -> .1.7 -> .6.11. TASK-25.1.7 is now dependency-gated behind .6.10, and .6.11 is dependency-gated behind .1.7. Do not close TASK-25.1 on the earlier dispatcher grep alone: require the final .6.11 export-contract and guardrail checks, with focused validation after each migration and the full non-smoke suite before final cleanup.
+---
+
+created: 2026-09-08 14:44
+---
+SCOPE UPDATE (2026-09-08): the unused legacy Google Groups report is removed from the migration goal. TASK-25.1.6.10 deletes modules/reports/google_groups.py and its tests; any future reporting capability must be a new business feature. TASK-25.1.6.8 and .10 therefore migrate only live consumers.
 ---
 <!-- COMMENTS:END -->

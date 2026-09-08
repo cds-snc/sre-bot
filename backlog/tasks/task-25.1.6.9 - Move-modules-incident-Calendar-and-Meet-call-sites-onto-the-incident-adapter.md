@@ -4,12 +4,13 @@ title: Move modules incident Calendar and Meet call sites onto the incident adap
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:03'
+updated_date: '2026-09-08 14:37'
 labels:
   - clients
   - phase-3
 milestone: m-3
 dependencies:
-  - TASK-25.1.6.7
+  - TASK-25.1.6.8
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
@@ -42,3 +43,12 @@ WATCH: core.py's existing try/except around create_space predates classification
 - [ ] #4 core.py's pre-existing try/except around create_space is either kept with a stated reason or removed as now-duplicated adapter handling; the choice is recorded in the notes and covered by a test
 - [ ] #5 Existing test_schedule_retro.py, test_incident_core.py and test_meet.py coverage is preserved at the new boundary, including the delegated_user_email pass-through and HttpError propagation cases TASK-25.1.1 added
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-08 14:37
+---
+ORDERING UPDATE (2026-09-08): run after .6.8. The Calendar/Meet adapter migration is serialized behind Drive because both are legacy incident-module changes and the shared adapter boundary should be validated one slice at a time.
+---
+<!-- COMMENTS:END -->

@@ -24,7 +24,7 @@ from googleapiclient.errors import HttpError
 
 from infrastructure.configuration.integrations.google import get_google_resources_config
 from integrations.google_workspace import client as google_workspace_client
-from integrations.google_workspace import google_docs, google_drive
+from integrations.google_workspace import google_drive
 from packages.incident_draft.domain import (
     DocumentField,
     DocumentSection,
@@ -33,11 +33,17 @@ from packages.incident_draft.domain import (
 )
 
 if TYPE_CHECKING:
+    from googleapiclient._apis.docs.v1 import (  # pyright: ignore[reportMissingModuleSource]
+        BatchUpdateDocumentRequest,
+        Document,
+    )
     from googleapiclient._apis.drive.v3 import File  # pyright: ignore[reportMissingModuleSource]
 
 logger = structlog.get_logger()
 
 _DRAFT_TITLE_SUFFIX = " - AI draft"
+# Kept local because this adapter must not import the legacy google_docs module.
+_DOCS_SCOPES = ["https://www.googleapis.com/auth/documents"]
 _SUBHEADING_STYLE = "HEADING_3"
 # The line marking where the SRE bot's generated timeline begins.
 # ``modules.incident`` locates the timeline by this exact string to append
@@ -146,16 +152,29 @@ class GoogleDocsIncidentDocument:
         boilerplate: title, status, metadata table). Returns an empty list when
         the document cannot be fetched.
         """
-        document = google_docs.get_document(document_id)
+        service = google_workspace_client.get_docs_service(scopes=_DOCS_SCOPES)
+        try:
+            document: Document = service.documents().get(documentId=document_id).execute()
+        except HttpError as exc:
+            status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
+            logger.warning(
+                "incident_draft_document_fetch_failed",
+                document_id=document_id,
+                status=status.value,
+                error_code=error_code,
+                retry_after=retry_after,
+            )
+            return []
         if not isinstance(document, dict):
             logger.warning("incident_draft_document_fetch_failed", document_id=document_id)
             return []
+        document_data = cast("dict[str, Any]", document)
 
         sections: list[DocumentSection] = []
         heading: str | None = None
         instruction_parts: list[str] = []
 
-        for element in _body_content(document):
+        for element in _body_content(document_data):
             paragraph = element.get("paragraph")
             if not paragraph:
                 continue
@@ -212,17 +231,42 @@ class GoogleDocsIncidentDocument:
         if not document_id:
             return None
 
-        document = google_docs.get_document(document_id)
+        service = google_workspace_client.get_docs_service(scopes=_DOCS_SCOPES)
+        try:
+            document: Document = service.documents().get(documentId=document_id).execute()
+        except HttpError as exc:
+            status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
+            logger.warning(
+                "incident_draft_draft_fetch_failed",
+                document_id=document_id,
+                status=status.value,
+                error_code=error_code,
+                retry_after=retry_after,
+            )
+            return None
         if not isinstance(document, dict):
             logger.warning("incident_draft_draft_fetch_failed", document_id=document_id)
             return None
+        document_data = cast("dict[str, Any]", document)
 
-        requests = _fill_section_requests(document, drafts, fields, links)
+        requests = _fill_section_requests(document_data, drafts, fields, links)
         if not requests:
             logger.warning("incident_draft_no_sections_filled", document_id=document_id)
             return None
 
-        result = google_docs.batch_update(document_id, requests)
+        body = cast("BatchUpdateDocumentRequest", {"requests": requests})
+        try:
+            result = service.documents().batchUpdate(documentId=document_id, body=body).execute()
+        except HttpError as exc:
+            status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
+            logger.warning(
+                "incident_draft_populate_failed",
+                document_id=document_id,
+                status=status.value,
+                error_code=error_code,
+                retry_after=retry_after,
+            )
+            return None
         if not isinstance(result, dict):
             logger.warning("incident_draft_populate_failed", document_id=document_id)
             return None
