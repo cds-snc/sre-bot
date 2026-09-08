@@ -2,17 +2,20 @@
 
 from collections.abc import Callable
 from functools import cache
-from typing import Any
+from typing import TYPE_CHECKING
 
 from infrastructure.drive.google import GoogleDriveProvider
 from infrastructure.drive.provider import DriveProvider
 from infrastructure.drive.settings import DriveSettings, get_drive_settings
 from integrations.google_workspace.client import get_drive_service
 
+if TYPE_CHECKING:
+    from googleapiclient._apis.drive.v3 import DriveResource  # pyright: ignore[reportMissingModuleSource]
+
 
 def build_google_drive_provider(
     *,
-    get_service: Callable[[list[str], str | None], Any],
+    get_service: Callable[[list[str], str | None], DriveResource],
     drive_settings: DriveSettings,
 ) -> DriveProvider:
     """Build a Google Drive provider with an injected service factory."""

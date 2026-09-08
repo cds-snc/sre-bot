@@ -1,7 +1,7 @@
 """Google Workspace implementation of the DriveProvider contract."""
 
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from googleapiclient.errors import HttpError
@@ -17,11 +17,14 @@ _NUM_RETRIES = 3
 
 logger = structlog.get_logger()
 
+if TYPE_CHECKING:
+    from googleapiclient._apis.drive.v3 import DriveResource  # pyright: ignore[reportMissingModuleSource]
+
 
 class GoogleDriveProvider:
     """DriveProvider backed by the Google Drive API."""
 
-    def __init__(self, get_service: Callable[[list[str], str | None], Any], drive_settings: DriveSettings) -> None:
+    def __init__(self, get_service: Callable[[list[str], str | None], DriveResource], drive_settings: DriveSettings) -> None:
         self._get_service = get_service
         self._drive_settings = drive_settings
 
@@ -42,7 +45,7 @@ class GoogleDriveProvider:
         except HttpError as exc:
             return self._map_sdk_exception(exc, operation)
 
-    def _build_drive_file(self, payload: dict[str, Any]) -> DriveFile:
+    def _build_drive_file(self, payload: Mapping[str, Any]) -> DriveFile:
         raw_parents = payload.get("parents")
         parents = tuple(str(parent) for parent in raw_parents if parent) if isinstance(raw_parents, list) else ()
         return DriveFile(
@@ -53,7 +56,7 @@ class GoogleDriveProvider:
             provider="google",
         )
 
-    def _service(self, delegated_user_email: str | None) -> Any:
+    def _service(self, delegated_user_email: str | None) -> DriveResource:
         return self._get_service(DRIVE_SCOPES, delegated_user_email)
 
     def _collect_files(self, files_resource: Any, request: Any) -> list[dict[str, Any]]:

@@ -19,23 +19,19 @@ class DriveProvider(Protocol):
         ...
 
     def create_folder(
-        self, name: str, parent_folder_id: str, *, fields: str | None = None, delegated_user_email: str | None = None
+        self, name: str, parent_folder_id: str, *, delegated_user_email: str | None = None
     ) -> OperationResult[DriveFile]: ...
 
     def list_folders(
         self,
         parent_folder_id: str,
-        query: str | None = None,
         *,
-        fields: str | None = None,
         delegated_user_email: str | None = None,
     ) -> OperationResult[list[DriveFile]]:
         """List folders directly within a parent folder."""
         ...
 
-    def list_files(
-        self, parent_folder_id: str, *, fields: str | None = None, delegated_user_email: str | None = None
-    ) -> OperationResult[list[DriveFile]]:
+    def list_files(self, parent_folder_id: str, *, delegated_user_email: str | None = None) -> OperationResult[list[DriveFile]]:
         """List non-folder files directly within a parent folder."""
         ...
 
@@ -44,7 +40,6 @@ class DriveProvider(Protocol):
         name: str,
         parent_folder_id: str | None = None,
         *,
-        fields: str | None = None,
         delegated_user_email: str | None = None,
     ) -> OperationResult[list[DriveFile]]: ...
 
@@ -54,7 +49,6 @@ class DriveProvider(Protocol):
         parent_folder_id: str,
         template_id: str,
         *,
-        fields: str | None = None,
         delegated_user_email: str | None = None,
     ) -> OperationResult[DriveFile]: ...
 
