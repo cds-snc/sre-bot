@@ -4,13 +4,14 @@ title: Delete the orphaned google_service.py dispatcher module
 status: To Do
 assignee: []
 created_date: '2026-09-02 13:26'
+updated_date: '2026-09-08 14:37'
 labels:
   - clients
   - phase-3
   - cleanup
 milestone: m-3
 dependencies:
-  - TASK-25.1.5
+  - TASK-25.1.6.10
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
@@ -39,3 +40,12 @@ Scope: pure deletion. Delete the module and its test file; prune "integrations/g
 - [ ] #3 decisions/sdk-typing.md's Google-side Checks are verified green: no string-dispatch and no docstring-based parameter discovery remain anywhere in app/integrations/google_workspace/
 - [ ] #4 make test is green with no behavior change; the assertion in tests/integrations/google_workspace/test_sheets.py:250 is updated or removed as appropriate
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-08 14:37
+---
+ORDERING UPDATE (2026-09-08): dispatcher deletion is the penultimate destructive step, after every legacy Google surface migration (.6.6-.6.10) has landed. It remains pure deletion, but delaying it keeps rollback and final package verification straightforward.
+---
+<!-- COMMENTS:END -->

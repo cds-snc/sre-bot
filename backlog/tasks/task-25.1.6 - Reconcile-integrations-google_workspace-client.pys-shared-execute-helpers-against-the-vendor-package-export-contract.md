@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 15:31'
-updated_date: '2026-09-03 18:03'
+updated_date: '2026-09-08 14:44'
 labels:
   - clients
   - phase-3
@@ -267,5 +267,15 @@ THREE FINDINGS FROM THAT PLANNING THAT AFFECT THIS COORDINATOR.
 2. TWO DEFECTS FOUND IN THE SURVIVING PROVIDER, i.e. in the side this coordinator decided keeps living. (a) list_users' limit is a post-hoc slice applied after walking EVERY page (google.py:402 then :418), so list_users(limit=3) pulls the whole directory today; fixed by Slice A. (b) get_group_members_batch ignores nextPageToken and silently truncates any group past the first page; fixed by Slice B. Both predate this work and neither is caused by the mirror retirement - worth knowing that 'the provider is the better of the two' (your 2026-09-02 Directory decision) was true but not defect-free.
 
 3. TWO FOLLOW-UPS CREATED OUTSIDE THIS COORDINATOR'S TREE, both deliberately NOT children of TASK-25.1.6 because neither is Google vendor-mirror work: TASK-76 (relocate managed-group prefix/domain policy out of infrastructure/directory into packages/access - the layering correction behind Slice A's mapper split, gated on TASK-25.1.6.3) and TASK-77 (safety review of packages/access/sync/desired_state.py:163 swallowing an IDP batch failure and returning an empty desired state).
+---
+
+created: 2026-09-08 14:37
+---
+RISK-CONTROLLED EXECUTION ORDER (2026-09-08): completed prerequisites are .6.1 characterization gate, .6.2 helper relocation, .6.3/.3.1 Directory capability work, .6.4/.6.5 Directory consumer migration and google_directory deletion, .6.12 A1 report bug fix, plus parent .1.1-.5 and .1.5.1 surface migrations. Remaining order is strictly: (1) .6.6 inline incident_draft Docs construction/classification; (2) .6.7 build the incident Docs adapter and migrate legacy incident Docs callers; (3) .6.8 migrate legacy Drive callers; (4) .6.9 migrate Calendar/Meet callers; (5) .6.10 migrate Sheets callers; (6) .7 delete orphaned google_service.py; (7) .6.11 delete execute_google_api_request, resolve execute_batch_request, verify the exact vendor export contract, and install the CI guardrail. Keep one slice per PR and run focused tests plus ruff/mypy/check_sdk_typing after each; run the full non-smoke suite before .6.11. The sequence is intentionally serialized because .6.7-.10 touch shared legacy modules and .6.11 is only meaningful after all deletions are complete.
+---
+
+created: 2026-09-08 14:44
+---
+SCOPE UPDATE (2026-09-08): the legacy modules/reports/google_groups.py feature is unused and will be deleted, not migrated. TASK-25.1.6.10 now owns that simple deletion alongside the live incident-folder and AWS-spending Sheets migration; no replacement reporting feature is part of TASK-25.1.
 ---
 <!-- COMMENTS:END -->

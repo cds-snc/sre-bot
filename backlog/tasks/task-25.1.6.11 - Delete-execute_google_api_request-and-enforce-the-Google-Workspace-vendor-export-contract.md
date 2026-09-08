@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:04'
-updated_date: '2026-09-03 21:30'
+updated_date: '2026-09-08 14:37'
 labels:
   - clients
   - phase-3
@@ -14,9 +14,11 @@ labels:
 milestone: m-3
 dependencies:
   - TASK-25.1.6.5
+  - TASK-25.1.6.7
   - TASK-25.1.6.8
   - TASK-25.1.6.9
   - TASK-25.1.6.10
+  - TASK-25.1.7
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
@@ -93,5 +95,10 @@ CONSEQUENCE. After TASK-25.1.6.4 repoints the legacy consumers, modules/reports/
 HUMAN DECISION (2026-09-03): NOT fixed in .4 - that slice touches app/modules/ only and does not modify the provider. Recorded as a finding, named in .4's PR, and left for this sweep to decide: either add orderBy="email" to the provider's two list builders for parity, or accept API order and delete this note. If you add it, verify against the Admin SDK docs which orderBy values each endpoint accepts rather than assuming symmetry between users.list and groups.list.
 
 ALSO, SMALLER: this task's AC#6 branch about execute_batch_request was already discharged by TASK-25.1.6.3.1 (the orchestration moved into the provider), per the note left on this task on 2026-09-03.
+---
+
+created: 2026-09-08 14:37
+---
+ORDERING UPDATE (2026-09-08): final closeout depends on TASK-25.1.7. The export-contract guardrail must observe google_service.py and all mirror modules already removed; it is the last task in the Google Workspace sequence.
 ---
 <!-- COMMENTS:END -->
