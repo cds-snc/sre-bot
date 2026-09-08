@@ -426,7 +426,7 @@ def test_copy_template_failure_aborts_before_channel_creation(
 
     role.role_view_handler(ack, body, say, client)
 
-    bound_logger.error.assert_any_call("talent_role_document_copy_failed", document_name="Scoring Guide")
+    bound_logger.error.assert_any_call("talent_role_document_copy_failed", document_name="Core Values Interview Notes")
     client.conversations_create.assert_not_called()
 
 

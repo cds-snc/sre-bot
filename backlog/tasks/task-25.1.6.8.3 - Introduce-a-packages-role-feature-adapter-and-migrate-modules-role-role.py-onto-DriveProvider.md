@@ -3,10 +3,11 @@ id: TASK-25.1.6.8.3
 title: >-
   Introduce a packages/role feature adapter and migrate modules/role/role.py
   onto DriveProvider
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-08 18:58'
-updated_date: '2026-09-08 23:21'
+updated_date: '2026-09-08 23:26'
 labels:
   - clients
   - phase-3

@@ -9,9 +9,7 @@ def test_create_role_folder_success(mock_get_provider):
     from packages.talent.adapters import google_drive
 
     provider = MagicMock()
-    provider.create_folder.return_value = OperationResult.success(
-        data=DriveFile(id="folder-1", name="Alpha")
-    )
+    provider.create_folder.return_value = OperationResult.success(data=DriveFile(id="folder-1", name="Alpha"))
     mock_get_provider.return_value = provider
 
     result = google_drive.create_role_folder("Alpha", "parent-folder")
@@ -43,9 +41,7 @@ def test_copy_template_to_role_folder_success(mock_get_provider):
     from packages.talent.adapters import google_drive
 
     provider = MagicMock()
-    provider.copy_file_to_folder.return_value = OperationResult.success(
-        data=DriveFile(id="copy-1", name="copy-name")
-    )
+    provider.copy_file_to_folder.return_value = OperationResult.success(data=DriveFile(id="copy-1", name="copy-name"))
     mock_get_provider.return_value = provider
 
     result = google_drive.copy_template_to_role_folder(
