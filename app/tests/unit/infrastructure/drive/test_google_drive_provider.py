@@ -1,8 +1,8 @@
 """Behavior contract for the Google-backed DriveProvider implementation."""
 
+from dataclasses import FrozenInstanceError
 from unittest.mock import MagicMock
 
-import httplib2
 import pytest
 from googleapiclient.errors import HttpError
 
@@ -65,7 +65,8 @@ def test_list_folders_paginates_across_multiple_pages(provider, drive_service):
 
     assert result.is_success
     assert [item.id for item in result.data] == ["f-1", "f-2"]
-    assert files_resource.list.call_count == 2
+    files_resource.list.assert_called_once()
+    assert files_resource.list_next.call_count == 2
 
 
 def test_copy_file_to_folder_uses_copy_then_move_sequence(provider, drive_service):

@@ -3,10 +3,11 @@ id: TASK-25.1.6.8.1
 title: >-
   Build a DriveProvider infrastructure capability (Protocol, Google
   implementation, settings, factory)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-08 18:55'
-updated_date: '2026-09-08 18:56'
+updated_date: '2026-09-08 19:49'
 labels:
   - clients
   - phase-3
@@ -63,11 +64,11 @@ FACTORY: `get_drive_provider()` singleton via `@cache`, mirrors `get_directory_p
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 infrastructure/drive/provider.py defines a runtime_checkable DriveProvider Protocol with warmup, health_check, create_folder, list_folders, list_files, find_files_by_name, create_file_from_template, copy_file_to_folder, get_metadata, set_metadata_property, delete_metadata_property, all OperationResult-wrapped
-- [ ] #2 infrastructure/drive/models.py defines a single frozen DriveFile dataclass used for both files and folders; no separate Folder type
+- [x] #2 infrastructure/drive/models.py defines a single frozen DriveFile dataclass used for both files and folders; no separate Folder type
 - [ ] #3 infrastructure/drive/google.py::GoogleDriveProvider implements the Protocol via integrations.google_workspace.client.get_drive_service, classifies HttpError with classify_google_error, and preserves today's q-DSL query composition, list_next pagination, and copy-then-move composition byte-for-byte
 - [ ] #4 infrastructure/drive/settings.py::DriveSettings (InfrastructureSettings) and infrastructure/drive/factory.py::get_drive_provider() (cached singleton) exist, mirroring infrastructure/directory's settings+factory shape
 - [ ] #5 app/integrations/google_workspace/google_drive.py is untouched and still exists; no consumer file is modified by this task
-- [ ] #6 Unit tests cover GoogleDriveProvider (success, HttpError classification, pagination across multiple pages, copy-then-move) plus settings and factory construction
+- [x] #6 Unit tests cover GoogleDriveProvider (success, HttpError classification, pagination across multiple pages, copy-then-move) plus settings and factory construction
 - [ ] #7 mypy, ruff, and app/bin/check_sdk_typing.py pass for the new package
 <!-- AC:END -->
 
@@ -120,3 +121,9 @@ DOUBTS FOR HUMAN REVIEW (not resolved unilaterally):
 (a) warmup()/health_check() semantics above are a best-effort mirror of DirectoryProvider's contract; DriveResource's stub surface must be checked for a cheap connectivity probe (e.g. about().get()) before committing to files().list(pageSize=1) as the warmup call — confirm during implementation, not blocking this plan.
 (b) DRIVE_SCOPES stays imported from the not-yet-deleted google_drive.py until TASK-25.1.6.10 — flagged above, not a design flaw, just a sequencing note for whoever picks up .10.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented the initial infrastructure/drive package and tests. Verified: make test is green (user-run); uv run pytest tests/unit/infrastructure/drive -q: 12 passed; uv run mypy infrastructure/drive: passed; uv run ruff check .: passed. AC 1, 3, 4, and 7 remain open: the Protocol/Google adapter currently implement only list_files, list_folders, and copy_file_to_folder; the factory currently pre-binds delegated_user_email despite the approved per-call delegation contract; app/bin/check_sdk_typing.py has not yet been run.
+<!-- SECTION:NOTES:END -->
