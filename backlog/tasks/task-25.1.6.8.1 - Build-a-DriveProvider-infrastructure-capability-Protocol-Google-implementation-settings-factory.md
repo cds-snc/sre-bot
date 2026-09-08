@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@me'
 created_date: '2026-09-08 18:55'
-updated_date: '2026-09-08 20:15'
+updated_date: '2026-09-08 21:05'
 labels:
   - clients
   - phase-3
@@ -138,5 +138,15 @@ All reconciled acceptance criteria checked after validation. AC #1 was replaced 
 created: 2026-09-08 20:07
 ---
 2026-09-08 architecture clarification: narrowed the new Path A Drive capability to vendor-neutral file/folder operations. Removed Google appProperties and metadata methods from DriveFile/DriveProvider/GoogleDriveProvider; legacy incident metadata remains in integrations.google_workspace.google_drive.py until the feature adapter migration. Updated decisions/layers.md, decisions/outbound-clients.md, and decisions/migration.md to require comparison against at least two plausible providers and keep vendor-specific projections, query fragments, authentication subjects, and metadata at adapter boundaries. Existing AC #1/description still name metadata and should be reconciled by the task owner.
+---
+
+created: 2026-09-08 20:48
+---
+CORRECTION found while planning TASK-25.1.6.8.2 (2026-09-08): infrastructure/drive/provider.py's DriveProvider.list_folders Protocol method has no 'query' parameter, even though GoogleDriveProvider.list_folders already implements one (used to compose the Templates-exclusion filter). incident_folder.py's migration requires it. TASK-25.1.6.8.2 adds the missing keyword-only 'query: str | None = None' parameter to the Protocol as a small, purely additive prerequisite step in its own PR (no change to GoogleDriveProvider, which already supports it) rather than reopening this task.
+---
+
+created: 2026-09-08 21:05
+---
+RETRACTION (2026-09-08): the prior comment proposing a 'query' parameter on DriveProvider.list_folders is withdrawn. Human review flagged that threading a Google q=-language string through the Protocol violates layers.md's Path A vendor-neutrality litmus test. TASK-25.1.6.8.2's plan now applies the Templates-folder exclusion as a client-side filter on DriveFile.name inside the incident adapter instead. infrastructure/drive/provider.py is not modified by TASK-25.1.6.8.2.
 ---
 <!-- COMMENTS:END -->
