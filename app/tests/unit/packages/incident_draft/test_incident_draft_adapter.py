@@ -14,8 +14,9 @@ from packages.incident_draft.domain import DocumentField, DocumentSection, Secti
 
 pytestmark = pytest.mark.unit
 
-_DOCS = "packages.incident_draft.adapters.google_docs.google_docs"
 _CLIENT = "packages.incident_draft.adapters.google_docs.google_workspace_client"
+_DOCS = "packages.incident_draft.adapters.google_docs.google_docs"
+_VENDOR_GET_DOCS = "integrations.google_workspace.google_docs.google_service_client.get_docs_service"
 _RESOURCES = "packages.incident_draft.adapters.google_docs.get_google_resources_config"
 
 
@@ -50,15 +51,20 @@ def _drive_resource_fake(*, copy_response=None, copy_error=None, get_response=No
 
 
 @pytest.fixture(autouse=True)
-def drive_service():
-    """Serve every Drive call from an in-memory Resource copying "D1" into "NEW1"."""
+def google_client():
     with patch(_CLIENT) as mock_client:
-        service = _drive_resource_fake(
-            copy_response={"id": "NEW1"},
-            get_response={"name": "testing draft functionality", "parents": ["FOLDER1"]},
-        )
-        mock_client.get_drive_service.return_value = service
-        yield service
+        yield mock_client
+
+
+@pytest.fixture(autouse=True)
+def drive_service(google_client):
+    """Serve every Drive call from an in-memory Resource copying "D1" into "NEW1"."""
+    service = _drive_resource_fake(
+        copy_response={"id": "NEW1"},
+        get_response={"name": "testing draft functionality", "parents": ["FOLDER1"]},
+    )
+    google_client.get_drive_service.return_value = service
+    return service
 
 
 def _copy_request(drive_service: MagicMock):
@@ -113,6 +119,15 @@ class TestReadSections:
         with patch(_DOCS) as mock_docs:
             mock_docs.get_document.return_value = None
             assert adapter.read_sections("D1") == []
+
+    @pytest.mark.parametrize("status", [404, 403, 503])
+    def test_fetch_http_error_returns_empty_list(self, docs_service, google_client, status):
+        docs_service.documents.return_value.get.return_value.execute.side_effect = _http_error(status)
+
+        with patch(_VENDOR_GET_DOCS, return_value=docs_service):
+            assert GoogleDocsIncidentDocument().read_sections("D1") == []
+
+        google_client.get_docs_service.assert_called_once()
 
 
 def _report_with_timeline() -> dict:
@@ -183,6 +198,37 @@ def _template_document() -> dict:
     )
 
 
+def _docs_resource_fake(*, get_response=None, get_error=None, batch_response=None, batch_error=None) -> MagicMock:
+    """A Docs Resource whose ``documents().get`` and ``batchUpdate`` are deterministic."""
+    service = MagicMock()
+    documents = service.documents.return_value
+
+    if get_error is not None:
+        documents.get.return_value.execute.side_effect = get_error
+    else:
+        documents.get.return_value.execute.return_value = get_response
+
+    if batch_error is not None:
+        documents.batchUpdate.return_value.execute.side_effect = batch_error
+    else:
+        documents.batchUpdate.return_value.execute.return_value = batch_response
+
+    return service
+
+
+@pytest.fixture(autouse=True)
+def docs_service(google_client):
+    service = _docs_resource_fake(get_response=_template_document(), batch_response={})
+    google_client.get_docs_service.return_value = service
+    return service
+
+
+def _batch_requests(docs_service: MagicMock, index: int = 0):
+    """Return the request body from one Docs batch update call."""
+    calls = docs_service.documents.return_value.batchUpdate.call_args_list
+    return calls[index].kwargs["body"]["requests"] if calls else []
+
+
 def _write(mock_docs, drafts, *, fields=()):
     """Run write_draft_document against a copied template and return requests."""
     mock_docs.get_document.return_value = _template_document()
@@ -215,6 +261,22 @@ def _style_of(requests, text: str):
 
 class TestWriteDraftDocument:
     """The draft is a filled-in copy of the report, preserving its format."""
+
+    @pytest.mark.parametrize("status", [404, 403, 503])
+    def test_draft_fetch_http_error_returns_none(self, docs_service, status):
+        docs_service.documents.return_value.get.return_value.execute.side_effect = _http_error(status)
+        drafts = [SectionDraft(heading="Summary", content="x", is_drafted=True)]
+
+        with patch(_VENDOR_GET_DOCS, return_value=docs_service):
+            assert GoogleDocsIncidentDocument().write_draft_document("D1", drafts) is None
+
+    @pytest.mark.parametrize("status", [404, 403, 503])
+    def test_populate_http_error_returns_none(self, docs_service, status):
+        docs_service.documents.return_value.batchUpdate.return_value.execute.side_effect = _http_error(status)
+        drafts = [SectionDraft(heading="Summary", content="x", is_drafted=True)]
+
+        with patch(_VENDOR_GET_DOCS, return_value=docs_service):
+            assert GoogleDocsIncidentDocument().write_draft_document("D1", drafts) is None
 
     def test_copies_the_source_report_rather_than_building_a_blank_doc(self, drive_service):
         drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
