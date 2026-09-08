@@ -29,9 +29,7 @@ def test_find_document_by_channel_name_enriches_match_with_app_properties(mock_g
     from packages.incident.drive.adapters import google_drive
 
     provider = MagicMock()
-    provider.find_files_by_name.return_value = OperationResult.success(
-        data=[DriveFile(id="doc-1", name="incident-2024-001")]
-    )
+    provider.find_files_by_name.return_value = OperationResult.success(data=[DriveFile(id="doc-1", name="incident-2024-001")])
     mock_get_provider.return_value = provider
 
     with patch.object(google_drive, "get_legacy_google_drive", return_value=MagicMock()) as mock_legacy:
