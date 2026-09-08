@@ -3,10 +3,10 @@ id: TASK-25.1.6.7
 title: >-
   Build the incident Google Docs adapter and move modules incident Docs call
   sites onto it
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-02 15:02'
-updated_date: '2026-09-08 18:27'
+updated_date: '2026-09-08 18:33'
 labels:
   - clients
   - phase-3
@@ -45,12 +45,12 @@ DO NOT reproduce the vendor module's create/batch_update/get_document signatures
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The architectural decision for where the incident feature's Google boundary lives is made, written into the task notes with its rationale, and stated in the PR description; TASK-25.1.6.8/.9/.10 reference it rather than re-deciding
-- [ ] #2 The adapter builds a stub-typed DocsResource via get_docs_service and performs its own try/except + classify_google_error around documents().get/.batchUpdate calls; documents().create has zero production callers today and is not reimplemented (google_docs.create is dead code, deleted not ported)
-- [ ] #3 The adapter's public functions are expressed in incident-domain terms and return typed results, not SDK-shaped passthroughs mirroring create/batch_update/get_document
-- [ ] #4 All four consumers (incident_document.py, incident_status.py, incident_conversation.py, information_update.py) call the adapter or its relocated domain helper; none imports integrations.google_workspace
-- [ ] #5 app/integrations/google_workspace/google_docs.py is deleted with its test file, grep-verified zero references repo-wide outside backlog/ and tmp/
-- [ ] #6 Existing incident tests pass, with any intentional behaviour change (in particular what each consumer now does on a classified Docs failure, which today is an unhandled propagation) named explicitly in the notes
+- [x] #1 The architectural decision for where the incident feature's Google boundary lives is made, written into the task notes with its rationale, and stated in the PR description; TASK-25.1.6.8/.9/.10 reference it rather than re-deciding
+- [x] #2 The adapter builds a stub-typed DocsResource via get_docs_service and performs its own try/except + classify_google_error around documents().get/.batchUpdate calls; documents().create has zero production callers today and is not reimplemented (google_docs.create is dead code, deleted not ported)
+- [x] #3 The adapter's public functions are expressed in incident-domain terms and return typed results, not SDK-shaped passthroughs mirroring create/batch_update/get_document
+- [x] #4 All four consumers (incident_document.py, incident_status.py, incident_conversation.py, information_update.py) call the adapter or its relocated domain helper; none imports integrations.google_workspace
+- [x] #5 app/integrations/google_workspace/google_docs.py is deleted with its test file, grep-verified zero references repo-wide outside backlog/ and tmp/
+- [x] #6 Existing incident tests pass, with any intentional behaviour change (in particular what each consumer now does on a classified Docs failure, which today is an unhandled propagation) named explicitly in the notes
 <!-- AC:END -->
 
 ## Implementation Plan
