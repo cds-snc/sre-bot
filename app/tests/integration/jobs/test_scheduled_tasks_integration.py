@@ -88,10 +88,10 @@ class TestIntegrationHealthchecksWorkflow:
     @patch("jobs.scheduled_tasks.identity_store")
     @patch("jobs.scheduled_tasks.opsgenie")
     @patch("jobs.scheduled_tasks.maxmind")
-    @patch("jobs.scheduled_tasks.google_drive")
+    @patch("jobs.scheduled_tasks.incident_drive")
     def test_healthcheck_all_healthy(
         self,
-        mock_google_drive,
+        mock_incident_drive,
         mock_maxmind,
         mock_opsgenie,
         mock_identity_store,
@@ -104,7 +104,7 @@ class TestIntegrationHealthchecksWorkflow:
         - No errors are logged
         - Healthy status is reported
         """
-        mock_google_drive.healthcheck.return_value = True
+        mock_incident_drive.incident_drive_healthcheck.return_value = True
         mock_maxmind.get_maxmind_client.return_value.healthcheck.return_value = OperationResult.success(
             data={"status": "healthy"}, message="MaxMind database is accessible"
         )
@@ -114,7 +114,7 @@ class TestIntegrationHealthchecksWorkflow:
         scheduled_tasks.integration_healthchecks()
 
         # Verify all healthchecks were called
-        assert mock_google_drive.healthcheck.call_count == 1
+        assert mock_incident_drive.incident_drive_healthcheck.call_count == 1
         assert mock_maxmind.get_maxmind_client.return_value.healthcheck.call_count == 1
         assert mock_opsgenie.healthcheck.call_count == 1
         assert mock_identity_store.healthcheck.call_count == 1
@@ -127,10 +127,10 @@ class TestIntegrationHealthchecksWorkflow:
     @patch("jobs.scheduled_tasks.identity_store")
     @patch("jobs.scheduled_tasks.opsgenie")
     @patch("jobs.scheduled_tasks.maxmind")
-    @patch("jobs.scheduled_tasks.google_drive")
+    @patch("jobs.scheduled_tasks.incident_drive")
     def test_healthcheck_partial_failures(
         self,
-        mock_google_drive,
+        mock_incident_drive,
         mock_maxmind,
         mock_opsgenie,
         mock_identity_store,
@@ -143,7 +143,7 @@ class TestIntegrationHealthchecksWorkflow:
         - Healthcheck continues for other integrations
         - Error messages include integration name
         """
-        mock_google_drive.healthcheck.return_value = False
+        mock_incident_drive.incident_drive_healthcheck.return_value = False
         mock_maxmind.get_maxmind_client.return_value.healthcheck.return_value = OperationResult.permanent_error(
             message="MaxMind healthcheck failed", error_code="HEALTHCHECK_FAILED"
         )
@@ -153,7 +153,7 @@ class TestIntegrationHealthchecksWorkflow:
         scheduled_tasks.integration_healthchecks()
 
         # All checks should be called
-        assert mock_google_drive.healthcheck.call_count == 1
+        assert mock_incident_drive.incident_drive_healthcheck.call_count == 1
         assert mock_maxmind.get_maxmind_client.return_value.healthcheck.call_count == 1
         assert mock_opsgenie.healthcheck.call_count == 1
         assert mock_identity_store.healthcheck.call_count == 1

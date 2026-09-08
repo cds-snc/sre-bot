@@ -4,7 +4,7 @@ from unittest.mock import ANY, MagicMock, patch
 from modules.incident import incident_roles as incident_helper
 
 
-@patch("modules.incident.incident_roles.google_drive.find_files_by_name")
+@patch("modules.incident.incident_roles.incident_drive.find_document_by_channel_name")
 def test_manage_roles(get_document_by_channel_name_mock):
     client = MagicMock()
     body = {
@@ -14,16 +14,14 @@ def test_manage_roles(get_document_by_channel_name_mock):
     }
     ack = MagicMock()
     respond = MagicMock()
-    get_document_by_channel_name_mock.return_value = [{"id": "file_id", "appProperties": {"ic_id": "ic_id", "ol_id": "ol_id"}}]
+    get_document_by_channel_name_mock.return_value = {"id": "file_id", "appProperties": {"ic_id": "ic_id", "ol_id": "ol_id"}}
     incident_helper.manage_roles(client, body, ack, respond)
     ack.assert_called_once()
-    get_document_by_channel_name_mock.assert_called_once_with(
-        "channel_name", fields="nextPageToken, files(appProperties, id, name)"
-    )
+    get_document_by_channel_name_mock.assert_called_once_with("channel_name")
     client.views_open.assert_called_once_with(trigger_id="trigger_id", view=ANY)
 
 
-@patch("modules.incident.incident_roles.google_drive.find_files_by_name")
+@patch("modules.incident.incident_roles.incident_drive.find_document_by_channel_name")
 def test_manage_roles_with_no_result(get_document_by_channel_name_mock):
     client = MagicMock()
     body = {
@@ -33,7 +31,7 @@ def test_manage_roles_with_no_result(get_document_by_channel_name_mock):
     }
     ack = MagicMock()
     respond = MagicMock()
-    get_document_by_channel_name_mock.return_value = []
+    get_document_by_channel_name_mock.return_value = None
     incident_helper.manage_roles(client, body, ack, respond)
     ack.assert_called_once()
     respond.assert_called_once_with(
@@ -41,7 +39,7 @@ def test_manage_roles_with_no_result(get_document_by_channel_name_mock):
     )
 
 
-@patch("modules.incident.incident_roles.google_drive.find_files_by_name")
+@patch("modules.incident.incident_roles.incident_drive.find_document_by_channel_name")
 def test_manage_roles_with_dev_prefix(get_document_by_channel_name_mock):
     client = MagicMock()
     body = {
@@ -51,16 +49,14 @@ def test_manage_roles_with_dev_prefix(get_document_by_channel_name_mock):
     }
     ack = MagicMock()
     respond = MagicMock()
-    get_document_by_channel_name_mock.return_value = [{"id": "file_id", "appProperties": {"ic_id": "ic_id", "ol_id": "ol_id"}}]
+    get_document_by_channel_name_mock.return_value = {"id": "file_id", "appProperties": {"ic_id": "ic_id", "ol_id": "ol_id"}}
     incident_helper.manage_roles(client, body, ack, respond)
     ack.assert_called_once()
-    get_document_by_channel_name_mock.assert_called_once_with(
-        "channel_name", fields="nextPageToken, files(appProperties, id, name)"
-    )
+    get_document_by_channel_name_mock.assert_called_once_with("channel_name")
     client.views_open.assert_called_once_with(trigger_id="trigger_id", view=ANY)
 
 
-@patch("modules.incident.incident_roles.google_drive.add_metadata")
+@patch("modules.incident.incident_roles.incident_drive.add_metadata")
 def test_save_incident_roles(add_metadata_mock):
     client = MagicMock()
     ack = MagicMock()
@@ -99,7 +95,7 @@ def test_save_incident_roles(add_metadata_mock):
     )
 
 
-@patch("modules.incident.incident_roles.google_drive.add_metadata")
+@patch("modules.incident.incident_roles.incident_drive.add_metadata")
 def test_save_incident_roles_append_purpose(add_metadata_mock):
     """If the channel purpose does NOT have existing IC/OL roles,
     it should append them (including leading newline)."""
@@ -147,7 +143,7 @@ def test_save_incident_roles_append_purpose(add_metadata_mock):
     client.conversations_setPurpose.assert_called_once_with(channel="channel_id", purpose=expected_purpose)
 
 
-@patch("modules.incident.incident_roles.google_drive.add_metadata")
+@patch("modules.incident.incident_roles.incident_drive.add_metadata")
 def test_save_incident_roles_replace_purpose(add_metadata_mock):
     """If the channel purpose already HAS existing IC/OL roles,
     it should replace them with the new roles."""
@@ -197,7 +193,7 @@ def test_save_incident_roles_replace_purpose(add_metadata_mock):
     client.conversations_setPurpose.assert_called_once_with(channel="channel_id", purpose=expected_purpose)
 
 
-@patch("modules.incident.incident_roles.google_drive.add_metadata")
+@patch("modules.incident.incident_roles.incident_drive.add_metadata")
 def test_save_incident_roles_purpose_truncation(add_metadata_mock):
     """If the updated purpose exceeds 250 characters, it should be truncated."""
     client = MagicMock()

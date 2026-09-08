@@ -11,7 +11,6 @@ from infrastructure.idempotency import get_lease_store, run_if_leased
 from infrastructure.plugins.manager import get_plugin_manager
 from integrations import maxmind, opsgenie
 from integrations.aws import identity_store
-from integrations.google_workspace import google_drive
 from jobs.models import BackgroundJobRegistry
 from jobs.settings import get_scheduler_settings
 from modules.aws import identity_center, spending
@@ -22,6 +21,7 @@ from packages.access.sync.providers import (
     get_access_runtime_config,
     get_access_sync_coordinator,
 )
+from packages.incident.drive.adapters import google_drive as incident_drive
 
 logger = get_logger()
 schedule_lib = schedule
@@ -122,7 +122,7 @@ def integration_healthchecks():
     """Run integration healthchecks."""
     logger.info("running_integration_healthchecks", module="scheduled_tasks", time=time.ctime())
     healthchecks: dict[str, Callable[[], bool]] = {
-        "google_drive": google_drive.healthcheck,
+        "google_drive": incident_drive.incident_drive_healthcheck,
         "maxmind": lambda: maxmind.get_maxmind_client().healthcheck().is_success,
         "opsgenie": opsgenie.healthcheck,
         "aws": identity_store.healthcheck,
