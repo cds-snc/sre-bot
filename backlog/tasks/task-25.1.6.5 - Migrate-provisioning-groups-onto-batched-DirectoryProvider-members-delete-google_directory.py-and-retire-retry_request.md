@@ -3,11 +3,11 @@ id: TASK-25.1.6.5
 title: >-
   Migrate provisioning groups onto batched DirectoryProvider members, delete
   google_directory.py and retire retry_request
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-02 15:01'
-updated_date: '2026-09-08 14:23'
+updated_date: '2026-09-08 14:28'
 labels:
   - clients
   - phase-3
