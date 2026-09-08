@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 15:31'
-updated_date: '2026-09-08 14:44'
+updated_date: '2026-09-08 16:01'
 labels:
   - clients
   - phase-3
@@ -277,5 +277,10 @@ RISK-CONTROLLED EXECUTION ORDER (2026-09-08): completed prerequisites are .6.1 c
 created: 2026-09-08 14:44
 ---
 SCOPE UPDATE (2026-09-08): the legacy modules/reports/google_groups.py feature is unused and will be deleted, not migrated. TASK-25.1.6.10 now owns that simple deletion alongside the live incident-folder and AWS-spending Sheets migration; no replacement reporting feature is part of TASK-25.1.
+---
+
+created: 2026-09-08 16:01
+---
+TASK-25.1.6.6 discharged the 3 Docs call sites in app/packages/incident_draft/adapters/google_docs.py: read_sections documents().get, write_draft_document post-copy documents().get, and write_draft_document documents().batchUpdate. Remaining integrations/google_workspace/google_docs.py production consumers are app/modules/incident/incident_document.py (get_document x2, batch_update x3), owned by the legacy incident Docs adapter task. google_docs.py::create remains pre-existing dead code with only its vendor test as a caller.
 ---
 <!-- COMMENTS:END -->
