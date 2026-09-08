@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 15:31'
-updated_date: '2026-09-08 16:01'
+updated_date: '2026-09-08 18:55'
 labels:
   - clients
   - phase-3
@@ -282,5 +282,14 @@ SCOPE UPDATE (2026-09-08): the legacy modules/reports/google_groups.py feature i
 created: 2026-09-08 16:01
 ---
 TASK-25.1.6.6 discharged the 3 Docs call sites in app/packages/incident_draft/adapters/google_docs.py: read_sections documents().get, write_draft_document post-copy documents().get, and write_draft_document documents().batchUpdate. Remaining integrations/google_workspace/google_docs.py production consumers are app/modules/incident/incident_document.py (get_document x2, batch_update x3), owned by the legacy incident Docs adapter task. google_docs.py::create remains pre-existing dead code with only its vendor test as a caller.
+---
+
+created: 2026-09-08 18:55
+---
+DRIVE ARCHITECTURE PIVOT (2026-09-08, task-planner, human-directed while planning TASK-25.1.6.8). google_drive.py has two real, unrelated feature consumers today: the incident feature (core.py, incident_document.py, incident_folder.py, incident_roles.py, jobs/scheduled_tasks.py's healthcheck) and the talent/hiring `role` workflow (modules/role/role.py: create_folder + copy_file_to_folder x7). No packages/role package exists. Building "the incident Drive adapter" as TASK-25.1.6.8 was originally titled would have made an unrelated feature import packages/incident's adapter, or forced a second flat Path-B adapter duplicating the same Drive semantics.
+
+DECISION: Drive graduates directly to a Path A infrastructure capability instead of a Path B feature adapter, since two independent feature consumers are already known upfront (the layers.md "promotion on second consumer" trigger, applied proactively rather than after building and later promoting a first adapter). New app/infrastructure/drive/ (DriveProvider Protocol + GoogleDriveProvider + settings + factory), mirroring the existing infrastructure/directory/{provider,google,factory,models,settings}.py shape exactly. Two thin feature adapters then consume DriveProvider: packages/incident/<subdomain>/adapters/google_drive.py and a new packages/role/adapters/google_drive.py.
+
+TASK-25.1.6.8 RETITLED to a coordinator with three children: .8.1 (build DriveProvider), .8.2 (incident feature adapter + migrate incident/jobs consumers), .8.3 (role feature adapter + migrate modules/role/role.py). TASK-25.1.6.9's dependency is repointed from TASK-25.1.6.8 to TASK-25.1.6.8.2,TASK-25.1.6.8.3 (both Drive migrations must land before Calendar/Meet per the coordinator's serialized execution order). TASK-25.1.6.10 gains ownership of actually deleting app/integrations/google_workspace/google_drive.py + its test file, since modules/reports/google_groups.py (deleted only by .10) keeps calling google_drive.find_files_by_name/create_file until then — neither .8.2 nor .8.3 can reach a zero-production-reference state on their own.
 ---
 <!-- COMMENTS:END -->

@@ -4,13 +4,14 @@ title: Move modules incident Calendar and Meet call sites onto the incident adap
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:03'
-updated_date: '2026-09-08 14:37'
+updated_date: '2026-09-08 18:58'
 labels:
   - clients
   - phase-3
 milestone: m-3
 dependencies:
-  - TASK-25.1.6.8
+  - TASK-25.1.6.8.2
+  - TASK-25.1.6.8.3
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
@@ -50,5 +51,10 @@ WATCH: core.py's existing try/except around create_space predates classification
 created: 2026-09-08 14:37
 ---
 ORDERING UPDATE (2026-09-08): run after .6.8. The Calendar/Meet adapter migration is serialized behind Drive because both are legacy incident-module changes and the shared adapter boundary should be validated one slice at a time.
+---
+
+created: 2026-09-08 18:58
+---
+Dependency repointed 2026-09-08 (task-planner) from TASK-25.1.6.8 (now a coordinator) to its two consumer-migration children, TASK-25.1.6.8.2 and TASK-25.1.6.8.3 — both must land before this slice per the coordinator's serialized execution order. TASK-25.1.6.8.1 (the DriveProvider capability) is a transitive prerequisite of both, no direct edge needed.
 ---
 <!-- COMMENTS:END -->

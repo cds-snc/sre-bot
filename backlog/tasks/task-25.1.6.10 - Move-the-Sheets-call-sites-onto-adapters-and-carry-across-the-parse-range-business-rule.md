@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:03'
-updated_date: '2026-09-08 14:44'
+updated_date: '2026-09-08 18:59'
 labels:
   - clients
   - phase-3
@@ -17,6 +17,7 @@ references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
   - app/integrations/google_workspace/sheets.py
+  - app/integrations/google_workspace/google_drive.py
   - app/modules/incident/incident_folder.py
   - app/modules/aws/spending.py
   - app/modules/reports/google_groups.py
@@ -39,6 +40,7 @@ Migrate the live Sheets consumers in modules/incident/incident_folder.py and mod
 - [ ] #4 integrations/google_workspace/sheets.py and its tests are deleted, with no remaining production imports.
 - [ ] #5 The report module time.sleep loop is removed with the module; live Sheets callers use SDK-native retry configuration.
 - [ ] #6 Focused tests, ruff, mypy, and the SDK typing guard pass.
+- [ ] #7 app/integrations/google_workspace/google_drive.py and its test file are deleted, with no remaining production references (its last two call sites, find_files_by_name and create_file, live in modules/reports/google_groups.py and are removed by this task's AC#3); if infrastructure/drive/factory.py (TASK-25.1.6.8.1) imports DRIVE_SCOPES from this file, relocate the constant there first
 <!-- AC:END -->
 
 ## Comments
@@ -119,5 +121,10 @@ ORDERING UPDATE (2026-09-08): run after .6.9 and the A1 bug fix. Sheets is last 
 created: 2026-09-08 14:44
 ---
 SCOPE UPDATE (2026-09-08): the legacy Google Groups report is unused and is being deleted, not migrated. TASK-25.1.6.12 is no longer a prerequisite because its A1-range fix belongs only to the discarded report module. Keep incident-folder and AWS-spending as the live Sheets migration scope.
+---
+
+created: 2026-09-08 18:59
+---
+AC#7 added 2026-09-08 (task-planner, during TASK-25.1.6.8 planning). TASK-25.1.6.8.2/.8.3 migrate all live incident/role Drive consumers but cannot delete google_drive.py themselves — modules/reports/google_groups.py (deleted only by this task's AC#3) keeps calling google_drive.find_files_by_name/create_file until then. This task is therefore the one that reaches a true zero-production-reference state and should perform the actual file deletion.
 ---
 <!-- COMMENTS:END -->
