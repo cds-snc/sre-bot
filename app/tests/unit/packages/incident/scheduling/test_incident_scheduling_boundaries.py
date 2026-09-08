@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from integrations.google_workspace import google_calendar, google_docs
+from integrations.google_workspace import google_calendar
 from packages.incident.scheduling import availability
 
 APP_ROOT = Path(__file__).resolve().parents[5]
@@ -37,11 +37,6 @@ def test_relocated_helper_absent_from_google_workspace_sources(name):
 def test_google_calendar_keeps_its_google_api_functions():
     assert callable(google_calendar.get_freebusy)
     assert callable(google_calendar.insert_event)
-
-
-def test_extract_google_doc_id_stays_in_google_docs():
-    """AC#2: extract_google_doc_id is out of scope and must not be relocated."""
-    assert callable(google_docs.extract_google_doc_id)
 
 
 def test_schedule_retro_uses_relocated_availability_helpers():

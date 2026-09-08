@@ -4,9 +4,9 @@ APP_ROOT = Path(__file__).resolve().parents[5]
 
 
 def test_incident_documents_package_exposes_extract_google_doc_id():
-    from packages.incident.documents import domain
+    from packages.incident.documents import utils
 
-    assert callable(domain.extract_google_doc_id)
+    assert callable(utils.extract_google_doc_id)
 
 
 def test_extract_google_doc_id_is_not_left_in_google_workspace_sources():

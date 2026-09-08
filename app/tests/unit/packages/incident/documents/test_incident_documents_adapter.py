@@ -16,7 +16,9 @@ def _http_error(status: int = 403, message: str = "forbidden") -> HttpError:
 def test_replace_placeholders_success(mock_get_docs_service):
     mock_service = MagicMock()
     mock_get_docs_service.return_value = mock_service
-    mock_service.documents.return_value.batchUpdate.return_value = {"replies": [{"replaceAllText": {"occurrencesChanged": 2}}]}
+    mock_service.documents.return_value.batchUpdate.return_value.execute.return_value = {
+        "replies": [{"replaceAllText": {"occurrencesChanged": 2}}]
+    }
 
     result = google_docs.replace_placeholders(
         "document-id",

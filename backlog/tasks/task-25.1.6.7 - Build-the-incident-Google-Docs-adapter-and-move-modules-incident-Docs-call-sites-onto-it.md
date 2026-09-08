@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:02'
-updated_date: '2026-09-08 17:23'
+updated_date: '2026-09-08 18:27'
 labels:
   - clients
   - phase-3
@@ -303,5 +303,10 @@ AC#2 CORRECTED (bulk --acceptance-criteria replace): dropped its `.create` menti
 test calls it) and is deleted, not ported; reimplementing an unused method would be
 scope creep. Wording now covers only `.get`/`.batchUpdate`, the two calls
 `incident_document.py` actually makes.
+---
+
+created: 2026-09-08 18:27
+---
+POST-REVIEW RENAME (2026-09-08): packages/incident/documents/domain.py renamed to utils.py. decisions/feature-packages.md reserves domain.py for frozen dataclasses/enums/invariants; extract_google_doc_id is a stateless parsing helper with no domain modeling, so domain.py was a misnomer (matches the utils.py precedent set by not naming it after a reserved slot). Docstring reworded to drop the confusing Google-API mention and instead flag the forward-looking migration expectation, now tracked in TASK-80: if Google Docs is ever promoted to a core DocumentProvider infrastructure Protocol (mirroring DirectoryProvider/TASK-22.4), this helper migrates with it. All consumer imports (incident_status.py, incident_conversation.py, information_update.py) and their tests updated; information_update.py's pre-existing modules.incident.utils import aliased to incident_utils to avoid a name collision with the new packages.incident.documents.utils import.
 ---
 <!-- COMMENTS:END -->

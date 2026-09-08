@@ -6,7 +6,12 @@ import re
 from structlog import get_logger
 
 from infrastructure.configuration.integrations.google import get_google_resources_config
-from integrations.google_workspace import google_docs, google_drive
+from integrations.google_workspace import google_drive
+from packages.incident.documents.adapters.google_docs import (
+    apply_document_edits,
+    fetch_document_content,
+    replace_placeholders,
+)
 
 google_resources = get_google_resources_config()
 INCIDENT_TEMPLATE = google_resources.incident_template_id
@@ -34,46 +39,16 @@ def create_incident_document(title, folder):
 
 
 def update_boilerplate_text(document_id, name, product, slack_channel, on_call_names):
-    requests = [
-        {
-            "replaceAllText": {
-                "containsText": {"text": "{{date}}", "matchCase": "true"},
-                "replaceText": datetime.datetime.now().strftime("%Y-%m-%d"),
-            }
-        },
-        {
-            "replaceAllText": {
-                "containsText": {"text": "{{name}}", "matchCase": "true"},
-                "replaceText": str(name),
-            }
-        },
-        {
-            "replaceAllText": {
-                "containsText": {"text": "{{on-call-names}}", "matchCase": "true"},
-                "replaceText": str(on_call_names),
-            }
-        },
-        {
-            "replaceAllText": {
-                "containsText": {"text": "{{team}}", "matchCase": "true"},
-                "replaceText": str(product),
-            }
-        },
-        {
-            "replaceAllText": {
-                "containsText": {"text": "{{slack-channel}}", "matchCase": "true"},
-                "replaceText": str(slack_channel),
-            }
-        },
-        {
-            "replaceAllText": {
-                "containsText": {"text": "{{status}}", "matchCase": "true"},
-                "replaceText": "In Progress",
-            }
-        },
-    ]
+    replacements = {
+        "{{date}}": datetime.datetime.now().strftime("%Y-%m-%d"),
+        "{{name}}": str(name),
+        "{{on-call-names}}": str(on_call_names),
+        "{{team}}": str(product),
+        "{{slack-channel}}": str(slack_channel),
+        "{{status}}": "In Progress",
+    }
 
-    google_docs.batch_update(document_id, requests)
+    replace_placeholders(document_id, replacements, match_case=True)
 
 
 def update_incident_document_status(document_id, new_status="Closed"):
@@ -99,25 +74,15 @@ def update_incident_document_status(document_id, new_status="Closed"):
         raise ValueError(f"Invalid status: {new_status}")
 
     # Replace all possible statuses with the new status
-    changes = [
-        {
-            "replaceAllText": {
-                "containsText": {"text": f"Status: {status}", "matchCase": "false"},
-                "replaceText": f"Status: {new_status}",
-            }
-        }
-        for status in possible_statuses
-        if status != new_status
-    ]
-    result = google_docs.batch_update(document_id, changes)
-    replies = result.get("replies", []) if isinstance(result, dict) else []
-    return any(reply.get("replaceAllText", {}).get("occurrencesChanged", 0) > 0 for reply in replies)
+    replacements = {f"Status: {status}": f"Status: {new_status}" for status in possible_statuses if status != new_status}
+    return replace_placeholders(document_id, replacements, match_case=False)
 
 
 def get_timeline_section(document_id):
-    # Retrieve the document
-    document = google_docs.get_document(document_id)
-    content = document.get("body").get("content")
+    # Retrieve the document content
+    content = fetch_document_content(document_id)
+    if content is None:
+        return None
 
     timeline_content = ""
     record = False
@@ -173,8 +138,14 @@ def find_heading_indices(content, start_heading, end_heading):
 # Replace the text between the headings
 def replace_text_between_headings(doc_id, new_content, start_heading, end_heading):
 
-    document = google_docs.get_document(doc_id)
-    content = document.get("body").get("content")
+    content = fetch_document_content(doc_id)
+    if content is None:
+        logger.warning(
+            "replace_text_between_headings_failed",
+            document_id=doc_id,
+            error="Headings not found",
+        )
+        return
 
     # Find the start and end indices
     start_index, end_index = find_heading_indices(content, start_heading, end_heading)
@@ -282,7 +253,7 @@ def replace_text_between_headings(doc_id, new_content, start_heading, end_headin
                         }
                     }
                 )
-        google_docs.batch_update(doc_id, requests)
+        apply_document_edits(doc_id, requests)
     else:
         logger.warning(
             "replace_text_between_headings_failed",
