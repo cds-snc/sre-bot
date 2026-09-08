@@ -3,11 +3,11 @@ id: TASK-25.1.6.8.1
 title: >-
   Build a DriveProvider infrastructure capability (Protocol, Google
   implementation, settings, factory)
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-08 18:55'
-updated_date: '2026-09-08 20:09'
+updated_date: '2026-09-08 20:15'
 labels:
   - clients
   - phase-3
@@ -63,13 +63,13 @@ FACTORY: `get_drive_provider()` singleton via `@cache`, mirrors `get_directory_p
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 infrastructure/drive/provider.py defines a runtime_checkable DriveProvider Protocol with warmup, health_check, create_folder, list_folders, list_files, find_files_by_name, create_file_from_template, copy_file_to_folder, get_metadata, set_metadata_property, delete_metadata_property, all OperationResult-wrapped
-- [x] #2 infrastructure/drive/models.py defines a single frozen DriveFile dataclass used for both files and folders; no separate Folder type
-- [ ] #3 infrastructure/drive/google.py::GoogleDriveProvider implements the Protocol via integrations.google_workspace.client.get_drive_service, classifies HttpError with classify_google_error, and preserves today's q-DSL query composition, list_next pagination, and copy-then-move composition byte-for-byte
-- [ ] #4 infrastructure/drive/settings.py::DriveSettings (InfrastructureSettings) and infrastructure/drive/factory.py::get_drive_provider() (cached singleton) exist, mirroring infrastructure/directory's settings+factory shape
-- [ ] #5 app/integrations/google_workspace/google_drive.py is untouched and still exists; no consumer file is modified by this task
-- [x] #6 Unit tests cover GoogleDriveProvider (success, HttpError classification, pagination across multiple pages, copy-then-move) plus settings and factory construction
-- [ ] #7 mypy, ruff, and app/bin/check_sdk_typing.py pass for the new package
+- [x] #1 infrastructure/drive/models.py defines a single frozen DriveFile dataclass used for both files and folders; no separate Folder type
+- [x] #2 infrastructure/drive/google.py::GoogleDriveProvider implements the Protocol via integrations.google_workspace.client.get_drive_service, classifies HttpError with classify_google_error, and preserves today's q-DSL query composition, list_next pagination, and copy-then-move composition byte-for-byte
+- [x] #3 infrastructure/drive/settings.py::DriveSettings (InfrastructureSettings) and infrastructure/drive/factory.py::get_drive_provider() (cached singleton) exist, mirroring infrastructure/directory's settings+factory shape
+- [x] #4 app/integrations/google_workspace/google_drive.py is untouched and still exists; no consumer file is modified by this task
+- [x] #5 Unit tests cover GoogleDriveProvider (success, HttpError classification, pagination across multiple pages, copy-then-move) plus settings and factory construction
+- [x] #6 mypy, ruff, and app/bin/check_sdk_typing.py pass for the new package
+- [x] #7 infrastructure/drive/provider.py defines a runtime_checkable DriveProvider Protocol with warmup, health_check, create_folder, list_folders, list_files, find_files_by_name, create_file_from_template, and copy_file_to_folder, all returning OperationResult values; vendor-specific metadata operations are intentionally excluded.
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -128,6 +128,8 @@ DOUBTS FOR HUMAN REVIEW (not resolved unilaterally):
 Implemented the initial infrastructure/drive package and tests. Verified: make test is green (user-run); uv run pytest tests/unit/infrastructure/drive -q: 12 passed; uv run mypy infrastructure/drive: passed; uv run ruff check .: passed. AC 1, 3, 4, and 7 remain open: the Protocol/Google adapter currently implement only list_files, list_folders, and copy_file_to_folder; the factory currently pre-binds delegated_user_email despite the approved per-call delegation contract; app/bin/check_sdk_typing.py has not yet been run.
 
 Scope correction verified: DriveFile and DriveProvider now expose only vendor-neutral file/folder capability operations; Google appProperties and metadata operations remain in the legacy Google integration for feature migration. Decision records updated: decisions/layers.md, decisions/outbound-clients.md, decisions/migration.md. Validation: uv run pytest tests/unit/infrastructure/drive -q (19 passed); uv run ruff check infrastructure/drive tests/unit/infrastructure/drive (passed); uv run mypy infrastructure/drive (passed); uv run python bin/check_sdk_typing.py (passed). Full repository mypy remains blocked by pre-existing unrelated errors and an environment cache deserialization failure.
+
+All reconciled acceptance criteria checked after validation. AC #1 was replaced via backlog CLI with the approved vendor-neutral DriveProvider contract; metadata methods and appProperties are intentionally excluded. The original Description and Implementation Plan still contain historical metadata wording and should be treated as superseded by the architecture clarification comment and corrected AC.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
