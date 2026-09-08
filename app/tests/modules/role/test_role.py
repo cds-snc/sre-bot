@@ -306,115 +306,95 @@ def test_update_modal_locale_to_FR():
 
 
 @patch.object(role, "INTERNAL_TALENT_FOLDER", "internal_talent_folder")
-@patch("modules.role.role.BOT_EMAIL", "bot_email")
-@patch("modules.role.role.google_drive.copy_file_to_folder")
-@patch("modules.role.role.google_drive.create_folder")
-def test_create_new_folder(mock_create_new_folder, mock_copy_file_to_folder):
-    # test creating a new folder
+@patch("modules.role.role.talent_drive.copy_template_to_role_folder")
+@patch("modules.role.role.talent_drive.create_role_folder")
+def test_create_new_folder(mock_create_role_folder, mock_copy_template_to_role_folder):
+    # test creating a new folder via the talent adapter
     ack = MagicMock()
     say = MagicMock()
     body = helper_body_payload("en-US")
     client = MagicMock()
-    mock_create_new_folder.return_value = {"id": "id"}
+    mock_create_role_folder.return_value = {"id": "id"}
     role.role_view_handler(ack, body, say, client)
-    mock_create_new_folder.assert_called_once_with(
-        "foo",
-        "internal_talent_folder",
-        "id",
-        delegated_user_email="bot_email",
-    )
+    mock_create_role_folder.assert_called_once_with("foo", "internal_talent_folder")
 
 
 @patch.object(role, "INTERNAL_TALENT_FOLDER", "internal_talent_folder")
-@patch("modules.role.role.BOT_EMAIL", "bot_email")
 @patch("modules.role.role.logger")
-@patch("modules.role.role.google_drive.copy_file_to_folder")
-@patch("modules.role.role.google_drive.create_folder")
-def test_create_new_folder_failed(mock_create_new_folder, mock_copy_file_to_folder, mock_logger):
+@patch("modules.role.role.talent_drive.copy_template_to_role_folder")
+@patch("modules.role.role.talent_drive.create_role_folder")
+def test_create_new_folder_failed(mock_create_role_folder, mock_copy_template_to_role_folder, mock_logger):
     ack = MagicMock()
     say = MagicMock()
     body = helper_body_payload("en-US")
     client = MagicMock()
     bound_logger = MagicMock()
     mock_logger.bind.return_value = bound_logger
-    mock_create_new_folder.return_value = ""
+    mock_create_role_folder.return_value = None
     role.role_view_handler(ack, body, say, client)
-    mock_create_new_folder.assert_called_once_with(
-        "foo",
-        "internal_talent_folder",
-        "id",
-        delegated_user_email="bot_email",
-    )
+    mock_create_role_folder.assert_called_once_with("foo", "internal_talent_folder")
     bound_logger.error.assert_called_once_with("talent_role_folder_creation_failed", folder_name="foo")
-    mock_copy_file_to_folder.assert_not_called()
+    mock_copy_template_to_role_folder.assert_not_called()
 
 
 @patch.multiple(role, **ROLE_CONSTANTS)  # type: ignore
-@patch("modules.role.role.BOT_EMAIL", "bot_email")
 @patch("modules.role.role.logger")
-@patch("modules.role.role.google_drive.create_folder")
-@patch("modules.role.role.google_drive.copy_file_to_folder")
-def test_copy_files_to_internal_talent_folder(mock_copy_file_to_folder, mock_create_new_folder, mock_logger):
-    # test copying files to internal talent folder
+@patch("modules.role.role.talent_drive.create_role_folder")
+@patch("modules.role.role.talent_drive.copy_template_to_role_folder")
+def test_copy_files_to_internal_talent_folder(mock_copy_template_to_role_folder, mock_create_role_folder, mock_logger):
+    # test copying files to the internal talent folder through the adapter boundary
     ack = MagicMock()
     say = MagicMock()
     body = helper_body_payload("en-US")
     client = MagicMock()
     bound_logger = MagicMock()
     mock_logger.bind.return_value = bound_logger
-    mock_create_new_folder.return_value = {"id": "folder_id"}
-    mock_copy_file_to_folder.return_value = "id"
+    mock_create_role_folder.return_value = {"id": "folder_id"}
+    mock_copy_template_to_role_folder.return_value = "id"
     role.role_view_handler(ack, body, say, client)
-    mock_copy_file_to_folder.assert_has_calls(
+    mock_copy_template_to_role_folder.assert_has_calls(
         [
             call(
                 "scoring_guide_template",
                 "Template 2022/06 - foo Interview Panel Scoring Document - <year/month> ",
                 "mock_templates_folder",
                 "folder_id",
-                delegated_user_email="bot_email",
             ),
             call(
                 "core_values_template",
                 "Template EN+FR 2022/09- foo - Core Values Panel - Interview Guide - <year/month> - <candidate initials> ",
                 "mock_templates_folder",
                 "folder_id",
-                delegated_user_email="bot_email",
             ),
             call(
                 "technical_interview_template",
                 "Template EN+FR 2022/09 - foo - Technical Panel - Interview Guide - <year/month> - <candidate initials> ",
                 "mock_templates_folder",
                 "folder_id",
-                delegated_user_email="bot_email",
             ),
             call(
                 "intake_form_template",
                 "TEMPLATE Month YYYY - foo - Kick-off form",
                 "mock_templates_folder",
                 "folder_id",
-                delegated_user_email="bot_email",
             ),
             call(
                 "phone_screen_template",
                 "Phone Screen - Template",
                 "mock_templates_folder",
                 "folder_id",
-                delegated_user_email="bot_email",
             ),
             call(
                 "recruitment_feedback_template",
                 "Recruitment Feedback - foo",
                 "mock_templates_folder",
                 "folder_id",
-                delegated_user_email="bot_email",
             ),
             call(
                 "panelist_guidebook_template",
                 "Panelist Guidebook - Interview Best Practices - foo",
                 "mock_templates_folder",
                 "folder_id",
-                delegated_user_email="bot_email",
             ),
         ]
     )
@@ -424,6 +404,71 @@ def test_copy_files_to_internal_talent_folder(mock_copy_file_to_folder, mock_cre
     # 7 calls for copying files
     # 1 call for conversation creation
     assert bound_logger.info.call_count == 10
+
+
+@patch.object(role, "INTERNAL_TALENT_FOLDER", "internal_talent_folder")
+@patch("modules.role.role.logger")
+@patch("modules.role.role.talent_drive.copy_template_to_role_folder")
+@patch("modules.role.role.talent_drive.create_role_folder")
+def test_copy_template_failure_aborts_before_channel_creation(
+    mock_create_role_folder,
+    mock_copy_template_to_role_folder,
+    mock_logger,
+):
+    ack = MagicMock()
+    say = MagicMock()
+    body = helper_body_payload("en-US")
+    client = MagicMock()
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
+    mock_create_role_folder.return_value = {"id": "folder_id"}
+    mock_copy_template_to_role_folder.side_effect = ["first_id", None]
+
+    role.role_view_handler(ack, body, say, client)
+
+    bound_logger.error.assert_any_call("talent_role_document_copy_failed", document_name="Scoring Guide")
+    client.conversations_create.assert_not_called()
+
+
+@patch("modules.role.role.talent_drive.create_role_folder")
+@patch("modules.role.role.talent_drive.copy_template_to_role_folder")
+def test_role_creates_channel_and_sets_topic_and_announces_channel(mock_copy_template_to_role_folder, mock_create_role_folder):
+    # test that a private channel is created, the topic is set and the channel is announced
+    ack = MagicMock()
+    say = MagicMock()
+    body = helper_body_payload("en-US")
+    client = MagicMock()
+    client.conversations_create.return_value = {"channel": {"id": "channel_id", "name": "channel_name"}}
+    mock_create_role_folder.return_value = {"id": "folder_id"}
+    role.role_view_handler(ack, body, say, client)
+
+    client.conversations_create.assert_called_once_with(name="bar", is_private=True)
+    client.conversations_setTopic.assert_called_once_with(
+        channel="channel_id",
+        topic=f"Channel for foo\nScoring Guide: https://docs.google.com/spreadsheets/d/{mock_copy_template_to_role_folder.return_value}",
+    )
+    say.assert_any_call(
+        text="<@user_id> has created a new channel for foo with channel name channel_name in <#channel_id>\n",
+        channel="channel_id",
+    )
+
+
+# test that indicated users are invited to the channel
+@patch("modules.role.role.talent_drive.create_role_folder")
+@patch("modules.role.role.talent_drive.copy_template_to_role_folder")
+def test_role_add_invited_users_to_channel(mock_copy_template_to_role_folder, mock_create_role_folder):
+    ack = MagicMock()
+    say = MagicMock()
+    body = helper_body_payload("en-US")
+    client = MagicMock()
+    client.conversations_create.return_value = {"channel": {"id": "channel_id", "name": "channel_name"}}
+    client.users_lookupByEmail.return_value = {
+        "ok": True,
+        "user": {"id": "user_id", "profile": {"display_name_normalized": "name"}},
+    }
+    mock_create_role_folder.return_value = {"id": "folder_id"}
+    role.role_view_handler(ack, body, say, client)
+    client.conversations_invite.assert_called_with(channel="channel_id", users="user_id")
 
 
 @patch("modules.role.role.i18n")
@@ -446,47 +491,6 @@ def test_role_modal_view(mock_role_modal_view):
     role.update_modal_locale(ack, client, body)
     ack.assert_called()
     mock_role_modal_view.assert_called_once()
-
-
-@patch("modules.role.role.google_drive.create_folder")
-@patch("modules.role.role.google_drive.copy_file_to_folder")
-def test_role_creates_channel_and_sets_topic_and_announces_channel(mock_copy_file_to_folder, mock_create_new_folder):
-    # test that a private channel is created, the topic is set and the channel is announced
-    ack = MagicMock()
-    say = MagicMock()
-    body = helper_body_payload("en-US")
-    client = MagicMock()
-    client.conversations_create.return_value = {"channel": {"id": "channel_id", "name": "channel_name"}}
-    mock_create_new_folder.return_value = {"id": "folder_id"}
-    role.role_view_handler(ack, body, say, client)
-
-    client.conversations_create.assert_called_once_with(name="bar", is_private=True)
-    client.conversations_setTopic.assert_called_once_with(
-        channel="channel_id",
-        topic=f"Channel for foo\nScoring Guide: https://docs.google.com/spreadsheets/d/{mock_copy_file_to_folder.return_value}",
-    )
-    say.assert_any_call(
-        text="<@user_id> has created a new channel for foo with channel name channel_name in <#channel_id>\n",
-        channel="channel_id",
-    )
-
-
-# test that indicated users are invited to the channel
-@patch("modules.role.role.google_drive.create_folder")
-@patch("modules.role.role.google_drive.copy_file_to_folder")
-def test_role_add_invited_users_to_channel(mock_copy_file_to_folder, mock_create_new_folder):
-    ack = MagicMock()
-    say = MagicMock()
-    body = helper_body_payload("en-US")
-    client = MagicMock()
-    client.conversations_create.return_value = {"channel": {"id": "channel_id", "name": "channel_name"}}
-    client.users_lookupByEmail.return_value = {
-        "ok": True,
-        "user": {"id": "user_id", "profile": {"display_name_normalized": "name"}},
-    }
-    mock_create_new_folder.return_value = {"id": "folder_id"}
-    role.role_view_handler(ack, body, say, client)
-    client.conversations_invite.assert_called_with(channel="channel_id", users="user_id")
 
 
 def helper_client_locale(locale=""):
