@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@me'
 created_date: '2026-09-08 18:57'
-updated_date: '2026-09-08 22:48'
+updated_date: '2026-09-08 23:14'
 labels:
   - clients
   - phase-3
@@ -176,5 +176,10 @@ PLAN WRITTEN 2026-09-08 (task-planner). Grounded against the actually-shipped TA
 created: 2026-09-08 21:06
 ---
 VENDOR-NEUTRALITY CORRECTION (2026-09-08): human review flagged that the plan's original 'query' parameter on DriveProvider.list_folders would leak Google's own q=-language string through a Path A Protocol, failing layers.md's portability litmus test. Plan revised: infrastructure/drive/provider.py is untouched by this task; the Templates-folder exclusion is applied as a client-side filter on DriveFile.name inside the incident adapter's list_child_folders. AC#4 and the size gate updated accordingly (9 production files, not 10); the earlier --comment on TASK-25.1.6.8.1 proposing the Protocol change was retracted.
+---
+
+created: 2026-09-08 23:14
+---
+FOUND DURING TASK-25.1.6.8.3 PLANNING (2026-09-08, task-planner), not fixed there: app/packages/incident/drive/__init__.py and app/packages/incident/drive/adapters/__init__.py do not exist on main, although this task's implementation notes state the empty package initializers were added. Verified with: find packages/incident -name __init__.py (returns only incident/, incident/documents/, incident/documents/adapters/, incident/scheduling/). The subdomain currently imports only as an implicit namespace package, which deviates from decisions/feature-packages.md's layout table and from every other shipped subdomain. app/tests/unit/packages/incident/drive/ is likewise missing __init__.py while its siblings have one. Small fix, needs an owner before this task's Definition of Done is verified.
 ---
 <!-- COMMENTS:END -->

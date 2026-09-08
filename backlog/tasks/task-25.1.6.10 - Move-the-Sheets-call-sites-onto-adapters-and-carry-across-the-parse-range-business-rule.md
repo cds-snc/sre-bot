@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:03'
-updated_date: '2026-09-08 18:59'
+updated_date: '2026-09-08 23:14'
 labels:
   - clients
   - phase-3
@@ -126,5 +126,10 @@ SCOPE UPDATE (2026-09-08): the legacy Google Groups report is unused and is bein
 created: 2026-09-08 18:59
 ---
 AC#7 added 2026-09-08 (task-planner, during TASK-25.1.6.8 planning). TASK-25.1.6.8.2/.8.3 migrate all live incident/role Drive consumers but cannot delete google_drive.py themselves — modules/reports/google_groups.py (deleted only by this task's AC#3) keeps calling google_drive.find_files_by_name/create_file until then. This task is therefore the one that reaches a true zero-production-reference state and should perform the actual file deletion.
+---
+
+created: 2026-09-08 23:14
+---
+IMPACT NOTE FROM TASK-25.1.6.8.3 PLANNING (2026-09-08, task-planner): AC#7's premise that google_drive.py's last two call sites live in modules/reports/google_groups.py is now stale. TASK-25.1.6.8.2 shipped packages/incident/drive/adapters/google_drive.py with deliberate pass-throughs to the legacy module (list_metadata, add_metadata, delete_metadata, and the incident-template health check), and packages/incident_draft/adapters/google_docs.py plus infrastructure/drive/google.py import DRIVE_SCOPES from it. Deleting google_drive.py therefore also requires re-homing those metadata operations (Google appProperties stays out of the vendor-neutral DriveProvider per decisions/layers.md) and relocating DRIVE_SCOPES. TASK-25.1.6.8.3 (packages/talent Drive adapter) adds no new reference: it uses DriveProvider only.
 ---
 <!-- COMMENTS:END -->
