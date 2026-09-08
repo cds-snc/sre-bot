@@ -3,11 +3,11 @@ id: TASK-25.1.6.8.3
 title: >-
   Introduce a packages/role feature adapter and migrate modules/role/role.py
   onto DriveProvider
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-08 18:58'
-updated_date: '2026-09-08 23:26'
+updated_date: '2026-09-08 23:42'
 labels:
   - clients
   - phase-3
@@ -48,13 +48,13 @@ NOT IN SCOPE: modules/incident/*, jobs/scheduled_tasks.py (TASK-25.1.6.8.2, alre
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A new flat feature package app/packages/talent/ exists (empty __init__.py, adapters/__init__.py, no hookimpl and no entry-point line) with adapters/google_drive.py built on infrastructure.drive.factory.get_drive_provider(), never constructing GoogleDriveProvider directly
-- [ ] #2 The adapter owns the SRE_BOT_EMAIL delegation and passes delegated_user_email to every DriveProvider call; modules/role/role.py no longer defines BOT_EMAIL or ROLE_SCOPES and no longer imports integrations.google_workspace.google_drive
-- [ ] #3 modules/role/role.py calls the adapter for its folder creation and all seven template copies, with call order, document names and log events preserved
-- [ ] #4 A failed Drive operation (classified OperationResult error) logs an error and aborts role_view_handler before any Slack channel is created, instead of raising out of the handler
-- [ ] #5 Existing Drive coverage in app/tests/modules/role/test_role.py is preserved at the new adapter boundary, plus new unit tests for the adapter under app/tests/unit/packages/talent/adapters/
-- [ ] #6 Focused tests, ruff, mypy, and app/bin/check_sdk_typing.py pass
-- [ ] #7 app/packages/incident/drive/__init__.py and app/packages/incident/drive/adapters/__init__.py exist (currently missing on main despite TASK-25.1.6.8.2's notes claiming otherwise); app/tests/unit/packages/incident/drive/__init__.py also added to match its sibling subdomains
+- [x] #1 A new flat feature package app/packages/talent/ exists (empty __init__.py, adapters/__init__.py, no hookimpl and no entry-point line) with adapters/google_drive.py built on infrastructure.drive.factory.get_drive_provider(), never constructing GoogleDriveProvider directly
+- [x] #2 The adapter owns the SRE_BOT_EMAIL delegation and passes delegated_user_email to every DriveProvider call; modules/role/role.py no longer defines BOT_EMAIL or ROLE_SCOPES and no longer imports integrations.google_workspace.google_drive
+- [x] #3 modules/role/role.py calls the adapter for its folder creation and all seven template copies, with call order, document names and log events preserved
+- [x] #4 A failed Drive operation (classified OperationResult error) logs an error and aborts role_view_handler before any Slack channel is created, instead of raising out of the handler
+- [x] #5 Existing Drive coverage in app/tests/modules/role/test_role.py is preserved at the new adapter boundary, plus new unit tests for the adapter under app/tests/unit/packages/talent/adapters/
+- [x] #6 Focused tests, ruff, mypy, and app/bin/check_sdk_typing.py pass
+- [x] #7 app/packages/incident/drive/__init__.py and app/packages/incident/drive/adapters/__init__.py exist (currently missing on main despite TASK-25.1.6.8.2's notes claiming otherwise); app/tests/unit/packages/incident/drive/__init__.py also added to match its sibling subdomains
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -158,6 +158,12 @@ Only the /sre talent-role modal-submission path changes, plus the unrelated mech
 SIZE GATE
 Production: packages/talent/__init__.py, packages/talent/adapters/__init__.py, packages/talent/adapters/google_drive.py (~65 LOC new), modules/role/role.py (~45 LOC changed), plus 3 near-empty __init__.py files for packages/incident/drive (~0 LOC, mechanical) = 7 production files, roughly 110 production LOC, one primary subsystem (packages/talent) plus one trivial mechanical addition to a second (packages/incident/drive). No mixed mechanical/behavior refactor beyond the single flagged failure-semantics change. Comfortably inside the single-PR gate; no decomposition needed.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+packages/talent/adapters/google_drive.py added on infrastructure.drive.factory.get_drive_provider(); create_role_folder/copy_template_to_role_folder own SRE_BOT_EMAIL delegation. modules/role/role.py migrated: dropped BOT_EMAIL, ROLE_SCOPES, and integrations.google_workspace.google_drive import; folder creation and all 7 template copies now route through talent_drive, with a copy_template() helper that aborts (return, no channel created) and logs talent_role_document_copy_failed on any classified Drive failure, matching the existing talent_role_folder_creation_failed abort path. Added missing app/packages/incident/drive/__init__.py, adapters/__init__.py, and app/tests/unit/packages/incident/drive/__init__.py (AC#7, mechanical, no behavior change). Repointed app/tests/modules/role/test_role.py patches to talent_drive; fixed one pre-authored test bug where the abort assertion referenced the wrong (already-succeeded) document label instead of the actually-failing one. Added app/tests/unit/packages/talent/adapters/test_talent_drive_adapter.py coverage (pre-authored, passing as-is). Verified: uv run pytest tests/unit/packages/talent tests/unit/packages/incident/drive tests/modules/role tests/unit/modules/role -q -> 34 passed; uv run ruff check . -> all checks passed; uv run mypy on modules/role, packages/talent, packages/incident/drive -> only 1 pre-existing baseline error in modules/role/role.py:update_modal_locale, unrelated to this change and present before it; uv run python bin/check_sdk_typing.py -> OK, no net-new anti-patterns; full suite via user's 'make test' -> all green. DoD items left for human verification: Step 8B's one-off manual Drive smoke check (dropping fields='id') was not run in this session - real Drive credentials required; recommend running before merge or accepting the field-projection risk as documented in the plan.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
