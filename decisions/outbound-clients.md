@@ -47,3 +47,13 @@ Clients **raise typed SDK exceptions**. They do not return `OperationResult`, do
 ## Migration
 
 Ticket: client-layer convergence (delete `infrastructure/clients/`, resolve `_next` twins, refactor `AWSShield`). Tolerated until closed: the seven baselined deprecated-client consumers; shield-shaped AWS client.
+
+**Change note (2026-09-08, adapter-boundary clarification):** The adaptation tier
+must translate vendor payloads and classify expected SDK errors, but it must not
+leak vendor-only concepts through a vendor-neutral Path A Protocol. Examples
+include Google Drive `appProperties`, Drive `q` expressions, and SDK field
+projection strings. Those details may be used by the Google implementation, or by
+a feature-owned Path B adapter when the feature explicitly depends on them; they
+are not canonical capability operations. A Path A contract is portable only when
+its operation names and models remain meaningful for at least one other plausible
+provider.

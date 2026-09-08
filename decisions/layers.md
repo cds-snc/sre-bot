@@ -69,3 +69,16 @@ app/integrations/     Outbound clients. Thin, vendor-specific, raise SDK excepti
 ## Migration
 
 Ticket: architecture epic. Tolerated divergences until closed: `_next.py` twins, Slack content still in `integrations/slack/`, the upward imports from `integrations/` into `infrastructure/`, and the non-tier top-level directories listed above (each held by its own ticket).
+
+**Change note (2026-09-08, Path A portability clarification):** A Path A capability
+must be shaped around operations that can be stated without naming one vendor's
+query language, response projection, authentication subject, or metadata model.
+Before adding a new capability contract, compare the intended operations against
+at least two plausible providers (for example Google Drive and Microsoft OneDrive)
+and keep only the shared capability surface in the Protocol and canonical models.
+Provider-specific features such as Google `appProperties`, raw field projections,
+and vendor query fragments remain inside the provider implementation or a
+feature-owned adapter. A legacy feature may continue using its existing vendor
+integration until its migration task is cut over; introducing a Path A capability
+does not make the legacy module an infrastructure consumer or require moving its
+vendor-specific behavior into the shared contract.
