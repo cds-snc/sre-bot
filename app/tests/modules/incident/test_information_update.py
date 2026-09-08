@@ -66,9 +66,9 @@ def test_generate_default_field_update_view():
 
 @patch("modules.incident.information_update.generate_date_field_update_view")
 @patch("modules.incident.information_update.datetime")
-@patch("modules.incident.information_update.utils")
+@patch("modules.incident.information_update.incident_utils")
 @patch("modules.incident.information_update.logger")
-def test_update_field_view_date_field(mock_logger, mock_utils, mock_datetime, mock_generate_date_field_update_view):
+def test_update_field_view_date_field(mock_logger, mock_incident_utils, mock_datetime, mock_generate_date_field_update_view):
     mock_client = MagicMock()
     body = {
         "channel_id": "C12345",
@@ -82,7 +82,7 @@ def test_update_field_view_date_field(mock_logger, mock_utils, mock_datetime, mo
         "23:31",
     ]
     # mock_datetime.strftime.side_effect = ["2009-02-13", "23:31"]
-    mock_utils.convert_utc_datetime_to_tz.return_value = "2009-02-13 23:31"
+    mock_incident_utils.convert_utc_datetime_to_tz.return_value = "2009-02-13 23:31"
     information_update.update_field_view(mock_client, body, "detection_time", incident_data)
     mock_logger.info.assert_called_once_with(
         "updating_field_view",
@@ -92,9 +92,9 @@ def test_update_field_view_date_field(mock_logger, mock_utils, mock_datetime, mo
     mock_generate_date_field_update_view.assert_called_once_with(mock_client, body, "detection_time", incident_data)
 
 
-@patch("modules.incident.information_update.utils")
+@patch("modules.incident.information_update.incident_utils")
 @patch("modules.incident.information_update.datetime")
-def test_generate_date_field_update_view(mock_datetime, mock_utils):
+def test_generate_date_field_update_view(mock_datetime, mock_incident_utils):
     incident_data = {"status": "data", "detection_time": "1234567890"}
     body = {
         "channel_id": "C12345",
@@ -110,7 +110,7 @@ def test_generate_date_field_update_view(mock_datetime, mock_utils):
 
     mock_converted_date = MagicMock()
     mock_converted_date.strftime.side_effect = ["2009-02-13", "23:31"]
-    mock_utils.convert_utc_datetime_to_tz.return_value = mock_converted_date
+    mock_incident_utils.convert_utc_datetime_to_tz.return_value = mock_converted_date
 
     view = information_update.generate_date_field_update_view(mock_client, body, "detection_time", incident_data)
 
@@ -173,7 +173,9 @@ def test_generate_date_field_update_view(mock_datetime, mock_utils):
         ],
     }
     mock_client.users_info.assert_called_once_with(user="U12345")
-    mock_utils.convert_utc_datetime_to_tz.assert_called_with(mock_datetime.fromtimestamp.return_value, "America/Montreal")
+    mock_incident_utils.convert_utc_datetime_to_tz.assert_called_with(
+        mock_datetime.fromtimestamp.return_value, "America/Montreal"
+    )
 
 
 @patch("modules.incident.information_update.generate_text_field_update_view")
@@ -314,7 +316,7 @@ def test_generate_drop_down_field_update_view():
 
 @patch("modules.incident.information_update.logger")
 @patch("modules.incident.information_update.datetime")
-@patch("modules.incident.information_update.utils")
+@patch("modules.incident.information_update.incident_utils")
 @patch("modules.incident.information_update.incident_document")
 @patch("modules.incident.information_update.incident_folder")
 @patch("modules.incident.information_update.information_display")
@@ -324,7 +326,7 @@ def test_handle_update_field_submission_date_type(
     mock_information_display,
     mock_incident_folder,
     mock_incident_document,
-    mock_utils,
+    mock_incident_utils,
     mock_datetime,
     mock_logger,
 ):
@@ -353,7 +355,7 @@ def test_handle_update_field_submission_date_type(
     }
     mock_client.users_info.return_value = {"user": {"tz": "America/Montreal"}}
     mock_datetime.strptime.return_value = datetime(2024, 1, 12, 12, 0)
-    mock_utils.convert_tz_datetime_to_utc.return_value = datetime.fromtimestamp(float(updated_value))
+    mock_incident_utils.convert_tz_datetime_to_utc.return_value = datetime.fromtimestamp(float(updated_value))
     mock_information_display.incident_information_view.return_value = {"view": [{"block": "block_id"}]}
 
     information_update.handle_update_field_submission(mock_client, body, mock_ack, view)
@@ -423,7 +425,7 @@ def test_handle_update_field_submission_text_type(
 
 
 @patch("modules.incident.information_update.logger")
-@patch("modules.incident.information_update.google_docs")
+@patch("modules.incident.information_update.utils")
 @patch("modules.incident.information_update.incident_document")
 @patch("modules.incident.information_update.incident_folder")
 @patch("modules.incident.information_update.information_display")
@@ -433,7 +435,7 @@ def test_handle_update_field_submission_dropdown_type(
     mock_information_display,
     mock_incident_folder,
     mock_incident_document,
-    mock_google_docs,
+    mock_utils,
     mock_logger,
 ):
     mock_client = MagicMock()
@@ -452,7 +454,7 @@ def test_handle_update_field_submission_dropdown_type(
         "user": {"id": incident_data["user_id"]},
         "view": {"root_view_id": "root_view_id"},
     }
-    mock_google_docs.extract_google_doc_id.return_value = "document_id"
+    mock_utils.extract_google_doc_id.return_value = "document_id"
     mock_information_display.incident_information_view.return_value = {"view": [{"block": "block_id"}]}
 
     information_update.handle_update_field_submission(mock_client, body, mock_ack, view)
@@ -467,7 +469,7 @@ def test_handle_update_field_submission_dropdown_type(
         channel=incident_data["channel_id"],
         text="<@user_id> has updated the field status to Closed",
     )
-    mock_google_docs.extract_google_doc_id.assert_called_once_with("report_url")
+    mock_utils.extract_google_doc_id.assert_called_once_with("report_url")
     mock_incident_document.update_incident_document_status.assert_called_once_with("document_id", "Closed")
     mock_incident_folder.update_spreadsheet_incident_status.assert_called_once_with(incident_data["channel_name"], "Closed")
 

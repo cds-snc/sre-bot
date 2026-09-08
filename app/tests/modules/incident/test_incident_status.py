@@ -9,9 +9,9 @@ from modules.incident import incident_status
 @patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_folder")
 @patch("modules.incident.incident_status.incident_document")
-@patch("modules.incident.incident_status.google_docs")
+@patch("modules.incident.incident_status.utils")
 def test_update_status_success(
-    mock_google_docs,
+    mock_utils,
     mock_incident_document,
     mock_incident_folder,
     mock_db_operations,
@@ -33,14 +33,14 @@ def test_update_status_success(
             }
         ],
     }
-    mock_google_docs.extract_google_doc_id.return_value = "1234567890"
+    mock_utils.extract_google_doc_id.return_value = "1234567890"
     mock_incident_folder.update_spreadsheet_incident_status.return_value = True
     mock_incident_folder.return_channel_name.return_value = "123"
 
     incident_status.update_status(client, respond, status, channel_id, channel_name, user_id)
 
     client.bookmarks_list.assert_called_once_with(channel_id=channel_id)
-    mock_google_docs.extract_google_doc_id.assert_called_once_with("https://docs.google.com/document/d/1234567890/edit")
+    mock_utils.extract_google_doc_id.assert_called_once_with("https://docs.google.com/document/d/1234567890/edit")
     mock_incident_document.update_incident_document_status.assert_called_once_with("1234567890", status)
 
     mock_incident_folder.update_spreadsheet_incident_status.assert_called_once_with(
@@ -59,9 +59,9 @@ def test_update_status_success(
 @patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_folder")
 @patch("modules.incident.incident_status.incident_document")
-@patch("modules.incident.incident_status.google_docs")
+@patch("modules.incident.incident_status.utils")
 def test_update_status_success_with_incident_id(
-    mock_google_docs,
+    mock_utils,
     mock_incident_document,
     mock_incident_folder,
     mock_db_operations,
@@ -84,14 +84,14 @@ def test_update_status_success_with_incident_id(
             }
         ],
     }
-    mock_google_docs.extract_google_doc_id.return_value = "1234567890"
+    mock_utils.extract_google_doc_id.return_value = "1234567890"
     mock_incident_folder.update_spreadsheet_incident_status.return_value = True
     mock_incident_folder.return_channel_name.return_value = "123"
 
     incident_status.update_status(client, respond, status, channel_id, channel_name, user_id, incident_id)
 
     client.bookmarks_list.assert_called_once_with(channel_id=channel_id)
-    mock_google_docs.extract_google_doc_id.assert_called_once_with("https://docs.google.com/document/d/1234567890/edit")
+    mock_utils.extract_google_doc_id.assert_called_once_with("https://docs.google.com/document/d/1234567890/edit")
     mock_incident_document.update_incident_document_status.assert_called_once_with("1234567890", status)
 
     mock_incident_folder.update_spreadsheet_incident_status.assert_called_once_with(
@@ -108,11 +108,11 @@ def test_update_status_success_with_incident_id(
 @patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_document")
 @patch("modules.incident.incident_status.incident_folder")
-@patch("modules.incident.incident_status.google_docs")
+@patch("modules.incident.incident_status.utils")
 @patch("modules.incident.incident_status.logger")
 def test_update_status_handles_bookmarks_list_errors(
     mock_logger,
-    mock_google_docs,
+    mock_utils,
     mock_incident_folder,
     mock_incident_document,
     mock_db_operations,
@@ -155,11 +155,11 @@ def test_update_status_handles_bookmarks_list_errors(
 @patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_document")
 @patch("modules.incident.incident_status.incident_folder")
-@patch("modules.incident.incident_status.google_docs")
+@patch("modules.incident.incident_status.utils")
 @patch("modules.incident.incident_status.logger")
 def test_update_status_handles_update_document_errors(
     mock_logger,
-    mock_google_docs,
+    mock_utils,
     mock_incident_folder,
     mock_incident_document,
     mock_db_operations,
@@ -180,7 +180,7 @@ def test_update_status_handles_update_document_errors(
             }
         ],
     }
-    mock_google_docs.extract_google_doc_id.return_value = "1234567890"
+    mock_utils.extract_google_doc_id.return_value = "1234567890"
     mock_incident_document.update_incident_document_status.side_effect = Exception("error_document")
     incident_status.update_status(client, respond, status, channel_id, channel_name, user_id)
     logger_calls = [
@@ -204,11 +204,11 @@ def test_update_status_handles_update_document_errors(
 @patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_document")
 @patch("modules.incident.incident_status.incident_folder")
-@patch("modules.incident.incident_status.google_docs")
+@patch("modules.incident.incident_status.utils")
 @patch("modules.incident.incident_status.logger")
 def test_update_status_handles_update_spreadsheet_errors(
     mock_logger,
-    mock_google_docs,
+    mock_utils,
     mock_incident_folder,
     mock_incident_document,
     mock_db_operations,
@@ -232,7 +232,7 @@ def test_update_status_handles_update_spreadsheet_errors(
         }
     )
 
-    mock_google_docs.extract_google_doc_id.return_value = "1234567890"
+    mock_utils.extract_google_doc_id.return_value = "1234567890"
     mock_incident_folder.update_spreadsheet_incident_status.side_effect = Exception("error_spreadsheet")
     incident_status.update_status(client, respond, status, channel_id, channel_name, user_id)
     logger_calls = [
@@ -257,11 +257,11 @@ def test_update_status_handles_update_spreadsheet_errors(
 @patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_document")
 @patch("modules.incident.incident_status.incident_folder")
-@patch("modules.incident.incident_status.google_docs")
+@patch("modules.incident.incident_status.utils")
 @patch("modules.incident.incident_status.logger")
 def test_update_status_handles_chat_postMessage_errors(
     mock_logger,
-    mock_google_docs,
+    mock_utils,
     mock_incident_folder,
     mock_incident_document,
     mock_db_operations,

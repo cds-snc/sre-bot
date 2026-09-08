@@ -5,15 +5,17 @@ from slack_bolt import Ack
 from slack_sdk import WebClient
 from structlog import get_logger
 
-from integrations.google_workspace import google_docs
 from models.incidents import Incident
 from modules.incident import (
     db_operations,
     incident_document,
     incident_folder,
     information_display,
-    utils,
 )
+from modules.incident import (
+    utils as incident_utils,
+)
+from packages.incident.documents import utils
 
 FIELD_SCHEMA = {
     "detection_time": {"type": "datetime"},
@@ -102,9 +104,9 @@ def generate_date_field_update_view(client: WebClient, body, action, incident_da
 
     user_info = client.users_info(user=body["user"]["id"])["user"]
     tz = user_info["tz"]
-    now = utils.convert_utc_datetime_to_tz(datetime.now(), tz)
+    now = incident_utils.convert_utc_datetime_to_tz(datetime.now(), tz)
     if incident_data[action] != "Unknown":
-        now = utils.convert_utc_datetime_to_tz(datetime.fromtimestamp(float(incident_data[action])), tz)
+        now = incident_utils.convert_utc_datetime_to_tz(datetime.fromtimestamp(float(incident_data[action])), tz)
     initial_date = now.strftime("%Y-%m-%d")
     initial_time = now.strftime("%H:%M")
     return {
@@ -286,7 +288,7 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view):
             date = view["state"]["values"]["date_input"]["date_picker"]["selected_date"]
             time = view["state"]["values"]["time_input"]["time_picker"]["selected_time"]
             date_time = datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
-            value = str(utils.convert_tz_datetime_to_utc(date_time, tz).timestamp())
+            value = str(incident_utils.convert_tz_datetime_to_utc(date_time, tz).timestamp())
             value_type = "S"
             message += f"{date} {time}"
         case "text":
@@ -306,7 +308,7 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view):
             return
     if value and value_type:
         if action == "status" and isinstance(value, str):
-            document_id = google_docs.extract_google_doc_id(report_url)
+            document_id = utils.extract_google_doc_id(report_url)
             incident_document.update_incident_document_status(document_id, value)
             incident_folder.update_spreadsheet_incident_status(channel_name, value)
 
