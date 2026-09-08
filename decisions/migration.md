@@ -50,3 +50,13 @@ scope: The strangler-fig plan for legacy app/modules/ and the coexistence rules 
 **Change note (2026-09-03, post-acceptance):** added coexistence rule 5, permitting relocation of host-surface-free pure logic out of frozen modules into a real `packages/<concern>/` home ahead of that module's full migration, grounded in the already-shipped `packages/incident_draft`/`packages/incident_summary` precedent. Motivated by TASK-25.1.6.2 (Google Workspace vendor-mirror cleanup), which needed a non-legacy home for pure Calendar-availability helpers living inside `app/integrations/google_workspace/` and consumed only by `app/modules/incident/schedule_retro.py`.
 
 **Change note (2026-09-03, second amendment):** closed rule 5's open shape/naming question. [feature-packages.md](feature-packages.md) now decides it — complex features get an umbrella directory with subdomain subpackages, and flat `<feature>_<subfeature>` naming is rejected — so rule 5 destinations are stated as final umbrella positions rather than deferred. `packages/incident_draft` and `packages/incident_summary` become named deviations relocated by TASK-38.
+
+**Change note (2026-09-08, infrastructure coexistence clarification):** Adding a
+shared infrastructure capability is an expand step, not a legacy-module cutover.
+Until the feature's migration slice is complete, the legacy module may continue
+calling its existing vendor integration, including feature-specific metadata
+conventions. The new capability must not be widened to reproduce those conventions
+merely to make the legacy module an immediate consumer. The feature adapter owns
+vendor-specific behavior during migration, and the old integration is removed
+only after all approved consumers have moved and the final cleanup task permits
+its deletion.

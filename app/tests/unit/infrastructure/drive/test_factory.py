@@ -46,7 +46,6 @@ def test_get_drive_provider_uses_scoped_google_service_factory(monkeypatch):
     drive_factory.get_drive_provider.cache_clear()
 
     drive_settings = SimpleNamespace(provider="google")
-    workspace_settings = SimpleNamespace(SRE_BOT_EMAIL="sre-bot@example.com")
     captured = {}
 
     def fake_builder(*, get_service, drive_settings):
@@ -61,7 +60,6 @@ def test_get_drive_provider_uses_scoped_google_service_factory(monkeypatch):
         return MagicMock()
 
     monkeypatch.setattr(drive_factory, "get_drive_settings", lambda: drive_settings)
-    monkeypatch.setattr(drive_factory, "get_google_workspace_settings", lambda: workspace_settings, raising=False)
     monkeypatch.setattr(drive_factory, "get_drive_service", fake_get_drive_service, raising=False)
     monkeypatch.setattr(drive_factory, "build_google_drive_provider", fake_builder)
 
@@ -73,7 +71,7 @@ def test_get_drive_provider_uses_scoped_google_service_factory(monkeypatch):
     scoped_get_service = captured["get_service"]
     assert callable(scoped_get_service)
 
-    scoped_get_service(["https://www.googleapis.com/auth/drive"])
+    scoped_get_service(["https://www.googleapis.com/auth/drive"], "caller@example.com")
     assert observed_service_calls == [
-        (["https://www.googleapis.com/auth/drive"], "sre-bot@example.com"),
+        (["https://www.googleapis.com/auth/drive"], "caller@example.com"),
     ]

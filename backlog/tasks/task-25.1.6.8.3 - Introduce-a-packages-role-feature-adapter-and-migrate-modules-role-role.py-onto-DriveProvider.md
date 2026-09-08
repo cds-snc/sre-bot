@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-08 18:58'
+updated_date: '2026-09-08 20:12'
 labels:
   - clients
   - phase-3
@@ -45,3 +46,12 @@ NOT IN SCOPE: modules/incident/*, jobs/scheduled_tasks.py, modules/reports/googl
 - [ ] #3 Existing test_role.py Drive-related coverage is preserved at the new boundary
 - [ ] #4 Focused tests, ruff, mypy, and app/bin/check_sdk_typing.py pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-08 20:12
+---
+2026-09-08 portability confirmation: this task can proceed unchanged against the adjusted DriveProvider. create_folder and copy_file_to_folder are shared file/folder capabilities; the role adapter preserves BOT_EMAIL by passing delegated_user_email through the Google implementation boundary, while modules/role/role.py calls only the role adapter. No metadata or other Google-only behavior is involved. Keep the adapter domain-oriented and preserve the existing return shapes and failure logging.
+---
+<!-- COMMENTS:END -->

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-08 18:57'
-updated_date: '2026-09-08 18:57'
+updated_date: '2026-09-08 20:12'
 labels:
   - clients
   - phase-3
@@ -60,5 +60,10 @@ NOT IN SCOPE: modules/role/role.py (TASK-25.1.6.8.3, different feature, differen
 created: 2026-09-08 18:57
 ---
 TASK-81 created (2026-09-08) as the linked Slack pagination/search follow-up for LEGACY_FOLDER_DISPLAY_LIMIT. AC#4 updated to reference it by ID instead of describing it generically.
+---
+
+created: 2026-09-08 20:12
+---
+2026-09-08 portability adjustment: this task remains implementable, but its adapter boundary must distinguish common Drive operations from incident-specific Google metadata. Migrate core.py, incident_document.py, incident_folder.py, incident_roles.py, and scheduled_tasks.py so consumers call the incident-owned adapter only. The adapter uses DriveProvider for folder/file listing, template creation, and name lookup. It owns appProperties reads/writes and the incident-template health check as Google-specific feature behavior, temporarily delegating to the legacy google_workspace.google_drive metadata helpers (or an equivalent adapter-local classified client call) until TASK-25.1.6.10 removes that integration. Do not restore get_metadata/set_metadata_property/delete_metadata_property to the vendor-neutral DriveProvider; revise AC#3's wording from DriveProvider.get_metadata to the incident adapter's Google metadata helper. This is a full consumer migration: legacy modules/jobs no longer import the Google integration directly; only the feature adapter may retain the temporary vendor dependency.
 ---
 <!-- COMMENTS:END -->

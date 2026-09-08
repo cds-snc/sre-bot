@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-09-08 18:55'
-updated_date: '2026-09-08 19:49'
+updated_date: '2026-09-08 20:09'
 labels:
   - clients
   - phase-3
@@ -126,4 +126,15 @@ DOUBTS FOR HUMAN REVIEW (not resolved unilaterally):
 
 <!-- SECTION:NOTES:BEGIN -->
 Implemented the initial infrastructure/drive package and tests. Verified: make test is green (user-run); uv run pytest tests/unit/infrastructure/drive -q: 12 passed; uv run mypy infrastructure/drive: passed; uv run ruff check .: passed. AC 1, 3, 4, and 7 remain open: the Protocol/Google adapter currently implement only list_files, list_folders, and copy_file_to_folder; the factory currently pre-binds delegated_user_email despite the approved per-call delegation contract; app/bin/check_sdk_typing.py has not yet been run.
+
+Scope correction verified: DriveFile and DriveProvider now expose only vendor-neutral file/folder capability operations; Google appProperties and metadata operations remain in the legacy Google integration for feature migration. Decision records updated: decisions/layers.md, decisions/outbound-clients.md, decisions/migration.md. Validation: uv run pytest tests/unit/infrastructure/drive -q (19 passed); uv run ruff check infrastructure/drive tests/unit/infrastructure/drive (passed); uv run mypy infrastructure/drive (passed); uv run python bin/check_sdk_typing.py (passed). Full repository mypy remains blocked by pre-existing unrelated errors and an environment cache deserialization failure.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-08 20:07
+---
+2026-09-08 architecture clarification: narrowed the new Path A Drive capability to vendor-neutral file/folder operations. Removed Google appProperties and metadata methods from DriveFile/DriveProvider/GoogleDriveProvider; legacy incident metadata remains in integrations.google_workspace.google_drive.py until the feature adapter migration. Updated decisions/layers.md, decisions/outbound-clients.md, and decisions/migration.md to require comparison against at least two plausible providers and keep vendor-specific projections, query fragments, authentication subjects, and metadata at adapter boundaries. Existing AC #1/description still name metadata and should be reconciled by the task owner.
+---
+<!-- COMMENTS:END -->
