@@ -1,10 +1,70 @@
 from structlog import get_logger
 
+from infrastructure.directory import get_directory_provider
+from infrastructure.directory.models import DirectoryGroupWithMembers, DirectoryUser
 from integrations.aws import identity_store
-from integrations.google_workspace import google_directory
+from modules.provisioning import users
 from utils import filters
 
 logger = get_logger()
+
+
+class DirectoryGroupsUnavailableError(Exception):
+    """Raised when a directory provider cannot supply the group list."""
+
+    def __init__(self, message: str, error_code: str | None = None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.error_code = error_code
+
+
+def _google_groups_to_legacy_shape(
+    provider_groups: tuple[DirectoryGroupWithMembers, ...],
+    directory_users: list[DirectoryUser],
+    log,
+) -> list[dict]:
+    user_by_email = {user.email.lower(): user for user in directory_users}
+    legacy_groups: list[dict] = []
+
+    for provider_group in provider_groups:
+        resolved_members: list[dict] = []
+        for member in provider_group.members:
+            member_email = (member.email or "").lower()
+            matched_user = user_by_email.get(member_email)
+            if matched_user is None:
+                log.warning(
+                    "google_group_member_unresolved",
+                    group_email=provider_group.group.group_email,
+                    member_email=member_email,
+                )
+                continue
+            resolved_members.append(
+                {
+                    "primaryEmail": matched_user.email,
+                    "email": matched_user.email,
+                    "name": {
+                        "givenName": matched_user.given_name or "",
+                        "familyName": matched_user.family_name or "",
+                    },
+                }
+            )
+
+        if not resolved_members:
+            log.warning(
+                "google_group_dropped_no_resolvable_members",
+                group_email=provider_group.group.group_email,
+            )
+            continue
+
+        legacy_groups.append(
+            {
+                "email": provider_group.group.group_email,
+                "name": provider_group.group.name or "",
+                "members": resolved_members,
+            }
+        )
+
+    return legacy_groups
 
 
 def get_groups_from_integration(
@@ -47,10 +107,29 @@ def get_groups_from_integration(
                 service="Google Groups",
                 query=query,
             )
-            groups = google_directory.list_groups_with_members(
-                groups_filters=pre_processing_filters,
-                query=query,
-            )
+            result = get_directory_provider().list_groups_with_members(query=query or "")
+            if not result.is_success:
+                log.error(
+                    "list_groups_with_members_failed",
+                    error_code=result.error_code,
+                    error=result.message,
+                )
+                raise DirectoryGroupsUnavailableError(result.message, result.error_code)
+
+            if result.data is not None:
+                for failure in result.data.failures:
+                    log.warning(
+                        "google_group_list_failed",
+                        group_email=failure.group_email,
+                        status=failure.status.name,
+                        error_code=failure.error_code,
+                        message=failure.message,
+                    )
+
+                directory_users = users.get_users_from_integration("google_directory")
+                groups = _google_groups_to_legacy_shape(result.data.groups, directory_users, log)
+                for filter in pre_processing_filters:
+                    groups = filters.filter_by_condition(groups, filter)
             integration_name = "Google"
             group_display_key = "name"
             members = "members"

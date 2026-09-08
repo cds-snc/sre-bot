@@ -3,7 +3,6 @@
 import random
 import re
 import string
-import time
 
 import structlog
 
@@ -88,36 +87,3 @@ def generate_unique_id():
     unique_id = "-".join(segments)
 
     return unique_id
-
-
-def retry_request(
-    func,
-    *args,
-    max_attempts=3,
-    delay=1,
-    **kwargs,
-):
-    """Retry a function up to a maximum number of attempts with a delay between each attempt.
-
-    Args:
-        func (function): The function to call.
-        max_attempts (int): The maximum number of attempts to make.
-        delay (int): The delay between each attempt in seconds.
-        *args: Positional arguments to pass to the function.
-        **kwargs: Keyword arguments to pass to the function.
-
-    Returns:
-        Any: The result of the function call.
-    """
-    log = logger.bind(func=func.__name__, max_attempts=max_attempts)
-    for i in range(max_attempts):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            if i == max_attempts - 1:
-                log.warning("retry_request_failed", error=str(e))
-                raise e
-            else:
-                log.warning("retry_request_attempt", error=str(e), attempt=i + 1)
-            time.sleep(delay)
-            continue

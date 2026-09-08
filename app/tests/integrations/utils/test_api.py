@@ -1,5 +1,4 @@
 import string
-from unittest.mock import MagicMock, call, patch
 
 import pytest
 
@@ -11,7 +10,6 @@ from integrations.utils.api import (
     convert_string_to_camel_case,
     convert_string_to_pascal_case,
     generate_unique_id,
-    retry_request,
 )
 
 
@@ -243,78 +241,3 @@ def test_no_illegal_characters():
     assert not any(char in illegal_chars for char in unique_id.replace("-", "")), (
         "ID should not have uppercase or special characters"
     )
-
-
-def test_retry_request_success():
-    mock_func = MagicMock(return_value="success")
-    mock_func.__name__ = "test_func"
-    result = retry_request(mock_func, max_attempts=3, delay=1)
-    assert result == "success"
-    mock_func.assert_called_once()
-
-
-@patch("integrations.utils.api.logger")
-def test_retry_request_success_after_retries(mock_logger):
-    mock_func = MagicMock(side_effect=[Exception("fail"), Exception("fail"), "success"])
-    mock_func.__name__ = "test_func"
-    bound_logger_mock = mock_logger.bind.return_value
-    result = retry_request(mock_func, max_attempts=3, delay=1)
-    assert result == "success"
-    assert mock_func.call_count == 3
-    assert bound_logger_mock.warning.call_count == 2
-    assert bound_logger_mock.warning.call_args_list == [
-        call("retry_request_attempt", error="fail", attempt=1),
-        call("retry_request_attempt", error="fail", attempt=2),
-    ]
-
-
-def test_retry_request_failure():
-    mock_func = MagicMock(side_effect=Exception("fail"))
-    mock_func.__name__ = "test_func"
-    with pytest.raises(Exception, match="fail"):
-        retry_request(mock_func, max_attempts=3, delay=1)
-    assert mock_func.call_count == 3
-
-
-@patch("time.sleep", return_value=None)
-def test_retry_request_delay(mock_sleep):
-    mock_func = MagicMock(side_effect=[Exception("fail"), "success"])
-    mock_func.__name__ = "test_func"
-    result = retry_request(mock_func, max_attempts=3, delay=2)
-    assert result == "success"
-    assert mock_func.call_count == 2
-    mock_sleep.assert_called_once_with(2)
-
-
-@patch("integrations.utils.api.logger")
-def test_retry_request_logging(mock_logger: MagicMock):
-    mock_func = MagicMock(side_effect=Exception("fail"))
-    mock_func.__name__ = "test_func"
-    bound_logger_mock = mock_logger.bind.return_value
-    with pytest.raises(Exception, match="fail"):
-        retry_request(mock_func, max_attempts=3, delay=1)
-    assert mock_func.call_count == 3
-    assert bound_logger_mock.warning.call_count == 3
-    bound_logger_mock.warning.assert_has_calls(
-        [
-            call("retry_request_attempt", error="fail", attempt=1),
-            call("retry_request_attempt", error="fail", attempt=2),
-            call("retry_request_failed", error="fail"),
-        ]
-    )
-
-
-def test_retry_request_passes_args_and_kwargs():
-    mock_func = MagicMock(return_value="success")
-    mock_func.__name__ = "test_func"
-    result = retry_request(
-        mock_func,
-        "arg1",
-        "arg2",
-        max_attempts=3,
-        delay=1,
-        kwarg1="kwarg1",
-        kwarg2="kwarg2",
-    )
-    assert result == "success"
-    mock_func.assert_called_once_with("arg1", "arg2", kwarg1="kwarg1", kwarg2="kwarg2")
