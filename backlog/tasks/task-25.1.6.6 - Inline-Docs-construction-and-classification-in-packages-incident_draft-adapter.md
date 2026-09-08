@@ -1,11 +1,11 @@
 ---
 id: TASK-25.1.6.6
 title: Inline Docs construction and classification in packages incident_draft adapter
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-02 15:01'
-updated_date: '2026-09-08 16:01'
+updated_date: '2026-09-08 16:16'
 labels:
   - clients
   - phase-3
