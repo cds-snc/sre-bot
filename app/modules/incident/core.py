@@ -6,7 +6,7 @@ from structlog import get_logger
 
 from infrastructure.configuration.app import get_app_settings
 from infrastructure.configuration.features.incident import get_incident_settings
-from integrations.google_workspace import google_drive, meet
+from integrations.google_workspace import meet
 from models.incidents import IncidentPayload
 from modules.incident import (
     db_operations,
@@ -14,6 +14,7 @@ from modules.incident import (
     incident_folder,
     on_call,
 )
+from packages.incident.drive.adapters import google_drive as incident_drive
 
 app_settings = get_app_settings()
 incident_settings = get_incident_settings()
@@ -167,7 +168,7 @@ def _create_document_bookmark(
         document_link = None
 
         # Search for document by name in the folder
-        files = google_drive.list_files_in_folder(folder_id)
+        files = incident_drive.list_folder_files(folder_id)
         for file in files:
             if slug in file.get("name", ""):
                 document_id = file["id"]

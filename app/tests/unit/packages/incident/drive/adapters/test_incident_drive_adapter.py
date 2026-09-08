@@ -1,5 +1,7 @@
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
+
+from infrastructure.drive.models import DriveFile
+from infrastructure.operations import OperationResult
 
 
 @patch("packages.incident.drive.adapters.google_drive.get_drive_provider")
@@ -7,11 +9,11 @@ def test_list_child_folders_filters_templates_from_results(mock_get_provider):
     from packages.incident.drive.adapters import google_drive
 
     provider = MagicMock()
-    provider.list_folders.return_value = MagicMock(
+    provider.list_folders.return_value = OperationResult.success(
         data=[
-            SimpleNamespace(id="folder-1", name="Alpha"),
-            SimpleNamespace(id="folder-2", name="Release Templates"),
-            SimpleNamespace(id="folder-3", name="Beta"),
+            DriveFile(id="folder-1", name="Alpha"),
+            DriveFile(id="folder-2", name="Release Templates"),
+            DriveFile(id="folder-3", name="Beta"),
         ]
     )
     mock_get_provider.return_value = provider
@@ -27,9 +29,9 @@ def test_find_document_by_channel_name_enriches_match_with_app_properties(mock_g
     from packages.incident.drive.adapters import google_drive
 
     provider = MagicMock()
-    provider.find_files_by_name.return_value = [
-        SimpleNamespace(id="doc-1", name="incident-2024-001"),
-    ]
+    provider.find_files_by_name.return_value = OperationResult.success(
+        data=[DriveFile(id="doc-1", name="incident-2024-001")]
+    )
     mock_get_provider.return_value = provider
 
     with patch.object(google_drive, "get_legacy_google_drive", return_value=MagicMock()) as mock_legacy:

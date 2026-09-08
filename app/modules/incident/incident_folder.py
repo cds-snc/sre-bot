@@ -16,8 +16,9 @@ from structlog import get_logger
 
 from infrastructure.configuration.integrations.google import get_google_resources_config
 from integrations.aws import dynamodb
-from integrations.google_workspace import google_drive, sheets
+from integrations.google_workspace import sheets
 from modules.incident import db_operations
+from packages.incident.drive.adapters import google_drive as incident_drive
 
 google_resources = get_google_resources_config()
 SRE_INCIDENT_FOLDER = google_resources.incident_folder_id
@@ -30,14 +31,14 @@ LEGACY_FOLDER_DISPLAY_LIMIT = 25
 
 
 def list_incident_folders():
-    folders = google_drive.list_folders_in_folder(SRE_INCIDENT_FOLDER, "not name contains 'Templates'")
+    folders = incident_drive.list_child_folders(SRE_INCIDENT_FOLDER)
     folders.sort(key=lambda x: x["name"])
     return folders[:LEGACY_FOLDER_DISPLAY_LIMIT]
 
 
 def list_folders_view(client: WebClient, body, ack: Ack):
     ack()
-    folders = google_drive.list_folders_in_folder(SRE_INCIDENT_FOLDER, "not name contains 'Templates'")
+    folders = incident_drive.list_child_folders(SRE_INCIDENT_FOLDER)
     folders.sort(key=lambda x: x["name"])
     folders = folders[:LEGACY_FOLDER_DISPLAY_LIMIT]
     blocks = {
@@ -54,7 +55,7 @@ def delete_folder_metadata(client: WebClient, body, ack):
     ack()
     folder_id = body["view"]["private_metadata"]
     key = body["actions"][0]["value"]
-    response = google_drive.delete_metadata(folder_id, key)
+    response = incident_drive.delete_metadata(folder_id, key)
     if not response:
         logger.warning(
             "metadata_delete_failed",
@@ -76,7 +77,7 @@ def save_metadata(client: WebClient, body, ack, view):
     folder_id = view["private_metadata"]
     key = view["state"]["values"]["key"]["key"]["value"]
     value = view["state"]["values"]["value"]["value"]["value"]
-    google_drive.add_metadata(folder_id, key, value)
+    incident_drive.add_metadata(folder_id, key, value)
     body["actions"] = [{"value": folder_id}]
     del body["view"]
     view_folder_metadata(client, body, ack)
@@ -84,7 +85,7 @@ def save_metadata(client: WebClient, body, ack, view):
 
 def get_folder_metadata(folder_id) -> dict:
     """Get metadata for a folder."""
-    return google_drive.list_metadata(folder_id, fields="id, name, appProperties")
+    return incident_drive.get_metadata(folder_id, fields="id, name, appProperties")
 
 
 def view_folder_metadata(client, body, ack):
@@ -94,7 +95,7 @@ def view_folder_metadata(client, body, ack):
         "view_folder_metadata",
         folder_id=folder_id,
     )
-    folder = google_drive.list_metadata(folder_id, fields="id, name, appProperties")
+    folder = incident_drive.get_metadata(folder_id, fields="id, name, appProperties")
     blocks = {
         "type": "modal",
         "callback_id": "view_folder_metadata_modal",

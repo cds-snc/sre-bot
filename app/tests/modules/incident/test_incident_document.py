@@ -18,11 +18,11 @@ def create_mock_document(content):
 
 
 @patch("modules.incident.incident_document.INCIDENT_TEMPLATE", "test_template_id")
-@patch("modules.incident.incident_document.google_drive")
-def test_create_incident_document_calls_create_file_from_template(mock_google_drive):
+@patch("modules.incident.incident_document.incident_drive")
+def test_create_incident_document_calls_create_file_from_template(mock_incident_drive):
     title = "Incident 123"
     folder = "test_folder_id"
-    mock_google_drive.create_file_from_template.return_value = {
+    mock_incident_drive.create_document_from_template.return_value = {
         "id": "test_document_id",
         "name": title,
     }
@@ -30,7 +30,7 @@ def test_create_incident_document_calls_create_file_from_template(mock_google_dr
     response = incident_document.create_incident_document(title, folder)
     assert response == "test_document_id"
 
-    mock_google_drive.create_file_from_template.assert_called_once_with(title, folder, "test_template_id")
+    mock_incident_drive.create_document_from_template.assert_called_once_with(title, folder, "test_template_id")
 
 
 @patch("modules.incident.incident_document.datetime")

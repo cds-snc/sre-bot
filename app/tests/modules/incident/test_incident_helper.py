@@ -11,7 +11,7 @@ VALID_STATUS = incident_helper.VALID_STATUS
 # Legacy command tests to be removed once transition period is over
 
 
-@patch("modules.incident.incident_helper.google_drive.create_folder")
+@patch("modules.incident.incident_helper.incident_drive.create_folder")
 def test_legacy_handle_incident_command_with_create_command(mock_create_folder):
     mock_create_folder.return_value = {"id": "test_id", "name": "foo bar"}
     respond = MagicMock()
@@ -30,7 +30,7 @@ def test_legacy_handle_incident_command_with_create_command(mock_create_folder):
     )
 
 
-@patch("modules.incident.incident_helper.google_drive.create_folder")
+@patch("modules.incident.incident_helper.incident_drive.create_folder")
 def test_legacy_handle_incident_command_with_create_command_error(mock_create_folder):
     mock_create_folder.return_value = None
     respond = MagicMock()
@@ -420,7 +420,7 @@ Use `/sre incident help` to see a list of commands."""
     respond.assert_called_once_with(product_help_text)
 
 
-@patch("modules.incident.incident_helper.google_drive.create_folder")
+@patch("modules.incident.incident_helper.incident_drive.create_folder")
 def test_handle_products_with_create(mock_create_folder):
     mock_create_folder.return_value = {"id": "test_id", "name": "foo bar"}
     respond = MagicMock()
@@ -432,7 +432,7 @@ def test_handle_products_with_create(mock_create_folder):
     respond.assert_called_once_with("Product `foo bar` created.")
 
 
-@patch("modules.incident.incident_helper.google_drive.create_folder")
+@patch("modules.incident.incident_helper.incident_drive.create_folder")
 def test_handle_products_create_without_name(mock_create_folder):
     respond = MagicMock()
     ack = MagicMock()
@@ -442,7 +442,7 @@ def test_handle_products_create_without_name(mock_create_folder):
     respond.assert_called_once_with("Please provide a product name using `create <product_name>`")
 
 
-@patch("modules.incident.incident_helper.google_drive.create_folder")
+@patch("modules.incident.incident_helper.incident_drive.create_folder")
 def test_handle_products_with_create_error(mock_create_folder):
     mock_create_folder.return_value = None
     respond = MagicMock()

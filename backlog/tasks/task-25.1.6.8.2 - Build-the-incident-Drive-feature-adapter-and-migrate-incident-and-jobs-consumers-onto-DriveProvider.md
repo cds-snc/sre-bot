@@ -3,10 +3,11 @@ id: TASK-25.1.6.8.2
 title: >-
   Build the incident Drive feature adapter and migrate incident and jobs
   consumers onto DriveProvider
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-08 18:57'
-updated_date: '2026-09-08 21:06'
+updated_date: '2026-09-08 22:46'
 labels:
   - clients
   - phase-3
@@ -51,13 +52,13 @@ NOT IN SCOPE: modules/role/role.py (TASK-25.1.6.8.3), modules/reports/google_gro
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A new packages/incident/drive/adapters/google_drive.py (no hookimpl, empty subdomain __init__.py) exposes domain-oriented functions for folder/file listing, folder creation, template-based file creation, and name lookup, built on infrastructure.drive.factory.get_drive_provider(), never constructing GoogleDriveProvider directly
-- [ ] #2 core.py, incident_document.py, incident_folder.py, incident_helper.py, incident_roles.py, and jobs/scheduled_tasks.py call the adapter; none imports integrations.google_workspace.google_drive
-- [ ] #3 Metadata operations (add/delete/get appProperties) and the incident-template health check are exposed by the adapter as thin pass-throughs to the legacy integrations.google_workspace.google_drive module, not a generic DriveProvider method (DriveProvider has no metadata operations)
-- [ ] #4 The Templates-folder exclusion is applied by the adapter filtering DriveFile.name client-side, not by passing a vendor-specific query string through DriveProvider; infrastructure/drive/provider.py is not modified by this task
-- [ ] #5 LEGACY_FOLDER_DISPLAY_LIMIT is left unchanged with its TASK-81 reference intact; this task does not implement the real Slack pagination/search fix
-- [ ] #6 Existing incident/jobs Drive test coverage (test_incident_document.py, test_incident_folder.py, test_incident_helper.py, test_incident_roles.py, test_recreate_missing_resources.py, test_scheduled_tasks_integration.py) is preserved at the new boundary, plus new unit tests for the adapter itself
-- [ ] #7 Focused tests, ruff, mypy, and app/bin/check_sdk_typing.py pass
+- [x] #1 A new packages/incident/drive/adapters/google_drive.py (no hookimpl, empty subdomain __init__.py) exposes domain-oriented functions for folder/file listing, folder creation, template-based file creation, and name lookup, built on infrastructure.drive.factory.get_drive_provider(), never constructing GoogleDriveProvider directly
+- [x] #2 core.py, incident_document.py, incident_folder.py, incident_helper.py, incident_roles.py, and jobs/scheduled_tasks.py call the adapter; none imports integrations.google_workspace.google_drive
+- [x] #3 Metadata operations (add/delete/get appProperties) and the incident-template health check are exposed by the adapter as thin pass-throughs to the legacy integrations.google_workspace.google_drive module, not a generic DriveProvider method (DriveProvider has no metadata operations)
+- [x] #4 The Templates-folder exclusion is applied by the adapter filtering DriveFile.name client-side, not by passing a vendor-specific query string through DriveProvider; infrastructure/drive/provider.py is not modified by this task
+- [x] #5 LEGACY_FOLDER_DISPLAY_LIMIT is left unchanged with its TASK-81 reference intact; this task does not implement the real Slack pagination/search fix
+- [x] #6 Existing incident/jobs Drive test coverage (test_incident_document.py, test_incident_folder.py, test_incident_helper.py, test_incident_roles.py, test_recreate_missing_resources.py, test_scheduled_tasks_integration.py) is preserved at the new boundary, plus new unit tests for the adapter itself
+- [x] #7 Focused tests, ruff, mypy, and app/bin/check_sdk_typing.py pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -147,6 +148,12 @@ All production changes are import-path swaps at six call sites; infrastructure/d
 SIZE GATE
 Production: packages/incident/drive/{__init__.py, adapters/__init__.py, adapters/google_drive.py} (3 new files, ~150-180 LOC), core.py/incident_document.py/incident_folder.py/incident_helper.py/incident_roles.py/scheduled_tasks.py (6 edits, ~60-90 LOC total) = 9 production files, roughly 220-270 LOC — comfortably under both the 400-LOC and 10-file thresholds. One subsystem (packages/incident/drive plus its six already-coordinator-scoped consumers); the only behavior changes are the two narrowly flagged ones above, not a mixed refactor-plus-unrelated-feature change. Fits one PR; no decomposition needed.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented incident Drive adapter and migrated incident/jobs consumers. Added required empty package initializers after verification. Evidence: make test reported green; focused adapter and migrated-consumer suite passes (144 passed); uv run python bin/check_sdk_typing.py passes; uv run ruff check . passes; uv run mypy packages/incident/drive passes. Templates filtering is client-side, legacy metadata/healthcheck remain adapter pass-throughs, and LEGACY_FOLDER_DISPLAY_LIMIT is unchanged. Task remains In Progress for human DoD verification; not set to Done.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
