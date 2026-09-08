@@ -3,11 +3,11 @@ id: TASK-25.1.6.8.2
 title: >-
   Build the incident Drive feature adapter and migrate incident and jobs
   consumers onto DriveProvider
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-08 18:57'
-updated_date: '2026-09-08 22:46'
+updated_date: '2026-09-08 22:48'
 labels:
   - clients
   - phase-3
