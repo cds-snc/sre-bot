@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@me'
 created_date: '2026-09-08 18:57'
-updated_date: '2026-09-08 23:14'
+updated_date: '2026-09-08 23:21'
 labels:
   - clients
   - phase-3
@@ -181,5 +181,10 @@ VENDOR-NEUTRALITY CORRECTION (2026-09-08): human review flagged that the plan's 
 created: 2026-09-08 23:14
 ---
 FOUND DURING TASK-25.1.6.8.3 PLANNING (2026-09-08, task-planner), not fixed there: app/packages/incident/drive/__init__.py and app/packages/incident/drive/adapters/__init__.py do not exist on main, although this task's implementation notes state the empty package initializers were added. Verified with: find packages/incident -name __init__.py (returns only incident/, incident/documents/, incident/documents/adapters/, incident/scheduling/). The subdomain currently imports only as an implicit namespace package, which deviates from decisions/feature-packages.md's layout table and from every other shipped subdomain. app/tests/unit/packages/incident/drive/ is likewise missing __init__.py while its siblings have one. Small fix, needs an owner before this task's Definition of Done is verified.
+---
+
+created: 2026-09-08 23:21
+---
+RESOLUTION (2026-09-08): the missing __init__.py files are folded into TASK-25.1.6.8.3's PR (human-directed) rather than reopening this Done task. No action needed here.
 ---
 <!-- COMMENTS:END -->
