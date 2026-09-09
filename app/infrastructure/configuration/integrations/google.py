@@ -74,9 +74,6 @@ class GoogleResourcesConfig(IntegrationSettings):
                 "rec": <recruitment_feedback_id>,
                 "pan": <panelist_guidebook_id>
             },
-            "rep": {  # Reports resources
-                "g": <google_groups_folder_id>
-            },
             "aws": {  # AWS resources
                 "s": <spending_sheet_id>
             },
@@ -200,12 +197,6 @@ class GoogleResourcesConfig(IntegrationSettings):
     def panelist_guidebook_template_id(self) -> str:
         """Panelist guidebook template ID."""
         return self._get_resource("tal", "pan")
-
-    # --- Reports Resources ---
-    @property
-    def google_groups_reports_folder_id(self) -> str:
-        """Google Groups reports folder ID."""
-        return self._get_resource("rep", "g")
 
     # --- AWS Resources ---
     @property

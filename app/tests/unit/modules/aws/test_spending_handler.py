@@ -1,11 +1,27 @@
 """Unit tests for AWS spending data handler."""
 
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
 
+from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.spreadsheets import SpreadsheetProvider
 from modules.aws import spending
+
+
+@pytest.fixture
+def spreadsheet_provider():
+    """Patch the spending module's provider lookup with a Protocol-shaped double.
+
+    The double defaults to a successful write so happy-path tests assert on the
+    values matrix handed to the provider rather than on transport details.
+    """
+    provider = MagicMock(spec=SpreadsheetProvider)
+    provider.update_values.return_value = OperationResult.success()
+    with patch("modules.aws.spending.get_spreadsheet_provider", return_value=provider):
+        yield provider
 
 
 @pytest.mark.unit
@@ -100,43 +116,85 @@ def test_should_flatten_spending_data_correctly():
 
 
 @pytest.mark.unit
-@patch("modules.aws.spending.sheets")
-def test_should_update_spending_data_in_sheet(mock_sheets):
-    """Test updating spending data in Google Sheets."""
+def test_should_update_spending_data_in_sheet(spreadsheet_provider):
+    """Test that a successful write reaches the spreadsheet provider and reports success."""
     # Arrange
     data = {"Account": ["123456789012"], "Cost": [100.00]}
     df = pd.DataFrame(data)
 
     # Act
-    spending.update_spending_data(df, spreadsheet_id="test_sheet_id")
+    result = spending.update_spending_data(df, spreadsheet_id="test_sheet_id")
 
     # Assert
-    mock_sheets.batch_update_values.assert_called_once()
-    call_kwargs = mock_sheets.batch_update_values.call_args[1]
-    assert call_kwargs["spreadsheetId"] == "test_sheet_id"
-    assert call_kwargs["cell_range"] == "Sheet1"
-    assert call_kwargs["valueInputOption"] == "USER_ENTERED"
+    spreadsheet_provider.update_values.assert_called_once_with(
+        "test_sheet_id",
+        "Sheet1",
+        [["Account", "Cost"], ["123456789012", 100.00]],
+    )
+    assert result is True
 
 
 @pytest.mark.unit
-@patch("modules.aws.spending.sheets")
-def test_should_skip_update_when_spreadsheet_id_not_set(mock_sheets):
-    """Test that update is skipped when spreadsheet ID is not set."""
+@patch("modules.aws.spending.get_google_resources_config")
+def test_should_skip_update_when_spreadsheet_id_not_set(mock_get_config, spreadsheet_provider):
+    """Test that the write is skipped when the configured spreadsheet ID is empty.
+
+    The configuration lookup is stubbed rather than the module attribute because
+    the ID is resolved per call, not bound at import time.
+    """
     # Arrange
-    data = {"Account": ["123456789012"], "Cost": [100.00]}
-    df = pd.DataFrame(data)
+    mock_get_config.return_value = SimpleNamespace(spending_sheet_id="")
+    df = pd.DataFrame({"Account": ["123456789012"], "Cost": [100.00]})
 
     # Act
-    spending.update_spending_data(df, spreadsheet_id=None)
+    result = spending.update_spending_data(df)
 
     # Assert
-    mock_sheets.batch_update_values.assert_not_called()
+    spreadsheet_provider.update_values.assert_not_called()
+    assert result is False
 
 
 @pytest.mark.unit
-@patch("modules.aws.spending.sheets")
-def test_should_send_header_row_followed_by_dataframe_rows_to_sheets(mock_sheets):
-    """Test the exact values matrix crossing the Sheets boundary."""
+def test_should_skip_update_when_spreadsheet_id_is_empty_string(spreadsheet_provider):
+    """Test that update is skipped when the spreadsheet ID is an empty string."""
+    # Arrange
+    df = pd.DataFrame({"Account": ["123456789012"], "Cost": [100.00]})
+
+    # Act
+    result = spending.update_spending_data(df, spreadsheet_id="")
+
+    # Assert
+    spreadsheet_provider.update_values.assert_not_called()
+    assert result is False
+
+
+@pytest.mark.unit
+@patch("modules.aws.spending.get_google_resources_config")
+def test_should_resolve_spreadsheet_id_from_config_on_every_call(mock_get_config, spreadsheet_provider):
+    """Test that an omitted spreadsheet ID is read from configuration on each call.
+
+    Two successive calls see two different configured IDs; asserting both reach
+    the provider proves the ID is not cached from the first resolution.
+    """
+    # Arrange
+    df = pd.DataFrame({"Account": ["123456789012"], "Cost": [100.00]})
+    mock_get_config.side_effect = [
+        SimpleNamespace(spending_sheet_id="first_sheet_id"),
+        SimpleNamespace(spending_sheet_id="second_sheet_id"),
+    ]
+
+    # Act
+    spending.update_spending_data(df)
+    spending.update_spending_data(df)
+
+    # Assert
+    used_ids = [call.args[0] for call in spreadsheet_provider.update_values.call_args_list]
+    assert used_ids == ["first_sheet_id", "second_sheet_id"]
+
+
+@pytest.mark.unit
+def test_should_send_header_row_followed_by_dataframe_rows_to_sheets(spreadsheet_provider):
+    """Test the exact values matrix crossing the spreadsheet boundary."""
     # Arrange
     df = pd.DataFrame({"Account": ["123456789012", "210987654321"], "Cost": [100.00, 250.50]})
 
@@ -144,8 +202,8 @@ def test_should_send_header_row_followed_by_dataframe_rows_to_sheets(mock_sheets
     spending.update_spending_data(df, spreadsheet_id="test_sheet_id")
 
     # Assert
-    call_kwargs = mock_sheets.batch_update_values.call_args[1]
-    assert call_kwargs["values"] == [
+    values = spreadsheet_provider.update_values.call_args.args[2]
+    assert values == [
         ["Account", "Cost"],
         ["123456789012", 100.00],
         ["210987654321", 250.50],
@@ -153,8 +211,7 @@ def test_should_send_header_row_followed_by_dataframe_rows_to_sheets(mock_sheets
 
 
 @pytest.mark.unit
-@patch("modules.aws.spending.sheets")
-def test_should_send_header_row_only_when_dataframe_has_no_rows(mock_sheets):
+def test_should_send_header_row_only_when_dataframe_has_no_rows(spreadsheet_provider):
     """Test that an empty but columned DataFrame sends just the header."""
     # Arrange
     df = pd.DataFrame(columns=["Account", "Cost"])
@@ -163,45 +220,49 @@ def test_should_send_header_row_only_when_dataframe_has_no_rows(mock_sheets):
     spending.update_spending_data(df, spreadsheet_id="test_sheet_id")
 
     # Assert
-    call_kwargs = mock_sheets.batch_update_values.call_args[1]
-    assert call_kwargs["values"] == [["Account", "Cost"]]
+    values = spreadsheet_provider.update_values.call_args.args[2]
+    assert values == [["Account", "Cost"]]
 
 
 @pytest.mark.unit
-@patch("modules.aws.spending.sheets")
-def test_should_skip_update_when_spreadsheet_id_is_empty_string(mock_sheets):
-    """Test that update is skipped when the spreadsheet ID is an empty string."""
+@patch("modules.aws.spending.logger")
+def test_should_log_and_return_false_when_sheets_update_fails(mock_logger, spreadsheet_provider):
+    """Test that a classified write failure is logged and contained.
+
+    The logger is stubbed at the module level; the module binds context before
+    logging, so assertions target the bound logger returned by ``bind``.
+    """
     # Arrange
     df = pd.DataFrame({"Account": ["123456789012"], "Cost": [100.00]})
+    spreadsheet_provider.update_values.return_value = OperationResult.error(
+        status=OperationStatus.TRANSIENT_ERROR,
+        message="sheets down",
+        error_code="RATE_LIMITED",
+    )
 
     # Act
-    spending.update_spending_data(df, spreadsheet_id="")
+    result = spending.update_spending_data(df, spreadsheet_id="test_sheet_id")
 
     # Assert
-    mock_sheets.batch_update_values.assert_not_called()
+    assert result is False
+    mock_logger.bind.return_value.error.assert_called_once_with(
+        "update_spending_data_failed",
+        status="transient_error",
+        error_code="RATE_LIMITED",
+        message="sheets down",
+    )
 
 
 @pytest.mark.unit
-@patch("modules.aws.spending.sheets")
-def test_should_propagate_error_when_sheets_update_fails(mock_sheets):
-    """Test that a failing Sheets write propagates out of update_spending_data."""
-    # Arrange
-    df = pd.DataFrame({"Account": ["123456789012"], "Cost": [100.00]})
-    mock_sheets.batch_update_values.side_effect = RuntimeError("sheets down")
-
-    # Act / Assert
-    with pytest.raises(RuntimeError):
-        spending.update_spending_data(df, spreadsheet_id="test_sheet_id")
-
-
-@pytest.mark.unit
+@patch("modules.aws.spending.logger")
 @patch("modules.aws.spending.generate_spending_data")
 @patch("modules.aws.spending.update_spending_data")
-def test_should_execute_and_update_spending_job_successfully(mock_update, mock_generate):
+def test_should_execute_and_update_spending_job_successfully(mock_update, mock_generate, mock_logger):
     """Test successful execution of spending data update job."""
     # Arrange
     mock_spending_data = pd.DataFrame({"Account": ["123456789012"], "Cost": [100.00]})
     mock_generate.return_value = mock_spending_data
+    mock_update.return_value = True
 
     # Act
     spending.execute_spending_data_update_job()
@@ -209,6 +270,34 @@ def test_should_execute_and_update_spending_job_successfully(mock_update, mock_g
     # Assert
     mock_generate.assert_called_once()
     mock_update.assert_called_once_with(mock_spending_data)
+    bound_logger = mock_logger.bind.return_value
+    bound_logger.info.assert_any_call("execute_spending_data_update_job", status="success")
+    assert not [call for call in bound_logger.warning.call_args_list if call.kwargs.get("status") == "failed"]
+
+
+@pytest.mark.unit
+@patch("modules.aws.spending.logger")
+@patch("modules.aws.spending.generate_spending_data")
+@patch("modules.aws.spending.update_spending_data")
+def test_should_log_failed_run_when_update_spending_data_fails(mock_update, mock_generate, mock_logger):
+    """Test that a failed write makes the scheduled job log a failed run instead of raising."""
+    # Arrange
+    mock_spending_data = pd.DataFrame({"Account": ["123456789012"], "Cost": [100.00]})
+    mock_generate.return_value = mock_spending_data
+    mock_update.return_value = False
+
+    # Act
+    spending.execute_spending_data_update_job()
+
+    # Assert
+    bound_logger = mock_logger.bind.return_value
+    failed_calls = [
+        call
+        for call in bound_logger.warning.call_args_list
+        if call.args == ("execute_spending_data_update_job",) and call.kwargs.get("status") == "failed"
+    ]
+    assert len(failed_calls) == 1
+    bound_logger.info.assert_called_once_with("execute_spending_data_update_job", status="started")
 
 
 @pytest.mark.unit

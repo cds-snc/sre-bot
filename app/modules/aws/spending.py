@@ -9,18 +9,11 @@ from pandas.core.frame import DataFrame
 from infrastructure.configuration.integrations.google import (
     get_google_resources_config,
 )
+from infrastructure.spreadsheets import get_spreadsheet_provider
 from integrations.aws import cost_explorer, organizations
-from integrations.google_workspace import sheets
 
 logger = structlog.get_logger()
 
-
-def _get_spending_sheet_id():
-    google_resources = get_google_resources_config()
-    return google_resources.spending_sheet_id
-
-
-SPENDING_SHEET_ID = _get_spending_sheet_id()
 
 rates = {
     "2025-03-01": {"rate": 1.4591369, "confirmed": False},
@@ -153,18 +146,26 @@ def spending_to_df(spending: list):
     return pd.DataFrame(flattened_data)
 
 
-def update_spending_data(spending_data_df: DataFrame, spreadsheet_id=SPENDING_SHEET_ID):
+def update_spending_data(
+    spending_data_df: DataFrame,
+    spreadsheet_id: str | None = None,
+) -> bool:
     """
-    Updates the entire Sheet1 with new spending data
+    Updates the entire Sheet1 with new spending data.
 
     Args:
         spending_data_df: pandas DataFrame containing the data to upload
-        spreadsheet_id: Google Sheets spreadsheet ID
+        spreadsheet_id: Google Sheets spreadsheet ID; resolved from config when omitted
+
+    Returns:
+        True if the write succeeded, False if it was skipped or failed.
     """
+    if spreadsheet_id is None:
+        spreadsheet_id = get_google_resources_config().spending_sheet_id
     log = logger.bind(spreadsheet_id=spreadsheet_id)
     if not spreadsheet_id:
-        log.error("update_spending_data", error="SPENDING_SHEET_ID is not set")
-        return
+        log.error("update_spending_data", error="spending sheet id is not set")
+        return False
 
     # Convert DataFrame to list of lists for Google Sheets API
     header = spending_data_df.columns.tolist()
@@ -186,17 +187,22 @@ def update_spending_data(spending_data_df: DataFrame, spreadsheet_id=SPENDING_SH
         for _, row in spending_data_df.iterrows():
             values.append(row.tolist())
 
-    # Update the entire sheet with new values
-    sheets.batch_update_values(
-        spreadsheetId=spreadsheet_id,
-        cell_range="Sheet1",
-        values=values,
-        valueInputOption="USER_ENTERED",
-    )
+    # Temporary shim until AWS spending reporting is rearchitected into a feature package.
+    result = get_spreadsheet_provider().update_values(spreadsheet_id, "Sheet1", values)
+    if not result.is_success:
+        log.error(
+            "update_spending_data_failed",
+            status=result.status.value,
+            error_code=result.error_code,
+            message=result.message,
+        )
+        return False
+
     log.info("update_spending_data")
+    return True
 
 
-def execute_spending_data_update_job():
+def execute_spending_data_update_job() -> None:
     """Executes the spending data update job"""
     log = logger.bind()
     log.info("execute_spending_data_update_job", status="started")
@@ -208,9 +214,12 @@ def execute_spending_data_update_job():
             message="No spending data to update",
         )
         return
-    update_spending_data(spending_data)
-    log.info(
-        "execute_spending_data_update_job",
-        status="success",
-        spreadsheet_id=SPENDING_SHEET_ID,
-    )
+    updated = update_spending_data(spending_data)
+    if not updated:
+        log.warning(
+            "execute_spending_data_update_job",
+            status="failed",
+            message="Spending data update did not complete",
+        )
+        return
+    log.info("execute_spending_data_update_job", status="success")

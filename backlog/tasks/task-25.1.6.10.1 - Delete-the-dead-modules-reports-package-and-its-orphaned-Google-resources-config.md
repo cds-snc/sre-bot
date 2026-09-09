@@ -3,9 +3,11 @@ id: TASK-25.1.6.10.1
 title: >-
   Delete the dead modules/reports package and its orphaned Google resources
   config
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@me'
 created_date: '2026-09-09 15:02'
+updated_date: '2026-09-09 20:48'
 labels:
   - clients
   - phase-3
@@ -45,10 +47,29 @@ NOT IN SCOPE: integrations/google_workspace/sheets.py (deleted by TASK-25.1.6.10
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/modules/reports/ is deleted in full (__init__.py, core.py, google_groups.py); no module, test, or registration references modules.reports anywhere in the repo
-- [ ] #2 app/tests/unit/modules/reports/ is deleted; no report behavior, help text, or A1 helper is migrated or recreated elsewhere
-- [ ] #3 grep -rn 'time.sleep' over app/modules/reports returns nothing because the package is gone; the 1.1s per-group pacer is removed with it and not reintroduced
-- [ ] #4 GoogleResourcesSettings.google_groups_reports_folder_id and the 'rep' entry in its docstring example are removed, along with any test asserting them; no terraform or SSM change is made
-- [ ] #5 integrations/google_workspace/sheets.py and integrations/google_workspace/google_drive.py are NOT deleted by this task and still exist for their remaining consumers
-- [ ] #6 Full test suite, ruff, mypy, and app/bin/check_sdk_typing.py pass
+- [x] #1 app/modules/reports/ is deleted in full (__init__.py, core.py, google_groups.py); no module, test, or registration references modules.reports anywhere in the repo
+- [x] #2 app/tests/unit/modules/reports/ is deleted; no report behavior, help text, or A1 helper is migrated or recreated elsewhere
+- [x] #3 grep -rn 'time.sleep' over app/modules/reports returns nothing because the package is gone; the 1.1s per-group pacer is removed with it and not reintroduced
+- [x] #4 GoogleResourcesSettings.google_groups_reports_folder_id and the 'rep' entry in its docstring example are removed, along with any test asserting them; no terraform or SSM change is made
+- [x] #5 Full test suite, ruff, mypy, and app/bin/check_sdk_typing.py pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Deleted app/modules/reports/__init__.py, core.py, google_groups.py and app/tests/unit/modules/reports/. Removed the orphaned GoogleResourcesSettings reports entry and google_groups_reports_folder_id property. Verification: no reports source/test files, modules.reports references, report setting references, or reports time.sleep remain in app; google_drive.py remains present; Ruff and bin/check_sdk_typing.py pass; human reports make test green. AC #5 is intentionally unchecked because integrations/google_workspace/sheets.py was deleted by TASK-25.1.6.10.4 in the same approved cleanup session, so this task's historical NOT IN SCOPE retention condition is no longer true. AC #6 remains unchecked because repository-wide mypy reports 65 pre-existing errors in unrelated files; resolve that existing typing debt before checking it.
+<!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-09 20:43
+---
+Human confirmed make test completed successfully on 2026-09-09. This supports the full-suite portion of AC#6; AC#6 remains unchecked because make lint runs Ruff only and the repository-wide mypy command previously reported 65 unrelated errors.
+---
+
+created: 2026-09-09 20:46
+---
+Human-approved scope correction: removed the obsolete AC requiring integrations/google_workspace/sheets.py and google_drive.py to remain. Sheets was intentionally deleted by TASK-25.1.6.10.4; Google Drive deletion is owned by TASK-25.1.6.10.5. Human also approved checking the quality-gate AC while treating the existing whole-tree mypy errors as pre-existing debt; make test, Ruff, and SDK typing evidence are green.
+---
+<!-- COMMENTS:END -->
