@@ -3,10 +3,11 @@ id: TASK-25.1.6.13
 title: >-
   Configure google-api-python-client retry once at construction and retire the
   per-call num_retries drift
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-09 15:25'
-updated_date: '2026-09-09 16:33'
+updated_date: '2026-09-09 17:22'
 labels:
   - clients
   - phase-3
@@ -52,14 +53,14 @@ NOT IN SCOPE: timeouts (a separate SDK knob, no consumer has asked), asyncio.to_
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/google_workspace/client.py configures SDK-native retry once at construction via a requestBuilder passed to discovery.build; no factory passes build(num_retries=...), which is verified to affect only discovery-document fetching
-- [ ] #2 The retry count is a typed setting (default 3) rather than a duplicated module constant
-- [ ] #3 infrastructure/directory/google.py and infrastructure/drive/google.py define no _NUM_RETRIES and pass no num_retries at any .execute() call site; their retry behavior is unchanged, proven by tests asserting a retried 429/5xx still succeeds through the provider
-- [ ] #4 A unit test proves the configured retry count reaches HttpRequest.execute by default for a Resource built through client.py, without any caller passing it
-- [ ] #5 No new provider or adapter is required to name a retry policy; the pattern is documented in client.py so the next Google surface inherits it
-- [ ] #6 Full test suite, ruff, mypy, and app/bin/check_sdk_typing.py pass
-- [ ] #7 The new retry-count field is added to the existing GoogleWorkspaceSettings (infrastructure/configuration/integrations/google.py), not a new settings home; the task description/comments carry an explicit interim-home comment naming app/integrations/google_workspace/settings.py as the future home and TASK-24 as its owner
-- [ ] #8 app/infrastructure/spreadsheets/google.py is not modified by this task; a test proves GoogleSpreadsheetProvider's Resource (built via get_sheets_service/client.py) inherits the configured retry with zero per-call changes in that package
+- [x] #1 integrations/google_workspace/client.py configures SDK-native retry once at construction via a requestBuilder passed to discovery.build; no factory passes build(num_retries=...), which is verified to affect only discovery-document fetching
+- [x] #2 The retry count is a typed setting (default 3) rather than a duplicated module constant
+- [x] #3 infrastructure/directory/google.py and infrastructure/drive/google.py define no _NUM_RETRIES and pass no num_retries at any .execute() call site; their retry behavior is unchanged, proven by tests asserting a retried 429/5xx still succeeds through the provider
+- [x] #4 A unit test proves the configured retry count reaches HttpRequest.execute by default for a Resource built through client.py, without any caller passing it
+- [x] #5 No new provider or adapter is required to name a retry policy; the pattern is documented in client.py so the next Google surface inherits it
+- [x] #6 Full test suite, ruff, mypy, and app/bin/check_sdk_typing.py pass
+- [x] #7 The new retry-count field is added to the existing GoogleWorkspaceSettings (infrastructure/configuration/integrations/google.py), not a new settings home; the task description/comments carry an explicit interim-home comment naming app/integrations/google_workspace/settings.py as the future home and TASK-24 as its owner
+- [x] #8 app/infrastructure/spreadsheets/google.py is not modified by this task; a test proves GoogleSpreadsheetProvider's Resource (built via get_sheets_service/client.py) inherits the configured retry with zero per-call changes in that package
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -121,6 +122,12 @@ Modifies exactly 3 production files (client.py, directory/google.py, drive/googl
 SIZE GATE
 Production: 4 files touched (client.py, directory/google.py, drive/google.py, infrastructure/configuration/integrations/google.py), all subtraction-heavy or small-addition, one subsystem (Google Workspace vendor construction), no consumer/business-logic file touched, no mixed refactor. Comfortably inside the single-PR gate; no decomposition needed.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented construction-time google-api-python-client retry defaults via a configured HttpRequest requestBuilder; added typed GOOGLE_API_NUM_RETRIES=3 on GoogleWorkspaceSettings with the TASK-24 interim-home note; removed directory/drive per-call retry constants and arguments; preserved plain provider execute calls and spreadsheet inheritance. Evidence: focused Google suites 188 passed; full make test reported green by the human; Ruff passed; mypy passed; bin/check_sdk_typing.py passed with no net-new SDK anti-patterns. Task remains In Progress for human review and closure.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

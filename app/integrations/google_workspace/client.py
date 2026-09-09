@@ -8,12 +8,14 @@ narrow OAuth scopes its caller needs.
 """
 
 import json
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from googleapiclient.http import HttpRequest
 
 from infrastructure.configuration.integrations.google import get_google_workspace_settings
 from infrastructure.operations.result import OperationResult
@@ -34,6 +36,27 @@ logger = structlog.get_logger()
 _NOT_FOUND_STATUSES = {404}
 _UNAUTHORIZED_STATUSES = {401, 403}
 _TRANSIENT_STATUSES = {429, 500, 502, 503, 504}
+
+
+class _DefaultingRetryHttpRequest(HttpRequest):
+    """Apply the configured retry count when a request does not specify one."""
+
+    def __init__(self, *args: Any, default_num_retries: int, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._default_num_retries = default_num_retries
+
+    def execute(self, http: Any = None, num_retries: int | None = None, **kwargs: Any) -> Any:
+        resolved_num_retries = self._default_num_retries if num_retries is None else num_retries
+        return super().execute(http=http, num_retries=resolved_num_retries, **kwargs)
+
+
+def _build_request_builder(num_retries: int) -> Callable[..., HttpRequest]:
+    """Build a request constructor carrying the service's retry default."""
+
+    def request_builder(*args: Any, **kwargs: Any) -> HttpRequest:
+        return _DefaultingRetryHttpRequest(*args, default_num_retries=num_retries, **kwargs)
+
+    return request_builder
 
 
 def get_admin_directory_service(
@@ -113,13 +136,15 @@ def _build_service(
     if scopes:
         creds = creds.with_scopes(scopes)
 
-    # Use bundled discovery docs to avoid remote discovery fetches.
+    # Resource construction propagates this builder to nested resources, so all
+    # Google API calls inherit one SDK-native retry policy without call-site drift.
     return build(
         api_name,
         api_version,
         credentials=creds,
         cache_discovery=False,
         static_discovery=True,
+        requestBuilder=_build_request_builder(settings.GOOGLE_API_NUM_RETRIES),
     )
 
 

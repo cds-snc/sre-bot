@@ -20,6 +20,7 @@ class GoogleWorkspaceSettings(IntegrationSettings):
         SRE_BOT_EMAIL: SRE Bot service account email
         GOOGLE_WORKSPACE_CUSTOMER_ID: Google Workspace customer ID (defaults to "my_customer")
         GCP_SRE_SERVICE_ACCOUNT_KEY_FILE: Path to service account key file
+        GOOGLE_API_NUM_RETRIES: Number of automatic retries for transient Google API failures
 
     Example:
         ```python
@@ -36,6 +37,12 @@ class GoogleWorkspaceSettings(IntegrationSettings):
     SRE_BOT_EMAIL: str = Field(default="", alias="SRE_BOT_EMAIL")
     GOOGLE_WORKSPACE_CUSTOMER_ID: str = Field(default="my_customer", alias="GOOGLE_WORKSPACE_CUSTOMER_ID")
     GCP_SRE_SERVICE_ACCOUNT_KEY_FILE: str = Field(default="", alias="GCP_SRE_SERVICE_ACCOUNT_KEY_FILE")
+    # Interim home until TASK-24 migrates this setting to app/integrations/google_workspace/settings.py.
+    GOOGLE_API_NUM_RETRIES: int = Field(
+        default=3,
+        alias="GOOGLE_API_NUM_RETRIES",
+        description="Number of automatic retries googleapiclient applies to transient (429/5xx) API call failures, configured once at service construction.",
+    )
 
 
 class GoogleResourcesConfig(IntegrationSettings):

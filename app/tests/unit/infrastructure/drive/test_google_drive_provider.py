@@ -35,10 +35,14 @@ def _request_that_retries_once(payload):
 
     def execute():
         nonlocal attempts
-        attempts += 1
-        if attempts == 1:
-            raise _http_error(503)
-        return payload
+        while True:
+            attempts += 1
+            try:
+                if attempts == 1:
+                    raise _http_error(503)
+                return payload
+            except HttpError:
+                continue
 
     request.execute.side_effect = execute
     return request

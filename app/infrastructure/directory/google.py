@@ -28,7 +28,6 @@ logger = structlog.get_logger()
 
 T = TypeVar("T")
 
-_NUM_RETRIES = 3
 _USERS_PAGE_SIZE = 500
 _GROUPS_PAGE_SIZE = 200
 _MEMBERS_PAGE_SIZE = 200
@@ -103,7 +102,7 @@ class GoogleDirectoryProvider:
             items: list[dict[str, Any]] = []
             next_request = request
             while next_request is not None:
-                response = next_request.execute(num_retries=_NUM_RETRIES)
+                response = next_request.execute()
                 items.extend(response.get(response_key, []))
                 if limit is not None and len(items) >= limit:
                     return items[:limit]
@@ -406,7 +405,7 @@ class GoogleDirectoryProvider:
         service = self._get_service(["https://www.googleapis.com/auth/admin.directory.customer.readonly"])
         result = self._call(
             "warmup",
-            lambda: service.customers().get(customerKey=self._customer_id).execute(num_retries=_NUM_RETRIES),
+            lambda: service.customers().get(customerKey=self._customer_id).execute(),
         )
         if result.is_success:
             log.info("directory_warmup_completed")
@@ -430,7 +429,7 @@ class GoogleDirectoryProvider:
         service = self._get_service(["https://www.googleapis.com/auth/admin.directory.user.readonly"])
         result = self._call(
             "get_user",
-            lambda: service.users().get(userKey=normalized_email).execute(num_retries=_NUM_RETRIES),
+            lambda: service.users().get(userKey=normalized_email).execute(),
         )
         self._logger.info(
             "get_user_result",
@@ -613,7 +612,7 @@ class GoogleDirectoryProvider:
         service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.readonly"])
         result = self._call(
             "get_group",
-            lambda: service.groups().get(groupKey=normalized_group_key).execute(num_retries=_NUM_RETRIES),
+            lambda: service.groups().get(groupKey=normalized_group_key).execute(),
         )
         if not result.is_success:
             return self._typed_error(result)
@@ -659,7 +658,7 @@ class GoogleDirectoryProvider:
                     groupKey=normalized_group,
                     body={"email": normalized_user_email, "role": normalized_role},
                 )
-                .execute(num_retries=_NUM_RETRIES)
+                .execute()
             ),
         )
         if not result.is_success:
@@ -704,11 +703,7 @@ class GoogleDirectoryProvider:
         service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.member"])
         result = self._call(
             "remove_member",
-            lambda: (
-                service.members()
-                .delete(groupKey=normalized_group, memberKey=normalized_user_email)
-                .execute(num_retries=_NUM_RETRIES)
-            ),
+            lambda: service.members().delete(groupKey=normalized_group, memberKey=normalized_user_email).execute(),
         )
         if not result.is_success:
             return self._typed_error(result)
@@ -735,11 +730,7 @@ class GoogleDirectoryProvider:
         service = self._get_service(["https://www.googleapis.com/auth/admin.directory.group.member.readonly"])
         result = self._call(
             "has_member",
-            lambda: (
-                service.members()
-                .hasMember(groupKey=normalized_group, memberKey=normalized_user_email)
-                .execute(num_retries=_NUM_RETRIES)
-            ),
+            lambda: service.members().hasMember(groupKey=normalized_group, memberKey=normalized_user_email).execute(),
         )
         if not result.is_success:
             return self._typed_error(result)
