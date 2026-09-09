@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:02'
-updated_date: '2026-09-08 18:58'
+updated_date: '2026-09-08 23:14'
 labels:
   - clients
   - phase-3
@@ -44,8 +44,8 @@ The real Slack pagination/search fix for LEGACY_FOLDER_DISPLAY_LIMIT is out of s
 <!-- AC:BEGIN -->
 - [ ] #1 app/infrastructure/drive/ exists (DriveProvider Protocol, GoogleDriveProvider, settings, factory) per TASK-25.1.6.8.1
 - [ ] #2 packages/incident/<subdomain>/adapters/google_drive.py exists and core.py, incident_document.py, incident_folder.py, incident_roles.py, and jobs/scheduled_tasks.py call it; none imports integrations.google_workspace.google_drive (TASK-25.1.6.8.2)
-- [ ] #3 packages/role/adapters/google_drive.py exists and modules/role/role.py calls it; it no longer imports integrations.google_workspace.google_drive (TASK-25.1.6.8.3)
-- [ ] #4 app/integrations/google_workspace/google_drive.py is not yet deleted by this coordinator or its children — its last production references (modules/reports/google_groups.py) are removed by TASK-25.1.6.10, which owns the file's actual deletion
+- [ ] #3 packages/talent/adapters/google_drive.py exists and modules/role/role.py calls it; it no longer imports integrations.google_workspace.google_drive (TASK-25.1.6.8.3; package renamed from the originally proposed packages/role during .8.3 planning)
+- [ ] #4 app/integrations/google_workspace/google_drive.py is not yet deleted by this coordinator or its children - its last production references are removed by TASK-25.1.6.10, which owns the file's actual deletion
 - [ ] #5 LEGACY_FOLDER_DISPLAY_LIMIT is untouched or removed only if TASK-81 has already landed; TASK-81 owns the real fix
 - [ ] #6 Focused tests, ruff, mypy, and app/bin/check_sdk_typing.py pass for all three children
 <!-- AC:END -->
@@ -82,5 +82,10 @@ SCOPE UPDATE (2026-09-08): acceptance criteria were refreshed to remove the unus
 created: 2026-09-08 18:58
 ---
 RETITLED AND RESCOPED 2026-09-08 (task-planner, human-directed). The prior 7-consumer, single-adapter framing (and its file_type-to-mimeType/ValueError AC clause, which only ever served modules/reports/google_groups.py's dead-not-migrated create_file call) is replaced wholesale by the 3-child coordinator structure above. See TASK-25.1.6's pivot comment for the architecture rationale, and TASK-25.1.6.10's updated AC for where google_drive.py's actual deletion now lives.
+---
+
+created: 2026-09-08 23:14
+---
+AC#3 updated 2026-09-08 during TASK-25.1.6.8.3 planning (human-decided): the third child's package home is app/packages/talent/ (flat feature package), not packages/role/. The legacy module is the talent/hiring workflow (INTERNAL_TALENT_FOLDER, talent_role_* log events, /sre talent-role), and decisions/migration.md rule 5 requires the concern's final home at creation rather than a later rename. AC#4's wording was also loosened: modules/reports/google_groups.py is no longer the only remaining google_drive.py reference - TASK-25.1.6.8.2 shipped metadata pass-throughs in packages/incident/drive/adapters/google_drive.py that also call it until TASK-25.1.6.10 lands.
 ---
 <!-- COMMENTS:END -->
