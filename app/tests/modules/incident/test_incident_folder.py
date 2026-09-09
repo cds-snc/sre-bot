@@ -1,8 +1,9 @@
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
-from googleapiclient.errors import HttpError
 
+from infrastructure.operations import OperationResult, OperationStatus
+from infrastructure.spreadsheets import RANGE_NOT_FOUND, SheetCell
 from modules.incident import incident_folder
 
 
@@ -266,41 +267,69 @@ def test_metadata_items():
     ]
 
 
+class FakeSpreadsheetProvider:
+    def __init__(self):
+        self.read_values_result = OperationResult.success(data=[])
+        self.update_values_result = OperationResult.success()
+        self.append_values_result = OperationResult.success()
+        self.read_cells_result = OperationResult.success(data=[])
+        self.read_values_calls = []
+        self.update_values_calls = []
+        self.append_values_calls = []
+        self.read_cells_calls = []
+
+    def read_values(self, spreadsheet_id, a1_range):
+        self.read_values_calls.append((spreadsheet_id, a1_range))
+        return self.read_values_result
+
+    def update_values(self, spreadsheet_id, a1_range, values):
+        self.update_values_calls.append((spreadsheet_id, a1_range, values))
+        return self.update_values_result
+
+    def append_values(self, spreadsheet_id, a1_range, values):
+        self.append_values_calls.append((spreadsheet_id, a1_range, values))
+        return self.append_values_result
+
+    def read_cells(self, spreadsheet_id, a1_range):
+        self.read_cells_calls.append((spreadsheet_id, a1_range))
+        return self.read_cells_result
+
+
 @patch("modules.incident.incident_folder.INCIDENT_LIST", "INCIDENT_LIST")
 @patch("modules.incident.incident_folder.datetime")
-@patch("modules.incident.incident_folder.sheets")
-def test_add_new_incident_to_list(sheets_mock, datetime_mock):
+def test_add_new_incident_to_list_success(datetime_mock):
+    provider = FakeSpreadsheetProvider()
     datetime_mock.datetime.now.return_value.strftime.return_value = "2021-01-01"
     document_link = "http://example.com"
     name = "foo"
     slug = "bar"
     product = "baz"
     channel_url = "http://channel.com"
-    body = {
-        "majorDimension": "ROWS",
-        "values": [
-            [
-                "2021-01-01",
-                '=HYPERLINK("http://example.com", "foo")',
-                "baz",
-                "In Progress",
-                '=HYPERLINK("http://channel.com", "#bar")',
-            ]
+    values = [
+        [
+            "2021-01-01",
+            '=HYPERLINK("http://example.com", "foo")',
+            "baz",
+            "In Progress",
+            '=HYPERLINK("http://channel.com", "#bar")',
         ],
-    }
-    sheets_mock.append_values.return_value = ANY
-    updated_sheet = incident_folder.add_new_incident_to_list(document_link, name, slug, product, channel_url)
-    sheets_mock.append_values.assert_called_once_with(
-        "INCIDENT_LIST",
-        "Sheet1!A:A",
-        body,
-    )
-    assert updated_sheet == ANY
+    ]
+    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
+        assert incident_folder.add_new_incident_to_list(document_link, name, slug, product, channel_url)
+    assert provider.append_values_calls == [("INCIDENT_LIST", "Sheet1!A:A", values)]
 
 
-@patch("modules.incident.incident_folder.sheets")
+@patch("modules.incident.incident_folder.INCIDENT_LIST", "INCIDENT_LIST")
+def test_add_new_incident_to_list_raises_on_failure():
+    provider = FakeSpreadsheetProvider()
+    provider.append_values_result = OperationResult.error(OperationStatus.TRANSIENT_ERROR, "write failed")
+    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
+        with pytest.raises(incident_folder.IncidentSheetError, match="write failed"):
+            incident_folder.add_new_incident_to_list("doc", "name", "slug", "product", "channel")
+
+
 @patch("modules.incident.incident_folder.logger")
-def test_update_spreadsheet_incident_status_invalid_status(logger_mock, sheets_mock):
+def test_update_spreadsheet_incident_status_invalid_status(logger_mock):
     assert not incident_folder.update_spreadsheet_incident_status("foo", "InvalidStatus")
     logger_mock.warning.assert_called_once_with(
         "update_incident_spreadsheet_error",
@@ -310,11 +339,11 @@ def test_update_spreadsheet_incident_status_invalid_status(logger_mock, sheets_m
     )
 
 
-@patch("modules.incident.incident_folder.sheets")
 @patch("modules.incident.incident_folder.logger")
-def test_update_spreadsheet_incident_status_empty_values(logger_mock, sheets_mock):
-    sheets_mock.get_values.return_value = {"values": []}
-    assert not incident_folder.update_spreadsheet_incident_status("foo", "Closed")
+def test_update_spreadsheet_incident_status_empty_values(logger_mock):
+    provider = FakeSpreadsheetProvider()
+    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
+        assert not incident_folder.update_spreadsheet_incident_status("foo", "Closed")
     logger_mock.warning.assert_called_once_with(
         "update_incident_spreadsheet_error",
         channel="foo",
@@ -323,19 +352,44 @@ def test_update_spreadsheet_incident_status_empty_values(logger_mock, sheets_moc
     )
 
 
+def test_update_spreadsheet_incident_status_read_failure_raises():
+    provider = FakeSpreadsheetProvider()
+    provider.read_values_result = OperationResult.error(OperationStatus.TRANSIENT_ERROR, "read failed")
+    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
+        with pytest.raises(incident_folder.IncidentSheetError, match="read failed"):
+            incident_folder.update_spreadsheet_incident_status("foo", "Closed")
+
+
 @patch("modules.incident.incident_folder.INCIDENT_LIST", "INCIDENT_LIST")
-@patch("modules.incident.incident_folder.sheets")
-def test_update_spreadsheet_incident_status_channel_found(sheets_mock):
-    sheets_mock.get_values.return_value = {"values": [["foo", "bar", "baz", "qux"]]}
-    sheets_mock.batch_update_values.return_value = True
-    assert incident_folder.update_spreadsheet_incident_status("foo", "Closed")
-    sheets_mock.batch_update_values.assert_called_once_with("INCIDENT_LIST", "Sheet1!D1", [["Closed"]])
+def test_update_spreadsheet_incident_status_channel_found():
+    provider = FakeSpreadsheetProvider()
+    provider.read_values_result = OperationResult.success(data=[["foo", "bar", "baz", "qux"]])
+    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
+        assert incident_folder.update_spreadsheet_incident_status("foo", "Closed")
+    assert provider.update_values_calls == [("INCIDENT_LIST", "Sheet1!D1", [["Closed"]])]
 
 
-@patch("modules.incident.incident_folder.sheets")
-def test_update_spreadsheet_incident_status_channel_not_found(sheets_mock):
-    sheets_mock.get_values.return_value = {"values": [["bar", "baz", "qux"]]}
-    assert not incident_folder.update_spreadsheet_incident_status("foo", "Closed")
+def test_update_spreadsheet_incident_status_update_failure_raises():
+    provider = FakeSpreadsheetProvider()
+    provider.read_values_result = OperationResult.success(data=[["foo"]])
+    provider.update_values_result = OperationResult.error(OperationStatus.TRANSIENT_ERROR, "update failed")
+    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
+        with pytest.raises(incident_folder.IncidentSheetError, match="update failed"):
+            incident_folder.update_spreadsheet_incident_status("foo", "Closed")
+
+
+@patch("modules.incident.incident_folder.logger")
+def test_update_spreadsheet_incident_status_channel_not_found(logger_mock):
+    provider = FakeSpreadsheetProvider()
+    provider.read_values_result = OperationResult.success(data=[["bar", "baz", "qux"]])
+    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
+        assert not incident_folder.update_spreadsheet_incident_status("foo", "Closed")
+    logger_mock.warning.assert_called_once_with(
+        "update_incident_spreadsheet_error",
+        channel="foo",
+        status="Closed",
+        error="Channel not found in the sheet",
+    )
 
 
 def test_return_channel_name_with_prefix():
@@ -366,6 +420,21 @@ def test_return_channel_name_prefix_only():
 def test_return_channel_name_dev_prefix_only():
     # Test the function with a string that is only the incident-dev prefix.
     assert incident_folder.return_channel_name("incident-dev-") == "#"
+
+
+@pytest.mark.parametrize(
+    ("channel_name", "expected"),
+    [
+        ("incident-abc123", "abc123"),
+        ("incident-dev-abc123", "abc123"),
+        ("general", "general"),
+        ("", ""),
+        ("incident-", ""),
+        ("incident-dev-", ""),
+    ],
+)
+def test_channel_slug(channel_name, expected):
+    assert incident_folder.channel_slug(channel_name) == expected
 
 
 @patch("modules.incident.incident_folder.dynamodb.scan")
@@ -415,52 +484,24 @@ def test_fetch_updates(mock_scan_item):
     assert mock_scan_item.call_count == 2
 
 
-def _sheet_http_error(reason: str) -> HttpError:
-    class FakeResp(dict):
-        def __init__(self) -> None:
-            super().__init__()
-            self.status = 400
-            self.reason = reason
-
-    return HttpError(resp=FakeResp(), content=b"{}")
-
-
-def _incident_row_data() -> dict:
-    return {
-        "sheets": [
-            {
-                "data": [
-                    {
-                        "rowData": [
-                            {"values": [{"formattedValue": "header"}]},
-                            {
-                                "values": [
-                                    {"formattedValue": "2024-01-01"},
-                                    {
-                                        "formattedValue": "Incident name",
-                                        "hyperlink": "https://report.example.com/doc",
-                                    },
-                                    {"formattedValue": "Team A"},
-                                    {"formattedValue": "Closed"},
-                                    {
-                                        "formattedValue": "#incident-2024-01-01-test",
-                                        "hyperlink": "https://gcdigital.slack.com/archives/C0123456789",
-                                    },
-                                ]
-                            },
-                        ]
-                    }
-                ]
-            }
-        ]
-    }
+def _incident_row_data():
+    return [
+        [SheetCell("header")],
+        [
+            SheetCell("2024-01-01"),
+            SheetCell("Incident name", "https://report.example.com/doc"),
+            SheetCell("Team A"),
+            SheetCell("Closed"),
+            SheetCell("#incident-2024-01-01-test", "https://gcdigital.slack.com/archives/C0123456789"),
+        ],
+    ]
 
 
-@patch("modules.incident.incident_folder.sheets")
-def test_get_incidents_from_sheet_returns_parsed_incidents(mock_sheets):
-    mock_sheets.get_sheet.return_value = _incident_row_data()
-
-    incidents = incident_folder.get_incidents_from_sheet()
+def test_get_incidents_from_sheet_returns_parsed_incidents():
+    provider = FakeSpreadsheetProvider()
+    provider.read_cells_result = OperationResult.success(data=_incident_row_data())
+    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
+        incidents = incident_folder.get_incidents_from_sheet()
 
     assert incidents == [
         {
@@ -478,31 +519,21 @@ def test_get_incidents_from_sheet_returns_parsed_incidents(mock_sheets):
 
 
 @patch("modules.incident.incident_folder.logger")
-@patch("modules.incident.incident_folder.sheets")
-def test_get_incidents_from_sheet_swallows_unable_to_parse_range(mock_sheets, mock_logger):
-    mock_sheets.get_sheet.side_effect = _sheet_http_error("Unable to parse range: Sheet1")
-
-    assert incident_folder.get_incidents_from_sheet() == []
+def test_get_incidents_from_sheet_swallows_range_not_found(mock_logger):
+    provider = FakeSpreadsheetProvider()
+    provider.read_cells_result = OperationResult.error(
+        OperationStatus.NOT_FOUND,
+        "Unable to parse range: Sheet1",
+        error_code=RANGE_NOT_FOUND,
+    )
+    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
+        assert incident_folder.get_incidents_from_sheet() == []
     mock_logger.warning.assert_called_once()
 
 
-@patch("modules.incident.incident_folder.sheets")
-def test_get_incidents_from_sheet_propagates_other_http_error(mock_sheets):
-    error = _sheet_http_error("Internal error")
-    mock_sheets.get_sheet.side_effect = error
-
-    with pytest.raises(HttpError) as exc_info:
-        incident_folder.get_incidents_from_sheet()
-
-    assert exc_info.value is error
-
-
-@patch("modules.incident.incident_folder.sheets")
-def test_get_incidents_from_sheet_propagates_non_http_error(mock_sheets):
-    error = ValueError("Unable to parse range")
-    mock_sheets.get_sheet.side_effect = error
-
-    with pytest.raises(ValueError) as exc_info:
-        incident_folder.get_incidents_from_sheet()
-
-    assert exc_info.value is error
+def test_get_incidents_from_sheet_raises_on_other_failure():
+    provider = FakeSpreadsheetProvider()
+    provider.read_cells_result = OperationResult.error(OperationStatus.TRANSIENT_ERROR, "Internal error", error_code="X")
+    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
+        with pytest.raises(incident_folder.IncidentSheetError, match="Internal error"):
+            incident_folder.get_incidents_from_sheet()

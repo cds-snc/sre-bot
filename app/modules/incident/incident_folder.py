@@ -6,17 +6,18 @@ Includes functions to manage the folders, the metadata, and the list of incident
 import datetime
 import re
 import time
+from typing import Any
 
 import pytz
-from googleapiclient.errors import HttpError
 from slack_bolt import Ack
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web import WebClient
 from structlog import get_logger
 
 from infrastructure.configuration.integrations.google import get_google_resources_config
+from infrastructure.operations import OperationStatus
+from infrastructure.spreadsheets import RANGE_NOT_FOUND, get_spreadsheet_provider
 from integrations.aws import dynamodb
-from integrations.google_workspace import sheets
 from modules.incident import db_operations
 from packages.incident.drive.adapters import google_drive as incident_drive
 
@@ -28,6 +29,13 @@ logger = get_logger()
 
 # Temporary TASK-25.1.6 shim for Slack's modal block and option-list limits.
 LEGACY_FOLDER_DISPLAY_LIMIT = 25
+
+
+class IncidentSheetError(Exception):
+    def __init__(self, message: str, error_code: str | None = None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.error_code = error_code
 
 
 def list_incident_folders():
@@ -258,7 +266,10 @@ def add_new_incident_to_list(document_link, name, slug, product, channel_url):
         channel_url (str): The link to the Slack channel for the incident.
 
     Returns:
-        bool: True if the incident was added successfully, False otherwise.
+        bool: True if the incident was added successfully.
+
+    Raises:
+        IncidentSheetError: If the spreadsheet write fails.
     """
     incident_data = [
         [
@@ -269,13 +280,11 @@ def add_new_incident_to_list(document_link, name, slug, product, channel_url):
             f'=HYPERLINK("{channel_url}", "#{slug}")',
         ]
     ]
-    cell_range = "Sheet1!A:A"
-    body = {
-        "majorDimension": "ROWS",
-        "values": incident_data,
-    }
-    updated_sheet = sheets.append_values(INCIDENT_LIST, cell_range, body)
-    return updated_sheet
+    result = get_spreadsheet_provider().append_values(INCIDENT_LIST, "Sheet1!A:A", incident_data)
+    if not result.is_success:
+        logger.error("add_new_incident_to_list_failed", error=result.message, error_code=result.error_code)
+        raise IncidentSheetError(result.message, result.error_code)
+    return True
 
 
 def update_spreadsheet_incident_status(channel_name, status="Closed"):
@@ -304,8 +313,18 @@ def update_spreadsheet_incident_status(channel_name, status="Closed"):
         )
         return False
     sheet_name = "Sheet1"
-    sheet = dict(sheets.get_values(INCIDENT_LIST, cell_range=sheet_name))
-    values = sheet.get("values", [])
+    provider = get_spreadsheet_provider()
+    result = provider.read_values(INCIDENT_LIST, sheet_name)
+    if not result.is_success:
+        logger.error(
+            "update_incident_spreadsheet_error",
+            channel=channel_name,
+            status=status,
+            error=result.message,
+            error_code=result.error_code,
+        )
+        raise IncidentSheetError(result.message, result.error_code)
+    values = result.data or []
     if len(values) == 0:
         logger.warning(
             "update_incident_spreadsheet_error",
@@ -319,69 +338,82 @@ def update_spreadsheet_incident_status(channel_name, status="Closed"):
         if channel_name in row:
             # Update the 4th column (index 3) of the found row
             update_range = f"{sheet_name}!D{i + 1}"  # Column D, Rows are 1-indexed in Sheets
-            updated_sheet = sheets.batch_update_values(INCIDENT_LIST, update_range, [[status]])
-            if updated_sheet:
-                return True
+            update_result = provider.update_values(INCIDENT_LIST, update_range, [[status]])
+            if not update_result.is_success:
+                logger.error(
+                    "update_incident_spreadsheet_error",
+                    channel=channel_name,
+                    status=status,
+                    error=update_result.message,
+                    error_code=update_result.error_code,
+                )
+                raise IncidentSheetError(update_result.message, update_result.error_code)
+            return True
+    logger.warning(
+        "update_incident_spreadsheet_error",
+        channel=channel_name,
+        status=status,
+        error="Channel not found in the sheet",
+    )
     return False
 
 
-def return_channel_name(input_str: str):
-    # return the channel name without the incident- prefix and appending a # to the channel name
+def channel_slug(channel_name: str) -> str:
+    dev_prefix = "incident-dev-"
     prefix = "incident-"
-    dev_prefix = prefix + "dev-"
-    if input_str.startswith(dev_prefix):
-        return "#" + input_str[len(dev_prefix) :]
-    if input_str.startswith(prefix):
-        return "#" + input_str[len(prefix) :]
+    if channel_name.startswith(dev_prefix):
+        return channel_name.removeprefix(dev_prefix)
+    return channel_name.removeprefix(prefix)
+
+
+def return_channel_name(input_str: str):
+    if input_str.startswith("incident-"):
+        return "#" + channel_slug(input_str)
     return input_str
 
 
 def get_incidents_from_sheet(days=0) -> list:
-    """Get incidents from Google Sheet"""
+    """Get incidents from the incident list spreadsheet."""
     date_lookback = datetime.datetime.now() - datetime.timedelta(days=days)
     date_lookback_str = date_lookback.strftime("%Y-%m-%d")
-    incidents: dict | None
-    try:
-        incidents = sheets.get_sheet(INCIDENT_LIST, "Sheet1", includeGridData=True)
-    except HttpError as exc:
-        # Non-critical: an unparseable range means there is nothing to read.
-        if "Unable to parse range" not in str(exc):
-            raise
-        logger.warning("get_incidents_from_sheet_unable_to_parse_range", error=str(exc))
-        incidents = None
-    if incidents and isinstance(incidents, dict):
-        row_data = incidents.get("sheets")[0].get("data")[0].get("rowData")
-        incidents_details = []
-        for row in row_data[1:]:
-            values = row.get("values")
-            if not values or len(values) < 5:
-                continue
-            channel_url = values[4].get("hyperlink")
-            channel_id = None
-            if channel_url:
-                match = re.search(r"https://gcdigital\.slack\.com/archives/(\w+)", channel_url)
-                if match:
-                    channel_id = match.group(1)
-            channel_name = values[4].get("formattedValue")
-            channel_name = "TBC" if not channel_name else channel_name[1:]
-            incident_details = {
-                "channel_id": channel_id,
-                "channel_name": channel_name,
-                "name": values[1].get("formattedValue"),
-                "user_id": "",
-                "teams": [values[2].get("formattedValue")],
-                "report_url": values[1].get("hyperlink"),
-                "status": values[3].get("formattedValue"),
-                "created_at": values[0].get("formattedValue"),
-                "meet_url": "TBC",
-            }
-            if incident_details["channel_id"] is None:
-                continue
-            if days > 0 and incident_details["created_at"] < date_lookback_str:
-                continue
-            incidents_details.append(incident_details)
-        return incidents_details
-    return []
+    result = get_spreadsheet_provider().read_cells(INCIDENT_LIST, "Sheet1")
+    if not result.is_success:
+        if result.status is OperationStatus.NOT_FOUND and result.error_code == RANGE_NOT_FOUND:
+            logger.warning("get_incidents_from_sheet_unable_to_parse_range", error=result.message)
+            return []
+        logger.error("get_incidents_from_sheet_failed", error=result.message, error_code=result.error_code)
+        raise IncidentSheetError(result.message, result.error_code)
+
+    row_data = result.data or []
+    incidents_details: list[dict[str, Any]] = []
+    for row in row_data[1:]:
+        if not row or len(row) < 5:
+            continue
+        channel_cell = row[4]
+        channel_id = None
+        if channel_cell.link:
+            match = re.search(r"https://gcdigital\.slack\.com/archives/(\w+)", channel_cell.link)
+            if match:
+                channel_id = match.group(1)
+        channel_name = channel_cell.formatted_value
+        channel_name = "TBC" if not channel_name else channel_name[1:]
+        incident_details = {
+            "channel_id": channel_id,
+            "channel_name": channel_name,
+            "name": row[1].formatted_value,
+            "user_id": "",
+            "teams": [row[2].formatted_value],
+            "report_url": row[1].link,
+            "status": row[3].formatted_value,
+            "created_at": row[0].formatted_value,
+            "meet_url": "TBC",
+        }
+        if incident_details["channel_id"] is None:
+            continue
+        if days > 0 and incident_details["created_at"] < date_lookback_str:
+            continue
+        incidents_details.append(incident_details)
+    return incidents_details
 
 
 def complete_incidents_details(client: WebClient, incidents: list[dict]):

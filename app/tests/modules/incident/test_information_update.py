@@ -456,6 +456,8 @@ def test_handle_update_field_submission_dropdown_type(
     }
     mock_utils.extract_google_doc_id.return_value = "document_id"
     mock_information_display.incident_information_view.return_value = {"view": [{"block": "block_id"}]}
+    mock_incident_folder.update_spreadsheet_incident_status.return_value = True
+    mock_incident_folder.return_channel_name.return_value = incident_data["channel_name"]
 
     information_update.handle_update_field_submission(mock_client, body, mock_ack, view)
     mock_db_operations.update_incident_field.assert_called_once_with(
@@ -471,7 +473,49 @@ def test_handle_update_field_submission_dropdown_type(
     )
     mock_utils.extract_google_doc_id.assert_called_once_with("report_url")
     mock_incident_document.update_incident_document_status.assert_called_once_with("document_id", "Closed")
-    mock_incident_folder.update_spreadsheet_incident_status.assert_called_once_with(incident_data["channel_name"], "Closed")
+    mock_incident_folder.return_channel_name.assert_called_once_with(incident_data["channel_name"])
+    mock_incident_folder.update_spreadsheet_incident_status.assert_called_once_with(
+        mock_incident_folder.return_channel_name.return_value,
+        "Closed",
+    )
+
+
+@patch("modules.incident.information_update.logger")
+@patch("modules.incident.information_update.incident_document")
+@patch("modules.incident.information_update.incident_folder")
+@patch("modules.incident.information_update.information_display")
+@patch("modules.incident.information_update.db_operations")
+def test_handle_update_field_submission_status_type_spreadsheet_update_failed(
+    mock_db_operations,
+    mock_information_display,
+    mock_incident_folder,
+    mock_incident_document,
+    mock_logger,
+):
+    mock_client = MagicMock()
+    mock_ack = MagicMock()
+    incident_data = generate_incident_data(channel_name="incident-dev-2024-01-12-test")
+    view = {
+        "state": {"values": {"drop_down_input": {"static_select": {"selected_option": {"value": "Closed"}}}}},
+        "private_metadata": json.dumps({"action": "status", "incident_data": incident_data}),
+    }
+    body = {"user": {"id": incident_data["user_id"]}, "view": {"root_view_id": "root_view_id"}}
+    mock_incident_folder.return_channel_name.return_value = "#2024-01-12-test"
+    mock_incident_folder.update_spreadsheet_incident_status.return_value = False
+    mock_information_display.incident_information_view.return_value = {"view": [{"block": "block_id"}]}
+
+    information_update.handle_update_field_submission(mock_client, body, mock_ack, view)
+
+    mock_incident_folder.update_spreadsheet_incident_status.assert_called_once_with("#2024-01-12-test", "Closed")
+    assert mock_client.chat_postMessage.call_count == 2
+    mock_client.chat_postMessage.assert_any_call(
+        channel=incident_data["channel_id"],
+        text="Could not update the incident status in the spreadsheet for channel incident-dev-2024-01-12-test.",
+    )
+    mock_client.chat_postMessage.assert_any_call(
+        channel=incident_data["channel_id"],
+        text="<@user_id> has updated the field status to Closed",
+    )
 
 
 @patch("modules.incident.information_update.logger")
@@ -581,13 +625,14 @@ def generate_incident_data(
     detection_time=None,
     retrospective_url=None,
     environment="prod",
+    channel_name="channel_name",
 ):
     id = str(uuid.uuid4())
     incident_data = {
         "id": id,
         "created_at": created_at,
         "channel_id": "channel_id",
-        "channel_name": "channel_name",
+        "channel_name": channel_name,
         "name": "name",
         "status": "status",
         "user_id": "user_id",

@@ -310,7 +310,14 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view):
         if action == "status" and isinstance(value, str):
             document_id = utils.extract_google_doc_id(report_url)
             incident_document.update_incident_document_status(document_id, value)
-            incident_folder.update_spreadsheet_incident_status(channel_name, value)
+            spreadsheet_updated = incident_folder.update_spreadsheet_incident_status(
+                incident_folder.return_channel_name(channel_name), value
+            )
+            if not spreadsheet_updated:
+                client.chat_postMessage(
+                    channel=channel_id,
+                    text=f"Could not update the incident status in the spreadsheet for channel {channel_name}.",
+                )
 
         db_operations.update_incident_field(incident_id, action, value, user_id, type=value_type)
         client.chat_postMessage(

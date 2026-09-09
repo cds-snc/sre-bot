@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from modules.incident import core
+from modules.incident import core, incident_folder
 
 
 @pytest.fixture
@@ -64,6 +64,55 @@ def test_contract_create_database_record_uses_environment_not_prefix(
     assert mock_create.call_count == 1
     incident_data = mock_create.call_args.args[0]
     assert incident_data["environment"] == "dev"
+
+
+def test_add_incident_to_sheet_dev_channel_uses_consistent_slug():
+    results = {"success": [], "errors": [], "skipped": []}
+    channel_name = "incident-dev-2024-01-01-foo"
+
+    with patch.object(core, "incident_folder") as mock_incident_folder:
+        mock_incident_folder.channel_slug = incident_folder.channel_slug
+        mock_incident_folder.get_incidents_from_sheet.return_value = []
+
+        core._add_incident_to_sheet(
+            MagicMock(),
+            "C123",
+            channel_name,
+            "https://docs.example/report",
+            "Incident name",
+            "Product",
+            results,
+        )
+
+    mock_incident_folder.add_new_incident_to_list.assert_called_once_with(
+        "https://docs.example/report",
+        "Incident name",
+        "2024-01-01-foo",
+        "Product",
+        "https://gcdigital.slack.com/archives/C123",
+    )
+
+
+def test_create_document_bookmark_dev_channel_uses_consistent_slug():
+    results = {"success": [], "errors": [], "skipped": []}
+    with (
+        patch.object(core.incident_drive, "list_folder_files", return_value=[]),
+        patch.object(core.incident_document, "create_incident_document", return_value="doc-123") as mock_create,
+        patch.object(core.incident_document, "update_boilerplate_text"),
+        patch.object(core.on_call, "get_on_call_users_from_folder", return_value=[]),
+    ):
+        core._create_document_bookmark(
+            MagicMock(),
+            "C123",
+            "incident-dev-2024-01-01-foo",
+            {},
+            "folder-123",
+            "Incident name",
+            "Product",
+            results,
+        )
+
+    mock_create.assert_called_once_with("2024-01-01-foo", "folder-123")
 
 
 @patch("modules.incident.core.db_operations")

@@ -13,6 +13,7 @@ from modules.incident import (
     incident_folder,
     on_call,
 )
+from modules.incident.incident_folder import channel_slug
 from packages.incident.drive.adapters import google_drive as incident_drive
 from packages.incident.meet.adapters import google_meet as meet
 
@@ -163,7 +164,7 @@ def _create_document_bookmark(
         return ""
 
     try:
-        slug = channel_name.replace("incident-", "")
+        slug = channel_slug(channel_name)
         document_id = None
         document_link = None
 
@@ -239,7 +240,7 @@ def _add_incident_to_sheet(
     try:
         # Check if incident already exists in the list
         incidents_in_sheet = incident_folder.get_incidents_from_sheet()
-        slug = channel_name.replace("incident-", "")
+        slug = channel_slug(channel_name)
 
         already_in_sheet = False
         for inc in incidents_in_sheet:
