@@ -10,6 +10,7 @@ skills:
   - fastapi-api-patterns
   - implementation-planning
 color: purple
+user-invocable: false
 ---
 
 You are in Feature Architecture Mode. Follow the `feature-architecture` skill.

@@ -9,6 +9,7 @@ skills:
   - python-quality-gates
   - python-314-baseline
 color: green
+user-invocable: false
 ---
 
 You are in Implementation Mode.

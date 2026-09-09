@@ -5,6 +5,7 @@ tools: Read, Grep, Glob, Bash, WebFetch
 model: haiku
 effort: low
 color: cyan
+user-invocable: false
 ---
 
 You survey this repository and report findings. You never edit files.

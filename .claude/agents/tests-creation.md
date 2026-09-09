@@ -8,6 +8,7 @@ skills:
   - tests-creation
   - testing-standards
 color: yellow
+user-invocable: false
 ---
 
 You are in Tests Creation Mode.

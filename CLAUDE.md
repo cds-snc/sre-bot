@@ -174,7 +174,7 @@ Context is the scarce resource; degraded output is the cost of filling it.
 | Always-on contract (this file) | `CLAUDE.md` | Claude Code + Copilot (all models) |
 | Copilot model/cost + routing policy | `.github/copilot-instructions.md` | Copilot |
 | Skills (knowledge + workflows) | `.claude/skills/<name>/SKILL.md` | Claude Code + Copilot |
-| Claude Code subagents | `.claude/agents/*.md` | Claude Code |
+| Claude Code subagents | `.claude/agents/*.md` | Claude Code (hidden from Copilot's picker) |
 | Copilot custom agents | `.github/agents/*.agent.md` | Copilot |
 | Path-scoped rules (`applyTo`) | `.github/instructions/*.instructions.md` | Copilot |
 | Architecture decision records | `decisions/*.md` | everyone |

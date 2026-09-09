@@ -8,6 +8,7 @@ skills:
   - architecture-review
   - backlog-task-workflow
 color: orange
+user-invocable: false
 ---
 
 You are in App-Level Architecture Mode. Follow the `architecture-review` skill.

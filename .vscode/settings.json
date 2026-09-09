@@ -3,7 +3,6 @@
     // .claude/skills/ for EVERY model — GPT, Claude, MAI, Gemini.
     // Pinned explicitly so the setup does not depend on VS Code defaults.
     "chat.useClaudeMdFile": true,
-    "chat.useClaudeSkills": true,
     "chat.tools.terminal.autoApprove": {
         "backlog": true,
         "rg": true,
@@ -22,5 +21,6 @@
             "source.fixAll.ruff": "explicit",
             "source.organizeImports.ruff": "explicit"
         }
-    }
+    },
+    "chat.useAgentSkills": true
 }
