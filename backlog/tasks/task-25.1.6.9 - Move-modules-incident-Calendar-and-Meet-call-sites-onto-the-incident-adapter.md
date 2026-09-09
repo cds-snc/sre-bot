@@ -1,10 +1,10 @@
 ---
 id: TASK-25.1.6.9
 title: Move modules incident Calendar and Meet call sites onto the incident adapter
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-02 15:03'
-updated_date: '2026-09-09 13:08'
+updated_date: '2026-09-09 13:33'
 labels:
   - clients
   - phase-3
@@ -38,11 +38,11 @@ WATCH: core.py's existing try/except around create_space predates classification
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The incident adapter builds stub-typed CalendarResource and MeetResource via get_calendar_service/get_meet_service, calls freebusy().query, events().insert and spaces().create directly, and performs its own try/except + classify_google_error
-- [ ] #2 modules/incident/schedule_retro.py and modules/incident/core.py call the adapter; neither imports integrations.google_workspace
-- [ ] #3 app/integrations/google_workspace/google_calendar.py and meet.py are deleted with their test files, grep-verified zero references repo-wide outside backlog/ and tmp/ (requires TASK-25.1.6.2's helper relocation to have landed)
-- [ ] #4 core.py's pre-existing try/except around create_space is either kept with a stated reason or removed as now-duplicated adapter handling; the choice is recorded in the notes and covered by a test
-- [ ] #5 Existing test_schedule_retro.py, test_incident_core.py and test_meet.py coverage is preserved at the new boundary, including the delegated_user_email pass-through and HttpError propagation cases TASK-25.1.1 added
+- [x] #1 The incident adapter builds stub-typed CalendarResource and MeetResource via get_calendar_service/get_meet_service, calls freebusy().query, events().insert and spaces().create directly, and performs its own try/except + classify_google_error
+- [x] #2 modules/incident/schedule_retro.py and modules/incident/core.py call the adapter; neither imports integrations.google_workspace
+- [x] #3 app/integrations/google_workspace/google_calendar.py and meet.py are deleted with their test files, grep-verified zero references repo-wide outside backlog/ and tmp/ (requires TASK-25.1.6.2's helper relocation to have landed)
+- [x] #4 core.py's pre-existing try/except around create_space is either kept with a stated reason or removed as now-duplicated adapter handling; the choice is recorded in the notes and covered by a test
+- [x] #5 Existing test_schedule_retro.py, test_incident_core.py and test_meet.py coverage is preserved at the new boundary, including the delegated_user_email pass-through and HttpError propagation cases TASK-25.1.1 added
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -202,6 +202,12 @@ OPEN ITEM FOR HUMAN REVIEW (not blocking, recorded per AC#4's "recorded in the n
   divergence should be revisited then rather than papered over now by inventing new None-handling
   in schedule_retro.py/core.py that neither file's current design calls for.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+ACs verified: adapter boundary migrated to packages/incident/scheduling/adapters/google_calendar.py and packages/incident/meet/adapters/google_meet.py; schedule_retro and core now import the adapters; legacy Google Calendar/Meet module files and stale references removed; local create_space catch is intentionally retained because the adapter re-raises after classification/logging and the caller still handles domain-level bookmark creation/incident reporting. Validation: targeted pytest for the adapter, boundary, and incident consumer tests passed (60 passed).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
