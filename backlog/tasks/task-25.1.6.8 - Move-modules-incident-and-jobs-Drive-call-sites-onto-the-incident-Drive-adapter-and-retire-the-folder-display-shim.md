@@ -3,10 +3,10 @@ id: TASK-25.1.6.8
 title: >-
   Retire google_drive.py: introduce a Drive infrastructure capability and
   incident/role feature adapters
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-02 15:02'
-updated_date: '2026-09-08 23:14'
+updated_date: '2026-09-09 13:35'
 labels:
   - clients
   - phase-3
@@ -42,12 +42,12 @@ The real Slack pagination/search fix for LEGACY_FOLDER_DISPLAY_LIMIT is out of s
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/infrastructure/drive/ exists (DriveProvider Protocol, GoogleDriveProvider, settings, factory) per TASK-25.1.6.8.1
-- [ ] #2 packages/incident/<subdomain>/adapters/google_drive.py exists and core.py, incident_document.py, incident_folder.py, incident_roles.py, and jobs/scheduled_tasks.py call it; none imports integrations.google_workspace.google_drive (TASK-25.1.6.8.2)
-- [ ] #3 packages/talent/adapters/google_drive.py exists and modules/role/role.py calls it; it no longer imports integrations.google_workspace.google_drive (TASK-25.1.6.8.3; package renamed from the originally proposed packages/role during .8.3 planning)
-- [ ] #4 app/integrations/google_workspace/google_drive.py is not yet deleted by this coordinator or its children - its last production references are removed by TASK-25.1.6.10, which owns the file's actual deletion
-- [ ] #5 LEGACY_FOLDER_DISPLAY_LIMIT is untouched or removed only if TASK-81 has already landed; TASK-81 owns the real fix
-- [ ] #6 Focused tests, ruff, mypy, and app/bin/check_sdk_typing.py pass for all three children
+- [x] #1 app/infrastructure/drive/ exists (DriveProvider Protocol, GoogleDriveProvider, settings, factory) per TASK-25.1.6.8.1
+- [x] #2 packages/incident/<subdomain>/adapters/google_drive.py exists and core.py, incident_document.py, incident_folder.py, incident_roles.py, and jobs/scheduled_tasks.py call it; none imports integrations.google_workspace.google_drive (TASK-25.1.6.8.2)
+- [x] #3 packages/talent/adapters/google_drive.py exists and modules/role/role.py calls it; it no longer imports integrations.google_workspace.google_drive (TASK-25.1.6.8.3; package renamed from the originally proposed packages/role during .8.3 planning)
+- [x] #4 app/integrations/google_workspace/google_drive.py is not yet deleted by this coordinator or its children - its last production references are removed by TASK-25.1.6.10, which owns the file's actual deletion
+- [x] #5 LEGACY_FOLDER_DISPLAY_LIMIT is untouched or removed only if TASK-81 has already landed; TASK-81 owns the real fix
+- [x] #6 Focused tests, ruff, mypy, and app/bin/check_sdk_typing.py pass for all three children
 <!-- AC:END -->
 
 ## Comments

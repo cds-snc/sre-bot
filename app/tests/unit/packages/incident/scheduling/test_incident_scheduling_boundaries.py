@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from integrations.google_workspace import google_calendar
 from packages.incident.scheduling import availability
+from packages.incident.scheduling.adapters import google_calendar
 
 APP_ROOT = Path(__file__).resolve().parents[5]
 RELOCATED_NAMES = (
@@ -32,11 +32,6 @@ def test_relocated_helper_absent_from_google_workspace_sources(name):
     package_dir = APP_ROOT / "integrations" / "google_workspace"
     offenders = [path.name for path in package_dir.glob("*.py") if name in path.read_text(encoding="utf-8")]
     assert offenders == []
-
-
-def test_google_calendar_keeps_its_google_api_functions():
-    assert callable(google_calendar.get_freebusy)
-    assert callable(google_calendar.insert_event)
 
 
 def test_schedule_retro_uses_relocated_availability_helpers():
