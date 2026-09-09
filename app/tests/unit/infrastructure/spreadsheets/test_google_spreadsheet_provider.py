@@ -22,9 +22,9 @@ def _http_error(status: int, reason: str = "boom") -> HttpError:
     return HttpError(resp=FakeResp(status, reason), content=b"{}")
 
 
-def _request(payload: object = {}) -> MagicMock:
+def _request(payload: object | None = None) -> MagicMock:
     request = MagicMock()
-    request.execute.return_value = payload
+    request.execute.return_value = {} if payload is None else payload
     return request
 
 
