@@ -3,11 +3,11 @@ id: TASK-25.1.6.10.2
 title: >-
   Build a SpreadsheetProvider infrastructure capability (Protocol, Google
   implementation, models, settings, factory)
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-09 15:02'
-updated_date: '2026-09-09 15:55'
+updated_date: '2026-09-09 15:59'
 labels:
   - clients
   - phase-3
@@ -182,6 +182,12 @@ Additive only. Six new files under app/infrastructure/spreadsheets/ and three ne
 SIZE GATE
 Production: __init__.py, models.py, provider.py, google.py, settings.py, factory.py = 6 new files, roughly 200 LOC (down from the first draft after dropping warmup/health_check), one subsystem, no consumer touched, no mixed refactor. Comfortably inside the single-PR gate; no decomposition needed.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented app/infrastructure/spreadsheets: runtime-checkable four-method SpreadsheetProvider Protocol, frozen SheetCell model, Google implementation with local Sheets scope and canonical grid mapping, parse-range NOT_FOUND/RANGE_NOT_FOUND handling, partitioned settings, cached factory, and package exports. Added focused provider, settings, and factory tests. Verified ACs 1-9 individually. Evidence: from app, uv run pytest tests/unit/infrastructure/spreadsheets -q -> 22 passed; from app, uv run mypy with a fresh cache on infrastructure/spreadsheets -> no issues; from app, uv run ruff check . -> passed; from app, uv run python bin/check_sdk_typing.py -> passed; user reports make test -> all green; scope grep checks passed. Remaining human verification: review the change and merge/close the task; no runtime Google API or smoke validation was run.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
