@@ -3,11 +3,11 @@ id: TASK-25.1.6.10.3
 title: >-
   Migrate incident_folder.py onto SpreadsheetProvider and fix the incident
   status spreadsheet defects
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-09 15:03'
-updated_date: '2026-09-09 18:30'
+updated_date: '2026-09-09 18:38'
 labels:
   - clients
   - phase-3
@@ -64,7 +64,7 @@ NOT IN SCOPE: modules/aws/spending.py and the deletion of integrations/google_wo
 - [x] #5 update_spreadsheet_incident_status logs a warning when no row matches instead of returning False silently, and information_update.py surfaces a failed spreadsheet update to the user instead of unconditionally confirming the field change
 - [x] #6 core.py::_add_incident_to_sheet derives the incident slug the same way incident_conversation.py does, so dev incident channels produce a consistent slug on the recreate path
 - [x] #7 Existing Sheets coverage in app/tests/modules/incident/test_incident_folder.py is preserved at the new provider seam (Protocol-shaped fakes returning real OperationResult values, per decisions/testing.md), with no MagicMock standing in for the subject under test
-- [ ] #8 Focused tests, ruff, mypy, and app/bin/check_sdk_typing.py pass
+- [x] #8 Focused tests, ruff, mypy, and app/bin/check_sdk_typing.py pass
 - [x] #9 update_spreadsheet_incident_status raises IncidentSheetError for any classified read_values/update_values failure that is not the 'empty sheet' or 'no matching row' business outcome; those two outcomes still return False with a warning log (human-approved 2026-09-09 planning decision)
 - [x] #10 add_new_incident_to_list raises IncidentSheetError when append_values returns a classified failure, instead of silently returning a falsy value (human-approved 2026-09-09 planning decision)
 - [x] #11 information_update.py posts an additional client.chat_postMessage warning when update_spreadsheet_incident_status returns False, without removing the existing '<@user> has updated the field status to X' confirmation message (human-approved 2026-09-09 planning decision)
