@@ -9,6 +9,7 @@ skills:
   - backlog-task-workflow
   - implementation-planning
 color: blue
+user-invocable: false
 ---
 
 You are in Task Planning Mode. Follow the `plan-task` skill end to end.

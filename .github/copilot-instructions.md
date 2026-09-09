@@ -91,12 +91,20 @@ Workflow order: `architecture` → `feature-architecture` → `task-planner` →
 | `CLAUDE.md` | always-on engineering contract (all models) |
 | `.github/copilot-instructions.md` | this file — Copilot policy delta |
 | `.claude/skills/<name>/SKILL.md` | skills, shared with Claude Code (`chat.useClaudeSkills`) |
-| `.github/agents/*.agent.md` | Copilot custom agents (model-pinned) |
+| `.github/agents/*.agent.md` | Copilot custom agents (model-pinned) — **pick these** |
 | `.github/instructions/*.instructions.md` | path-scoped rules via `applyTo` globs |
 | `.vscode/mcp.json` | workspace MCP servers |
 
 Skills live under `.claude/skills/` on purpose: VS Code and Claude Code both read
 that directory, so one file serves every model. Do not create `.github/skills/`.
+
+**Agents are the exception — they cannot be shared.** VS Code reads *both*
+`.github/agents/*.agent.md` and `.claude/agents/*.md`, and the two formats express
+`model:` and `tools:` differently, so each harness needs its own file. The
+`.claude/agents/*.md` twins therefore carry `user-invocable: false`, which keeps
+them out of the VS Code agents dropdown — otherwise every agent appears twice. In
+Copilot always pick the `.github/agents/` one: only it carries the Tier L/M model
+pin and the handoff buttons. Keep the two sets in sync when you change a role.
 
 There is no `.github/prompts/` directory: prompt files are **deprecated for Agent
 Host sessions** and are not loaded there. Every former prompt is now a workflow
