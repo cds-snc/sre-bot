@@ -3,10 +3,11 @@ id: TASK-25.1.6.10.3
 title: >-
   Migrate incident_folder.py onto SpreadsheetProvider and fix the incident
   status spreadsheet defects
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-09 15:03'
-updated_date: '2026-09-09 18:08'
+updated_date: '2026-09-09 18:30'
 labels:
   - clients
   - phase-3
@@ -56,18 +57,18 @@ NOT IN SCOPE: modules/aws/spending.py and the deletion of integrations/google_wo
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 incident_folder.py's four Sheets call sites use infrastructure.spreadsheets.get_spreadsheet_provider(); the module no longer imports integrations.google_workspace.sheets or googleapiclient, and no feature adapter or new packages/incident subdomain is created
-- [ ] #2 get_incidents_from_sheet returns [] with a warning only for the provider's parse-range NOT_FOUND result, and raises IncidentSheetError for any other classified failure, so core.py::_add_incident_to_sheet cannot mistake an API failure for an empty sheet and write a duplicate row; both paths are covered by tests
-- [ ] #3 The parsed incident dicts from get_incidents_from_sheet are byte-for-byte identical to today's for the same sheet contents (channel_id regex extraction, TBC fallbacks, header-row skip, short-row skip, days lookback filter), proven against the existing fixture in app/tests/modules/incident/test_incident_folder.py
-- [ ] #4 information_update.py passes return_channel_name(channel_name) to update_spreadsheet_incident_status, matching incident_status.py; a test proves the value reaching the provider matches the '#slug' form actually written to the sheet by add_new_incident_to_list
-- [ ] #5 update_spreadsheet_incident_status logs a warning when no row matches instead of returning False silently, and information_update.py surfaces a failed spreadsheet update to the user instead of unconditionally confirming the field change
-- [ ] #6 core.py::_add_incident_to_sheet derives the incident slug the same way incident_conversation.py does, so dev incident channels produce a consistent slug on the recreate path
-- [ ] #7 Existing Sheets coverage in app/tests/modules/incident/test_incident_folder.py is preserved at the new provider seam (Protocol-shaped fakes returning real OperationResult values, per decisions/testing.md), with no MagicMock standing in for the subject under test
+- [x] #1 incident_folder.py's four Sheets call sites use infrastructure.spreadsheets.get_spreadsheet_provider(); the module no longer imports integrations.google_workspace.sheets or googleapiclient, and no feature adapter or new packages/incident subdomain is created
+- [x] #2 get_incidents_from_sheet returns [] with a warning only for the provider's parse-range NOT_FOUND result, and raises IncidentSheetError for any other classified failure, so core.py::_add_incident_to_sheet cannot mistake an API failure for an empty sheet and write a duplicate row; both paths are covered by tests
+- [x] #3 The parsed incident dicts from get_incidents_from_sheet are byte-for-byte identical to today's for the same sheet contents (channel_id regex extraction, TBC fallbacks, header-row skip, short-row skip, days lookback filter), proven against the existing fixture in app/tests/modules/incident/test_incident_folder.py
+- [x] #4 information_update.py passes return_channel_name(channel_name) to update_spreadsheet_incident_status, matching incident_status.py; a test proves the value reaching the provider matches the '#slug' form actually written to the sheet by add_new_incident_to_list
+- [x] #5 update_spreadsheet_incident_status logs a warning when no row matches instead of returning False silently, and information_update.py surfaces a failed spreadsheet update to the user instead of unconditionally confirming the field change
+- [x] #6 core.py::_add_incident_to_sheet derives the incident slug the same way incident_conversation.py does, so dev incident channels produce a consistent slug on the recreate path
+- [x] #7 Existing Sheets coverage in app/tests/modules/incident/test_incident_folder.py is preserved at the new provider seam (Protocol-shaped fakes returning real OperationResult values, per decisions/testing.md), with no MagicMock standing in for the subject under test
 - [ ] #8 Focused tests, ruff, mypy, and app/bin/check_sdk_typing.py pass
-- [ ] #9 update_spreadsheet_incident_status raises IncidentSheetError for any classified read_values/update_values failure that is not the 'empty sheet' or 'no matching row' business outcome; those two outcomes still return False with a warning log (human-approved 2026-09-09 planning decision)
-- [ ] #10 add_new_incident_to_list raises IncidentSheetError when append_values returns a classified failure, instead of silently returning a falsy value (human-approved 2026-09-09 planning decision)
-- [ ] #11 information_update.py posts an additional client.chat_postMessage warning when update_spreadsheet_incident_status returns False, without removing the existing '<@user> has updated the field status to X' confirmation message (human-approved 2026-09-09 planning decision)
-- [ ] #12 core.py::_create_document_bookmark also derives its slug via the corrected channel_slug helper (same fix as defect D's _add_incident_to_sheet), so dev-channel document lookup/creation and the incident-list slug stay consistent (scope widened by human decision 2026-09-09)
+- [x] #9 update_spreadsheet_incident_status raises IncidentSheetError for any classified read_values/update_values failure that is not the 'empty sheet' or 'no matching row' business outcome; those two outcomes still return False with a warning log (human-approved 2026-09-09 planning decision)
+- [x] #10 add_new_incident_to_list raises IncidentSheetError when append_values returns a classified failure, instead of silently returning a falsy value (human-approved 2026-09-09 planning decision)
+- [x] #11 information_update.py posts an additional client.chat_postMessage warning when update_spreadsheet_incident_status returns False, without removing the existing '<@user> has updated the field status to X' confirmation message (human-approved 2026-09-09 planning decision)
+- [x] #12 core.py::_create_document_bookmark also derives its slug via the corrected channel_slug helper (same fix as defect D's _add_incident_to_sheet), so dev-channel document lookup/creation and the incident-list slug stay consistent (scope widened by human decision 2026-09-09)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -278,3 +279,9 @@ Production changes: 3 files (incident_folder.py, information_update.py, core.py)
 SIZE GATE
 This PR mixes a mechanical migration (swap sheets.* client calls for the provider) with four behavior fixes (A-D) at the SAME call sites - technically triggers the implementation-planning skill's rule #3 (mechanical + behavior in one PR). This mixing is NOT a new decision made in this plan: it is the task's own pre-approved framing (\"FOUR DEFECTS FIXED HERE...folded into this slice rather than a separate bug task\", explicitly human-approved 2026-09-09 at task-creation time, checkpoint #1). Recommending against further decomposition because: (1) the migration and each defect fix land in the SAME function body (e.g. update_spreadsheet_incident_status's provider swap and its defect-B warning are one inseparable edit), so a mechanical-only PR would ship half-finished, semantically-incomplete functions; (2) total size is modest - 3 production files, ~150-170 LOC, one subsystem, no mixed refactor+behavior ACROSS unrelated areas (it's the same 4 call sites throughout); (3) well under the 400 LOC/10-file thresholds. If the human disagrees with carrying this mixing forward, the natural split would be Slice 1 (mechanical: migrate all 4 call sites onto the provider with IDENTICAL behavior, i.e. still silently return False/[] on any failure) then Slice 2 (behavior: defects A-D plus the IncidentSheetError raise-on-failure change) - flagging this as an option, not proceeding with it unless requested.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented and verified the SpreadsheetProvider migration and incident spreadsheet defect fixes in modules/incident/incident_folder.py, information_update.py, and core.py. Provider calls now use get_spreadsheet_provider(); parse-range NOT_FOUND remains the only swallowed read_cells failure; other classified failures raise IncidentSheetError; status updates normalize channel names and surface false returns; dev slugs are consistent for sheet and document recreation. Evidence: focused incident suite 71 passed with one existing pytest_asyncio deprecation warning; user reports make test all green; uv run ruff check . passed; bin/check_sdk_typing.py passed; incident_folder.py has no legacy Sheets/googleapiclient imports. ACs 1-7 and 9-12 checked. AC 8 remains unchecked because repository-wide uv run mypy . fails on existing typing errors across the repository and legacy incident modules; no mypy cleanup was added because it is outside this task scope. DoD remaining: human review of the mypy baseline and deployment/production verification.
+<!-- SECTION:NOTES:END -->
