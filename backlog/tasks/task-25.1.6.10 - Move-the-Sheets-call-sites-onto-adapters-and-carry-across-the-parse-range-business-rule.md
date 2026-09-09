@@ -1,12 +1,12 @@
 ---
 id: TASK-25.1.6.10
 title: >-
-  Migrate live Sheets consumers and delete the legacy Google Groups report
-  module
+  Retire sheets.py: introduce a Spreadsheet infrastructure capability and
+  migrate live consumers
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:03'
-updated_date: '2026-09-08 23:14'
+updated_date: '2026-09-09 15:29'
 labels:
   - clients
   - phase-3
@@ -14,13 +14,12 @@ milestone: m-3
 dependencies:
   - TASK-25.1.6.9
 references:
+  - decisions/layers.md
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
-  - app/integrations/google_workspace/sheets.py
-  - app/integrations/google_workspace/google_drive.py
-  - app/modules/incident/incident_folder.py
-  - app/modules/aws/spending.py
-  - app/modules/reports/google_groups.py
+  - decisions/feature-packages.md
+  - decisions/migration.md
+  - decisions/testing.md
 parent_task_id: TASK-25.1.6
 priority: medium
 ordinal: 141000
@@ -29,18 +28,37 @@ ordinal: 141000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Migrate the live Sheets consumers in modules/incident/incident_folder.py and modules/aws/spending.py onto stub-typed SheetsResource calls with adapter-owned try/except + classify_google_error, preserving the incident parse-range behavior and removing the hand-rolled time.sleep rate limiter after SDK-native retries are configured. The unused legacy modules/reports/google_groups.py feature is not migrated: delete that module and its dedicated tests as part of this slice. Do not create a replacement reporting feature here; a future report capability requires a new feature task.
+COORDINATOR TASK (retitled and rescoped 2026-09-09 during planning, human-directed). Originally scoped as a single slice moving the Sheets call sites onto feature adapters and deleting the report module. Planning found that Sheets, like Drive before it, has two independent live feature consumers - the incident feature (modules/incident/incident_folder.py, 4 call sites) and AWS spending reporting (modules/aws/spending.py, 1 call site). Per decisions/layers.md's promote-on-second-consumer rule, applied proactively exactly as TASK-25.1.6.8 did for Drive, Sheets graduates directly to a Path A infrastructure capability instead of growing a feature-owned adapter that would be promoted later.
+
+KEY DECISIONS TAKEN AT PLANNING TIME (2026-09-09, human-directed):
+1. The capability is vendor-neutral: app/infrastructure/spreadsheets/, SpreadsheetProvider, get_spreadsheet_provider(). Not 'sheets' - that is Google vocabulary, and directory/ and drive/ set the naming precedent.
+2. Rich grid reads are IN the Protocol via a canonical frozen SheetCell(formatted_value, link). The incident feature recovers a Slack channel id from a cell hyperlink; a values-only contract cannot express that. Portability holds under decisions/layers.md's two-provider test (Microsoft Graph's workbookRange exposes text and formulas, so a second provider populates link by parsing HYPERLINK).
+3. A1 notation strings cross the Protocol. sheet!range addressing is a cross-vendor spreadsheet convention, not a vendor DSL like Drive's q= language that was correctly rejected for DriveProvider.
+4. No feature adapters. Both live consumers call get_spreadsheet_provider() directly from their legacy modules, following the Directory precedent (TASK-25.1.6.4/.5). The Drive precedent needed adapters only because Google appProperties had to stay out of the vendor-neutral contract; nothing equivalent exists here.
+5. No delegated_user_email on the Protocol. No Sheets caller passes one and client._build_service already defaults the subject to SRE_BOT_EMAIL, so the Google auth subject never enters the vendor-neutral contract.
+6. The unused legacy report feature is deleted, not migrated. modules/reports/core.py::reports_command has zero callers repo-wide and is absent from _register_legacy_handlers(), so the whole package is unreachable dead code.
+
+DEVIATION FOUND AND OWNED HERE: integrations/google_workspace/client.py::classify_google_error maps only {404}, {401,403} and {429,5xx} and re-raises everything else. The 'Unable to parse range' outcome that modules/incident/incident_folder.py depends on is an HTTP 400, so it would escape the Path A boundary. The Google Sheets implementation maps that specific 400 onto OperationStatus.NOT_FOUND before delegating to classify_google_error; the shared classifier is not modified, so Directory/Drive/Docs/Calendar classification is untouched.
+
+FIVE CHILDREN, in dependency order:
+- TASK-25.1.6.10.1 - delete the dead app/modules/reports/ package plus the Google resources config field it orphans. Independent; removes 3 Sheets sites, 2 legacy Drive sites, and the last time.sleep pacer.
+- TASK-25.1.6.10.2 - build app/infrastructure/spreadsheets/ (SpreadsheetProvider Protocol, GoogleSpreadsheetProvider, SheetCell, settings, factory). Touches no consumer; does not delete sheets.py.
+- TASK-25.1.6.10.3 - migrate modules/incident/incident_folder.py onto the provider, keep the parse-range rule caller-side, and fix four live incident status spreadsheet defects found while planning (the /sre incident show status change never reaching the spreadsheet, its silent no-match failure, its unconditional success message, and an inconsistent dev-channel slug on the recreate path).
+- TASK-25.1.6.10.4 - migrate modules/aws/spending.py, fix its import-time spreadsheet-id binding, and delete integrations/google_workspace/sheets.py plus its tests.
+- TASK-25.1.6.10.5 - retire integrations/google_workspace/google_drive.py (inherits the original AC#7, whose premise was stale): re-home the incident appProperties metadata operations as real Path B adapter code and relocate DRIVE_SCOPES.
+
+This task closes when all five are Done. Its own remaining direct work is nil.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Live incident-folder and AWS-spending Sheets calls use get_sheets_service and adapter-owned classification; no consumer imports integrations.google_workspace.sheets.
-- [ ] #2 The incident parse-range behavior remains caller-specific and covered for both the swallowed expected error and propagated other HttpError.
-- [ ] #3 The legacy modules/reports/google_groups.py module and its tests are deleted; no report behavior is migrated or recreated.
-- [ ] #4 integrations/google_workspace/sheets.py and its tests are deleted, with no remaining production imports.
-- [ ] #5 The report module time.sleep loop is removed with the module; live Sheets callers use SDK-native retry configuration.
-- [ ] #6 Focused tests, ruff, mypy, and the SDK typing guard pass.
-- [ ] #7 app/integrations/google_workspace/google_drive.py and its test file are deleted, with no remaining production references (its last two call sites, find_files_by_name and create_file, live in modules/reports/google_groups.py and are removed by this task's AC#3); if infrastructure/drive/factory.py (TASK-25.1.6.8.1) imports DRIVE_SCOPES from this file, relocate the constant there first
+- [ ] #1 All five children (TASK-25.1.6.10.1 through .10.5) are Done
+- [ ] #2 app/infrastructure/spreadsheets/ exists as a vendor-neutral Path A capability (SpreadsheetProvider Protocol, GoogleSpreadsheetProvider, SheetCell model, settings, cached factory) and no Google response key or auth subject crosses its contract
+- [ ] #3 app/integrations/google_workspace/sheets.py and its test file are deleted with zero remaining production references; both live consumers resolve the capability through get_spreadsheet_provider()
+- [ ] #4 The whole app/modules/reports/ package and its tests are deleted, no report behavior is migrated or recreated, and the 1.1s time.sleep pacer goes with it
+- [ ] #5 The incident parse-range business rule remains caller-side, get_incidents_from_sheet still distinguishes an empty sheet from a failed read, and the four incident status spreadsheet defects are fixed with tests
+- [ ] #6 app/integrations/google_workspace/google_drive.py and its test file are deleted, with DRIVE_SCOPES relocated out of the vendor mirror and the incident appProperties metadata operations re-homed to feature-owned Path B adapter code; DriveProvider is not widened
+- [ ] #7 Focused tests, ruff, mypy, and app/bin/check_sdk_typing.py pass for every child
 <!-- AC:END -->
 
 ## Comments
@@ -131,5 +149,46 @@ AC#7 added 2026-09-08 (task-planner, during TASK-25.1.6.8 planning). TASK-25.1.6
 created: 2026-09-08 23:14
 ---
 IMPACT NOTE FROM TASK-25.1.6.8.3 PLANNING (2026-09-08, task-planner): AC#7's premise that google_drive.py's last two call sites live in modules/reports/google_groups.py is now stale. TASK-25.1.6.8.2 shipped packages/incident/drive/adapters/google_drive.py with deliberate pass-throughs to the legacy module (list_metadata, add_metadata, delete_metadata, and the incident-template health check), and packages/incident_draft/adapters/google_docs.py plus infrastructure/drive/google.py import DRIVE_SCOPES from it. Deleting google_drive.py therefore also requires re-homing those metadata operations (Google appProperties stays out of the vendor-neutral DriveProvider per decisions/layers.md) and relocating DRIVE_SCOPES. TASK-25.1.6.8.3 (packages/talent Drive adapter) adds no new reference: it uses DriveProvider only.
+---
+
+author: @task-planner
+created: 2026-09-09 15:06
+---
+DECOMPOSED, RETITLED AND ACs REPLACED 2026-09-09 (task-planner, human-approved). Recording the replacement explicitly per the backlog-task-workflow rule against silently reshaping ACs.
+
+TITLE: 'Migrate live Sheets consumers and delete the legacy Google Groups report module' -> 'Retire sheets.py: introduce a Spreadsheet infrastructure capability and migrate live consumers'.
+
+THE SEVEN PREVIOUS ACs WERE REPLACED WHOLESALE by seven coordinator-level ones. Where the old ones went:
+- old AC#1 (consumers use get_sheets_service with adapter-owned classification) -> superseded: the architecture changed from feature adapters to a Path A capability, so consumers now resolve get_spreadsheet_provider(). Owned by .10.2/.10.3/.10.4.
+- old AC#2 (parse-range behavior caller-specific) -> .10.3, strengthened with the empty-vs-failed distinction.
+- old AC#3 (delete google_groups.py and its tests) -> .10.1, widened to the whole modules/reports package plus its orphaned config field.
+- old AC#4 (delete sheets.py) -> .10.4.
+- old AC#5 (remove the time.sleep loop) -> .10.1.
+- old AC#6 (gates pass) -> per-child, plus coordinator AC#7.
+- old AC#7 (delete google_drive.py) -> .10.5, with its stale premise corrected (see comment #9 on this task).
+
+FOUR PRE-REGISTERED ITEMS FROM SIBLING PLANNING WERE ALL CARRIED, NONE DROPPED:
+- The spending.py import-time SPENDING_SHEET_ID default-argument defect (registered by .1 planning, comment #1 item 3) -> .10.4.
+- The report module's blanket except Exception handling and skip-and-report question (comments #2, #3) -> moot: the module is deleted, not migrated.
+- The _a1_range / _sheet_title helpers that TASK-25.1.6.12 shipped and that were to 'travel with the call site' (comments #3, #4) -> moot for the same reason; .10.1's description records that the fix is superseded by deletion, not regressed.
+- The time.sleep(1.1) pacer and its num_retries swap (comment #5) -> .10.1 deletes it with the module. Note the SDK-native retry it was waiting for is not needed: the surviving live Sheets consumers never had a pacer.
+
+NEW FINDING THAT SHAPES .10.2 AND .10.3: classify_google_error re-raises HTTP 400, and 'Unable to parse range' IS a 400 - so the one error case a live consumer depends on would escape the Path A boundary. Handled inside the Google Sheets implementation without touching the shared classifier. Full rationale in the rewritten description.
+
+PRODUCTION BUG FOUND WHILE PLANNING, FOLDED INTO .10.3 (human-directed): changing an incident's status through the /sre incident show modal updates DynamoDB and the incident document but never the spreadsheet, which stays 'In Progress'. Root cause is exact: add_new_incident_to_list writes column E as =HYPERLINK(url, '#{slug}') with no 'incident-' prefix; incident_status.py:57 normalizes with return_channel_name() but information_update.py:313 passes the raw DB channel_name, so the row scan never matches and update_spreadsheet_incident_status returns False silently. Three related defects (silent no-match, unconditional success message, inconsistent dev-channel slug on the recreate path) were approved into the same slice.
+---
+
+author: @task-planner
+created: 2026-09-09 15:29
+---
+REVIEW ROUND 2 OUTCOME 2026-09-09 (human-directed). Three answers, two new tasks outside this coordinator, and one AC change on a child.
+
+1. NO warmup/health_check ON SpreadsheetProvider. Dropped from .10.2 (AC and plan). Rationale in .10.2's comment; the broader convention question - does connectivity warmup belong to the vendor SDK client rather than to each capability Protocol - is now TASK-82, which also owns reconciling DirectoryProvider and DriveProvider. .10.2 must not pre-empt it with a Sheets-specific answer.
+
+2. NO per-call num_retries ANYWHERE IN THIS SERIES. New TASK-25.1.6.13 (sibling under TASK-25.1.6) configures google-api-python-client retry once at construction in client.py via requestBuilder and deletes the 12 per-call arguments plus two duplicate _NUM_RETRIES constants already in infrastructure/directory/google.py and infrastructure/drive/google.py. It is now a dependency of .10.2 and .10.5, the two children that touch the SDK. Empirically verified against 2.198.0 so nobody re-derives it: execute(num_retries=) is the SDK's genuine built-in retry, build(num_retries=) only retries the discovery fetch, and build(requestBuilder=) is the real construction-time seam.
+
+3. DO NOT CARRY DRIFT ACROSS THE SEAM. .10.4's failure semantics are decided rather than deferred: today's uncaught HttpError propagation out of the spending job is drift, not a contract - the migrated call site logs the classified OperationResult and returns, with an explicit one-line comment marking the in-module result handling as a temporary shim until the concern moves into a feature package. Its 'decide during implementation' AC was replaced accordingly.
+
+STANDING PRINCIPLE FOR THE REMAINING CHILDREN, from the human: infrastructure/drive/ and infrastructure/directory/ are a STRUCTURAL template (file split, settings/factory shape, helper naming), not a behavioral one. Existing code may be outdated; where it diverges from decisions/outbound-clients.md or decisions/sdk-typing.md, fix the divergence or route around it rather than copying it. Temporary shims inside frozen legacy modules are acceptable and should be labelled as such, since they are removed when those features are rearchitected into packages.
 ---
 <!-- COMMENTS:END -->

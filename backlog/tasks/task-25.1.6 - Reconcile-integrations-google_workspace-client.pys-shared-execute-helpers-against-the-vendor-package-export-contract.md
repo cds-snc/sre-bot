@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 15:31'
-updated_date: '2026-09-08 18:55'
+updated_date: '2026-09-09 15:06'
 labels:
   - clients
   - phase-3
@@ -291,5 +291,21 @@ DRIVE ARCHITECTURE PIVOT (2026-09-08, task-planner, human-directed while plannin
 DECISION: Drive graduates directly to a Path A infrastructure capability instead of a Path B feature adapter, since two independent feature consumers are already known upfront (the layers.md "promotion on second consumer" trigger, applied proactively rather than after building and later promoting a first adapter). New app/infrastructure/drive/ (DriveProvider Protocol + GoogleDriveProvider + settings + factory), mirroring the existing infrastructure/directory/{provider,google,factory,models,settings}.py shape exactly. Two thin feature adapters then consume DriveProvider: packages/incident/<subdomain>/adapters/google_drive.py and a new packages/role/adapters/google_drive.py.
 
 TASK-25.1.6.8 RETITLED to a coordinator with three children: .8.1 (build DriveProvider), .8.2 (incident feature adapter + migrate incident/jobs consumers), .8.3 (role feature adapter + migrate modules/role/role.py). TASK-25.1.6.9's dependency is repointed from TASK-25.1.6.8 to TASK-25.1.6.8.2,TASK-25.1.6.8.3 (both Drive migrations must land before Calendar/Meet per the coordinator's serialized execution order). TASK-25.1.6.10 gains ownership of actually deleting app/integrations/google_workspace/google_drive.py + its test file, since modules/reports/google_groups.py (deleted only by .10) keeps calling google_drive.find_files_by_name/create_file until then — neither .8.2 nor .8.3 can reach a zero-production-reference state on their own.
+---
+
+author: @task-planner
+created: 2026-09-09 15:06
+---
+CHILD .10 DECOMPOSED 2026-09-09 (task-planner, human-approved). Your child count goes from twelve to sixteen: TASK-25.1.6.10 becomes a coordinator with five children (.10.1 through .10.5) and no direct implementation, mirroring what TASK-25.1.6.8 did for Drive.
+
+ARCHITECTURE PIVOT, SAME AS .8's: Sheets graduates to a Path A infrastructure capability (app/infrastructure/spreadsheets/, SpreadsheetProvider) rather than a feature-owned adapter, because two independent live consumers already exist (modules/incident/incident_folder.py and modules/aws/spending.py). Unlike Drive, neither consumer needs a feature adapter at all - the contract is fully vendor-neutral, so both legacy modules call get_spreadsheet_provider() directly, following the Directory precedent from .4/.5.
+
+WHAT THIS MOVES THE COORDINATOR'S OWN ACs TOWARD:
+- AC#2 (integrations/google_workspace/ contains only client.py and settings): .10.4 deletes sheets.py, .10.5 deletes google_drive.py. After the .10 series, the surviving mirror modules are google_docs.py, google_calendar.py and meet.py.
+- AC#3 (every Google call site lives in an adapter or infrastructure capability with its own classify): .10.2 adds the fourth infrastructure capability; .10.5 converts the last legacy Drive pass-throughs into real Path B adapter code.
+- AC#5 (no time.sleep under app/integrations, no business logic there): .10.1 deletes the last time.sleep pacer in this series along with the report module's business logic.
+- AC#6 (execute_google_api_request deleted): the .10 series removes roughly 17 of its call sites. Impact recorded on TASK-25.1.6.11.
+
+ONE DEVIATION SURFACED FOR THE RECORD: classify_google_error maps only {404}, {401,403} and {429,5xx} and re-raises everything else, so an expected Sheets HTTP 400 ('Unable to parse range') would escape a Path A boundary. Handled locally in the Sheets Google implementation without modifying the shared classifier; flagged to .11 in case the guardrail work wants to generalize it.
 ---
 <!-- COMMENTS:END -->
