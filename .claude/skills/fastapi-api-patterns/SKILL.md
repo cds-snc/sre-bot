@@ -1,6 +1,6 @@
 ---
 name: fastapi-api-patterns
-description: Apply typed FastAPI route patterns with clean dependency boundaries, stable error mapping, and test coverage for success/failure paths.
+description: Typed FastAPI route patterns — dependency boundaries, stable error mapping, OpenAPI metadata, CORS safety. Use when adding, changing or reviewing an endpoint, router, request/response schema, or HTTP error mapping.
 ---
 
 # FastAPI API Patterns

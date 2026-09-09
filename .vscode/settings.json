@@ -1,6 +1,13 @@
 {
+    // Load the shared engineering contract (CLAUDE.md) and the shared skills in
+    // .claude/skills/ for EVERY model — GPT, Claude, MAI, Gemini.
+    // Pinned explicitly so the setup does not depend on VS Code defaults.
+    "chat.useClaudeMdFile": true,
+    "chat.useClaudeSkills": true,
     "chat.tools.terminal.autoApprove": {
-        "backlog": true
+        "backlog": true,
+        "rg": true,
+        "/^cd app && uv run (mypy|ruff|pytest)\\b/": true
     },
     "python.defaultInterpreterPath": "${workspaceFolder}/app/.venv/bin/python",
     "python-envs.defaultEnvManager": "ms-python.python:system",

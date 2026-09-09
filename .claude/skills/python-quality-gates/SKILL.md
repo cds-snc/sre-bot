@@ -28,8 +28,9 @@ Always run from `app/` and keep checks scoped to project code only (exclude virt
 
 ## Targeted Re-run Examples
 
-- Type changes only: run `mypy` first, then full sequence.
-- Lint-only changes: run `ruff check`, then full sequence.
+- Lint-only changes: run `ruff check`, then the full sequence.
+- Type changes only: run `ruff check` (it is nearly free) then `mypy`, then the
+  full sequence.
 - Behavioral changes or tests touched: run focused `pytest` target, then full sequence.
 - When a targeted run includes smoke tests, skip unless the task explicitly requests smoke execution with env configured.
 

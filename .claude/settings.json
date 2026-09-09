@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(rg:*)",
+      "Bash(backlog:*)",
+      "Bash(cd app && uv run mypy:*)",
+      "Bash(cd app && uv run ruff:*)",
+      "Bash(cd app && uv run pytest:*)",
+      "Bash(cd app && uv run python:*)",
+      "WebFetch",
+      "WebSearch"
+    ],
+    "deny": [
+      "Read(./app/.env)",
+      "Read(./**/.env.*)",
+      "Read(./**/*.pem)"
+    ]
+  }
+}

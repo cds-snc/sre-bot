@@ -1,6 +1,6 @@
 ---
 name: type-model-boundaries
-description: Choose correct Python type boundaries (Protocol, dataclass, BaseModel, TypedDict) for maintainable FastAPI architecture.
+description: Choosing between Protocol, frozen dataclass, Pydantic BaseModel and TypedDict. Use when defining or refactoring a service contract, domain entity, or transport schema — especially before reaching for BaseModel on an internal boundary.
 ---
 
 # Type Model Boundaries

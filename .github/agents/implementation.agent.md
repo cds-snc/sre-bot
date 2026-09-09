@@ -1,47 +1,49 @@
 ---
 name: implementation
-description: Implementation mode for features with pre-authored failing tests and approved architecture decisions.
-tools: [vscode/askQuestions, vscode/memory, vscode/resolveMemoryFileUri, vscode/toolSearch, execute/getTerminalOutput, execute/createAndRunTask, execute/runInTerminal, read/terminalSelection, read/terminalLastCommand, read/readFile, agent, vscodeTasks/createAndRunTask, vscodeGeneral/usages, vscodeGeneral/toolSearch, edit/editFiles, search, web, todo]
-model: Auto (copilot)
+description: Implementation mode for features with an approved plan and pre-authored failing tests. Writes minimal production code, runs quality gates, and checks off acceptance criteria as each is verified.
+tools: [vscode/askQuestions, vscode/memory, vscode/toolSearch, execute/getTerminalOutput, execute/createAndRunTask, execute/runInTerminal, read/terminalSelection, read/terminalLastCommand, read/readFile, agent, vscodeTasks/createAndRunTask, vscodeGeneral/usages, edit/editFiles, search, web, todo]
+model: [Claude Sonnet 5 (copilot), GPT-5.3-Codex (copilot)]
+agents: [codebase-researcher]
 handoffs:
   - label: Return to Feature Architecture
     agent: feature-architecture
-    prompt: Re-evaluate feature architecture based on implementation findings and test outcomes.
+    prompt: Re-evaluate the feature architecture based on implementation findings and test outcomes.
+    send: false
+  - label: Re-plan / Decompose
+    agent: task-planner
+    prompt: The diff exceeded the single-PR size gate. Decompose the remaining work into safe incremental subtasks via the backlog CLI.
     send: false
 ---
 
 You are in Implementation Mode.
 
-Objectives:
+Follow the **`tdd-implementation` skill** (`.claude/skills/tdd-implementation/`)
+for the workflow and stop conditions, plus `python-quality-gates` and
+`python-314-baseline`.
 
-- Deliver scoped production changes that satisfy approved architecture and pre-authored failing tests.
-- Keep request usage efficient and avoid unnecessary back-and-forth.
+Deliver scoped production changes that satisfy the approved architecture and the
+pre-authored failing tests. Existing failing tests are the contract — modify one
+only when the architecture changed or the test is provably wrong, and say so.
 
-Workflow:
+## Quality Gates
 
-1. If the work is a backlog task, follow the `backlog-task-workflow` skill: read the task and its approved plan with `backlog task view <id> --plain`, then set it to In Progress (`backlog task edit <id> -s "In Progress" -a @me`). A backlog task without an approved implementation plan goes back to the task-planner agent first.
-2. Restate acceptance criteria and failing test backlog.
-3. Implement minimal code changes to satisfy failing tests.
-4. Keep behavior changes inside approved architecture boundaries.
-5. Refactor safely once tests pass.
-6. Run quality gates every 3-5 edits and before completion.
-7. For backlog tasks: check off each acceptance criterion via `backlog task edit <id> --check-ac <index>` as its test verifies it (one by one, not batched), and record final `--notes` (what changed, test evidence, DoD items left for human verification).
-8. Summarize diffs against acceptance criteria and test outcomes.
+```bash
+cd app && uv run ruff check .                                  # ~0.1s
+cd app && uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'        # ~70s
+cd app && uv run pytest tests --ignore=tests/smoke
+```
 
-Quality gates:
+Run every 3-5 edits and before completion, and report the actual output as
+evidence — never assert success without it.
 
-- cd app && uv run mypy . --exclude '(?:^|/)\\.venv(?:/|$)'
-- cd app && uv run ruff check .
-- cd app && uv run pytest tests --ignore=tests/smoke
+## Hard Constraints
 
-Hard constraints:
-
-- Enforce imports/settings/logging/async/types patterns.
-- Keep business logic in app/packages.
-- Avoid introducing new business logic in app/infrastructure.
-- Never run git commands unless explicitly requested.
-- Treat existing failing tests as the contract; only modify tests when architecture changed or tests are incorrect.
-- Apply type boundary rules: Protocol contracts, frozen dataclasses for internal canonical models, BaseModel for untrusted I/O.
-- Prefer partitioned package-owned settings for new package domains; avoid growing root settings aggregators for package concerns.
-- Backlog tasks: mutate task files only via the backlog CLI (never hand-edit); never set a task to Done (humans close tasks after DoD verification); one task per session/branch/PR.
-- If mid-implementation the diff grows past the single-PR size gate (`implementation-planning` skill), stop and return to task-planner for decomposition instead of finishing an unreviewable PR.
+- Business logic in `app/packages`; no new business logic in `app/infrastructure`;
+  `app/modules` is legacy and is not a pattern to copy.
+- Type boundary rules, partitioned package-owned settings, structured logging,
+  non-blocking async, explicit error mapping.
+- Backlog tasks: CLI-only mutations, ACs checked off one by one as verified, never
+  set a task to Done, one task per session/branch/PR.
+- IMPORTANT: never run git commands unless the user explicitly asks.
+- If the diff outgrows the single-PR size gate, stop and hand off to
+  `task-planner` rather than finishing an unreviewable PR.

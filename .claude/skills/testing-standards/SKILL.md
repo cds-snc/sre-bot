@@ -1,6 +1,6 @@
 ---
 name: testing-standards
-description: Apply project testing standards for app/tests layout, naming, dependency overrides, and route/service coverage.
+description: Project testing standards — app/tests layout, file naming, dependency overrides, fakes, fixture cleanup, docstring rules. Use whenever writing, moving or reviewing a test in app/tests.
 ---
 
 # Testing Standards
@@ -13,6 +13,12 @@ Mirror `app/` under `app/tests/`:
 - `app/tests/smoke/` — live systems. On-demand only.
 
 Names: `test_<domain>_<entity>_<action>.py`. No generic names.
+
+`app/tests/` also still holds legacy directories — `api/`, `integrations/`,
+`modules/`, `utils/`, `test_factory_validation.py` — from the pre-split layout.
+New tests never go there. When a change forces you to touch a legacy test, make
+the minimal edit that keeps it passing and note it; do not opportunistically
+migrate it, and do not treat its patterns as the standard to copy.
 
 ## Unit Tests
 

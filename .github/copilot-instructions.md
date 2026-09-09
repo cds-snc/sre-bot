@@ -1,177 +1,110 @@
-# Project AI Operating Contract
+# Copilot Operating Policy
 
-## Mission
+> The project's engineering contract lives in **[`CLAUDE.md`](../CLAUDE.md)**, which
+> VS Code loads automatically for every chat request on **every model** (GPT,
+> Claude, MAI, Gemini) via `chat.useClaudeMdFile`. Read it first — it is not
+> repeated here.
+>
+> This file adds only what is Copilot-specific: **model cost tiering**, agent
+> routing, and the `.github/` customization surface.
 
-Produce production-grade Python/FastAPI backend changes with architecture-first decision making, strict typing, deterministic validation, and low premium request waste.
+## Model Cost Policy (Mandatory)
 
-## Priority Order
+Copilot bills per token as AI credits (1 credit = $0.01 USD), so model choice —
+not request count — is what drains the budget. Every agent, prompt and handoff in
+this repo pins a model from **Tier L or Tier M**. Tier H is off-limits without
+explicit human approval in the request.
 
-1. Safety and correctness
-2. Architecture consistency
-3. Testability and maintainability
-4. Cost-efficient Copilot usage
-5. Speed
+Prices are USD per 1M tokens (input / output), verified 2026-09-09 against
+[Models and pricing](https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing).
+Re-verify before changing any pinned model.
 
-## Python Language Baseline (Authoritative)
+### Tier L — low consumption (default for mechanical work)
 
-This repository runs **CPython 3.14** (`app/.python-version` = `3.14`, `requires-python = ">=3.14"`, mypy `python_version = "3.14"`). Verify with `cd app && uv run python -V` if in doubt — do not assume an older version from training data.
+| Model | In / Out | Best for |
+| --- | --- | --- |
+| GPT-5.6 Luna | 0.20 / 1.20 | file surveys, greps, summarizing, status sweeps |
+| MAI-Code-1.1-Flash | 0.20 / 1.20 | mechanical edits, renames, formatting |
+| GPT-5.4 nano | 0.20 / 1.25 | trivial lookups |
+| GPT-5 mini | 0.25 / 2.00 | short scoped edits |
+| Gemini 3.8 Flash | 0.75 / 3.75 | long-context reading (promo pricing to 2026-12-31) |
+| GPT-5.4 mini | 0.75 / 4.50 | test scaffolding |
+| Claude Haiku 4.5 | 1.00 / 5.00 | spec-driven test authoring, gate triage |
 
-Treat the following Python 3.14 features as **valid, current, and non-deprecated**. Do not flag them as errors, do not "investigate why they parse", and do not rewrite them to older equivalents:
+### Tier M — medium consumption (reasoning, design, implementation)
 
-- **PEP 758** — `except` / `except*` without parentheses for multiple exception types:
-  ```python
-  except ValueError, TypeError:   # valid in 3.14; NOT the removed Python 2 `except E, name:` form
-  ```
-  Semantics are identical to `except (ValueError, TypeError):`. Parentheses are still required when using `as`: `except (ValueError, TypeError) as exc:`.
-- **PEP 649/749** — annotations are lazily evaluated by default; `from __future__ import annotations` is unnecessary (and itself deprecated) and string-quoted forward references are no longer required. Use `annotationlib` for annotation introspection.
-- **PEP 750** — t-strings (`t'...'` → `string.templatelib.Template`).
-- **PEP 765** — `return` / `break` / `continue` leaving a `finally` block emits `SyntaxWarning`.
-- **PEP 734** — `concurrent.interpreters`; **PEP 784** — `compression.zstd`.
-- `typing.Union` and `types.UnionType` are the same runtime type; compare unions with `==`, never `is`.
-- Also assume all 3.12/3.13 syntax is available: PEP 695 `type` aliases and `def f[T]()` type parameters, PEP 696 type-parameter defaults, PEP 701 f-strings, `warnings.deprecated`.
+| Model | In / Out | Best for |
+| --- | --- | --- |
+| Claude Sonnet 5 | 2.00 / 10.00 | **default** for architecture, planning, implementation |
+| GPT-5.3-Codex | 1.75 / 14.00 | code-heavy implementation fallback |
+| GPT-5.6 Terra | 2.00 / 12.00 | general fallback |
+| GPT-5.4 | 2.50 / 15.00 | general fallback |
+| Claude Sonnet 4.6 | 3.00 / 15.00 | last-resort fallback |
 
-Removed in 3.14 — do not use: `asyncio` child watchers, implicit `asyncio.get_event_loop()` loop creation, `ast.Num`/`Str`/`Bytes`, `pkgutil.get_loader`, `sqlite3.version`.
+### Tier H — do not select (2.5x–10x Tier M output cost)
 
-Reference: [What's new in Python 3.14](https://docs.python.org/3/whatsnew/3.14.html), [PEP 758](https://peps.python.org/pep-0758/).
+Claude Opus 4.7 / 4.8 / 5 (5.00 / 25.00), Opus 4.8 fast mode and Claude Fable 5.x
+(10.00 / 50.00), GPT-5.5 (5.00 / 30.00), GPT-5.6 Sol (4.00 / 20.00), GPT-6 Astra
+(10.00 / 50.00).
 
-If a construct still looks wrong after checking this list, verify empirically with `cd app && uv run python -c '...'` instead of speculating.
+If a task genuinely needs Tier H, say so and ask — do not switch silently.
 
-## Product and Architecture Constraints
+### Routing rule
 
-- Runtime target: Python 3.14 (see Python Language Baseline above).
-- Framework: FastAPI.
-- Focus: API/backend only.
-- Shared platform capabilities belong in `app/infrastructure`.
-- Business logic belongs in `app/packages/<domain>`.
-- Do not place new business logic in `app/infrastructure`.
-- Treat `app/modules` as legacy and do not use it as an architectural reference.
-- Prefer architecture references from `app/infrastructure` and `app/packages`.
-- `app/packages/access` is a useful reference package but not a source of absolute truth.
-- Prefer partitioned settings for new package domains in `app/packages/<feature>/settings.py`.
-- Avoid growing root settings aggregators for new package-owned concerns.
-- Services should receive the narrowest settings slice needed, not broad root settings objects.
+Pick the **cheapest tier that can do the job correctly**, and state the model in
+the handoff. Escalate L → M only when the task requires multi-step reasoning,
+cross-file design, or trade-off analysis. Never escalate for volume of text.
 
-## Model Boundary Rules
+## Cost Discipline
 
-- Use `Protocol` for behavior/service contracts.
-- Use `@dataclass(frozen=True)` for canonical internal entities and shared internal data.
-- Use Pydantic `BaseModel` at untrusted I/O boundaries (HTTP, webhook, external payload parsing).
-- Use `TypedDict` only when dictionary semantics are explicitly required.
-- Do not default to Pydantic models for internal service boundaries.
+These waste credits faster than model choice fixes:
 
-## Plugin and Startup Rules
+- **Don't re-read what you already read.** File contents stay in context.
+- **Delegate output-heavy exploration** to the `codebase-researcher` agent (Tier L)
+  so raw file dumps never enter the expensive session.
+- **Start a new session between unrelated tasks.** A polluted context re-bills every
+  turn for tokens that no longer help.
+- **Two failed corrections = restart** with a better prompt, not a third correction.
+- **Scope investigations** to named files/globs. Never "investigate the codebase".
+- Reach for `rg` over reading whole files; read the lines you need.
+- Prefer `#tool:web/fetch` on a known doc URL over open-ended web search.
 
-- Package discovery/registration/loading/initialization must be startup-driven via lifespan.
-- Use pluggy-based registration for package capabilities.
-- Register packages via `pyproject.toml` entry-points loaded at startup (`pm.load_setuptools_entrypoints`), per `decisions/plugins.md` — declarative, reviewed registration, not implicit filesystem discovery.
-- Never perform plugin registration at import time (no side-effecting code in `__init__.py` bodies).
-- Design all new packages to be plugin-registerable from day one.
+## Agent Routing
 
-## Working Modes
+| Agent | Tier | Pinned model (fallback) | Use for |
+| --- | --- | --- | --- |
+| `codebase-researcher` | L | GPT-5.6 Luna (Claude Haiku 4.5) | read-only surveys, call-site enumeration |
+| `tests-creation` | L | Claude Haiku 4.5 (GPT-5.4 mini) | failing tests from an approved spec |
+| `task-planner` | M | Claude Sonnet 5 (GPT-5.4) | backlog task research + implementation plan |
+| `implementation` | M | Claude Sonnet 5 (GPT-5.3-Codex) | production code against failing tests |
+| `feature-architecture` | M | Claude Sonnet 5 (GPT-5.3-Codex) | one feature's contracts + test matrix |
+| `architecture` | M | Claude Sonnet 5 (GPT-5.4) | app-level direction + decision records |
 
-### Architecture Mode
+Workflow order: `architecture` → `feature-architecture` → `task-planner` →
+`tests-creation` → `implementation`. Each stage hands off explicitly; do not skip
+`task-planner` for anything that touches more than one file.
 
-Use when requirements are unclear, when introducing/refactoring patterns, or before major implementation.
+## Copilot Customization Surface
 
-Required behavior:
+| File | Purpose |
+| --- | --- |
+| `CLAUDE.md` | always-on engineering contract (all models) |
+| `.github/copilot-instructions.md` | this file — Copilot policy delta |
+| `.claude/skills/<name>/SKILL.md` | skills, shared with Claude Code (`chat.useClaudeSkills`) |
+| `.github/agents/*.agent.md` | Copilot custom agents (model-pinned) |
+| `.github/instructions/*.instructions.md` | path-scoped rules via `applyTo` globs |
+| `.vscode/mcp.json` | workspace MCP servers |
 
-- Architect first, then implement.
-- Research best practices in isolation from current code.
-- Ask clarifying questions before proposing implementation.
-- Produce explicit decisions: context, alternatives, tradeoffs, chosen option, risks, test strategy.
-- Define acceptance criteria before coding begins.
+Skills live under `.claude/skills/` on purpose: VS Code and Claude Code both read
+that directory, so one file serves every model. Do not create `.github/skills/`.
 
-### Implementation Mode
+There is no `.github/prompts/` directory: prompt files are **deprecated for Agent
+Host sessions** and are not loaded there. Every former prompt is now a workflow
+skill (`disable-model-invocation: true`, so its description costs nothing until you
+invoke it) and the model pinning moved to the agent files, which Copilot honors in
+every session type. Add new workflows as skills, and run them under the agent named
+at the top of the skill.
 
-Use when architecture and acceptance criteria are clear.
-
-Required behavior:
-
-- Follow TDD loop: write or update failing tests first, implement, then iterate to green.
-- Keep changes scoped to the agreed architecture.
-- Maintain strict typing and predictable async behavior.
-- Run validations after every 3-5 meaningful changes and before completion.
-- Prefer reusable prompt files for recurring workflows under `.github/prompts/*.prompt.md`.
-
-## Task Workflow (Backlog.md)
-
-Work items live as Backlog.md tasks under `backlog/tasks/` and are the source of truth for scope, plans, and acceptance criteria.
-
-- Operate tasks only through the backlog CLI (`backlog task view/edit/create`); never hand-edit task markdown files. See the `backlog-task-workflow` skill and `backlog instructions overview`.
-- Before implementing a backlog task, it must have a human-approved implementation plan written into the task (`backlog task edit <id> --plan`). Use the `task-planner` agent (`/plan-task <id>`) to produce it.
-- Single-PR size gate: if a task's change is too large for one reviewable PR (~400 production LOC / ~10 files / multiple subsystems / mixed refactor+behavior), it must be decomposed into smaller, safer, incremental subtasks (`backlog task create ... --dep --parent`) before implementation. See the `implementation-planning` skill. This is mandatory so the dev team can properly review every change.
-- One task per session, one branch, one PR. Agents check acceptance criteria one by one as verified and stop at In Progress with notes; humans move tasks to Done.
-
-## Testing Placement and Naming
-
-- Place tests in `app/tests/` only.
-- Use feature-prefix names (for example, `test_groups_routes.py`, `test_identity_resolver.py`).
-- Avoid ambiguous test file names such as `test_routes.py`.
-- For FastAPI route changes, include success and error-mapping path coverage.
-
-## Request Context and Logging
-
-- Prefer `structlog.contextvars` middleware binding for request context propagation.
-- Avoid threading `request_id` through every signature unless crossing boundaries that require explicit values.
-
-## Dependency Import Boundaries
-
-- Do not import concrete infrastructure service implementations directly from `app/infrastructure/<service>/...` in package/domain/route code.
-- Resolve infrastructure services via singleton provider functions in `app/infrastructure/services/providers.py`.
-- For FastAPI endpoints, consume infrastructure dependencies through `Annotated[..., Depends(...)]` aliases from `app/infrastructure/services/dependencies.py` (or re-exported `infrastructure.services` symbols), not by importing concrete classes.
-- Keep service construction in provider layers only; route and business modules must not instantiate infrastructure clients/services directly.
-
-## OpenAPI and Route Metadata
-
-- Router declarations should include exactly one tag.
-- Route handlers should include concise summary/description and explicit response mapping.
-- Public schema fields should include clear field descriptions.
-
-## Mandatory Generation Patterns (Every Change)
-
-- Imports: explicit, minimal, no unused imports.
-- Settings/config: centralized, typed, no ad-hoc constants scattered in code.
-- Logging: structured, contextual, no sensitive data leakage.
-- Async: non-blocking paths for I/O, explicit await boundaries, cancellation-aware patterns.
-- Types: type hints on public interfaces and internal service boundaries.
-- Errors: explicit domain/application boundaries and predictable API error mapping.
-
-## Tooling Policy
-
-- Use web search/fetch tooling for up-to-date best practices and documentation when making architectural or library decisions.
-- Use Bash for fast repository analysis; prefer `rg` and `rg --files`, fallback to `grep/find` if needed.
-- Use subagents for research/investigation/output-heavy tasks; keep main session focused on decisions and implementation.
-
-## Validation Policy
-
-Run these checks regularly (after each 3-5 edits and before completion):
-
-- `cd app && uv run mypy . --exclude '(?:^|/)\\.venv(?:/|$)'`
-- `cd app && uv run ruff check .`
-- `cd app && uv run pytest tests --ignore=tests/smoke`
-
-Always run validation from `app/` and scope checks to project code only. Do not run quality gates against repository-external paths or virtual environment contents.
-
-Do not run `app/tests/smoke/*` unless explicitly requested and required environment variables are configured.
-
-If a check fails, fix root causes before proceeding.
-
-## Git and File-Change Guardrail
-
-- Never run git commands unless the user explicitly requests a specific git task.
-- Never modify files unless explicitly asked for the task.
-- User controls all git operations manually.
-
-## Customization Paths
-
-- Always-on workspace instructions: `.github/copilot-instructions.md`.
-- Scoped instructions: `.github/instructions/*.instructions.md` with `applyTo` globs.
-- Skills: `.github/skills/<skill-name>/SKILL.md` where frontmatter `name` matches folder name in kebab-case.
-- Custom agents: `.github/agents/*.agent.md`.
-- Prompt files: `.github/prompts/*.prompt.md`.
-- Hooks: `.github/hooks/*.json`.
-- Workspace MCP configuration: `.vscode/mcp.json`.
-
-## Skill Promotion Rule
-
-When a best practice is repeatedly validated and stable, create/update a dedicated skill for it and reference that skill from architecture/implementation workflows.
+Available workflow commands: `/architecture-review`, `/feature-architecture`,
+`/plan-task`, `/tests-creation`, `/tdd-implementation`, `/groom-backlog`,
+`/python-quality-gates` — identical in Claude Code and Copilot.
