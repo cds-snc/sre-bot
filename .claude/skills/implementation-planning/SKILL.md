@@ -1,6 +1,6 @@
 ---
 name: implementation-planning
-description: Author review-ready implementation plans grounded in real code, with a hard single-PR size gate and decomposition into safe incremental tasks when exceeded.
+description: Review-ready implementation plans grounded in real code, with the mandatory single-PR size gate. Use when writing a backlog task plan, or whenever judging whether a change is too large for one reviewable PR and must be decomposed.
 ---
 
 # Implementation Planning

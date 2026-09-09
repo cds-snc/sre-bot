@@ -230,4 +230,4 @@ credentials.json
 
 # Local scratch and temporary working notes
 tmp/
-tmp.json
+tmp.json.claude/settings.local.json

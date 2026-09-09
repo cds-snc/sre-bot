@@ -125,6 +125,30 @@ The legacy `docs/adr/` folder has been removed; its historical content is availa
 
 ---
 
+## AI Coding Agents
+
+This repo is configured for Claude Code and GitHub Copilot from one shared source
+of truth, so every model behaves the same way.
+
+- **[`CLAUDE.md`](CLAUDE.md)** — the always-on engineering contract. Claude Code
+  loads it natively; VS Code loads it for *every* model via `chat.useClaudeMdFile`.
+- **[`.claude/skills/`](.claude/skills/)** — knowledge and workflow skills, read by
+  both tools (`chat.useClaudeSkills`). Run a workflow with `/plan-task`,
+  `/tdd-implementation`, `/tests-creation`, `/feature-architecture`,
+  `/architecture-review`, `/groom-backlog`, `/python-quality-gates`.
+- **[`.github/copilot-instructions.md`](.github/copilot-instructions.md)** — Copilot
+  policy delta: the **model cost tiers** every agent is pinned to, plus agent routing.
+- **Agents** — [`.claude/agents/`](.claude/agents/) (Claude Code) and
+  [`.github/agents/`](.github/agents/) (Copilot). Same six roles, per-tool
+  frontmatter: `codebase-researcher` → `architecture` → `feature-architecture` →
+  `task-planner` → `tests-creation` → `implementation`.
+
+Agents are pinned to low/medium-cost models only; Tier H models (Opus, GPT-5.5,
+GPT-6, Fable) require explicit human approval. Read-only surveys are delegated to
+the Tier L `codebase-researcher` so file dumps never enter an expensive session.
+
+---
+
 ## Security & Privacy
 
 SRE Bot handles sensitive data such as secrets and user/group assignments. Please review our [security guidelines](./SECURITY.md) and ensure you follow best practices for environment configuration and access control.

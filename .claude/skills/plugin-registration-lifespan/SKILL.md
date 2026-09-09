@@ -1,6 +1,6 @@
 ---
 name: plugin-registration-lifespan
-description: Apply pluggy registration and lifespan startup patterns for package discovery, initialization ordering, and testable startup behavior.
+description: Pluggy registration and lifespan startup patterns. Use when adding a new package, touching entry-points, hookspecs/hookimpls, app startup or warmup, event-handler registration, or debugging import-time side effects.
 ---
 
 # Plugin Registration and Lifespan Startup
