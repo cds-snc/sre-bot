@@ -3,11 +3,11 @@ id: TASK-25.1.6.13
 title: >-
   Configure google-api-python-client retry once at construction and retire the
   per-call num_retries drift
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-09 15:25'
-updated_date: '2026-09-09 17:22'
+updated_date: '2026-09-09 17:23'
 labels:
   - clients
   - phase-3
