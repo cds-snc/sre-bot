@@ -14,7 +14,9 @@ Tier L by design: this agent exists so that expensive Tier M sessions receive a
 ## Method
 
 1. Start with `rg --files` and targeted `rg` patterns. Read only the lines you
-   need — never dump a whole file when a range answers the question.
+   need — never dump a whole file when a range answers the question. If `rg` is
+   not found, the container predates the ripgrep install: fall back to
+   `grep -rn --exclude-dir={.git,.venv,node_modules}` and note it in your report.
 2. Enumerate every hit as `path:line` with a one-line description of what happens there.
 3. When config or environment behavior is involved, search `terraform/`,
    `.github/workflows/`, `bin/` and `app/Makefile` too — not just `app/`.

@@ -15,6 +15,7 @@ jq
 make
 openssh-client
 python3-pip
+ripgrep
 vim
 xz-utils
 zsh

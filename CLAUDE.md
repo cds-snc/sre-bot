@@ -155,7 +155,9 @@ Context is the scarce resource; degraded output is the cost of filling it.
   stay out of the main session. Keep the main thread for decisions and edits.
 - Scope investigations narrowly — never an open-ended "investigate X".
 - Prefer `rg` / `rg --files` over `grep`/`find`; read the specific lines you need
-  rather than whole files.
+  rather than whole files. `ripgrep` is installed by the devcontainer — if `rg`
+  is not found you are on a pre-rebuild container, so fall back to
+  `grep -rn --exclude-dir={.git,.venv,node_modules}` rather than stopping.
 - Use web search/fetch for current library and standards guidance when making
   architectural decisions — do not rely on training-data recall for library APIs.
 
