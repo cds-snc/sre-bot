@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@me'
 created_date: '2026-09-02 18:52'
-updated_date: '2026-09-02 20:00'
+updated_date: '2026-09-09 15:06'
 labels:
   - reports
   - phase-3
@@ -407,5 +407,15 @@ REASSESSMENT NOTE ATTACHED BY THE SAME APPROVAL. Revisit this fix when app/modul
 2. WHETHER THE DERIVED TITLE IS STILL THE RIGHT MODEL. The 50-character bound, the hash suffix and the apostrophe strip are all compensations for using a user-controlled display name as a sheet identifier. A feature package with a real domain type for a group could carry a stable identifier separately from the display label, which would make the suffix unnecessary and would let the Group Name cell show the full untruncated name - the open question already flagged in the plan and registered on TASK-25.1.6.10.
 
 No task owns the reports-to-package migration today (grep of backlog/ finds none), so this is recorded here and on TASK-25.1.6.10 rather than filed as work. Whoever picks up that migration should read this before re-deriving the quoting rules from scratch; the evidence set (no A1 helper in googleapiclient or its stubs, the Sheets concepts page, gspread's absolute_range_name) is in this task's plan and references.
+---
+
+author: @task-planner
+created: 2026-09-09 15:06
+---
+SUPERSEDED BY DELETION, NOT REGRESSED (2026-09-09, task-planner, during TASK-25.1.6.10 planning). This task shipped correctly and stays Done; recording where its code goes so the history is not confusing later.
+
+The A1 quoting fix, the _a1_range and _sheet_title helpers and the collision-safe sha256 title derivation all live inside app/modules/reports/google_groups.py, and that whole package is now deleted rather than migrated - TASK-25.1.6.10.1 owns the deletion. The legacy report is unreachable dead code: modules/reports/core.py::reports_command has zero callers repo-wide and is absent from server/lifespan.py::_register_legacy_handlers().
+
+The forward notes attached to this work ('the two helpers travel with the call site into the feature adapter', and the open question about the Group Name cell showing a hash suffix) are therefore moot. No A1 quoting logic is carried into app/infrastructure/spreadsheets/ - the new SpreadsheetProvider takes A1 range strings from callers and neither of the two surviving live consumers uses a dynamic sheet title (both address the literal 'Sheet1').
 ---
 <!-- COMMENTS:END -->

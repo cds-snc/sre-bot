@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 15:04'
-updated_date: '2026-09-08 14:37'
+updated_date: '2026-09-09 15:06'
 labels:
   - clients
   - phase-3
@@ -100,5 +100,15 @@ ALSO, SMALLER: this task's AC#6 branch about execute_batch_request was already d
 created: 2026-09-08 14:37
 ---
 ORDERING UPDATE (2026-09-08): final closeout depends on TASK-25.1.7. The export-contract guardrail must observe google_service.py and all mirror modules already removed; it is the last task in the Google Workspace sequence.
+---
+
+author: @task-planner
+created: 2026-09-09 15:06
+---
+SURFACE UPDATE FROM TASK-25.1.6.10 PLANNING (2026-09-09, task-planner). Your execute_google_api_request call-site count shrinks, and the shape of what is left changes.
+
+REMOVED BY THE .10 SERIES: the 5 sites in integrations/google_workspace/sheets.py go when TASK-25.1.6.10.4 deletes that file, and the ~12 sites in integrations/google_workspace/google_drive.py go when TASK-25.1.6.10.5 deletes that one. Neither replacement uses the helper: infrastructure/spreadsheets/google.py and the reworked packages/incident/drive/adapters/google_drive.py each own their try/except plus classify_google_error at the SDK seam, per decisions/outbound-clients.md.
+
+ONE THING TO CHECK WHEN YOU PLAN: TASK-25.1.6.10.2 establishes a precedent you may want to generalize or record. classify_google_error currently maps only {404}, {401,403} and {429,5xx} and RE-RAISES every other status, including 400. That makes an expected, documented Sheets outcome ('Unable to parse range', an HTTP 400) escape a Path A provider boundary. The Sheets Google implementation handles it locally by mapping that specific 400 to OperationStatus.NOT_FOUND before delegating to classify_google_error; the shared classifier is deliberately NOT modified, to keep the blast radius off Directory/Drive/Docs/Calendar. If your vendor-export-contract guardrail work touches classify_google_error, decide explicitly whether 400s deserve a mapped family there rather than per-provider - and if you widen the classifier, revisit the Sheets local mapping so the two do not disagree.
 ---
 <!-- COMMENTS:END -->
