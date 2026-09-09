@@ -34,6 +34,21 @@ def _request(payload: Any) -> MagicMock:
     return request
 
 
+def _request_that_retries_once(payload: Any) -> MagicMock:
+    request = MagicMock()
+    attempts = 0
+
+    def execute() -> Any:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 1:
+            raise _http_error(503)
+        return payload
+
+    request.execute.side_effect = execute
+    return request
+
+
 def _http_error(status: int) -> HttpError:
     """Build a fake googleapiclient HttpError carrying the given HTTP status."""
     return HttpError(httplib2.Response({"status": status}), b"{}")
@@ -183,6 +198,16 @@ class TestWarmup:
         # Assert
         assert not result.is_success
         assert result.status == OperationStatus.UNAUTHORIZED
+
+    def test_provider_retries_transient_request_without_per_call_retry_argument(self, provider, google_service):
+        request = _request_that_retries_once({"id": "user-1", "primaryEmail": "user@example.com"})
+        google_service.users.return_value.get.return_value = request
+
+        result = provider.get_user("user@example.com")
+
+        assert result.is_success
+        assert result.data.email == "user@example.com"
+        request.execute.assert_called_once_with()
 
 
 class TestHealthCheck:
