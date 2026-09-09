@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from googleapiclient.errors import HttpError
+from googleapiclient.http import HttpRequest
 
 from infrastructure.operations.status import OperationStatus
 
@@ -94,6 +95,7 @@ def test_get_admin_directory_service_builds_with_static_discovery_and_no_cache(
     settings = SimpleNamespace(
         GCP_SRE_SERVICE_ACCOUNT_KEY_FILE='{"client_email":"sre-bot@example.com","private_key":"FAKE"}',
         SRE_BOT_EMAIL="sre-bot@example.com",
+        GOOGLE_API_NUM_RETRIES=3,
     )
 
     class FakeCredentials:
@@ -131,6 +133,7 @@ def test_get_admin_directory_service_builds_with_static_discovery_and_no_cache(
     assert captured["build_api_version"] == "directory_v1"
     assert captured["build_kwargs"]["cache_discovery"] is False
     assert captured["build_kwargs"]["static_discovery"] is True
+    assert callable(captured["build_kwargs"]["requestBuilder"])
     assert captured["delegated_subject"] == "sre-bot@example.com"
 
 
@@ -142,6 +145,7 @@ def _install_fake_build(
     settings = SimpleNamespace(
         GCP_SRE_SERVICE_ACCOUNT_KEY_FILE='{"client_email":"sre-bot@example.com","private_key":"FAKE"}',
         SRE_BOT_EMAIL="sre-bot@example.com",
+        GOOGLE_API_NUM_RETRIES=3,
     )
 
     class FakeCredentials:
@@ -224,8 +228,40 @@ def test_service_factories_build_with_static_discovery_and_no_cache(
     assert captured["build_api_version"] == api_version
     assert captured["build_kwargs"]["cache_discovery"] is False
     assert captured["build_kwargs"]["static_discovery"] is True
+    assert callable(captured["build_kwargs"]["requestBuilder"])
     assert captured["scopes"] == [scope]
     assert captured["delegated_subject"] == "sre-bot@example.com"
+
+
+@pytest.mark.unit
+def test_request_builder_defaults_and_honors_explicit_retry_count(
+    monkeypatch: pytest.MonkeyPatch,
+    google_client_module: Any,
+) -> None:
+    captured: list[int] = []
+
+    def fake_parent_execute(self: HttpRequest, http: Any = None, num_retries: int = 0, **kwargs: Any) -> Any:
+        captured.append(num_retries)
+        return {"ok": True}
+
+    monkeypatch.setattr(HttpRequest, "execute", fake_parent_execute)
+    request_builder = google_client_module._build_request_builder(3)
+    request = request_builder(None, MagicMock(), "https://example.test")
+
+    assert request.execute() == {"ok": True}
+    assert request.execute(num_retries=0) == {"ok": True}
+    assert captured == [3, 0]
+
+
+@pytest.mark.unit
+def test_google_workspace_settings_retry_count_defaults_and_reads_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
+
+    assert GoogleWorkspaceSettings().GOOGLE_API_NUM_RETRIES == 3
+    monkeypatch.setenv("GOOGLE_API_NUM_RETRIES", "7")
+    assert GoogleWorkspaceSettings().GOOGLE_API_NUM_RETRIES == 7
 
 
 @pytest.mark.unit

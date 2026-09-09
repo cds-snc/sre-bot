@@ -13,7 +13,6 @@ from integrations.google_workspace.client import classify_google_error
 from integrations.google_workspace.google_drive import DRIVE_SCOPES
 
 _FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
-_NUM_RETRIES = 3
 
 logger = structlog.get_logger()
 
@@ -62,7 +61,7 @@ class GoogleDriveProvider:
     def _collect_files(self, files_resource: Any, request: Any) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
         while request is not None:
-            response = request.execute(num_retries=_NUM_RETRIES)
+            response = request.execute()
             results.extend(item for item in response.get("files", []) if isinstance(item, dict))
             request = files_resource.list_next(request, response)
         return results
@@ -71,7 +70,7 @@ class GoogleDriveProvider:
         """Validate Drive credentials with a minimal list request."""
         result = self._call(
             "warmup",
-            lambda: self._service(None).files().list(pageSize=1, fields="files(id)").execute(num_retries=_NUM_RETRIES),
+            lambda: self._service(None).files().list(pageSize=1, fields="files(id)").execute(),
         )
         if result.is_success:
             return OperationResult.success(provider="google", operation="warmup")
@@ -106,9 +105,7 @@ class GoogleDriveProvider:
     ) -> OperationResult[DriveFile]:
         return self._call(
             operation,
-            lambda: self._build_drive_file(
-                request_factory(self._service(delegated_user_email).files()).execute(num_retries=_NUM_RETRIES)
-            ),
+            lambda: self._build_drive_file(request_factory(self._service(delegated_user_email).files()).execute()),
         )
 
     def _list(
@@ -200,7 +197,7 @@ class GoogleDriveProvider:
                 body={"name": name, "parents": [source_parent_id]},
                 supportsAllDrives=True,
                 fields="id",
-            ).execute(num_retries=_NUM_RETRIES)
+            ).execute()
             logger.debug("google_drive_file_copied", file_id=copied["id"])
             moved = files.update(
                 fileId=copied["id"],
@@ -209,7 +206,7 @@ class GoogleDriveProvider:
                 removeParents=source_parent_id,
                 supportsAllDrives=True,
                 fields="id",
-            ).execute(num_retries=_NUM_RETRIES)
+            ).execute()
             logger.debug("google_drive_file_moved", file_id=moved["id"])
             return self._build_drive_file(moved)
 

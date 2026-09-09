@@ -1,14 +1,18 @@
 """Behavior contract for the Google-backed SpreadsheetProvider implementation."""
 
+from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from googleapiclient.errors import HttpError
+from googleapiclient.http import HttpRequest
 
 from infrastructure.operations.status import OperationStatus
 from infrastructure.spreadsheets.google import GoogleSpreadsheetProvider
 from infrastructure.spreadsheets.models import SheetCell
 from infrastructure.spreadsheets.provider import SpreadsheetProvider
+from integrations.google_workspace import client as google_client_module
 
 
 class FakeResp(dict):
@@ -227,3 +231,47 @@ def test_unmapped_http_error_propagates(provider: GoogleSpreadsheetProvider) -> 
 
     with pytest.raises(HttpError):
         provider.read_values("sheet-id", "Sheet1")
+
+
+def test_sheets_factory_resource_inherits_configured_retry_default(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+    settings = SimpleNamespace(
+        GCP_SRE_SERVICE_ACCOUNT_KEY_FILE='{"client_email":"sre-bot@example.com","private_key":"FAKE"}',
+        SRE_BOT_EMAIL="sre-bot@example.com",
+        GOOGLE_API_NUM_RETRIES=3,
+    )
+
+    class FakeCredentials:
+        def with_scopes(self, scopes: list[str]) -> FakeCredentials:
+            return self
+
+        def with_subject(self, subject: str) -> FakeCredentials:
+            return self
+
+    monkeypatch.setattr(google_client_module, "get_google_workspace_settings", lambda: settings)
+    monkeypatch.setattr(
+        google_client_module.service_account.Credentials,
+        "from_service_account_info",
+        lambda info: FakeCredentials(),
+    )
+    monkeypatch.setattr(
+        google_client_module,
+        "build",
+        lambda *args, **kwargs: captured.update(kwargs) or MagicMock(),
+    )
+
+    google_client_module.get_sheets_service(scopes=["https://www.googleapis.com/auth/spreadsheets"])
+
+    assert callable(captured["requestBuilder"])
+    retry_counts: list[int] = []
+    monkeypatch.setattr(
+        HttpRequest,
+        "execute",
+        lambda self, http=None, num_retries=0, **kwargs: retry_counts.append(num_retries) or {"ok": True},
+    )
+    request = captured["requestBuilder"](None, MagicMock(), "https://example.test")
+
+    assert request.execute() == {"ok": True}
+    assert retry_counts == [3]

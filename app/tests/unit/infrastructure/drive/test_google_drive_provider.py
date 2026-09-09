@@ -29,6 +29,25 @@ def _request(payload):
     return request
 
 
+def _request_that_retries_once(payload):
+    request = MagicMock()
+    attempts = 0
+
+    def execute():
+        nonlocal attempts
+        while True:
+            attempts += 1
+            try:
+                if attempts == 1:
+                    raise _http_error(503)
+                return payload
+            except HttpError:
+                continue
+
+    request.execute.side_effect = execute
+    return request
+
+
 @pytest.fixture
 def drive_service():
     service = MagicMock()
@@ -68,6 +87,21 @@ def test_list_folders_paginates_across_multiple_pages(provider, drive_service):
     assert [item.id for item in result.data] == ["f-1", "f-2"]
     files_resource.list.assert_called_once()
     assert files_resource.list_next.call_count == 2
+
+
+def test_provider_retries_transient_request_without_per_call_retry_argument(provider, drive_service):
+    request = _request_that_retries_once(
+        {"files": [{"id": "f-1", "name": "Folder 1", "mimeType": "application/vnd.google-apps.folder"}]}
+    )
+    files_resource = drive_service.files.return_value
+    files_resource.list.return_value = request
+    files_resource.list_next.return_value = None
+
+    result = provider.list_folders("parent-1")
+
+    assert result.is_success
+    assert [item.id for item in result.data] == ["f-1"]
+    request.execute.assert_called_once_with()
 
 
 def test_list_folders_preserves_query_composition_and_delegation(provider, drive_service):
