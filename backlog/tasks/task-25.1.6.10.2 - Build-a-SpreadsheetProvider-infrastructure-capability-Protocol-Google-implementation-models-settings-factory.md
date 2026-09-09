@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@me'
 created_date: '2026-09-09 15:02'
-updated_date: '2026-09-09 15:59'
+updated_date: '2026-09-09 16:33'
 labels:
   - clients
   - phase-3
@@ -204,5 +204,11 @@ PLAN REVISED AFTER HUMAN REVIEW 2026-09-09. All three open questions answered; t
 3. THE DRIVE/DIRECTORY PACKAGES ARE A STRUCTURAL TEMPLATE, NOT A BEHAVIORAL ONE. Per the human's standing instruction that current code may be outdated and drift must not be carried forward, the plan now names its two deliberate deviations from infrastructure/drive/ up front and pins both with tests, so a future reader sees intent rather than an inconsistency to 'fix' by copying the older packages.
 
 NET EFFECT ON SIZE: roughly 200 production LOC, down from 230. Still one PR.
+---
+
+author: @task-planner
+created: 2026-09-09 16:33
+---
+ORDER-OF-IMPLEMENTATION VALIDATION (2026-09-09): this task shipped (Done) before its declared dependency TASK-25.1.6.13 ("Configure google-api-python-client retry once at construction and retire the per-call num_retries drift"). Validated: no conflict resulted. Every .execute() call in app/infrastructure/spreadsheets/google.py (lines 83,116,138,148) was already written with no num_retries argument and the package defines no retry constant, per this task's own Deviation 2/AC#4 - i.e. it was already born compliant with TASK-25.1.6.13's target end state rather than becoming a third copy of the directory/drive per-call retry drift. The only practical consequence of the reversal is a temporary one: Sheets calls made through GoogleSpreadsheetProvider currently have zero retry on 429/5xx (unlike Drive/Directory's num_retries=3) until TASK-25.1.6.13 lands and configures retry once at construction in integrations/google_workspace/client.py - at which point this package inherits it automatically with no code change here. The dependencies field is left as-is (historical record of intended order); TASK-25.1.6.13's description/plan were updated accordingly. No action needed on this task.
 ---
 <!-- COMMENTS:END -->
