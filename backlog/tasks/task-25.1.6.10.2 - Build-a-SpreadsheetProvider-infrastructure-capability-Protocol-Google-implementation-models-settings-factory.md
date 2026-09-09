@@ -3,10 +3,11 @@ id: TASK-25.1.6.10.2
 title: >-
   Build a SpreadsheetProvider infrastructure capability (Protocol, Google
   implementation, models, settings, factory)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-09 15:02'
-updated_date: '2026-09-09 15:28'
+updated_date: '2026-09-09 15:55'
 labels:
   - clients
   - phase-3
@@ -58,15 +59,15 @@ FACTORY: get_spreadsheet_provider() singleton via @cache, mirroring get_drive_pr
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/infrastructure/spreadsheets/provider.py defines a runtime_checkable SpreadsheetProvider Protocol with exactly read_values, update_values, append_values and read_cells, all returning OperationResult; there is no warmup, no health_check, no delegated_user_email and no batch_update/add-worksheet method
-- [ ] #2 app/infrastructure/spreadsheets/models.py defines a single frozen SheetCell dataclass (formatted_value, link, provider); no Google response key (formattedValue, hyperlink, rowData, sheets) appears in any type or return value crossing the Protocol
-- [ ] #3 app/infrastructure/spreadsheets/google.py::GoogleSpreadsheetProvider implements the Protocol via integrations.google_workspace.client.get_sheets_service, owns its own SHEETS scope constant (no import from integrations.google_workspace.sheets), and keeps includeGridData plus the sheets[0].data[0].rowData walk internal
-- [ ] #4 No retry policy is named anywhere in the new package: every .execute() call is plain, with retry inherited from the construction-time configuration in integrations/google_workspace/client.py (TASK-25.1.6.13); there is no _NUM_RETRIES constant and no num_retries argument
-- [ ] #5 GoogleSpreadsheetProvider maps HttpError 400 with an 'Unable to parse range' reason onto OperationStatus.NOT_FOUND with a stable exported error code, delegates all other HttpErrors to classify_google_error, and leaves integrations/google_workspace/client.py::classify_google_error unmodified
-- [ ] #6 app/infrastructure/spreadsheets/settings.py::SpreadsheetSettings (InfrastructureSettings, SPREADSHEET_PROVIDER alias) and factory.py::get_spreadsheet_provider() (cached singleton) exist, mirroring infrastructure/drive's shape; server/lifespan.py is not modified and no startup warmup is wired
-- [ ] #7 app/integrations/google_workspace/sheets.py is untouched and still exists; no consumer file (modules/incident/incident_folder.py, modules/aws/spending.py) is modified by this task
-- [ ] #8 Unit tests under app/tests/unit/infrastructure/spreadsheets/ cover each Protocol method's success path, the parse-range 400 to NOT_FOUND mapping, at least one classify_google_error path, an unmapped HttpError propagating, cell mapping for a row with and without a hyperlink, an empty/absent values response, plus settings and factory construction
-- [ ] #9 mypy, ruff, and app/bin/check_sdk_typing.py pass for the new package
+- [x] #1 app/infrastructure/spreadsheets/provider.py defines a runtime_checkable SpreadsheetProvider Protocol with exactly read_values, update_values, append_values and read_cells, all returning OperationResult; there is no warmup, no health_check, no delegated_user_email and no batch_update/add-worksheet method
+- [x] #2 app/infrastructure/spreadsheets/models.py defines a single frozen SheetCell dataclass (formatted_value, link, provider); no Google response key (formattedValue, hyperlink, rowData, sheets) appears in any type or return value crossing the Protocol
+- [x] #3 app/infrastructure/spreadsheets/google.py::GoogleSpreadsheetProvider implements the Protocol via integrations.google_workspace.client.get_sheets_service, owns its own SHEETS scope constant (no import from integrations.google_workspace.sheets), and keeps includeGridData plus the sheets[0].data[0].rowData walk internal
+- [x] #4 No retry policy is named anywhere in the new package: every .execute() call is plain, with retry inherited from the construction-time configuration in integrations/google_workspace/client.py (TASK-25.1.6.13); there is no _NUM_RETRIES constant and no num_retries argument
+- [x] #5 GoogleSpreadsheetProvider maps HttpError 400 with an 'Unable to parse range' reason onto OperationStatus.NOT_FOUND with a stable exported error code, delegates all other HttpErrors to classify_google_error, and leaves integrations/google_workspace/client.py::classify_google_error unmodified
+- [x] #6 app/infrastructure/spreadsheets/settings.py::SpreadsheetSettings (InfrastructureSettings, SPREADSHEET_PROVIDER alias) and factory.py::get_spreadsheet_provider() (cached singleton) exist, mirroring infrastructure/drive's shape; server/lifespan.py is not modified and no startup warmup is wired
+- [x] #7 app/integrations/google_workspace/sheets.py is untouched and still exists; no consumer file (modules/incident/incident_folder.py, modules/aws/spending.py) is modified by this task
+- [x] #8 Unit tests under app/tests/unit/infrastructure/spreadsheets/ cover each Protocol method's success path, the parse-range 400 to NOT_FOUND mapping, at least one classify_google_error path, an unmapped HttpError propagating, cell mapping for a row with and without a hyperlink, an empty/absent values response, plus settings and factory construction
+- [x] #9 mypy, ruff, and app/bin/check_sdk_typing.py pass for the new package
 <!-- AC:END -->
 
 ## Implementation Plan
