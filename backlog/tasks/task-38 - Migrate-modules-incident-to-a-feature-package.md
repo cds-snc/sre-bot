@@ -4,7 +4,7 @@ title: Migrate modules/incident to a feature package
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-03 16:29'
+updated_date: '2026-09-10 15:45'
 labels:
   - migration
   - phase-5
@@ -94,5 +94,22 @@ CANDIDATE SUBDOMAIN SPLIT is a proposal only. The mapping in the description cam
 created: 2026-09-03 16:29
 ---
 SCOPE CORRECTION (2026-09-03): TASK-25.1.6.2 was redirected to create app/packages/incident/scheduling/ directly, so incident_scheduling is no longer a relocation this task owns - it also creates the empty umbrella app/packages/incident/__init__.py that this task inherits. AC#6 replaced accordingly (now covers incident_draft and incident_summary only, plus a no-packages/incident_*-anywhere sweep). Description updated with the human sequencing decision: this task runs after the TASK-25* vendor-integration cleanup, exact position TBD once that is done. Also recorded the mock-patch-string-literal hazard: renaming directories alone is insufficient because patch targets are strings that fail at patch time, not import time - TASK-25.1.6.2 hit this with 10 patch targets.
+---
+
+created: 2026-09-10 15:45
+---
+ARCHITECTURE CONSTRAINT ADDED 2026-09-10 (human-directed). Do not introduce new infrastructure services for workplace concerns: calendar, documents, files, directory, mail, notifications, people or identity. That means no new app/infrastructure/<service>/ package, Protocol or factory.
+
+Why: the organization will run Google Workspace with Slack and Microsoft 365 with Teams side by side for the long term. Three Draft decision records describe the direction:
+- decisions/workplace-systems.md
+- decisions/capability-packages.md
+- decisions/people-and-accounts.md
+
+Until those are accepted:
+- keep vendor behavior in feature Path B adapters (app/packages/<feature>/adapters/);
+- the existing infrastructure/directory, drive and spreadsheets providers stay usable, including changes needed to finish migrating their current consumers;
+- do not create capability packages yet.
+
+Incident scheduling, documents, Drive, Meet and Sheets needs stay in incident Path B adapters during this migration. Moving incident records into storage, and recording each incident's origin as (platform, tenant, channel_id), are expected follow-ups under the Draft records. Do not add infrastructure services for them.
 ---
 <!-- COMMENTS:END -->

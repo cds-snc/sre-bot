@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 15:31'
-updated_date: '2026-09-09 15:06'
+updated_date: '2026-09-10 15:45'
 labels:
   - clients
   - phase-3
@@ -307,5 +307,22 @@ WHAT THIS MOVES THE COORDINATOR'S OWN ACs TOWARD:
 - AC#6 (execute_google_api_request deleted): the .10 series removes roughly 17 of its call sites. Impact recorded on TASK-25.1.6.11.
 
 ONE DEVIATION SURFACED FOR THE RECORD: classify_google_error maps only {404}, {401,403} and {429,5xx} and re-raises everything else, so an expected Sheets HTTP 400 ('Unable to parse range') would escape a Path A boundary. Handled locally in the Sheets Google implementation without modifying the shared classifier; flagged to .11 in case the guardrail work wants to generalize it.
+---
+
+created: 2026-09-10 15:45
+---
+ARCHITECTURE CONSTRAINT ADDED 2026-09-10 (human-directed). Do not introduce new infrastructure services for workplace concerns: calendar, documents, files, directory, mail, notifications, people or identity. That means no new app/infrastructure/<service>/ package, Protocol or factory.
+
+Why: the organization will run Google Workspace with Slack and Microsoft 365 with Teams side by side for the long term. Three Draft decision records describe the direction:
+- decisions/workplace-systems.md
+- decisions/capability-packages.md
+- decisions/people-and-accounts.md
+
+Until those are accepted:
+- keep vendor behavior in feature Path B adapters (app/packages/<feature>/adapters/);
+- the existing infrastructure/directory, drive and spreadsheets providers stay usable, including changes needed to finish migrating their current consumers;
+- do not create capability packages yet.
+
+This applies to every open child of this coordinator. Finishing SDK isolation is unaffected.
 ---
 <!-- COMMENTS:END -->

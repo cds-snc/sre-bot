@@ -4,7 +4,7 @@ title: 'Webhooks slice 3: transport-neutral intent + Slack renderer'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:40'
-updated_date: '2026-07-28 19:16'
+updated_date: '2026-09-10 16:18'
 labels:
   - migration
   - webhooks
@@ -48,3 +48,20 @@ Verify: the infrastructure/slack/ transport status - if the migration.md 'Slack 
 - [ ] #4 Incident-button behaviour is expressed as an intent/target attribute, not a hook_type magic-string branch in the route (test)
 - [ ] #5 Message output for existing SNS notification types is unchanged: TASK-36 smoke tests pass before and after
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-10 16:18
+---
+ARCHITECTURE CONSTRAINT ADDED 2026-09-10 (human-directed). Chat platforms are split by direction (decisions/platform-entrypoints.md, Draft):
+- Entry point: SDK runtime and connection lifecycle, verification, dispatch and in-request replies. Goes to app/server/<platform>/, beside HTTP.
+- Handler contract: typed request/response models, argument parser, OperationResult renderer, in-request reply Protocol and registrar Protocol. Goes to app/infrastructure/<platform>/, with no runtime and no I/O.
+- Messaging people or channels outside a request: goes to a capability package (decisions/capability-packages.md, Draft) or a Path B adapter.
+- Web API client and classify_<platform>_error: app/integrations/<platform>/ (unchanged).
+
+Features never receive SDK runtime objects such as the Bolt App. Do not move a runtime into app/infrastructure/<platform>/ in the meantime, so it moves only once.
+
+The OperationResult renderer is part of the Slack handler contract and stays importable from app/infrastructure/slack/. Posting outside a request belongs to a capability package or a Path B adapter, not to a SlackService in the contract.
+---
+<!-- COMMENTS:END -->

@@ -23,6 +23,10 @@ The app is a modular monolith that started as a Slack bot and is becoming platfo
 | --- | --- | --- |
 | [governance.md](governance.md) | How decisions are written and changed | now |
 | [layers.md](layers.md) | Three tiers, import direction, Path A/B, transports vs clients | target |
+| [workplace-systems.md](workplace-systems.md) | Draft: hosting services vs workplace systems, records of truth in storage | target |
+| [capability-packages.md](capability-packages.md) | Draft: shared business capabilities in a layer below features | target |
+| [people-and-accounts.md](people-and-accounts.md) | Draft: people, linked accounts across systems, person kinds, conversation origin | target |
+| [platform-entrypoints.md](platform-entrypoints.md) | Draft: chat platforms split into server entry points, handler contracts and outbound messaging | target |
 | [cloud-portability.md](cloud-portability.md) | The four portability contracts | target |
 | [platform-transports.md](platform-transports.md) | How a chat platform composes into the host | target |
 | [transport-slack.md](transport-slack.md) | Slack: verification, delivery mode, handlers, errors | target |

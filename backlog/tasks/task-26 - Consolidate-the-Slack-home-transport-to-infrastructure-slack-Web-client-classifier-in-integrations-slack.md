@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-27 14:07'
+updated_date: '2026-09-10 16:18'
 labels:
   - slack
   - phase-3
@@ -66,5 +66,18 @@ Carry-forward from TASK-5.2 (2026-07-27): TASK-5.2 was re-scoped to DELETE the d
 created: 2026-07-27 14:07
 ---
 Bootstrap relocation sequence (added 2026-07-27): the Slack Bolt bootstrap in app/integrations/slack/bootstrap.py moves to app/infrastructure/slack/ as part of this transport-home consolidation. At the time this task runs (phase-3), BOTH SlackBootstrap (AsyncApp) and the still-live LegacySlackBootstrap (sync App, used by provider.py:180 runtime + ops/dev/sre module callers) exist; per step 3 of this task, leave an import shim at the old integrations/slack path so app/modules/ callers keep working until the strangler (TASK-37..41). TASK-33 (phase-4, depends on this task) then collapses the sync/async duplication down to AsyncApp only and deletes LegacySlackBootstrap once its provider.py runtime and module callers are cut over - see the LegacySlackBootstrap call-site inventory recorded on TASK-33.
+---
+
+created: 2026-09-10 16:18
+---
+ARCHITECTURE CONSTRAINT ADDED 2026-09-10 (human-directed). Chat platforms are split by direction (decisions/platform-entrypoints.md, Draft):
+- Entry point: SDK runtime and connection lifecycle, verification, dispatch and in-request replies. Goes to app/server/<platform>/, beside HTTP.
+- Handler contract: typed request/response models, argument parser, OperationResult renderer, in-request reply Protocol and registrar Protocol. Goes to app/infrastructure/<platform>/, with no runtime and no I/O.
+- Messaging people or channels outside a request: goes to a capability package (decisions/capability-packages.md, Draft) or a Path B adapter.
+- Web API client and classify_<platform>_error: app/integrations/<platform>/ (unchanged).
+
+Features never receive SDK runtime objects such as the Bolt App. Do not move a runtime into app/infrastructure/<platform>/ in the meantime, so it moves only once.
+
+This task's AC#1 conflicts with the split. The runtime, verification and dispatch go to app/server/slack/; infrastructure/slack/ keeps only the handler contract. The acceptance criteria are left unchanged; re-scope when the Draft records are accepted (TASK-83.1).
 ---
 <!-- COMMENTS:END -->

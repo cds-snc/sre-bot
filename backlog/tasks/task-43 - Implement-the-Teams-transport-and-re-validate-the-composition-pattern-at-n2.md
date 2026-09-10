@@ -4,7 +4,7 @@ title: Implement the Teams transport and re-validate the composition pattern at 
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 16:58'
+updated_date: '2026-09-10 16:18'
 labels:
   - teams
   - phase-6
@@ -41,3 +41,20 @@ BLOCKED until task-42 lands.
 - [ ] #1 Smoke tests for the Teams surface
 - [ ] #2 PR references decisions/platform-transports.md
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-10 16:18
+---
+ARCHITECTURE CONSTRAINT ADDED 2026-09-10 (human-directed). Chat platforms are split by direction (decisions/platform-entrypoints.md, Draft):
+- Entry point: SDK runtime and connection lifecycle, verification, dispatch and in-request replies. Goes to app/server/<platform>/, beside HTTP.
+- Handler contract: typed request/response models, argument parser, OperationResult renderer, in-request reply Protocol and registrar Protocol. Goes to app/infrastructure/<platform>/, with no runtime and no I/O.
+- Messaging people or channels outside a request: goes to a capability package (decisions/capability-packages.md, Draft) or a Path B adapter.
+- Web API client and classify_<platform>_error: app/integrations/<platform>/ (unchanged).
+
+Features never receive SDK runtime objects such as the Bolt App. Do not move a runtime into app/infrastructure/<platform>/ in the meantime, so it moves only once.
+
+Implementation step 1 conflicts with the split. The runtime and lifecycle go to app/server/teams/, and the handler contract to app/infrastructure/teams/. Re-scope when the Draft records are accepted (TASK-83.1).
+---
+<!-- COMMENTS:END -->

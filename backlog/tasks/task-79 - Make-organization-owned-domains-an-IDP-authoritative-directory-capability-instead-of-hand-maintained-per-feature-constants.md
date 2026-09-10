@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-04 14:19'
-updated_date: '2026-09-04 15:33'
+updated_date: '2026-09-10 15:45'
 labels:
   - layering
 milestone: m-3
@@ -65,5 +65,22 @@ Two consequences for your scope:
 - When list_domains / primary_domain lands, the single feature-side seam to redirect is ManagedGroupPolicy.from_config, plus removing dir_domain from the runtime config document, its JSON schema (RuntimeConfigJsonModel), the ACCESS_CONFIG_ENV_DIR_DOMAIN assembly variable and packages/access/access.local.json. No other access file reads the domain directly.
 
 The other two hand-maintained copies named in TASK-76 decision D4 are unaffected by this slice: infrastructure/configuration/features/groups.py GROUP_DOMAIN (legacy) and TASK-74/75's approved-participant-domain, which is an allow-list policy rather than an identity fact.
+---
+
+created: 2026-09-10 15:45
+---
+ARCHITECTURE CONSTRAINT ADDED 2026-09-10 (human-directed). Do not introduce new infrastructure services for workplace concerns: calendar, documents, files, directory, mail, notifications, people or identity. That means no new app/infrastructure/<service>/ package, Protocol or factory.
+
+Why: the organization will run Google Workspace with Slack and Microsoft 365 with Teams side by side for the long term. Three Draft decision records describe the direction:
+- decisions/workplace-systems.md
+- decisions/capability-packages.md
+- decisions/people-and-accounts.md
+
+Until those are accepted:
+- keep vendor behavior in feature Path B adapters (app/packages/<feature>/adapters/);
+- the existing infrastructure/directory, drive and spreadsheets providers stay usable, including changes needed to finish migrating their current consumers;
+- do not create capability packages yet.
+
+Organization-owned domains are directory and identity data for an organization with both Google and Microsoft tenants. Do not implement them as a new infrastructure capability, or as new operations on infrastructure/directory. Under decisions/people-and-accounts.md (Draft), tenants and domains belong with people and accounts. Hold planning until the Draft records are decided, or keep the change feature-local.
 ---
 <!-- COMMENTS:END -->

@@ -36,7 +36,7 @@ app/integrations/     Outbound clients. Thin, vendor-specific, raise SDK excepti
 
 **Two integration paths for features** (unchanged from the original vision, by *purpose* not consumer count):
 
-- **Path A — portable capability.** The feature asks in vendor-neutral language ("store this object"). Infrastructure owns the Protocol; the vendor is a deployment detail. Lives in `app/infrastructure/<service>/`.
+- **Path A — portable capability.** The feature asks in vendor-neutral language ("store this object"). Infrastructure owns the Protocol; the vendor is a deployment detail. Lives in `app/infrastructure/<service>/`. Each operation must be expressible without naming one vendor's query language, response projection, authentication subject, or metadata model. Before adding a contract, compare its operations against at least two plausible providers (e.g. Google Drive and Microsoft OneDrive) and keep only the shared surface. Provider-specific features (Google `appProperties`, raw field projections, vendor query fragments) stay in the provider implementation or in a feature-owned Path B adapter.
 - **Path B — the external system *is* the point.** The feature exists to act on a specific system (provision AWS Identity Center, post to Slack). The Protocol is shaped by that system. Feature-owned Path B adapters live at `app/packages/<feature>/adapters/<provider>.py` and are the only feature files that may import from `app/integrations/`. Promotion to shared infrastructure happens when a second feature needs the same adapter — then, in one PR, it moves to `app/infrastructure/<service>/`.
 
 **The invariant:** feature domain and service code never names a concrete vendor type. Protocols in, adapters at the edge.
@@ -68,17 +68,7 @@ app/integrations/     Outbound clients. Thin, vendor-specific, raise SDK excepti
 
 ## Migration
 
-Ticket: architecture epic. Tolerated divergences until closed: `_next.py` twins, Slack content still in `integrations/slack/`, the upward imports from `integrations/` into `infrastructure/`, and the non-tier top-level directories listed above (each held by its own ticket).
+Ticket: architecture epic. Tolerated divergences until closed: `_next.py` twins, Slack content still in `integrations/slack/`, the upward imports from `integrations/` into `infrastructure/`, the non-tier top-level directories listed above (each held by its own ticket), and legacy features that still call their existing vendor integration until their own migration task cuts them over. Introducing a Path A capability does not make such a legacy module an infrastructure consumer, and does not move its vendor-specific behavior into the shared contract.
 
-**Change note (2026-09-08, Path A portability clarification):** A Path A capability
-must be shaped around operations that can be stated without naming one vendor's
-query language, response projection, authentication subject, or metadata model.
-Before adding a new capability contract, compare the intended operations against
-at least two plausible providers (for example Google Drive and Microsoft OneDrive)
-and keep only the shared capability surface in the Protocol and canonical models.
-Provider-specific features such as Google `appProperties`, raw field projections,
-and vendor query fragments remain inside the provider implementation or a
-feature-owned adapter. A legacy feature may continue using its existing vendor
-integration until its migration task is cut over; introducing a Path A capability
-does not make the legacy module an infrastructure consumer or require moving its
-vendor-specific behavior into the shared contract.
+**Changes:**
+- 2026-09-08: Path A contracts are limited to operations shared by at least two plausible providers.
