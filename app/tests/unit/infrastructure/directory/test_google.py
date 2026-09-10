@@ -10,7 +10,6 @@ import pytest
 from googleapiclient.errors import HttpError
 from structlog.testing import capture_logs
 
-from infrastructure.directory import google as google_module
 from infrastructure.directory import models as directory_models
 from infrastructure.directory.google import GoogleDirectoryProvider
 from infrastructure.directory.models import (
@@ -1757,10 +1756,6 @@ class TestGetGroupMembersBatch:
         # Assert
         page_sizes = {call.kwargs["maxResults"] for call in google_service.members.return_value.list.call_args_list}
         assert page_sizes == {_MEMBERS_PAGE_SIZE}
-
-    def test_vendor_batch_helper_is_not_imported(self):
-        # Assert
-        assert not hasattr(google_module, "execute_batch_request")
 
     def test_surfaces_per_key_response_and_error(self, provider, google_service):
         # Arrange

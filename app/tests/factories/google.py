@@ -1,4 +1,4 @@
-from integrations.google_workspace.schemas import Group, Member, User
+from tests.factories.google_schemas import Group, Member, User
 
 
 def make_google_groups(n=3, prefix="", domain="test.com", as_model=False):
