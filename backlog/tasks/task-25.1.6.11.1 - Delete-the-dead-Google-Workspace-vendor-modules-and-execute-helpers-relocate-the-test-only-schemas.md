@@ -3,10 +3,10 @@ id: TASK-25.1.6.11.1
 title: >-
   Delete the dead Google Workspace vendor modules and execute helpers; relocate
   the test-only schemas
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-10 17:25'
-updated_date: '2026-09-10 17:27'
+updated_date: '2026-09-10 18:04'
 labels:
   - clients
   - phase-3
@@ -39,11 +39,11 @@ NOT IN SCOPE: google_service.py (TASK-25.1.7); the vendor-package CI guardrail (
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/google_workspace/google_calendar.py, meet.py and google_meet.py are deleted together with tests/integrations/google_workspace/test_google_meet.py; a repo-wide grep outside backlog/ and tmp/ finds no import of or path reference to any of them
-- [ ] #2 integrations/google_workspace/client.py defines neither execute_google_api_request nor execute_batch_request and does not import OperationResult; their tests are removed and a repo-wide grep for both names outside backlog/ and tmp/ returns zero hits
-- [ ] #3 schemas.py is relocated under app/tests/factories/; tests/factories/google.py and tests/test_factory_validation.py import it from there and no file under app/ imports integrations.google_workspace.schemas
-- [ ] #4 app/integrations/google_workspace/ contains only __init__.py, client.py and google_service.py (the last removed by TASK-25.1.7)
-- [ ] #5 ruff, mypy, pytest tests --ignore=tests/smoke, bin/check_sdk_typing.py and bin/check_deprecated_infra_client_imports.py pass with no behaviour change
+- [x] #1 integrations/google_workspace/google_calendar.py, meet.py and google_meet.py are deleted together with tests/integrations/google_workspace/test_google_meet.py; a repo-wide grep outside backlog/ and tmp/ finds no import of or path reference to any of them
+- [x] #2 integrations/google_workspace/client.py defines neither execute_google_api_request nor execute_batch_request and does not import OperationResult; their tests are removed and a repo-wide grep for both names outside backlog/ and tmp/ returns zero hits
+- [x] #3 schemas.py is relocated under app/tests/factories/; tests/factories/google.py and tests/test_factory_validation.py import it from there and no file under app/ imports integrations.google_workspace.schemas
+- [x] #4 app/integrations/google_workspace/ contains only __init__.py, client.py and google_service.py (the last removed by TASK-25.1.7)
+- [x] #5 ruff, mypy, pytest tests --ignore=tests/smoke, bin/check_sdk_typing.py and bin/check_deprecated_infra_client_imports.py pass with no behaviour change
 <!-- AC:END -->
 
 ## Implementation Plan

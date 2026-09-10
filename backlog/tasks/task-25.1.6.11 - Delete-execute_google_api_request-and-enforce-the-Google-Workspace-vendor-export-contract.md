@@ -3,10 +3,10 @@ id: TASK-25.1.6.11
 title: >-
   Delete execute_google_api_request and enforce the Google Workspace vendor
   export contract
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-02 15:04'
-updated_date: '2026-09-10 17:50'
+updated_date: '2026-09-10 18:05'
 labels:
   - clients
   - phase-3
