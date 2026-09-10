@@ -47,7 +47,12 @@ Three rules keep the umbrella from becoming a god package:
 2. **`common/` admits only types and values with two or more subdomain consumers and no I/O.** The moment an item there calls a backing service it is either a subdomain service or an infrastructure promotion candidate ([layers.md](layers.md)). `common/` is the staging area that makes promotion visible, not the thing that prevents it.
 3. **Entry-point names carry the dotted prefix**: `"incident.draft" = "packages.incident.draft"`, never `"draft"`. Entry-point names form a flat registry per group, so the bare last path component collides the day a second feature grows a `summary`. Django hits the identical wall — `AppConfig.label` defaults to the last component of the dotted path and must be unique project-wide.
 
-**Flat `<feature>_<subfeature>` naming is rejected.** It is the convention for *separately distributed* components: the Python modular-monolith reference implementations go flat precisely because each component is its own installable distribution and the dependency resolver enforces the graph. We ship one wheel from one `pyproject.toml`, so flat naming costs without enforcing. Concretely it (a) declares subdomains to be separate features, which makes shared feature vocabulary illegal under "features never import other features" and forces either duplication or premature promotion of domain types into infrastructure, and (b) cannot be expressed as an import-linter `containers` contract, so the sibling-independence and exhaustiveness guards in Checks are unavailable. Nesting stops at two levels — `packages/<feature>/<subdomain>/`, no deeper.
+**Flat `<feature>_<subfeature>` naming is rejected.** It is the convention for *separately distributed* components, where each component is its own installable distribution. Separate distributions don't enforce import boundaries by themselves: uv [can't ensure](https://docs.astral.sh/uv/concepts/projects/workspaces/) that one workspace member doesn't import another member's dependencies. Import contracts are needed either way, and we ship one wheel from one `pyproject.toml`. Within that wheel, flat naming causes two problems:
+
+- It declares subdomains to be separate features. Shared feature vocabulary then becomes illegal under "features never import other features", forcing either duplication or premature promotion of domain types into infrastructure.
+- No package groups a feature's subdomains. import-linter wildcards replace whole module names only (`packages.incident_*` is not valid), and `exhaustive` requires `containers`, so the per-feature contract with the exhaustiveness guard in Checks cannot be written.
+
+Nesting stops at two levels — `packages/<feature>/<subdomain>/`, no deeper.
 
 ### Handler discipline
 
@@ -73,4 +78,6 @@ A handler (any platform) does five things and nothing else: receive the platform
 - Umbrella `__init__.py` files are empty and have no entry-point line; every subdomain entry-point name is `<feature>.<subdomain>` (grep + review).
 - Each umbrella carries an import-linter `layers` contract with `containers = ["packages.<feature>"]`, subdomains as pipe-separated independent siblings above `common`, and `exhaustive = true` so an undeclared subdirectory fails CI (owned by TASK-18; until it lands, review).
 
-**Change note (2026-09-03, post-acceptance):** added the umbrella rule for complex features, resolving the shape/naming question [migration.md](migration.md) rule 5 had left open. Grounded in the shipped `access/` layout, [plugins.md](plugins.md)'s subdomain-plugin allowance, and import-linter's `containers`/`exhaustive` support, which makes the umbrella mechanically checkable and the flat alternative not.
+**Changes:**
+- 2026-09-03: added the umbrella rule for complex features.
+- 2026-09-10: corrected the rationale for rejecting flat naming.

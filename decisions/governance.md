@@ -13,7 +13,7 @@ The previous corpus (`docs/adr/`) failed in specific, diagnosed ways: records gr
 
 ## Decision
 
-**Format.** One decision per file, flat kebab-case filename, **two pages maximum**. Frontmatter has exactly four fields: `status`, `date`, `applies`, `scope`. Body sections: **Context** (including the *current state of the code*, honestly), **Decision**, **Consequences** (tradeoffs included), **Checks**, and — when `applies: target` — **Migration** (ticket link + divergences currently tolerated).
+**Format.** One decision per file, flat kebab-case filename, **two pages maximum**. Frontmatter has exactly four fields: `status`, `date`, `applies`, `scope`. Body sections: **Context** (including the *current state of the code*, honestly), **Decision**, **Consequences** (tradeoffs included), **Checks**, and — when `applies: target` — **Migration** (ticket link + divergences currently tolerated). Amendments rewrite the body in place so it states the current decision. Git holds the history, so a record ends with at most one short dated sentence per change, under **Changes:**.
 
 **Statuses.** `Draft` → `Accepted` → `Superseded` (with a pointer) or `Rejected` (with the real reason) — a trimmed variant of the MADR 4 / Nygard vocabulary (`proposed/rejected/accepted/deprecated/superseded`): `Draft` stands in for `proposed`, and `deprecated` folds into `Superseded`. There are no tiers, domains, or concern tags. (MADR frontmatter is explicitly extensible, so the extra `applies` field is an extension, not a fork.)
 
@@ -40,3 +40,6 @@ The previous corpus (`docs/adr/`) failed in specific, diagnosed ways: records gr
 - Every file in `decisions/` has the four frontmatter fields and is under ~150 lines.
 - No record with `applies: now` has a failing check (spot-audit quarterly, or when touched).
 - `README.md`'s index matches the folder contents (review on every decisions PR).
+
+**Changes:**
+- 2026-09-10: amendments are made in place, with one short dated sentence per change.

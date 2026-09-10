@@ -4,7 +4,7 @@ title: 'Resolve the empty infrastructure services: persistence/ and notification
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-28 13:20'
+updated_date: '2026-09-10 15:45'
 labels:
   - infrastructure
   - phase-4
@@ -45,5 +45,22 @@ Steps:
 created: 2026-07-28 13:20
 ---
 Scope note from a 2026-07-28 architecture review: if notifications/ is REBUILT (rather than deleted), it must be a capability-shaped NotificationService Protocol with Email/SMS channels, vendor specifics (GC Notify, SNS, SES) in adapters per outbound-clients.md. Critically: durable 'must be delivered even if we crash' delivery is QueueService work (TASK-34), NOT a bespoke queue inside notifications/ - the channel adapter is only the sender. This makes notifications a concrete driver/consumer for TASK-34. The persistence/ half is unaffected (storage/ covers it - default remains delete).
+---
+
+created: 2026-09-10 15:45
+---
+ARCHITECTURE CONSTRAINT ADDED 2026-09-10 (human-directed). Do not introduce new infrastructure services for workplace concerns: calendar, documents, files, directory, mail, notifications, people or identity. That means no new app/infrastructure/<service>/ package, Protocol or factory.
+
+Why: the organization will run Google Workspace with Slack and Microsoft 365 with Teams side by side for the long term. Three Draft decision records describe the direction:
+- decisions/workplace-systems.md
+- decisions/capability-packages.md
+- decisions/people-and-accounts.md
+
+Until those are accepted:
+- keep vendor behavior in feature Path B adapters (app/packages/<feature>/adapters/);
+- the existing infrastructure/directory, drive and spreadsheets providers stay usable, including changes needed to finish migrating their current consumers;
+- do not create capability packages yet.
+
+Resolve app/infrastructure/notifications/ by deleting it, not by building it. Reaching a person on Slack or Teams is a workplace concern (decisions/workplace-systems.md, Draft). Do not build app/infrastructure/persistence/ as a new service either: durable storage is StorageService's job (TASK-27).
 ---
 <!-- COMMENTS:END -->

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-09 15:26'
+updated_date: '2026-09-10 15:45'
 labels:
   - architecture
   - clients
@@ -55,3 +56,24 @@ NOT IN SCOPE OF THIS TASK: implementing the change. Decide and record first; rec
 - [ ] #4 The decision states what a capability should do when its vendor surface offers no cheap probe endpoint, using Google Sheets as the worked example
 - [ ] #5 Follow-up reconciliation tasks are created; no production code is changed by this task
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-10 15:45
+---
+ARCHITECTURE CONSTRAINT ADDED 2026-09-10 (human-directed). Do not introduce new infrastructure services for workplace concerns: calendar, documents, files, directory, mail, notifications, people or identity. That means no new app/infrastructure/<service>/ package, Protocol or factory.
+
+Why: the organization will run Google Workspace with Slack and Microsoft 365 with Teams side by side for the long term. Three Draft decision records describe the direction:
+- decisions/workplace-systems.md
+- decisions/capability-packages.md
+- decisions/people-and-accounts.md
+
+Until those are accepted:
+- keep vendor behavior in feature Path B adapters (app/packages/<feature>/adapters/);
+- the existing infrastructure/directory, drive and spreadsheets providers stay usable, including changes needed to finish migrating their current consumers;
+- do not create capability packages yet.
+
+When deciding where warmup and liveness belong, treat infrastructure/directory and infrastructure/drive as tolerated workplace providers that are expected to move (decisions/workplace-systems.md, Draft). Do not introduce a new infrastructure service to host warmup or liveness for workplace systems.
+---
+<!-- COMMENTS:END -->
