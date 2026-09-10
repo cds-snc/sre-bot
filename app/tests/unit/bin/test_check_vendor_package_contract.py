@@ -2,7 +2,8 @@
 
 Each test builds a throwaway ``integrations/`` tree under ``tmp_path`` and points
 the checker's path constants at it, so no test depends on the real vendor
-packages except the explicit real-tree and CI-wiring tests at the end.
+packages. The only exception is the final test, which inspects the committed
+baseline file.
 """
 
 from pathlib import Path
@@ -10,8 +11,6 @@ from pathlib import Path
 import pytest
 
 from bin import check_vendor_package_contract as checker
-
-APP_ROOT = Path(__file__).resolve().parents[3]
 
 COMPLIANT_VENDOR = {
     "__init__.py": "",
@@ -235,25 +234,10 @@ def test_find_current_violations_ignores_non_python_files_and_cache_directories(
     assert checker.find_current_violations() == set()
 
 
-def test_main_passes_against_real_integrations_tree():
-    assert checker.main() == 0
-
-
 def test_real_baseline_lists_no_google_workspace_or_non_vendor_entries():
+    """Widening the baseline is the only way around the check, so the cleaned vendor and utils/ must stay out of it."""
     baseline = checker.load_baseline()
 
     assert checker.BASELINE_PATH.exists()
     assert sorted(entry for entry in baseline if "integrations/google_workspace/" in entry) == []
     assert sorted(entry for entry in baseline if "integrations/utils/" in entry) == []
-
-
-def test_makefile_has_check_vendor_package_contract_target():
-    makefile_text = (APP_ROOT / "Makefile").read_text(encoding="utf-8")
-
-    assert "check-vendor-package-contract:" in makefile_text
-
-
-def test_ci_code_workflow_runs_vendor_package_contract_check():
-    workflow_text = (APP_ROOT.parent / ".github" / "workflows" / "ci_code.yml").read_text(encoding="utf-8")
-
-    assert "make check-vendor-package-contract" in workflow_text

@@ -1,4 +1,4 @@
-.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit backlog-board audit-client-usage-matrix client-usage-matrix check-deprecated-client-imports check-sdk-typing
+.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit backlog-board audit-client-usage-matrix client-usage-matrix check-deprecated-client-imports check-sdk-typing check-vendor-package-contract
 
 dev:
 	SLACK__COMMAND_PREFIX="dev-" uv run uvicorn main:server_app --reload
@@ -99,6 +99,9 @@ check-deprecated-client-imports:
 
 check-sdk-typing:
 	uv run python bin/check_sdk_typing.py
+
+check-vendor-package-contract:
+	uv run python bin/check_vendor_package_contract.py
 
 backlog-board: # Backlog.md web UI (Kanban board) at http://localhost:6421
 	cd .. && backlog browser --no-open --port 6421

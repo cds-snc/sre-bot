@@ -1,0 +1,36 @@
+# Vendor-package export contract baseline — only ratchets down (see decisions/outbound-clients.md).
+# Entries are "<rule>:<app-relative path>":
+#   module            a module other than __init__.py, client.py or settings.py in a vendor package
+#   operation-result  a code reference to OperationResult under app/integrations/
+# Moving logic out of a vendor package removes its entries. Removing an entry is always safe.
+# Do NOT add new entries; net-new violations fail CI. Non-vendor directories (utils/) are
+# reported as warnings and are never listed here.
+module:integrations/aws/config.py
+module:integrations/aws/cost_explorer.py
+module:integrations/aws/dynamodb.py
+module:integrations/aws/guard_duty.py
+module:integrations/aws/identity_store.py
+module:integrations/aws/lambdas.py
+module:integrations/aws/organizations.py
+module:integrations/aws/schemas.py
+module:integrations/aws/security_hub.py
+module:integrations/aws/shield.py
+module:integrations/aws/sqs.py
+module:integrations/aws/sso_admin.py
+module:integrations/openai/summarizer.py
+module:integrations/slack/blocks.py
+module:integrations/slack/bootstrap.py
+module:integrations/slack/channels.py
+module:integrations/slack/commands.py
+module:integrations/slack/formatter.py
+module:integrations/slack/help.py
+module:integrations/slack/models.py
+module:integrations/slack/parser.py
+module:integrations/slack/provider.py
+module:integrations/slack/users.py
+operation-result:integrations/aws/shield.py
+operation-result:integrations/maxmind/client.py
+operation-result:integrations/openai/client.py
+operation-result:integrations/openai/summarizer.py
+operation-result:integrations/slack/formatter.py
+operation-result:integrations/slack/provider.py
