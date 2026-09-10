@@ -1,5 +1,7 @@
 """Behavior tests for the incident Calendar adapter's request boundary."""
 
+import inspect
+import re
 from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -11,6 +13,7 @@ from integrations.google_workspace import client as google_client
 from packages.incident.scheduling.adapters import google_calendar
 
 CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"]
+UNIQUE_ID_PATTERN = re.compile(r"[a-z0-9]{3}-[a-z0-9]{3}-[a-z0-9]{3}")
 
 
 def _http_error(status: int) -> HttpError:
@@ -54,7 +57,7 @@ def test_get_freebusy_calls_calendar_resource_with_required_body(calendar_client
     query.return_value.execute.assert_called_once_with()
 
 
-def test_get_freebusy_passes_optional_body_and_delegated_user(calendar_client):
+def test_get_freebusy_passes_delegated_user_to_calendar_service(calendar_client):
     query = calendar_client.service.freebusy.return_value.query
     query.return_value.execute.return_value = {}
 
@@ -62,7 +65,6 @@ def test_get_freebusy_passes_optional_body_and_delegated_user(calendar_client):
         "2022-01-01T00:00:00Z",
         "2022-01-02T00:00:00Z",
         ["calendar1"],
-        body_kwargs={"time_zone": "America/Los_Angeles", "groupExpansionMax": 30},
         delegated_user_email="custom@example.com",
     )
 
@@ -74,8 +76,6 @@ def test_get_freebusy_passes_optional_body_and_delegated_user(calendar_client):
         "timeMin": "2022-01-01T00:00:00Z",
         "timeMax": "2022-01-02T00:00:00Z",
         "items": ["calendar1"],
-        "timeZone": "America/Los_Angeles",
-        "groupExpansionMax": 30,
     }
 
 
@@ -89,20 +89,26 @@ def test_get_freebusy_propagates_http_error(calendar_client):
     assert exc_info.value is error
 
 
+@pytest.mark.parametrize("function_name", ["get_freebusy", "insert_event"])
+def test_calendar_adapter_functions_take_no_body_overrides(function_name):
+    """Request bodies are built only from named arguments; no free-form body_kwargs override exists.
+
+    Inspects the signature rather than calling the function, because a stray
+    ``body_kwargs=`` keyword would be silently absorbed by ``**kwargs``.
+    """
+    parameters = inspect.signature(getattr(google_calendar, function_name)).parameters
+
+    assert "body_kwargs" not in parameters
+
+
 @patch("packages.incident.scheduling.adapters.google_calendar.generate_unique_id")
-@patch("packages.incident.scheduling.adapters.google_calendar.convert_string_to_camel_case")
-def test_insert_event_builds_event_and_returns_link(
-    mock_convert,
-    mock_unique_id,
-    calendar_client,
-):
+def test_insert_event_builds_event_and_returns_link(mock_unique_id, calendar_client):
     insert = calendar_client.service.events.return_value.insert
     insert.return_value.execute.return_value = {
         "htmlLink": "test_link",
         "start": {"dateTime": "2024-07-25T13:30:00-04:00"},
     }
     mock_unique_id.return_value = "abc-123-de4"
-    mock_convert.side_effect = lambda value: value
     start = datetime.now()
 
     result = google_calendar.insert_event(
@@ -111,7 +117,6 @@ def test_insert_event_builds_event_and_returns_link(
         [" test1@test.com "],
         "Test Event",
         incident_document="test_document_id",
-        body_kwargs={"location": "Test Location", "time_zone": "America/New_York"},
         delegated_user_email="custom@example.com",
     )
 
@@ -145,8 +150,6 @@ def test_insert_event_builds_event_and_returns_link(
                     "conferenceSolutionKey": {"type": "hangoutsMeet"},
                 }
             },
-            "location": "Test Location",
-            "time_zone": "America/New_York",
         },
         supportsAttachments=True,
         sendUpdates="all",
@@ -166,8 +169,7 @@ def test_insert_event_without_document_omits_attachment(calendar_client):
     assert "attachments" not in insert.call_args.kwargs["body"]
 
 
-@patch("packages.incident.scheduling.adapters.google_calendar.convert_string_to_camel_case")
-def test_insert_event_propagates_http_error(mock_convert, calendar_client):
+def test_insert_event_propagates_http_error(calendar_client):
     error = _http_error(500)
     calendar_client.service.events.return_value.insert.return_value.execute.side_effect = error
     start = datetime.now()
@@ -176,11 +178,9 @@ def test_insert_event_propagates_http_error(mock_convert, calendar_client):
         google_calendar.insert_event(start, start, ["test@example.com"], "Test Event", "document")
 
     assert exc_info.value is error
-    assert not mock_convert.called
 
 
-@patch("packages.incident.scheduling.adapters.google_calendar.convert_string_to_camel_case")
-def test_insert_event_propagates_unclassified_error(mock_convert, calendar_client):
+def test_insert_event_propagates_unclassified_error(calendar_client):
     error = RuntimeError("API call error")
     calendar_client.service.events.return_value.insert.return_value.execute.side_effect = error
     start = datetime.now()
@@ -189,7 +189,6 @@ def test_insert_event_propagates_unclassified_error(mock_convert, calendar_clien
         google_calendar.insert_event(start, start, ["test@example.com"], "Test Event", "document")
 
     assert exc_info.value is error
-    assert not mock_convert.called
 
 
 def test_get_freebusy_classifies_and_logs_http_error(calendar_client, monkeypatch):
@@ -210,3 +209,22 @@ def test_get_freebusy_classifies_and_logs_http_error(calendar_client, monkeypatc
         error_code="429",
         retry_after=7,
     )
+
+
+def test_generate_unique_id_is_owned_by_the_calendar_adapter():
+    """The requestId generator lives in the adapter module, not in a shared integrations helper."""
+    assert google_calendar.generate_unique_id.__module__ == google_calendar.__name__
+
+
+def test_generate_unique_id_returns_three_hyphen_joined_lowercase_alphanumeric_segments():
+    """Samples many ids so the character-set assertion is not satisfied by one lucky draw."""
+    unique_ids = [google_calendar.generate_unique_id() for _ in range(100)]
+
+    assert all(UNIQUE_ID_PATTERN.fullmatch(unique_id) for unique_id in unique_ids), unique_ids
+
+
+def test_generate_unique_id_returns_distinct_values_per_call():
+    """The 36**9 id space makes a collision among 100 draws negligible, so any repeat signals a regression."""
+    unique_ids = {google_calendar.generate_unique_id() for _ in range(100)}
+
+    assert len(unique_ids) == 100

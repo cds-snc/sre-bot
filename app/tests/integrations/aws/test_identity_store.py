@@ -306,9 +306,8 @@ def test_list_users(mock_execute_aws_api_call):
 
 @patch("integrations.aws.identity_store.ROLE_ARN", "test_role_arn")
 @patch.dict(os.environ, {"AWS_SSO_INSTANCE_ID": "test_instance_id"})
-@patch("integrations.utils.api.convert_string_to_pascal_case")
 @patch("integrations.aws.identity_store.execute_aws_api_call")
-def test_list_users_with_identity_store_id(mock_execute_aws_api_call, mock_convert_string_to_pascal_case):
+def test_list_users_with_identity_store_id(mock_execute_aws_api_call):
     mock_execute_aws_api_call.return_value = ["User1", "User2"]
 
     result = identity_store.list_users(identity_store_id="custom_instance_id")
