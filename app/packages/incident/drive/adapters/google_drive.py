@@ -1,27 +1,31 @@
 """Incident-owned Drive adapter.
 
 Generic file and folder operations route through the configured DriveProvider.
-Incident-specific metadata and template health checks remain temporary pass-throughs
-to the legacy Google Drive integration until that integration is retired.
+Metadata (Drive appProperties) is Google-specific Path B code implemented here,
+since appProperties is deliberately not part of the vendor-neutral DriveProvider.
 """
 
-from types import ModuleType
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
+from googleapiclient.errors import HttpError
 
 from infrastructure.configuration.integrations.google import get_google_resources_config
+from infrastructure.drive import DRIVE_SCOPES
 from infrastructure.drive.factory import get_drive_provider
 from infrastructure.drive.models import DriveFile
 from infrastructure.operations import OperationResult
-from integrations.google_workspace import google_drive as legacy_google_drive
+from integrations.google_workspace import client as google_workspace_client
+
+if TYPE_CHECKING:
+    from googleapiclient._apis.drive.v3 import DriveResource, File  # pyright: ignore[reportMissingModuleSource]
 
 logger = structlog.get_logger()
 INCIDENT_TEMPLATE = get_google_resources_config().incident_template_id
 
 
-def get_legacy_google_drive() -> ModuleType:
-    return legacy_google_drive
+def _drive_service() -> DriveResource:
+    return google_workspace_client.get_drive_service(scopes=DRIVE_SCOPES)
 
 
 def _to_dict(file: DriveFile) -> dict[str, Any]:
@@ -34,6 +38,17 @@ def _log_failure(event: str, result: OperationResult[Any]) -> None:
         status=result.status.value,
         error_code=result.error_code,
         retry_after=result.retry_after,
+    )
+
+
+def _log_http_failure(event: str, file_id: str, exc: HttpError) -> None:
+    status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
+    logger.warning(
+        event,
+        file_id=file_id,
+        status=status.value,
+        error_code=error_code,
+        retry_after=retry_after,
     )
 
 
@@ -84,20 +99,37 @@ def find_document_by_channel_name(channel_name: str) -> dict[str, Any] | None:
         return None
 
     document = matches[0]
-    metadata = get_legacy_google_drive().list_metadata(document.id, fields="id, name, appProperties")
+    metadata = get_metadata(document.id, fields="id, name, appProperties")
     return {"id": document.id, "appProperties": metadata.get("appProperties", {})}
 
 
 def add_metadata(file_id: str, key: str, value: str) -> dict[str, Any]:
-    return cast("dict[str, Any]", get_legacy_google_drive().add_metadata(file_id, key, value))
+    body = cast("File", {"appProperties": {key: value}})
+    try:
+        file = _drive_service().files().update(fileId=file_id, body=body, supportsAllDrives=True).execute()
+    except HttpError as exc:
+        _log_http_failure("incident_drive_add_metadata_failed", file_id, exc)
+        raise
+    return cast("dict[str, Any]", file)
 
 
 def delete_metadata(file_id: str, key: str) -> dict[str, Any]:
-    return cast("dict[str, Any]", get_legacy_google_drive().delete_metadata(file_id, key))
+    body = cast("File", {"appProperties": {key: None}})
+    try:
+        file = _drive_service().files().update(fileId=file_id, body=body, supportsAllDrives=True).execute()
+    except HttpError as exc:
+        _log_http_failure("incident_drive_delete_metadata_failed", file_id, exc)
+        raise
+    return cast("dict[str, Any]", file)
 
 
 def get_metadata(file_id: str, fields: str | None = None) -> dict[str, Any]:
-    return cast("dict[str, Any]", get_legacy_google_drive().list_metadata(file_id, fields=fields))
+    try:
+        file = _drive_service().files().get(fileId=file_id, fields=fields, supportsAllDrives=True).execute()
+    except HttpError as exc:
+        _log_http_failure("incident_drive_get_metadata_failed", file_id, exc)
+        raise
+    return cast("dict[str, Any]", file)
 
 
 def incident_drive_healthcheck() -> bool:

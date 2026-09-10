@@ -10,7 +10,9 @@ from infrastructure.drive.models import DriveFile
 from infrastructure.drive.settings import DriveSettings
 from infrastructure.operations import OperationResult
 from integrations.google_workspace.client import classify_google_error
-from integrations.google_workspace.google_drive import DRIVE_SCOPES
+
+# Shared with Google Path B adapters via infrastructure.drive; revisit when another Drive provider is added.
+DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
 
 _FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
 
