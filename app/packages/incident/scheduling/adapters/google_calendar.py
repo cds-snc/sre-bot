@@ -1,3 +1,5 @@
+import random
+import string
 from datetime import datetime
 from typing import TYPE_CHECKING, cast
 
@@ -5,7 +7,6 @@ import structlog
 from googleapiclient.errors import HttpError
 
 from integrations.google_workspace.client import classify_google_error, get_calendar_service
-from integrations.utils.api import convert_string_to_camel_case, generate_unique_id
 
 if TYPE_CHECKING:
     from googleapiclient._apis.calendar.v3 import Event, FreeBusyRequest  # pyright: ignore[reportMissingModuleSource]
@@ -14,15 +15,28 @@ logger = structlog.get_logger()
 CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"]
 
 
-def get_freebusy(time_min, time_max, items, body_kwargs=None, **kwargs):
+def generate_unique_id() -> str:
+    # Define the characters to use in the ID
+    chars = string.ascii_lowercase + string.digits
+
+    # Function to generate a segment of three characters
+    def generate_segment():
+        return "".join(random.choices(chars, k=3))  # noqa: S311 -- non-secret readable ID, not used for security tokens
+
+    # Generate the three segments and join them with hyphens
+    segments = [generate_segment() for _ in range(3)]
+    unique_id = "-".join(segments)
+
+    return unique_id
+
+
+def get_freebusy(time_min, time_max, items, **kwargs):
     """Return the free/busy response for the requested calendars."""
     body = {
         "timeMin": time_min,
         "timeMax": time_max,
         "items": items,
     }
-    if body_kwargs is not None and isinstance(body_kwargs, dict):
-        body.update({convert_string_to_camel_case(k): v for k, v in body_kwargs.items()})
 
     service = get_calendar_service(
         scopes=CALENDAR_SCOPES,
@@ -48,18 +62,10 @@ def insert_event(
     title,
     calendar_id="primary",
     incident_document=None,
-    body_kwargs=None,
     **kwargs,
 ) -> dict:
     """Create a new calendar event and return the scheduled metadata."""
-    if body_kwargs is None:
-        time_zone = "America/New_York"
-    elif isinstance(body_kwargs, dict):
-        time_zone = body_kwargs.get("time_zone", "America/New_York")
-    else:
-        raise ValueError(
-            "body_kwargs must be a dictionary or None. If you want to pass a time zone, use body_kwargs={'time_zone': 'America/New_York'}"
-        )
+    time_zone = "America/New_York"
 
     body = {
         "start": {"dateTime": start, "timeZone": time_zone},
@@ -85,9 +91,6 @@ def insert_event(
         ]
     else:
         body.pop("attachments", None)
-
-    if body_kwargs is not None and isinstance(body_kwargs, dict):
-        body.update({convert_string_to_camel_case(k): v for k, v in body_kwargs.items()})
 
     service = get_calendar_service(
         scopes=CALENDAR_SCOPES,
