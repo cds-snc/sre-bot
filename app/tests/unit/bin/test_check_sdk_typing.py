@@ -6,6 +6,8 @@ import importlib.util
 import tomllib
 from pathlib import Path
 
+from bin import check_sdk_typing as checker
+
 APP_ROOT = Path(__file__).resolve().parents[3]
 
 
@@ -33,6 +35,12 @@ def test_sdk_typing_baseline_file_exists() -> None:
     baseline = APP_ROOT / "bin" / "baselines" / "sdk_typing_antipatterns.txt"
 
     assert baseline.exists()
+
+
+def test_sdk_typing_baseline_lists_no_google_workspace_files() -> None:
+    baseline = checker.load_baseline()
+
+    assert sorted(entry for entry in baseline if entry.startswith("integrations/google_workspace/")) == []
 
 
 def test_makefile_has_check_sdk_typing_target() -> None:
