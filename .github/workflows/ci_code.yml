@@ -51,6 +51,10 @@ jobs:
         working-directory: ./app
         run: make check-sdk-typing
 
+      - name: Vendor package contract freeze check
+        working-directory: ./app
+        run: make check-vendor-package-contract
+
       - name: Test
         working-directory: ./app
         run: make test
