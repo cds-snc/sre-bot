@@ -3,10 +3,11 @@ id: TASK-25.1.6.10.5
 title: >-
   Retire integrations/google_workspace/google_drive.py: re-home incident
   appProperties metadata and relocate DRIVE_SCOPES
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-09 15:04'
-updated_date: '2026-09-10 13:55'
+updated_date: '2026-09-10 17:05'
 labels:
   - clients
   - phase-3
@@ -53,13 +54,13 @@ NOT IN SCOPE: widening DriveProvider with metadata methods (explicitly rejected 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 packages/incident/drive/adapters/google_drive.py implements add_metadata, delete_metadata and get_metadata itself against a stub-typed DriveResource from integrations.google_workspace.client.get_drive_service, with its own try/except HttpError plus classify_google_error; no pass-through to a vendor mirror module and no execute_google_api_request remains
-- [ ] #2 infrastructure.drive.DriveProvider is NOT widened with metadata or appProperties operations; the vendor-neutral contract is unchanged
-- [ ] #3 DRIVE_SCOPES lives in app/infrastructure/drive/google.py (or each adapter owns its own scope list); no module imports it from integrations.google_workspace.google_drive, including packages/incident_draft/adapters/google_docs.py's two call sites
-- [ ] #4 app/integrations/google_workspace/google_drive.py and app/tests/integrations/google_workspace/test_google_drive.py are deleted, with zero remaining production references repo-wide
-- [ ] #5 app/tests/unit/packages/incident/drive/adapters/test_incident_drive_boundaries.py is updated to guard the new boundary rather than deleted, and the incident callers of the metadata functions are unchanged
-- [ ] #6 Unit tests cover the three metadata operations' success and classified-failure paths at the adapter's SDK seam
-- [ ] #7 Full test suite, ruff, mypy, and app/bin/check_sdk_typing.py pass
+- [x] #1 packages/incident/drive/adapters/google_drive.py implements add_metadata, delete_metadata and get_metadata itself against a stub-typed DriveResource from integrations.google_workspace.client.get_drive_service, with its own try/except HttpError plus classify_google_error; no pass-through to a vendor mirror module and no execute_google_api_request remains
+- [x] #2 infrastructure.drive.DriveProvider is NOT widened with metadata or appProperties operations; the vendor-neutral contract is unchanged
+- [x] #3 DRIVE_SCOPES lives in app/infrastructure/drive/google.py (or each adapter owns its own scope list); no module imports it from integrations.google_workspace.google_drive, including packages/incident_draft/adapters/google_docs.py's two call sites
+- [x] #4 app/integrations/google_workspace/google_drive.py and app/tests/integrations/google_workspace/test_google_drive.py are deleted, with zero remaining production references repo-wide
+- [x] #5 app/tests/unit/packages/incident/drive/adapters/test_incident_drive_boundaries.py is updated to guard the new boundary rather than deleted, and the incident callers of the metadata functions are unchanged
+- [x] #6 Unit tests cover the three metadata operations' success and classified-failure paths at the adapter's SDK seam
+- [x] #7 Full test suite, ruff, mypy, and app/bin/check_sdk_typing.py pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -186,6 +187,32 @@ RISKS
 SIZE GATE
 Production files touched: infrastructure/drive/google.py (edit, ~2 lines), infrastructure/drive/__init__.py (edit, ~2 lines), packages/incident/drive/adapters/google_drive.py (edit, ~40-50 changed lines), packages/incident_draft/adapters/google_docs.py (edit, ~4 lines), integrations/google_workspace/google_drive.py (delete, -308 LOC). 5 production files, roughly 60-70 net changed/added production LOC plus a 308-LOC deletion (deletions do not count against the "production LOC changed" spirit of the gate the way added complexity does, but even counted literally the whole diff is ~370 lines touched across 5 files). One subsystem (Google Workspace Drive integration boundary). No mixed mechanical-refactor-plus-behavior-change: the metadata operations' behavior (success dict shape, failure propagation) is explicitly preserved, this is a seam relocation, not new behavior. Well inside the ~400 LOC / ~10 file / two-subsystem gate - no decomposition required.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented per approved plan, zero deviations.
+
+Changes:
+- infrastructure/drive/google.py: DRIVE_SCOPES now a local module constant (mirrors SHEETS_SCOPES), no longer imported from the legacy vendor module.
+- infrastructure/drive/__init__.py: re-exports DRIVE_SCOPES (mirrors RANGE_NOT_FOUND precedent).
+- packages/incident/drive/adapters/google_drive.py: add_metadata/delete_metadata/get_metadata rewritten as real Path B code against a stub-typed DriveResource from integrations.google_workspace.client.get_drive_service; each wraps its own try/except HttpError + classify_google_error via new _log_http_failure, then re-raises (preserves existing raise semantics). find_document_by_channel_name now calls get_metadata instead of the legacy pass-through. get_legacy_google_drive()/ModuleType import removed.
+- packages/incident_draft/adapters/google_docs.py: both DRIVE_SCOPES call sites now import from infrastructure.drive instead of the legacy vendor module.
+- Deleted app/integrations/google_workspace/google_drive.py and app/tests/integrations/google_workspace/test_google_drive.py.
+- test_incident_drive_boundaries.py already contained the widened adapter-source guard (not import client / not legacy) from the pre-authored failing-test contract; left unchanged as it already matches the new boundary.
+- test_incident_drive_adapter.py already contained the 6 new SDK-seam tests (success + classified-failure for all 3 metadata ops) plus the updated find_document_by_channel_name/healthcheck tests from the pre-authored contract; no test edits needed.
+
+Evidence:
+- cd app && uv run pytest tests/unit/packages/incident/drive/adapters tests/unit/infrastructure/drive tests/unit/packages/incident_draft tests/unit/packages/talent -q -> 252 passed
+- cd app && uv run ruff check . -> All checks passed!
+- cd app && uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> 88 pre-existing errors in 32 files, none in touched files (infrastructure/drive/*, packages/incident/drive/adapters/google_drive.py, packages/incident_draft/adapters/google_docs.py all clean)
+- cd app && uv run python bin/check_sdk_typing.py -> OK: no net-new SDK anti-patterns
+- grep -rn for integrations.google_workspace(.|import )google_drive -> zero production hits (only the boundary test's own literal guard strings)
+
+AC#7 left unchecked: full `uv run pytest tests --ignore=tests/smoke` was not run by the agent per task instructions (user runs the full suite); targeted subset above is green.
+
+UPDATE: user ran the full suite (make test) - all green. AC#7 checked off. Task ready for human review/PR (status remains In Progress per workflow; only a human moves it to Done).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

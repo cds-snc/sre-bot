@@ -23,8 +23,8 @@ import structlog
 from googleapiclient.errors import HttpError
 
 from infrastructure.configuration.integrations.google import get_google_resources_config
+from infrastructure.drive import DRIVE_SCOPES
 from integrations.google_workspace import client as google_workspace_client
-from integrations.google_workspace import google_drive
 from packages.incident_draft.domain import (
     DocumentField,
     DocumentSection,
@@ -318,7 +318,7 @@ def _regular_label_requests(document: dict) -> list[dict[str, Any]]:
 
 def _copy_source_document(source_document_id: str, draft_title: str, folder: str) -> str | None:
     """Copy the incident report into ``folder`` as the draft; return its id."""
-    service = google_workspace_client.get_drive_service(scopes=google_drive.DRIVE_SCOPES)
+    service = google_workspace_client.get_drive_service(scopes=DRIVE_SCOPES)
     body = cast("File", {"name": draft_title, "parents": [folder]})
     try:
         copied = service.files().copy(fileId=source_document_id, body=body, supportsAllDrives=True, fields="id").execute()
@@ -1305,7 +1305,7 @@ def _source_name_and_folder(document_id: str) -> tuple[str, str]:
     Falls back to the configured incident folder when the metadata lookup
     fails, so a draft still lands somewhere responders can find it.
     """
-    service = google_workspace_client.get_drive_service(scopes=google_drive.DRIVE_SCOPES)
+    service = google_workspace_client.get_drive_service(scopes=DRIVE_SCOPES)
     metadata: Any = None
     try:
         metadata = service.files().get(fileId=document_id, fields="id, name, parents", supportsAllDrives=True).execute()
