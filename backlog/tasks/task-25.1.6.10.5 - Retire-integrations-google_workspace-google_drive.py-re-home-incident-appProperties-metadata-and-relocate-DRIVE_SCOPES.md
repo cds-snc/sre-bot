@@ -3,11 +3,11 @@ id: TASK-25.1.6.10.5
 title: >-
   Retire integrations/google_workspace/google_drive.py: re-home incident
   appProperties metadata and relocate DRIVE_SCOPES
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-09 15:04'
-updated_date: '2026-09-10 17:05'
+updated_date: '2026-09-10 17:10'
 labels:
   - clients
   - phase-3
