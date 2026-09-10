@@ -3,10 +3,10 @@ id: TASK-25.1.6.10
 title: >-
   Retire sheets.py: introduce a Spreadsheet infrastructure capability and
   migrate live consumers
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-02 15:03'
-updated_date: '2026-09-09 15:29'
+updated_date: '2026-09-10 18:38'
 labels:
   - clients
   - phase-3
@@ -52,13 +52,13 @@ This task closes when all five are Done. Its own remaining direct work is nil.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All five children (TASK-25.1.6.10.1 through .10.5) are Done
-- [ ] #2 app/infrastructure/spreadsheets/ exists as a vendor-neutral Path A capability (SpreadsheetProvider Protocol, GoogleSpreadsheetProvider, SheetCell model, settings, cached factory) and no Google response key or auth subject crosses its contract
-- [ ] #3 app/integrations/google_workspace/sheets.py and its test file are deleted with zero remaining production references; both live consumers resolve the capability through get_spreadsheet_provider()
-- [ ] #4 The whole app/modules/reports/ package and its tests are deleted, no report behavior is migrated or recreated, and the 1.1s time.sleep pacer goes with it
-- [ ] #5 The incident parse-range business rule remains caller-side, get_incidents_from_sheet still distinguishes an empty sheet from a failed read, and the four incident status spreadsheet defects are fixed with tests
-- [ ] #6 app/integrations/google_workspace/google_drive.py and its test file are deleted, with DRIVE_SCOPES relocated out of the vendor mirror and the incident appProperties metadata operations re-homed to feature-owned Path B adapter code; DriveProvider is not widened
-- [ ] #7 Focused tests, ruff, mypy, and app/bin/check_sdk_typing.py pass for every child
+- [x] #1 All five children (TASK-25.1.6.10.1 through .10.5) are Done
+- [x] #2 app/infrastructure/spreadsheets/ exists as a vendor-neutral Path A capability (SpreadsheetProvider Protocol, GoogleSpreadsheetProvider, SheetCell model, settings, cached factory) and no Google response key or auth subject crosses its contract
+- [x] #3 app/integrations/google_workspace/sheets.py and its test file are deleted with zero remaining production references; both live consumers resolve the capability through get_spreadsheet_provider()
+- [x] #4 The whole app/modules/reports/ package and its tests are deleted, no report behavior is migrated or recreated, and the 1.1s time.sleep pacer goes with it
+- [x] #5 The incident parse-range business rule remains caller-side, get_incidents_from_sheet still distinguishes an empty sheet from a failed read, and the four incident status spreadsheet defects are fixed with tests
+- [x] #6 app/integrations/google_workspace/google_drive.py and its test file are deleted, with DRIVE_SCOPES relocated out of the vendor mirror and the incident appProperties metadata operations re-homed to feature-owned Path B adapter code; DriveProvider is not widened
+- [x] #7 Focused tests, ruff, mypy, and app/bin/check_sdk_typing.py pass for every child
 <!-- AC:END -->
 
 ## Comments
