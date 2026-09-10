@@ -4,7 +4,7 @@ title: Move modules incident Calendar and Meet call sites onto the incident adap
 status: Done
 assignee: []
 created_date: '2026-09-02 15:03'
-updated_date: '2026-09-09 13:33'
+updated_date: '2026-09-10 17:27'
 labels:
   - clients
   - phase-3
@@ -225,5 +225,10 @@ Dependency repointed 2026-09-08 (task-planner) from TASK-25.1.6.8 (now a coordin
 created: 2026-09-09 13:08
 ---
 Plan written 2026-09-09 (task-planner). Subdomain layout confirmed with human: Calendar extends packages/incident/scheduling/adapters/google_calendar.py (its only caller already uses scheduling/availability.py); Meet gets a new packages/incident/meet/adapters/google_meet.py subdomain (unrelated concern, mirrors the documents/drive one-subdomain-per-vendor-surface precedent). Key finding driving the design: today's get_freebusy/insert_event/create_space all classify+log+RE-RAISE via execute_google_api_request, and existing vendor tests (test_get_freebusy_propagates_http_error, test_insert_event_propagates_http_error/_unclassified_error, test_create_space_propagates_http_error/_unclassified_error) pin that propagation behavior, which AC#5 requires preserved at the new boundary — so these two new adapters classify+log+RAISE (not the documents/drive adapters' log+return-sentinel shape); a plan doubt records this as a deliberate deviation for human awareness. AC#4 resolved with a premise correction: core.py's SECOND create_space call site (initiate_resources_creation) has NO local try/except today (verified) — only modules/incident/incident.py's generic outer catch protects it; kept as-is since the adapter's raise-on-failure changes nothing there. Also found: tests/unit/packages/incident/scheduling/test_incident_scheduling_boundaries.py pins google_calendar.get_freebusy/insert_event staying in the vendor module and schedule_retro re-exporting them by identity — both assertions must be fixed/removed as part of this task (mirrors the TASK-25.1.6.7 precedent). Fits one PR (2 new small subdomains, 2 one-line consumer import swaps, 2 vendor-file deletions, 2 new adapter test files, 1 boundary-test fix); no decomposition needed.
+---
+
+created: 2026-09-10 17:27
+---
+POST-CLOSE DISCREPANCY (2026-09-10, found while planning TASK-25.1.6.11). AC#3 is checked, but app/integrations/google_workspace/google_calendar.py (130 LOC) and meet.py (29 LOC) are still on main. Their test files are gone and they have zero importers repo-wide; they are the last callers of client.py::execute_google_api_request (google_calendar.py:38, :108; meet.py:28). The migration itself shipped correctly: schedule_retro.py and core.py use the incident adapters. Human-decided not to reopen this task. The deletion is owned by TASK-25.1.6.11.1.
 ---
 <!-- COMMENTS:END -->

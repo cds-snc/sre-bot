@@ -1,9 +1,9 @@
-from integrations.google_workspace.schemas import GroupsResult, Member, User
 from tests.factories.google import (
     make_google_groups,
     make_google_members,
     make_google_users,
 )
+from tests.factories.google_schemas import GroupsResult, Member, User
 
 
 def test_helpers_produce_valid_groups_and_users_and_members():

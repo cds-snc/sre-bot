@@ -3,10 +3,10 @@ id: TASK-25.1.6.11
 title: >-
   Delete execute_google_api_request and enforce the Google Workspace vendor
   export contract
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-02 15:04'
-updated_date: '2026-09-09 15:06'
+updated_date: '2026-09-10 18:05'
 labels:
   - clients
   - phase-3
@@ -46,13 +46,48 @@ THEN: TASK-25.1's AC#1 and TASK-25's AC#1/#2 become provable for the Google vend
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/google_workspace/client.py::execute_google_api_request is deleted with its tests; grep confirms zero references repo-wide outside backlog/ and tmp/
-- [ ] #2 execute_batch_request is either moved into infrastructure/directory/google.py (vendor package left with factories + classify only) or retained with a written amendment to decisions/outbound-clients.md explaining why the batch protocol cannot be expressed at the adapter - not left as a silent exception
-- [ ] #3 app/integrations/google_workspace/ contains only client.py and settings; the six mirror modules (google_calendar, meet, google_docs, sheets, google_drive, google_directory) and google_service.py are all gone
-- [ ] #4 No file under app/integrations/ returns OperationResult except as part of a classify_<vendor>_error return type (TASK-25 AC#2, spot-checked and covered by the guardrail below)
-- [ ] #5 A CI guardrail fails the build when app/integrations/<vendor>/ gains a non-factory/non-classification/non-settings module, and it is proven by a deliberately failing fixture in the check's own tests
-- [ ] #6 app/bin/baselines/sdk_typing_antipatterns.txt has zero remaining google_workspace entries and python3 bin/check_sdk_typing.py passes
+- [ ] #1 TASK-25.1.6.11.1, TASK-25.1.6.11.2 and TASK-25.1.6.11.3 are Done
+- [ ] #2 integrations/google_workspace/client.py::execute_google_api_request and execute_batch_request are deleted with their tests, and grep confirms zero references repo-wide outside backlog/ and tmp/. execute_batch_request's orchestration was already relocated into GoogleDirectoryProvider by TASK-25.1.6.3.1, so no amendment to decisions/outbound-clients.md is needed
+- [ ] #3 app/integrations/google_workspace/ contains only __init__.py and client.py (settings.py permitted once TASK-24 creates it). The six per-method mirror modules, google_meet.py and google_service.py are gone, and schemas.py lives under app/tests/factories/
+- [ ] #4 No file under app/integrations/google_workspace/ references OperationResult, and every remaining reference elsewhere under app/integrations/ is frozen in the vendor-package guardrail baseline (TASK-25 AC#2 provable for the Google vendor)
+- [ ] #5 A CI guardrail fails the build when app/integrations/<vendor>/ gains a non-factory/non-classification/non-settings module or a new OperationResult reference, proven by a deliberately failing fixture in the check's own tests
+- [ ] #6 app/bin/baselines/sdk_typing_antipatterns.txt and the vendor-package guardrail baseline both have zero google_workspace entries, and both checks pass
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+COORDINATOR (decomposed 2026-09-10, human-approved). No direct implementation. As one PR this task was about 11 production files and mixed a dead-code deletion/relocation with a new CI enforcement rule, tripping size-gate rules #1 and #3. A third slice was added the same day, when the human ruled integrations/utils/ is not a vendor package.
+
+SLICES AND ORDER
+1. TASK-25.1.6.11.1 - delete google_calendar.py, meet.py and google_meet.py (all orphaned), execute_google_api_request and execute_batch_request (zero consumers), and the stale docstring references; relocate the test-only schemas.py to tests/factories. No blockers.
+2. TASK-25.1.7 - delete google_service.py (existing task, unchanged).
+3. TASK-25.1.6.11.2 and TASK-25.1.6.11.3 can run in parallel once 1 and 2 land:
+   - .11.2: new bin/check_vendor_package_contract.py covering all vendors, with a rule-qualified ratchet-down baseline, Makefile target and CI step. utils/ is a declared non-vendor directory that only warns.
+   - .11.3: retire integrations/utils/api.py. Delete the six case converters (no production callers once 1 and 2 land) and the scheduling adapter's unused body_kwargs parameter; move generate_unique_id verbatim into its only consumer, packages/incident/scheduling/adapters/google_calendar.py.
+
+SURFACE FINDINGS THAT CHANGED THE SCOPE (verified on main 2026-09-10)
+- TASK-25.1.6.9 checked the deletion of google_calendar.py and meet.py, but both are still on disk with zero importers and are the last callers of execute_google_api_request. Not reopened; folded into slice 1 and recorded on TASK-25.1.6.9.
+- google_meet.py (dead URL builder) and schemas.py (Pydantic models used only by test factories) were owned by no task. Both are folded into slice 1.
+- No settings.py exists in the vendor package. Google settings stay in infrastructure/configuration/integrations/google.py until TASK-24, so AC#3 permits settings.py rather than requiring it.
+- Checked across all vendors, the contract fails today: aws, slack and openai have extra modules; aws/shield, maxmind, openai and slack reference OperationResult. The guardrail freezes those in a baseline instead of fixing them. AC#4 was reworded from "no file under app/integrations/" to that frozen-baseline form.
+- integrations/utils/api.py was owned by no task (TASK-25.1.6.5 removed only retry_request). None of its seven functions justifies both its form and its location, hence slice .11.3.
+
+DECISIONS CLOSING EARLIER NOTES ON THIS TASK (human, 2026-09-10)
+- orderBy="email" parity (comment of 2026-09-03, TASK-25.1.6.4 planning): NOT added. The Admin Directory API's default order is accepted. The only order-sensitive consumer, modules/reports/google_groups.py, was deleted by TASK-25.1.6.10.1.
+- classify_google_error and 400s (comment of 2026-09-09, TASK-25.1.6.10 planning): NO classifier change. 400s stay mapped per provider, so the Sheets "Unable to parse range" local mapping in infrastructure/spreadsheets/google.py remains the only 400 handling.
+- Directory residuals (comment of 2026-09-03, TASK-25.1.6.3.1 planning): excluded from this sweep, because neither isolates vendor SDK calls. Filed as standalone, low-priority tasks: R1 duplicated member mapping -> TASK-84; R2 inconsistent OAuth scope -> TASK-85.
+- execute_batch_request: straight deletion. The relocation branch of the original AC was discharged by TASK-25.1.6.3.1. Carry into slice 1's PR description that the provider classifies per-item HttpErrors via classify_google_error and does not reproduce the helper's blanket PERMANENT_ERROR/BATCH_ERRORS.
+- utils/ is not a vendor package: the guardrail warns and never fails CI for it, and never baselines it.
+- Bug found while tracing generate_unique_id: modules/incident/schedule_retro.py builds description, reminders and a requestId that the scheduling adapter silently drops (pre-existing, carried over from the legacy module). Filed as standalone bug TASK-86. Kept out of every slice here.
+
+CLOSURE VERIFICATION (from app/, after all three slices and TASK-25.1.7 merge)
+- rg -n --hidden -g '!backlog/**' -g '!tmp/**' -g '!**/.venv/**' 'execute_google_api_request|execute_batch_request|integrations[./]utils' .. -> zero (AC#2)
+- ls integrations/google_workspace -> __init__.py client.py; integrations/utils absent (AC#3)
+- make check-vendor-package-contract (exit 0, no WARN) ; make check-sdk-typing ; rg -n google_workspace bin/baselines/ -> zero (AC#4, AC#6)
+- uv run pytest tests/unit/bin -> the deliberately failing fixture test passes (AC#5)
+Once this closes, TASK-25.1's AC#1 and TASK-25's AC#1/#2 are provable for the Google vendor, and TASK-25.1.6 can close.
+<!-- SECTION:PLAN:END -->
 
 ## Comments
 

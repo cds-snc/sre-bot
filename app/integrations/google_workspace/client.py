@@ -18,7 +18,6 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import HttpRequest
 
 from infrastructure.configuration.integrations.google import get_google_workspace_settings
-from infrastructure.operations.result import OperationResult
 from infrastructure.operations.status import OperationStatus
 
 if TYPE_CHECKING:
@@ -171,55 +170,3 @@ def classify_google_error(exc: Exception) -> tuple[OperationStatus, str | None, 
         return OperationStatus.UNAUTHORIZED, error_code, None
 
     raise exc
-
-
-def execute_google_api_request(request: Any) -> Any:
-    """Execute a Google API request, logging classified failures and re-raising them.
-
-    Temporary shared primitive: TASK-25.1.6 decides whether to inline this per
-    call site or formalize it in decisions/outbound-clients.md.
-    """
-    try:
-        return request.execute()
-    except Exception as exc:
-        status, error_code, retry_after = classify_google_error(exc)
-        logger.warning(
-            "google_api_request_failed",
-            status=status.value,
-            error_code=error_code,
-            retry_after=retry_after,
-        )
-        raise
-
-
-def execute_batch_request(
-    service: AdminDirectoryResource,
-    requests: list[tuple[str, Any]],
-) -> OperationResult[dict[str, Any]]:
-    """Execute multiple Directory API calls in a single batch request.
-
-    Per-item HttpErrors are captured per request_id (the Admin SDK batch
-    protocol's own error-reporting shape) rather than raised individually.
-    """
-    results: dict[str, Any] = {}
-    errors: dict[str, str] = {}
-
-    def callback(request_id: str, response: Any, exception: Exception | None) -> None:
-        if exception is not None:
-            errors[request_id] = str(exception)
-        else:
-            results[request_id] = response
-
-    batch = service.new_batch_http_request(callback=callback)
-    for request_id, api_request in requests:
-        batch.add(api_request, request_id=request_id)
-    batch.execute()
-
-    if errors:
-        return OperationResult.error(
-            status=OperationStatus.PERMANENT_ERROR,
-            message="Batch request completed with errors",
-            error_code="BATCH_ERRORS",
-            data={"results": results, "errors": errors},
-        )
-    return OperationResult.success(data={"results": results, "errors": errors})

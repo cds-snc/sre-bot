@@ -4,6 +4,7 @@ title: Stop SDK retries from duplicating non-idempotent Google Workspace writes
 status: To Do
 assignee: []
 created_date: '2026-09-10 14:57'
+updated_date: '2026-09-10 17:50'
 labels:
   - clients
   - phase-3
@@ -61,3 +62,15 @@ NOT IN SCOPE: the Google timeout (TASK-25.1.6.14); retry counts for reads; AWS w
 - [ ] #7 decisions/outbound-clients.md's Migration section no longer lists non-idempotent Google writes issued on the retrying handle
 - [ ] #8 Full test suite, ruff, mypy and app/bin/check_sdk_typing.py pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-10 17:50
+---
+COORDINATION FOR PLANNING (2026-09-10, from TASK-25.1.6.11 planning). Two new tasks touch your retro events.insert write site in packages/incident/scheduling/adapters/google_calendar.py:
+- TASK-86 (bug, High): modules/incident/schedule_retro.py passes description, reminders and a timestamp-based conferenceData.createRequest.requestId as **event_config. insert_event silently drops all of them and uses its own random requestId. Choosing the requestId source is shared between TASK-86 and this task's replay-safety design, so plan on top of TASK-86's outcome or settle it jointly.
+- TASK-25.1.6.11.3 moves generate_unique_id (today's requestId source) verbatim from integrations/utils/api.py into that adapter and removes the unused body_kwargs parameter. It is a pure move, so rebase onto it.
+Also: if you add a retries-disabled factory variant, keep it inside integrations/google_workspace/client.py. A new module there will fail TASK-25.1.6.11.2's vendor-package contract guardrail by design.
+---
+<!-- COMMENTS:END -->

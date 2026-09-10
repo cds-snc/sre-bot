@@ -3,8 +3,8 @@
 Per decisions/feature-packages.md this is the only file in
 packages/incident/documents/ allowed to import integrations.google_workspace.
 Builds a stub-typed DocsResource, owns its own try/except + classify_google_error
-around documents().get/.batchUpdate (no execute_google_api_request), and exposes
-incident-domain operations rather than SDK-shaped passthroughs.
+around documents().get/.batchUpdate, and exposes incident-domain operations
+rather than SDK-shaped passthroughs.
 """
 
 from collections.abc import Mapping
