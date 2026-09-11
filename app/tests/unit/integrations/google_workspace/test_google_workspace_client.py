@@ -11,9 +11,11 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
+import google_auth_httplib2
 import pytest
 from googleapiclient.errors import HttpError
 from googleapiclient.http import HttpRequest
+from pydantic import ValidationError
 
 from infrastructure.operations.status import OperationStatus
 
@@ -96,6 +98,7 @@ def test_get_admin_directory_service_builds_with_static_discovery_and_no_cache(
         GCP_SRE_SERVICE_ACCOUNT_KEY_FILE='{"client_email":"sre-bot@example.com","private_key":"FAKE"}',
         SRE_BOT_EMAIL="sre-bot@example.com",
         GOOGLE_API_NUM_RETRIES=3,
+        GOOGLE_API_TIMEOUT_SECONDS=10.0,
     )
 
     class FakeCredentials:
@@ -141,11 +144,13 @@ def _install_fake_build(
     monkeypatch: pytest.MonkeyPatch,
     google_client_module: Any,
     captured: dict[str, Any],
+    timeout_seconds: float = 10.0,
 ) -> Any:
     settings = SimpleNamespace(
         GCP_SRE_SERVICE_ACCOUNT_KEY_FILE='{"client_email":"sre-bot@example.com","private_key":"FAKE"}',
         SRE_BOT_EMAIL="sre-bot@example.com",
         GOOGLE_API_NUM_RETRIES=3,
+        GOOGLE_API_TIMEOUT_SECONDS=timeout_seconds,
     )
 
     class FakeCredentials:
@@ -284,3 +289,140 @@ def test_service_factories_use_explicit_delegated_user_email(
     factory(scopes=["https://www.googleapis.com/auth/calendar"], delegated_user_email="delegate@example.com")
 
     assert captured["delegated_subject"] == "delegate@example.com"
+
+
+@pytest.mark.unit
+def test_build_service_sets_explicit_http_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+    google_client_module: Any,
+) -> None:
+    """A built service carries an authorized http whose timeout comes from settings.
+
+    googleapiclient.discovery.build is stubbed so the kwargs it receives can be
+    inspected without network access, and the settings double supplies a
+    distinctive timeout so the assertion proves the value is read from
+    configuration rather than hard-coded. The library rejects http and
+    credentials together, so credentials must be absent from the build kwargs.
+    """
+    captured: dict[str, Any] = {}
+    _install_fake_build(monkeypatch, google_client_module, captured, timeout_seconds=7.5)
+
+    google_client_module.get_calendar_service(scopes=["https://www.googleapis.com/auth/calendar"])
+
+    authorized_http = captured["build_kwargs"]["http"]
+    assert isinstance(authorized_http, google_auth_httplib2.AuthorizedHttp)
+    assert authorized_http.http.timeout == 7.5
+    assert "credentials" not in captured["build_kwargs"]
+
+
+@pytest.mark.unit
+def test_build_service_http_preserves_resumable_upload_redirect_handling(
+    monkeypatch: pytest.MonkeyPatch,
+    google_client_module: Any,
+) -> None:
+    """The hand-built http drops 308 from httplib2's automatic redirect codes.
+
+    googleapiclient's own build_http makes the same adjustment; resumable Drive
+    uploads rely on seeing 308 responses instead of having httplib2 follow them,
+    so replacing the library's http must not silently regress that behavior.
+    """
+    captured: dict[str, Any] = {}
+    _install_fake_build(monkeypatch, google_client_module, captured)
+
+    google_client_module.get_drive_service(scopes=["https://www.googleapis.com/auth/drive"])
+
+    assert 308 not in captured["build_kwargs"]["http"].http.redirect_codes
+
+
+@pytest.mark.unit
+def test_build_service_applies_timeout_and_retry_builder_together(
+    monkeypatch: pytest.MonkeyPatch,
+    google_client_module: Any,
+) -> None:
+    """One built service carries both the configured timeout and the retry default.
+
+    HttpRequest.execute is stubbed to record the retry count the request
+    builder supplies, so the two construction-time policies are asserted on the
+    same service rather than in isolation — a request builder that survived but
+    lost its retry default would otherwise go unnoticed.
+    """
+    captured: dict[str, Any] = {}
+    _install_fake_build(monkeypatch, google_client_module, captured, timeout_seconds=7.5)
+
+    observed_retries: list[int] = []
+
+    def fake_parent_execute(self: HttpRequest, http: Any = None, num_retries: int = 0, **kwargs: Any) -> Any:
+        observed_retries.append(num_retries)
+        return {"ok": True}
+
+    monkeypatch.setattr(HttpRequest, "execute", fake_parent_execute)
+
+    google_client_module.get_sheets_service(scopes=["https://www.googleapis.com/auth/spreadsheets"])
+
+    build_kwargs = captured["build_kwargs"]
+    assert build_kwargs["http"].http.timeout == 7.5
+
+    request = build_kwargs["requestBuilder"](None, MagicMock(), "https://example.test")
+    request.execute()
+    assert observed_retries == [3]
+
+
+@pytest.mark.unit
+def test_build_service_creates_a_new_http_per_call(
+    monkeypatch: pytest.MonkeyPatch,
+    google_client_module: Any,
+) -> None:
+    """Each built service owns a distinct http instance.
+
+    httplib2.Http is not thread-safe and the legacy callers build services from
+    worker threads, so construction must not cache or share an http. Two
+    successive builds are captured and compared by identity at both the
+    authorized wrapper and the wrapped httplib2 layer.
+    """
+    captured: dict[str, Any] = {}
+    _install_fake_build(monkeypatch, google_client_module, captured)
+
+    google_client_module.get_calendar_service(scopes=["https://www.googleapis.com/auth/calendar"])
+    first_http = captured["build_kwargs"]["http"]
+
+    google_client_module.get_calendar_service(scopes=["https://www.googleapis.com/auth/calendar"])
+    second_http = captured["build_kwargs"]["http"]
+
+    assert first_http is not second_http
+    assert first_http.http is not second_http.http
+
+
+@pytest.mark.unit
+def test_google_workspace_settings_timeout_defaults_and_reads_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The per-attempt timeout has a documented default and is environment-overridable.
+
+    The settings class is constructed directly rather than through its cached
+    provider so each assertion sees a fresh read of the environment.
+    """
+    from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
+
+    assert GoogleWorkspaceSettings().GOOGLE_API_TIMEOUT_SECONDS == 10.0
+    monkeypatch.setenv("GOOGLE_API_TIMEOUT_SECONDS", "2.5")
+    assert GoogleWorkspaceSettings().GOOGLE_API_TIMEOUT_SECONDS == 2.5
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("invalid_timeout", ["0", "-1"])
+def test_google_workspace_settings_timeout_rejects_non_positive(
+    monkeypatch: pytest.MonkeyPatch,
+    invalid_timeout: str,
+) -> None:
+    """A non-positive timeout fails validation at settings construction.
+
+    Zero or negative values would make every Google call fail immediately, so
+    the misconfiguration must surface at startup rather than as opaque socket
+    errors at call time.
+    """
+    from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
+
+    monkeypatch.setenv("GOOGLE_API_TIMEOUT_SECONDS", invalid_timeout)
+
+    with pytest.raises(ValidationError):
+        GoogleWorkspaceSettings()
