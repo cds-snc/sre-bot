@@ -3,11 +3,11 @@ id: TASK-25.2.1
 title: >-
   Add characterization tests for the AWS call sites lacking unit coverage before
   adapter work
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-31 18:48'
-updated_date: '2026-09-11 16:35'
+updated_date: '2026-09-11 16:41'
 labels:
   - clients
   - phase-3
