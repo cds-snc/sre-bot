@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 20:55'
-updated_date: '2026-09-11 20:57'
+updated_date: '2026-09-11 21:33'
 labels:
   - clients
   - phase-3
@@ -130,3 +130,16 @@ This file lives outside `app/tests/unit` in the legacy `tests/modules/` tree. Pe
 ## Verification (Step 5)
 Run from app/: `uv run ruff check .`, `uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'`, `uv run pytest tests --ignore=tests/smoke`, and `rg -n "integrations\.aws\.identity_store|integrations import identity_store" app/modules/provisioning/users.py app/modules/provisioning/groups.py` (expect zero hits). Record all four outputs in this task's notes at finalization.
 <!-- SECTION:PLAN:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-11 21:33
+---
+2026-09-11: failing tests authored (TDD red). 9 aws-branch tests fail with AttributeError: module has no attribute 'build_identity_center_adapter'; 20 untouched tests pass; ruff clean.
+Test-name mapping vs plan Steps 3-4:
+- users.py: test_should_return_raw_identity_store_dicts_from_the_aws_branch (rewritten, patches factory); test_should_raise_when_aws_identity_store_list_users_returns_false -> renamed test_should_raise_directory_users_unavailable_with_error_code_on_failed_listing; new test_should_return_empty_list_on_successful_empty_listing.
+- groups.py: test_get_groups_from_integration_case_aws_raises_when_integration_returns_false -> renamed test_get_groups_from_integration_case_aws_raises_directory_groups_unavailable_on_failed_listing; new test_get_groups_from_integration_case_aws_empty_listing_returns_empty_list; case_aws / case_invalid / filters_applied / filters_returns_subset retargeted to @patch the factory.
+Status left at To Do until production edits begin.
+---
+<!-- COMMENTS:END -->
