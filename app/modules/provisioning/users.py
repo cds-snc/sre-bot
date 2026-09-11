@@ -1,9 +1,12 @@
 """Module for getting users from integrations."""
 
+from typing import Any
+
 from structlog import get_logger
 
 from infrastructure.directory import get_directory_provider
-from integrations.aws import identity_store
+from infrastructure.directory.models import DirectoryUser
+from packages.aws_platform.adapters.identity_center import build_identity_center_adapter
 from utils import filters
 
 logger = get_logger()
@@ -22,8 +25,8 @@ def get_users_from_integration(integration_source, **kwargs):
     """Return the users of an integration source.
 
     The `google_directory` source yields canonical `DirectoryUser` values for
-    the full directory (no limit); `aws_identity_center` still yields raw
-    identity_store dicts.
+    the full directory (no limit); `aws_identity_center` still yields the raw
+    Identity Store user dicts returned by the adapter.
 
     Raises:
         DirectoryUsersUnavailableError: when the directory listing fails.
@@ -33,7 +36,7 @@ def get_users_from_integration(integration_source, **kwargs):
         operation="get_users_from_integration",
     )
     processing_filters = kwargs.get("processing_filters", [])
-    users = []
+    users: list[DirectoryUser] | list[dict[str, Any]] = []
 
     match integration_source:
         case "google_directory":
@@ -55,7 +58,15 @@ def get_users_from_integration(integration_source, **kwargs):
                 "get_users_from_integration_started",
                 service="AWS Identity Center",
             )
-            users = identity_store.list_users()
+            aws_result = build_identity_center_adapter().list_users()
+            if not aws_result.is_success:
+                log.error(
+                    "list_users_failed",
+                    error_code=aws_result.error_code,
+                    error=aws_result.message,
+                )
+                raise DirectoryUsersUnavailableError(aws_result.message, aws_result.error_code)
+            users = aws_result.data or []
         case _:
             return users
 
