@@ -3,10 +3,10 @@ id: TASK-25.1.6.14
 title: >-
   Set an explicit per-attempt timeout on Google Workspace API clients at
   construction
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-10 14:56'
-updated_date: '2026-09-11 13:31'
+updated_date: '2026-09-11 13:46'
 labels:
   - clients
   - phase-3
@@ -50,7 +50,7 @@ NOT IN SCOPE: changing retry counts; handling non-idempotent writes (separate ta
 - [x] #4 Each built service gets its own Http instance; no Http or Resource is cached and shared across threads
 - [x] #5 Factory unit tests assert both the configured timeout and the retry request builder on a built service
 - [x] #6 decisions/outbound-clients.md's Migration section no longer lists Google factories inheriting the 60-second default timeout
-- [ ] #7 Full test suite, ruff, mypy and app/bin/check_sdk_typing.py pass
+- [x] #7 Full test suite, ruff, mypy and app/bin/check_sdk_typing.py pass
 <!-- AC:END -->
 
 ## Implementation Plan
