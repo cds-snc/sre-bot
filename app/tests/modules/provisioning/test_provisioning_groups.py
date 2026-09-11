@@ -350,6 +350,21 @@ def test_get_groups_from_integration_case_aws(
 
 @patch("modules.provisioning.groups.filters")
 @patch("modules.provisioning.groups.identity_store.list_groups_with_memberships")
+def test_get_groups_from_integration_case_aws_raises_when_integration_returns_false(
+    mock_aws_list_groups_with_memberships,
+    mock_filters,
+):
+    """A False return (the integration's real error contract on failure) reaches
+    log_groups' unguarded len(groups) call and crashes, unlike an empty-list result.
+    """
+    mock_aws_list_groups_with_memberships.return_value = False
+
+    with pytest.raises(TypeError):
+        groups.get_groups_from_integration("aws_identity_center")
+
+
+@patch("modules.provisioning.groups.filters")
+@patch("modules.provisioning.groups.identity_store.list_groups_with_memberships")
 def test_get_groups_from_integration_case_invalid(
     mock_aws_list_groups_with_memberships,
     mock_filters,

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:49'
-updated_date: '2026-09-11 15:36'
+updated_date: '2026-09-11 16:19'
 labels:
   - clients
   - phase-3
@@ -46,4 +46,14 @@ Size gate: seven small adapters (about 400 production LOC) plus seven caller fil
 - [ ] #1 The seven adapters exist under packages/aws_platform/adapters/, return OperationResult, build clients only through get_aws_client, and have Stubber unit tests
 - [ ] #2 The seven listed caller files no longer import any of the seven mirrors and handle OperationResult explicitly, with error-path behaviour recorded in notes and reviewed
 - [ ] #3 The seven mirror modules and their legacy tests are deleted and both guard baselines pruned accordingly
+- [ ] #4 Every caller that today crashes on a False return from organizations, cost_explorer, config, guard_duty, security_hub or lambdas (dict/list comprehensions and len() over the result in aws_access_requests.request_access_modal, aws_account_health, spending, ops_group_assignment and lambdas, as pinned by TASK-25.2.1) handles the non-success OperationResult status explicitly with a user-visible or logged outcome; the pinned crash tests are replaced by tests of the new behaviour
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-11 16:19
+---
+2026-09-11: TASK-25.2.1's characterization pass pinned several crash-on-False paths in this slice's callers (TypeError from comprehensions and len() over a bool). They are listed here so the migration replaces each with explicit status handling. The dead request_aws_account_access in modules/aws/aws.py is owned by TASK-25.2.3.
+---
+<!-- COMMENTS:END -->

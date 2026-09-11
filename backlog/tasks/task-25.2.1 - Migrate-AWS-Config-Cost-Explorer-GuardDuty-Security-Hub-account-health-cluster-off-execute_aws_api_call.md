@@ -3,10 +3,11 @@ id: TASK-25.2.1
 title: >-
   Add characterization tests for the AWS call sites lacking unit coverage before
   adapter work
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-31 18:48'
-updated_date: '2026-09-11 16:15'
+updated_date: '2026-09-11 16:35'
 labels:
   - clients
   - phase-3
@@ -39,8 +40,8 @@ Production code is not modified. New tests go under app/tests/ per the testing-s
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every production call into integrations.aws.{identity_store,organizations,sso_admin,config,cost_explorer,guard_duty,security_hub,lambdas,dynamodb} has at least one unit test asserting the caller's success path and its behaviour when the integration returns False; the verified call-site inventory is recorded in notes
-- [ ] #2 No production file is modified; ruff, mypy and pytest pass with output recorded
+- [x] #1 Every production call into integrations.aws.{identity_store,organizations,sso_admin,config,cost_explorer,guard_duty,security_hub,lambdas,dynamodb} has at least one unit test asserting the caller's success path and its behaviour when the integration returns False; the verified call-site inventory is recorded in notes
+- [x] #2 No production file is modified; ruff, mypy and pytest pass with output recorded
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -189,3 +190,48 @@ ASSUMPTIONS AND HOW TO VERIFY THEM
 BLAST RADIUS AND ROLLBACK
 - Zero production code changes; a `git revert` of this PR is always safe and trivially restores nothing-changed. The only risk is a mis-pinned characterization test asserting behaviour that isn't actually today's behaviour -- mitigated by running the new tests against the unmodified checkout before merging (see assumptions above) and by every crash-path test using `pytest.raises(<exact type>)` rather than a loose assertion.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Files changed (all under app/tests/, zero production files modified):
+- tests/unit/modules/aws/test_aws_account_health_handler.py (+6 tests; 19 total)
+- tests/unit/modules/aws/test_spending_handler.py (+4 tests; 17 total)
+- tests/unit/modules/aws/test_ops_group_assignment_handler.py (+2 tests; 11 total)
+- tests/unit/modules/aws/test_aws_access_requests_handler.py (+4 tests; 16 total)
+- tests/unit/modules/aws/test_aws_command_handler.py (+3 tests; 13 total)
+- tests/unit/modules/aws/test_identity_center_handler.py (+1 test; 15 total)
+- tests/unit/modules/provisioning/test_provisioning_users.py (+1 test; 8 total)
+- tests/modules/provisioning/test_provisioning_groups.py (+1 test; 19 total, legacy tree)
+- tests/modules/slack/test_slack_webhooks.py (+8 tests; 27 total, legacy tree)
+- tests/modules/incident/test_db_operations.py (+6 tests; 21 total, legacy tree)
+- tests/modules/incident/test_incident_folder.py (+1 test; 42 total, legacy tree)
+- tests/unit/jobs/test_revoke_aws_sso_access.py (+1 test; 6 total)
+Total: 38 new tests across 12 files.
+
+Call-site disposition (plan's 39-row inventory, file:line -> fn):
+- Added now (crash pinned with pytest.raises or defended-branch/pass-through pinned with literal False): rows 1,2,3,4,6,7,8,9,10,12,13,16,17,18,19,20,21,22,24,25,27,28,29,30,32,33,34,36,37,38,39 -- all covered by the new tests above exactly as planned.
+- Branch-equivalent, no new test (existing falsy fixture takes the identical `if x:`/`if not x:` branch as False): rows 5,11,14,15,26,31,35 -- verified by re-reading each guard during implementation, matches the plan's disposition record.
+- Already adequate, no new test: row 23 (jobs/scheduled_tasks.py identity_store.healthcheck) -- confirmed already exercised via test_identity_store.py and the integration-agnostic healthcheck loop, per the plan's grounding note.
+
+Behavioural claims corrected: none. Every planned exception type (TypeError/AttributeError) and every planned pass-through/defended-branch assertion matched today's real behaviour on first run; no test needed re-deriving from an actual stack trace.
+
+Verification commands and results (run from app/):
+- `uv run ruff check .` -> All checks passed!
+- `uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'` -> 88 pre-existing errors in 32 production files (none in app/tests/, none in files touched by this task -- e.g. modules/incident/core.py, modules/webhooks/aws_sns_notification.py, packages/incident/scheduling/adapters/google_calendar.py); unrelated to this tests-only change, not fixed per the stop-condition on pre-existing unrelated gate failures.
+- `uv run pytest tests --ignore=tests/smoke` -> 3294 passed, 6 failed. The 6 failures are in tests/modules/webhooks/test_webhooks_aws_sns.py (3 tests) and tests/unit/infrastructure/directory/test_google.py (3 tests) -- files this task never touches. Each of the 6 passes in isolation and as a pair-run; they only fail as part of the full ordered suite, indicating pre-existing full-suite state leakage unrelated to this change. Not fixed, per the stop-condition on pre-existing unrelated failures.
+- Each of the 12 extended files was also run standalone; all pass (counts listed above).
+
+Remaining for human: PR review of the 12 extended test files; optional decision on whether to open a follow-up investigation task for the pre-existing full-suite-only failures in test_webhooks_aws_sns.py / test_google.py (unrelated to TASK-25.2.1's scope) and for the two dead-code/positional-argument defects documented inline in the plan (aws.py request_aws_account_access positional shift; aws_access_requests.py access_view_handler's `is None` vs `is False` dead branch).
+
+INDEPENDENT VERIFICATION OF THE GATE CLAIMS (2026-09-11, main session, after the implementation agent's run):
+- ruff: `uv run ruff check .` -> All checks passed.
+- mypy: `uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'` -> 88 errors in 32 production files. mypy excludes tests/ by config (pyproject [tool.mypy] exclude = ["^tests/"]), so a tests-only change cannot add or remove any of them; CI runs mypy non-blocking (`make lint-ci` appends `|| true`). Pre-existing, unrelated, not fixed.
+- pytest, combined invocation `uv run pytest tests --ignore=tests/smoke` -> 3294 passed, 6 failed (3 in tests/modules/webhooks/test_webhooks_aws_sns.py, 3 in tests/unit/infrastructure/directory/test_google.py).
+  Proof the 6 are pre-existing and independent of this change:
+  (a) same invocation with all 12 modified test files excluded via --ignore -> the same 6 fail, 3080 passed;
+  (b) each of the 12 modified files run ahead of the two failing files -> all pass (117-153 passed per pair);
+  (c) CI-shaped splits are green: `pytest tests/unit tests/integration` -> 2475 passed; `pytest tests/api tests/modules tests/integrations tests/utils tests/test_factory_validation.py` (the make test-legacy list) -> 825 passed.
+  The failures are an order-dependent state leak that only surfaces when the unit and legacy trees run in one process; candidate for a separate bug task, out of this slice's scope.
+- Hygiene: rg over the 12 files finds no task ids, sprint labels or plan-step references; pinned-defect comments describe the defect and its revisit trigger in words.
+<!-- SECTION:NOTES:END -->

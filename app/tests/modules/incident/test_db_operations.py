@@ -204,6 +204,75 @@ def test_create_incident_already_exists(mock_get_incident_by_channel_id, mock_dy
 
 
 @patch("modules.incident.db_operations.dynamodb")
+@patch("modules.incident.db_operations.get_incident_by_channel_id")
+@patch("modules.incident.db_operations.datetime")
+def test_create_incident_raises_when_put_item_returns_false(mock_datetime, mock_get_incident_by_channel_id, mock_dynamodb):
+    """put_item returning the integration's literal False error contract crashes on the
+    unguarded response["ResponseMetadata"] index, unlike the tested 400-status dict.
+    """
+    mock_datetime.datetime.now.return_value.timestamp.return_value = 1234567890
+    mock_get_incident_by_channel_id.return_value = None
+    mock_dynamodb.put_item.return_value = False
+    incident_data = {
+        "id": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "name": "name",
+        "user_id": "user_id",
+        "teams": ["teams"],
+        "report_url": "report_url",
+        "meet_url": "meet_url",
+    }
+    with pytest.raises(TypeError):
+        db_operations.create_incident(incident_data)
+
+
+@patch("modules.incident.db_operations.dynamodb")
+def test_list_incidents_returns_false_unchanged(mock_dynamodb):
+    """list_incidents is a pure pass-through, so an integration False propagates unchanged."""
+    mock_dynamodb.scan.return_value = False
+    assert db_operations.list_incidents() is False
+
+
+@patch("modules.incident.db_operations.dynamodb")
+def test_get_incident_returns_false_unchanged(mock_dynamodb):
+    """get_incident is a pure pass-through, so an integration False propagates unchanged."""
+    mock_dynamodb.get_item.return_value = False
+    assert db_operations.get_incident("foo") is False
+
+
+@patch("modules.incident.db_operations.dynamodb")
+def test_lookup_incident_returns_false_unchanged(mock_dynamodb):
+    """lookup_incident is a pure pass-through, so an integration False propagates unchanged."""
+    mock_dynamodb.scan.return_value = False
+    assert db_operations.lookup_incident("channel_id", "bar") is False
+
+
+@patch("modules.incident.db_operations.lookup_incident")
+def test_get_incident_by_channel_id_raises_when_lookup_incident_returns_false(mock_lookup_incident):
+    """A False return from lookup_incident (the integration's real error contract on
+    failure) crashes on the unguarded len(incidents) call, unlike the tested empty-list
+    "no results" case which returns None cleanly.
+    """
+    mock_lookup_incident.return_value = False
+
+    with pytest.raises(TypeError):
+        db_operations.get_incident_by_channel_id("bar")
+
+
+@patch("modules.incident.db_operations.dynamodb")
+def test_log_activity_returns_false_and_logs_error_when_integration_returns_false(mock_dynamodb):
+    """log_activity's own False branch (log an error, return False) is exercised
+    directly rather than only reached indirectly through create_incident's success path.
+    """
+    mock_dynamodb.update_item.return_value = False
+
+    result = db_operations.log_activity("incident-1", "message")
+
+    assert result is False
+
+
+@patch("modules.incident.db_operations.dynamodb")
 def test_list_incidents(
     mock_dynamodb,
 ):

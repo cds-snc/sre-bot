@@ -471,6 +471,22 @@ def test_store_update_failed(mock_current_time_est, mock_update_item, mock_scan_
 
 
 @patch("modules.incident.incident_folder.dynamodb.scan")
+@patch("modules.incident.incident_folder.dynamodb.update_item")
+@patch("modules.incident.incident_folder.current_time_est")
+def test_store_update_raises_when_update_item_returns_false(mock_current_time_est, mock_update_item, mock_scan_item):
+    """update_item returning the integration's literal False error contract crashes on
+    the unguarded response.get("ResponseMetadata", {}) call, unlike the tested
+    400-status dict.
+    """
+    mock_current_time_est.return_value = "2025-01-31 11:17:06"
+    mock_scan_item.return_value = [{"incident_updates": {"L": [{"S": "Previous update"}]}}]
+    mock_update_item.return_value = False
+
+    with pytest.raises(AttributeError):
+        incident_folder.store_update("incident_id", "New update")
+
+
+@patch("modules.incident.incident_folder.dynamodb.scan")
 def test_fetch_updates(mock_scan_item):
     mock_scan_item.return_value = [{"incident_updates": {"L": [{"S": "Update 1\n Update 2"}]}}]
 

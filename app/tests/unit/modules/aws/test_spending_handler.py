@@ -315,3 +315,71 @@ def test_should_skip_update_when_spending_data_empty(mock_update, mock_generate)
     # Assert
     mock_generate.assert_called_once()
     mock_update.assert_not_called()
+
+
+@pytest.mark.unit
+@patch("modules.aws.spending.organizations")
+def test_should_raise_when_list_organization_accounts_returns_false(mock_organizations):
+    """Test generate_spending_data surfaces a TypeError when organizations returns False.
+
+    Stub strategy: list_organization_accounts returns the literal False that
+    handle_aws_api_errors produces on error; the list comprehension iterating over
+    accounts pins today's crash on a non-iterable bool.
+    """
+    # Arrange
+    mock_organizations.list_organization_accounts.return_value = False
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        spending.generate_spending_data()
+
+
+@pytest.mark.unit
+@patch("modules.aws.spending.organizations")
+def test_should_raise_when_get_account_details_returns_false(mock_organizations):
+    """Test get_accounts_details surfaces a TypeError when get_account_details returns False.
+
+    Stub strategy: get_account_details returns False; the subsequent item assignment
+    `details["Tags"] = ...` on a bool pins today's crash.
+    """
+    # Arrange
+    mock_organizations.get_account_details.return_value = False
+    mock_organizations.get_account_tags.return_value = []
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        spending.get_accounts_details(["123456789012"])
+
+
+@pytest.mark.unit
+@patch("modules.aws.spending.organizations")
+def test_should_raise_when_get_account_tags_returns_false(mock_organizations):
+    """Test get_accounts_details surfaces a TypeError when get_account_tags returns False.
+
+    Stub strategy: get_account_details succeeds but get_account_tags returns False;
+    the crash actually happens inside format_account_details' `for tag in account["Tags"]`,
+    reached from get_accounts_details, so the raise is asserted at the caller.
+    """
+    # Arrange
+    mock_organizations.get_account_details.return_value = {"Id": "123456789012", "Name": "TestAccount"}
+    mock_organizations.get_account_tags.return_value = False
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        spending.get_accounts_details(["123456789012"])
+
+
+@pytest.mark.unit
+@patch("modules.aws.spending.cost_explorer")
+def test_should_raise_when_cost_and_usage_returns_false(mock_cost_explorer):
+    """Test get_accounts_spending surfaces an AttributeError when cost_explorer returns False.
+
+    Stub strategy: get_cost_and_usage returns the literal False; the subsequent
+    `response.get(...)` call on a bool pins today's crash.
+    """
+    # Arrange
+    mock_cost_explorer.get_cost_and_usage.return_value = False
+
+    # Act & Assert
+    with pytest.raises(AttributeError):
+        spending.get_accounts_spending("2024", "01", span=1)

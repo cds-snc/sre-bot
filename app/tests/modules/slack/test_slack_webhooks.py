@@ -1,5 +1,7 @@
 from unittest.mock import ANY, patch
 
+import pytest
+
 from modules.slack import webhooks
 
 
@@ -260,6 +262,71 @@ def test_toggle_webhook(get_webhook_mock, dynamodb_mock):
         UpdateExpression="SET active = :active",
         ExpressionAttributeValues={":active": {"BOOL": ANY}},
     )
+
+
+@patch("modules.slack.webhooks.dynamodb")
+def test_create_webhook_raises_when_integration_returns_false(dynamodb_mock):
+    """put_item returning the integration's literal False error contract crashes on
+    the unguarded response["ResponseMetadata"] index, unlike the tested 401-status dict.
+    """
+    dynamodb_mock.put_item.return_value = False
+    with pytest.raises(TypeError):
+        webhooks.create_webhook("test_channel", "test_user_id", "test_name")
+
+
+@patch("modules.slack.webhooks.dynamodb")
+def test_delete_webhook_returns_false_unchanged(dynamodb_mock):
+    """delete_webhook is a pure pass-through, so an integration False propagates unchanged."""
+    dynamodb_mock.delete_item.return_value = False
+    assert webhooks.delete_webhook("test_id") is False
+
+
+@patch("modules.slack.webhooks.dynamodb")
+def test_lookup_webhooks_returns_false_unchanged(mock_dynamodb):
+    """lookup_webhooks is a pure pass-through, so an integration False propagates unchanged."""
+    mock_dynamodb.scan.return_value = False
+    assert webhooks.lookup_webhooks("channel", "test_channel") is False
+
+
+@patch("modules.slack.webhooks.dynamodb")
+def test_increment_acknowledged_count_returns_false_unchanged(dynamodb_mock):
+    """increment_acknowledged_count is a pure pass-through, so an integration False
+    propagates unchanged."""
+    dynamodb_mock.update_item.return_value = False
+    assert webhooks.increment_acknowledged_count("test_id") is False
+
+
+@patch("modules.slack.webhooks.dynamodb")
+def test_increment_invocation_count_returns_false_unchanged(dynamodb_mock):
+    """increment_invocation_count is a pure pass-through, so an integration False
+    propagates unchanged."""
+    dynamodb_mock.update_item.return_value = False
+    assert webhooks.increment_invocation_count("test_id") is False
+
+
+@patch("modules.slack.webhooks.dynamodb")
+def test_list_all_webhooks_returns_false_unchanged(dynamodb_mock):
+    """list_all_webhooks is a pure pass-through, so an integration False propagates unchanged."""
+    dynamodb_mock.scan.return_value = False
+    assert webhooks.list_all_webhooks() is False
+
+
+@patch("modules.slack.webhooks.dynamodb")
+def test_revoke_webhook_returns_false_unchanged(dynamodb_mock):
+    """revoke_webhook is a pure pass-through, so an integration False propagates unchanged."""
+    dynamodb_mock.update_item.return_value = False
+    assert webhooks.revoke_webhook("test_id") is False
+
+
+@patch("modules.slack.webhooks.dynamodb")
+def test_toggle_webhook_raises_when_get_webhook_returns_none_due_to_integration_failure(dynamodb_mock):
+    """get_item returning the integration's literal False makes get_webhook return None
+    (its own defended `if response:` branch), and toggle_webhook's inline
+    `get_webhook(id)["active"]` then crashes indexing None.
+    """
+    dynamodb_mock.get_item.return_value = False
+    with pytest.raises(TypeError):
+        webhooks.toggle_webhook("test_id")
 
 
 @patch("modules.slack.webhooks.model_utils")

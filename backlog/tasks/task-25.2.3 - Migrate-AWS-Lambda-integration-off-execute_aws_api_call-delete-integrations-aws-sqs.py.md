@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:48'
-updated_date: '2026-09-11 15:56'
+updated_date: '2026-09-11 16:19'
 labels:
   - clients
   - phase-3
@@ -43,4 +43,16 @@ packages/access/sync/adapters/aws_identity_center.py is not reused: it exposes p
 - [ ] #2 The eight listed caller files no longer import integrations.aws.identity_store; each handles OperationResult explicitly, with per-call-site error-path behaviour recorded in notes and reviewed
 - [ ] #3 integrations/aws/identity_store.py and its legacy tests are deleted; both guard baselines are pruned of identity_store entries
 - [ ] #4 packages/access is not reworked; the access feature's own migration stays out of scope
+- [ ] #5 Defect found by TASK-25.2.1's characterization pass is resolved deliberately, not carried across the seam: modules/aws/aws_access_requests.py's access_view_handler guards get_user_id with 'is None' although the integration only ever returns False, so its 'not registered with AWS SSO' reply is unreachable and a lookup failure flows into already_has_access and create_account_assignment with a False user id. With OperationResult, NOT_FOUND sends that reply and any other failure status stops before the assignment; the pinned characterization tests are updated to the new contract
+- [ ] #6 jobs/revoke_aws_sso_access.py no longer passes a failed get_user_id result into delete_account_assignment: a non-success status ends the job step with an explicit log and result
+- [ ] #7 modules/aws/aws.py's request_aws_account_access is unreferenced in production and calls create_aws_access_request with positionally shifted arguments (access_type receives a datetime, start_date_time receives the access type string); it is deleted, or fixed if the planner finds a live caller, with the pinned test removed or corrected accordingly
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-11 16:19
+---
+2026-09-11: three defects surfaced by the TASK-25.2.1 characterization pass were assigned here as explicit ACs (unreachable 'not registered' branch, revoke job forwarding False, dead request_aws_account_access with shifted positional args) so they are fixed or deleted deliberately when these call sites move to OperationResult, rather than pinned forever.
+---
+<!-- COMMENTS:END -->
