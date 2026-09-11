@@ -155,6 +155,7 @@ def test_insert_event_builds_event_and_returns_link(mock_unique_id, calendar_cli
         sendUpdates="all",
         conferenceDataVersion=1,
     )
+    insert.return_value.execute.assert_called_once_with(num_retries=0)
 
 
 def test_insert_event_without_document_omits_attachment(calendar_client):

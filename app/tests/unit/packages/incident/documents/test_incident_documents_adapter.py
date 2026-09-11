@@ -28,6 +28,7 @@ def test_replace_placeholders_success(mock_get_docs_service):
 
     assert result is True
     mock_service.documents.return_value.batchUpdate.assert_called_once()
+    mock_service.documents.return_value.batchUpdate.return_value.execute.assert_called_once_with()
 
 
 @patch("packages.incident.documents.adapters.google_docs.get_docs_service")
@@ -54,6 +55,7 @@ def test_apply_document_edits_success(mock_get_docs_service):
 
     assert result == {"status": "ok"}
     mock_service.documents.return_value.batchUpdate.assert_called_once()
+    mock_service.documents.return_value.batchUpdate.return_value.execute.assert_called_once_with(num_retries=0)
 
 
 @patch("packages.incident.documents.adapters.google_docs.get_docs_service")

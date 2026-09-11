@@ -47,7 +47,7 @@ def test_create_space_returns_api_response_and_sends_expected_body(meet_client):
     }
     meet_client.factory.assert_called_once_with(scopes=MEET_SCOPES, delegated_user_email=None)
     create.assert_called_once_with(body=EXPECTED_BODY)
-    create.return_value.execute.assert_called_once_with()
+    create.return_value.execute.assert_called_once_with(num_retries=0)
 
 
 def test_create_space_passes_delegated_user_email(meet_client):

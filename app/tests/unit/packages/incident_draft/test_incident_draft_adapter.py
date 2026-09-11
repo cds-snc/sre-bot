@@ -285,6 +285,27 @@ class TestWriteDraftDocument:
         assert request["fields"] == "id"
         assert request["supportsAllDrives"] is True
 
+    def test_copy_source_document_disables_retries(self, drive_service, docs_service):
+        """File copy is not naturally idempotent; retries risk duplicate drafts."""
+        drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
+        _write(docs_service, drafts)
+
+        drive_service.files.return_value.copy.return_value.execute.assert_called_once_with(num_retries=0)
+
+    def test_populate_batch_update_disables_retries(self, drive_service, docs_service):
+        """Batch update with index-based requests corrupts the draft on replay."""
+        drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
+        _write(docs_service, drafts)
+
+        docs_service.documents.return_value.batchUpdate.return_value.execute.assert_called_once_with(num_retries=0)
+
+    def test_template_read_executes_with_default_retries(self, drive_service, docs_service):
+        """Template fetch is a read; retries apply to handle transient errors."""
+        drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
+        _write(docs_service, drafts)
+
+        docs_service.documents.return_value.get.return_value.execute.assert_called_with()
+
     def test_drive_copy_failure_writes_nothing(self, drive_service, docs_service):
         """A copy that never happened leaves no document to fill."""
         drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
