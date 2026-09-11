@@ -27,6 +27,16 @@ class FakeDirectory:
         return self._result
 
 
+class FakeIdentityCenterAdapter:
+    """Replays a preset OperationResult from list_users()."""
+
+    def __init__(self, result: OperationResult):
+        self._result = result
+
+    def list_users(self, *args, **kwargs) -> OperationResult:
+        return self._result
+
+
 def _user(email: str, given_name: str = "User", family_name: str = "One") -> DirectoryUser:
     return DirectoryUser(
         email=email,
@@ -101,19 +111,38 @@ class TestGetUsersFromIntegration:
         assert [user.email for user in result] == ["user1@example.com"]
 
     def test_should_return_raw_identity_store_dicts_from_the_aws_branch(self, monkeypatch: pytest.MonkeyPatch):
+        """Adapter success result with users is passed through unchanged to caller."""
         aws_users = [{"UserName": "user1@example.com", "UserId": "user-1"}]
-        monkeypatch.setattr(users.identity_store, "list_users", lambda *args, **kwargs: aws_users)
+        fake_adapter = FakeIdentityCenterAdapter(OperationResult.success(data=aws_users))
+        monkeypatch.setattr(users, "build_identity_center_adapter", lambda: fake_adapter)
 
         assert users.get_users_from_integration("aws_identity_center") == aws_users
 
-    def test_should_raise_when_aws_identity_store_list_users_returns_false(self, monkeypatch: pytest.MonkeyPatch):
-        """A False return (the integration's real error contract) crashes on the
-        subsequent len(users) logging call, unlike the empty-list success path.
+    def test_should_raise_directory_users_unavailable_with_error_code_on_failed_listing(self, monkeypatch: pytest.MonkeyPatch):
+        """Failed adapter listing (non-success status) raises module-local error
+        carrying message and error_code for structured error handling.
         """
-        monkeypatch.setattr(users.identity_store, "list_users", lambda *args, **kwargs: False)
+        fake_adapter = FakeIdentityCenterAdapter(
+            OperationResult.error(
+                status=OperationStatus.TRANSIENT_ERROR,
+                message="Identity Store service unavailable",
+                error_code=_ERROR_CODE,
+            )
+        )
+        monkeypatch.setattr(users, "build_identity_center_adapter", lambda: fake_adapter)
 
-        with pytest.raises(TypeError):
+        with pytest.raises(users.DirectoryUsersUnavailableError) as excinfo:
             users.get_users_from_integration("aws_identity_center")
+
+        assert excinfo.value.error_code == _ERROR_CODE
+        assert "unavailable" in str(excinfo.value)
+
+    def test_should_return_empty_list_on_successful_empty_listing(self, monkeypatch: pytest.MonkeyPatch):
+        """Successful adapter result with no users yields empty list without raising."""
+        fake_adapter = FakeIdentityCenterAdapter(OperationResult.success(data=[]))
+        monkeypatch.setattr(users, "build_identity_center_adapter", lambda: fake_adapter)
+
+        assert users.get_users_from_integration("aws_identity_center") == []
 
     def test_should_not_bind_the_google_workspace_directory_module(self):
         assert not hasattr(users, "google_directory")
