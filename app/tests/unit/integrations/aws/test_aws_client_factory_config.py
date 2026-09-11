@@ -19,6 +19,7 @@ pytestmark = pytest.mark.unit
 
 _LOCAL_DYNAMODB = "http://dynamodb-local:8000"
 _REGIONAL_DYNAMODB = "https://dynamodb.ca-central-1.amazonaws.com"
+_REGIONAL_IDENTITYSTORE = "https://identitystore.ca-central-1.amazonaws.com"
 
 
 def _reload_settings() -> None:
@@ -104,7 +105,7 @@ class TestDynamoDbLocalEndpointGate:
 
         client = aws_client.get_aws_client("identitystore")
 
-        assert client.meta.endpoint_url.startswith("https://identitystore.ca-central-1.amazonaws.com")
+        assert client.meta.endpoint_url == _REGIONAL_IDENTITYSTORE
 
     def test_factory_no_longer_depends_on_the_application_environment_setting(self) -> None:
         """The gate is driven by AWS settings alone; the application settings module is not consulted."""
