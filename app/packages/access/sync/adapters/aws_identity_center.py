@@ -17,7 +17,7 @@ import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from dataclasses import replace as dc_replace
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal
 
 import structlog
 from botocore.exceptions import BotoCoreError, ClientError
@@ -1223,5 +1223,5 @@ def build_aws_identity_center_adapter() -> AwsIdentityCenterAdapter:
     """
     settings = get_aws_settings()
     role_arn = settings.SERVICE_ROLE_MAP.get("identitystore") or None
-    client = cast("_BotoIdentityStoreClient", get_aws_client("identitystore", role_arn=role_arn))
+    client = get_aws_client("identitystore", role_arn=role_arn)
     return AwsIdentityCenterAdapter(client, settings.INSTANCE_ID)

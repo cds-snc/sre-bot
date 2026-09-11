@@ -1,90 +1,196 @@
+"""AWS vendor client.
+
+Provides the typed boto3 client factory and the shared error classification
+per decisions/outbound-clients.md: clients raise typed SDK exceptions; adapters
+classify them. Every client carries SDK-native standard retries and explicit
+per-attempt timeouts fixed once at construction, AssumeRole goes through the
+public STS API, and the only endpoint override is the dynamodb-local one.
+Clients are built per call and never cached, so assumed credentials never
+need refreshing.
+"""
+
 from functools import wraps
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, Literal, overload
 
-import boto3  # type: ignore
+import boto3
 import structlog
-from botocore.client import BaseClient  # type: ignore
-from botocore.config import Config  # type: ignore
-from botocore.credentials import (  # type: ignore
-    DeferredRefreshableCredentials,
-    create_assume_role_refresher,
-)
-from botocore.exceptions import BotoCoreError, ClientError  # type: ignore
+from botocore.client import BaseClient
+from botocore.config import Config
+from botocore.exceptions import BotoCoreError, ClientError
 
-from infrastructure.configuration.app import get_app_settings
-from infrastructure.configuration.integrations.aws import get_aws_settings
+from infrastructure.configuration.integrations.aws import get_aws_settings as _get_legacy_aws_settings
 from infrastructure.operations.status import OperationStatus
+from integrations.aws.settings import AWSSettings, get_aws_settings
+
+if TYPE_CHECKING:
+    from types_boto3_ce.client import CostExplorerClient
+    from types_boto3_config.client import ConfigServiceClient
+    from types_boto3_dynamodb.client import DynamoDBClient
+    from types_boto3_guardduty.client import GuardDutyClient
+    from types_boto3_identitystore.client import IdentityStoreClient
+    from types_boto3_lambda.client import LambdaClient
+    from types_boto3_organizations.client import OrganizationsClient
+    from types_boto3_securityhub.client import SecurityHubClient
+    from types_boto3_sso_admin.client import SSOAdminClient
+    from types_boto3_sts.client import STSClient
+    from types_boto3_sts.type_defs import CredentialsTypeDef
 
 logger = structlog.get_logger()
-settings = get_aws_settings()
-app_settings = get_app_settings()
-SYSTEM_ADMIN_PERMISSIONS = settings.SYSTEM_ADMIN_PERMISSIONS
-VIEW_ONLY_PERMISSIONS = settings.VIEW_ONLY_PERMISSIONS
-AWS_REGION = settings.AWS_REGION
-THROTTLING_ERRS = settings.THROTTLING_ERRS
-RESOURCE_NOT_FOUND_ERRS = settings.RESOURCE_NOT_FOUND_ERRS
+
+type AwsServiceName = Literal[
+    "dynamodb",
+    "identitystore",
+    "organizations",
+    "sso-admin",
+    "ce",
+    "config",
+    "guardduty",
+    "securityhub",
+    "lambda",
+    "sts",
+]
+
+_DEFAULT_SESSION_NAME = "sre-bot"
+
+
+@overload
+def get_aws_client(
+    service_name: Literal["dynamodb"],
+    *,
+    role_arn: str | None = None,
+    session_name: str = _DEFAULT_SESSION_NAME,
+    retries: bool = True,
+) -> DynamoDBClient: ...
+@overload
+def get_aws_client(
+    service_name: Literal["identitystore"],
+    *,
+    role_arn: str | None = None,
+    session_name: str = _DEFAULT_SESSION_NAME,
+    retries: bool = True,
+) -> IdentityStoreClient: ...
+@overload
+def get_aws_client(
+    service_name: Literal["organizations"],
+    *,
+    role_arn: str | None = None,
+    session_name: str = _DEFAULT_SESSION_NAME,
+    retries: bool = True,
+) -> OrganizationsClient: ...
+@overload
+def get_aws_client(
+    service_name: Literal["sso-admin"],
+    *,
+    role_arn: str | None = None,
+    session_name: str = _DEFAULT_SESSION_NAME,
+    retries: bool = True,
+) -> SSOAdminClient: ...
+@overload
+def get_aws_client(
+    service_name: Literal["ce"],
+    *,
+    role_arn: str | None = None,
+    session_name: str = _DEFAULT_SESSION_NAME,
+    retries: bool = True,
+) -> CostExplorerClient: ...
+@overload
+def get_aws_client(
+    service_name: Literal["config"],
+    *,
+    role_arn: str | None = None,
+    session_name: str = _DEFAULT_SESSION_NAME,
+    retries: bool = True,
+) -> ConfigServiceClient: ...
+@overload
+def get_aws_client(
+    service_name: Literal["guardduty"],
+    *,
+    role_arn: str | None = None,
+    session_name: str = _DEFAULT_SESSION_NAME,
+    retries: bool = True,
+) -> GuardDutyClient: ...
+@overload
+def get_aws_client(
+    service_name: Literal["securityhub"],
+    *,
+    role_arn: str | None = None,
+    session_name: str = _DEFAULT_SESSION_NAME,
+    retries: bool = True,
+) -> SecurityHubClient: ...
+@overload
+def get_aws_client(
+    service_name: Literal["lambda"],
+    *,
+    role_arn: str | None = None,
+    session_name: str = _DEFAULT_SESSION_NAME,
+    retries: bool = True,
+) -> LambdaClient: ...
+@overload
+def get_aws_client(
+    service_name: Literal["sts"],
+    *,
+    role_arn: str | None = None,
+    session_name: str = _DEFAULT_SESSION_NAME,
+    retries: bool = True,
+) -> STSClient: ...
 
 
 def get_aws_client(
-    service_name: str,
-    session_config: dict[str, Any] | None = None,
-    client_config: dict[str, Any] | None = None,
+    service_name: AwsServiceName,
+    *,
     role_arn: str | None = None,
-    session_name: str = "DefaultSession",
-) -> BaseClient:
-    """Construct a boto3 client with standardized retry/timeouts and endpoint gating.
+    session_name: str = _DEFAULT_SESSION_NAME,
+    retries: bool = True,
+) -> Any:
+    """Build a boto3 client with the standard retry, timeout and endpoint policy.
 
-    For DynamoDB in local-style environments, this applies the dynamodb-local
-    endpoint override used across the integrations package.
+    ``role_arn`` assumes that role eagerly through STS before the client is
+    built. ``retries=False`` makes exactly one attempt, for writes that are not
+    safe to replay. The dynamodb-local endpoint is applied to dynamodb only,
+    and only when configured. Failures raise SDK exceptions; adapters classify
+    them with ``classify_aws_error``.
     """
-    region_name = getattr(settings, "AWS_REGION", "ca-central-1")
-    retry_mode = getattr(settings, "RETRY_MODE", "standard")
-    retry_max_attempts = getattr(settings, "RETRY_MAX_ATTEMPTS", 3)
-    connect_timeout = getattr(settings, "CONNECT_TIMEOUT_SECONDS", 10)
-    read_timeout = getattr(settings, "READ_TIMEOUT_SECONDS", 10)
+    settings = get_aws_settings()
+    session = _session_for(settings, role_arn, session_name)
+    endpoint_url = settings.DYNAMODB_ENDPOINT_URL if service_name == "dynamodb" else None
+    return session.client(
+        service_name,
+        region_name=settings.AWS_REGION,
+        config=_build_config(settings, retries=retries),
+        endpoint_url=endpoint_url,
+    )
 
-    merged_session_config: dict[str, Any] = {"region_name": region_name}
-    if session_config:
-        merged_session_config.update(session_config)
 
-    merged_client_config: dict[str, Any] = {"region_name": region_name}
-    if client_config:
-        merged_client_config.update(client_config)
+def _build_config(settings: AWSSettings, *, retries: bool) -> Config:
+    """Botocore config with explicit retry mode, attempt budget and timeouts."""
+    max_attempts = settings.RETRY_MAX_ATTEMPTS if retries else 0
+    return Config(
+        retries={"mode": settings.RETRY_MODE, "max_attempts": max_attempts},
+        connect_timeout=settings.CONNECT_TIMEOUT_SECONDS,
+        read_timeout=settings.READ_TIMEOUT_SECONDS,
+    )
 
-    if "config" not in merged_client_config:
-        retries: dict[str, Any] = {"mode": retry_mode}
-        if retry_max_attempts is not None:
-            retries["max_attempts"] = retry_max_attempts
-        merged_client_config["config"] = Config(
-            retries=cast(Any, retries),
-            connect_timeout=connect_timeout,
-            read_timeout=read_timeout,
-        )
 
-    environment = getattr(app_settings, "ENVIRONMENT", None)
-    if service_name == "dynamodb" and environment in ("local", "dev", "ci"):
-        merged_client_config["endpoint_url"] = "http://dynamodb-local:8000"
+def _session_for(settings: AWSSettings, role_arn: str | None, session_name: str) -> boto3.Session:
+    """Ambient-credential session, or one holding credentials assumed for ``role_arn``."""
+    ambient = boto3.Session(region_name=settings.AWS_REGION)
+    if not role_arn:
+        return ambient
 
-    if role_arn:
-        # Defer the actual AssumeRole call until the client's first real
-        # request needs credentials, instead of assuming the role eagerly at
-        # client-construction time (matches the previous facade's lazy
-        # per-call session/credential behavior).
-        session = boto3.Session(**merged_session_config)
-        sts_client = session.client("sts")
-        refresher = create_assume_role_refresher(sts_client, {"RoleArn": role_arn, "RoleSessionName": session_name})
-        # Reaches into botocore's internal session to install lazily-refreshed
-        # credentials; no public boto3 API exposes this hook.
-        session._session._credentials = DeferredRefreshableCredentials(  # type: ignore[attr-defined]
-            method="assume-role",
-            refresh_using=refresher,
-        )
-    else:
-        session = boto3.Session(**merged_session_config)
+    sts: STSClient = ambient.client("sts", config=_build_config(settings, retries=True))
+    credentials = _assume_role_credentials(sts, role_arn, session_name)
+    return boto3.Session(
+        aws_access_key_id=credentials["AccessKeyId"],
+        aws_secret_access_key=credentials["SecretAccessKey"],
+        aws_session_token=credentials["SessionToken"],
+        region_name=settings.AWS_REGION,
+    )
 
-    # boto3 stubs expose per-service overloads; runtime selection by str needs
-    # the generic BaseClient return type.
-    return cast(BaseClient, session.client(service_name, **merged_client_config))  # type: ignore[call-overload,no-any-return]
+
+def _assume_role_credentials(sts: STSClient, role_arn: str, session_name: str) -> CredentialsTypeDef:
+    """Exchange ``role_arn`` for temporary credentials through the public STS API."""
+    response = sts.assume_role(RoleArn=role_arn, RoleSessionName=session_name)
+    return response["Credentials"]
 
 
 def classify_aws_error(exc: Exception) -> tuple[OperationStatus, str | None, int | None]:
@@ -101,37 +207,29 @@ def classify_aws_error(exc: Exception) -> tuple[OperationStatus, str | None, int
     if not isinstance(code, str) or not code:
         raise exc
 
-    not_found_codes = set(getattr(settings, "NOT_FOUND_CODES", ["ResourceNotFoundException"]))
-    unauthorized_codes = set(
-        getattr(
-            settings,
-            "UNAUTHORIZED_CODES",
-            ["AccessDeniedException", "UnauthorizedOperation", "UnauthorizedException"],
-        )
-    )
-    transient_codes = set(
-        getattr(
-            settings,
-            "TRANSIENT_CODES",
-            [
-                "Throttling",
-                "ThrottlingException",
-                "RequestLimitExceeded",
-                "ProvisionedThroughputExceededException",
-            ],
-        )
-    )
-
-    if code in not_found_codes:
+    settings = get_aws_settings()
+    if code in settings.NOT_FOUND_CODES:
         return OperationStatus.NOT_FOUND, code, None
-    if code in unauthorized_codes:
+    if code in settings.UNAUTHORIZED_CODES:
         return OperationStatus.UNAUTHORIZED, code, None
-    if code in transient_codes:
-        return OperationStatus.TRANSIENT_ERROR, code, 60
+    if code in settings.TRANSIENT_CODES:
+        return OperationStatus.TRANSIENT_ERROR, code, settings.TRANSIENT_RETRY_AFTER_SECONDS
     if code == "ConditionalCheckFailedException":
         return OperationStatus.PERMANENT_ERROR, code, None
 
     raise exc
+
+
+# --- Legacy dispatcher helpers -------------------------------------------------
+# Kept only for the per-service mirror modules and deleted together with the
+# last of them. They keep reading the infrastructure settings module the mirrors
+# still import; nothing above this line does.
+_legacy_settings = _get_legacy_aws_settings()
+SYSTEM_ADMIN_PERMISSIONS = _legacy_settings.SYSTEM_ADMIN_PERMISSIONS
+VIEW_ONLY_PERMISSIONS = _legacy_settings.VIEW_ONLY_PERMISSIONS
+AWS_REGION = _legacy_settings.AWS_REGION
+THROTTLING_ERRS = _legacy_settings.THROTTLING_ERRS
+RESOURCE_NOT_FOUND_ERRS = _legacy_settings.RESOURCE_NOT_FOUND_ERRS
 
 
 def handle_aws_api_errors(func):

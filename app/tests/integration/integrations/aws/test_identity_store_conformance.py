@@ -35,7 +35,8 @@ def _set_moto_aws_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AWS_SECURITY_TOKEN", "testing")
     monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
     monkeypatch.setenv("AWS_DEFAULT_REGION", AWS_REGION)
-    monkeypatch.setattr(aws_client.app_settings, "ENVIRONMENT", "test")
+    monkeypatch.delenv("AWS_ENDPOINT_URL_DYNAMODB", raising=False)
+    aws_client.get_aws_settings.cache_clear()
 
 
 @pytest.fixture

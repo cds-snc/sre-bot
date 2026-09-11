@@ -1,6 +1,6 @@
 """Factory for creating retry stores based on configuration."""
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import structlog
 
@@ -10,8 +10,6 @@ from infrastructure.resilience.retry.store import InMemoryRetryStore, RetryStore
 from integrations.aws.client import get_aws_client
 
 if TYPE_CHECKING:
-    from types_boto3_dynamodb.client import DynamoDBClient
-
     from infrastructure.configuration.infrastructure.retry import RetrySettings
 
 logger = structlog.get_logger()
@@ -51,7 +49,7 @@ def create_retry_store(
         )
 
         return DynamoDBRetryStore(
-            cast("DynamoDBClient", get_aws_client("dynamodb")),
+            get_aws_client("dynamodb"),
             config=config,
             table_name=retry_settings.dynamodb_table_name,
             ttl_days=retry_settings.dynamodb_ttl_days,

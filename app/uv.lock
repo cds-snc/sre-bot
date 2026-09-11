@@ -2283,7 +2283,7 @@ dev = [
     { name = "requests-mock" },
     { name = "ruff" },
     { name = "setuptools" },
-    { name = "types-boto3", extra = ["ce", "config", "dynamodb", "guardduty", "identitystore", "lambda", "organizations", "securityhub", "sqs", "sso-admin"] },
+    { name = "types-boto3", extra = ["ce", "config", "dynamodb", "guardduty", "identitystore", "lambda", "organizations", "securityhub", "sqs", "sso-admin", "sts"] },
 ]
 
 [package.metadata]
@@ -2335,7 +2335,7 @@ dev = [
     { name = "requests-mock", specifier = "==1.12.1" },
     { name = "ruff", specifier = "==0.15.7" },
     { name = "setuptools", specifier = "==78.1.1" },
-    { name = "types-boto3", extras = ["ce", "config", "dynamodb", "guardduty", "identitystore", "lambda", "organizations", "securityhub", "sqs", "sso-admin"], specifier = ">=1.43.63" },
+    { name = "types-boto3", extras = ["ce", "config", "dynamodb", "guardduty", "identitystore", "lambda", "organizations", "securityhub", "sqs", "sso-admin", "sts"], specifier = ">=1.43.63" },
 ]
 
 [[package]]
@@ -2451,6 +2451,9 @@ sqs = [
 sso-admin = [
     { name = "types-boto3-sso-admin" },
 ]
+sts = [
+    { name = "types-boto3-sts" },
+]
 
 [[package]]
 name = "types-boto3-ce"
@@ -2540,6 +2543,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/46/5c/236c27585e4f625d370808231639046c15ee4fae1eb4e7facfd1d55e0974/types_boto3_sso_admin-1.43.38.tar.gz", hash = "sha256:7574dbefe48819c9b9ad97a6e1adb2c63109638c55f29c2a233303ba101dbedf", size = 41021, upload-time = "2026-06-30T21:06:18.269Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/dd/55/b234a719b98f210f43e991553b0fc308a2e426f378526a5bbda485fe0cc8/types_boto3_sso_admin-1.43.38-py3-none-any.whl", hash = "sha256:c3a4235d802fc6e3d7da9a0781407221b7e4be670a4f52cc5c5554bb79105973", size = 45279, upload-time = "2026-06-30T21:06:16.195Z" },
+]
+
+[[package]]
+name = "types-boto3-sts"
+version = "1.43.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4d/a7/ea448e34f9b519b68505df256e8cc185d60ef8aeb41552553f66da5a7b35/types_boto3_sts-1.43.0.tar.gz", hash = "sha256:d8e0061fed51bb246bd966b9968104bc44411450faa8848f26170bf271913ab1", size = 16823, upload-time = "2026-04-29T23:07:24.448Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/56/18/167b2aae0614a6f4d7fe11f85517d3f4ba56e1b0807534a172a9dfe6f4c5/types_boto3_sts-1.43.0-py3-none-any.whl", hash = "sha256:ce21eab88182d8fef3795e6517d3da90da367c1e5db34fc2281c0e7ba218cb65", size = 20831, upload-time = "2026-04-29T23:07:23.152Z" },
 ]
 
 [[package]]

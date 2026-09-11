@@ -32,7 +32,6 @@ def shield() -> AWSShield:
     return AWSShield(
         settings=AWSSettings(
             AWS_REGION=os.environ.get("AWS_SMOKE_REGION", "us-east-1"),
-            AWS_ENDPOINT_URL=_SMOKE_ENDPOINT,
         )
     )
 

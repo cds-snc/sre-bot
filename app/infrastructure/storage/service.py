@@ -10,7 +10,7 @@ as a constructor argument and delegates all DynamoDB I/O here.
 """
 
 from functools import cache
-from typing import Any, Protocol, cast
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
@@ -21,20 +21,13 @@ from infrastructure.operations.status import OperationStatus
 from infrastructure.storage.protocol import StorageService
 from integrations.aws.client import classify_aws_error, get_aws_client
 
+if TYPE_CHECKING:
+    from types_boto3_dynamodb.client import DynamoDBClient
+
 logger = structlog.get_logger(__name__)
 
 _serializer = TypeSerializer()
 _deserializer = TypeDeserializer()
-
-
-class DynamoDBClient(Protocol):
-    def put_item(self, **kwargs: Any) -> dict[str, Any]: ...
-
-    def get_item(self, **kwargs: Any) -> dict[str, Any]: ...
-
-    def delete_item(self, **kwargs: Any) -> dict[str, Any]: ...
-
-    def get_paginator(self, operation_name: str) -> Any: ...
 
 
 def _serialize_item(item: dict[str, Any]) -> dict[str, Any]:
@@ -299,5 +292,5 @@ def get_storage_service() -> StorageService:
     Returns:
         StorageService instance.
     """
-    dynamodb = cast(DynamoDBClient, get_aws_client("dynamodb"))
+    dynamodb = get_aws_client("dynamodb")
     return DynamoDBStorageService(dynamodb)
