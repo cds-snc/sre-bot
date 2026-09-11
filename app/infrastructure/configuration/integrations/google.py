@@ -21,6 +21,7 @@ class GoogleWorkspaceSettings(IntegrationSettings):
         GOOGLE_WORKSPACE_CUSTOMER_ID: Google Workspace customer ID (defaults to "my_customer")
         GCP_SRE_SERVICE_ACCOUNT_KEY_FILE: Path to service account key file
         GOOGLE_API_NUM_RETRIES: Number of automatic retries for transient Google API failures
+        GOOGLE_API_TIMEOUT_SECONDS: Per-attempt HTTP timeout in seconds for Google API calls (defaults to 10.0)
 
     Example:
         ```python
@@ -42,6 +43,13 @@ class GoogleWorkspaceSettings(IntegrationSettings):
         default=3,
         alias="GOOGLE_API_NUM_RETRIES",
         description="Number of automatic retries googleapiclient applies to transient (429/5xx) API call failures, configured once at service construction.",
+    )
+    # Move alongside GOOGLE_API_NUM_RETRIES when Google Workspace settings get their own vendor package module.
+    GOOGLE_API_TIMEOUT_SECONDS: float = Field(
+        default=10.0,
+        alias="GOOGLE_API_TIMEOUT_SECONDS",
+        gt=0,
+        description="Per-attempt HTTP timeout in seconds for every Google Workspace API client, configured once at service construction. Defaults to 10.0; must be positive.",
     )
 
 

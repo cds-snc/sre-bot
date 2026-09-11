@@ -11,6 +11,8 @@ import json
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
+import google_auth_httplib2
+import httplib2
 import structlog
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -56,6 +58,18 @@ def _build_request_builder(num_retries: int) -> Callable[..., HttpRequest]:
         return _DefaultingRetryHttpRequest(*args, default_num_retries=num_retries, **kwargs)
 
     return request_builder
+
+
+def _build_authorized_http(credentials: Any, timeout_seconds: float) -> google_auth_httplib2.AuthorizedHttp:
+    """Build a new authorized http with an explicit per-attempt timeout.
+
+    Mirrors googleapiclient.http.build_http, which otherwise falls back to the
+    library's 60-second default: 308 is removed from the automatic redirect codes
+    because Drive resumable uploads use it as a status rather than a redirect.
+    """
+    http = httplib2.Http(timeout=timeout_seconds)
+    http.redirect_codes = http.redirect_codes - {308}
+    return google_auth_httplib2.AuthorizedHttp(credentials, http=http)
 
 
 def get_admin_directory_service(
@@ -135,12 +149,15 @@ def _build_service(
     if scopes:
         creds = creds.with_scopes(scopes)
 
-    # Resource construction propagates this builder to nested resources, so all
-    # Google API calls inherit one SDK-native retry policy without call-site drift.
+    # Timeout and retry policy are both fixed here, once per service: the http
+    # carries the per-attempt timeout, and resource construction propagates the
+    # request builder to nested resources so every call inherits one SDK-native
+    # retry policy without call-site drift. httplib2.Http is not thread-safe, so
+    # each built service owns a new http; never cache or share one.
     return build(
         api_name,
         api_version,
-        credentials=creds,
+        http=_build_authorized_http(creds, settings.GOOGLE_API_TIMEOUT_SECONDS),
         cache_discovery=False,
         static_discovery=True,
         requestBuilder=_build_request_builder(settings.GOOGLE_API_NUM_RETRIES),

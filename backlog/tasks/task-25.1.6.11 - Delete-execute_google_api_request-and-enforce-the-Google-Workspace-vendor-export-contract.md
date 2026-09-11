@@ -3,10 +3,10 @@ id: TASK-25.1.6.11
 title: >-
   Delete execute_google_api_request and enforce the Google Workspace vendor
   export contract
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-02 15:04'
-updated_date: '2026-09-10 18:05'
+updated_date: '2026-09-11 13:17'
 labels:
   - clients
   - phase-3
@@ -46,12 +46,12 @@ THEN: TASK-25.1's AC#1 and TASK-25's AC#1/#2 become provable for the Google vend
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 TASK-25.1.6.11.1, TASK-25.1.6.11.2 and TASK-25.1.6.11.3 are Done
-- [ ] #2 integrations/google_workspace/client.py::execute_google_api_request and execute_batch_request are deleted with their tests, and grep confirms zero references repo-wide outside backlog/ and tmp/. execute_batch_request's orchestration was already relocated into GoogleDirectoryProvider by TASK-25.1.6.3.1, so no amendment to decisions/outbound-clients.md is needed
-- [ ] #3 app/integrations/google_workspace/ contains only __init__.py and client.py (settings.py permitted once TASK-24 creates it). The six per-method mirror modules, google_meet.py and google_service.py are gone, and schemas.py lives under app/tests/factories/
-- [ ] #4 No file under app/integrations/google_workspace/ references OperationResult, and every remaining reference elsewhere under app/integrations/ is frozen in the vendor-package guardrail baseline (TASK-25 AC#2 provable for the Google vendor)
-- [ ] #5 A CI guardrail fails the build when app/integrations/<vendor>/ gains a non-factory/non-classification/non-settings module or a new OperationResult reference, proven by a deliberately failing fixture in the check's own tests
-- [ ] #6 app/bin/baselines/sdk_typing_antipatterns.txt and the vendor-package guardrail baseline both have zero google_workspace entries, and both checks pass
+- [x] #1 TASK-25.1.6.11.1, TASK-25.1.6.11.2 and TASK-25.1.6.11.3 are Done
+- [x] #2 integrations/google_workspace/client.py::execute_google_api_request and execute_batch_request are deleted with their tests, and grep confirms zero references repo-wide outside backlog/ and tmp/. execute_batch_request's orchestration was already relocated into GoogleDirectoryProvider by TASK-25.1.6.3.1, so no amendment to decisions/outbound-clients.md is needed
+- [x] #3 app/integrations/google_workspace/ contains only __init__.py and client.py (settings.py permitted once TASK-24 creates it). The six per-method mirror modules, google_meet.py and google_service.py are gone, and schemas.py lives under app/tests/factories/
+- [x] #4 No file under app/integrations/google_workspace/ references OperationResult, and every remaining reference elsewhere under app/integrations/ is frozen in the vendor-package guardrail baseline (TASK-25 AC#2 provable for the Google vendor)
+- [x] #5 A CI guardrail fails the build when app/integrations/<vendor>/ gains a non-factory/non-classification/non-settings module or a new OperationResult reference, proven by a deliberately failing fixture in the check's own tests
+- [x] #6 app/bin/baselines/sdk_typing_antipatterns.txt and the vendor-package guardrail baseline both have zero google_workspace entries, and both checks pass
 <!-- AC:END -->
 
 ## Implementation Plan
