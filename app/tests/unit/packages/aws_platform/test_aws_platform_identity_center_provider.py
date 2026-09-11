@@ -9,6 +9,7 @@ get_user_id uses the standard-retry client. Both clients assert no pending
 responses.
 """
 
+from collections.abc import Iterator
 from typing import Any
 from unittest.mock import patch
 
@@ -36,7 +37,7 @@ class TestBuildIdentityCenterAdapter:
     """build_identity_center_adapter routes clients and reads settings."""
 
     @pytest.fixture(autouse=True)
-    def clear_settings_cache(self) -> None:
+    def clear_settings_cache(self) -> Iterator[None]:
         """Clear settings cache before and after each test."""
         get_aws_settings.cache_clear()
         yield
@@ -138,9 +139,16 @@ class TestBuildIdentityCenterAdapter:
         assert get_aws_client_calls[1]["role_arn"] is None
 
     def test_identity_store_id_from_aws_sso_instance_id(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """IdentityStoreId is read from AWS_SSO_INSTANCE_ID."""
+        """IdentityStoreId sent on the wire comes from AWS_SSO_INSTANCE_ID.
+
+        Stub strategy: the built adapter issues one GetUserId whose expected
+        params pin the IdentityStoreId, so the assertion is on the request the
+        SDK would send rather than on adapter internals.
+        """
         monkeypatch.setenv("AWS_SSO_INSTANCE_ID", "d-9876543210")
         monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/org-role")
+
+        client = _identitystore_client()
 
         def stub_get_aws_client(
             service_name: str,
@@ -149,7 +157,7 @@ class TestBuildIdentityCenterAdapter:
             session_name: str = "sre-bot",
             retries: bool = True,
         ) -> Any:
-            return _identitystore_client()
+            return client
 
         with patch(
             "packages.aws_platform.adapters.identity_center.get_aws_client",
@@ -157,8 +165,24 @@ class TestBuildIdentityCenterAdapter:
         ):
             adapter = build_identity_center_adapter()
 
-        # Verify the adapter has the correct IdentityStoreId
-        assert adapter._identity_store_id == "d-9876543210"
+        with Stubber(client) as stub:
+            stub.add_response(
+                "get_user_id",
+                {"UserId": "user-1", "IdentityStoreId": "d-9876543210"},
+                expected_params={
+                    "IdentityStoreId": "d-9876543210",
+                    "AlternateIdentifier": {
+                        "UniqueAttribute": {"AttributePath": "userName", "AttributeValue": "alice@example.com"}
+                    },
+                },
+            )
+
+            result = adapter.get_user_id("alice@example.com")
+
+            stub.assert_no_pending_responses()
+
+        assert result.is_success
+        assert result.data == "user-1"
 
     def test_create_user_uses_no_retry_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """CreateUser is sent through the no-retry client."""

@@ -238,7 +238,7 @@ class TestListGroupsWithMemberships:
             )
             stub.add_response(
                 "list_users",
-                {"Users": []},
+                {"Users": [{"UserId": "user-2", "UserName": "bob@example.com"}]},
                 expected_params={"IdentityStoreId": "d-1234567890"},
             )
             # g-1 fails
@@ -250,10 +250,10 @@ class TestListGroupsWithMemberships:
                     "GroupId": "g-1",
                 },
             )
-            # g-2 succeeds
+            # g-2 succeeds with one membership
             stub.add_response(
                 "list_group_memberships",
-                {"GroupMemberships": []},
+                {"GroupMemberships": [{"MembershipId": "m-2", "MemberId": {"UserId": "user-2"}}]},
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "GroupId": "g-2",
@@ -265,8 +265,9 @@ class TestListGroupsWithMemberships:
             stub.assert_no_pending_responses()
 
         assert result.is_success
-        # Only g-2 is returned (g-1 was skipped)
-        assert len(result.data) == 0  # g-2 also has no memberships
+        # Only g-2 survives: g-1's membership listing failed and was skipped, the run still succeeds.
+        assert [group["GroupId"] for group in result.data] == ["g-2"]
+        assert result.data[0]["GroupMemberships"][0]["MemberId"]["UserName"] == "bob@example.com"
 
     def test_missing_user_drops_group_when_tolerate_errors_false(self) -> None:
         """A membership whose user is absent drops the group when tolerate_errors=False."""

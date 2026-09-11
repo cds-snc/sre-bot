@@ -280,7 +280,12 @@ class TestListUsers:
         assert result.data[1]["UserId"] == "user-2"
 
     def test_list_users_pagination_two_pages(self) -> None:
-        """ListUsers flattens users across two pages via NextToken."""
+        """ListUsers flattens users across two pages via NextToken.
+
+        Stub strategy: two canned ListUsers responses on the real client; the
+        first carries a NextToken and the second expects that token back, which
+        proves the adapter drives the SDK paginator rather than a single call.
+        """
         client = _identitystore_client()
         adapter = IdentityCenterAdapter(
             identitystore=client,
@@ -289,21 +294,26 @@ class TestListUsers:
         )
 
         with Stubber(client) as stub:
-            paginator = stub.client.get_paginator("list_users")
-            paginator.paginate = lambda **kwargs: [
+            stub.add_response(
+                "list_users",
                 {
                     "Users": [{"UserId": "user-1", "UserName": "alice@example.com"}],
                     "NextToken": "token123",
                 },
+                expected_params={"IdentityStoreId": "d-1234567890"},
+            )
+            stub.add_response(
+                "list_users",
                 {"Users": [{"UserId": "user-2", "UserName": "bob@example.com"}]},
-            ]
-            stub.client.get_paginator = lambda op: paginator if op == "list_users" else None
+                expected_params={"IdentityStoreId": "d-1234567890", "NextToken": "token123"},
+            )
 
-            _ = adapter.list_users()
+            result = adapter.list_users()
 
-            # For paginator-based tests, we verify the structure after paginate completes
-        # Note: Stubber works with low-level pagination; for high-level paginate,
-        # we're testing the pagination logic directly via the real paginator interface.
+            stub.assert_no_pending_responses()
+
+        assert result.is_success
+        assert [user["UserId"] for user in result.data] == ["user-1", "user-2"]
 
     def test_list_users_with_filters(self) -> None:
         """ListUsers includes Filters parameter only when filters are provided."""
@@ -399,6 +409,39 @@ class TestListGroups:
         assert result.is_success
         assert len(result.data) == 2
         assert result.data[0]["GroupId"] == "group-1"
+
+    def test_list_groups_pagination_two_pages(self) -> None:
+        """ListGroups flattens groups across two pages via NextToken.
+
+        Stub strategy: two canned ListGroups responses, the second expecting the
+        NextToken issued by the first, so a single-call implementation leaves a
+        pending response and fails.
+        """
+        client = _identitystore_client()
+        adapter = IdentityCenterAdapter(
+            identitystore=client,
+            identitystore_no_retry=client,
+            identity_store_id="d-1234567890",
+        )
+
+        with Stubber(client) as stub:
+            stub.add_response(
+                "list_groups",
+                {"Groups": [{"GroupId": "group-1", "DisplayName": "Admins"}], "NextToken": "g-token"},
+                expected_params={"IdentityStoreId": "d-1234567890"},
+            )
+            stub.add_response(
+                "list_groups",
+                {"Groups": [{"GroupId": "group-2", "DisplayName": "Users"}]},
+                expected_params={"IdentityStoreId": "d-1234567890", "NextToken": "g-token"},
+            )
+
+            result = adapter.list_groups()
+
+            stub.assert_no_pending_responses()
+
+        assert result.is_success
+        assert [group["GroupId"] for group in result.data] == ["group-1", "group-2"]
 
     def test_list_groups_with_filters(self) -> None:
         """ListGroups includes Filters parameter only when filters are provided."""
@@ -555,6 +598,45 @@ class TestListGroupMemberships:
         assert result.is_success
         assert len(result.data) == 2
         assert result.data[0]["MembershipId"] == "m-1"
+
+    def test_list_group_memberships_pagination_two_pages(self) -> None:
+        """ListGroupMemberships flattens memberships across two pages via NextToken.
+
+        Stub strategy: two canned responses for the same GroupId, the second
+        expecting the NextToken from the first; both must be consumed.
+        """
+        client = _identitystore_client()
+        adapter = IdentityCenterAdapter(
+            identitystore=client,
+            identitystore_no_retry=client,
+            identity_store_id="d-1234567890",
+        )
+
+        with Stubber(client) as stub:
+            stub.add_response(
+                "list_group_memberships",
+                {
+                    "GroupMemberships": [{"MembershipId": "m-1", "MemberId": {"UserId": "user-1"}}],
+                    "NextToken": "m-token",
+                },
+                expected_params={"IdentityStoreId": "d-1234567890", "GroupId": "group-123"},
+            )
+            stub.add_response(
+                "list_group_memberships",
+                {"GroupMemberships": [{"MembershipId": "m-2", "MemberId": {"UserId": "user-2"}}]},
+                expected_params={
+                    "IdentityStoreId": "d-1234567890",
+                    "GroupId": "group-123",
+                    "NextToken": "m-token",
+                },
+            )
+
+            result = adapter.list_group_memberships("group-123")
+
+            stub.assert_no_pending_responses()
+
+        assert result.is_success
+        assert [m["MembershipId"] for m in result.data] == ["m-1", "m-2"]
 
 
 class TestErrorClassification:
