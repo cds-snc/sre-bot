@@ -4,10 +4,11 @@ title: >-
   Rationalize integrations/aws/client.py: typed Literal-overloaded factory,
   eager AssumeRole, SDK-native retry and timeout policy, settings consolidated
   in integrations/aws/settings.py
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-31 18:48'
-updated_date: '2026-09-11 17:31'
+updated_date: '2026-09-11 17:44'
 labels:
   - clients
   - phase-3
@@ -116,6 +117,13 @@ BLAST RADIUS AND ROLLBACK
 - Behaviour changes to disclose in the PR: (1) retry/timeout settings become effective for the first time (today's getattr fallbacks happen to equal the defaults, so effective values are unchanged unless an AWS_RETRY_*/AWS_*_TIMEOUT_SECONDS variable is already set somewhere; verify env on staging/production before merge); (2) endpoint gate moves from ENVIRONMENT to AWS_ENDPOINT_URL_DYNAMODB; (3) RoleSessionName "sre-bot".
 - Single `git revert` restores the previous code, lockfile and compose line together; no data migration, no ordering constraint beyond the compose line landing in the same PR.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-11 tests-first checkpoint (no production code changed). Added four behaviour test files under app/tests/unit/integrations/aws/: test_aws_client_factory_config.py (retry/timeout Config for both variants, env overrides, region, dynamodb-only endpoint from AWS_ENDPOINT_URL_DYNAMODB, ten service names, no caching, legacy kwargs rejected), test_aws_client_assume_role.py (Stubber on a real STS client for _assume_role_credentials incl. AccessDenied propagation; recording boto3 Session subclass for eager wiring, default RoleSessionName sre-bot, no private botocore hook), test_aws_client_classify_error.py (each mapped family, settings-driven catalogues and TRANSIENT_RETRY_AFTER_SECONDS, propagation of unmapped/blank-code/programmer errors), test_aws_settings_fields.py (transport aliases, DYNAMODB_ENDPOINT_URL, AWS_ENDPOINT_URL absent, feature fields with the infrastructure aliases, SERVICE_ROLE_MAP parity with the infrastructure module, provider cache).
+Evidence: `uv run ruff check` + `ruff format --check` clean on the four files. `uv run pytest <four files> -q` -> 41 failed, 35 passed, 4 errors: failures/errors are the missing seams (_assume_role_credentials, DYNAMODB_ENDPOINT_URL, TRANSIENT_RETRY_AFTER_SECONDS, feature fields, retries kwarg, settings read at call time, app-settings import still present, botocore.credentials hook still imported); the 35 passing cases are today's already-correct defaults kept as regression guards. Full suite deliberately not run at this checkpoint. Superseded legacy tests (test_aws_client.py, test_settings.py, the client matrix case in test_dynamodb_local_endpoint.py, the two endpoint cases in test_shield.py) are removed together with the implementation, per the plan.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
