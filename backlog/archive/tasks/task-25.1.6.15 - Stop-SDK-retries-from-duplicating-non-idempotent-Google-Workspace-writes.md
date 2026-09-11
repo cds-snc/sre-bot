@@ -4,7 +4,7 @@ title: Stop SDK retries from duplicating non-idempotent Google Workspace writes
 status: To Do
 assignee: []
 created_date: '2026-09-10 14:57'
-updated_date: '2026-09-10 17:50'
+updated_date: '2026-09-11 13:59'
 labels:
   - clients
   - phase-3
@@ -72,5 +72,10 @@ COORDINATION FOR PLANNING (2026-09-10, from TASK-25.1.6.11 planning). Two new ta
 - TASK-86 (bug, High): modules/incident/schedule_retro.py passes description, reminders and a timestamp-based conferenceData.createRequest.requestId as **event_config. insert_event silently drops all of them and uses its own random requestId. Choosing the requestId source is shared between TASK-86 and this task's replay-safety design, so plan on top of TASK-86's outcome or settle it jointly.
 - TASK-25.1.6.11.3 moves generate_unique_id (today's requestId source) verbatim from integrations/utils/api.py into that adapter and removes the unused body_kwargs parameter. It is a pure move, so rebase onto it.
 Also: if you add a retries-disabled factory variant, keep it inside integrations/google_workspace/client.py. A new module there will fail TASK-25.1.6.11.2's vendor-package contract guardrail by design.
+---
+
+created: 2026-09-11 13:59
+---
+ARCHIVED 2026-09-11 (human decision). Planning found the fix needs eight subtasks across the Google client factory, three infrastructure capabilities and four feature adapters. Deferred until the Google clients move out of the feature packages into capability packages. Replaced by: TASK-87 (the lasting fix, re-scoped when the capability-package work is underway; carries the call-site research and candidate fixes from this planning), and TASK-25.1.6.16 (stopgap under TASK-25.1.6: num_retries=0 at the writes that only started retrying in TASK-25.1.6.13, which closes the regression that task introduced).
 ---
 <!-- COMMENTS:END -->
