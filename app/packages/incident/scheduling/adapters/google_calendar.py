@@ -97,6 +97,8 @@ def insert_event(
         delegated_user_email=kwargs.pop("delegated_user_email", None),
     )
     try:
+        # Not naturally idempotent: a retry can create a duplicate event and re-send
+        # invitations, so retries stay off until a retries-disabled handle exists at construction.
         result = (
             service.events()
             .insert(
@@ -106,7 +108,7 @@ def insert_event(
                 sendUpdates="all",
                 conferenceDataVersion=1,
             )
-            .execute()
+            .execute(num_retries=0)
         )
     except HttpError as exc:
         status, error_code, retry_after = classify_google_error(exc)

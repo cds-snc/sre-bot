@@ -256,7 +256,9 @@ class GoogleDocsIncidentDocument:
 
         body = cast("BatchUpdateDocumentRequest", {"requests": requests})
         try:
-            result = service.documents().batchUpdate(documentId=document_id, body=body).execute()
+            # Index-based insert/delete requests corrupt the document on replay, so retries
+            # stay off until a retries-disabled handle exists at construction.
+            result = service.documents().batchUpdate(documentId=document_id, body=body).execute(num_retries=0)
         except HttpError as exc:
             status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
             logger.warning(
@@ -321,7 +323,11 @@ def _copy_source_document(source_document_id: str, draft_title: str, folder: str
     service = google_workspace_client.get_drive_service(scopes=DRIVE_SCOPES)
     body = cast("File", {"name": draft_title, "parents": [folder]})
     try:
-        copied = service.files().copy(fileId=source_document_id, body=body, supportsAllDrives=True, fields="id").execute()
+        # Workspace file copies can't use a pre-generated id, so a replay would duplicate the
+        # draft; retries stay off until a retries-disabled handle exists at construction.
+        copied = (
+            service.files().copy(fileId=source_document_id, body=body, supportsAllDrives=True, fields="id").execute(num_retries=0)
+        )
     except HttpError as exc:
         status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
         logger.warning(

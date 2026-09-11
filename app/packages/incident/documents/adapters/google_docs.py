@@ -75,7 +75,9 @@ def apply_document_edits(document_id: str, requests: list[dict[str, Any]]) -> di
     service = get_docs_service(scopes=_DOCS_SCOPES)
     body = cast("Any", {"requests": requests})
     try:
-        result = service.documents().batchUpdate(documentId=document_id, body=body).execute()
+        # Generic passthrough: callers send index-based edits that a replay would apply twice,
+        # so retries stay off until a retries-disabled handle exists at construction.
+        result = service.documents().batchUpdate(documentId=document_id, body=body).execute(num_retries=0)
     except HttpError as exc:
         status, error_code, retry_after = classify_google_error(exc)
         logger.warning(
