@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 19:18'
-updated_date: '2026-09-11 20:09'
+updated_date: '2026-09-11 21:11'
 labels:
   - clients
   - phase-3
@@ -44,17 +44,24 @@ Test files to retarget (patch build_identity_center_adapter / a fake adapter ins
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The eight caller files no longer import integrations.aws.identity_store; each obtains the adapter through build_identity_center_adapter() at function entry and branches on OperationResult explicitly, with per-call-site error-path behaviour recorded in notes for review
-- [ ] #2 modules/aws/identity_center.py bridges entities.provision_entities with a local unwrap: each create/delete callable maps the entity dict to adapter arguments and returns result.data on success or False on a non-success (logged with status and error_code), so failed entities are still recorded as failed; provision_entities itself is unchanged
-- [ ] #3 synchronize and the AWS branches of provisioning/users.py and provisioning/groups.py raise DirectoryUsersUnavailableError / DirectoryGroupsUnavailableError carrying message and error_code when a listing fails; the pinned TypeError characterization tests are replaced by tests of the new contract
-- [ ] #4 access_view_handler: a NOT_FOUND get_user_id sends the existing 'not registered with AWS SSO' reply; any other non-success falls to the existing 'Failed to provision' reply; already_has_access and create_account_assignment are not called on either failure; the two pinned tests are rewritten to the new contract
-- [ ] #5 revoke_aws_sso_access: a non-success get_user_id logs status and error_code, skips delete_account_assignment and expire_request for that request and continues with the next; the pinned false-user-id test is replaced
-- [ ] #6 request_aws_account_access and its three pinned tests are deleted (no production caller exists), and the now-unused get_account_id_by_name import is removed from modules/aws/aws.py
-- [ ] #7 ops_group_assignment: NOT_FOUND keeps the existing 'not found' failed status; any other non-success returns a failed status carrying the result message; success path unchanged
-- [ ] #8 jobs/scheduled_tasks.py registers lambda: build_identity_center_adapter().healthcheck().is_success under the 'aws' key, with the integration test retargeted
-- [ ] #9 integrations/aws/identity_store.py and tests/integrations/aws/test_identity_store.py are deleted; the identity_store lines are removed from bin/baselines/sdk_typing_antipatterns.txt and bin/baselines/vendor_package_contract.txt; test_identity_store_conformance.py and packages/access are untouched
-- [ ] #10 ruff, mypy (no new errors), pytest, make check-sdk-typing and make check-vendor-package-contract pass with output recorded; a repo-wide grep shows zero references to integrations.aws.identity_store
+- [ ] #1 All four subtasks (TASK-25.2.3.2.1, TASK-25.2.3.2.2, TASK-25.2.3.2.3, TASK-25.2.3.2.4) are Done, with TASK-25.2.3.2.4 landing last; a repo-wide grep shows zero references to integrations.aws.identity_store and the module no longer exists
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+COORDINATOR TASK -- implementation lives in four subtasks, not here.
+
+This task's original 10 ACs and full grounded plan (adapter contract, per-file call-site inventory, defect analysis, size-gate arithmetic) remain in this task's history as the scope record; the size gate on that plan came back "exceeds" (~587 production LOC, 11 files, mechanical-refactor + behavior-change + deletion mixed in one PR), so the human approved splitting it into four independently-planned, independently-shippable subtasks instead of executing it as one PR. See the 2026-09-11 comment for the size-gate numbers and subtask list.
+
+Execution order (dependency-wired in the CLI, not just narrative):
+1. TASK-25.2.3.2.1 (provisioning/users.py + groups.py listings) and TASK-25.2.3.2.2 (modules/aws/identity_center.py) and TASK-25.2.3.2.3 (access_view_handler, ops_group_assignment, revoke job) can proceed in any order or in parallel -- each depends only on TASK-25.2.3.1 (the adapter, already completed) and touches disjoint files.
+2. TASK-25.2.3.2.4 (delete request_aws_account_access, flip the healthcheck lambda, delete integrations/aws/identity_store.py + its test, prune both guard baselines) depends on all three of the above and must land last, once no production caller of identity_store remains.
+
+Each subtask carries its own full implementation plan, AC set, and test matrix scoped to what it alone touches. This task closes (human decision, not automated) once all four subtasks are Done -- at that point a repo-wide grep for integrations.aws.identity_store should return zero hits and the legacy module and its test file should no longer exist.
+
+No production code, tests, or further decomposition happen directly on this task; its role from here is tracking only.
+<!-- SECTION:PLAN:END -->
 
 ## Comments
 
@@ -62,5 +69,20 @@ Test files to retarget (patch build_identity_center_adapter / a fake adapter ins
 created: 2026-09-11 20:09
 ---
 2026-09-11 carried over from TASK-25.2.3.1 for the caller migration: classify_aws_error now maps ConflictException to PERMANENT_ERROR (app/integrations/aws/client.py), where it previously propagated as a raised ClientError. When migrating each call site, account for that at every write that can conflict: create_user and create_group_membership in modules/aws/identity_center.py's provision_entities bridge (an 'already exists' conflict must be recorded as a failed entity and the sync must continue, matching the legacy False-swallow rather than aborting), and any other classify_aws_error consumer touched by the migration. Also verify packages/access's ensure_user path still behaves acceptably now that a conflict arrives as a result instead of an exception (the access feature is not enabled; document, do not rework). The per-call-site error-path notes required by AC#1 must state explicitly how a PERMANENT_ERROR conflict is handled at each site.
+---
+
+created: 2026-09-11 20:56
+---
+2026-09-11: Per the size-gate verdict in this task's plan (approx. 587 production LOC across 11 files, mixing a mechanical import swap across 8 callers with 3 independent behavior fixes and a contract deletion -- exceeding the ~400 LOC / ~10 file / mechanical-vs-behavior-mix thresholds), this task is split into four subtasks, each independently shippable and reviewable:
+- TASK-25.2.3.2.1 -- Migrate provisioning listings (users.py, groups.py) onto the Identity Center adapter
+- TASK-25.2.3.2.2 -- Migrate modules/aws/identity_center.py onto the Identity Center adapter
+- TASK-25.2.3.2.3 -- Fix the three AWS SSO error-path defects (access_view_handler, ops_group_assignment, revoke job)
+- TASK-25.2.3.2.4 -- Delete dead request_aws_account_access, flip healthcheck lambda, delete integrations/aws/identity_store.py, prune guard baselines (depends on the three above; must land last)
+This task (25.2.3.2) becomes the coordinator; its own ACs are left as-is below rather than retired, since only a human should decide whether to retire them in favour of "all four subtasks done." If that's the preferred framing, consider replacing ACs #1-#10 with a single "all four subtasks are Done" criterion, or leaving them as a scope record and closing this task once the subtasks close.
+---
+
+created: 2026-09-11 21:11
+---
+2026-09-11: human retired the ten original ACs; each is now carried by the subtask that owns it (listings → .1, identity_center.py → .2, the three error-path defects → .3, deletion/healthcheck/baselines/repo-wide grep → .4). The coordinator's single AC is 'all four subtasks Done'.
 ---
 <!-- COMMENTS:END -->
