@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:48'
-updated_date: '2026-09-11 15:56'
+updated_date: '2026-09-11 19:54'
 labels:
   - clients
   - phase-3
@@ -66,5 +66,15 @@ SEQUENCING. 25.2.1 characterization gate -> 25.2.2 client.py + settings consolid
 created: 2026-08-31 18:52
 ---
 Forward reference from TASK-23.2 planning (2026-08-31): the DynamoDB idempotency store keeps a conservative error-swallow on one path - a classified (mapped) SDK failure while re-reading a contended claim is downgraded to ClaimResult.IN_PROGRESS rather than raised. That was deliberately left as-is for TASK-23.2 and is flagged for reassessment during this AWS-remainder work, alongside the same question for other classify-and-continue call sites.
+---
+
+created: 2026-09-11 19:48
+---
+2026-09-11 finding from TASK-25.2.3.1's full-suite run: since TASK-25.2.2 made AssumeRole eager, app startup (lifespan -> plugin manager -> packages/access/sync providers -> build_aws_identity_center_adapter -> get_aws_client('identitystore', role_arn=ORG_ROLE_ARN)) performs a real sts.assume_role whenever AWS_ORG_ACCOUNT_ROLE_ARN is set. In this devcontainer (role ARNs exported, compose dummy keys) that raises InvalidClientTokenId and errors 32 API/e2e tests that build the app through TestClient; .github/workflows/ci_code.yml:72 also injects AWS_ORG_ACCOUNT_ROLE_ARN from secrets, so CI may hit the same startup call. Not caused by and not fixed in 25.2.3.1. Candidate follow-up: make the access-sync adapter build lazily (at first sync) or stub STS in the app-startup test fixtures; the access feature is not enabled so a lazy build has no runtime cost.
+---
+
+created: 2026-09-11 19:54
+---
+2026-09-11 correction to the previous comment (human challenged the attribution): the AssumeRole at app startup is not a devcontainer-only artefact. pytest-env pins AWS_ORG_ACCOUNT_ROLE_ARN to a placeholder for every test run, and app/.env's ACCESS_SYNC_ENABLED=true is read by pydantic env_file during tests, so any developer with that .env line gets 32 startup errors in the api/e2e/app-state tests since TASK-25.2.2 made AssumeRole eager. CI does not enable access sync, so CI is unaffected. Root gaps are in test isolation, not in 25.2.2's design: (1) settings read the developer's real .env under pytest, so feature toggles leak into tests; (2) the app-startup fixtures stub the directory provider but not the AWS boundary, so a warmup can reach STS. Proposed tests-only fix: pin ACCESS_SYNC_ENABLED=false in pytest-env (tests that need the feature enable it explicitly) and add an autouse fixture in the startup-test conftests that patches integrations.aws.client._assume_role_credentials, plus optionally a no-network guard. Awaiting the human's decision on where to track it.
 ---
 <!-- COMMENTS:END -->

@@ -3,11 +3,11 @@ id: TASK-25.2.3.1
 title: >-
   Build the Identity Center adapter with Stubber tests; map ConflictException in
   classify_aws_error
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-11 19:18'
-updated_date: '2026-09-11 19:34'
+updated_date: '2026-09-11 20:09'
 labels:
   - clients
   - phase-3
@@ -41,13 +41,14 @@ packages/aws_platform is the provisional transition seam described in TASK-25.2 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 packages/aws_platform/adapters/identity_center.py defines IdentityCenterAdapter exposing healthcheck, create_user, delete_user, get_user_id, describe_user, list_users, get_group_id, list_groups, create_group_membership, delete_group_membership, get_group_membership_id, list_group_memberships and list_groups_with_memberships, each returning OperationResult; ClientError/BotoCoreError go through classify_aws_error and any other exception propagates
-- [ ] #2 build_identity_center_adapter() constructs clients only through get_aws_client('identitystore', role_arn=SERVICE_ROLE_MAP['identitystore'] or None), reads IdentityStoreId from AWSSettings.INSTANCE_ID, and hands create_user and create_group_membership a retries=False client while every other operation uses the standard-retry client; no boto3 construction and no cast in the adapter
-- [ ] #3 list_users, list_groups and list_group_memberships paginate through client.get_paginator; list_groups_with_memberships keeps the legacy join semantics (group filters applied, user details merged into MemberId, per-group membership failures logged and skipped, tolerate_errors preserved) and returns a failed list_groups or list_users as its own failure result
-- [ ] #4 healthcheck returns a success result iff a single-page list_users call (MaxResults=1) succeeds
-- [ ] #5 classify_aws_error maps ConflictException to PERMANENT_ERROR, covered by a test alongside the existing mapped families in tests/unit/integrations/aws/test_aws_client_classify_error.py
-- [ ] #6 botocore Stubber unit tests under tests/unit/packages/aws_platform/ cover each operation's success path with expected params (IdentityStoreId on every call), pagination across two pages, the join cases, and the classification paths NOT_FOUND, UNAUTHORIZED, transient with retry_after, ConflictException permanent, BotoCoreError transient and an unmapped ClientError propagating; provider tests assert which client each write uses
-- [ ] #7 No production caller changes and integrations/aws/identity_store.py is untouched; ruff, mypy (no new errors) and pytest pass with output recorded; make check-sdk-typing and make check-vendor-package-contract pass with no baseline edits
+- [x] #1 packages/aws_platform/adapters/identity_center.py defines IdentityCenterAdapter exposing healthcheck, create_user, delete_user, get_user_id, describe_user, list_users, get_group_id, list_groups, create_group_membership, delete_group_membership, get_group_membership_id, list_group_memberships and list_groups_with_memberships, each returning OperationResult; ClientError/BotoCoreError go through classify_aws_error and any other exception propagates
+- [x] #2 build_identity_center_adapter() constructs clients only through get_aws_client('identitystore', role_arn=SERVICE_ROLE_MAP['identitystore'] or None), reads IdentityStoreId from AWSSettings.INSTANCE_ID, and hands create_user and create_group_membership a retries=False client while every other operation uses the standard-retry client; no boto3 construction and no cast in the adapter
+- [x] #3 list_users, list_groups and list_group_memberships paginate through client.get_paginator; list_groups_with_memberships keeps the legacy join semantics (group filters applied, user details merged into MemberId, per-group membership failures logged and skipped, tolerate_errors preserved) and returns a failed list_groups or list_users as its own failure result
+- [x] #4 healthcheck returns a success result iff a single-page list_users call (MaxResults=1) succeeds
+- [x] #5 classify_aws_error maps ConflictException to PERMANENT_ERROR, covered by a test alongside the existing mapped families in tests/unit/integrations/aws/test_aws_client_classify_error.py
+- [x] #6 botocore Stubber unit tests under tests/unit/packages/aws_platform/ cover each operation's success path with expected params (IdentityStoreId on every call), pagination across two pages, the join cases, and the classification paths NOT_FOUND, UNAUTHORIZED, transient with retry_after, ConflictException permanent, BotoCoreError transient and an unmapped ClientError propagating; provider tests assert which client each write uses
+- [x] #7 No production caller changes and integrations/aws/identity_store.py is untouched; ruff, mypy (no new errors) and pytest pass with output recorded; make check-sdk-typing and make check-vendor-package-contract pass with no baseline edits
+- [x] #8 Test isolation (folded in 2026-09-11 by human decision): pytest-env pins ACCESS_SYNC_ENABLED=false so a developer's .env cannot switch feature warmups on in tests, and an autouse fixture in the app-startup test conftests patches the AssumeRole seam so no test can reach STS; tests/api, tests/integration and the app-state/webhook e2e files pass without the 32 startup errors
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -106,6 +107,46 @@ BLAST RADIUS AND ROLLBACK: additive; no production caller imports the new packag
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-2026-09-11 tests-first checkpoint (no production code changed). Added under app/tests/unit/packages/aws_platform/ (new __init__.py): test_aws_platform_identity_center_operations.py (27 tests: every operation's success path with Stubber expected_params incl. IdentityStoreId, two-page pagination for list_users/list_groups/list_group_memberships, Filters only when given, healthcheck MaxResults=1 on empty and non-empty pages, classification NOT_FOUND/UNAUTHORIZED/transient retry_after 60/ConflictException permanent on both creates/BotoCoreError transient, unmapped ValidationException and a KeyError propagating), test_aws_platform_identity_center_groups_join.py (10 tests: filters, four-key projection, user merge into MemberId, failed group skipped while the rest survive, missing user drop/keep by tolerate_errors, empty groups, failed list_groups/list_users returned as the failure), test_aws_platform_identity_center_provider.py (7 tests: two get_aws_client calls with the second retries=False, role_arn from AWS_ORG_ACCOUNT_ROLE_ARN or None when empty, IdentityStoreId from AWS_SSO_INSTANCE_ID proven on the wire, create_user/create_group_membership routed to the no-retry stub, get_user_id to the standard stub). Added test_conflict_is_permanent to tests/unit/integrations/aws/test_aws_client_classify_error.py.
-Evidence: `uv run ruff check` and `ruff format --check` clean on the new files. `uv run pytest tests/unit/packages/aws_platform tests/unit/integrations/aws/test_aws_client_classify_error.py -q` -> 3 collection errors (ModuleNotFoundError: packages.aws_platform) and test_conflict_is_permanent failing on the re-raised ClientError; `uv run pytest tests/unit/integrations/aws -q` -> 1 failed (that case), 132 passed. Review notes on the generated tests: replaced a lambda-patched paginator with real two-page Stubber responses, removed `from __future__ import annotations` from the new files (deprecated on 3.14), made the provider store-id test assert the request rather than a private attribute, and gave the skipped-group join test a surviving group so it proves selective skipping. Full suite deliberately not run at this checkpoint.
+2026-09-11 tests-first checkpoint (no production code changed). Added under app/tests/unit/packages/aws_platform/ (new __init__.py): test_aws_platform_identity_center_operations.py, test_aws_platform_identity_center_groups_join.py, test_aws_platform_identity_center_provider.py, plus test_conflict_is_permanent in tests/unit/integrations/aws/test_aws_client_classify_error.py. Review fixes applied to the generated tests: real two-page Stubber pagination instead of a lambda-patched paginator; removed `from __future__ import annotations` (deprecated on 3.14); provider store-id test asserts the request instead of a private attribute; skipped-group join test keeps a surviving group.
+
+2026-09-11 implementation complete (awaiting human review; not moved to Done).
+WHAT CHANGED
+- app/packages/aws_platform/__init__.py and adapters/__init__.py: empty namespace modules (docstring only), no hookimpl, no entry-point, no settings.py.
+- app/packages/aws_platform/adapters/identity_center.py (~270 LOC): IdentityCenterAdapter(identitystore, identitystore_no_retry, identity_store_id) with the thirteen operations returning OperationResult (provider="aws", operation=<name>), _call/_paginate helpers catching only ClientError/BotoCoreError and classifying through classify_aws_error (everything else propagates), get_paginator for the three list operations, healthcheck = ListUsers(MaxResults=1) succeeds, create_user and create_group_membership on the no-retry client, list_groups_with_memberships with the legacy join semantics (filters as an inline comprehension, four-key projection, users indexed by UserId once, failed membership listing logged and skipped, missing user drops the group unless tolerate_errors, groups without memberships omitted, failed list_groups/list_users returned as the failure) and the legacy aws_identity_store_* log event names. build_identity_center_adapter() builds both clients per call from get_aws_settings() (SERVICE_ROLE_MAP["identitystore"] or None, INSTANCE_ID). Two `# type: ignore[typeddict-item]` on AttributeValue, same stub over-narrowing packages/access already documents.
+- app/integrations/aws/client.py: ConflictException joins ConditionalCheckFailedException as PERMANENT_ERROR (one line + comment). No other production file touched; integrations/aws/identity_store.py untouched; no caller migrated.
+- Test fixtures corrected during implementation because botocore Stubber validates canned responses against the identitystore model: every User/Group/GroupMembership entry and every Get*/Create* response now carries the required IdentityStoreId; Group Description must be non-empty; Emails cannot be an empty list; a made-up ExtraField became the real CreatedBy member; the filter callable is case-insensitive so "Superadmins" is consumed; the projection and omitted-groups fixtures list the member user so the missing-user rule does not drop the group under test.
+EVIDENCE (from app/)
+- `uv run ruff check .` -> All checks passed!; `uv run ruff format --check .` -> 728 files already formatted.
+- `uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'` -> Found 87 errors in 31 files, identical to the pre-existing count recorded on TASK-25.2.2; `uv run mypy packages/aws_platform` -> Success: no issues found in 3 source files.
+- `uv run pytest tests/unit/packages/aws_platform tests/unit/integrations/aws/test_aws_client_classify_error.py -q` -> 63 passed (27 operations, 10 join, 7 provider, 19 classifier incl. the new case). `uv run pytest tests/unit/integrations/aws -q` -> 133 passed.
+- `make check-sdk-typing` -> OK (11 baselined files remain); `make check-vendor-package-contract` -> OK (29 baselined entries remain). No baseline edited.
+- `uv run pytest tests --ignore=tests/smoke -q` -> 3 failed, 3354 passed, 32 errors. AC#7 left UNCHECKED for the human because the suite is not green locally; both groups are pre-existing and independent of this slice:
+  (a) 32 errors, all `ClientError: InvalidClientTokenId when calling AssumeRole` raised during app startup in tests/api/routes/test_landing.py, tests/integration/test_app_state_initialization.py and tests/integration/webhooks/test_webhook_e2e.py. Mechanism (corrected 2026-09-11 after the human questioned the first attribution): pytest-env (pyproject.toml [tool.pytest.ini_options] env) pins the placeholder AWS_ORG_ACCOUNT_ROLE_ARN=AWS_ORG_ACCOUNT_ROLE_ARN for every test; app/.env sets ACCESS_SYNC_ENABLED=true and pydantic settings read .env through env_file, so the access-sync plugin's initialize hook (packages/access/sync/__init__.py:83) warms get_access_sync_coordinator -> build_aws_identity_center_adapter -> get_aws_client("identitystore", role_arn=<placeholder>) -> the eager sts.assume_role introduced by TASK-25.2.2 -> a real STS request that fails with the compose dummy keys. The startup fixtures (tests/integration/conftest.py app_with_lifespan, TestClient(server_app) in the api/e2e files) stub only the directory provider, not the AWS boundary. Before 25.2.2 the deferred credential provider hid this: no STS call happened at construction. CI does not set ACCESS_SYNC_ENABLED, so the warmup returns early there and the errors are local-only (any developer whose .env enables access sync). Nothing outside tests imports packages.aws_platform and the ConflictException branch is not on that path. Not fixed here (test-isolation gap, out of scope); see the comment on TASK-25.2.
+  (b) 3 failures in tests/unit/infrastructure/directory/test_google.py, the order-dependent state leak already documented in TASK-25.2.1 notes; the file passes alone (99 passed).
+BEHAVIOUR CHANGE TO REVIEW: classify_aws_error now returns PERMANENT_ERROR for ConflictException for every caller (packages/access ensure_user gets a result instead of a raised ClientError on an already-existing user; the DynamoDB stores never emit that code).
+REMAINING FOR HUMAN: PR review; decision on AC#7 given the pre-existing full-suite state; decide how the test-isolation gap (real .env leaking into tests, unstubbed STS at startup) is tracked.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-11 20:00
+---
+2026-09-11 test-isolation fix folded in (AC#8, human decision after challenging the first root-cause attribution).
+WHAT CHANGED (tests/config only)
+- app/pyproject.toml [tool.pytest.ini_options] env: added ACCESS_SYNC_ENABLED=false with a comment. Rationale: pydantic settings read app/.env via env_file under pytest, so a developer's ACCESS_SYNC_ENABLED=true switched the access-sync warmup on in the app-startup tests; pytest-env now pins it off and feature tests enable it explicitly (tests/unit/packages/access and tests/integration/packages/access already do).
+- app/tests/integration/conftest.py and new app/tests/api/conftest.py: autouse fixture patching integrations.aws.client._assume_role_credentials to return static temporary credentials, so no test that boots the lifespan can reach STS even when a feature warmup builds a role-assuming client. The seam's own tests (tests/unit/integrations/aws/test_aws_client_assume_role.py, tests/integrations/aws/test_legacy_aws_client.py) sit outside both trees and are unaffected.
+EVIDENCE (from app/)
+- `uv run ruff check .` -> All checks passed!; `ruff format --check .` -> 729 files already formatted.
+- `uv run pytest tests/api tests/integration/test_app_state_initialization.py tests/integration/webhooks -q` -> 62 passed (previously 32 errors).
+- `uv run pytest tests/unit/packages/access tests/integration/packages/access -q` -> 392 passed (the pin does not break feature tests).
+- Belt-and-braces proof: `ACCESS_SYNC_ENABLED=true uv run pytest -p no:env tests/integration/test_app_state_initialization.py -q` (pytest-env disabled, feature forced on) -> 7 passed, i.e. the AssumeRole stub alone keeps startup off the network.
+- `uv run pytest tests --ignore=tests/smoke -q` -> 6 failed, 3383 passed, 0 errors. The 6 are exactly the pre-existing order-dependent failures TASK-25.2.1 documented (3 in tests/modules/webhooks/test_webhooks_aws_sns.py, 3 in tests/unit/infrastructure/directory/test_google.py); each file passes alone (12 passed / 99 passed). AC#7 still left for the human on that basis.
+OBSERVATION for a possible follow-up (not changed): tests/integration/packages/access/sync/conftest.py strips ACCESS_SYNC_* from os.environ for isolation, which lets pydantic fall back to app/.env for those keys; the deeper fix for ".env leaks into tests" is to stop settings from reading env_file under pytest, which is a production settings change and out of this slice.
+---
+
+created: 2026-09-11 20:08
+---
+2026-09-11 AC#7 checked on the human's review: ruff clean, mypy at the pre-existing 87 errors with none in touched files, make test green (2564 + 825 passed), both guard checks OK with no baseline edits, no production caller changed and identity_store.py untouched. The six failures seen only in a single-process full run are the order-dependent leaks documented on TASK-25.2.1 and pass per file. Human reports 'aws groups sync sre' works locally; note that this command still uses the legacy integrations.aws.identity_store until TASK-25.2.3.2 migrates the callers, so it exercises the 25.2.2 client factory rather than the new adapter.
+---
+<!-- COMMENTS:END -->

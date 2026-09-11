@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 19:18'
+updated_date: '2026-09-11 20:09'
 labels:
   - clients
   - phase-3
@@ -54,3 +55,12 @@ Test files to retarget (patch build_identity_center_adapter / a fake adapter ins
 - [ ] #9 integrations/aws/identity_store.py and tests/integrations/aws/test_identity_store.py are deleted; the identity_store lines are removed from bin/baselines/sdk_typing_antipatterns.txt and bin/baselines/vendor_package_contract.txt; test_identity_store_conformance.py and packages/access are untouched
 - [ ] #10 ruff, mypy (no new errors), pytest, make check-sdk-typing and make check-vendor-package-contract pass with output recorded; a repo-wide grep shows zero references to integrations.aws.identity_store
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-11 20:09
+---
+2026-09-11 carried over from TASK-25.2.3.1 for the caller migration: classify_aws_error now maps ConflictException to PERMANENT_ERROR (app/integrations/aws/client.py), where it previously propagated as a raised ClientError. When migrating each call site, account for that at every write that can conflict: create_user and create_group_membership in modules/aws/identity_center.py's provision_entities bridge (an 'already exists' conflict must be recorded as a failed entity and the sync must continue, matching the legacy False-swallow rather than aborting), and any other classify_aws_error consumer touched by the migration. Also verify packages/access's ensure_user path still behaves acceptably now that a conflict arrives as a result instead of an exception (the access feature is not enabled; document, do not rework). The per-call-site error-path notes required by AC#1 must state explicitly how a PERMANENT_ERROR conflict is handled at each site.
+---
+<!-- COMMENTS:END -->

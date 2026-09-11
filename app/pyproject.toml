@@ -105,6 +105,10 @@ markers = [
     "smoke: Smoke tests that exercise live or sandbox external systems; excluded from default runs"
 ]
 env = [
+    # Feature warmups must not depend on the developer's .env: tests that need a
+    # feature enable it explicitly. ACCESS_SYNC_ENABLED=true would make lifespan
+    # build the AWS Identity Center adapter (and assume its role) at startup.
+    "ACCESS_SYNC_ENABLED=false",
     "SLACK_ENABLED=false",
     "SLACK_TOKEN=xoxb-test-token-for-tests",
     "SLACK_BOT_TOKEN=xoxb-test-token-for-tests",

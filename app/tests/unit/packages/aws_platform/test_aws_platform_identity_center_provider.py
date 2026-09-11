@@ -211,7 +211,7 @@ class TestBuildIdentityCenterAdapter:
                 # Only register on no_retry_stub
                 no_retry_stub.add_response(
                     "create_user",
-                    {"UserId": "user-123"},
+                    {"UserId": "user-123", "IdentityStoreId": "d-1234567890"},
                     expected_params={
                         "IdentityStoreId": "d-1234567890",
                         "UserName": "test@example.com",
@@ -255,7 +255,7 @@ class TestBuildIdentityCenterAdapter:
                 # Only register on std_stub
                 std_stub.add_response(
                     "get_user_id",
-                    {"UserId": "user-789"},
+                    {"UserId": "user-789", "IdentityStoreId": "d-1234567890"},
                     expected_params={
                         "IdentityStoreId": "d-1234567890",
                         "AlternateIdentifier": {
@@ -301,7 +301,7 @@ class TestBuildIdentityCenterAdapter:
                 # Only register on no_retry_stub
                 no_retry_stub.add_response(
                     "create_group_membership",
-                    {"MembershipId": "membership-123"},
+                    {"MembershipId": "membership-123", "IdentityStoreId": "d-1234567890"},
                     expected_params={
                         "IdentityStoreId": "d-1234567890",
                         "GroupId": "group-456",

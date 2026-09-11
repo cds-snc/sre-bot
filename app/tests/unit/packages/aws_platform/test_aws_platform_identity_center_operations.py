@@ -71,7 +71,7 @@ class TestHealthcheck:
         with Stubber(client) as stub:
             stub.add_response(
                 "list_users",
-                {"Users": [{"UserId": "user-123"}]},
+                {"Users": [{"UserId": "user-123", "IdentityStoreId": "d-1234567890"}]},
                 expected_params={"IdentityStoreId": "d-1234567890", "MaxResults": 1},
             )
 
@@ -99,7 +99,7 @@ class TestCreateUser:
         with Stubber(no_retry_client) as stub:
             stub.add_response(
                 "create_user",
-                {"UserId": "user-456"},
+                {"UserId": "user-456", "IdentityStoreId": "d-1234567890"},
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "UserName": "alice@example.com",
@@ -129,7 +129,7 @@ class TestCreateUser:
         with Stubber(std_client) as std_stub, Stubber(no_retry_client) as no_retry_stub:
             no_retry_stub.add_response(
                 "create_user",
-                {"UserId": "user-456"},
+                {"UserId": "user-456", "IdentityStoreId": "d-1234567890"},
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "UserName": "bob@example.com",
@@ -189,7 +189,7 @@ class TestGetUserId:
         with Stubber(client) as stub:
             stub.add_response(
                 "get_user_id",
-                {"UserId": "user-789"},
+                {"UserId": "user-789", "IdentityStoreId": "d-1234567890"},
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "AlternateIdentifier": {
@@ -263,8 +263,8 @@ class TestListUsers:
                 "list_users",
                 {
                     "Users": [
-                        {"UserId": "user-1", "UserName": "alice@example.com"},
-                        {"UserId": "user-2", "UserName": "bob@example.com"},
+                        {"UserId": "user-1", "UserName": "alice@example.com", "IdentityStoreId": "d-1234567890"},
+                        {"UserId": "user-2", "UserName": "bob@example.com", "IdentityStoreId": "d-1234567890"},
                     ]
                 },
                 expected_params={"IdentityStoreId": "d-1234567890"},
@@ -297,14 +297,14 @@ class TestListUsers:
             stub.add_response(
                 "list_users",
                 {
-                    "Users": [{"UserId": "user-1", "UserName": "alice@example.com"}],
+                    "Users": [{"UserId": "user-1", "UserName": "alice@example.com", "IdentityStoreId": "d-1234567890"}],
                     "NextToken": "token123",
                 },
                 expected_params={"IdentityStoreId": "d-1234567890"},
             )
             stub.add_response(
                 "list_users",
-                {"Users": [{"UserId": "user-2", "UserName": "bob@example.com"}]},
+                {"Users": [{"UserId": "user-2", "UserName": "bob@example.com", "IdentityStoreId": "d-1234567890"}]},
                 expected_params={"IdentityStoreId": "d-1234567890", "NextToken": "token123"},
             )
 
@@ -329,7 +329,7 @@ class TestListUsers:
         with Stubber(client) as stub:
             stub.add_response(
                 "list_users",
-                {"Users": [{"UserId": "user-1", "UserName": "alice@example.com"}]},
+                {"Users": [{"UserId": "user-1", "UserName": "alice@example.com", "IdentityStoreId": "d-1234567890"}]},
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "Filters": filters,
@@ -358,7 +358,7 @@ class TestGetGroupId:
         with Stubber(client) as stub:
             stub.add_response(
                 "get_group_id",
-                {"GroupId": "group-123"},
+                {"GroupId": "group-123", "IdentityStoreId": "d-1234567890"},
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "AlternateIdentifier": {
@@ -395,8 +395,8 @@ class TestListGroups:
                 "list_groups",
                 {
                     "Groups": [
-                        {"GroupId": "group-1", "DisplayName": "Admins"},
-                        {"GroupId": "group-2", "DisplayName": "Users"},
+                        {"GroupId": "group-1", "DisplayName": "Admins", "IdentityStoreId": "d-1234567890"},
+                        {"GroupId": "group-2", "DisplayName": "Users", "IdentityStoreId": "d-1234567890"},
                     ]
                 },
                 expected_params={"IdentityStoreId": "d-1234567890"},
@@ -427,12 +427,15 @@ class TestListGroups:
         with Stubber(client) as stub:
             stub.add_response(
                 "list_groups",
-                {"Groups": [{"GroupId": "group-1", "DisplayName": "Admins"}], "NextToken": "g-token"},
+                {
+                    "Groups": [{"GroupId": "group-1", "DisplayName": "Admins", "IdentityStoreId": "d-1234567890"}],
+                    "NextToken": "g-token",
+                },
                 expected_params={"IdentityStoreId": "d-1234567890"},
             )
             stub.add_response(
                 "list_groups",
-                {"Groups": [{"GroupId": "group-2", "DisplayName": "Users"}]},
+                {"Groups": [{"GroupId": "group-2", "DisplayName": "Users", "IdentityStoreId": "d-1234567890"}]},
                 expected_params={"IdentityStoreId": "d-1234567890", "NextToken": "g-token"},
             )
 
@@ -457,7 +460,7 @@ class TestListGroups:
         with Stubber(client) as stub:
             stub.add_response(
                 "list_groups",
-                {"Groups": [{"GroupId": "group-1", "DisplayName": "Admins"}]},
+                {"Groups": [{"GroupId": "group-1", "DisplayName": "Admins", "IdentityStoreId": "d-1234567890"}]},
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "Filters": filters,
@@ -487,7 +490,7 @@ class TestCreateGroupMembership:
         with Stubber(no_retry_client) as stub:
             stub.add_response(
                 "create_group_membership",
-                {"MembershipId": "membership-789"},
+                {"MembershipId": "membership-789", "IdentityStoreId": "d-1234567890"},
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "GroupId": "group-123",
@@ -548,7 +551,7 @@ class TestGetGroupMembershipId:
         with Stubber(client) as stub:
             stub.add_response(
                 "get_group_membership_id",
-                {"MembershipId": "membership-999"},
+                {"MembershipId": "membership-999", "IdentityStoreId": "d-1234567890"},
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "GroupId": "group-123",
@@ -581,8 +584,16 @@ class TestListGroupMemberships:
                 "list_group_memberships",
                 {
                     "GroupMemberships": [
-                        {"MembershipId": "m-1", "MemberId": {"UserId": "user-1"}},
-                        {"MembershipId": "m-2", "MemberId": {"UserId": "user-2"}},
+                        {
+                            "MembershipId": "m-1",
+                            "IdentityStoreId": "d-1234567890",
+                            "MemberId": {"UserId": "user-1"},
+                        },
+                        {
+                            "MembershipId": "m-2",
+                            "IdentityStoreId": "d-1234567890",
+                            "MemberId": {"UserId": "user-2"},
+                        },
                     ]
                 },
                 expected_params={
@@ -616,14 +627,28 @@ class TestListGroupMemberships:
             stub.add_response(
                 "list_group_memberships",
                 {
-                    "GroupMemberships": [{"MembershipId": "m-1", "MemberId": {"UserId": "user-1"}}],
+                    "GroupMemberships": [
+                        {
+                            "MembershipId": "m-1",
+                            "IdentityStoreId": "d-1234567890",
+                            "MemberId": {"UserId": "user-1"},
+                        }
+                    ],
                     "NextToken": "m-token",
                 },
                 expected_params={"IdentityStoreId": "d-1234567890", "GroupId": "group-123"},
             )
             stub.add_response(
                 "list_group_memberships",
-                {"GroupMemberships": [{"MembershipId": "m-2", "MemberId": {"UserId": "user-2"}}]},
+                {
+                    "GroupMemberships": [
+                        {
+                            "MembershipId": "m-2",
+                            "IdentityStoreId": "d-1234567890",
+                            "MemberId": {"UserId": "user-2"},
+                        }
+                    ]
+                },
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "GroupId": "group-123",
