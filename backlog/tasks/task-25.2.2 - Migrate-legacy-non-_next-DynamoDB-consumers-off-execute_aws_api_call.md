@@ -4,11 +4,11 @@ title: >-
   Rationalize integrations/aws/client.py: typed Literal-overloaded factory,
   eager AssumeRole, SDK-native retry and timeout policy, settings consolidated
   in integrations/aws/settings.py
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-31 18:48'
-updated_date: '2026-09-11 17:57'
+updated_date: '2026-09-11 18:33'
 labels:
   - clients
   - phase-3
