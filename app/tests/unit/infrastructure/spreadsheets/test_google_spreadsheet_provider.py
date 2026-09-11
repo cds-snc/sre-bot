@@ -145,7 +145,9 @@ def test_append_values_preserves_hyperlink_formula_and_append_options(
         valueInputOption="USER_ENTERED",
         insertDataOption="INSERT_ROWS",
     )
-    spreadsheet_service.spreadsheets.return_value.values.return_value.append.return_value.execute.assert_called_once_with(num_retries=0)
+    spreadsheet_service.spreadsheets.return_value.values.return_value.append.return_value.execute.assert_called_once_with(
+        num_retries=0
+    )
 
 
 def test_read_cells_maps_formatted_values_and_optional_hyperlinks(

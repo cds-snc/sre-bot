@@ -326,9 +326,7 @@ def _copy_source_document(source_document_id: str, draft_title: str, folder: str
         # Workspace file copies can't use a pre-generated id, so a replay would duplicate the
         # draft; retries stay off until a retries-disabled handle exists at construction.
         copied = (
-            service.files()
-            .copy(fileId=source_document_id, body=body, supportsAllDrives=True, fields="id")
-            .execute(num_retries=0)
+            service.files().copy(fileId=source_document_id, body=body, supportsAllDrives=True, fields="id").execute(num_retries=0)
         )
     except HttpError as exc:
         status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
