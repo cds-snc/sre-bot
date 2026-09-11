@@ -11,6 +11,28 @@ from fastapi.testclient import TestClient
 
 from server.server import handler
 
+_FAKE_ASSUMED_CREDENTIALS = {
+    "AccessKeyId": "ASIATESTASSUMEDKEY",
+    "SecretAccessKey": "test-assumed-secret",
+    "SessionToken": "test-assumed-session-token",
+}
+
+
+@pytest.fixture(autouse=True)
+def _autouse_stub_aws_assume_role(monkeypatch):
+    """Stub the AWS AssumeRole seam so no integration test reaches STS.
+
+    Integration tests boot the real lifespan and feature warmups; a client
+    built with a role ARN would otherwise call ``sts.assume_role`` for real.
+    The seam ``integrations.aws.client._assume_role_credentials`` returns
+    static temporary credentials instead, and the factory builds an ordinary
+    boto3 session from them. Tests of the seam itself live under tests/unit.
+    """
+    monkeypatch.setattr(
+        "integrations.aws.client._assume_role_credentials",
+        lambda sts, role_arn, session_name: dict(_FAKE_ASSUMED_CREDENTIALS),
+    )
+
 
 @pytest.fixture(autouse=True)
 def _autouse_mock_dynamodb_audit(monkeypatch):

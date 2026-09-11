@@ -214,7 +214,8 @@ def classify_aws_error(exc: Exception) -> tuple[OperationStatus, str | None, int
         return OperationStatus.UNAUTHORIZED, code, None
     if code in settings.TRANSIENT_CODES:
         return OperationStatus.TRANSIENT_ERROR, code, settings.TRANSIENT_RETRY_AFTER_SECONDS
-    if code == "ConditionalCheckFailedException":
+    if code in ("ConditionalCheckFailedException", "ConflictException"):
+        # DynamoDB conditional writes and Identity Store "already exists" conflicts are final outcomes.
         return OperationStatus.PERMANENT_ERROR, code, None
 
     raise exc
