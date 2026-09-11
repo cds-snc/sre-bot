@@ -21,7 +21,9 @@ def create_space(**kwargs) -> dict:
     )
     body = cast("Space", {"config": config})
     try:
-        return service.spaces().create(body=body).execute()
+        # Meet has no idempotency key for space creation, so retries stay off until a
+        # retries-disabled handle exists at construction.
+        return service.spaces().create(body=body).execute(num_retries=0)
     except HttpError as exc:
         status, error_code, retry_after = classify_google_error(exc)
         logger.warning(

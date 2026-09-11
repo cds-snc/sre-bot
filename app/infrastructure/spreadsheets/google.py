@@ -135,7 +135,9 @@ class GoogleSpreadsheetProvider:
                     ),
                     insertDataOption=cast("Literal['OVERWRITE', 'INSERT_ROWS']", _INSERT_DATA_OPTION),
                 )
-                .execute()
+                # Sheets has no idempotency key and a replayed append duplicates rows, so
+                # retries stay off until a retries-disabled handle exists at construction.
+                .execute(num_retries=0)
             ),
         )
         return self._success_or_error(result, "append_values")
