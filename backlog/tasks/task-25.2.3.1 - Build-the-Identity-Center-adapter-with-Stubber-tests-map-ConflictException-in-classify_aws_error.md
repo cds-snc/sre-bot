@@ -3,10 +3,11 @@ id: TASK-25.2.3.1
 title: >-
   Build the Identity Center adapter with Stubber tests; map ConflictException in
   classify_aws_error
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-11 19:18'
-updated_date: '2026-09-11 19:20'
+updated_date: '2026-09-11 19:34'
 labels:
   - clients
   - phase-3
@@ -101,3 +102,10 @@ ASSUMPTIONS AND DOUBTS (verify during implementation)
 
 BLAST RADIUS AND ROLLBACK: additive; no production caller imports the new package, so runtime behaviour is unchanged except the classifier mapping above. A single git revert of the PR restores the previous state. No config, env or manifest prerequisite. Ordering: 25.2.3.2 must not start until this merges.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-11 tests-first checkpoint (no production code changed). Added under app/tests/unit/packages/aws_platform/ (new __init__.py): test_aws_platform_identity_center_operations.py (27 tests: every operation's success path with Stubber expected_params incl. IdentityStoreId, two-page pagination for list_users/list_groups/list_group_memberships, Filters only when given, healthcheck MaxResults=1 on empty and non-empty pages, classification NOT_FOUND/UNAUTHORIZED/transient retry_after 60/ConflictException permanent on both creates/BotoCoreError transient, unmapped ValidationException and a KeyError propagating), test_aws_platform_identity_center_groups_join.py (10 tests: filters, four-key projection, user merge into MemberId, failed group skipped while the rest survive, missing user drop/keep by tolerate_errors, empty groups, failed list_groups/list_users returned as the failure), test_aws_platform_identity_center_provider.py (7 tests: two get_aws_client calls with the second retries=False, role_arn from AWS_ORG_ACCOUNT_ROLE_ARN or None when empty, IdentityStoreId from AWS_SSO_INSTANCE_ID proven on the wire, create_user/create_group_membership routed to the no-retry stub, get_user_id to the standard stub). Added test_conflict_is_permanent to tests/unit/integrations/aws/test_aws_client_classify_error.py.
+Evidence: `uv run ruff check` and `ruff format --check` clean on the new files. `uv run pytest tests/unit/packages/aws_platform tests/unit/integrations/aws/test_aws_client_classify_error.py -q` -> 3 collection errors (ModuleNotFoundError: packages.aws_platform) and test_conflict_is_permanent failing on the re-raised ClientError; `uv run pytest tests/unit/integrations/aws -q` -> 1 failed (that case), 132 passed. Review notes on the generated tests: replaced a lambda-patched paginator with real two-page Stubber responses, removed `from __future__ import annotations` from the new files (deprecated on 3.14), made the provider store-id test assert the request rather than a private attribute, and gave the skipped-group join test a surviving group so it proves selective skipping. Full suite deliberately not run at this checkpoint.
+<!-- SECTION:NOTES:END -->

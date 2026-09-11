@@ -47,6 +47,11 @@ class TestMappedFamilies:
 
         assert result == (OperationStatus.PERMANENT_ERROR, "ConditionalCheckFailedException", None)
 
+    def test_conflict_is_permanent(self) -> None:
+        result = aws_client.classify_aws_error(_client_error("ConflictException"))
+
+        assert result == (OperationStatus.PERMANENT_ERROR, "ConflictException", None)
+
     def test_botocore_transport_errors_are_transient_without_a_retry_hint(self) -> None:
         exc = EndpointConnectionError(endpoint_url="https://dynamodb.ca-central-1.amazonaws.com")
 
