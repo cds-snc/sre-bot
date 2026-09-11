@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-31 18:48'
-updated_date: '2026-09-11 17:54'
+updated_date: '2026-09-11 17:57'
 labels:
   - clients
   - phase-3
@@ -140,6 +140,8 @@ EVIDENCE
 - `rg "DeferredRefreshableCredentials|create_assume_role_refresher|_session\._credentials|botocore\.credentials" app/integrations` -> 0 hits; `rg "cast\(.*get_aws_client" app/infrastructure app/packages` -> 0 hits.
 - `make check-sdk-typing` -> OK (11 baselined files remain; client.py stays baselined for execute_aws_api_call); `make check-vendor-package-contract` -> OK (29 baselined entries remain).
 BEHAVIOUR CHANGES TO REVIEW: retry/timeout settings become effective (defaults equal today's fallbacks; verify no AWS_RETRY_*/AWS_*_TIMEOUT_SECONDS vars are set in staging/production env); endpoint gate driven by AWS_ENDPOINT_URL_DYNAMODB instead of ENVIRONMENT; RoleSessionName "sre-bot"; InternalServerError and the other settings-catalogue codes now classify as transient/unauthorized/not-found where the old fallbacks propagated them.
+
+2026-09-11 human confirmed no AWS_RETRY_* or AWS_*_TIMEOUT_SECONDS variables exist in any environment, so effective retry/timeout values are unchanged by the settings wiring. Devcontainer rebuild to validate AWS_ENDPOINT_URL_DYNAMODB scheduled by the human after commit.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

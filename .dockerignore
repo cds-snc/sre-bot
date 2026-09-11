@@ -15,6 +15,7 @@ __pycache__
 # keeps the build context small and the daemon upload fast (Docker build
 # best practices: "Exclude with .dockerignore").
 .devcontainer
+!.devcontainer/apt-packages.txt
 .vscode
 node_modules
 backlog
