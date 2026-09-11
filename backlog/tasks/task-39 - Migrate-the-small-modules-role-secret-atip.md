@@ -4,7 +4,7 @@ title: 'Migrate the small modules: role, secret, atip'
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 16:58'
+updated_date: '2026-09-11 14:53'
 labels:
   - migration
   - phase-5
@@ -35,6 +35,7 @@ Steps per module (role, then secret, then atip):
 - [ ] #1 Three feature packages exist matching the layout; three module directories deleted
 - [ ] #2 Smoke tests pass pre/post for each module independently
 - [ ] #3 Baselines only shrank
+- [ ] #4 packages/talent/adapters/google_drive.py returns frozen domain dataclasses instead of {id, name} dicts once modules/role moves into the talent package (decisions/sdk-typing.md item 3; handed off by TASK-25.1.6 AC#3)
 <!-- AC:END -->
 
 ## Definition of Done

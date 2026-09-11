@@ -3,10 +3,10 @@ id: TASK-25.1
 title: >-
   Migrate Google Workspace remainder (Drive/Docs/Calendar/Meet/Sheets/legacy
   Directory consumers) off the execute_google_api_call dispatcher
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-31 18:32'
-updated_date: '2026-09-08 14:44'
+updated_date: '2026-09-11 14:56'
 labels:
   - clients
   - phase-3
@@ -38,10 +38,16 @@ WHO CLOSES IT: TASK-25.1.6 (retitled 2026-09-02 to 'Retire the Google Workspace 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 make client-usage-matrix / a repo-wide grep of execute_google_api_call and get_google_api_command_parameters shows zero call sites outside google_service.py/google_service_next.py itself (both slated for TASK-23 deletion once this coordinator's children land)
-- [ ] #2 Every one of the 16 identified legacy consumer files is migrated behavior-neutrally (existing tests pass with identical outcomes) onto a factory-built, stub-typed Resource (google-api-python-client-stubs, per decisions/sdk-typing.md item 3) + classify_google_error, per its owning child subtask
-- [ ] #3 gmail.py and gmail_next.py are deleted (zero production consumers, confirmed)
+- [x] #1 A repo-wide grep of execute_google_api_call and get_google_api_command_parameters shows zero call sites (the only remaining hits are decisions/sdk-typing.md and the bin/check_sdk_typing.py guard pattern); google_service.py was deleted by TASK-25.1.7 and google_service_next.py by TASK-23.1
+- [x] #2 Every live legacy consumer of the retired Google Workspace modules reaches Google through an infrastructure capability (DirectoryProvider, DriveProvider, SpreadsheetProvider) or a packages/<feature>/adapters/ file that builds a factory-built, stub-typed Resource (google-api-python-client-stubs, per decisions/sdk-typing.md item 3) and classifies with classify_google_error; modules/reports/google_groups.py was deleted rather than migrated, and the only behaviour changes are the defect fixes and retry/timeout changes made deliberately by their owning subtasks
+- [x] #3 gmail.py and gmail_next.py are deleted (zero production consumers, confirmed)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+CLOSEOUT VERIFICATION (2026-09-11). All seven children Done. AC#1 and AC#2 reworded where they had drifted (google_service.py deleted by TASK-25.1.7, not TASK-23; reports/google_groups.py deleted rather than migrated; consumers reach Google through the Directory, Drive and Spreadsheet providers or feature adapters), then checked individually. Evidence is recorded on TASK-25.1.6's closeout notes. The Description's endstate of frozen domain dataclasses at every boundary is met by the infrastructure providers and packages/incident_draft; the legacy-facing incident and talent adapters' dict returns are deferred to TASK-38 AC#9 and TASK-39 AC#4.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

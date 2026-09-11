@@ -3,10 +3,10 @@ id: TASK-25.1.6
 title: >-
   Retire the Google Workspace vendor mirror layer: adapters own construction and
   classification
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-01 15:31'
-updated_date: '2026-09-10 15:45'
+updated_date: '2026-09-11 14:56'
 labels:
   - clients
   - phase-3
@@ -74,13 +74,13 @@ This task closes when all twelve are Done. Its own remaining direct work is nil.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All twelve children (TASK-25.1.6.1 through .12) are Done
-- [ ] #2 app/integrations/google_workspace/ contains only client.py (per-API stub-typed factories plus classify_google_error) and settings; the six per-method mirror modules and google_service.py no longer exist
-- [ ] #3 Every Google Workspace call site in the repo lives in a packages/<feature>/adapters/ file or an infrastructure/ capability, builds its Resource from a client.py factory, performs its own try/except plus classify_google_error, and returns typed domain values rather than raw SDK dicts
-- [ ] #4 The Directory duplication is resolved as decided: GoogleDirectoryProvider survives, integrations/google_workspace/google_directory.py is deleted, and all four legacy app/modules/* consumers use the DirectoryProvider Protocol
-- [ ] #5 No business logic remains under app/integrations/google_workspace/, and grep -rn 'time.sleep' app/integrations returns zero hits (TASK-25 AC#5)
-- [ ] #6 execute_google_api_request is deleted and execute_batch_request is either relocated to the provider or covered by a written amendment to decisions/outbound-clients.md
-- [ ] #7 A CI guardrail prevents app/integrations/<vendor>/ from regrowing non-factory/non-classification/non-settings modules, so this convention is machine-enforced rather than remembered
+- [x] #1 All children are Done: TASK-25.1.6.1 through .14 and .16 (TASK-25.1.6.15 was archived)
+- [x] #2 app/integrations/google_workspace/ contains only client.py (per-API stub-typed factories plus classify_google_error), with Google settings in infrastructure/configuration/integrations/google.py; the six per-method mirror modules and google_service.py no longer exist
+- [x] #3 Every Google Workspace call site lives in a packages/<feature>/adapters/ file or an infrastructure/ capability, builds its Resource from a client.py factory, and performs its own try/except plus classify_google_error. The Directory, Drive and Spreadsheet infrastructure capabilities and packages/incident_draft return typed domain values; the packages/incident/{documents,drive,meet,scheduling} and packages/talent adapters still return dicts to their legacy modules/ callers, and typing those returns is owned by TASK-38 (incident) and TASK-39 (talent)
+- [x] #4 The Directory duplication is resolved as decided: GoogleDirectoryProvider survives, integrations/google_workspace/google_directory.py is deleted, and the live legacy consumers (modules/permissions/handler.py, modules/provisioning/users.py, modules/provisioning/groups.py) use the DirectoryProvider Protocol; modules/reports/google_groups.py was deleted rather than migrated
+- [x] #5 No business logic remains under app/integrations/google_workspace/, and grep -rn 'time.sleep' app/integrations returns zero hits (TASK-25 AC#5)
+- [x] #6 execute_google_api_request and execute_batch_request are deleted; batch orchestration was relocated into GoogleDirectoryProvider by TASK-25.1.6.3.1, so decisions/outbound-clients.md needed no amendment
+- [x] #7 A CI guardrail (bin/check_vendor_package_contract.py, run as make check-vendor-package-contract in .github/workflows/ci_code.yml) prevents app/integrations/<vendor>/ from regrowing non-factory/non-classification/non-settings modules, and its baseline has no Google Workspace entries
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -116,6 +116,15 @@ AC#1 classification for these 5: NONE live in a real packages/<feature>/adapters
 TEST-COVERAGE GAP flagged for whoever picks this up (discovered during TASK-25.1.3): app/modules/reports/google_groups.py and app/modules/aws/spending.py have NO automated regression coverage for their Sheets call sites — before or after TASK-25.1.3. (app/tests/modules/aws/test_spending_handler.py covers a different function, not the Sheets call site.) TASK-25.1.3's behavior-neutrality for these two files rests solely on preserved public signatures/return shapes, not on a green test suite. Any reconciliation work that changes their error-handling shape (which is the whole point of AC#3 for them) is therefore UNGUARDED and must add characterization tests FIRST, before touching either file. Do not treat 'existing tests pass' as evidence of safety for these two.
 
 DECOMPOSITION NOTE (2026-09-01): with .1/.2/.3 reported, the known inventory is already Calendar/Meet + 3 Docs + 5 Sheets sites across 3 vendor modules and ~7 legacy app/modules/* consumer files, plus app/packages/incident_draft/adapters/google_docs.py — and .4/.5 (legacy Directory consumers, Drive) have yet to report. This task as scoped (inline everywhere + build/file adapters for every legacy consumer + delete the helper) will NOT fit a single reviewable PR. Expect to decompose it before implementation, roughly: (a) one task per real adapters/ file to inline (incident_draft/adapters/google_docs.py is already named in comment 2026-09-01 17:13); (b) one task per legacy feature area needing a new adapter (incident Docs/Drive/Calendar; incident Sheets incl. the relocated parse-range rule; reports/google_groups; aws/spending — each gated on adding characterization tests first where coverage is missing); (c) a final small task deleting execute_google_api_request from client.py once the call-site count reaches zero. Run this through the implementation-planning size gate rather than attempting it as one change.
+
+CLOSEOUT VERIFICATION (2026-09-11). All children Done (.1-.14, .16; .15 archived). ACs reworded where they had drifted from the shipped subtasks, then checked individually:
+- app/integrations/google_workspace/ holds only __init__.py and client.py (six factories plus classify_google_error).
+- rg for execute_google_api_call, get_google_api_command_parameters, execute_google_api_request, execute_batch_request and retry_request in app/: zero hits for the retired Google symbols (the only retry_request hits are the unrelated access-request service method).
+- rg 'time\.sleep' app/integrations: zero hits.
+- Only infrastructure/{directory,drive,spreadsheets} and packages/*/adapters import integrations.google_workspace; each call site classifies with classify_google_error.
+- uv run python bin/check_vendor_package_contract.py -> "OK: no net-new vendor-package contract violations (29 baselined entry(ies) remain)", no Google entries; wired in ci_code.yml as make check-vendor-package-contract.
+- uv run python bin/check_sdk_typing.py -> "OK: no net-new SDK anti-patterns (11 baselined file(s) remain)".
+AC#3 amended (human-decided): the incident documents/drive/meet/scheduling adapters and the talent Drive adapter still return dicts because their callers are legacy modules/ code. Typing those returns moves with the caller migrations, recorded as TASK-38 AC#9 and TASK-39 AC#4.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

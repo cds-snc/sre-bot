@@ -3,10 +3,10 @@ id: TASK-25.1.6.16
 title: >-
   Disable SDK retries on the Google writes that construction-time retry made
   unsafe to replay
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-11 13:59'
-updated_date: '2026-09-11 14:28'
+updated_date: '2026-09-11 14:42'
 labels:
   - clients
   - phase-3

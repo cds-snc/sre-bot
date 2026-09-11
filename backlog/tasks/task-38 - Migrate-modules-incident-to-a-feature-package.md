@@ -4,7 +4,7 @@ title: Migrate modules/incident to a feature package
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-10 15:45'
+updated_date: '2026-09-11 14:53'
 labels:
   - migration
   - phase-5
@@ -67,6 +67,7 @@ Steps:
 - [ ] #6 Shared incident vocabulary lives in packages/incident/common/ with no I/O and at least two subdomain consumers per item; no subdomain imports another subdomain
 - [ ] #7 TASK-18 contract (e) gains a packages.incident container with exhaustive = true and lint-imports is green
 - [ ] #8 packages/incident_draft and packages/incident_summary no longer exist; their code, tests and locales live under packages/incident/ and no packages/incident_* directory remains anywhere under app/packages/
+- [ ] #9 The packages/incident/{documents,drive,meet,scheduling} Google adapters return frozen domain dataclasses instead of dicts once their modules/incident callers move into the package (decisions/sdk-typing.md item 3; handed off by TASK-25.1.6 AC#3)
 <!-- AC:END -->
 
 ## Definition of Done
