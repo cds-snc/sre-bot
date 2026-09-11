@@ -1,11 +1,34 @@
 """Unit tests for AWS access requests handler."""
 
 import datetime
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from modules.aws import aws_access_requests
+
+
+def _access_view_body():
+    """Build a Slack view-submission body shaped like access_view_handler expects."""
+    return {
+        "view": {
+            "state": {
+                "values": {
+                    "rationale": {"rationale": {"value": "Need access for an investigation"}},
+                    "account": {
+                        "account": {
+                            "selected_option": {
+                                "value": "account-123",
+                                "text": {"text": "TestAccount"},
+                            }
+                        }
+                    },
+                    "access_type": {"access_type": {"selected_option": {"value": "read"}}},
+                }
+            }
+        },
+        "user": {"id": "U123"},
+    }
 
 
 @pytest.mark.unit
@@ -276,3 +299,100 @@ def test_should_return_empty_list_when_no_active_requests(mock_client):
 
     # Assert
     assert result == []
+
+
+@pytest.mark.unit
+@patch("modules.aws.aws_access_requests.log_ops_message")
+@patch("modules.aws.aws_access_requests.sso_admin")
+@patch("modules.aws.aws_access_requests.create_aws_access_request")
+@patch("modules.aws.aws_access_requests.already_has_access")
+@patch("modules.aws.aws_access_requests.identity_store")
+def test_should_treat_integration_false_as_not_none_and_proceed(
+    mock_identity_store,
+    mock_already_has_access,
+    mock_create_request,
+    mock_sso_admin,
+    mock_log_ops_message,
+):
+    """Test access_view_handler proceeds past the "not registered" branch when the
+    integration returns False for a failed lookup.
+
+    Stub strategy: identity_store.get_user_id returns the literal False that
+    handle_aws_api_errors produces on error, not None. The handler's guard is
+    `if aws_user_id is None`, so False takes the same path as a real user id --
+    this is a pinned defect (the guard is effectively dead code today), not an
+    endorsed behaviour, and would need revisiting if the integration's error
+    contract ever changes from a bare False to a structured result.
+    """
+    # Arrange
+    mock_identity_store.get_user_id.return_value = False
+    mock_already_has_access.return_value = False
+    mock_create_request.return_value = True
+    mock_sso_admin.create_account_assignment.return_value = True
+    ack = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = {"user": {"profile": {"email": "user@example.com"}}}
+    body = _access_view_body()
+
+    # Act
+    aws_access_requests.access_view_handler(ack, body, MagicMock(), client)
+
+    # Assert
+    mock_create_request.assert_called_once()
+    mock_sso_admin.create_account_assignment.assert_called_once_with(False, "account-123", "read")
+
+
+@pytest.mark.unit
+@patch("modules.aws.aws_access_requests.log_ops_message")
+@patch("modules.aws.aws_access_requests.sso_admin")
+@patch("modules.aws.aws_access_requests.create_aws_access_request")
+@patch("modules.aws.aws_access_requests.already_has_access")
+@patch("modules.aws.aws_access_requests.identity_store")
+def test_should_respond_not_registered_message_never_fires_on_integration_failure(
+    mock_identity_store,
+    mock_already_has_access,
+    mock_create_request,
+    mock_sso_admin,
+    mock_log_ops_message,
+):
+    """Test access_view_handler's ephemeral message never mentions "not registered" when
+    identity_store.get_user_id returns False rather than None.
+
+    Stub strategy: same setup as the sibling test; this asserts the observable
+    Slack message text directly, confirming the "is None" guard is bypassed
+    for the actual False contract.
+    """
+    # Arrange
+    mock_identity_store.get_user_id.return_value = False
+    mock_already_has_access.return_value = False
+    mock_create_request.return_value = True
+    mock_sso_admin.create_account_assignment.return_value = True
+    ack = MagicMock()
+    client = MagicMock()
+    client.users_info.return_value = {"user": {"profile": {"email": "user@example.com"}}}
+    body = _access_view_body()
+
+    # Act
+    aws_access_requests.access_view_handler(ack, body, MagicMock(), client)
+
+    # Assert
+    sent_text = client.chat_postEphemeral.call_args.kwargs["text"]
+    assert "not registered" not in sent_text
+
+
+@pytest.mark.unit
+@patch("modules.aws.aws_access_requests.organizations")
+def test_should_raise_when_request_access_modal_organizations_call_returns_false(mock_organizations):
+    """Test request_access_modal surfaces a TypeError when organizations returns False.
+
+    Stub strategy: list_organization_accounts returns the literal False; the dict
+    comprehension over accounts pins today's crash on a non-iterable bool.
+    """
+    # Arrange
+    mock_organizations.list_organization_accounts.return_value = False
+    client = MagicMock()
+    body = {"trigger_id": "trigger-123"}
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        aws_access_requests.request_access_modal(client, body)

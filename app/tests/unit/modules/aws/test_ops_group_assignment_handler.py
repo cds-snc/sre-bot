@@ -268,3 +268,65 @@ def test_should_handle_multiple_accounts_with_mixed_status(
     # Only Account3 should be assigned (Account1 already assigned, Account2/4 not ACTIVE)
     assert mock_sso_admin.create_account_assignment.call_count == 1
     assert result["status"] == "success"
+
+
+@pytest.mark.unit
+@patch("modules.aws.ops_group_assignment.get_aws_feature_settings")
+@patch("modules.aws.ops_group_assignment.identity_store")
+@patch("modules.aws.ops_group_assignment.organizations")
+@patch("modules.aws.ops_group_assignment.sso_admin")
+def test_should_raise_when_list_organization_accounts_returns_false(
+    mock_sso_admin,
+    mock_organizations,
+    mock_identity_store,
+    mock_get_aws_feature_settings,
+):
+    """Test execute surfaces a TypeError when organizations returns False.
+
+    Stub strategy: list_organization_accounts returns the literal False that
+    handle_aws_api_errors produces on error; the list comprehension over
+    organizations_accounts pins today's crash on a non-iterable bool.
+    """
+    # Arrange
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_OPS_GROUP_NAME = "OpsGroup"
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
+    mock_identity_store.get_group_id.return_value = "group-123"
+    mock_organizations.list_organization_accounts.return_value = False
+    mock_sso_admin.list_account_assignments_for_principal.return_value = []
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        ops_group_assignment.execute()
+
+
+@pytest.mark.unit
+@patch("modules.aws.ops_group_assignment.get_aws_feature_settings")
+@patch("modules.aws.ops_group_assignment.identity_store")
+@patch("modules.aws.ops_group_assignment.organizations")
+@patch("modules.aws.ops_group_assignment.sso_admin")
+def test_should_raise_when_list_account_assignments_returns_false(
+    mock_sso_admin,
+    mock_organizations,
+    mock_identity_store,
+    mock_get_aws_feature_settings,
+):
+    """Test execute surfaces a TypeError when sso_admin returns False.
+
+    Stub strategy: list_account_assignments_for_principal returns the literal False;
+    the set comprehension over account_assignments pins today's crash on a
+    non-iterable bool.
+    """
+    # Arrange
+    mock_feature_settings = MagicMock()
+    mock_feature_settings.AWS_OPS_GROUP_NAME = "OpsGroup"
+    mock_get_aws_feature_settings.return_value = mock_feature_settings
+    mock_identity_store.get_group_id.return_value = "group-123"
+    mock_organizations.list_organization_accounts.return_value = [
+        {"Id": "111111111111", "Name": "Account1", "Status": "ACTIVE"},
+    ]
+    mock_sso_admin.list_account_assignments_for_principal.return_value = False
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        ops_group_assignment.execute()

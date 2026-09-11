@@ -273,3 +273,108 @@ def test_should_request_health_modal(mock_organizations):
     # Assert
     mock_organizations.list_organization_accounts.assert_called_once()
     client.views_open.assert_called_once()
+
+
+@pytest.mark.unit
+@patch("modules.aws.aws_account_health.cost_explorer")
+def test_should_raise_when_cost_explorer_returns_false(mock_cost_explorer):
+    """Test get_account_spend surfaces a TypeError when the integration swallows an error to False.
+
+    Stub strategy: cost_explorer.get_cost_and_usage returns the literal False that
+    handle_aws_api_errors produces on any boto/client error, matching today's real contract
+    instead of a defended falsy fixture like {} or [].
+    """
+    # Arrange
+    mock_cost_explorer.get_cost_and_usage.return_value = False
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        aws_account_health.get_account_spend("account-123", "2024-01-01", "2024-01-31")
+
+
+@pytest.mark.unit
+@patch("modules.aws.aws_account_health.config")
+def test_should_raise_when_config_summary_integration_returns_false(mock_config):
+    """Test get_config_summary surfaces a TypeError when the integration returns False.
+
+    Stub strategy: describe_aggregate_compliance_by_config_rules returns False; the unguarded
+    len() call on it pins today's crash rather than the success-path count.
+    """
+    # Arrange
+    mock_config.describe_aggregate_compliance_by_config_rules.return_value = False
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        aws_account_health.get_config_summary("account-123")
+
+
+@pytest.mark.unit
+@patch("modules.aws.aws_account_health.guard_duty")
+def test_should_raise_when_guardduty_list_detectors_returns_false(mock_guard_duty):
+    """Test get_guardduty_summary surfaces a TypeError when list_detectors returns False.
+
+    Stub strategy: list_detectors returns False; indexing detector_ids[0] on a bool pins
+    today's crash.
+    """
+    # Arrange
+    mock_guard_duty.list_detectors.return_value = False
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        aws_account_health.get_guardduty_summary("account-123")
+
+
+@pytest.mark.unit
+@patch("modules.aws.aws_account_health.guard_duty")
+def test_should_raise_when_guardduty_findings_statistics_returns_false(mock_guard_duty):
+    """Test get_guardduty_summary surfaces a TypeError when get_findings_statistics returns False.
+
+    Stub strategy: list_detectors succeeds so control reaches get_findings_statistics, which
+    then returns False; indexing response["FindingStatistics"] on a bool pins today's crash.
+    """
+    # Arrange
+    mock_guard_duty.list_detectors.return_value = ["detector-123"]
+    mock_guard_duty.get_findings_statistics.return_value = False
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        aws_account_health.get_guardduty_summary("account-123")
+
+
+@pytest.mark.unit
+@patch("modules.aws.aws_account_health.get_ignored_security_hub_issues")
+@patch("modules.aws.aws_account_health.security_hub")
+def test_should_return_zero_securityhub_when_integration_returns_false(mock_security_hub, mock_get_ignored):
+    """Test get_securityhub_summary treats an integration False the same as an empty result list.
+
+    Stub strategy: get_findings returns the literal False; the existing `if response:` guard
+    takes the same falsy branch as the already-tested [] case, so this pins the branch
+    explicitly with False rather than assuming branch-equivalence.
+    """
+    # Arrange
+    mock_get_ignored.return_value = []
+    mock_security_hub.get_findings.return_value = False
+
+    # Act
+    result = aws_account_health.get_securityhub_summary("account-123")
+
+    # Assert
+    assert result == 0
+
+
+@pytest.mark.unit
+@patch("modules.aws.aws_account_health.organizations")
+def test_should_raise_when_request_health_modal_organizations_call_returns_false(mock_organizations):
+    """Test request_health_modal surfaces a TypeError when list_organization_accounts returns False.
+
+    Stub strategy: list_organization_accounts returns False; the list comprehension iterating
+    over accounts pins today's crash on a non-iterable bool.
+    """
+    # Arrange
+    mock_organizations.list_organization_accounts.return_value = False
+    client = MagicMock()
+    body = MagicMock()
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        aws_account_health.request_health_modal(client, body)

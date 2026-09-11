@@ -234,3 +234,39 @@ def test_revoke_access_no_expired_requests(
     mock_sso.delete_account_assignment.assert_not_called()
     mock_slack_client.chat_postEphemeral.assert_not_called()
     mock_log_ops.assert_not_called()
+
+
+@pytest.mark.unit
+@patch("jobs.revoke_aws_sso_access.aws_access_requests")
+@patch("jobs.revoke_aws_sso_access.identity_store")
+@patch("jobs.revoke_aws_sso_access.sso_admin")
+@patch("jobs.revoke_aws_sso_access.log_ops_message")
+@patch("jobs.revoke_aws_sso_access.logger")
+def test_revoke_access_proceeds_with_false_user_id_when_identity_store_lookup_fails(
+    mock_logger,
+    mock_log_ops,
+    mock_sso,
+    mock_identity_store,
+    mock_aws_requests,
+    expired_request,
+    mock_slack_client,
+) -> None:
+    """Test that a failed identity_store lookup surfaces as the literal False
+    handle_aws_api_errors returns today, not a raised exception, and that the loop
+    has no guard against it.
+
+    Stub strategy: get_user_id.return_value = False (the integration's real error
+    contract) rather than a side_effect exception, since the decorator that wraps
+    every AWS call always returns False on error and never raises. This replaces
+    reliance on the sibling exception-based test as evidence of "error handling":
+    that scenario cannot occur against the real integration.
+    """
+    mock_aws_requests.get_expired_requests.return_value = [expired_request]
+    mock_identity_store.get_user_id.return_value = False
+
+    revoke_aws_sso_access(mock_slack_client)
+
+    mock_sso.delete_account_assignment.assert_called_once_with(False, "123456789", "ReadOnlyAccess")
+    mock_aws_requests.expire_request.assert_called_once_with(account_id="123456789", created_at="1704067200")
+    assert mock_slack_client.chat_postEphemeral.call_count == 1
+    mock_logger.error.assert_not_called()

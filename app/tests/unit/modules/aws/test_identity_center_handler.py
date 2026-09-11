@@ -427,3 +427,27 @@ class TestProvisionAwsUsers:
         items = call_args[0][1]
         assert len(items) == 1
         assert items[0]["primaryEmail"] == "user1@example.com"
+
+
+@pytest.mark.unit
+@patch("modules.aws.identity_center.groups")
+@patch("modules.aws.identity_center.filters")
+@patch("modules.aws.identity_center.identity_store")
+def test_should_raise_when_list_users_returns_false_before_sync(mock_identity_store, mock_filters, mock_groups):
+    """Test synchronize surfaces a TypeError when identity_store.list_users returns False.
+
+    Stub strategy: identity_store.list_users returns the literal False that
+    handle_aws_api_errors produces on error; the immediate `len(target_users)`
+    logging call pins today's crash before either sync_users or sync_groups runs.
+    """
+    # Arrange
+    mock_groups.get_groups_from_integration.side_effect = [
+        [{"name": "AWS-Group1", "members": []}],  # source groups
+        [{"DisplayName": "Group1", "GroupMemberships": []}],  # target groups
+    ]
+    mock_filters.get_unique_nested_dicts.return_value = []
+    mock_identity_store.list_users.return_value = False
+
+    # Act & Assert
+    with pytest.raises(TypeError):
+        identity_center.synchronize()

@@ -106,5 +106,14 @@ class TestGetUsersFromIntegration:
 
         assert users.get_users_from_integration("aws_identity_center") == aws_users
 
+    def test_should_raise_when_aws_identity_store_list_users_returns_false(self, monkeypatch: pytest.MonkeyPatch):
+        """A False return (the integration's real error contract) crashes on the
+        subsequent len(users) logging call, unlike the empty-list success path.
+        """
+        monkeypatch.setattr(users.identity_store, "list_users", lambda *args, **kwargs: False)
+
+        with pytest.raises(TypeError):
+            users.get_users_from_integration("aws_identity_center")
+
     def test_should_not_bind_the_google_workspace_directory_module(self):
         assert not hasattr(users, "google_directory")
