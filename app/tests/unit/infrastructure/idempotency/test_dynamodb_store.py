@@ -98,7 +98,7 @@ class TestDynamoDBIdempotencyStoreClaimConflict:
 
     def test_claim_unmapped_client_error_propagates_unchanged(self, dynamodb_client, store):
         client_error = ClientError(
-            error_response={"Error": {"Code": "InternalServerError", "Message": "boom"}},
+            error_response={"Error": {"Code": "ValidationException", "Message": "boom"}},
             operation_name="PutItem",
         )
         dynamodb_client.put_item.side_effect = client_error

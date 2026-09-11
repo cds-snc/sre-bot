@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@me'
 created_date: '2026-07-31 18:48'
-updated_date: '2026-09-11 17:44'
+updated_date: '2026-09-11 17:54'
 labels:
   - clients
   - phase-3
@@ -44,15 +44,15 @@ Callers updated: infrastructure/storage/service.py, infrastructure/idempotency/f
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 get_aws_client is overloaded on Literal service names and returns the types-boto3 client type for each; mypy passes with the casts removed from the storage, idempotency and retry-store callers; packages/access needs at most its redundant cast removed
-- [ ] #2 AssumeRole uses sts.assume_role and a public boto3.Session constructor; no private botocore attribute is accessed anywhere under app/integrations
-- [ ] #3 Retry mode, max attempts, connect and read timeouts, region and endpoint are read from integrations/aws/settings.py and set once at construction, a retries-disabled option exists, and unit tests assert the botocore Config the factory produces for both variants and that environment overrides take effect
-- [ ] #4 classify_aws_error reads its code catalogues from integrations/aws/settings.py and its tests cover each mapped family (not-found, unauthorized, transient with retry_after, ConditionalCheckFailedException permanent, BotoCoreError transient) plus one unmapped ClientError propagating
-- [ ] #5 integrations/aws/settings.py carries the feature-level fields (permission sets, role ARNs, SSO instance id/ARN, SERVICE_ROLE_MAP) with the same names and env aliases as the infrastructure module, covered by tests; infrastructure/configuration gains no AWS field
-- [ ] #6 The legacy helpers remain callable and every existing mirror-module test still passes
-- [ ] #7 The dynamodb-local endpoint is driven by AWSSettings.DYNAMODB_ENDPOINT_URL (env AWS_ENDPOINT_URL_DYNAMODB, botocore's native name) applied only to dynamodb clients; client.py no longer imports infrastructure.configuration.app; .devcontainer/docker-compose.yml sets the variable; unit tests cover set, unset and a non-dynamodb service
-- [ ] #8 AWS_ENDPOINT_URL is removed from AWSSettings (shield.py passes endpoint_url=None until its deletion) and classify_aws_error's transient retry hint is AWSSettings.TRANSIENT_RETRY_AFTER_SECONDS (env AWS_TRANSIENT_RETRY_AFTER_SECONDS, default 60), both covered by tests
-- [ ] #9 types-boto3 gains the sts extra in pyproject.toml with uv.lock regenerated so the sts overload is typed; the default RoleSessionName is sre-bot and AssumeRole failures propagate as SDK exceptions
+- [x] #1 get_aws_client is overloaded on Literal service names and returns the types-boto3 client type for each; mypy passes with the casts removed from the storage, idempotency and retry-store callers; packages/access needs at most its redundant cast removed
+- [x] #2 AssumeRole uses sts.assume_role and a public boto3.Session constructor; no private botocore attribute is accessed anywhere under app/integrations
+- [x] #3 Retry mode, max attempts, connect and read timeouts, region and endpoint are read from integrations/aws/settings.py and set once at construction, a retries-disabled option exists, and unit tests assert the botocore Config the factory produces for both variants and that environment overrides take effect
+- [x] #4 classify_aws_error reads its code catalogues from integrations/aws/settings.py and its tests cover each mapped family (not-found, unauthorized, transient with retry_after, ConditionalCheckFailedException permanent, BotoCoreError transient) plus one unmapped ClientError propagating
+- [x] #5 integrations/aws/settings.py carries the feature-level fields (permission sets, role ARNs, SSO instance id/ARN, SERVICE_ROLE_MAP) with the same names and env aliases as the infrastructure module, covered by tests; infrastructure/configuration gains no AWS field
+- [x] #6 The legacy helpers remain callable and every existing mirror-module test still passes
+- [x] #7 The dynamodb-local endpoint is driven by AWSSettings.DYNAMODB_ENDPOINT_URL (env AWS_ENDPOINT_URL_DYNAMODB, botocore's native name) applied only to dynamodb clients; client.py no longer imports infrastructure.configuration.app; .devcontainer/docker-compose.yml sets the variable; unit tests cover set, unset and a non-dynamodb service
+- [x] #8 AWS_ENDPOINT_URL is removed from AWSSettings (shield.py passes endpoint_url=None until its deletion) and classify_aws_error's transient retry hint is AWSSettings.TRANSIENT_RETRY_AFTER_SECONDS (env AWS_TRANSIENT_RETRY_AFTER_SECONDS, default 60), both covered by tests
+- [x] #9 types-boto3 gains the sts extra in pyproject.toml with uv.lock regenerated so the sts overload is typed; the default RoleSessionName is sre-bot and AssumeRole failures propagate as SDK exceptions
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -123,6 +123,23 @@ BLAST RADIUS AND ROLLBACK
 <!-- SECTION:NOTES:BEGIN -->
 2026-09-11 tests-first checkpoint (no production code changed). Added four behaviour test files under app/tests/unit/integrations/aws/: test_aws_client_factory_config.py (retry/timeout Config for both variants, env overrides, region, dynamodb-only endpoint from AWS_ENDPOINT_URL_DYNAMODB, ten service names, no caching, legacy kwargs rejected), test_aws_client_assume_role.py (Stubber on a real STS client for _assume_role_credentials incl. AccessDenied propagation; recording boto3 Session subclass for eager wiring, default RoleSessionName sre-bot, no private botocore hook), test_aws_client_classify_error.py (each mapped family, settings-driven catalogues and TRANSIENT_RETRY_AFTER_SECONDS, propagation of unmapped/blank-code/programmer errors), test_aws_settings_fields.py (transport aliases, DYNAMODB_ENDPOINT_URL, AWS_ENDPOINT_URL absent, feature fields with the infrastructure aliases, SERVICE_ROLE_MAP parity with the infrastructure module, provider cache).
 Evidence: `uv run ruff check` + `ruff format --check` clean on the four files. `uv run pytest <four files> -q` -> 41 failed, 35 passed, 4 errors: failures/errors are the missing seams (_assume_role_credentials, DYNAMODB_ENDPOINT_URL, TRANSIENT_RETRY_AFTER_SECONDS, feature fields, retries kwarg, settings read at call time, app-settings import still present, botocore.credentials hook still imported); the 35 passing cases are today's already-correct defaults kept as regression guards. Full suite deliberately not run at this checkpoint. Superseded legacy tests (test_aws_client.py, test_settings.py, the client matrix case in test_dynamodb_local_endpoint.py, the two endpoint cases in test_shield.py) are removed together with the implementation, per the plan.
+
+2026-09-11 implementation complete (awaiting human review; not moved to Done).
+WHAT CHANGED
+- app/pyproject.toml: types-boto3 extras gain sts; uv.lock regenerated (types-boto3-sts 1.43.0 added). Venv pre-flight ran: `uv sync --locked --reinstall-package types-boto3` removed the stray boto3-stubs 1.42.54 and restored the types-boto3 files.
+- app/integrations/aws/settings.py: single AWS settings home. Removed AWS_ENDPOINT_URL; added DYNAMODB_ENDPOINT_URL (alias AWS_ENDPOINT_URL_DYNAMODB), TRANSIENT_RETRY_AFTER_SECONDS (alias AWS_TRANSIENT_RETRY_AFTER_SECONDS, default 60), and the seven feature fields with the infrastructure module's aliases plus the SERVICE_ROLE_MAP property. RETRY_MAX_ATTEMPTS documented as retries after the initial attempt.
+- app/integrations/aws/client.py: get_aws_client(service, *, role_arn=None, session_name="sre-bot", retries=True) overloaded on the ten Literal service names, returning the types-boto3 client types; Config(retries={"mode","max_attempts"}, connect_timeout, read_timeout) built per call from settings, retries=False -> max_attempts 0 (one attempt); eager AssumeRole via sts.assume_role + public boto3.Session; dynamodb-only endpoint from settings; no infrastructure.configuration.app import. classify_aws_error reads the catalogues and retry hint from settings at call time. Legacy helpers (handle_aws_api_errors, assume_role_session, get_aws_service_client, execute_aws_api_call, paginator) and their five module constants are byte-identical, kept in a delimited block that still reads the infrastructure settings module until the mirrors go.
+- Casts removed: infrastructure/storage/service.py (local DynamoDBClient Protocol replaced by the types-boto3 type under TYPE_CHECKING), infrastructure/idempotency/factory.py, infrastructure/resilience/retry/factory.py, packages/access/sync/adapters/aws_identity_center.py (cast + unused import only).
+- app/integrations/aws/shield.py passes endpoint_url=None (field removed; shield deleted later).
+- .devcontainer/docker-compose.yml sets AWS_ENDPOINT_URL_DYNAMODB=http://dynamodb-local:8000; developers must recreate the container to pick it up.
+- Tests: four new files under tests/unit/integrations/aws (factory config, assume role, classify error, settings fields); deleted test_aws_client.py and test_settings.py; removed the client matrix case from test_dynamodb_local_endpoint.py and the two endpoint cases from test_shield.py; removed the AWS_ENDPOINT_URL kwarg from tests/smoke/integrations/aws/test_shield_smoke.py (that smoke fixture no longer routes to a local endpoint; file is deleted with the shield). Three moto conftests (tests/integration/infrastructure/{storage,idempotency}, tests/integration/integrations/aws/test_identity_store_conformance.py) now unset AWS_ENDPOINT_URL_DYNAMODB and clear the settings cache instead of patching the removed app_settings attribute. tests/unit/infrastructure/idempotency/test_dynamodb_store.py's unmapped-error case now uses ValidationException: InternalServerError became a mapped transient code once the settings catalogue took effect (this is the intended consequence of the classifier reading settings).
+EVIDENCE
+- `uv run ruff check .` -> All checks passed; `uv run ruff format --check .` -> 721 files already formatted.
+- `uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'` -> no errors in any touched file; 87 pre-existing errors in 31 untouched files (i18n, incident, webhooks, slack, legacy aws mirrors' execute_aws_api_call returns); CI runs mypy as `|| true` (Makefile lint-ci). Not fixed opportunistically.
+- `uv run pytest tests/unit/integrations/aws tests/unit/infrastructure/{storage,idempotency,resilience,configuration,operations} tests/unit/packages/access tests/integrations/aws tests/integration/infrastructure tests/integration/integrations/aws -q` -> 951 passed. Full suite not run at the human's request.
+- `rg "DeferredRefreshableCredentials|create_assume_role_refresher|_session\._credentials|botocore\.credentials" app/integrations` -> 0 hits; `rg "cast\(.*get_aws_client" app/infrastructure app/packages` -> 0 hits.
+- `make check-sdk-typing` -> OK (11 baselined files remain; client.py stays baselined for execute_aws_api_call); `make check-vendor-package-contract` -> OK (29 baselined entries remain).
+BEHAVIOUR CHANGES TO REVIEW: retry/timeout settings become effective (defaults equal today's fallbacks; verify no AWS_RETRY_*/AWS_*_TIMEOUT_SECONDS vars are set in staging/production env); endpoint gate driven by AWS_ENDPOINT_URL_DYNAMODB instead of ENVIRONMENT; RoleSessionName "sre-bot"; InternalServerError and the other settings-catalogue codes now classify as transient/unauthorized/not-found where the old fallbacks propagated them.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

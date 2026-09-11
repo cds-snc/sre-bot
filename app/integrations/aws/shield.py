@@ -82,7 +82,7 @@ class AWSShield:
             service_name,
             region_name=self._settings.AWS_REGION,
             config=self._config,
-            endpoint_url=self._settings.AWS_ENDPOINT_URL,
+            endpoint_url=None,
         )
         self._clients[service_name] = built
         return built

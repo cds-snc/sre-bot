@@ -22,7 +22,6 @@ pytestmark = pytest.mark.unit
 def settings() -> AWSSettings:
     return AWSSettings(
         AWS_REGION="us-east-1",
-        AWS_ENDPOINT_URL=None,
         AWS_RETRY_MAX_ATTEMPTS=3,
         AWS_RETRY_MODE="standard",
         AWS_CONNECT_TIMEOUT_SECONDS=10,
@@ -56,21 +55,6 @@ class TestAWSShieldClientConstruction:
             config = mock_create.call_args.kwargs["config"]
             assert config.connect_timeout == 10
             assert config.read_timeout == 10
-
-    def test_client_passes_endpoint_url_when_set(self) -> None:
-        settings = AWSSettings(AWS_REGION="us-east-1", AWS_ENDPOINT_URL="http://localhost:4566")
-        shield = AWSShield(settings=settings)
-        with patch.object(shield._session, "client") as mock_create:
-            shield.client("dynamodb")
-
-            assert mock_create.call_args.kwargs["endpoint_url"] == "http://localhost:4566"
-
-    def test_client_passes_none_endpoint_url_when_unset(self, settings: AWSSettings) -> None:
-        shield = AWSShield(settings=settings)
-        with patch.object(shield._session, "client") as mock_create:
-            shield.client("dynamodb")
-
-            assert mock_create.call_args.kwargs["endpoint_url"] is None
 
     def test_client_caches_one_instance_per_service(self, settings: AWSSettings) -> None:
         shield = AWSShield(settings=settings)

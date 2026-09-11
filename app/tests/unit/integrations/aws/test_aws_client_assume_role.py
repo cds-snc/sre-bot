@@ -25,7 +25,7 @@ pytestmark = pytest.mark.unit
 
 _ROLE_ARN = "arn:aws:iam::123456789012:role/sre-bot-org"
 _ASSUMED = {
-    "AccessKeyId": "ASIAASSUMEDKEY",
+    "AccessKeyId": "ASIAASSUMEDKEY000001",
     "SecretAccessKey": "assumed-secret",
     "SessionToken": "assumed-token",
     "Expiration": datetime(2030, 1, 1, tzinfo=UTC),
@@ -56,7 +56,7 @@ class TestAssumeRoleCredentials:
             credentials = aws_client._assume_role_credentials(sts, _ROLE_ARN, "sre-bot")
 
             stub.assert_no_pending_responses()
-        assert credentials["AccessKeyId"] == "ASIAASSUMEDKEY"
+        assert credentials["AccessKeyId"] == "ASIAASSUMEDKEY000001"
         assert credentials["SecretAccessKey"] == "assumed-secret"
         assert credentials["SessionToken"] == "assumed-token"
 
@@ -124,7 +124,7 @@ class TestFactoryWiring:
         credentials = assumed_session.get_credentials()
         assert credentials is not None
         assert type(credentials).__name__ == "Credentials"
-        assert credentials.access_key == "ASIAASSUMEDKEY"
+        assert credentials.access_key == "ASIAASSUMEDKEY000001"
         assert credentials.secret_key == "assumed-secret"
         assert credentials.token == "assumed-token"
         assert assumed_session.region_name == "ca-central-1"
