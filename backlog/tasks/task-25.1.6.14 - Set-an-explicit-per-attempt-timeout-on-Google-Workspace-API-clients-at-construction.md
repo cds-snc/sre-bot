@@ -3,10 +3,10 @@ id: TASK-25.1.6.14
 title: >-
   Set an explicit per-attempt timeout on Google Workspace API clients at
   construction
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-10 14:56'
-updated_date: '2026-09-10 20:35'
+updated_date: '2026-09-11 13:31'
 labels:
   - clients
   - phase-3
@@ -44,12 +44,12 @@ NOT IN SCOPE: changing retry counts; handling non-idempotent writes (separate ta
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every service built by app/integrations/google_workspace/client.py uses an explicit per-attempt HTTP timeout read from typed Google Workspace settings, not the google-api-python-client default
-- [ ] #2 The timeout setting has a documented default and rejects non-positive values
-- [ ] #3 The construction-time retry default still applies to every built service
-- [ ] #4 Each built service gets its own Http instance; no Http or Resource is cached and shared across threads
-- [ ] #5 Factory unit tests assert both the configured timeout and the retry request builder on a built service
-- [ ] #6 decisions/outbound-clients.md's Migration section no longer lists Google factories inheriting the 60-second default timeout
+- [x] #1 Every service built by app/integrations/google_workspace/client.py uses an explicit per-attempt HTTP timeout read from typed Google Workspace settings, not the google-api-python-client default
+- [x] #2 The timeout setting has a documented default and rejects non-positive values
+- [x] #3 The construction-time retry default still applies to every built service
+- [x] #4 Each built service gets its own Http instance; no Http or Resource is cached and shared across threads
+- [x] #5 Factory unit tests assert both the configured timeout and the retry request builder on a built service
+- [x] #6 decisions/outbound-clients.md's Migration section no longer lists Google factories inheriting the 60-second default timeout
 - [ ] #7 Full test suite, ruff, mypy and app/bin/check_sdk_typing.py pass
 <!-- AC:END -->
 
@@ -122,3 +122,24 @@ uv run python bin/check_vendor_package_contract.py
 ## Size gate
 2 production files (client.py, settings), 1 mypy override line, 1 ADR bullet, roughly 40-60 production LOC, one subsystem, a single behaviour change. Within the single-PR gate; no decomposition needed.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## Implementation
+- client.py: `_build_authorized_http(credentials, timeout_seconds)` builds a new `httplib2.Http(timeout=...)`, drops 308 from `redirect_codes` (as `googleapiclient.http.build_http` does), and wraps it in `google_auth_httplib2.AuthorizedHttp`. `_build_service` passes `http=` instead of `credentials=`; `requestBuilder` is unchanged. Nothing is cached.
+- The library's `AttributeError` guard around `redirect_codes` was not copied: google-api-python-client>=2.190 requires an httplib2 version that has the attribute, and the stubs type it.
+- settings: `GOOGLE_API_TIMEOUT_SECONDS: float`, default 10.0, `gt=0`, documented on the field and in the class docstring.
+- pyproject: `google_auth_httplib2` added to the mypy `ignore_missing_imports` override.
+- decisions/outbound-clients.md: Migration bullet removed; one dated line added under Changes.
+- tests/unit/infrastructure/spreadsheets/test_google_spreadsheet_provider.py: settings double gains `GOOGLE_API_TIMEOUT_SECONDS`, since construction now reads it.
+
+## AC #7 left unchecked: pre-existing gate failures
+Checked by running both gates with this change temporarily reverted:
+- mypy: 88 errors in 32 files, output identical line for line with and without the change; none in touched files.
+- pytest: 6 failures present with and without the change (3 in tests/modules/webhooks/test_webhooks_aws_sns.py, 3 in tests/unit/infrastructure/directory/test_google.py). The directory ones pass when run alone, so they depend on test order.
+- ruff, check_sdk_typing.py and check_vendor_package_contract.py pass.
+
+## Environment fix (.vscode/settings.json)
+The mypy VS Code extension ran its bundled mypy 1.15.0 against the same app/.mypy_cache as the pinned CLI mypy 1.19.1. The CLI gate crashed with `KeyError: 'setter_type'` and gave inconsistent results. The workspace settings now point the extension at app/.venv (`importStrategy: fromEnvironment`) and give it its own `--cache-dir=.mypy_cache/vscode`.
+<!-- SECTION:NOTES:END -->

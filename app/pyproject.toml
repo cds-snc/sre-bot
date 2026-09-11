@@ -84,7 +84,7 @@ exclude = ["^tests/"]
 explicit_package_bases = true
 
 [[tool.mypy.overrides]]
-module = ["google.oauth2.service_account", "googleapiclient.*"]
+module = ["google.oauth2.service_account", "googleapiclient.*", "google_auth_httplib2"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

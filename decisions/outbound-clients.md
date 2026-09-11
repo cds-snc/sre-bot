@@ -61,9 +61,9 @@ Clients **raise typed SDK exceptions**. They do not return `OperationResult`, do
 Ticket: client-layer convergence (delete `infrastructure/clients/`, resolve `_next` twins, refactor `AWSShield`). Tolerated until closed:
 - the seven baselined deprecated-client consumers;
 - the shield-shaped AWS client;
-- Google factories that inherit the library's 60-second default timeout (TASK-25.1.6.14);
 - non-idempotent Google writes (Drive create and copy) issued on the retrying handle (TASK-25.1.6.15).
 
 **Changes:**
 - 2026-09-08: adapters must not leak vendor-only concepts through Path A Protocols.
 - 2026-09-10: added explicit timeout, non-idempotent write and thread-safety rules, and corrected how Google retries are configured.
+- 2026-09-11: Google factories set an explicit per-attempt timeout.

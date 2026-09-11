@@ -14,6 +14,16 @@
         "${workspaceFolder}/app/.venv/bin/python"
     ],
     "ruff.organizeImports": true,
+    // Run the project-pinned mypy rather than the extension's bundled copy, and
+    // keep the editor's cache separate: two mypy processes sharing app/.mypy_cache
+    // corrupt it and crash the CLI quality gate.
+    "mypy-type-checker.interpreter": [
+        "${workspaceFolder}/app/.venv/bin/python"
+    ],
+    "mypy-type-checker.importStrategy": "fromEnvironment",
+    "mypy-type-checker.args": [
+        "--cache-dir=.mypy_cache/vscode"
+    ],
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff",
         "editor.formatOnSave": true,
