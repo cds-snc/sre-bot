@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:48'
-updated_date: '2026-09-11 16:19'
+updated_date: '2026-09-11 19:20'
 labels:
   - clients
   - phase-3
@@ -54,5 +54,10 @@ packages/access/sync/adapters/aws_identity_center.py is not reused: it exposes p
 created: 2026-09-11 16:19
 ---
 2026-09-11: three defects surfaced by the TASK-25.2.1 characterization pass were assigned here as explicit ACs (unreachable 'not registered' branch, revoke job forwarding False, dead request_aws_account_access with shifted positional args) so they are fixed or deleted deliberately when these call sites move to OperationResult, rather than pinned forever.
+---
+
+created: 2026-09-11 19:20
+---
+2026-09-11 planning: split under the single-PR size gate (estimate ~12 production files mixing new adapter code, a behaviour-changing caller migration and a 379-line deletion). 25.2.3 stays the coordinator with its ACs unchanged: AC#1 and AC#4 are delivered by TASK-25.2.3.1 (adapter + Stubber tests + ConflictException mapping, on branch feat/aws_identity_center_adapter); AC#2, #3, #5, #6, #7 by TASK-25.2.3.2 (caller migration, defect resolution, deletion, baseline pruning). Human decisions recorded on the subtasks: retries=False client for the two creates; ConflictException -> PERMANENT_ERROR; healthcheck = single-page ListUsers succeeds; provider build_identity_center_adapter() in the adapter module; failed bulk listings raise the module-local Directory*UnavailableError; access_view_handler reuses the existing 'Failed to provision' reply for non-NOT_FOUND failures; revoke job logs and skips on any non-success. Finding: tests/integration/integrations/aws/test_identity_store_conformance.py targets packages/access's adapter via moto and never imports the legacy module, so it is not orphaned and stays untouched.
 ---
 <!-- COMMENTS:END -->
