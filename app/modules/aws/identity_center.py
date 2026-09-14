@@ -1,12 +1,86 @@
 """Module to sync the AWS Identity Center with the Google Workspace."""
 
+from typing import Any
+
 import structlog
 
-from integrations.aws import identity_store
 from modules.provisioning import entities, groups, users
+from packages.aws_platform.adapters.identity_center import build_identity_center_adapter
 from utils import filters
 
 logger = structlog.get_logger()
+
+
+# provision_entities splats each whole entity dict into the callable and treats a falsy
+# return as a failed entity, so these bridges absorb the keys the adapter does not take
+# and turn a non-success result into False.
+
+
+def _create_user(email: str, first_name: str, family_name: str, **_ignored: Any) -> str | bool:
+    """Create an Identity Center user; returns the UserId, or False on failure.
+
+    An "already exists" ConflictException arrives as PERMANENT_ERROR and is
+    returned as False, so the entity is recorded as failed and the sync continues.
+    """
+    result = build_identity_center_adapter().create_user(email=email, first_name=first_name, family_name=family_name)
+    if not result.is_success:
+        logger.error("create_user_failed", status=result.status.value, error_code=result.error_code, error=result.message)
+        return False
+    return result.data or False
+
+
+def _delete_user(user_id: str, **_ignored: Any) -> bool:
+    """Delete an Identity Center user; returns True, or False on failure."""
+    result = build_identity_center_adapter().delete_user(user_id=user_id)
+    if not result.is_success:
+        logger.error("delete_user_failed", status=result.status.value, error_code=result.error_code, error=result.message)
+        return False
+    return bool(result.data)
+
+
+def _create_group_membership(group_id: str, user_id: str, **_ignored: Any) -> str | bool:
+    """Add a user to a group; returns the MembershipId, or False on failure.
+
+    An "already exists" ConflictException arrives as PERMANENT_ERROR and is
+    returned as False, so the entity is recorded as failed and the sync continues.
+    """
+    result = build_identity_center_adapter().create_group_membership(group_id=group_id, user_id=user_id)
+    if not result.is_success:
+        logger.error(
+            "create_group_membership_failed",
+            status=result.status.value,
+            error_code=result.error_code,
+            error=result.message,
+        )
+        return False
+    return result.data or False
+
+
+def _delete_group_membership(membership_id: str, **_ignored: Any) -> bool:
+    """Remove a group membership; returns True, or False on failure."""
+    result = build_identity_center_adapter().delete_group_membership(membership_id=membership_id)
+    if not result.is_success:
+        logger.error(
+            "delete_group_membership_failed",
+            status=result.status.value,
+            error_code=result.error_code,
+            error=result.message,
+        )
+        return False
+    return bool(result.data)
+
+
+def _list_target_users(log: Any) -> list[dict[str, Any]]:
+    """List every Identity Center user.
+
+    Raises:
+        DirectoryUsersUnavailableError: when the listing fails.
+    """
+    result = build_identity_center_adapter().list_users()
+    if not result.is_success:
+        log.error("list_users_failed", error_code=result.error_code, error=result.message)
+        raise users.DirectoryUsersUnavailableError(result.message, result.error_code)
+    return result.data or []
 
 
 def synchronize(
@@ -67,7 +141,7 @@ def synchronize(
         source="google_groups",
     )
     target_groups = groups.get_groups_from_integration("aws_identity_center", pre_processing_filters=pre_processing_filters)
-    target_users = identity_store.list_users()
+    target_users = _list_target_users(log)
     log.info(
         "target_groups_users_fetched",
         groups_count=len(target_groups),
@@ -76,7 +150,7 @@ def synchronize(
     )
     if enable_users_sync:
         users_sync_status = sync_users(source_users, target_users, enable_user_create, enable_user_delete)
-        target_users = identity_store.list_users()
+        target_users = _list_target_users(log)
 
     if enable_groups_sync:
         groups_sync_status = sync_groups(
@@ -152,7 +226,7 @@ def sync_users(
         users_to_create = filters.preformat_items(users_to_create, old_key, new_key)
 
     created_users = entities.provision_entities(
-        identity_store.create_user,
+        _create_user,
         users_to_create,
         execute=enable_user_create,
         integration_name="AWS",
@@ -168,7 +242,7 @@ def sync_users(
         users_to_delete = filters.preformat_items(users_to_delete, old_key, new_key)
 
     deleted_users = entities.provision_entities(
-        identity_store.delete_user,
+        _delete_user,
         users_to_delete,
         execute=enable_user_delete,
         integration_name="AWS",
@@ -258,7 +332,7 @@ def sync_groups(
             ]
 
             memberships_created = entities.provision_entities(
-                identity_store.create_group_membership,
+                _create_group_membership,
                 users_to_add,
                 execute=enable_membership_create,
                 integration_name="AWS",
@@ -279,7 +353,7 @@ def sync_groups(
                 if user.get("MembershipId")
             ]
             memberships_deleted = entities.provision_entities(
-                identity_store.delete_group_membership,
+                _delete_group_membership,
                 users_to_remove,
                 execute=enable_membership_delete,
                 integration_name="AWS",
@@ -326,7 +400,7 @@ def provision_aws_users(operation, users_emails):
         ]
 
         return entities.provision_entities(
-            identity_store.create_user,
+            _create_user,
             users_to_create,
             execute=True,
             integration_name="AWS",
@@ -345,7 +419,7 @@ def provision_aws_users(operation, users_emails):
             users_to_delete = filters.preformat_items(users_to_delete, old_key, new_key)
 
         return entities.provision_entities(
-            identity_store.delete_user,
+            _delete_user,
             users_to_delete,
             execute=True,
             integration_name="AWS",
