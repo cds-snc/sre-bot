@@ -7,7 +7,6 @@ import pytest
 
 from infrastructure.configuration.app import AppSettings
 from integrations.aws import dynamodb as dynamodb_module
-from modules.aws import aws_access_requests
 
 
 @pytest.mark.unit
@@ -40,42 +39,3 @@ def test_integrations_aws_dynamodb_endpoint_matrix(
     reloaded = importlib.reload(dynamodb_module)
 
     assert reloaded.client_config.get("endpoint_url") == expected_url
-
-
-@pytest.mark.unit
-@pytest.mark.parametrize(
-    ("environment", "expected_url"),
-    [
-        ("local", "http://dynamodb-local:8000"),
-        ("dev", "http://dynamodb-local:8000"),
-        ("ci", "http://dynamodb-local:8000"),
-        ("staging", None),
-        ("production", None),
-    ],
-)
-def test_modules_aws_access_requests_dynamodb_endpoint_matrix(
-    monkeypatch: pytest.MonkeyPatch,
-    environment: str,
-    expected_url: str | None,
-) -> None:
-    """modules.aws.aws_access_requests._get_dynamodb_client should gate by ENVIRONMENT."""
-
-    captured: dict[str, object] = {}
-
-    def fake_client(service_name: str, **kwargs):
-        captured["service_name"] = service_name
-        captured["kwargs"] = kwargs
-        return SimpleNamespace()
-
-    monkeypatch.setattr(aws_access_requests.boto3, "client", fake_client)
-    monkeypatch.setattr(
-        aws_access_requests,
-        "get_app_settings",
-        lambda: SimpleNamespace(ENVIRONMENT=environment, PREFIX=""),
-    )
-
-    aws_access_requests._get_dynamodb_client()
-
-    kwargs = captured.get("kwargs", {})
-    assert isinstance(kwargs, dict)
-    assert kwargs.get("endpoint_url") == expected_url

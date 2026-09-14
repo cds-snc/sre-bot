@@ -8,7 +8,6 @@ integrations/aws/config.py
 integrations/aws/cost_explorer.py
 integrations/aws/dynamodb.py
 integrations/aws/guard_duty.py
-integrations/aws/identity_store.py
 integrations/aws/lambdas.py
 integrations/aws/organizations.py
 integrations/aws/security_hub.py

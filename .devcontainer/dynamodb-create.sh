@@ -39,25 +39,6 @@ else
   echo "✓ webhooks table created"
 fi
 
-# aws_access_requests table - Hash + Range key
-if table_exists "aws_access_requests"; then
-  echo "✓ aws_access_requests table already exists"
-else
-  echo "Creating aws_access_requests table..."
-  aws dynamodb create-table \
-    --table-name aws_access_requests \
-    --attribute-definitions \
-      AttributeName=account_id,AttributeType=S \
-      AttributeName=created_at,AttributeType=N \
-    --key-schema \
-      AttributeName=account_id,KeyType=HASH \
-      AttributeName=created_at,KeyType=RANGE \
-    --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 \
-    --endpoint-url "$ENDPOINT" \
-    --no-cli-pager >/dev/null
-  echo "✓ aws_access_requests table created"
-fi
-
 # sre_bot_access table - Generic PK/SK pattern
 if table_exists "sre_bot_access"; then
   echo "✓ sre_bot_access table already exists"

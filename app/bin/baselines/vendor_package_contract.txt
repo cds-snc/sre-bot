@@ -9,7 +9,6 @@ module:integrations/aws/config.py
 module:integrations/aws/cost_explorer.py
 module:integrations/aws/dynamodb.py
 module:integrations/aws/guard_duty.py
-module:integrations/aws/identity_store.py
 module:integrations/aws/lambdas.py
 module:integrations/aws/organizations.py
 module:integrations/aws/schemas.py

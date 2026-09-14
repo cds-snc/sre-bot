@@ -10,7 +10,6 @@ from structlog import get_logger
 from infrastructure.idempotency import get_lease_store, run_if_leased
 from infrastructure.plugins.manager import get_plugin_manager
 from integrations import maxmind, opsgenie
-from integrations.aws import identity_store
 from jobs.models import BackgroundJobRegistry
 from jobs.settings import get_scheduler_settings
 from modules.aws import identity_center, spending
@@ -21,6 +20,7 @@ from packages.access.sync.providers import (
     get_access_runtime_config,
     get_access_sync_coordinator,
 )
+from packages.aws_platform.adapters.identity_center import build_identity_center_adapter
 from packages.incident.drive.adapters import google_drive as incident_drive
 
 logger = get_logger()
@@ -125,10 +125,21 @@ def integration_healthchecks():
         "google_drive": incident_drive.incident_drive_healthcheck,
         "maxmind": lambda: maxmind.get_maxmind_client().healthcheck().is_success,
         "opsgenie": opsgenie.healthcheck,
-        "aws": identity_store.healthcheck,
+        "aws": lambda: build_identity_center_adapter().healthcheck().is_success,
     }
     for key, healthcheck in healthchecks.items():
-        if not healthcheck():
+        try:
+            healthy = healthcheck()
+        except Exception as exc:
+            logger.error(
+                "integration_healthcheck_result",
+                module="scheduled_tasks",
+                integration=key,
+                result="unhealthy",
+                error=str(exc),
+            )
+            continue
+        if not healthy:
             logger.error(
                 "integration_healthcheck_result",
                 module="scheduled_tasks",

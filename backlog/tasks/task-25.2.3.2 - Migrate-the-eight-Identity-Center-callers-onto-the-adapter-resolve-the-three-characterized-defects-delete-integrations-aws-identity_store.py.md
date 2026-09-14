@@ -3,10 +3,10 @@ id: TASK-25.2.3.2
 title: >-
   Migrate the eight Identity Center callers onto the adapter, resolve the three
   characterized defects, delete integrations/aws/identity_store.py
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-11 19:18'
-updated_date: '2026-09-14 14:04'
+updated_date: '2026-09-14 15:26'
 labels:
   - clients
   - phase-3
@@ -46,7 +46,7 @@ Test files to retarget (patch build_identity_center_adapter / a fake adapter ins
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All four subtasks (TASK-25.2.3.2.1, TASK-25.2.3.2.2, TASK-25.2.3.2.3, TASK-25.2.3.2.4) are Done, with TASK-25.2.3.2.4 landing last; a repo-wide grep shows zero references to integrations.aws.identity_store and the module no longer exists
+- [x] #1 All four subtasks (TASK-25.2.3.2.1, TASK-25.2.3.2.2, TASK-25.2.3.2.3, TASK-25.2.3.2.4) are Done, with TASK-25.2.3.2.4 landing last; a repo-wide grep shows zero references to integrations.aws.identity_store and the module no longer exists
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -64,6 +64,22 @@ Each subtask carries its own full implementation plan, AC set, and test matrix s
 
 No production code, tests, or further decomposition happen directly on this task; its role from here is tracking only.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Coordinator closed 2026-09-14 (human decision). All four subtasks are Done, and TASK-25.2.3.2.4 landed last:
+- TASK-25.2.3.2.1: provisioning users.py/groups.py listings moved onto build_identity_center_adapter.
+- TASK-25.2.3.2.2: modules/aws/identity_center.py moved onto the adapter; ConflictException handled as a recorded failed entity.
+- TASK-25.2.3.2.3: ops_group_assignment.py get_group_id moved onto the adapter, with NOT_FOUND told apart from other failures.
+- TASK-25.2.3.2.4: dead AWS access-request flow deleted with no code parity (aws_access_requests.py, /aws access, aws_access_view, request_aws_account_access, jobs/revoke_aws_sso_access.py, plus the local-dev table in dynamodb-create.sh/seed.sh/db.sh). The scheduled 'aws' healthcheck now goes through the adapter, with a per-entry exception guard. integrations/aws/identity_store.py and its 890-line test were deleted, and both guard baselines pruned.
+
+Re-scope outcome: the three characterized defects were resolved as follows. access_view_handler's unreachable 'is None' guard and the revoke job forwarding a failed lookup were resolved by deleting the flow, not fixed. ops_group_assignment's falsy-sentinel branch was fixed (.3).
+
+AC#1 evidence (2026-09-14, after .4): `ls app/integrations/aws/identity_store.py` -> no such file; `rg -n "integrations\.aws\.identity_store|from integrations\.aws import .*identity_store"` across the repo excluding .venv and backlog/ -> no hits.
+
+Follow-ups outside this coordinator: TASK-91 (retire the prod aws_access_requests table from Terraform after the retention check); TASK-92 (service health model, including the empty-store healthy semantics and the future of integration_healthchecks).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

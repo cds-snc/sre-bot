@@ -3,10 +3,10 @@ id: TASK-25.2.3
 title: >-
   Build the Identity Center adapter and migrate its legacy callers; delete
   integrations/aws/identity_store.py
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-31 18:48'
-updated_date: '2026-09-14 14:04'
+updated_date: '2026-09-14 15:27'
 labels:
   - clients
   - phase-3
@@ -41,14 +41,33 @@ packages/access/sync/adapters/aws_identity_center.py is not reused: it exposes p
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 packages/aws_platform/adapters/identity_center.py returns OperationResult from every operation, builds its client only through get_aws_client, and has botocore Stubber unit tests for each operation plus classification paths
-- [ ] #2 The listed caller files no longer import integrations.aws.identity_store; each handles OperationResult explicitly, with per-call-site error-path behaviour recorded in notes and reviewed
-- [ ] #3 integrations/aws/identity_store.py and its legacy tests are deleted; both guard baselines are pruned of identity_store entries
-- [ ] #4 packages/access is not reworked; the access feature's own migration stays out of scope
-- [ ] #5 The two defects TASK-25.2.1's characterization pass found in the dead access-request flow (access_view_handler's unreachable 'is None' guard on get_user_id, and jobs/revoke_aws_sso_access.py forwarding a failed get_user_id into delete_account_assignment) are resolved by deleting that flow, not by fixing it: modules/aws/aws_access_requests.py, the /aws access command and aws_access_view registration, jobs/revoke_aws_sso_access.py and their tests no longer exist, and no code parity is kept
-- [ ] #6 modules/aws/ops_group_assignment.py tells a NOT_FOUND ops-group lookup apart from any other non-success result instead of branching on a falsy sentinel
-- [ ] #7 modules/aws/aws.py's request_aws_account_access is unreferenced in production and calls create_aws_access_request with positionally shifted arguments (access_type receives a datetime, start_date_time receives the access type string); it is deleted, or fixed if the planner finds a live caller, with the pinned test removed or corrected accordingly
+- [x] #1 packages/aws_platform/adapters/identity_center.py returns OperationResult from every operation, builds its client only through get_aws_client, and has botocore Stubber unit tests for each operation plus classification paths
+- [x] #2 The listed caller files no longer import integrations.aws.identity_store; each handles OperationResult explicitly, with per-call-site error-path behaviour recorded in notes and reviewed
+- [x] #3 integrations/aws/identity_store.py and its legacy tests are deleted; both guard baselines are pruned of identity_store entries
+- [x] #4 packages/access is not reworked; the access feature's own migration stays out of scope
+- [x] #5 The two defects TASK-25.2.1's characterization pass found in the dead access-request flow (access_view_handler's unreachable 'is None' guard on get_user_id, and jobs/revoke_aws_sso_access.py forwarding a failed get_user_id into delete_account_assignment) are resolved by deleting that flow, not by fixing it: modules/aws/aws_access_requests.py, the /aws access command and aws_access_view registration, jobs/revoke_aws_sso_access.py and their tests no longer exist, and no code parity is kept
+- [x] #6 modules/aws/ops_group_assignment.py tells a NOT_FOUND ops-group lookup apart from any other non-success result instead of branching on a falsy sentinel
+- [x] #7 modules/aws/aws.py's request_aws_account_access is unreferenced in production and calls create_aws_access_request with positionally shifted arguments (access_type receives a datetime, start_date_time receives the access type string); it is deleted, or fixed if the planner finds a live caller, with the pinned test removed or corrected accordingly
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Closed 2026-09-14 (human decision), after both subtasks: TASK-25.2.3.1 (adapter) and coordinator TASK-25.2.3.2 (callers, via .2.1-.2.4) are Done.
+
+AC evidence, verified 2026-09-14:
+- AC#1: packages/aws_platform/adapters/identity_center.py returns OperationResult from every operation and builds both clients only via get_aws_client (:304-305). Stubber suites: tests/unit/packages/aws_platform/test_aws_platform_identity_center_operations.py (27 tests), ..._groups_join.py (10), ..._provider.py (7).
+- AC#2: modules/provisioning/users.py and groups.py (.2.1), modules/aws/identity_center.py (.2.2), ops_group_assignment.py (.2.3) and jobs/scheduled_tasks.py healthcheck (.2.4) all go through build_identity_center_adapter. modules/aws/aws.py no longer touches Identity Center (its only use was deleted). Per-call-site error-path notes are in each subtask.
+- AC#3: integrations/aws/identity_store.py and tests/integrations/aws/test_identity_store.py deleted; identity_store entries removed from both guard baselines (.2.4).
+- AC#4: packages/access untouched.
+- AC#5: aws_access_requests.py, /aws access, aws_access_view, jobs/revoke_aws_sso_access.py and their tests deleted with no code parity (.2.4).
+- AC#6: ops_group_assignment.py:24 branches on OperationStatus.NOT_FOUND separately from other non-success results (.2.3).
+- AC#7: request_aws_account_access deleted with its three pinned tests (.2.4); no live caller existed.
+
+Description correction (no scope change): the line saying test_identity_store_conformance.py 'is retargeted at the adapter or deleted' is stale. That file imports packages.access.sync.adapters.aws_identity_center.AwsIdentityCenterAdapter, never the legacy module, so it was intentionally left untouched (packages/access out of scope, AC#4).
+
+Follow-ups: TASK-25.2.4 (Organizations/SSO-Admin/... adapters; get_account_id_by_name now has no production caller), TASK-91 (Terraform table retirement), TASK-92 (service health model).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

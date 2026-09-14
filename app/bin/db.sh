@@ -24,7 +24,6 @@ Examples:
   $0 list
   $0 scan incidents
   $0 get webhooks "hook-123"
-  $0 get aws_access_requests "12345" "1234567890"
   $0 delete incidents "inc-001"
   $0 clear sre_bot_idempotency
   $0 reset incidents

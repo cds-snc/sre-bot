@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:49'
-updated_date: '2026-09-14 14:08'
+updated_date: '2026-09-14 15:27'
 labels:
   - clients
   - phase-3
@@ -60,5 +60,10 @@ created: 2026-09-11 16:19
 created: 2026-09-14 14:08
 ---
 2026-09-14 (human decision): modules/aws/aws_access_requests.py and jobs/revoke_aws_sso_access.py were removed from the caller list and from AC#4. That access-request flow is dead in production and is deleted under TASK-25.2.3.2.4 with no code parity. modules/aws/aws.py was also removed: after that task it imports nothing from integrations.aws. AC#2 now says 'the listed caller files' instead of 'seven', and the size-gate line counts four caller files.
+---
+
+created: 2026-09-14 15:27
+---
+2026-09-14 (after TASK-25.2.3 closed): re-grep for the description's get_account_id_by_name note. Its only production caller (request_aws_account_access in modules/aws/aws.py) was deleted by TASK-25.2.3.2.4. rg across app/ now finds only the definition (integrations/aws/organizations.py:34) and its four legacy tests (tests/integrations/aws/test_organizations.py:383-423), so drop it with the organizations mirror; do not port it into the adapter. Also: comment #1's line saying request_aws_account_access is owned by TASK-25.2.3 is resolved (deleted). modules/aws/aws.py imports nothing from integrations.aws, and the identity_store dependency is gone (the TASK-25.2.3 dependency is now Done).
 ---
 <!-- COMMENTS:END -->

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:48'
-updated_date: '2026-09-14 14:05'
+updated_date: '2026-09-14 15:27'
 labels:
   - clients
   - phase-3
@@ -81,5 +81,10 @@ created: 2026-09-11 19:54
 created: 2026-09-14 14:05
 ---
 2026-09-14 (human decision): the dead AWS account access-request flow (modules/aws/aws_access_requests.py, /aws access, jobs/revoke_aws_sso_access.py) is excluded from WHERE THE CALLS GO. It is deleted under TASK-25.2.3.2.4 with no code parity, and packages/access re-provides the capability. AC#2's 'every legacy AWS call site listed in the description' now excludes it by construction.
+---
+
+created: 2026-09-14 15:27
+---
+2026-09-14 progress: slice TASK-25.2.3 (Identity Center) is Done. packages/aws_platform/adapters/identity_center.py has Stubber tests, and all Identity Center callers are migrated (provisioning users/groups, modules/aws/identity_center.py, ops_group_assignment get_group_id, scheduled_tasks aws healthcheck). integrations/aws/identity_store.py and its tests are deleted, and its entries are removed from both guard baselines (AC#1 progress: sdk_typing_antipatterns 10 entries left, vendor_package_contract 28 entries left, not all integrations/aws). Per the 2026-09-14 exception, the dead access-request flow (aws_access_requests.py, /aws access, jobs/revoke_aws_sso_access.py) is deleted rather than migrated; the prod table stays in Terraform until TASK-91. Next: TASK-25.2.4.
 ---
 <!-- COMMENTS:END -->
