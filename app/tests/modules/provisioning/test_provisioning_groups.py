@@ -331,42 +331,67 @@ def test_get_groups_from_integration_google_returns_empty_list_when_provider_has
 
 
 @patch("modules.provisioning.groups.filters")
-@patch("modules.provisioning.groups.identity_store.list_groups_with_memberships")
+@patch("modules.provisioning.groups.build_identity_center_adapter")
 def test_get_groups_from_integration_case_aws(
-    mock_aws_list_groups_with_memberships,
+    mock_build,
     mock_filters,
     aws_groups_w_users,
 ):
+    """Successful adapter result with groups and memberships is returned unchanged."""
     aws_groups = aws_groups_w_users(n_groups=3, n_users=3)
-    mock_aws_list_groups_with_memberships.return_value = aws_groups
+    mock_build.return_value.list_groups_with_memberships.return_value = OperationResult.success(data=aws_groups)
 
     response = groups.get_groups_from_integration("aws_identity_center")
 
     assert response == aws_groups
 
-    mock_aws_list_groups_with_memberships.assert_called_once_with(groups_filters=[])
+    mock_build.return_value.list_groups_with_memberships.assert_called_once_with(groups_filters=[])
     assert not mock_filters.filter_by_condition.called
 
 
 @patch("modules.provisioning.groups.filters")
-@patch("modules.provisioning.groups.identity_store.list_groups_with_memberships")
-def test_get_groups_from_integration_case_aws_raises_when_integration_returns_false(
-    mock_aws_list_groups_with_memberships,
+@patch("modules.provisioning.groups.build_identity_center_adapter")
+def test_get_groups_from_integration_case_aws_raises_directory_groups_unavailable_on_failed_listing(
+    mock_build,
     mock_filters,
 ):
-    """A False return (the integration's real error contract on failure) reaches
-    log_groups' unguarded len(groups) call and crashes, unlike an empty-list result.
+    """Failed adapter listing (non-success status) raises module-local error
+    carrying message and error_code for structured error handling.
     """
-    mock_aws_list_groups_with_memberships.return_value = False
+    mock_build.return_value.list_groups_with_memberships.return_value = OperationResult.error(
+        status=OperationStatus.TRANSIENT_ERROR,
+        message="Identity Store service unavailable",
+        error_code="quotaExceeded",
+    )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(groups.DirectoryGroupsUnavailableError) as excinfo:
         groups.get_groups_from_integration("aws_identity_center")
+
+    assert excinfo.value.error_code == "quotaExceeded"
+    assert "unavailable" in str(excinfo.value)
 
 
 @patch("modules.provisioning.groups.filters")
-@patch("modules.provisioning.groups.identity_store.list_groups_with_memberships")
+@patch("modules.provisioning.groups.build_identity_center_adapter")
+def test_get_groups_from_integration_case_aws_empty_listing_returns_empty_list(
+    mock_build,
+    mock_filters,
+):
+    """Successful adapter result with no groups yields empty list without raising."""
+    mock_build.return_value.list_groups_with_memberships.return_value = OperationResult.success(data=[])
+
+    response = groups.get_groups_from_integration("aws_identity_center")
+
+    assert response == []
+
+    mock_build.return_value.list_groups_with_memberships.assert_called_once_with(groups_filters=[])
+    assert not mock_filters.filter_by_condition.called
+
+
+@patch("modules.provisioning.groups.filters")
+@patch("modules.provisioning.groups.build_identity_center_adapter")
 def test_get_groups_from_integration_case_invalid(
-    mock_aws_list_groups_with_memberships,
+    mock_build,
     mock_filters,
 ):
     response = groups.get_groups_from_integration("invalid_case")
@@ -374,13 +399,13 @@ def test_get_groups_from_integration_case_invalid(
     assert response == []
 
     assert not mock_filters.filter_by_condition.called
-    assert not mock_aws_list_groups_with_memberships.called
+    assert not mock_build.return_value.list_groups_with_memberships.called
 
 
 @patch("modules.provisioning.groups.filters")
-@patch("modules.provisioning.groups.identity_store.list_groups_with_memberships")
+@patch("modules.provisioning.groups.build_identity_center_adapter")
 def test_get_groups_from_integration_filters_applied(
-    mock_aws_list_groups_with_memberships,
+    mock_build,
     mock_filters,
     aws_groups_w_users,
 ):
@@ -389,7 +414,7 @@ def test_get_groups_from_integration_filters_applied(
     aws_groups.extend(aws_groups_prefix)
     aws_groups_wo_prefix = aws_groups_w_users(n_groups=3, n_users=3)
     aws_groups.extend(aws_groups_wo_prefix)
-    mock_aws_list_groups_with_memberships.return_value = aws_groups
+    mock_build.return_value.list_groups_with_memberships.return_value = OperationResult.success(data=aws_groups)
     mock_filters.filter_by_condition.side_effect = [aws_groups_prefix, []]
     post_processing_filters = [
         lambda group: "prefix" in group["DisplayName"],
@@ -406,13 +431,13 @@ def test_get_groups_from_integration_filters_applied(
             call(aws_groups_prefix, post_processing_filters[1]),
         ]
     )
-    mock_aws_list_groups_with_memberships.assert_called_once_with(groups_filters=[])
+    mock_build.return_value.list_groups_with_memberships.assert_called_once_with(groups_filters=[])
 
 
 @patch("modules.provisioning.groups.filters")
-@patch("modules.provisioning.groups.identity_store.list_groups_with_memberships")
+@patch("modules.provisioning.groups.build_identity_center_adapter")
 def test_get_groups_from_integration_filters_returns_subset(
-    mock_aws_list_groups_with_memberships,
+    mock_build,
     mock_filters,
     aws_groups_w_users,
 ):
@@ -421,7 +446,7 @@ def test_get_groups_from_integration_filters_returns_subset(
     aws_groups.extend(aws_groups_prefix)
     aws_groups_wo_prefix = aws_groups_w_users(n_groups=3, n_users=3)
     aws_groups.extend(aws_groups_wo_prefix)
-    mock_aws_list_groups_with_memberships.return_value = aws_groups
+    mock_build.return_value.list_groups_with_memberships.return_value = OperationResult.success(data=aws_groups)
     mock_filters.filter_by_condition.side_effect = [aws_groups_prefix]
     post_processing_filters = [
         lambda group: "prefix" in group["DisplayName"],
@@ -434,7 +459,7 @@ def test_get_groups_from_integration_filters_returns_subset(
     assert mock_filters.filter_by_condition.call_count == 1
     mock_filters.filter_by_condition.assert_called_once_with(aws_groups, post_processing_filters[0])
 
-    mock_aws_list_groups_with_memberships.assert_called_once_with(groups_filters=[])
+    mock_build.return_value.list_groups_with_memberships.assert_called_once_with(groups_filters=[])
 
 
 def test_get_groups_from_integration_rejects_return_dataframe():

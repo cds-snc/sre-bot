@@ -2,8 +2,8 @@ from structlog import get_logger
 
 from infrastructure.directory import get_directory_provider
 from infrastructure.directory.models import DirectoryGroupWithMembers, DirectoryUser
-from integrations.aws import identity_store
 from modules.provisioning import users
+from packages.aws_platform.adapters.identity_center import build_identity_center_adapter
 from utils import filters
 
 logger = get_logger()
@@ -139,9 +139,17 @@ def get_groups_from_integration(
                 "get_groups_from_integration_started",
                 service="AWS Identity Center",
             )
-            groups = identity_store.list_groups_with_memberships(
+            aws_result = build_identity_center_adapter().list_groups_with_memberships(
                 groups_filters=pre_processing_filters,
             )
+            if not aws_result.is_success:
+                log.error(
+                    "list_groups_with_memberships_failed",
+                    error_code=aws_result.error_code,
+                    error=aws_result.message,
+                )
+                raise DirectoryGroupsUnavailableError(aws_result.message, aws_result.error_code)
+            groups = aws_result.data or []
             integration_name = "AWS"
             group_display_key = "DisplayName"
             members = "GroupMemberships"
