@@ -3,7 +3,9 @@ import json
 import structlog
 
 from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
-from integrations.aws import identity_store, organizations, sso_admin
+from infrastructure.operations import OperationStatus
+from integrations.aws import organizations, sso_admin
+from packages.aws_platform.adapters.identity_center import build_identity_center_adapter
 
 logger = structlog.get_logger()
 
@@ -17,14 +19,31 @@ def execute():
     if not aws_feature_settings.AWS_OPS_GROUP_NAME:
         return
 
-    aws_ops_group_id = identity_store.get_group_id(aws_feature_settings.AWS_OPS_GROUP_NAME)
-    if not aws_ops_group_id:
+    group_name = aws_feature_settings.AWS_OPS_GROUP_NAME
+    group_result = build_identity_center_adapter().get_group_id(group_name)
+    if group_result.status is OperationStatus.NOT_FOUND:
         status = {
             "status": "failed",
-            "message": (f"Ops group '{aws_feature_settings.AWS_OPS_GROUP_NAME}' not found in AWS Identity Center."),
+            "message": (f"Ops group '{group_name}' not found in AWS Identity Center."),
         }
-        log.error("ops_group_not_found", group_name=aws_feature_settings.AWS_OPS_GROUP_NAME)
+        log.error("ops_group_not_found", group_name=group_name)
         return status
+    # Any other failure (throttling, AccessDenied, ...) is reported with its cause
+    # rather than as a missing group.
+    if not group_result.is_success or not group_result.data:
+        status = {
+            "status": "failed",
+            "message": (f"Failed to look up Ops group '{group_name}' in AWS Identity Center: {group_result.message}"),
+        }
+        log.error(
+            "ops_group_lookup_failed",
+            group_name=group_name,
+            status=group_result.status.value,
+            error_code=group_result.error_code,
+            error=group_result.message,
+        )
+        return status
+    aws_ops_group_id = group_result.data
 
     organizations_accounts = organizations.list_organization_accounts()
     account_assignments = sso_admin.list_account_assignments_for_principal(principal_id=aws_ops_group_id, principal_type="GROUP")
