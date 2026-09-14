@@ -1,10 +1,11 @@
 ---
 id: TASK-25.2.3.2.2
 title: Migrate modules/aws/identity_center.py onto the Identity Center adapter
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-11 20:55'
-updated_date: '2026-09-14 13:04'
+updated_date: '2026-09-14 13:08'
 labels:
   - clients
   - phase-3
@@ -30,11 +31,11 @@ Slice 2 of TASK-25.2.3.2 (split 2026-09-11 under the single-PR size gate). Migra
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 synchronize()'s two list_users() call sites use build_identity_center_adapter().list_users() and raise DirectoryUsersUnavailableError on a non-success result
-- [ ] #2 four local bridge functions (create_user, delete_user, create_group_membership, delete_group_membership) wrap the adapter, map entity-dict kwargs to adapter arguments, and return result.data on success or False (logged with status and error_code) on non-success, including the PERMANENT_ERROR conflict case for create_user and create_group_membership
-- [ ] #3 all six entities.provision_entities call sites pass the new local bridges instead of identity_store.* -- :155/:171/:261/:282 in sync_users/sync_groups and :329/:348 in provision_aws_users; entities.py itself is unchanged
-- [ ] #4 modules/aws/identity_center.py no longer imports integrations.aws.identity_store
-- [ ] #5 tests/unit/modules/aws/test_identity_center_handler.py is retargeted to patch build_identity_center_adapter, with new cases covering each bridge's success, non-success, and PERMANENT_ERROR-conflict paths, plus synchronize()'s DirectoryUsersUnavailableError path
+- [x] #1 synchronize()'s two list_users() call sites use build_identity_center_adapter().list_users() and raise DirectoryUsersUnavailableError on a non-success result
+- [x] #2 four local bridge functions (create_user, delete_user, create_group_membership, delete_group_membership) wrap the adapter, map entity-dict kwargs to adapter arguments, and return result.data on success or False (logged with status and error_code) on non-success, including the PERMANENT_ERROR conflict case for create_user and create_group_membership
+- [x] #3 all six entities.provision_entities call sites pass the new local bridges instead of identity_store.* -- :155/:171/:261/:282 in sync_users/sync_groups and :329/:348 in provision_aws_users; entities.py itself is unchanged
+- [x] #4 modules/aws/identity_center.py no longer imports integrations.aws.identity_store
+- [x] #5 tests/unit/modules/aws/test_identity_center_handler.py is retargeted to patch build_identity_center_adapter, with new cases covering each bridge's success, non-success, and PERMANENT_ERROR-conflict paths, plus synchronize()'s DirectoryUsersUnavailableError path
 - [ ] #6 ruff, mypy (no new errors) and pytest pass with output recorded; a grep of this file shows zero references to integrations.aws.identity_store
 <!-- AC:END -->
 
@@ -200,6 +201,27 @@ From app/: `uv run ruff check .`; `uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)
 - Mechanical/behavior mix: the callable swap and the typed-raise behavior change are the same uniform treatment applied across one file, not two separable refactors.
 - Verdict: far under the ~400 LOC / ~10 file / two-subsystem thresholds; independently shippable and revertible.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+What changed and why:
+- app/modules/aws/identity_center.py (only production file touched): dropped the integrations.aws.identity_store import; added build_identity_center_adapter and typing.Any imports.
+- Four module-private bridges (_create_user, _delete_user, _create_group_membership, _delete_group_membership) take the adapter's named arguments plus **_ignored, because provision_entities splats each whole entity dict (entities.py:61). They return result.data on success (UserId / True / MembershipId / True, the same values the legacy functions returned) and False on any non-success, logged with status, error_code and message. A ConflictException now arrives as PERMANENT_ERROR and becomes False, so the entity is recorded as failed and the sync continues; this is documented in both create-bridge docstrings.
+- Small deviation from plan Step 3: the two list_users call sites in synchronize() share one helper, _list_target_users(log), instead of duplicating the block. Same behaviour: it logs list_users_failed and raises users.DirectoryUsersUnavailableError(message, error_code) on non-success, and returns data or [] otherwise.
+- All six provision_entities call sites now pass the bridges (sync_users create/delete, sync_groups membership create/delete, provision_aws_users create/delete). entities.py is unchanged.
+
+Evidence (run from app/):
+- rg -n identity_store modules/aws/identity_center.py -> no hits
+- uv run ruff check . -> All checks passed! (ruff format --check on the file: already formatted)
+- uv run pytest tests/unit/modules/aws/test_identity_center_handler.py -> 41 passed (was 30 failed / 11 passed before implementation)
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 87 errors in 31 files (checked 355 source files). This equals the baseline recorded by TASK-25.2.3.2.1, with zero errors in modules/aws.
+- uv run pytest tests --ignore=tests/smoke -> 6 failed, 3411 passed. The 6 failures are unrelated and only fail in the full run: tests/modules/webhooks/test_webhooks_aws_sns.py (3) and tests/unit/infrastructure/directory/test_google.py (3). Both files pass on their own (111 passed) and neither references identity_center, identity_store or provisioning.
+
+Remaining for the human:
+- AC#6 is left unchecked: ruff, mypy and the grep are satisfied, but the full pytest run is not fully green because of the 6 failures above. Please confirm whether they also occur on main, then check AC#6.
+- Review and commit; no git operations were performed by the agent.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
