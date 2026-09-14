@@ -1,10 +1,10 @@
 ---
 id: TASK-25.2.4.1
 title: Build the Organizations and SSO-Admin adapters with Stubber tests
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-14 17:38'
-updated_date: '2026-09-14 18:36'
+updated_date: '2026-09-14 19:10'
 labels:
   - clients
   - phase-3
@@ -28,10 +28,10 @@ Slice 1a of TASK-25.2.4 (build phase, expand only, no caller changes). Create pa
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 packages/aws_platform/adapters/organizations.py returns OperationResult from every operation, builds its client only through get_aws_client, and has Stubber unit tests for each operation plus classification paths
-- [ ] #2 packages/aws_platform/adapters/sso_admin.py returns OperationResult from every operation, builds its client only through get_aws_client, and has Stubber unit tests for each operation plus classification paths
-- [ ] #3 get_active_account_names and get_account_id_by_name are re-grepped for callers and dropped (not ported) if still unused; list_accounts_for_provisioned_permission_set is re-grepped and dropped if still unused
-- [ ] #4 get_account_tags paginates Organizations ListTagsForResource across all pages (fixing the legacy organizations.py mirror's single unpaginated call), verified by a dedicated pagination Stubber test
+- [x] #1 packages/aws_platform/adapters/organizations.py returns OperationResult from every operation, builds its client only through get_aws_client, and has Stubber unit tests for each operation plus classification paths
+- [x] #2 packages/aws_platform/adapters/sso_admin.py returns OperationResult from every operation, builds its client only through get_aws_client, and has Stubber unit tests for each operation plus classification paths
+- [x] #3 get_active_account_names and get_account_id_by_name are re-grepped for callers and dropped (not ported) if still unused; list_accounts_for_provisioned_permission_set is re-grepped and dropped if still unused
+- [x] #4 get_account_tags paginates Organizations ListTagsForResource across all pages (fixing the legacy organizations.py mirror's single unpaginated call), verified by a dedicated pagination Stubber test
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -136,3 +136,16 @@ Fix any bug found in a file this slice touches, with a simple fix. If the fixes 
 OPEN QUESTIONS FOR HUMAN REVIEW
 None. Polling, test tool and bug-fix scope were resolved 2026-09-14.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented packages/aws_platform/adapters/organizations.py and sso_admin.py on the identity_center.py shape (_map_sdk_exception, _call, _paginate, build_<name>_adapter factory).
+- Re-grep before implementation (2026-09-14): get_active_account_names, get_account_id_by_name, list_accounts_for_provisioned_permission_set and get_predefined_permission_sets have no callers outside the legacy mirrors themselves; dropped, not ported. Predefined permission-set resolution travels as the private SsoAdminAdapter._get_predefined_permission_set.
+- get_account_tags now paginates ListTagsForResource (AC#4); list_account_assignments_for_principal is now error-wrapped like its siblings.
+- Tests: test_aws_platform_{organizations,sso_admin}_{operations,provider}.py, 33 tests. The provider tests go beyond the plan's matrix to cover the 'client built only through get_aws_client' clause of AC#1/#2.
+- Open follow-up for the human: Organizations raises AccountNotFoundException (DescribeAccount) and TargetNotFoundException (ListTagsForResource); neither is in AWSSettings.NOT_FOUND_CODES, so they propagate as raw ClientError instead of NOT_FOUND. Not changed here because the plan scopes settings.py out.
+- Gates: ruff clean; mypy clean on packages/aws_platform (remaining errors are pre-existing, outside this change); pytest tests --ignore=tests/smoke -> 3383 passed, 6 failed (pre-existing test-order leaks in test_webhooks_aws_sns.py and directory/test_google.py; they pass in isolation).
+
+Human decision 2026-09-14 (option B, beyond the plan's 'no settings.py changes'): added AccountNotFoundException and TargetNotFoundException to AWSSettings.NOT_FOUND_CODES defaults in integrations/aws/settings.py, so Organizations not-found errors classify as NOT_FOUND instead of propagating as a raw ClientError. Both codes are Organizations-only, so other classify_aws_error users (identitystore, DynamoDB, Shield, access sync) are unaffected, and no AWS_NOT_FOUND_CODES override exists outside tests. No production effect until the caller migrations land. Covered by two new parametrized cases in tests/unit/integrations/aws/test_aws_client_classify_error.py (seen failing first). Gates after the change: ruff clean; mypy 87 errors, unchanged and all outside this change; pytest tests --ignore=tests/smoke -> 3385 passed, 6 failed (the same order-dependent tests as before).
+<!-- SECTION:NOTES:END -->

@@ -60,6 +60,8 @@ class AWSSettings(BaseSettings):
             "NoSuchBucket",
             "NoSuchKey",
             "NotFoundException",
+            "AccountNotFoundException",
+            "TargetNotFoundException",
         ],
         alias="AWS_NOT_FOUND_CODES",
     )
