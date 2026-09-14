@@ -145,7 +145,7 @@ class TestGetFindingsStatistics:
         client = _guard_duty_client()
         adapter = GuardDutyAdapter(client=client)
 
-        finding_criteria = {"Criterion": {"severity": {"Gte": "MEDIUM"}}}
+        finding_criteria = {"Criterion": {"severity": {"Gte": 4}}}
 
         with Stubber(client) as stub:
             stub.add_response(
@@ -173,7 +173,7 @@ class TestGetFindingsStatistics:
         with Stubber(client) as stub:
             stub.add_response(
                 "get_findings_statistics",
-                {},
+                {"FindingStatistics": {}},
                 expected_params={
                     "DetectorId": "detector-123",
                     "FindingStatisticTypes": ["COUNT_BY_SEVERITY"],

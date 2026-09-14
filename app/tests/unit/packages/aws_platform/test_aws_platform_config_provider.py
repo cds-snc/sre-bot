@@ -2,9 +2,10 @@
 
 get_aws_client is patched in the adapter module to record its arguments and
 return a real boto3 config client with dummy static credentials. The config
-role comes from AWS_CONFIG_ROLE_ARN and the settings cache is cleared
-around each test, so the assertions pin the service name and the role ARN the
-factory reads from SERVICE_ROLE_MAP.
+role comes from SERVICE_ROLE_MAP["config"], which resolves to AUDIT_ROLE_ARN
+(AWS_AUDIT_ACCOUNT_ROLE_ARN), and the settings cache is cleared around each
+test, so the assertions pin the service name and the role ARN the factory
+reads from SERVICE_ROLE_MAP.
 """
 
 from collections.abc import Iterator
@@ -54,7 +55,7 @@ class TestBuildConfigAdapter:
 
     def test_single_config_client_with_audit_role(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """One get_aws_client('config') call carries SERVICE_ROLE_MAP['config']."""
-        monkeypatch.setenv("AWS_CONFIG_ROLE_ARN", "arn:aws:iam::123456789012:role/config-role")
+        monkeypatch.setenv("AWS_AUDIT_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/config-role")
         calls: list[dict[str, Any]] = []
 
         adapter = self._build_recording(calls)
@@ -65,8 +66,8 @@ class TestBuildConfigAdapter:
         assert calls[0]["role_arn"] == "arn:aws:iam::123456789012:role/config-role"
 
     def test_role_arn_none_when_setting_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """An empty AWS_CONFIG_ROLE_ARN is passed as role_arn=None, not an empty string."""
-        monkeypatch.setenv("AWS_CONFIG_ROLE_ARN", "")
+        """An empty AWS_AUDIT_ACCOUNT_ROLE_ARN is passed as role_arn=None, not an empty string."""
+        monkeypatch.setenv("AWS_AUDIT_ACCOUNT_ROLE_ARN", "")
         calls: list[dict[str, Any]] = []
 
         self._build_recording(calls)

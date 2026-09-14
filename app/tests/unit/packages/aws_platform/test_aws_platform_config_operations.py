@@ -49,7 +49,7 @@ class TestDescribeAggregateComplianceByConfigRules:
                             "ConfigRuleName": "my-rule",
                             "Compliance": {
                                 "ComplianceType": "COMPLIANT",
-                                "ComplianceSummary": {"CompliantResourceCount": {"CappedCount": 5, "CapExceeded": False}},
+                                "ComplianceContributorCount": {"CappedCount": 5, "CapExceeded": False},
                             },
                         }
                     ]

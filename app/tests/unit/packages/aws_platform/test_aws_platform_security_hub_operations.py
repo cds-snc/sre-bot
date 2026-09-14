@@ -31,6 +31,23 @@ def _security_hub_client() -> Any:
     )
 
 
+def _finding(finding_id: str, severity_label: str) -> dict[str, Any]:
+    """Build a minimal Finding dict satisfying every field the GetFindings response shape requires."""
+    return {
+        "SchemaVersion": "2018-10-08",
+        "Id": finding_id,
+        "ProductArn": "arn:aws:securityhub:ca-central-1::product/aws/securityhub",
+        "GeneratorId": "aws-foundational-security-best-practices",
+        "AwsAccountId": "123456789012",
+        "CreatedAt": "2026-09-14T00:00:00.000Z",
+        "UpdatedAt": "2026-09-14T00:00:00.000Z",
+        "Title": "Example finding",
+        "Description": "Example finding description.",
+        "Severity": {"Label": severity_label},
+        "Resources": [{"Type": "AwsAccount", "Id": "AWS::::Account:123456789012"}],
+    }
+
+
 class TestGetFindings:
     """GetFindings returns paginated flat list of findings."""
 
@@ -42,16 +59,7 @@ class TestGetFindings:
         with Stubber(client) as stub:
             stub.add_response(
                 "get_findings",
-                {
-                    "Findings": [
-                        {
-                            "AwsAccountId": "123456789012",
-                            "Id": "finding-1",
-                            "Type": "Software and Configuration Checks",
-                            "Severity": {"Label": "MEDIUM"},
-                        }
-                    ]
-                },
+                {"Findings": [_finding("finding-1", "MEDIUM")]},
                 expected_params={"Filters": {}},
             )
 
@@ -79,20 +87,14 @@ class TestGetFindings:
             stub.add_response(
                 "get_findings",
                 {
-                    "Findings": [
-                        {"Id": "finding-1", "Severity": {"Label": "LOW"}},
-                    ],
+                    "Findings": [_finding("finding-1", "LOW")],
                     "NextToken": "findings-token",
                 },
                 expected_params={"Filters": {}},
             )
             stub.add_response(
                 "get_findings",
-                {
-                    "Findings": [
-                        {"Id": "finding-2", "Severity": {"Label": "HIGH"}},
-                    ]
-                },
+                {"Findings": [_finding("finding-2", "HIGH")]},
                 expected_params={"Filters": {}, "NextToken": "findings-token"},
             )
 
@@ -143,8 +145,8 @@ class TestGetFindings:
                 "get_findings",
                 {
                     "Findings": [
-                        {"Id": "finding-1", "Severity": {"Label": "HIGH"}},
-                        {"Id": "finding-2", "Severity": {"Label": "CRITICAL"}},
+                        _finding("finding-1", "HIGH"),
+                        _finding("finding-2", "CRITICAL"),
                     ]
                 },
                 expected_params={"Filters": filters},

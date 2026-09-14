@@ -3,10 +3,10 @@ id: TASK-25.2.4.2
 title: >-
   Build the Config, Cost Explorer, GuardDuty, Security Hub and Lambda adapters
   with Stubber tests
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-14 17:39'
-updated_date: '2026-09-14 20:15'
+updated_date: '2026-09-14 20:30'
 labels:
   - clients
   - phase-3
@@ -46,12 +46,12 @@ Size: ~485 production LOC across 7 files, over the ~400 guideline; kept as one P
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 packages/aws_platform/adapters/config.py, cost_explorer.py, guard_duty.py, security_hub.py and aws_lambda.py each return OperationResult from every operation, build their clients only through get_aws_client with the SERVICE_ROLE_MAP role (none for Lambda), and have Stubber operations and provider unit tests plus classification paths
-- [ ] #2 Cost Explorer get_cost_and_usage follows NextPageToken across all pages and returns the concatenated ResultsByTime, verified by a two-page Stubber test
-- [ ] #3 Security Hub get_findings returns a flat list of findings paginated on the Findings key, verified by a two-page Stubber test
-- [ ] #4 SERVICE_ROLE_MAP maps securityhub to LOGGING_ROLE_ARN in integrations/aws/settings.py, and the settings parity test with the legacy infrastructure module stays green
-- [ ] #5 AWSSettings defaults classify NoSuchConfigurationAggregatorException as NOT_FOUND, InvalidAccessException as UNAUTHORIZED, and InternalServerErrorException, InternalException, ServiceException and LimitExceededException as TRANSIENT, covered by test_aws_client_classify_error.py cases
-- [ ] #6 lambdas.get_layer_version is re-grepped for callers and dropped (not ported) if still unused
+- [x] #1 packages/aws_platform/adapters/config.py, cost_explorer.py, guard_duty.py, security_hub.py and aws_lambda.py each return OperationResult from every operation, build their clients only through get_aws_client with the SERVICE_ROLE_MAP role (none for Lambda), and have Stubber operations and provider unit tests plus classification paths
+- [x] #2 Cost Explorer get_cost_and_usage follows NextPageToken across all pages and returns the concatenated ResultsByTime, verified by a two-page Stubber test
+- [x] #3 Security Hub get_findings returns a flat list of findings paginated on the Findings key, verified by a two-page Stubber test
+- [x] #4 SERVICE_ROLE_MAP maps securityhub to LOGGING_ROLE_ARN in integrations/aws/settings.py, and the settings parity test with the legacy infrastructure module stays green
+- [x] #5 AWSSettings defaults classify NoSuchConfigurationAggregatorException as NOT_FOUND, InvalidAccessException as UNAUTHORIZED, and InternalServerErrorException, InternalException, ServiceException and LimitExceededException as TRANSIENT, covered by test_aws_client_classify_error.py cases
+- [x] #6 lambdas.get_layer_version is re-grepped for callers and dropped (not ported) if still unused
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -184,4 +184,6 @@ Candidate bugs verified 2026-09-14 during TASK-25.2.4.1 planning (organizations/
 2. CONFIRMED - integrations/aws/security_hub.py's get_findings calls execute_aws_api_call(service, "get_findings", paginated=True, ...) without a keys= argument. client.py's generic paginator() only flattens by named keys when keys is not None; with keys=None it flattens every non-ResponseMetadata field from each page - including scalar fields like NextToken - into one flat list alongside the Findings list items, corrupting the shape aws_account_health.py:105-109 expects (a list of {"Findings": [...]} page dicts). Also see the cross-reference on TASK-25.2.4.5. Fix when building the Security Hub adapter: paginate with an explicit response_key="Findings" using the identity_center.py _paginate() pattern (response_key parameter, list-type guard on each page's value) rather than reusing the legacy unkeyed paginator() helper's behavior.
 
 Plan review 2026-09-14 (human): (1) confirmed adding securityhub to the legacy infrastructure settings map as well, keeping the parity test; (2) accepted LimitExceededException -> TRANSIENT for every classify_aws_error user, including DynamoDB; revert that entry if it causes issues; (3) return shapes and the aws_lambda module name are cross-referenced in the notes of TASK-25.2.4.4, .4.5 and .4.6.
+
+Implementation 2026-09-14: five adapters added under packages/aws_platform/adapters/ (config, cost_explorer, guard_duty, security_hub, aws_lambda); securityhub -> LOGGING_ROLE_ARN in both settings role maps; six new default error codes. Test fixture corrections (no assertions weakened): Stubber validates payloads against botocore service models, so Config Compliance uses ComplianceContributorCount, GuardDuty severity Gte is an integer and the empty response carries FindingStatistics, Security Hub findings carry the required fields; the Config provider test uses AWS_AUDIT_ACCOUNT_ROLE_ARN (no AWS_CONFIG_ROLE_ARN alias exists). AC#6 re-grep: get_layer_version only appears in its own definition in integrations/aws/lambdas.py, so it is dropped. Gates: ruff clean; mypy has 87 pre-existing errors, none in touched files; pytest 3452 passed, 6 failed (the known order-dependent SNS/google-directory failures).
 <!-- SECTION:NOTES:END -->
