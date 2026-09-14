@@ -3,10 +3,10 @@ id: TASK-25.2.4.2
 title: >-
   Build the Config, Cost Explorer, GuardDuty, Security Hub and Lambda adapters
   with Stubber tests
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-14 17:39'
-updated_date: '2026-09-14 20:01'
+updated_date: '2026-09-14 20:15'
 labels:
   - clients
   - phase-3

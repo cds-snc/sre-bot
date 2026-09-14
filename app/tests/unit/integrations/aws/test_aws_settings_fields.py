@@ -125,6 +125,7 @@ class TestFeatureFields:
             "ce": "arn:org",
             "config": "arn:audit",
             "guardduty": "arn:logging",
+            "securityhub": "arn:logging",
         }
 
     def test_service_role_map_matches_the_infrastructure_module_while_both_exist(self, monkeypatch: pytest.MonkeyPatch) -> None:

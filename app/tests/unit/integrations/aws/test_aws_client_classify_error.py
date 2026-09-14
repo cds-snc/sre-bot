@@ -38,16 +38,29 @@ class TestMappedFamilies:
             "NotFoundException",
             "AccountNotFoundException",
             "TargetNotFoundException",
+            "NoSuchConfigurationAggregatorException",
         ],
     )
     def test_not_found_codes(self, code: str) -> None:
         assert aws_client.classify_aws_error(_client_error(code)) == (OperationStatus.NOT_FOUND, code, None)
 
-    @pytest.mark.parametrize("code", ["AccessDenied", "AccessDeniedException", "ExpiredToken"])
+    @pytest.mark.parametrize("code", ["AccessDenied", "AccessDeniedException", "ExpiredToken", "InvalidAccessException"])
     def test_unauthorized_codes(self, code: str) -> None:
         assert aws_client.classify_aws_error(_client_error(code)) == (OperationStatus.UNAUTHORIZED, code, None)
 
-    @pytest.mark.parametrize("code", ["Throttling", "ThrottlingException", "ServiceUnavailable", "InternalServerError"])
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "Throttling",
+            "ThrottlingException",
+            "ServiceUnavailable",
+            "InternalServerError",
+            "InternalServerErrorException",
+            "InternalException",
+            "ServiceException",
+            "LimitExceededException",
+        ],
+    )
     def test_transient_codes_carry_the_default_retry_hint(self, code: str) -> None:
         assert aws_client.classify_aws_error(_client_error(code)) == (OperationStatus.TRANSIENT_ERROR, code, 60)
 
