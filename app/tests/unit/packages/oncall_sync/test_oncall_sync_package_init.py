@@ -91,6 +91,7 @@ def test_startup_warmup_logs_schedule_and_rotation_counts(monkeypatch) -> None:
 def test_startup_warmup_warns_when_no_schedules(monkeypatch) -> None:
     pkg = _reload_pkg()
     monkeypatch.setattr(pkg, "get_oncall_schedules", lambda: [])
+    monkeypatch.setattr(pkg, "get_rotations", lambda: [])
 
     logger = _Logger()
     pkg.startup_warmup(logger=logger)
