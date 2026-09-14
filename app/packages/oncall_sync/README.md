@@ -1,12 +1,14 @@
 # On-call Sync
 
-Sync OpsGenie on-call schedules to Slack UserGroups to make contacting on-call folks in Slack easier. This allows folks to use @foo-on-call in Slack instead of trying to figure out who's currently on-call.
+Sync OpsGenie on-call schedules and self-managed user rotations to Slack UserGroups to make contacting responsible people in Slack easier. This allows folks to use @foo-on-call in Slack instead of trying to figure out who's currently on-call.
 
 ## How it works
 
 Synced rotations are defined in [rotations.json](./rotations.json).
 
-Every 5 minutes, SRE Bot will fetch the current on-call individual for each rotation and update the linked Slack UserGroup if necessary. SRE Bot will also update the schedule-level UserGroup to contain all folks on-call for the nested rotations.
+Self-managed rotations are defined in [user_rotations](../user_rotations/).
+
+Every 5 minutes, SRE Bot will fetch the current on-call individual for each rotation and the current user for each self-managed rotation, then update the linked Slack UserGroups if necessary. SRE Bot will also update the schedule-level UserGroup to contain all folks on-call for the nested rotations.
 
 The optional top-level `approved_email_domains` list in [rotations.json](./rotations.json) restricts which participant emails are looked up in Slack. Emails outside those domains are skipped without calling Slack and logged with a hashed fingerprint instead of the raw address. Leaving the list empty disables the filtering.
 

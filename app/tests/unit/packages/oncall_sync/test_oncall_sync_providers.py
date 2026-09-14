@@ -17,8 +17,12 @@ pytestmark = pytest.mark.unit
 @pytest.fixture(autouse=True)
 def _provider_cache_isolation() -> Iterator[None]:
     providers.get_user_group_sync_target.cache_clear()
+    providers.get_user_rotations_provider.cache_clear()
+    providers.get_oncall_sync_service.cache_clear()
     yield
     providers.get_user_group_sync_target.cache_clear()
+    providers.get_user_rotations_provider.cache_clear()
+    providers.get_oncall_sync_service.cache_clear()
 
 
 @pytest.fixture(autouse=True)
@@ -92,3 +96,20 @@ def test_get_user_group_sync_target_passes_approved_domains(monkeypatch: pytest.
     target = providers.get_user_group_sync_target()
 
     assert target._approved_domains == frozenset({"example.com"})
+
+
+def test_get_oncall_sync_service_includes_user_rotations_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    on_call = MagicMock()
+    target = MagicMock()
+    user_rotations = MagicMock()
+    with monkeypatch.context() as context:
+        context.setattr(providers, "get_oncall_schedule_provider", lambda: on_call)
+        context.setattr(providers, "get_user_group_sync_target", lambda: target)
+        context.setattr(providers, "get_oncall_schedules", lambda: [])
+        context.setattr(providers, "get_user_rotations_provider", lambda: user_rotations)
+
+        service = providers.get_oncall_sync_service()
+
+        assert service._on_call is on_call
+        assert service._target is target
+        assert service._user_rotations is user_rotations

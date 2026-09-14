@@ -13,6 +13,7 @@ from collections.abc import Sequence
 from typing import Protocol
 
 from packages.oncall_sync.settings import OnCallRotation
+from packages.user_rotations.service import CurrentUserRotation
 
 
 class OnCallScheduleProvider(Protocol):
@@ -44,6 +45,24 @@ class UserGroupSyncTarget(Protocol):
         signal a transport/permission failure that should be reported but
         should not abort the remaining syncs.
         """
+        ...
+
+    def sync_user_group_ids(
+        self,
+        handle: str,
+        name: str,
+        description: str,
+        user_ids: Sequence[str],
+    ) -> None:
+        """Ensure a user group contains exactly the supplied Slack user IDs."""
+        ...
+
+
+class UserRotationsProvider(Protocol):
+    """Source of current assignments from self-managed user rotations."""
+
+    def get_current_rotations(self) -> Sequence[CurrentUserRotation]:
+        """Return each self-managed rotation with its current Slack user ID."""
         ...
 
 
