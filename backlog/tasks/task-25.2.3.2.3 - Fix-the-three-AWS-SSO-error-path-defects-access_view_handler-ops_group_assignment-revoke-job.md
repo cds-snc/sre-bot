@@ -3,10 +3,10 @@ id: TASK-25.2.3.2.3
 title: >-
   Migrate ops_group_assignment.py's get_group_id onto the Identity Center
   adapter with an explicit error path
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-11 20:55'
-updated_date: '2026-09-14 14:21'
+updated_date: '2026-09-14 14:25'
 labels:
   - clients
   - phase-3
@@ -159,5 +159,10 @@ Mapping to plan and ACs:
 - Unchanged: the two pinned organizations/sso_admin False-crash tests still patch the legacy mirrors (TASK-25.2.4 owns them).
 
 ACs stay unchecked until implementation turns these tests green.
+---
+
+created: 2026-09-14 14:25
+---
+2026-09-14: the human ran make test (CI-shaped) and the full suite is green, which confirms the 6 single-process failures are only the TASK-90 test-order leaks. All 4 ACs were verified. The human reviewed the work and moved the task to Done.
 ---
 <!-- COMMENTS:END -->
