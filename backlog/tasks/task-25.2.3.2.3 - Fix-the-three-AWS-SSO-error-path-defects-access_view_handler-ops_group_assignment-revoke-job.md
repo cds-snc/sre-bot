@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 20:55'
-updated_date: '2026-09-14 14:07'
+updated_date: '2026-09-14 14:18'
 labels:
   - clients
   - phase-3
@@ -116,5 +116,22 @@ created: 2026-09-14 14:05
 created: 2026-09-14 14:07
 ---
 2026-09-14 planning: plan written for the re-scoped task (ops_group_assignment.py only). References now point at the ops call site and its caller instead of the deleted access-request flow. Awaiting human approval of the plan before implementation.
+---
+
+created: 2026-09-14 14:18
+---
+2026-09-14: failing tests written (TDD red) in app/tests/unit/modules/aws/test_ops_group_assignment_handler.py; no production code touched.
+
+Evidence (from app/): uv run pytest tests/unit/modules/aws/test_ops_group_assignment_handler.py -q -> 14 failed, 1 passed. All 14 failures are the same error: AttributeError, modules.aws.ops_group_assignment has no attribute build_identity_center_adapter (the patch target). The 1 pass is test_should_return_none_when_feature_disabled, which never reaches the lookup. uv run ruff check -> All checks passed. ruff format --check -> already formatted.
+
+Mapping to plan and ACs:
+- AC#1 / AC#2, not-found: test_should_return_failed_when_group_not_found now returns a NOT_FOUND OperationResult (ResourceNotFoundException). It asserts the exact legacy message 'Ops group 'OpsGroup' not found in AWS Identity Center.', and that no organizations or sso_admin calls are made.
+- AC#1 / AC#2, other failures: test_should_return_failed_with_lookup_error_when_group_lookup_fails, parametrized over TRANSIENT_ERROR/ThrottlingException, UNAUTHORIZED/AccessDeniedException and PERMANENT_ERROR/ValidationException. It asserts a failed status that carries result.message, never says 'not found', logs ops_group_lookup_failed once with group_name, status, error_code and error, and makes no downstream calls.
+- AC#1 boundary: test_should_return_failed_when_group_lookup_succeeds_without_group_id. A success result with data=None gives a failed status that doesn't say 'not found', and sso_admin is never called.
+- AC#1 success path unchanged: the 8 existing happy-path and pinned-crash tests are retargeted to OperationResult.success(data='group-123'). Two small regression guards were added: list_account_assignments_for_principal receives principal_id='group-123', and create_account_assignment receives user_id='group-123', so result.data (not the result object) is what flows downstream.
+- AC#2: every identity_store patch was replaced by modules.aws.ops_group_assignment.build_identity_center_adapter.
+- Unchanged: the two pinned organizations/sso_admin False-crash tests still patch the legacy mirrors (TASK-25.2.4 owns them).
+
+ACs stay unchecked until implementation turns these tests green.
 ---
 <!-- COMMENTS:END -->
