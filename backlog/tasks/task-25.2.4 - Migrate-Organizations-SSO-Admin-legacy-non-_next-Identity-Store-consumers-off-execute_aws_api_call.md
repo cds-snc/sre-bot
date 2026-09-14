@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:49'
-updated_date: '2026-09-14 17:40'
+updated_date: '2026-09-14 18:35'
 labels:
   - clients
   - phase-3
@@ -104,6 +104,15 @@ OPEN QUESTIONS FOR HUMAN REVIEW
 - .4.4 (spending.py): confirm whether a single AWS-account's spend/detail lookup failing during generate_spending_data should skip that account (partial report) or abort the whole run -- current crash-on-False behaviour aborts the whole run today, which the plan is not required to preserve given the AC#4 error-contract change, but the choice needs an explicit human decision recorded in that subtask's notes.
 - Confirm the misspelled legacy test filename tests/integrations/aws/test_lambas.py (not test_lambdas.py) is intentional/historical and just needs deleting, not a sign a differently-named file also exists and was missed.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Human decisions 2026-09-14 (apply to every TASK-25.2.4.x subtask):
+1. TEST TOOL: every AWS adapter test in this series uses botocore.stub.Stubber, matching TASK-25.2.3. This is a deliberate standard, not ADR compliance: decisions/testing.md:24 names moto for boto3 adapter tests, but moto is only installed as moto[dynamodb], nothing in app/tests uses it, and TASK-50 tracks the adoption. Keeping every adapter on the same tool makes a later switch to moto one uniform mechanical change.
+2. BUG FIXES: fix any bug found in a file the subtask already touches, keeping the fix simple (modules/aws/ features will be rearchitected when they move to packages/). If a fix would push the subtask well past the single-PR size gate, stop and ask the human before splitting or deferring.
+3. LEGACY TESTS: tests that predate decisions/testing.md are brought up to it only as far as the subtask's scope allows. Tests slated for deletion in .7 are not rewritten; the behaviour they pin is carried into the new adapter tests instead.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

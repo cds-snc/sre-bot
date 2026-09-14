@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-14 17:39'
+updated_date: '2026-09-14 17:57'
 labels:
   - clients
   - phase-3
@@ -37,3 +38,13 @@ Slice 1b of TASK-25.2.4 (build phase, expand only, no caller changes). Create pa
 - [ ] #2 integrations/aws/settings.py SERVICE_ROLE_MAP includes a securityhub entry mapped to LOGGING_ROLE_ARN
 - [ ] #3 lambdas.get_layer_version is re-grepped for callers and dropped (not ported) if still unused
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Candidate bugs verified 2026-09-14 during TASK-25.2.4.1 planning (organizations/sso_admin scope); these are owned by .4.2 (Config/CE/GuardDuty/SecurityHub/Lambda adapters), not .1:
+
+1. CONFIRMED - Cost Explorer's get_cost_and_usage has no boto3 paginator (confirmed via AWS/boto3 docs: GetCostAndUsage is not in the Cost Explorer paginator list) but its response can include NextPageToken when results exceed one page. The legacy mirror (integrations/aws/cost_explorer.py) and both its callers (spending.py, aws_account_health.py - see notes on TASK-25.2.4.4 and TASK-25.2.4.5) make a single call and never read NextPageToken. The new Cost Explorer adapter needs a manual NextPageToken loop (there is no client.get_paginator("get_cost_and_usage") to lean on, unlike the other adapters' paginate() helpers) so results aren't silently truncated.
+
+2. CONFIRMED - integrations/aws/security_hub.py's get_findings calls execute_aws_api_call(service, "get_findings", paginated=True, ...) without a keys= argument. client.py's generic paginator() only flattens by named keys when keys is not None; with keys=None it flattens every non-ResponseMetadata field from each page - including scalar fields like NextToken - into one flat list alongside the Findings list items, corrupting the shape aws_account_health.py:105-109 expects (a list of {"Findings": [...]} page dicts). Also see the cross-reference on TASK-25.2.4.5. Fix when building the Security Hub adapter: paginate with an explicit response_key="Findings" using the identity_center.py _paginate() pattern (response_key parameter, list-type guard on each page's value) rather than reusing the legacy unkeyed paginator() helper's behavior.
+<!-- SECTION:NOTES:END -->

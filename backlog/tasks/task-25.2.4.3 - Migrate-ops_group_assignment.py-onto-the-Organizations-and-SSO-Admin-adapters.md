@@ -4,6 +4,7 @@ title: Migrate ops_group_assignment.py onto the Organizations and SSO-Admin adap
 status: To Do
 assignee: []
 created_date: '2026-09-14 17:39'
+updated_date: '2026-09-14 18:35'
 labels:
   - clients
   - phase-3
@@ -30,3 +31,12 @@ Slice 2a of TASK-25.2.4. modules/aws/ops_group_assignment.py already branches on
 - [ ] #2 The three call sites that crashed on a bare False return (TASK-25.2.1 characterization) instead produce a logged/returned failure status; the pinned crash tests in tests/unit/modules/aws/test_ops_group_assignment_handler.py are replaced by tests of the new explicit-status behaviour
 - [ ] #3 Per-call-site error-path behaviour (what happens on NOT_FOUND vs TRANSIENT_ERROR vs PERMANENT_ERROR for each of the three calls) is documented in the task notes for review
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Human decision 2026-09-14: keep ops_group_assignment migration to the bare minimum. The feature hasn't been called in at least 3 weeks and has no known active user; it will be reassessed when the business feature moves to packages/.
+- create_account_assignment/delete_account_assignment keep the legacy behaviour: success is judged on the initial response Status != FAILED, with no polling of describe_account_assignment_creation_status/_deletion_status (IN_PROGRESS counts as success).
+- Do only what AC#1-#3 require: swap to the adapters, add a simple explicit OperationResult branch with logging at the three call sites, and replace the pinned crash tests. No new retry, polling or UX logic.
+- AC#3's per-status notes can be brief. One line per call site covering non-success (logged and handled like the existing get_group_id failure branch) is enough; there is no need to split NOT_FOUND/TRANSIENT/PERMANENT beyond what the existing pattern already does.
+<!-- SECTION:NOTES:END -->
