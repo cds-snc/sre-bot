@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:49'
-updated_date: '2026-09-14 15:27'
+updated_date: '2026-09-14 17:40'
 labels:
   - clients
   - phase-3
@@ -48,6 +48,62 @@ Size gate: seven small adapters (about 400 production LOC) plus four caller file
 - [ ] #3 The seven mirror modules and their legacy tests are deleted and both guard baselines pruned accordingly
 - [ ] #4 Every caller that today crashes on a False return from organizations, cost_explorer, config, guard_duty, security_hub or lambdas (dict/list comprehensions and len() over the result in aws_account_health, spending, ops_group_assignment and lambdas, as pinned by TASK-25.2.1) handles the non-success OperationResult status explicitly with a user-visible or logged outcome; the pinned crash tests are replaced by tests of the new behaviour
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+COORDINATOR PLAN. TASK-25.2.4 is decomposed into 7 subtasks under the single-PR size gate; this task's own ACs are satisfied by the union of its children. Ground truth verified 2026-09-14 by reading TASK-25.2's coordinator description, TASK-25.2.3's plan/notes and the landed code at app/packages/aws_platform/adapters/identity_center.py, app/integrations/aws/client.py and app/integrations/aws/settings.py.
+
+WHY DECOMPOSED (size-gate evidence)
+- The seven legacy mirrors total ~489 production LOC (organizations.py 96, sso_admin.py 145, config.py 45, cost_explorer.py 42, guard_duty.py 71, security_hub.py 32, lambdas.py 58); the identity_center adapter that set the pattern is 306 LOC for 13 operations (~23 LOC/op) across just one service. Seven adapters at a similar per-operation cost, plus four caller-file migrations (ops_group_assignment.py 113, spending.py 225, aws_account_health.py 247, lambdas.py 78 = 663 LOC of caller code touched) plus deleting 489 LOC of mirrors and ~419 LOC of legacy tests (test_organizations.py 424 down to ~419 total across the seven test files) is far over the ~400 production LOC / ~10 file gate in one PR, and mixes new adapter code (additive) with caller behaviour changes (the False-to-OperationResult contract change) and mechanical deletion -- three things the gate says must not ship in one PR.
+- The task's own description anticipated a 2-way split (Organizations+SSO-Admin vs account-health+Lambda); re-grepping the actual callers shows organizations is shared by three callers (ops_group_assignment.py, spending.py, aws_account_health.py) and cost_explorer by two (spending.py, aws_account_health.py), so a clean per-adapter-pair split of the callers isn't possible without forcing spending.py or aws_account_health.py to depend on adapters from "the other half". The decomposition below instead follows expand/contract: build all adapters first (2 slices, split only by production-LOC balance), then migrate each caller file independently (4 slices, matching TASK-25.2.3's per-caller subtask shape), then delete the mirrors once every caller is off them (1 slice, matching TASK-25.2.3.2.4's precedent of bundling a deletion+baseline-prune as one subtask).
+
+SUBTASKS AND DEPENDENCY ORDER
+1. TASK-25.2.4.1 (expand) -- Build packages/aws_platform/adapters/organizations.py and sso_admin.py + Stubber tests. No caller changes. ~220 LOC, 2 production files.
+2. TASK-25.2.4.2 (expand) -- Build packages/aws_platform/adapters/{config,cost_explorer,guard_duty,security_hub,lambda}.py + Stubber tests, plus the securityhub SERVICE_ROLE_MAP fix in integrations/aws/settings.py. No caller changes. ~260 LOC, 5 production files (+ 1-line settings.py fix).
+3. TASK-25.2.4.3 (migrate, depends on .1) -- ops_group_assignment.py onto organizations + sso_admin.
+4. TASK-25.2.4.4 (migrate, depends on .1, .2) -- spending.py onto organizations + cost_explorer.
+5. TASK-25.2.4.5 (migrate, depends on .1, .2) -- aws_account_health.py onto organizations, cost_explorer, config, guard_duty, security_hub (largest single-file slice: 5 adapters, 6 call sites, one file).
+6. TASK-25.2.4.6 (migrate, depends on .2) -- lambdas.py onto the lambda adapter.
+7. TASK-25.2.4.7 (contract, depends on .3, .4, .5, .6) -- delete the seven mirrors + seven legacy test files, prune both guard baselines. Pure mechanical deletion once re-grep confirms zero remaining callers; kept as one bundled slice per the TASK-25.2.3.2.4 precedent (equivalent-shaped bundled deletion accepted there) despite ~16 files touched, since every file is a straight deletion or a baseline-line removal with no new logic to review.
+
+Each slice keeps main green and is independently revertible: slices 1-2 are additive (unused code, zero risk to ship alone); slices 3-6 each touch exactly one caller file and can be reverted with a single git revert without breaking the other callers (the mirrors they stop calling are still present and correct until slice 7); slice 7 only runs after re-confirming no caller remains.
+
+PATTERN REUSED FROM TASK-25.2.3 (verbatim, not reinvented)
+- Client construction: get_aws_client(service_name, role_arn=..., retries=...) from app/integrations/aws/client.py (Literal-overloaded factory already supports organizations, sso-admin, ce, config, guardduty, securityhub, lambda -- confirmed in client.py's AwsServiceName Literal, no client.py changes needed).
+- Adapter shape: a class holding the typed client(s), a private _call()/_paginate() helper wrapping try/except (ClientError, BotoCoreError) + classify_aws_error(exc) -> OperationResult.error(...), success calls returning OperationResult.success(data=...), and a module-level build_<name>_adapter() factory reading get_aws_settings().SERVICE_ROLE_MAP for the role ARN -- mirrors identity_center.py:46-54 (init), :68-82 (_call/_map_sdk_exception), :86-98 (_paginate), :296-306 (build_identity_center_adapter). No app/infrastructure/<service>/ Protocol and no packages/aws_platform/providers.py registry: packages/aws_platform is the documented provisional seam (TASK-25.2 description, TIER RULES section) and its own adapters already skip infrastructure/services/providers.py in favour of an inline build_*() factory -- this is a pre-approved, already-established deviation from the general "resolve infrastructure via singleton providers" rule, not a new one introduced here.
+- Caller-side OperationResult branching: modules/aws/ops_group_assignment.py:23-45 already does this for the Identity Center adapter (build_identity_center_adapter().get_group_id(), OperationStatus.NOT_FOUND special-cased from other failures, then is_success/data/message/error_code) -- every migrate slice (.4.3-.4.6) reuses this exact caller-side idiom rather than inventing a new one.
+- Test shape: one botocore.stub.Stubber-based test module per adapter (or per operation group) under app/tests/unit/packages/aws_platform/, named test_aws_platform_<service>_operations.py (matching test_aws_platform_identity_center_operations.py / _groups_join.py / _provider.py); one class per operation with a success test, a pagination test where relevant, and one test per mapped error family, plus an unmapped-exception-propagates test.
+- Deletion shape: TASK-25.2.3.2.4 deleted integrations/aws/identity_store.py + its legacy test + pruned both guard baselines as one subtask after all callers were migrated -- TASK-25.2.4.7 repeats that shape for all seven mirrors at once.
+
+DEAD CODE DROPPED, NOT PORTED (re-grepped 2026-09-14, verify again at implementation time)
+- organizations.get_account_id_by_name (organizations.py:34) and get_active_account_names (organizations.py:22): zero production callers. get_account_id_by_name's only caller (request_aws_account_access) was deleted by TASK-25.2.3.2.4; get_active_account_names has no caller at all, not even internally.
+- sso_admin.list_accounts_for_provisioned_permission_set (sso_admin.py:122): zero production callers found.
+- lambdas.get_layer_version (lambdas.py:39): zero production callers found (modules/aws/lambdas.py only calls list_functions/list_layers).
+Each build subtask's AC requires a re-grep confirmation before dropping, so a newly-discovered caller (e.g. in a script or job not covered by this grep pass) blocks the drop rather than silently losing behaviour.
+
+AC TRACEABILITY (TASK-25.2.4's own ACs, satisfied by children)
+- AC#1 (seven adapters + Stubber tests) <- .4.1, .4.2
+- AC#2 (callers migrated, OperationResult explicit, error-path documented) <- .4.3, .4.4, .4.5, .4.6
+- AC#3 (mirrors + legacy tests deleted, both baselines pruned) <- .4.7
+- AC#4 (crash-on-False call sites now handle non-success explicitly, pinned crash tests replaced) <- .4.3 (3 sites), .4.4 (4 sites), .4.5 (6 sites), .4.6 (2 sites) -- 15 crash-on-False sites total, enumerated with file:line in each child's description
+
+VERIFICATION (run in every child PR, from app/)
+cd app && uv run ruff check .
+cd app && uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'
+cd app && uv run pytest tests --ignore=tests/smoke
+
+BLAST RADIUS AND ROLLBACK
+- Slices .4.1/.4.2 (new adapters, unused): zero production risk, trivially revertible.
+- Slices .4.3-.4.6 (one caller file each): a git revert restores the exact prior mirror-based behaviour for that caller with no cross-file coupling, since the mirrors stay in place until .4.7. The behaviour change itself (False-swallow -> explicit OperationResult) is the intended, human-decided contract change from TASK-25.2 (AC-level "error contract" decision, 2026-09-11); each child's notes must record the concrete before/after per call site for human review, per that decision.
+- Slice .4.7 (deletion): only runs once re-grep confirms zero remaining references; a revert restores the seven mirror files and tests exactly, with no adapter-side coupling since the adapters are additive and independent of the mirrors.
+- Known pre-existing risk, not introduced or fixed by this task: TASK-25.2's comments #2/#3 document that eager AssumeRole (from TASK-25.2.2) can make app startup perform a real sts.assume_role when AWS_ORG_ACCOUNT_ROLE_ARN and ACCESS_SYNC_ENABLED are both set, which is a test-isolation gap tracked against TASK-25.2, not this task's adapters.
+
+OPEN QUESTIONS FOR HUMAN REVIEW
+- .4.5 (aws_account_health.py): the Slack health-check modal has no existing "partial failure" UI -- the plan proposes a per-field fallback string (e.g. "unknown") plus a log entry rather than failing the whole modal; confirm this is the desired UX rather than, e.g., showing an explicit error banner in the modal.
+- .4.4 (spending.py): confirm whether a single AWS-account's spend/detail lookup failing during generate_spending_data should skip that account (partial report) or abort the whole run -- current crash-on-False behaviour aborts the whole run today, which the plan is not required to preserve given the AC#4 error-contract change, but the choice needs an explicit human decision recorded in that subtask's notes.
+- Confirm the misspelled legacy test filename tests/integrations/aws/test_lambas.py (not test_lambdas.py) is intentional/historical and just needs deleting, not a sign a differently-named file also exists and was missed.
+<!-- SECTION:PLAN:END -->
 
 ## Comments
 
