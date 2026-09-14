@@ -30,7 +30,16 @@ def _client_error(code: str, message: str = "boom") -> ClientError:
 class TestMappedFamilies:
     """Expected ClientError codes and BotoCoreError map to a status, code and retry hint."""
 
-    @pytest.mark.parametrize("code", ["ResourceNotFoundException", "NoSuchEntity", "NotFoundException"])
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "ResourceNotFoundException",
+            "NoSuchEntity",
+            "NotFoundException",
+            "AccountNotFoundException",
+            "TargetNotFoundException",
+        ],
+    )
     def test_not_found_codes(self, code: str) -> None:
         assert aws_client.classify_aws_error(_client_error(code)) == (OperationStatus.NOT_FOUND, code, None)
 
