@@ -4,13 +4,14 @@ title: Provider registry with eager lifespan warmup and test clear-all fixture
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 16:58'
+updated_date: '2026-09-14 14:55'
 labels:
   - infrastructure
   - phase-4
   - di
 milestone: m-4
-dependencies: []
+dependencies:
+  - TASK-92
 references:
   - decisions/dependency-injection.md
   - decisions/testing.md
@@ -43,3 +44,12 @@ Steps:
 - [ ] #1 All existing providers registered; tests green
 - [ ] #2 PR references decisions/dependency-injection.md
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-14 14:55
+---
+2026-09-14 (human decision): now depends on TASK-92. Eager phase-2 invocation of every provider would perform network I/O at boot (eager STS AssumeRole in integrations/aws/client.py get_aws_client, jwks_manager.warmup, directory warmup), which conflicts with research advice to keep startup validation static. TASK-92 decides whether construction at boot may call vendors; revisit this task's steps and ACs against that decision before planning.
+---
+<!-- COMMENTS:END -->

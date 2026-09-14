@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-09 15:26'
-updated_date: '2026-09-10 15:45'
+updated_date: '2026-09-14 14:55'
 labels:
   - architecture
   - clients
@@ -75,5 +75,10 @@ Until those are accepted:
 - do not create capability packages yet.
 
 When deciding where warmup and liveness belong, treat infrastructure/directory and infrastructure/drive as tolerated workplace providers that are expected to move (decisions/workplace-systems.md, Draft). Do not introduce a new infrastructure service to host warmup or liveness for workplace systems.
+---
+
+created: 2026-09-14 14:55
+---
+2026-09-14 (human decision): absorbed into TASK-92, which widens the question to the whole service health model (startup validation, liveness vs readiness, vendor dependency monitoring). All of this task's evidence and its four ACs are carried into TASK-92 verbatim or as refined ACs. Archived; references to TASK-82 in done tasks 25.1.6.10 and 25.1.6.10.2 now resolve to TASK-92.
 ---
 <!-- COMMENTS:END -->
