@@ -1,10 +1,10 @@
 ---
 id: TASK-25.2.4.1
 title: Build the Organizations and SSO-Admin adapters with Stubber tests
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-14 17:38'
-updated_date: '2026-09-14 19:10'
+updated_date: '2026-09-14 19:20'
 labels:
   - clients
   - phase-3
