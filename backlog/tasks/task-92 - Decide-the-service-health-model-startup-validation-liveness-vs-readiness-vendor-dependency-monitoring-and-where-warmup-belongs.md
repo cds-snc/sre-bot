@@ -6,10 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-14 14:55'
+updated_date: '2026-09-14 14:58'
 labels:
   - architecture
   - clients
   - observability
+milestone: m-4
 dependencies: []
 references:
   - decisions/health-checks.md

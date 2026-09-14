@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 20:56'
-updated_date: '2026-09-14 14:55'
+updated_date: '2026-09-14 15:00'
 labels:
   - clients
   - phase-3
@@ -157,5 +157,31 @@ created: 2026-09-14 14:38
 created: 2026-09-14 14:55
 ---
 2026-09-14 planning follow-up (no scope change): the empty-store semantics difference (legacy bool(list_users()) vs adapter 'empty store is healthy') and the future of the log-only integration_healthchecks job are owned by TASK-92 (service health model decision). This task keeps the planned flip and loop guard; TASK-92 may later retire or replace the job.
+---
+
+created: 2026-09-14 15:00
+---
+2026-09-14: failing tests written (TDD red, plan Step 1). No production code touched.
+
+Changes:
+- tests/integration/jobs/test_scheduled_tasks_integration.py:
+  - test_healthcheck_all_healthy and test_healthcheck_partial_failures now patch jobs.scheduled_tasks.build_identity_center_adapter.
+  - Partial failures: the aws healthcheck returns a permanent_error and the test asserts an unhealthy integration_healthcheck_result for all four keys.
+  - NEW test_healthcheck_logs_unhealthy_and_continues_when_a_check_raises: Google Drive raises and the adapter factory raises. Asserts both are logged unhealthy with the exception text, and MaxMind/Opsgenie still run.
+- tests/unit/modules/aws/test_aws_command_handler.py:
+  - Deleted test_should_open_access_modal_when_access_command_given and the three request_aws_account_access tests.
+  - NEW test_should_reply_unknown_command_when_access_command_given.
+  - NEW test_should_not_advertise_or_expose_aws_account_access_requests: help text has no /aws access, and aws has no request_aws_account_access.
+- tests/unit/modules/aws/test_aws_command_registration.py: docstrings corrected; asserts bot.view is called once with aws_health_view.
+
+Evidence (from app/):
+- uv run ruff check / ruff format --check on the 3 files: All checks passed; already formatted.
+- uv run pytest on the 3 files: 7 failed, 14 passed. Failure reasons are as expected:
+  - The 3 healthcheck tests: AttributeError, scheduled_tasks has no build_identity_center_adapter.
+  - The 2 registration params: view called 2 times.
+  - Help/hasattr test: '/aws access' is still in help_text.
+  - Access unknown-command test: the access route still calls the legacy modal (TypeError: 'bool' object is not iterable in aws_access_requests.py:241, because the organizations mirror returns False without credentials; no network wait, 0.33s run).
+
+ACs stay unchecked until implementation turns these tests green.
 ---
 <!-- COMMENTS:END -->
