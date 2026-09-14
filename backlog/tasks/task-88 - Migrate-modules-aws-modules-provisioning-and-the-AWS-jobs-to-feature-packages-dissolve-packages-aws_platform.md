@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:36'
-updated_date: '2026-09-11 15:53'
+updated_date: '2026-09-14 14:05'
 labels:
   - phase-5
 dependencies:
@@ -27,7 +27,9 @@ ordinal: 189000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Follow-up to TASK-25.2 (created 2026-09-11). modules/aws was named after a vendor but holds several business features with mixed concerns: AWS access requests (aws_access_requests.py, ops_group_assignment.py, jobs/revoke_aws_sso_access.py), AWS account health reporting (aws_account_health.py), spending reports (spending.py), Lambda inventory (lambdas.py), and Identity Center user/group administration (identity_center.py, users.py, groups.py, aws.py), which overlaps modules/provisioning/{users,groups}.py and the disabled packages/access feature. TASK-25.2 isolates their AWS SDK calls behind packages/aws_platform/adapters/, a provisional adapters-only package that is neither a feature nor a capability package.
+Follow-up to TASK-25.2 (created 2026-09-11). modules/aws was named after a vendor but holds several business features with mixed concerns: AWS Ops group assignment (ops_group_assignment.py), AWS account health reporting (aws_account_health.py), spending reports (spending.py), Lambda inventory (lambdas.py), and Identity Center user/group administration (identity_center.py, users.py, groups.py, aws.py), which overlaps modules/provisioning/{users,groups}.py and the disabled packages/access feature. TASK-25.2 isolates their AWS SDK calls behind packages/aws_platform/adapters/, a provisional adapters-only package that is neither a feature nor a capability package.
+
+Not in this inventory (human decision 2026-09-14): the AWS account access-request flow (aws_access_requests.py, the /aws access command, jobs/revoke_aws_sso_access.py). It was not operational in production and is deleted under TASK-25.2.3.2.4. packages/access re-provides that capability, so no feature package is built for it here.
 
 This task decides the feature boundaries per decisions/feature-packages.md and decisions/capability-packages.md, migrates each module with the standard feature-package recipe (TASK-38 and TASK-39 are the incident and small-module precedents), moves each adapter into its owning home, types adapter returns as frozen domain dataclasses (decisions/sdk-typing.md item 3), relocates the feature-level AWS settings (permission sets, role ARNs, SSO instance, SERVICE_ROLE_MAP) out of integrations/aws/settings.py into the owning packages' settings.py so the vendor package keeps only the transport fields its client needs, and deletes packages/aws_platform together with the legacy modules. Decompose into per-feature subtasks at planning time. Do not start before TASK-25.2 is Done.
 
@@ -45,3 +47,12 @@ EVENTUAL HOMES (recorded 2026-09-11 so the Google-series pattern of vendor-neutr
 - [ ] #3 packages/aws_platform, modules/aws, modules/provisioning and the migrated jobs are deleted
 - [ ] #4 Feature-level AWS settings (permission sets, role ARNs, SSO instance, SERVICE_ROLE_MAP) move from integrations/aws/settings.py into the owning packages' settings.py; integrations/aws/settings.py keeps only the transport fields the client itself needs
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-14 14:05
+---
+2026-09-14 (human decision): the AWS access-request flow (aws_access_requests.py, jobs/revoke_aws_sso_access.py) was removed from the feature inventory. It is dead and deleted under TASK-25.2.3.2.4, and packages/access re-provides the capability. ops_group_assignment.py stays in the inventory as its own concern.
+---
+<!-- COMMENTS:END -->
