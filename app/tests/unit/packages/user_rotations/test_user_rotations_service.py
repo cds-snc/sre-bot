@@ -41,7 +41,9 @@ def test_get_current_rotations_returns_each_rotation_and_its_current_slack_user(
 
     current_rotations = UserRotationsService(rotations=[first, second]).get_current_rotations(t=first.rotation_start)
 
-    assert [(rotation.slack_usergroup_handle, rotation.slack_usergroup_name, rotation.slack_user_id) for rotation in current_rotations] == [
+    assert [
+        (rotation.slack_usergroup_handle, rotation.slack_usergroup_name, rotation.slack_user_id) for rotation in current_rotations
+    ] == [
         (
             "fielding-questions",
             "Fielding questions",

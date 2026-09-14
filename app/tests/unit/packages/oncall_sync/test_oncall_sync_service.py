@@ -177,9 +177,7 @@ def test_sync_all_updates_user_rotation_group_with_direct_slack_id() -> None:
     OnCallSyncService(on_call=on_call, target=target, schedules=[], user_rotations=user_rotations).sync_all()
 
     assert target.calls == []
-    assert target.user_id_calls == [
-        ("fielding-questions", "Fielding questions", "Auto-synced user rotation", ["U123"])
-    ]
+    assert target.user_id_calls == [("fielding-questions", "Fielding questions", "Auto-synced user rotation", ["U123"])]
 
 
 @pytest.mark.unit
