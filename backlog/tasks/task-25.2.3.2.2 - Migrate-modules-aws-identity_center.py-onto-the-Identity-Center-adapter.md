@@ -4,7 +4,7 @@ title: Migrate modules/aws/identity_center.py onto the Identity Center adapter
 status: To Do
 assignee: []
 created_date: '2026-09-11 20:55'
-updated_date: '2026-09-14 12:53'
+updated_date: '2026-09-14 13:04'
 labels:
   - clients
   - phase-3
@@ -215,5 +215,19 @@ created: 2026-09-14 12:53
 (3) Caller error handling is out of scope. synchronize() gains a typed raise where it previously crashed with TypeError, and neither caller catches it (jobs/scheduled_tasks.py:150; modules/aws/groups.py:76, a Slack handler that has already replied 'Synchronization Initiated'). Human direction: the provisioning feature is frozen and will not be migrated as-is -- the access feature takes over this business capability once the vendor-SDK client migration reaches its end state -- so provisioning keeps only the minimum needed to keep working. Net effect at those callers is unchanged crash surface with better diagnostics. No follow-up task raised, per that direction.
 
 Also verified during planning: return-shape parity between result.data and the legacy returns is exact at all four writes, so no shim is needed; and tests/unit/modules/aws/test_identity_center_handler.py is the only test file patching modules.aws.identity_center.identity_store (the other identity_store test references target modules.aws.aws and jobs.scheduled_tasks, both owned by TASK-25.2.3.2.4).
+---
+
+created: 2026-09-14 13:04
+---
+2026-09-14: failing tests authored (TDD red) in app/tests/unit/modules/aws/test_identity_center_handler.py; no production code touched.
+
+Evidence (from app/): uv run pytest tests/unit/modules/aws/test_identity_center_handler.py -q -> 30 failed, 11 passed. All 30 failures are AttributeError: modules.aws.identity_center has no build_identity_center_adapter / _create_user / _delete_user / _create_group_membership (26 on the adapter patch target, 4 on bridge identity asserts). The 11 passing tests cover unchanged sync_users/sync_groups/provision_aws_users behaviour. uv run ruff check -> All checks passed; ruff format applied to this file.
+
+Mapping to ACs:
+- AC#1: the three synchronize tests retargeted to the adapter; new test_should_raise_when_target_user_listing_fails_before_sync (replaces the TypeError characterization), test_should_raise_when_user_relisting_after_user_sync_fails, test_should_treat_an_empty_successful_user_listing_as_zero_users, test_should_pass_the_post_sync_user_listing_to_group_sync.
+- AC#2: TestCreateUserBridge, TestDeleteUserBridge, TestCreateGroupMembershipBridge, TestDeleteGroupMembershipBridge -- success, surplus-entity-key tolerance, non-success -> False, logged status/error_code, and ConflictException PERMANENT_ERROR -> False for both creates; plus success-with-no-UserId -> False.
+- AC#3: identity asserts that all six provision_entities call sites receive the bridges (TestSyncUsers, TestSyncGroups, and two new TestProvisionAwsUsers cases).
+- AC#5: the identity_store patch removed from TestProvisionAwsUsers (entities is mocked, so no adapter patch is needed there).
+Tests reference the bridges as module-private names _create_user, _delete_user, _create_group_membership, _delete_group_membership, as specified in the plan.
 ---
 <!-- COMMENTS:END -->
