@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-27 16:08'
-updated_date: '2026-07-27 16:13'
+updated_date: '2026-09-14 15:27'
 labels:
   - architecture
   - layers
@@ -40,3 +40,12 @@ Needs a human-approved implementation plan (task-planner) before any code; the p
 - [ ] #3 Dead members of app/utils/ (e.g. models.py, tests.py if unused) are identified and removed rather than relocated
 - [ ] #4 app/utils/ no longer exists as a top-level package; layers.md non-tier-directories section records this ticket as its disposition; existing tests pass under new import paths
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-14 15:27
+---
+2026-09-14 (TASK-25.2.3 series): the description and AC#2 name app/integrations/aws/identity_store.py as a current-tier consumer of utils.filters. That module was deleted by TASK-25.2.3.2.4, and packages/aws_platform/adapters/identity_center.py does not import utils. Current production utils.* import sites (rg, excluding tests): modules/provisioning/groups.py:7, modules/provisioning/users.py:10, modules/provisioning/entities.py:4 and modules/aws/identity_center.py:9 (utils.filters); modules/slack/webhooks.py:17 and modules/webhooks/base.py:17 (utils.models). Tests importing utils: tests/utils/test_filters.py, tests/api/routes/test_system.py, tests/api/v1/test_webhooks.py, tests/api/v1/test_geolocate.py, tests/integration/api/v1/test_geolocate_routes.py. google_directory.py should be re-checked when this task is planned. Human: consider rewording AC#2 so it no longer names the deleted file (not changed here).
+---
+<!-- COMMENTS:END -->

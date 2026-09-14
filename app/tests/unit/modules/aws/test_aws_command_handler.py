@@ -61,10 +61,14 @@ def test_should_respond_with_help_text_when_help_command_given(mock_parse_comman
 
 
 @pytest.mark.unit
-@patch("modules.aws.aws.aws_access_requests.request_access_modal")
 @patch("modules.aws.aws.slack_commands.parse_command")
-def test_should_open_access_modal_when_access_command_given(mock_parse_command, mock_request_access_modal, make_command):
-    """Test that access command opens modal."""
+def test_should_reply_unknown_command_when_access_command_given(mock_parse_command, make_command):
+    """The `access` action is not routed and falls through to the unknown-command reply.
+
+    Stub strategy: parse_command returns the bare action. client is a MagicMock,
+    so any attempt to open a Slack modal is recorded. Asserts a single reply
+    naming `access` as unknown, and that no view is opened.
+    """
     # Arrange
     ack = MagicMock()
     respond = MagicMock()
@@ -78,8 +82,19 @@ def test_should_open_access_modal_when_access_command_given(mock_parse_command, 
 
     # Assert
     ack.assert_called_once()
-    mock_request_access_modal.assert_called_once_with(client, body)
-    respond.assert_not_called()
+    respond.assert_called_once()
+    assert "Unknown command: `access`" in respond.call_args[0][0]
+    client.views_open.assert_not_called()
+
+
+@pytest.mark.unit
+def test_should_not_advertise_or_expose_aws_account_access_requests():
+    """The help text does not list `/aws access`, and the module exposes no account-access request helper.
+
+    Asserts on the module's public surface directly; no stubs are needed.
+    """
+    assert "/aws access" not in aws.help_text
+    assert not hasattr(aws, "request_aws_account_access")
 
 
 @pytest.mark.unit
@@ -232,112 +247,3 @@ def test_should_show_error_for_unknown_command(mock_parse_command, make_command)
     respond.assert_called_once()
     assert "Unknown command" in respond.call_args[0][0]
     assert "invalid_command" in respond.call_args[0][0]
-
-
-@pytest.mark.unit
-@patch("modules.aws.aws.aws_access_requests.create_aws_access_request")
-@patch("modules.aws.aws.identity_store")
-@patch("modules.aws.aws.get_account_id_by_name")
-def test_should_pass_through_account_id_and_user_id_on_success(mock_get_account_id, mock_identity_store, mock_create_request):
-    """Test request_aws_account_access pins today's positional call shape into
-    create_aws_access_request.
-
-    Stub strategy: get_account_id_by_name and identity_store.get_user_id resolve
-    successfully; create_aws_access_request is mocked so no DynamoDB write occurs.
-    The assertion pins the exact positional argument order the caller uses today --
-    which is shifted relative to create_aws_access_request's real parameter list
-    (access_type and start_date_time land in each other's slots) -- as a defect to
-    revisit only if this dead code path is ever wired back into production use.
-    """
-    # Arrange
-    mock_get_account_id.return_value = "account-123"
-    mock_identity_store.get_user_id.return_value = "user-123"
-    mock_create_request.return_value = True
-
-    # Act
-    aws.request_aws_account_access(
-        "TestAccount",
-        "Test rationale",
-        "2024-01-01",
-        "2024-01-31",
-        "user@example.com",
-        "read",
-    )
-
-    # Assert
-    mock_create_request.assert_called_once_with(
-        "account-123",
-        "TestAccount",
-        "user-123",
-        "user@example.com",
-        "2024-01-01",
-        "2024-01-31",
-        "read",
-        "Test rationale",
-    )
-
-
-@pytest.mark.unit
-@patch("modules.aws.aws.aws_access_requests.create_aws_access_request")
-@patch("modules.aws.aws.identity_store")
-@patch("modules.aws.aws.get_account_id_by_name")
-def test_should_proceed_with_false_account_id_when_organizations_lookup_fails(
-    mock_get_account_id, mock_identity_store, mock_create_request
-):
-    """Test request_aws_account_access has no guard against a failed account lookup.
-
-    Stub strategy: get_account_id_by_name returns the literal False that
-    handle_aws_api_errors produces on error; there is no `is None`/`if not` check
-    on account_id, so create_aws_access_request is still invoked with False.
-    """
-    # Arrange
-    mock_get_account_id.return_value = False
-    mock_identity_store.get_user_id.return_value = "user-123"
-    mock_create_request.return_value = True
-
-    # Act
-    aws.request_aws_account_access(
-        "TestAccount",
-        "Test rationale",
-        "2024-01-01",
-        "2024-01-31",
-        "user@example.com",
-        "read",
-    )
-
-    # Assert
-    mock_create_request.assert_called_once()
-    assert mock_create_request.call_args.args[0] is False
-
-
-@pytest.mark.unit
-@patch("modules.aws.aws.aws_access_requests.create_aws_access_request")
-@patch("modules.aws.aws.identity_store")
-@patch("modules.aws.aws.get_account_id_by_name")
-def test_should_proceed_with_false_user_id_when_identity_store_lookup_fails(
-    mock_get_account_id, mock_identity_store, mock_create_request
-):
-    """Test request_aws_account_access has no guard against a failed user lookup.
-
-    Stub strategy: identity_store.get_user_id returns the literal False that
-    handle_aws_api_errors produces on error; there is no guard on user_id, so
-    create_aws_access_request is still invoked with False.
-    """
-    # Arrange
-    mock_get_account_id.return_value = "account-123"
-    mock_identity_store.get_user_id.return_value = False
-    mock_create_request.return_value = True
-
-    # Act
-    aws.request_aws_account_access(
-        "TestAccount",
-        "Test rationale",
-        "2024-01-01",
-        "2024-01-31",
-        "user@example.com",
-        "read",
-    )
-
-    # Assert
-    mock_create_request.assert_called_once()
-    assert mock_create_request.call_args.args[2] is False

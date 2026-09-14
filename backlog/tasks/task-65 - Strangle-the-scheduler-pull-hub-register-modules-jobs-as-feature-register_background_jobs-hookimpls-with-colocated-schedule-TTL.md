@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-28 16:30'
-updated_date: '2026-07-28 17:04'
+updated_date: '2026-09-14 15:27'
 labels:
   - architecture
   - reliability
@@ -63,5 +63,10 @@ Reference decisions/reliability.md, decisions/plugins.md when implementing.
 created: 2026-07-28 16:33
 ---
 Placeholder ID resolved: 'TASK-A' in the description = TASK-64 (widened BackgroundJobRegistry). This is a coordinator/pattern task - per the breakdown guidance it should be decomposed by the planning agent, ideally folding each job's register_background_jobs hookimpl registration into that job's owning m-5 modules->packages migration task, one job per PR.
+---
+
+created: 2026-09-14 15:27
+---
+2026-09-14 (TASK-25.2.3 series): description line 'provision_aws_identity_center <- modules.aws.identity_center (calls integrations.aws.identity_store etc.)' is stale. modules/aws/identity_center.py now calls packages.aws_platform.adapters.identity_center.build_identity_center_adapter (TASK-25.2.3.2.2), and integrations/aws/identity_store.py no longer exists. jobs/revoke_aws_sso_access.py (never scheduled) was deleted by TASK-25.2.3.2.4. AC#3 keeps integration_healthchecks as a host-owned Tier-1 job, but TASK-92 (service health model, AC#4) decides whether that log-only vendor-probe job stays, is replaced, or is retired. Re-check AC#3 against TASK-92's outcome before planning.
 ---
 <!-- COMMENTS:END -->
