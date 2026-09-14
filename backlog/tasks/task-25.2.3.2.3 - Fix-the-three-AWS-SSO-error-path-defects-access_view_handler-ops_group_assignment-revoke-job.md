@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 20:55'
-updated_date: '2026-09-14 14:18'
+updated_date: '2026-09-14 14:21'
 labels:
   - clients
   - phase-3
@@ -37,10 +37,10 @@ Re-scope 2026-09-14 (human decision): the original access_view_handler (modules/
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ops_group_assignment.py uses build_identity_center_adapter().get_group_id(); NOT_FOUND keeps the existing 'not found' failed status, any other non-success returns a failed status carrying result.message (logged with status and error_code) without calling organizations or sso_admin, and the success path is unchanged
-- [ ] #2 test_ops_group_assignment_handler.py patches build_identity_center_adapter instead of identity_store in every test; the not-found case returns a NOT_FOUND OperationResult, and a new case covers a non-NOT_FOUND failure
-- [ ] #3 ops_group_assignment.py does not import integrations.aws.identity_store
-- [ ] #4 ruff, mypy (no new errors) and pytest pass with output recorded; a grep of ops_group_assignment.py shows zero references to identity_store
+- [x] #1 ops_group_assignment.py uses build_identity_center_adapter().get_group_id(); NOT_FOUND keeps the existing 'not found' failed status, any other non-success returns a failed status carrying result.message (logged with status and error_code) without calling organizations or sso_admin, and the success path is unchanged
+- [x] #2 test_ops_group_assignment_handler.py patches build_identity_center_adapter instead of identity_store in every test; the not-found case returns a NOT_FOUND OperationResult, and a new case covers a non-NOT_FOUND failure
+- [x] #3 ops_group_assignment.py does not import integrations.aws.identity_store
+- [x] #4 ruff, mypy (no new errors) and pytest pass with output recorded; a grep of ops_group_assignment.py shows zero references to identity_store
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -104,6 +104,32 @@ One production file, one test file; only /aws groups ops is affected. A single g
 ## Size Gate (PASSES)
 1 production file, ~20 production LOC changed, 1 subsystem, a single behaviour change with no mechanical-refactor mix. Far under the ~400 LOC / ~10 file thresholds.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+What changed and why:
+- app/modules/aws/ops_group_assignment.py is the only production file touched. identity_store was dropped from the integrations.aws import (organizations and sso_admin stay, since TASK-25.2.4 owns them). Added imports for OperationStatus (infrastructure.operations) and build_identity_center_adapter.
+- The lookup now calls build_identity_center_adapter().get_group_id(group_name) at call time and branches on the result:
+  - NOT_FOUND: same 'not found' failed status and ops_group_not_found log as before, byte-identical.
+  - Any other non-success, or a success with no data: a new failed status, "Failed to look up Ops group '<name>' in AWS Identity Center: <result.message>", logged as ops_group_lookup_failed with group_name, status, error_code and error. Returns before any Organizations or SSO Admin call.
+  - Success: aws_ops_group_id = result.data, and everything downstream is unchanged.
+- Behaviour change: throttling, AccessDenied and other non-NOT_FOUND failures used to be reported as 'not found', because the legacy mirror collapsed every error to False. They are now reported with their real cause. The only caller, modules/aws/groups.py:139, already renders any 'failed' status as an error reply, so it needed no change.
+- No deviations from the plan.
+
+Evidence (run from app/):
+- uv run pytest tests/unit/modules/aws/test_ops_group_assignment_handler.py -> 15 passed (14 failed / 1 passed before the implementation).
+- rg -n identity_store modules/aws/ops_group_assignment.py -> no hits.
+- uv run ruff check . -> All checks passed. ruff format --check on both files -> already formatted.
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 87 errors in 31 files (checked 355 source files). Same as the recorded baseline, with zero errors in modules/aws.
+- uv run pytest tests --ignore=tests/smoke (single process) -> 6 failed, 3415 passed. The 6 are the known test-order state leaks tracked by TASK-90, unrelated to this change:
+  - tests/modules/webhooks/test_webhooks_aws_sns.py: 3 failures.
+  - tests/unit/infrastructure/directory/test_google.py: 3 failures.
+
+Remaining for the human:
+- Review and commit. The agent ran no git commands.
+- Only a human moves the task to Done.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
