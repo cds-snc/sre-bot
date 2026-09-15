@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-29 20:03'
+updated_date: '2026-09-15 14:08'
 labels:
   - infrastructure
   - phase-4
@@ -56,5 +56,14 @@ Steps:
 created: 2026-07-29 20:03
 ---
 decisions/observability.md now documents a health-check log classification nuance relevant to this ticket's step 4 (uvicorn->pipeline unification): per OWASP, health-check/monitoring traffic (ALB + Route53 hits on /version, /health) must be classified (event_type=healthcheck or downgraded to DEBUG), never dropped from access logs. Only exact liveness-check matches (GET, path, 200, no query string) qualify; anything else on those routes stays at INFO+ so probing/fuzzing remains visible. See decisions/health-checks.md for the infra-side layering this traffic comes from.
+---
+
+created: 2026-09-15 14:08
+---
+2026-09-15: investigation of odd local-dev startup logs, recorded as subtasks so planning starts from the findings:
+- TASK-28.1: lifespan.py:305-313 logs slack_provider_start_skipped reason=test_environment after every SUCCESSFUL Slack start, in all environments (misplaced else). Independent of the middleware trio.
+- TASK-28.2: step 4 of this task (ProcessorFormatter foreign chain for stdlib/uvicorn/slack_sdk, logger names), with root causes, uvicorn 0.41.0 logger config, launch-path options and test starting points.
+Corrections to this description: timestamps are already UTC (structlog 25.5.0 TimeStamper defaults to utc=True; output ends in Z), so "timestamps are local time" is stale. Steps 1-3 (correlation middleware, security headers, RFC 9457) still need their own decomposition under the size gate.
+Local-dev "Invalid HTTP request received" / "HEAD / 405" were investigated and are not app defects (VS Code port-forward / browser TLS probe to the plain-HTTP port). Human decision: leave as is.
 ---
 <!-- COMMENTS:END -->
