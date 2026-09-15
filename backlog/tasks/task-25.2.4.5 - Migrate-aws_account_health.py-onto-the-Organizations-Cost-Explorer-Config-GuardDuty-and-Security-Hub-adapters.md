@@ -3,10 +3,11 @@ id: TASK-25.2.4.5
 title: >-
   Migrate aws_account_health.py onto the Organizations, Cost Explorer, Config,
   GuardDuty and Security Hub adapters
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@me'
 created_date: '2026-09-14 17:39'
-updated_date: '2026-09-15 16:55'
+updated_date: '2026-09-15 17:04'
 labels:
   - clients
   - phase-3
@@ -58,13 +59,13 @@ Bugs in touched code, fixed simply (standing TASK-25.2.4 decision):
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 modules/aws/aws_account_health.py no longer imports integrations.aws; all seven mirror calls go through build_organizations_adapter / build_cost_explorer_adapter / build_config_adapter / build_guard_duty_adapter / build_security_hub_adapter, built at run time (never at import, Cost Explorer once per health check) and branching on OperationResult explicitly
-- [ ] #2 A non-success result from get_cost_and_usage, describe_aggregate_compliance_by_config_rules, list_detectors, get_findings_statistics or get_findings is logged with status, error_code and error, and only that line of the health modal shows ⚠️ unavailable while the other lines render normally (a Security Hub failure no longer reads as ✅ 0 issues); the pinned False tests in tests/unit/modules/aws/test_aws_account_health_handler.py are replaced by tests of this behaviour
-- [ ] #3 When list_detectors succeeds with no detectors, the GuardDuty line shows ⚠️ not enabled and get_findings_statistics is not called
-- [ ] #4 A non-success result from list_organization_accounts is logged and /aws health opens a bilingual error modal with no submit button instead of raising
-- [ ] #5 A ClientError or BotoCoreError raised by adapter construction or an unmapped AWS error code is logged; health_view_handler replaces the Loading data... modal with a bilingual error view and request_health_modal opens its error modal; other exceptions still propagate
-- [ ] #6 Cost Explorer is queried with End set to the first day of the following month (exclusive) while the modal still displays the month's last day; an empty ResultsByTime list yields 0.00; the GuardDuty service.archived criterion is ["false"]
-- [ ] #7 Per-call-site error-path behaviour (one line per call site, including the GuardDuty zero-detector chain) is recorded in the task notes for review
+- [x] #1 modules/aws/aws_account_health.py no longer imports integrations.aws; all seven mirror calls go through build_organizations_adapter / build_cost_explorer_adapter / build_config_adapter / build_guard_duty_adapter / build_security_hub_adapter, built at run time (never at import, Cost Explorer once per health check) and branching on OperationResult explicitly
+- [x] #2 A non-success result from get_cost_and_usage, describe_aggregate_compliance_by_config_rules, list_detectors, get_findings_statistics or get_findings is logged with status, error_code and error, and only that line of the health modal shows ⚠️ unavailable while the other lines render normally (a Security Hub failure no longer reads as ✅ 0 issues); the pinned False tests in tests/unit/modules/aws/test_aws_account_health_handler.py are replaced by tests of this behaviour
+- [x] #3 When list_detectors succeeds with no detectors, the GuardDuty line shows ⚠️ not enabled and get_findings_statistics is not called
+- [x] #4 A non-success result from list_organization_accounts is logged and /aws health opens a bilingual error modal with no submit button instead of raising
+- [x] #5 A ClientError or BotoCoreError raised by adapter construction or an unmapped AWS error code is logged; health_view_handler replaces the Loading data... modal with a bilingual error view and request_health_modal opens its error modal; other exceptions still propagate
+- [x] #6 Cost Explorer is queried with End set to the first day of the following month (exclusive) while the modal still displays the month's last day; an empty ResultsByTime list yields 0.00; the GuardDuty service.archived criterion is ["false"]
+- [x] #7 Per-call-site error-path behaviour (one line per call site, including the GuardDuty zero-detector chain) is recorded in the task notes for review
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -225,4 +226,36 @@ Red-state evidence (from app/):
 - uv run ruff check / ruff format on the file -> All checks passed (formatted).
 - uv run mypy on the file -> 11 call-arg errors in the test file, all on the four helpers' new signatures; they clear on implementation. The remaining errors are existing ones in modules/ followed through imports.
 - uv run pytest tests/unit/modules/aws/test_aws_command_handler.py -> 13 passed (unchanged).
+
+Implementation 2026-09-15:
+- modules/aws/aws_account_health.py no longer imports integrations.aws (rg confirms).
+  - get_account_health builds the Cost Explorer, Config, GuardDuty and Security Hub adapters once per check (never at import) and passes them into the helpers; Cost Explorer is shared by both months.
+  - request_health_modal builds the Organizations adapter.
+  - Failure logs use a private _failure_fields helper (status, error_code, error), as in spending.py.
+- Cost Explorer now queries up to the first day of the next month (End is exclusive); the modal still shows the month's last day. arrow.utcnow() is read once per check.
+- An empty ResultsByTime list gives 0.00. The GuardDuty archived criterion is ["false"].
+- Rendering: _cost_line shows "⚠️ unavailable" for a failed month. _security_line shows ⚠️ (unavailable) / ⚠️ (not enabled) / ✅ / ❌. _error_view builds a closable modal with no submit button.
+- health_view_handler catches ClientError/BotoCoreError from the check (PEP 758 except form), logs aws_health_check_failed with account_id, and replaces the loading modal with a bilingual error. Other exceptions propagate.
+- request_health_modal opens a bilingual error modal when listing fails or raises ClientError/BotoCoreError.
+
+Per-call-site error-path behaviour (AC#7):
+- cost_explorer get_cost_and_usage (both months): a non-success logs aws_health_cost_lookup_failed (account_id, start, end, status, error_code, error). That month's line shows "⚠️ unavailable"; the other month and the security lines still render. Success with no entry or no Groups shows 0.00.
+- config describe_aggregate_compliance_by_config_rules: a non-success (e.g. NOT_FOUND for a missing aggregator) logs aws_health_config_lookup_failed. The line shows "⚠️ Config (unavailable)".
+- guard_duty list_detectors: a non-success logs aws_health_guardduty_detectors_failed and the line shows "⚠️ GuardDuty (unavailable)"; statistics are not queried. Success with zero detectors logs aws_health_guardduty_not_enabled (info) and shows "⚠️ GuardDuty (not enabled)", with no statistics call.
+- guard_duty get_findings_statistics (first detector only, as before): a non-success logs aws_health_guardduty_statistics_failed with detector_id and shows "⚠️ GuardDuty (unavailable)". An unmapped code such as BadRequestException raises ClientError and is handled by the view handler below.
+- security_hub get_findings: a non-success (e.g. UNAUTHORIZED from InvalidAccessException, Security Hub not enabled) logs aws_health_securityhub_lookup_failed and shows "⚠️ SecurityHub (unavailable)" instead of the previous false "✅ 0 issues".
+- organizations list_organization_accounts (/aws health): a non-success logs aws_health_accounts_list_failed and opens the bilingual "Could not list AWS accounts" modal with no submit button. A ClientError/BotoCoreError raised by the adapter build or the call is logged under the same event and opens the same modal.
+- Raised AWS errors during the check (eager AssumeRole at adapter build, unmapped ClientError codes, BotoCoreError): aws_health_check_failed is logged with account_id, and the loading modal is replaced with a bilingual "Could not load the health check" view. Programmer errors propagate to Bolt as before.
+
+Gates (from app/):
+- uv run pytest tests/unit/modules/aws/test_aws_account_health_handler.py tests/unit/modules/aws/test_aws_command_handler.py -> 42 passed (the 26 previously failing tests and 4 errors now pass; the /aws command tests are unchanged)
+- uv run ruff check . -> All checks passed; ruff format --check on both touched files -> already formatted
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 87 errors in 31 files; none in touched files (same count as after TASK-25.2.4.4)
+- uv run pytest tests --ignore=tests/smoke -> 3477 passed, 6 failed. The 6 are the known order-dependent failures in test_webhooks_aws_sns.py (3) and infrastructure/directory/test_google.py (3), not touched here.
+- bin/check_deprecated_infra_client_imports.py, bin/check_sdk_typing.py, bin/check_vendor_package_contract.py -> all OK. No baseline lists aws_account_health.py.
+
+For the human:
+- No settings, env or terraform changes. Each adapter uses the same IAM role as the mirror it replaces (ORG, AUDIT, LOGGING).
+- Visible on merge: cost figures include each month's last day (last month's total rises slightly). A disabled or unreachable GuardDuty or Security Hub now shows ⚠️ instead of ✅.
+- Unblocks TASK-25.2.4.7 for these five mirrors: rg over production code (excluding tests and integrations/aws) finds no remaining import of organizations, cost_explorer, config, guard_duty or security_hub. The only remaining mirror caller in the series is modules/aws/lambdas.py (TASK-25.2.4.6).
 <!-- SECTION:NOTES:END -->
