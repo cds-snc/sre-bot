@@ -5,17 +5,10 @@
 # Moving logic out of a vendor package removes its entries. Removing an entry is always safe.
 # Do NOT add new entries; net-new violations fail CI. Non-vendor directories (utils/) are
 # reported as warnings and are never listed here.
-module:integrations/aws/config.py
-module:integrations/aws/cost_explorer.py
 module:integrations/aws/dynamodb.py
-module:integrations/aws/guard_duty.py
-module:integrations/aws/lambdas.py
-module:integrations/aws/organizations.py
 module:integrations/aws/schemas.py
-module:integrations/aws/security_hub.py
 module:integrations/aws/shield.py
 module:integrations/aws/sqs.py
-module:integrations/aws/sso_admin.py
 module:integrations/openai/summarizer.py
 module:integrations/slack/blocks.py
 module:integrations/slack/bootstrap.py

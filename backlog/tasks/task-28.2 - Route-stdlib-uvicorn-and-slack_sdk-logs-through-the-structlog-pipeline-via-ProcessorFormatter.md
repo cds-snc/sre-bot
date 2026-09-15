@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-15 14:08'
+updated_date: '2026-09-15 19:37'
 labels:
   - infrastructure
   - phase-4
@@ -72,4 +73,15 @@ Local-dev `WARNING: Invalid HTTP request received.` bursts and `HEAD / HTTP/1.1 
 - [ ] #3 Every rendered line, structlog-native or foreign, carries a UTC ISO-8601 timestamp and a logger name
 - [ ] #4 Sensitive keys on foreign records are redacted by the same mask_sensitive_data processor, verified by a test
 - [ ] #5 Logging stays fully suppressed under pytest, and existing redaction pipeline tests stay green
+- [ ] #6 In production mode, a log.exception call (or any call with exc_info=True) emits exactly one line: a JSON object whose exception field holds the traceback. No raw traceback lines follow on stdout or stderr, verified by a test that captures both streams
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Finding 2026-09-15 (production incident, webhook_posting_error on /hook/{id}): each exception log is emitted twice. The JSON event, with the traceback in its "exception" field, is followed by the same traceback as raw lines with no level, one CloudWatch event per line.
+- Reproduced with a scratch script (not committed) that calls configure_logging with ENVIRONMENT=production and then structlog.get_logger().exception(...) inside an except. stderr shows the JSON line, then the raw "Traceback (most recent call last): ..." block.
+- Mechanism (structlog 25.5.0): structlog.stdlib.BoundLogger.exception sets exc_info=True and proxies to logging.Logger.exception. format_exc_info renders the traceback into the event dict, but the stdlib LogRecord still carries exc_info. The root handler from setup.py:224 `logging.basicConfig(format="%(message)s")` uses a plain logging.Formatter, which appends formatException(record.exc_info) after the message.
+- Fix path: ProcessorFormatter.format clears record.exc_info and record.exc_text when keep_exc_info=False, the default. Option (a) therefore removes the duplicate, as long as the structlog chain keeps rendering exceptions in-chain (format_exc_info or dict_tracebacks) and keep_exc_info is left False.
+- Operational impact: terraform/local.tf:10-14 error metric filter is a free-text regex (error|exception) that excludes only lines matching level.{0,6}(warning|info). Level-less raw traceback lines, and uvicorn plain-text access lines such as "POST /hook/... 500 Internal Server Error", each count as separate errors, so one failed request inflates the SRE Bot Errors alarm several times. The alarm rework is tracked separately and depends on this task.
+<!-- SECTION:NOTES:END -->
