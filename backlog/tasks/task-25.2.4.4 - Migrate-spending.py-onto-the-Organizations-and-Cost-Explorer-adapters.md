@@ -4,7 +4,7 @@ title: Migrate spending.py onto the Organizations and Cost Explorer adapters
 status: To Do
 assignee: []
 created_date: '2026-09-14 17:39'
-updated_date: '2026-09-15 15:14'
+updated_date: '2026-09-15 15:26'
 labels:
   - clients
   - phase-3
@@ -147,4 +147,15 @@ Planning 2026-09-15 (human decisions):
 Planning follow-up 2026-09-15:
 - Production log from 2026-09-14T00:00:00Z confirms bug (c): safe_run_error "generate_spending_data() got an unexpected keyword argument 'logger'" from the _tier2 wrapper. AC#5 covers it. The scheduler test now calls the registered job with .do()'s real args/kwargs, so it reproduces this failure.
 - Exchange rates: researched and split out to TASK-93 (Invoicing API ListInvoiceSummaries CurrencyExchangeDetails.Rate; payer invoiced in CAD). Human decision: not part of this migration; spending may be rearchitected when it moves to packages/aws_platform.
+
+Failing tests authored 2026-09-15 (no production code changed):
+- tests/unit/modules/aws/test_spending_handler.py: the happy path now stubs build_organizations_adapter / build_cost_explorer_adapter. The 4 pinned crash tests are replaced by: account-list failure, account-details failure, Cost Explorer failure (helper stops after the failing month; generation returns None), tags failure degrading to Unknown, and execute job logging a failed run on None. New boundary tests: exclusive End (year rollover, leap February), several result entries per month, and empty accounts/spending giving an empty DataFrame (parametrized). Log assertions match events by name on the patched module logger (aws_accounts_list_failed, aws_account_details_failed, aws_account_tags_failed, aws_cost_and_usage_failed, each with status/error_code/error), whether logged on the logger or a bound child.
+- tests/unit/jobs/test_scheduled_tasks.py: test_init_daily_spending_job_runs_update_job_without_arguments runs each daily .do() registration with its recorded args/kwargs through the real _tier2 and an in-memory lease store, with spending functions autospecced from the real signatures. It reproduces the production "unexpected keyword argument 'logger'" failure.
+- tests/unit/modules/aws/test_aws_command_handler.py: added sheet-write-failure and empty-DataFrame reply tests. Minimal edit to the existing success test: it now uses a real non-empty DataFrame and update returns True, because a MagicMock's .empty is truthy.
+- Helper signatures the tests expect: get_accounts_details(organizations_adapter, ids) and get_accounts_spending(cost_explorer_adapter, year, month, span=12); get_cost_and_usage is called with time_period as a keyword.
+
+Red-state evidence (from app/):
+- uv run pytest tests/unit/modules/aws/test_spending_handler.py tests/unit/jobs/test_scheduled_tasks.py tests/unit/modules/aws/test_aws_command_handler.py -> 15 failed, 41 passed. Every failure is the intended one: missing adapter factories, old helper signatures, None.empty AttributeError, the update job not called, the "updated" reply on a failed write, and update called on an empty DataFrame.
+- uv run ruff check / ruff format --check on the 3 files -> All checks passed, 3 files already formatted.
+- uv run mypy on the 3 files -> 4 errors in test_spending_handler.py (lines 449, 481, 540, 561: the new helper signatures, which clear on implementation). The remaining errors are existing ones in modules/ followed through imports.
 <!-- SECTION:NOTES:END -->

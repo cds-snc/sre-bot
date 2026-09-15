@@ -2,6 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
 import pytest
 
 from modules.aws import aws
@@ -195,8 +196,9 @@ def test_should_generate_and_update_spending_when_spending_command_given(
     respond = MagicMock()
     command = make_command("spending")
     mock_parse_command.return_value = ["spending"]
-    mock_spending_data = MagicMock()
+    mock_spending_data = pd.DataFrame({"Linked account": ["123456789012"], "Cost Amount": [100.00]})
     mock_generate.return_value = mock_spending_data
+    mock_update.return_value = True
 
     # Act
     aws.aws_command(ack, command, respond, MagicMock(), MagicMock())
@@ -206,6 +208,64 @@ def test_should_generate_and_update_spending_when_spending_command_given(
     assert respond.call_count == 2
     mock_generate.assert_called_once()
     mock_update.assert_called_once_with(mock_spending_data)
+    assert "has been updated" in respond.call_args_list[1][0][0]
+
+
+@pytest.mark.unit
+@patch("modules.aws.aws.spending.update_spending_data")
+@patch("modules.aws.aws.spending.generate_spending_data")
+@patch("modules.aws.aws.slack_commands.parse_command")
+def test_should_show_error_when_spending_sheet_update_fails(mock_parse_command, mock_generate, mock_update, make_command):
+    """A failed sheet write is reported to the user instead of a success message.
+
+    Stub strategy: generation returns a non-empty DataFrame and
+    update_spending_data returns False, its signal for a skipped or failed write.
+    """
+    # Arrange
+    ack = MagicMock()
+    respond = MagicMock()
+    command = make_command("spending")
+    mock_parse_command.return_value = ["spending"]
+    mock_generate.return_value = pd.DataFrame({"Linked account": ["123456789012"], "Cost Amount": [100.00]})
+    mock_update.return_value = False
+
+    # Act
+    aws.aws_command(ack, command, respond, MagicMock(), MagicMock())
+
+    # Assert
+    replies = [call.args[0] for call in respond.call_args_list]
+    assert len(replies) == 2
+    assert "Failed" in replies[1]
+    assert "Échec" in replies[1]
+    assert not any("has been updated" in reply for reply in replies)
+
+
+@pytest.mark.unit
+@patch("modules.aws.aws.spending.update_spending_data")
+@patch("modules.aws.aws.spending.generate_spending_data")
+@patch("modules.aws.aws.slack_commands.parse_command")
+def test_should_show_error_without_writing_when_spending_data_is_empty(
+    mock_parse_command, mock_generate, mock_update, make_command
+):
+    """An empty spending report is reported as a failure and never written, so it cannot wipe the sheet.
+
+    Stub strategy: generation returns an empty DataFrame; the update function is
+    observed to prove no write is attempted.
+    """
+    # Arrange
+    ack = MagicMock()
+    respond = MagicMock()
+    command = make_command("spending")
+    mock_parse_command.return_value = ["spending"]
+    mock_generate.return_value = pd.DataFrame()
+
+    # Act
+    aws.aws_command(ack, command, respond, MagicMock(), MagicMock())
+
+    # Assert
+    mock_update.assert_not_called()
+    assert respond.call_count == 2
+    assert "Failed" in respond.call_args_list[1][0][0]
 
 
 @pytest.mark.unit
