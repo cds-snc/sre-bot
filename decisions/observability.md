@@ -9,7 +9,7 @@ scope: Structured logging, secret redaction, and request correlation.
 
 ## Context
 
-The pieces exist separately today — structlog is configured, a redaction function exists but is not installed in the pipeline, a correlation helper exists but no middleware calls it, and uvicorn logs bypass the JSON pipeline entirely. This record merges the three concerns because they only work as one pipeline.
+The pieces exist separately today — structlog is configured with UTC timestamps and redaction installed, a correlation helper exists but no middleware calls it, and uvicorn/stdlib logs bypass the pipeline entirely. This record merges the three concerns because they only work as one pipeline.
 
 ## Decision
 
@@ -32,8 +32,11 @@ The audit trail for security events (auth failures, dev-bypass use, authz denial
 
 - Pipeline test: a nested `{"config": {"api_token": "x"}}` logs as redacted; uvicorn access line renders as JSON.
 - Middleware tests: generated/echoed/forwarded/malformed `X-Request-ID` cases; `request_id` present on a log line emitted inside a route.
-- Timestamps are UTC ISO-8601.
+- Timestamps are UTC ISO-8601 on every line, structlog-native and foreign (stdlib/uvicorn); UTC is set explicitly (`TimeStamper(fmt="iso", utc=True)`), not inherited from the library default ([`structlog.processors.TimeStamper`](https://www.structlog.org/en/stable/api.html#structlog.processors.TimeStamper) defaults `utc=True`, but the default must not be relied on silently).
 
 ## Migration
 
-Ticket: middleware/edge trio + logging pipeline (TASK-28). Tolerated until closed: uncorrelated HTTP logs, uninstalled redaction, local-time timestamps, `correlation_id` naming in the old helper, uvicorn access logs unclassified (health-check hits not yet distinguished from real traffic).
+Ticket: middleware/edge trio + logging pipeline (TASK-28), with logging split out into TASK-28.1 (lifespan `slack_provider_start_skipped` fix) and TASK-28.2 (route stdlib/uvicorn/`slack_sdk` logs through structlog's `ProcessorFormatter`). Tolerated until closed: uncorrelated HTTP logs, `correlation_id` naming in the old helper, uvicorn access logs unclassified (health-check hits not yet distinguished from real traffic), and stdlib/uvicorn lines emitted outside the pipeline — `logging.basicConfig(format="%(message)s")` instead of a `ProcessorFormatter` with matching `foreign_pre_chain` ([structlog stdlib guide](https://www.structlog.org/en/stable/standard-library.html)) — since uvicorn installs its own `uvicorn`/`uvicorn.access` handlers with `propagate=False` by default ([uvicorn `config.py`](https://github.com/encode/uvicorn/blob/master/uvicorn/config.py)), so those lines carry no timestamp, level, or logger name.
+
+**Changes:**
+- 2026-09-15: corrected Context and Migration to state redaction is installed (TASK-8); Checks now require UTC to be set explicitly, not inherited from the `TimeStamper` default; Migration's tolerated list swaps "uninstalled redaction"/"local-time timestamps" for the real remaining gap — stdlib/uvicorn logs bypassing the pipeline (TASK-28.2); TASK-28.1 tracks the separate lifespan start-log bug.
