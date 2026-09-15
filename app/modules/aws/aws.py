@@ -101,13 +101,19 @@ def aws_command(ack: Ack, command, respond: Respond, client: WebClient, body) ->
         case "spending":
             respond("Generating spending data...\nGénération des données de dépenses...")
             spending_df = spending.generate_spending_data()
-            if spending_df is None:
+            # An empty report is never written: it would replace the whole sheet.
+            if spending_df is None or spending_df.empty:
                 respond(
                     "Failed to generate spending data. Please try again later.\n"
                     "Échec de la génération des données de dépenses. Veuillez réessayer plus tard."
                 )
                 return
-            spending.update_spending_data(spending_df)
+            if not spending.update_spending_data(spending_df):
+                respond(
+                    "Failed to update spending data. Please try again later.\n"
+                    "Échec de la mise à jour des données de dépenses. Veuillez réessayer plus tard."
+                )
+                return
             respond("Spending data has been updated.\nLes données de dépenses ont été mises à jour.")
         case _:
             respond(

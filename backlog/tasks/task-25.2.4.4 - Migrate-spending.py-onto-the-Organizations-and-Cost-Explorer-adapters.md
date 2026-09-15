@@ -1,10 +1,11 @@
 ---
 id: TASK-25.2.4.4
 title: Migrate spending.py onto the Organizations and Cost Explorer adapters
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-14 17:39'
-updated_date: '2026-09-15 15:26'
+updated_date: '2026-09-15 15:40'
 labels:
   - clients
   - phase-3
@@ -53,13 +54,13 @@ Out of scope: replacing the hard-coded `rates` table (last entry 2025-03, fallba
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 modules/aws/spending.py no longer imports integrations.aws.organizations or integrations.aws.cost_explorer; list_organization_accounts, get_account_details, get_account_tags and get_cost_and_usage are called through build_organizations_adapter() / build_cost_explorer_adapter() and branch on OperationResult explicitly
-- [ ] #2 A non-success result from list_organization_accounts, get_account_details or get_cost_and_usage (any month) is logged with status, error_code and error and makes generate_spending_data return None without raising; execute_spending_data_update_job logs a failed run and writes nothing. The four pinned crash tests in tests/unit/modules/aws/test_spending_handler.py are replaced by tests of this behaviour
-- [ ] #3 A non-success result from get_account_tags is logged and that account is kept with Product and Business Unit set to Unknown
-- [ ] #4 Cost Explorer is queried with End set to the first day of the following month (exclusive end), and an empty account list or empty spending data yields an empty DataFrame instead of a KeyError
-- [ ] #5 The nightly scheduler entry runs spending.execute_spending_data_update_job with no extra kwargs under the existing scheduler:spending_generate_spending_data lease key
-- [ ] #6 The /aws spending Slack command replies with a bilingual failure message when generate_spending_data returns None or an empty DataFrame, or when update_spending_data returns False
-- [ ] #7 Per-call-site error-path behaviour (one line per call site) is recorded in the task notes for review
+- [x] #1 modules/aws/spending.py no longer imports integrations.aws.organizations or integrations.aws.cost_explorer; list_organization_accounts, get_account_details, get_account_tags and get_cost_and_usage are called through build_organizations_adapter() / build_cost_explorer_adapter() and branch on OperationResult explicitly
+- [x] #2 A non-success result from list_organization_accounts, get_account_details or get_cost_and_usage (any month) is logged with status, error_code and error and makes generate_spending_data return None without raising; execute_spending_data_update_job logs a failed run and writes nothing. The four pinned crash tests in tests/unit/modules/aws/test_spending_handler.py are replaced by tests of this behaviour
+- [x] #3 A non-success result from get_account_tags is logged and that account is kept with Product and Business Unit set to Unknown
+- [x] #4 Cost Explorer is queried with End set to the first day of the following month (exclusive end), and an empty account list or empty spending data yields an empty DataFrame instead of a KeyError
+- [x] #5 The nightly scheduler entry runs spending.execute_spending_data_update_job with no extra kwargs under the existing scheduler:spending_generate_spending_data lease key
+- [x] #6 The /aws spending Slack command replies with a bilingual failure message when generate_spending_data returns None or an empty DataFrame, or when update_spending_data returns False
+- [x] #7 Per-call-site error-path behaviour (one line per call site) is recorded in the task notes for review
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -158,4 +159,28 @@ Red-state evidence (from app/):
 - uv run pytest tests/unit/modules/aws/test_spending_handler.py tests/unit/jobs/test_scheduled_tasks.py tests/unit/modules/aws/test_aws_command_handler.py -> 15 failed, 41 passed. Every failure is the intended one: missing adapter factories, old helper signatures, None.empty AttributeError, the update job not called, the "updated" reply on a failed write, and update called on an empty DataFrame.
 - uv run ruff check / ruff format --check on the 3 files -> All checks passed, 3 files already formatted.
 - uv run mypy on the 3 files -> 4 errors in test_spending_handler.py (lines 449, 481, 540, 561: the new helper signatures, which clear on implementation). The remaining errors are existing ones in modules/ followed through imports.
+
+Implementation 2026-09-15:
+- modules/aws/spending.py: build_organizations_adapter() and build_cost_explorer_adapter() are built once per run in generate_spending_data (never at import) and passed into get_accounts_details / get_accounts_spending. No integrations.aws import remains (rg confirmed). generate_spending_data returns None on an AWS failure and an empty DataFrame when there are no accounts or no spending, skipping the merge (fixes the KeyError). Cost Explorer End is now the first day of the next month. execute_spending_data_update_job logs a failed run on None before its existing empty check. A small _failure_fields helper supplies status/error_code/error for every failure log.
+- jobs/scheduled_tasks.py: the 00:00 job runs spending.execute_spending_data_update_job with no kwargs, under the unchanged lease key scheduler:spending_generate_spending_data.
+- modules/aws/aws.py: /aws spending replies with the existing failure message for None or an empty DataFrame, and with a new bilingual message when update_spending_data returns False.
+
+Per-call-site error-path behaviour (AC#7):
+- list_organization_accounts: any non-success logs aws_accounts_list_failed (status, error_code, error). The run aborts: generate_spending_data returns None, and no account, cost lookup or sheet write happens.
+- get_account_details: any non-success (or success without data) logs aws_account_details_failed with account_id. The run aborts (None) before Cost Explorer is queried, so the fully replaced sheet never loses an account's costs.
+- get_account_tags: any non-success logs aws_account_tags_failed (warning) with account_id. The account is kept with Product and Business Unit set to Unknown, and its costs stay in the report.
+- get_cost_and_usage: a non-success for any month logs aws_cost_and_usage_failed with start/end. The lookup stops at that month and the run aborts (None), so an incomplete 12-month window is never written. The adapter follows NextPageToken, so spending.py has no pagination workaround.
+- Downstream: the nightly job logs execute_spending_data_update_job status=failed on None (status=no_data when empty). /aws spending replies "Failed to generate spending data" on None or empty, and "Failed to update spending data" when the write fails.
+- Unmapped ClientErrors, programmer errors and AssumeRole failures at adapter build time propagate (adapter contract, same as TASK-25.2.4.3). The nightly job's safe_run logs them.
+
+Gates (from app/):
+- uv run pytest tests/unit/modules/aws/test_spending_handler.py tests/unit/jobs/test_scheduled_tasks.py tests/unit/modules/aws/test_aws_command_handler.py -> 56 passed (15 previously failing now pass)
+- uv run ruff check . -> All checks passed; ruff format --check on the 3 production files -> already formatted
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 87 errors in 31 files; none in touched files (same count as after TASK-25.2.4.2/.3)
+- uv run pytest tests --ignore=tests/smoke -> 3467 passed, 6 failed. The 6 are the known order-dependent failures in test_webhooks_aws_sns.py (3) and infrastructure/directory/test_google.py (3), not touched here.
+- bin/check_deprecated_infra_client_imports.py, bin/check_sdk_typing.py, bin/check_vendor_package_contract.py -> all OK. No baseline listed spending.py, aws.py or scheduled_tasks.py, so nothing to prune.
+
+For the human:
+- Once merged, the nightly 00:00 job starts replacing Sheet1 with 12 months of data (12 GetCostAndUsage calls plus 2 Organizations calls per account). It needs the same org role and spending_sheet_id config as /aws spending. If spending_sheet_id is empty, the write is skipped and logged.
+- The organizations and cost_explorer mirrors stay for aws_account_health.py (TASK-25.2.4.5) until TASK-25.2.4.7. Exchange rates are tracked in TASK-93.
 <!-- SECTION:NOTES:END -->
