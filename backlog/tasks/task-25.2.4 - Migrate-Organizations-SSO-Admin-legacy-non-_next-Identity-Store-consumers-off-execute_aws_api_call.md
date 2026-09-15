@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:49'
-updated_date: '2026-09-14 18:35'
+updated_date: '2026-09-15 18:39'
 labels:
   - clients
   - phase-3
@@ -43,10 +43,10 @@ Size gate: seven small adapters (about 400 production LOC) plus four caller file
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The seven adapters exist under packages/aws_platform/adapters/, return OperationResult, build clients only through get_aws_client, and have Stubber unit tests
-- [ ] #2 The listed caller files no longer import any of the seven mirrors and handle OperationResult explicitly, with error-path behaviour recorded in notes and reviewed
-- [ ] #3 The seven mirror modules and their legacy tests are deleted and both guard baselines pruned accordingly
-- [ ] #4 Every caller that today crashes on a False return from organizations, cost_explorer, config, guard_duty, security_hub or lambdas (dict/list comprehensions and len() over the result in aws_account_health, spending, ops_group_assignment and lambdas, as pinned by TASK-25.2.1) handles the non-success OperationResult status explicitly with a user-visible or logged outcome; the pinned crash tests are replaced by tests of the new behaviour
+- [x] #1 The seven adapters exist under packages/aws_platform/adapters/, return OperationResult, build clients only through get_aws_client, and have Stubber unit tests
+- [x] #2 The listed caller files no longer import any of the seven mirrors and handle OperationResult explicitly, with error-path behaviour recorded in notes and reviewed
+- [x] #3 The seven mirror modules and their legacy tests are deleted and both guard baselines pruned accordingly
+- [x] #4 Every caller that today crashes on a False return from organizations, cost_explorer, config, guard_duty, security_hub or lambdas (dict/list comprehensions and len() over the result in aws_account_health, spending, ops_group_assignment and lambdas, as pinned by TASK-25.2.1) handles the non-success OperationResult status explicitly with a user-visible or logged outcome; the pinned crash tests are replaced by tests of the new behaviour
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -112,6 +112,12 @@ Human decisions 2026-09-14 (apply to every TASK-25.2.4.x subtask):
 1. TEST TOOL: every AWS adapter test in this series uses botocore.stub.Stubber, matching TASK-25.2.3. This is a deliberate standard, not ADR compliance: decisions/testing.md:24 names moto for boto3 adapter tests, but moto is only installed as moto[dynamodb], nothing in app/tests uses it, and TASK-50 tracks the adoption. Keeping every adapter on the same tool makes a later switch to moto one uniform mechanical change.
 2. BUG FIXES: fix any bug found in a file the subtask already touches, keeping the fix simple (modules/aws/ features will be rearchitected when they move to packages/). If a fix would push the subtask well past the single-PR size gate, stop and ask the human before splitting or deferring.
 3. LEGACY TESTS: tests that predate decisions/testing.md are brought up to it only as far as the subtask's scope allows. Tests slated for deletion in .7 are not rewritten; the behaviour they pin is carried into the new adapter tests instead.
+
+Close-out 2026-09-15 (from TASK-25.2.4.7): all seven children are implemented, so the coordinator ACs are checked. The status is left for a human.
+- AC#1 (seven adapters with Stubber tests) <- TASK-25.2.4.1 (organizations, sso_admin) and TASK-25.2.4.2 (config, cost_explorer, guard_duty, security_hub, aws_lambda).
+- AC#2 (callers on OperationResult, error paths recorded) <- TASK-25.2.4.3 ops_group_assignment, .4.4 spending, .4.5 aws_account_health, .4.6 lambdas. Per-call-site notes are on each child.
+- AC#3 (mirrors and legacy tests deleted, baselines pruned) <- TASK-25.2.4.7.
+- AC#4 (crash-on-False sites handled, pinned crash tests replaced) <- .4.3-.4.6 (.4.6 recorded that lambdas.py never crashed and fixed its failure/empty conflation instead).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-09-14 17:39'
-updated_date: '2026-09-15 18:37'
+updated_date: '2026-09-15 18:40'
 labels:
   - clients
   - phase-3
@@ -62,12 +62,12 @@ Size gate: this touches about 20 files. The diff deletes ~489 production LOC of 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/aws/{organizations,sso_admin,config,cost_explorer,guard_duty,security_hub,lambdas}.py and tests/integrations/aws/{test_organizations,test_sso_admin,test_legacy_config,test_cost_explorer,test_guard_duty,test_security_hub,test_lambas}.py no longer exist; client.py, dynamodb.py, settings.py, shield.py, sqs.py, schemas.py, test_legacy_aws_client.py and test_sqs.py are untouched
-- [ ] #2 bin/baselines/vendor_package_contract.txt and bin/baselines/sdk_typing_antipatterns.txt carry no entry for the seven deleted modules and every other entry is unchanged; make check-sdk-typing and make check-vendor-package-contract print OK with no stale INFO line naming any of the seven
-- [ ] #3 rg over app/ (production, tests and mock.patch strings) for the seven module paths (integrations.aws.<name> / from integrations.aws import <name>) returns zero hits; rg for execute_aws_api_call|handle_aws_api_errors hits only integrations/aws/{client,dynamodb,sqs}.py, tests/integrations/aws/{test_legacy_aws_client,test_sqs}.py, bin/check_sdk_typing.py, the sdk_typing_antipatterns.txt header and decisions/sdk-typing.md, recorded in notes as owned by TASK-25.2.5/25.2.6
-- [ ] #4 locales/dev.en-US.yml and dev.fr-FR.yml no longer contain subcommands.aws.description or any aws.* key and still load with yaml.safe_load; modules/dev/platforms/slack.py no longer contains the commented handle_aws_dev_command block or aws registration, and neither its docstring nor modules/dev/__init__.py's lists AWS; rg for aws_dev_router|handle_aws_dev_command|dev.subcommands.aws in app/ returns zero hits
-- [ ] #5 ruff check, mypy (error count no higher than the pre-edit baseline minus the two organizations.py errors) and pytest tests --ignore=tests/smoke (only the known order-dependent failures) pass, with commands and output recorded in notes
-- [ ] #6 TASK-25.2.4's AC#1-#4 are checked with a traceability note to its children; TASK-25.2.4's status is left for a human
+- [x] #1 integrations/aws/{organizations,sso_admin,config,cost_explorer,guard_duty,security_hub,lambdas}.py and tests/integrations/aws/{test_organizations,test_sso_admin,test_legacy_config,test_cost_explorer,test_guard_duty,test_security_hub,test_lambas}.py no longer exist; client.py, dynamodb.py, settings.py, shield.py, sqs.py, schemas.py, test_legacy_aws_client.py and test_sqs.py are untouched
+- [x] #2 bin/baselines/vendor_package_contract.txt and bin/baselines/sdk_typing_antipatterns.txt carry no entry for the seven deleted modules and every other entry is unchanged; make check-sdk-typing and make check-vendor-package-contract print OK with no stale INFO line naming any of the seven
+- [x] #3 rg over app/ (production, tests and mock.patch strings) for the seven module paths (integrations.aws.<name> / from integrations.aws import <name>) returns zero hits; rg for execute_aws_api_call|handle_aws_api_errors hits only integrations/aws/{client,dynamodb,sqs}.py, tests/integrations/aws/{test_legacy_aws_client,test_sqs}.py, bin/check_sdk_typing.py, the sdk_typing_antipatterns.txt header and decisions/sdk-typing.md, recorded in notes as owned by TASK-25.2.5/25.2.6
+- [x] #4 locales/dev.en-US.yml and dev.fr-FR.yml no longer contain subcommands.aws.description or any aws.* key and still load with yaml.safe_load; modules/dev/platforms/slack.py no longer contains the commented handle_aws_dev_command block or aws registration, and neither its docstring nor modules/dev/__init__.py's lists AWS; rg for aws_dev_router|handle_aws_dev_command|dev.subcommands.aws in app/ returns zero hits
+- [x] #5 ruff check, mypy (error count no higher than the pre-edit baseline minus the two organizations.py errors) and pytest tests --ignore=tests/smoke (only the known order-dependent failures) pass, with commands and output recorded in notes
+- [x] #6 TASK-25.2.4's AC#1-#4 are checked with a traceability note to its children; TASK-25.2.4's status is left for a human
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -141,4 +141,21 @@ Planning 2026-09-15 (human decisions):
 - Close-out: the implementer ticks TASK-25.2.4 AC#1-#4 with traceability (AC#6). A human moves the parent.
 - Gates AC (#5) added, following the TASK-25.2.3.2.4 precedent. mypy is expected to drop by 2, because organizations.py:63 and :77 carry no-any-return errors.
 - Size: about 20 files, all deletions or docstring edits, no live behaviour change. Kept as one PR on the TASK-25.2.3.2.4 bundled-deletion precedent.
+
+Implementation 2026-09-15:
+- Deleted app/integrations/aws/{organizations,sso_admin,config,cost_explorer,guard_duty,security_hub,lambdas}.py and app/tests/integrations/aws/{test_organizations,test_sso_admin,test_legacy_config,test_cost_explorer,test_guard_duty,test_security_hub,test_lambas}.py. integrations/aws/ keeps __init__, client, dynamodb, schemas, settings, shield and sqs; tests/integrations/aws/ keeps test_legacy_aws_client.py and test_sqs.py.
+- Pruned the seven lines from each baseline. vendor_package_contract.txt keeps aws dynamodb/schemas/shield/sqs plus every non-AWS entry; sdk_typing_antipatterns.txt keeps client, dynamodb and sqs.
+- Dev aws traces removed: line 2 and lines 12-22 from locales/dev.{en-US,fr-FR}.yml; the commented handle_aws_dev_command block and the commented aws registration from modules/dev/platforms/slack.py (408 -> 352 lines); "and aws" from its docstring; "AWS" from modules/dev/__init__.py's docstring.
+- Red/green check: a temporary pytest module in the session scratchpad (outside the repo, deleted afterwards, never committed) asserted mirror and test-file absence (incl. importlib find_spec), baseline pruning, retention of out-of-scope files and entries, dev locale keys (yaml.safe_load) and the slack.py/__init__.py traces. Before edits: 31 failed, 15 passed (the 15 are the retention guards). After: 46 passed.
+
+Evidence (from app/ unless noted):
+- uv run ruff check . -> All checks passed! ; uv run ruff format --check modules/dev -> 6 files already formatted
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> before edits: Found 87 errors in 31 files (checked 359 source files); after: Found 85 errors in 30 files (checked 352 source files). The two removed errors were organizations.py:63/:77.
+- uv run pytest tests --ignore=tests/smoke -> 6 failed, 3439 passed. The 6 are the known order-dependent failures: tests/modules/webhooks/test_webhooks_aws_sns.py (3) and tests/unit/infrastructure/directory/test_google.py (3). Not touched here.
+- make check-sdk-typing -> OK: no net-new SDK anti-patterns (3 baselined file(s) remain). make check-vendor-package-contract -> OK: no net-new vendor-package contract violations (21 baselined entry(ies) remain). Neither printed a stale INFO line.
+- rg (repo root, app/) for the seven module paths and from-imports -> no hits.
+- rg -l execute_aws_api_call|handle_aws_api_errors (repo, excluding backlog/) -> app/integrations/aws/{client,dynamodb,sqs}.py, app/tests/integrations/aws/{test_legacy_aws_client,test_sqs}.py, app/bin/check_sdk_typing.py, app/bin/baselines/sdk_typing_antipatterns.txt (header comment), decisions/sdk-typing.md. dynamodb.py belongs to TASK-25.2.5; client.py/sqs.py and the two legacy tests belong to TASK-25.2.6; the checker, baseline header and ADR stay until those baselines empty.
+- rg aws_dev_router|handle_aws_dev_command|dev\.subcommands\.aws in app/ -> no hits.
+
+For the human: no settings, env, terraform or runtime behaviour changes. TASK-25.2.4 ACs #1-#4 are now checked with traceability; both tasks await a human to move them to Done.
 <!-- SECTION:NOTES:END -->

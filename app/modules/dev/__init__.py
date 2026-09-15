@@ -1,7 +1,7 @@
 """Dev module - Platform command registration.
 
 Only available in development environment (PREFIX=dev-).
-Provides testing and development commands for Google Workspace, Slack, AWS, and incidents.
+Provides testing and development commands for Google Workspace, Slack and incidents.
 """
 
 from infrastructure.plugins import hookimpl

@@ -2,7 +2,7 @@
 
 Uses decorator-based command registration via auto-discovery.
 Registers the /sre dev subcommands for google, slack, stale, incident,
-load-incidents, add-incident, and aws.
+load-incidents and add-incident.
 
 Only available in development environment (ENVIRONMENT=dev).
 """
@@ -288,54 +288,6 @@ def handle_add_incident_command(payload: CommandPayload) -> CommandResponse:
     )
 
 
-# def handle_aws_dev_command(payload: CommandPayload) -> CommandResponse:
-#     """Handle /sre dev aws - test AWS client integrations.
-
-#     Routes to subcommands: identitystore, organizations, sso, health
-#     """
-#     logger.info("command_received", command="aws", text=payload.text)
-
-#     if error := _require_dev_environment(payload):
-#         return error
-
-#     captured_responses: List[str] = []
-
-#     def capture_respond(text: str | None = None, **kwargs):
-#         if text:
-#             captured_responses.append(text)
-
-#     slack_facade = get_slack_client()
-#     client = slack_facade.raw_client
-
-#     # Build payload for legacy router
-#     router_payload = {
-#         "command": {
-#             "text": payload.text or "",
-#             "user_id": payload.user_id,
-#             "channel_id": payload.channel_id,
-#             **(payload.platform_metadata or {}),
-#         },
-#         "client": client,
-#         "respond": capture_respond,
-#         "ack": lambda: None,
-#     }
-
-#     try:
-#         aws_dev_router.handle(router_payload)
-#     except Exception as e:
-#         logger.error("aws_dev_router_error", error=str(e), exc_info=True)
-#         return CommandResponse(
-#             message=f"AWS command error: {str(e)}",
-#             ephemeral=True,
-#         )
-
-#     message = (
-#         "\n".join(captured_responses) if captured_responses else "AWS"
-#         " command executed"
-#     )
-#     return CommandResponse(message=message, ephemeral=True)
-
-
 def register_commands(provider: SlackPlatformProvider) -> None:
     """Register dev module commands with Slack provider.
 
@@ -398,11 +350,3 @@ def register_commands(provider: SlackPlatformProvider) -> None:
         description="Add incident",
         description_key="dev.subcommands.add_incident.description",
     )
-
-    # provider.register_command(
-    #     command="aws",
-    #     handler=handle_aws_dev_command,
-    #     parent="sre.dev",
-    #     description="Test AWS client integrations",
-    #     description_key="dev.subcommands.aws.description",
-    # )
