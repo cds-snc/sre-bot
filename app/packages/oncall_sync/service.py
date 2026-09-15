@@ -16,6 +16,7 @@ from packages.oncall_sync.ports import (
     OnCallScheduleProvider,
     OnCallSyncError,
     UserGroupSyncTarget,
+    UserRotationsProvider,
 )
 from packages.oncall_sync.settings import (
     OnCallRotation,
@@ -35,15 +36,34 @@ class OnCallSyncService:
         on_call: OnCallScheduleProvider,
         target: UserGroupSyncTarget,
         schedules: Iterable[OnCallScheduleConfig],
+        user_rotations: UserRotationsProvider | None = None,
     ) -> None:
         self._on_call = on_call
         self._target = target
         self._schedules = list(schedules)
+        self._user_rotations = user_rotations
 
     def sync_all(self) -> None:
         """Sync every configured schedule; isolate per-schedule failures."""
         for schedule in self._schedules:
             self._sync_schedule(schedule)
+        if self._user_rotations is not None:
+            for rotation in self._user_rotations.get_current_rotations():
+                self._sync_user_rotation(rotation.slack_usergroup_handle, rotation.slack_usergroup_name, rotation.slack_user_id)
+
+    def _sync_user_rotation(self, handle: str, name: str, user_id: str) -> None:
+        log = logger.bind(slack_handle=handle)
+        try:
+            self._target.sync_user_group_ids(handle, name, "Auto-synced user rotation", [user_id])
+        except OnCallSyncError as exc:
+            cause = exc.__cause__
+            log.error(
+                "oncall_sync_user_rotation_failed",
+                error=str(exc),
+                error_type=type(cause).__name__ if cause is not None else None,
+            )
+            return
+        log.info("oncall_sync_user_rotation_synced", slack_user_id=user_id)
 
     def _sync_schedule(self, schedule: OnCallScheduleConfig) -> None:
         log = logger.bind(slack_handle=schedule.slack_handle)

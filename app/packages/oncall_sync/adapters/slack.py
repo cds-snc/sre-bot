@@ -48,12 +48,22 @@ class SlackUserGroupTarget:
             log.info("oncall_sync_usergroup_no_resolvable_users")
             return
 
+        self.sync_user_group_ids(handle, name, description, user_ids)
+
+    def sync_user_group_ids(
+        self,
+        handle: str,
+        name: str,
+        description: str,
+        user_ids: Sequence[str],
+    ) -> None:
+        """Set the user group to contain exactly the supplied Slack user IDs."""
+        log = logger.bind(slack_handle=handle)
         try:
             usergroup_id = self._find_or_create_usergroup(handle, name, description, log)
             self._client.usergroups_users_update(usergroup=usergroup_id, users=",".join(user_ids))
         except SlackApiError as exc:
             raise OnCallSyncError(f"Slack API call failed: {exc.response.get('error')}") from exc
-
         log.info("oncall_sync_usergroup_updated", usergroup_id=usergroup_id)
 
     def _resolve_user_id(self, email: str, log) -> str | None:

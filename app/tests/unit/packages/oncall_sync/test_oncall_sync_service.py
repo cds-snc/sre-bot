@@ -11,6 +11,7 @@ from packages.oncall_sync.settings import (
     OnCallRotationConfig,
     OnCallScheduleConfig,
 )
+from packages.user_rotations.service import CurrentUserRotation
 
 
 def _rotation_config(handle: str = "oncall-x", name: str = "rot") -> OnCallRotationConfig:
@@ -56,11 +57,25 @@ class _FakeTarget:
     def __init__(self, *, raise_for: set[str] | None = None) -> None:
         self._raise_for = raise_for or set()
         self.calls: list[tuple[str, list[str]]] = []  # (handle, emails)
+        self.user_id_calls: list[tuple[str, str, str, list[str]]] = []
 
     def sync_user_group(self, handle: str, name: str, description: str, emails: Sequence[str]) -> None:
         if handle in self._raise_for:
             raise OnCallSyncError("target failed")
         self.calls.append((handle, list(emails)))
+
+    def sync_user_group_ids(self, handle: str, name: str, description: str, user_ids: Sequence[str]) -> None:
+        if handle in self._raise_for:
+            raise OnCallSyncError("target failed")
+        self.user_id_calls.append((handle, name, description, list(user_ids)))
+
+
+class _FakeUserRotations:
+    def __init__(self, current_rotations: list[CurrentUserRotation]) -> None:
+        self._current_rotations = current_rotations
+
+    def get_current_rotations(self) -> list[CurrentUserRotation]:
+        return self._current_rotations
 
 
 @pytest.mark.unit
@@ -143,6 +158,26 @@ def test_sync_all_noop_when_no_schedules() -> None:
 
     assert on_call.calls == []
     assert target.calls == []
+
+
+@pytest.mark.unit
+def test_sync_all_updates_user_rotation_group_with_direct_slack_id() -> None:
+    on_call = _FakeOnCall()
+    target = _FakeTarget()
+    user_rotations = _FakeUserRotations(
+        [
+            CurrentUserRotation(
+                slack_usergroup_handle="fielding-questions",
+                slack_usergroup_name="Fielding questions",
+                slack_user_id="U123",
+            )
+        ]
+    )
+
+    OnCallSyncService(on_call=on_call, target=target, schedules=[], user_rotations=user_rotations).sync_all()
+
+    assert target.calls == []
+    assert target.user_id_calls == [("fielding-questions", "Fielding questions", "Auto-synced user rotation", ["U123"])]
 
 
 @pytest.mark.unit
