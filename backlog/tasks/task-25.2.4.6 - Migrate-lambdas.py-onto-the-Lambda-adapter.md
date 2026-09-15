@@ -4,7 +4,7 @@ title: Migrate lambdas.py onto the Lambda adapter
 status: To Do
 assignee: []
 created_date: '2026-09-14 17:39'
-updated_date: '2026-09-15 17:27'
+updated_date: '2026-09-15 17:30'
 labels:
   - clients
   - phase-3
@@ -159,4 +159,23 @@ Planning 2026-09-15 (human decisions):
 - Raised errors propagate: bare minimum, .3 precedent. The client is in-account, so there is no AssumeRole at build time.
 - New Slack messages are bilingual EN/FR, matching aws.py's spending failure text.
 - Bugs fixed simply: "Fetching" respond order in request_list_layers; optional LatestMatchingVersion (KeyError); handler signatures typed.
+
+Failing tests authored 2026-09-15 (no production code changed):
+- tests/unit/modules/aws/test_lambdas_handler.py rewritten in place (legacy name kept): 21 test cases, up from 14.
+  - The 8 command_handler routing tests are unchanged.
+  - A lambda_adapter fixture patches modules.aws.lambdas.build_lambda_adapter with MagicMock(spec=LambdaAdapter) and exposes the factory mock. A mock_logger fixture and a _logged helper are copied from test_spending_handler.py.
+  - Re-stubbed onto OperationResult.success: list functions, log count (now also asserts the adapter is built and queried once), list layers, format layer version.
+  - The two "currently disabled" tests are replaced by failure tests for functions and layers, parametrized TRANSIENT_ERROR/UNAUTHORIZED. Each asserts the exact bilingual failure text and that the lookup-failed event is logged with status, error_code and error.
+  - New tests: none-found for functions and for layers (exact bilingual text, no failure log); unclassified ClientError propagates; "Fetching Lambda layers..." is sent before list_layers (shared order list); a layer without LatestMatchingVersion is listed with no version suffix.
+- Exact texts the implementation must match:
+  - "Failed to list Lambda functions. Please try again later.\nImpossible de lister les fonctions Lambda. Veuillez réessayer plus tard."
+  - "No Lambda functions found.\nAucune fonction Lambda trouvée."
+  - "Failed to list Lambda layers. Please try again later.\nImpossible de lister les couches Lambda. Veuillez réessayer plus tard."
+  - "No Lambda layers found.\nAucune couche Lambda trouvée."
+  - Log events: lambda_functions_lookup_failed and lambda_layers_lookup_failed.
+
+Red-state evidence (from app/):
+- uv run pytest tests/unit/modules/aws/test_lambdas_handler.py -q: 8 passed, 13 errors. Every error is at setup: AttributeError, modules.aws.lambdas does not have the attribute 'build_lambda_adapter'. This setup error hides the assertion-level red, which only shows once the import lands.
+- uv run ruff check / ruff format --check on the file: All checks passed; 1 file already formatted.
+- uv run mypy tests/unit/modules/aws/test_lambdas_handler.py: 0 errors in the test file or modules/aws/lambdas.py. The 63 reported errors are in other files mypy followed from imports.
 <!-- SECTION:NOTES:END -->
