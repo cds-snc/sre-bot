@@ -4,7 +4,7 @@ Tests the scheduling logic, error handling, and task integration without
 executing the actual scheduled work.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, create_autospec, patch
 
 import pytest
 
@@ -17,6 +17,7 @@ from jobs.scheduled_tasks import (
     safe_run,
     scheduler_heartbeat,
 )
+from modules.aws import spending
 
 
 class TestSafeRun:
@@ -359,3 +360,57 @@ class TestInitJobRegistration:
             "scheduler:spending_generate_spending_data",
         }
         assert mock_tier2.call_count == 3
+
+    @pytest.mark.unit
+    @patch("jobs.scheduled_tasks.logger")
+    @patch("jobs.scheduled_tasks.spending")
+    @patch("jobs.scheduled_tasks.notify_stale_incident_channels")
+    @patch("jobs.scheduled_tasks.get_lease_store")
+    @patch("jobs.scheduled_tasks.get_plugin_manager")
+    @patch("jobs.scheduled_tasks.schedule.every")
+    @patch("jobs.scheduled_tasks.get_scheduler_settings")
+    def test_init_daily_spending_job_runs_update_job_without_arguments(
+        self,
+        mock_get_settings,
+        mock_schedule_every,
+        mock_get_pm,
+        mock_get_lease_store,
+        mock_notify_stale_incident_channels,
+        mock_spending,
+        mock_logger,
+    ) -> None:
+        """The daily spending job runs the spending update job cleanly when the scheduler fires it.
+
+        Stub strategy: schedule.every() is a MagicMock, so every daily .do()
+        registration and its recorded args/kwargs are observable; _tier2 is real
+        and backed by an in-memory lease store, so the wrapped job really runs.
+        The spending module is replaced by functions autospecced from the real
+        ones, so an argument the real signature rejects raises TypeError exactly
+        as it would in production, and safe_run's module logger is patched to
+        observe the error it would otherwise swallow.
+
+        Assertion rationale: invoking each daily registration with the args and
+        kwargs it was registered with mirrors what the schedule library does at
+        run time. The update job must run once with no arguments, the
+        generate-only function must not be the scheduled job, and no
+        safe_run_error may be logged.
+        """
+        # Arrange
+        mock_get_settings.return_value.DEFAULT_TIER2_LEASE_TTL_SECONDS = 1800
+        settings = IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
+        mock_get_lease_store.return_value = InMemoryIdempotencyStore(idempotency_settings=settings)
+        mock_spending.generate_spending_data = create_autospec(spending.generate_spending_data)
+        mock_spending.execute_spending_data_update_job = create_autospec(spending.execute_spending_data_update_job)
+
+        init(MagicMock())
+
+        # Act
+        daily_registrations = mock_schedule_every.return_value.day.at.return_value.do.call_args_list
+        for registration in daily_registrations:
+            job, *job_args = registration.args
+            job(*job_args, **registration.kwargs)
+
+        # Assert
+        mock_spending.execute_spending_data_update_job.assert_called_once_with()
+        mock_spending.generate_spending_data.assert_not_called()
+        assert not [call for call in mock_logger.error.call_args_list if call.args[:1] == ("safe_run_error",)]

@@ -106,8 +106,7 @@ def init(bot):
     )
     # Tier-2 job body is idempotent; lease only avoids duplicate cross-replica runs.
     schedule.every().day.at("00:00").do(
-        safe_run(_tier2("scheduler:spending_generate_spending_data", spending.generate_spending_data)),
-        logger=logger,
+        safe_run(_tier2("scheduler:spending_generate_spending_data", spending.execute_spending_data_update_job)),
     )
 
     registry = _ScheduleBackgroundJobRegistry()
