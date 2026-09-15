@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-15 14:08'
+updated_date: '2026-09-15 19:39'
 labels:
   - infrastructure
   - phase-4
@@ -49,6 +49,12 @@ Steps:
 - [ ] #1 Tests green; new routes documented to use the helper from day one
 - [ ] #2 PR references decisions/observability.md and decisions/errors-and-http.md
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-15: step 1 (correlation middleware and the correlation_id to request_id rename) carved out into TASK-28.3. Step 4 (logging pipeline) is TASK-28.2. Steps 2 (security headers) and 3 (RFC 9457) remain here.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
