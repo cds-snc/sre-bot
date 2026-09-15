@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-14 17:39'
-updated_date: '2026-09-15 16:37'
+updated_date: '2026-09-15 16:55'
 labels:
   - clients
   - phase-3
@@ -195,4 +195,34 @@ Planning 2026-09-15 (human decisions):
 - Raised AWS errors (AssumeRole at build, unmapped codes like GuardDuty BadRequestException): catch ClientError/BotoCoreError narrowly, log, update the loading modal to a bilingual error. The plan applies the same narrow catch to request_health_modal (flagged for review).
 - Security Hub silent 0-on-error (candidate bug #7) now shows ⚠️ unavailable. Bug #8 (pagination shape) is resolved by the .2 adapter (flat Findings list).
 - ACs rewritten: the original AC#2 split into failure fallback (#2), zero detectors (#3), modal-open failure (#4), raised errors (#5) and bug fixes (#6). Per-call-site notes stay as the last AC (#7).
+
+Failing tests authored 2026-09-15 (no production code changed):
+- tests/unit/modules/aws/test_aws_account_health_handler.py rewritten in place (legacy name kept): 29 test cases, up from 19.
+  - Helper tests call get_account_spend / get_config_summary / get_guardduty_summary / get_securityhub_summary directly, each with a MagicMock(spec=<Adapter>) passed in.
+  - get_account_health tests use one fixture that patches the four build_*_adapter factories.
+  - Handler rendering tests patch get_account_health, as the original test did.
+  - Log assertions match events by name on the patched module logger, as in test_spending_handler.py.
+- The 6 pinned False tests are replaced: cost / Config / GuardDuty detectors / GuardDuty statistics / Security Hub failure each returns None and logs its classification; account-list failure opens an error modal.
+- New tests:
+  - each adapter built once, with Cost Explorer shared by both months;
+  - exclusive End (year rollover, leap February) while the displayed end date stays the last day;
+  - one failed lookup leaves the other fields intact;
+  - get_cost_and_usage called with filter_expression/group_by;
+  - empty ResultsByTime shapes give 0.00;
+  - GuardDuty criteria archived Eq ["false"] on the first detector;
+  - zero detectors gives "not_enabled" and no statistics call;
+  - the per-field ⚠️ render;
+  - ClientError/BotoCoreError from the health check replaces the loading modal with a bilingual error (logged with account_id);
+  - KeyError propagates;
+  - the sorted account selector;
+  - request_health_modal shows the error modal on non-success and on a raised ClientError/BotoCoreError.
+- The render and error-modal tests assert exact line fragments where the plan fixes the format ("⚠️ SecurityHub (unavailable)", "2024-11-01 - 2024-11-30: ⚠️ unavailable"). The error texts must contain "Please try again later." and "Veuillez réessayer plus tard.".
+- Verified: freezegun freezes arrow.utcnow(). An AssumeRole failure at adapter build raises ClientError (STS) or BotoCoreError (e.g. NoCredentialsError).
+
+Red-state evidence (from app/):
+- uv run pytest tests/unit/modules/aws/test_aws_account_health_handler.py -> 22 failed, 4 errors, 3 passed. The 4 errors happen at fixture setup: the build_*_adapter patch targets don't exist yet. The 3 passes are intended regression guards: the ignore list, the happy-path render, and KeyError propagation.
+- The same run with a scratch pytest plugin that stubs the missing factories and makes the legacy mirrors fail loudly (verification only, not committed) -> 26 failed, 3 passed. Every failure is for the intended reason: a legacy mirror is called (cost_explorer.get_cost_and_usage, organizations.list_organization_accounts), a helper still has its old signature, the modal renders "$None USD" / "not_enabled issues", or ClientError/BotoCoreError is raised instead of handled.
+- uv run ruff check / ruff format on the file -> All checks passed (formatted).
+- uv run mypy on the file -> 11 call-arg errors in the test file, all on the four helpers' new signatures; they clear on implementation. The remaining errors are existing ones in modules/ followed through imports.
+- uv run pytest tests/unit/modules/aws/test_aws_command_handler.py -> 13 passed (unchanged).
 <!-- SECTION:NOTES:END -->
