@@ -68,6 +68,7 @@ class AwsSettings(IntegrationSettings):
             "ce": self.ORG_ROLE_ARN,
             "config": self.AUDIT_ROLE_ARN,
             "guardduty": self.LOGGING_ROLE_ARN,
+            "securityhub": self.LOGGING_ROLE_ARN,
         }
 
 

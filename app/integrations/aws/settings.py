@@ -62,6 +62,7 @@ class AWSSettings(BaseSettings):
             "NotFoundException",
             "AccountNotFoundException",
             "TargetNotFoundException",
+            "NoSuchConfigurationAggregatorException",
         ],
         alias="AWS_NOT_FOUND_CODES",
     )
@@ -75,6 +76,7 @@ class AWSSettings(BaseSettings):
             "ExpiredToken",
             "ExpiredTokenException",
             "TokenRefreshRequired",
+            "InvalidAccessException",
         ],
         alias="AWS_UNAUTHORIZED_CODES",
     )
@@ -91,6 +93,10 @@ class AWSSettings(BaseSettings):
             "ServiceUnavailableException",
             "InternalFailure",
             "InternalServerError",
+            "InternalServerErrorException",
+            "InternalException",
+            "ServiceException",
+            "LimitExceededException",
         ],
         alias="AWS_TRANSIENT_CODES",
     )
@@ -115,6 +121,7 @@ class AWSSettings(BaseSettings):
             "ce": self.ORG_ROLE_ARN,
             "config": self.AUDIT_ROLE_ARN,
             "guardduty": self.LOGGING_ROLE_ARN,
+            "securityhub": self.LOGGING_ROLE_ARN,
         }
 
 

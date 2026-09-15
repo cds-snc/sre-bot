@@ -4,7 +4,7 @@ title: Migrate spending.py onto the Organizations and Cost Explorer adapters
 status: To Do
 assignee: []
 created_date: '2026-09-14 17:39'
-updated_date: '2026-09-14 17:57'
+updated_date: '2026-09-14 20:01'
 labels:
   - clients
   - phase-3
@@ -45,4 +45,6 @@ Candidate bugs verified 2026-09-14 during TASK-25.2.4.1 planning (organizations/
 3. CONFIRMED - spending.py:61-63 `details = organizations.get_account_details(id); account_tags = organizations.get_account_tags(id); details["Tags"] = account_tags` mutates `details` without checking it for False first; if get_account_details errors, details is False and `details["Tags"] = ...` raises TypeError, aborting the whole account batch. Same AC#4 crash-on-False class; fold into the OperationResult migration (check organizations_adapter.get_account_details(id).is_success before building the Tags dict).
 
 4. CONFIRMED, cross-referenced on TASK-25.2.4.2 - spending.py:79-88 calls Cost Explorer get_cost_and_usage in a single call per month with no NextPageToken handling. get_cost_and_usage has no boto3 paginator (manual token loop required, confirmed via AWS/boto3 docs), so a response with more than one page silently drops results. The Cost Explorer adapter built in .4.2 needs a manual NextPageToken loop; when migrating spending.py onto it in .4.4, verify the adapter already loops and that spending.py doesn't need its own workaround.
+
+Cross-reference from TASK-25.2.4.2 planning (2026-09-14): the Cost Explorer adapter (packages/aws_platform/adapters/cost_explorer.py, build_cost_explorer_adapter) follows NextPageToken internally and returns OperationResult[list[dict]] holding the concatenated ResultsByTime entries, not the raw response. Replace response.get('ResultsByTime', []) at spending.py:88 with result.data. With GroupBy, one TimePeriod can repeat across pages carrying different Groups, so iterate every entry's Groups; don't assume one entry per month. The filter argument is named filter_expression. No pagination workaround is needed in spending.py (resolves candidate bug #4).
 <!-- SECTION:NOTES:END -->

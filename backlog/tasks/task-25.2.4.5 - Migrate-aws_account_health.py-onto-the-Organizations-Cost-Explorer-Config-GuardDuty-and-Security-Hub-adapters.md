@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-14 17:39'
-updated_date: '2026-09-14 17:57'
+updated_date: '2026-09-14 20:01'
 labels:
   - clients
   - phase-3
@@ -55,4 +55,10 @@ Candidate bugs verified 2026-09-14 during TASK-25.2.4.1 planning (organizations/
 7. Not a crash but a silent-failure mode, flagged for awareness: aws_account_health.py:105-109 `response = security_hub.get_findings(filters); if response: ...` already guards against the False sentinel (no crash), but on a real API error it silently reports "0 issues" rather than surfacing the failure - worth an explicit non-success branch when migrating onto the Security Hub adapter, consistent with the AC#4 intent even though it isn't a literal crash site.
 
 8. NEW FINDING, cross-referenced on TASK-25.2.4.2 - security_hub.py's get_findings calls execute_aws_api_call(..., paginated=True, ...) without passing keys=. In client.py's generic paginator(), when keys is None every non-ResponseMetadata page key is flattened into one flat list - including scalar values like NextToken - not just the Findings list. aws_account_health.py:105-109 then does `for res in response: issues += len(res["Findings"])`, assuming each item is a page dict with a "Findings" key, which breaks once pagination flattening changes the shape. This is a real shape-mismatch bug in security_hub.py, needs fixing when the Security Hub adapter is built in .4.2 (paginate with an explicit response_key="Findings" the way identity_center.py's _paginate() does), not preserved as-is.
+
+Cross-reference from TASK-25.2.4.2 planning (2026-09-14), adapter return shapes differ from the mirrors:
+- Cost Explorer get_cost_and_usage returns OperationResult[list[dict]] of concatenated ResultsByTime entries, so get_account_spend reads result.data[0] instead of response['ResultsByTime'][0], and the filter argument is filter_expression.
+- GuardDuty get_findings_statistics returns OperationResult[dict[str, int]]: the CountBySeverity dict itself, {} when absent. get_guardduty_summary sums result.data.values(). list_detectors returns OperationResult[list[str]].
+- Security Hub get_findings returns OperationResult[list[dict]], a flat list of findings. get_securityhub_summary uses len(result.data) instead of summing len(res['Findings']) per page (resolves candidate bug #8).
+- New error classifications in AWSSettings: NoSuchConfigurationAggregatorException -> NOT_FOUND, InvalidAccessException (Security Hub not enabled) -> UNAUTHORIZED, InternalServerErrorException/InternalException/LimitExceededException -> TRANSIENT. GuardDuty BadRequestException still propagates as a raw ClientError, so decide whether get_guardduty_summary catches it. SERVICE_ROLE_MAP now has securityhub -> LOGGING_ROLE_ARN.
 <!-- SECTION:NOTES:END -->
