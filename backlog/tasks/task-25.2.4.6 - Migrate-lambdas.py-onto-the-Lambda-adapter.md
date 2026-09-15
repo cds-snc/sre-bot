@@ -1,10 +1,10 @@
 ---
 id: TASK-25.2.4.6
 title: Migrate lambdas.py onto the Lambda adapter
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-14 17:39'
-updated_date: '2026-09-15 17:34'
+updated_date: '2026-09-15 17:54'
 labels:
   - clients
   - phase-3
