@@ -3,10 +3,10 @@ id: TASK-25.2.4
 title: >-
   Build the Organizations, SSO-Admin, Config, Cost Explorer, GuardDuty, Security
   Hub and Lambda adapters and migrate their callers; delete the seven mirrors
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-31 18:49'
-updated_date: '2026-09-15 18:39'
+updated_date: '2026-09-15 19:55'
 labels:
   - clients
   - phase-3

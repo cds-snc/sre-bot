@@ -3,10 +3,10 @@ id: TASK-25.2.4.7
 title: >-
   Delete the seven legacy AWS mirror modules and their tests; prune both guard
   baselines
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-14 17:39'
-updated_date: '2026-09-15 18:40'
+updated_date: '2026-09-15 19:55'
 labels:
   - clients
   - phase-3
