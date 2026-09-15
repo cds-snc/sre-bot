@@ -1,11 +1,11 @@
 ---
 id: TASK-25.2.4.4
 title: Migrate spending.py onto the Organizations and Cost Explorer adapters
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-14 17:39'
-updated_date: '2026-09-15 15:40'
+updated_date: '2026-09-15 16:14'
 labels:
   - clients
   - phase-3
