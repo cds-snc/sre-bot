@@ -1,10 +1,10 @@
 ---
 id: TASK-25.2.4.6
 title: Migrate lambdas.py onto the Lambda adapter
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-14 17:39'
-updated_date: '2026-09-15 17:30'
+updated_date: '2026-09-15 17:34'
 labels:
   - clients
   - phase-3
@@ -42,11 +42,11 @@ Bugs in the touched file, fixed simply (human decisions 2026-09-15):
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 modules/aws/lambdas.py no longer imports integrations.aws.lambdas; request_list_functions and request_list_layers call build_lambda_adapter() at function entry and branch on the OperationResult explicitly
-- [ ] #2 A non-success result from list_functions or list_layers logs status, error_code and error and responds with a distinct bilingual failure message; a successful empty list responds with a distinct bilingual 'none found' message; the 'management is currently disabled' text is gone and its two tests are replaced by tests of both outcomes
-- [ ] #3 request_list_layers responds 'Fetching Lambda layers...' before calling the adapter, and a layer without LatestMatchingVersion is listed without a version instead of raising KeyError
-- [ ] #4 command_handler, request_list_functions and request_list_layers are fully type-annotated and mypy reports no error in modules/aws/lambdas.py
-- [ ] #5 Per-call-site error-path behaviour (before/after) is documented in the task notes for review
+- [x] #1 modules/aws/lambdas.py no longer imports integrations.aws.lambdas; request_list_functions and request_list_layers call build_lambda_adapter() at function entry and branch on the OperationResult explicitly
+- [x] #2 A non-success result from list_functions or list_layers logs status, error_code and error and responds with a distinct bilingual failure message; a successful empty list responds with a distinct bilingual 'none found' message; the 'management is currently disabled' text is gone and its two tests are replaced by tests of both outcomes
+- [x] #3 request_list_layers responds 'Fetching Lambda layers...' before calling the adapter, and a layer without LatestMatchingVersion is listed without a version instead of raising KeyError
+- [x] #4 command_handler, request_list_functions and request_list_layers are fully type-annotated and mypy reports no error in modules/aws/lambdas.py
+- [x] #5 Per-call-site error-path behaviour (before/after) is documented in the task notes for review
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -178,4 +178,28 @@ Red-state evidence (from app/):
 - uv run pytest tests/unit/modules/aws/test_lambdas_handler.py -q: 8 passed, 13 errors. Every error is at setup: AttributeError, modules.aws.lambdas does not have the attribute 'build_lambda_adapter'. This setup error hides the assertion-level red, which only shows once the import lands.
 - uv run ruff check / ruff format --check on the file: All checks passed; 1 file already formatted.
 - uv run mypy tests/unit/modules/aws/test_lambdas_handler.py: 0 errors in the test file or modules/aws/lambdas.py. The 63 reported errors are in other files mypy followed from imports.
+
+Implementation 2026-09-15:
+- app/modules/aws/lambdas.py: the integrations.aws.lambdas import is replaced by build_lambda_adapter(), built inside each request_* function at call time. A private _failure_fields (copied from spending.py) supplies the log fields. All three handlers are type-annotated, and the redundant types in the docstring Args lines are removed. No adapter, settings, providers.py or aws.py change.
+
+Error-path behaviour per call site (before -> after):
+- request_list_functions / list_functions (was lambdas.py:48):
+  - AWS error (the mirror returned False): before, "Lambda functions management is currently disabled.", with nothing logged by the caller. After, lambda_functions_lookup_failed is logged at error with status/error_code/error, and the bilingual "Failed to list Lambda functions. Please try again later. / Impossible de lister..." is shown.
+  - Empty account: before, the same "currently disabled" text. After, the bilingual "No Lambda functions found. / Aucune fonction Lambda trouvée."
+  - Success: unchanged ("Lambda functions found:" list, count logged).
+  - Unclassified ClientError (InvalidParameterValueException): before, swallowed to False by handle_aws_api_errors. After, it propagates to Bolt. This is theoretical, since no parameters are sent.
+- request_list_layers / list_layers (was lambdas.py:68): same four outcomes, with event lambda_layers_lookup_failed and the layer texts. Also:
+  - "Fetching Lambda layers..." is now sent before the AWS call (it used to be sent after).
+  - A layer without LatestMatchingVersion is listed by name with no version suffix (it used to raise KeyError).
+
+Gate evidence (from app/):
+- rg -n "integrations.aws" modules/aws/lambdas.py: no matches.
+- uv run ruff check .: All checks passed! ruff format --check modules/aws/lambdas.py: 1 file already formatted.
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)': Found 87 errors in 31 files, identical to the baseline taken before the edit (87 in 31). None are in modules/aws/lambdas.py.
+- uv run pytest tests/unit/modules/aws/test_lambdas_handler.py: 21 passed.
+- uv run pytest tests --ignore=tests/smoke: 6 failed, 3484 passed. All 6 are pre-existing test-order failures unrelated to this task: 3 in tests/modules/webhooks/test_webhooks_aws_sns.py and 3 in tests/unit/infrastructure/directory/test_google.py. Run in isolation, those two files give 111 passed.
+- bin/check_deprecated_infra_client_imports.py, check_sdk_typing.py and check_vendor_package_contract.py: all OK, no net-new violations. The integrations/aws/lambdas.py baseline entries remain for TASK-25.2.4.7 to prune with the mirror.
+- Plan assumptions verified: mypy excludes only ^tests/; modules/aws already imports packages.aws_platform adapters (spending, aws_account_health, ops_group_assignment, identity_center); no other caller of request_list_functions/request_list_layers.
+
+For the human to verify: review and merge the PR; this unblocks TASK-25.2.4.7 for the Lambda mirror. No env, terraform or CI changes.
 <!-- SECTION:NOTES:END -->
