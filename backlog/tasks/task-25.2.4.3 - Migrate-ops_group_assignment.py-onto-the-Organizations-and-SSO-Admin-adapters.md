@@ -1,10 +1,10 @@
 ---
 id: TASK-25.2.4.3
 title: Migrate ops_group_assignment.py onto the Organizations and SSO-Admin adapters
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-14 17:39'
-updated_date: '2026-09-15 12:50'
+updated_date: '2026-09-15 13:15'
 labels:
   - clients
   - phase-3
@@ -38,11 +38,11 @@ Feature is effectively unused (not called in 3+ weeks, no known user); no retry,
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 modules/aws/ops_group_assignment.py no longer imports integrations.aws.organizations or integrations.aws.sso_admin; list_organization_accounts, list_account_assignments_for_principal and create_account_assignment are called through build_organizations_adapter() / build_sso_admin_adapter() and branch on OperationResult explicitly
-- [ ] #2 A non-success result from list_organization_accounts or list_account_assignments_for_principal makes execute() return a failed status carrying the adapter message and log status, error_code and error, with no assignment attempted; the two pinned TypeError crash tests in tests/unit/modules/aws/test_ops_group_assignment_handler.py are replaced by tests of this behaviour
-- [ ] #3 A create_account_assignment result that is non-success, or successful with data False (initial AWS status FAILED), counts as a failed assignment: the reason is logged for that account and the remaining accounts are still processed
-- [ ] #4 execute() returns a failed status naming every account whose assignment failed when at least one failed (no last-account-wins), and returns a failed status instead of raising UnboundLocalError when no unassigned active account has an Id
-- [ ] #5 Per-call-site error-path behaviour (one line per call site) is recorded in the task notes for review
+- [x] #1 modules/aws/ops_group_assignment.py no longer imports integrations.aws.organizations or integrations.aws.sso_admin; list_organization_accounts, list_account_assignments_for_principal and create_account_assignment are called through build_organizations_adapter() / build_sso_admin_adapter() and branch on OperationResult explicitly
+- [x] #2 A non-success result from list_organization_accounts or list_account_assignments_for_principal makes execute() return a failed status carrying the adapter message and log status, error_code and error, with no assignment attempted; the two pinned TypeError crash tests in tests/unit/modules/aws/test_ops_group_assignment_handler.py are replaced by tests of this behaviour
+- [x] #3 A create_account_assignment result that is non-success, or successful with data False (initial AWS status FAILED), counts as a failed assignment: the reason is logged for that account and the remaining accounts are still processed
+- [x] #4 execute() returns a failed status naming every account whose assignment failed when at least one failed (no last-account-wins), and returns a failed status instead of raising UnboundLocalError when no unassigned active account has an Id
+- [x] #5 Per-call-site error-path behaviour (one line per call site) is recorded in the task notes for review
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -145,4 +145,20 @@ Human decision 2026-09-14: keep ops_group_assignment migration to the bare minim
 Planning 2026-09-15 (human decisions):
 - Scope: minimal migration confirmed over deleting the `/aws groups ops` feature (option offered because the command is unused and absent from help text; declined).
 - Bug fixes in the touched file: fix both (a) last-account-wins status and (b) UnboundLocalError when no unassigned account has an Id. ACs #3-#4 added for them; AC#2 reworded because only two call sites actually crashed on False (create_account_assignment swallowed the failure instead). The AC#3 per-status detail was simplified per the 2026-09-14 decision and is now AC#5.
+
+Implementation 2026-09-15:
+- modules/aws/ops_group_assignment.py now calls build_organizations_adapter() and build_sso_admin_adapter() instead of the integrations.aws mirrors (confirmed with rg: no integrations.aws import left). Each adapter is built only after the group lookup succeeds, so the disabled and group-failure paths build nothing. The loop records every assigned and failed account and returns failed if any failed. It no longer raises UnboundLocalError when no unassigned account has an Id.
+- Tests: tests/unit/modules/aws/test_ops_group_assignment_handler.py, 20 tests. The existing tests now stub the adapter factories. The two TypeError crash tests are replaced by listing-failure tests, and 4 new tests cover assignment failures and the bug fixes. All 20 failed before the change: every one on the missing build_sso_admin_adapter patch target, and 14 also on legacy-mirror calls when that target was stubbed. They pass after it.
+
+Per-call-site error-path behaviour (AC#5):
+- list_organization_accounts: any non-success (NOT_FOUND / UNAUTHORIZED / TRANSIENT_ERROR / PERMANENT_ERROR) logs organization_accounts_lookup_failed with status, error_code and error, then returns failed with the adapter message and stops before any assignment. Unmapped ClientErrors and programmer errors propagate (adapter contract).
+- list_account_assignments_for_principal: same handling, logged as ops_group_account_assignments_lookup_failed. No assignment is attempted against a partial view.
+- create_account_assignment: a non-success result, or success with data False (initial AWS status FAILED), logs failed_to_assign_ops_group_to_account for that account with the reason and continues. The run returns failed naming every failed account. IN_PROGRESS still counts as success (no polling).
+
+Gates (from app/):
+- uv run ruff check . -> All checks passed
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 87 errors in 31 files; none in the touched files (same count as recorded after TASK-25.2.4.2)
+- uv run pytest tests --ignore=tests/smoke -> 3457 passed, 6 failed. The 6 are the known order-dependent failures in test_webhooks_aws_sns.py (3) and infrastructure/directory/test_google.py (3), not touched here.
+
+For the human: no settings, env or terraform changes. The legacy organizations/sso_admin mirrors stay in place for spending.py and aws_account_health.py until TASK-25.2.4.7.
 <!-- SECTION:NOTES:END -->
