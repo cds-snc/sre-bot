@@ -1,10 +1,10 @@
 ---
 id: TASK-25.2.5.2
 title: Migrate modules/slack/webhooks.py onto the DynamoDB adapter
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-15 20:09'
-updated_date: '2026-09-16 17:48'
+updated_date: '2026-09-16 18:00'
 labels:
   - clients
   - phase-3
