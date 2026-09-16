@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-15 20:09'
-updated_date: '2026-09-16 13:48'
+updated_date: '2026-09-16 19:31'
 labels:
   - clients
   - phase-3
@@ -15,6 +15,7 @@ milestone: m-3
 dependencies:
   - TASK-25.2.5.2
   - TASK-25.2.5.3
+  - TASK-25.2.5.6
 references:
   - app/integrations/aws/dynamodb.py
   - app/tests/unit/integrations/aws/test_dynamodb_local_endpoint.py
