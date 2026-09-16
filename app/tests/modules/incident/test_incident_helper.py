@@ -4,7 +4,9 @@ from unittest.mock import ANY, MagicMock, call, patch
 
 import pytest
 
+from infrastructure.operations import OperationStatus
 from modules import incident_helper
+from modules.incident import db_operations
 
 VALID_STATUS = incident_helper.VALID_STATUS
 
@@ -1165,3 +1167,110 @@ def test_display_current_updates(mock_fetch_updates):
     mock_fetch_updates.return_value = []
     incident_helper.display_current_updates(client, body, respond, ack)
     respond.assert_called_once_with("No updates found for this incident.")
+
+
+# -- store-unavailable tests --
+
+
+@patch("modules.incident.incident_helper.db_operations")
+def test_close_incident_responds_when_store_unavailable(mock_db_ops):
+    """When the incidents store is unavailable, the handler responds with the unavailable message."""
+    mock_db_ops.IncidentStoreUnavailableError = db_operations.IncidentStoreUnavailableError
+    mock_db_ops.INCIDENT_STORE_UNAVAILABLE_MESSAGE = db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE
+    mock_db_ops.get_incident_by_channel_id.side_effect = db_operations.IncidentStoreUnavailableError(
+        OperationStatus.PERMANENT_ERROR
+    )
+
+    client = MagicMock()
+    body = {"channel_id": "C1234567890", "channel_name": "incident-test", "user_id": "U1234567890"}
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.close_incident(client, body, respond, ack)
+
+    respond.assert_called_once_with(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
+
+
+@patch("modules.incident.incident_helper.db_operations")
+def test_handle_update_status_command_responds_when_store_unavailable(mock_db_ops):
+    """When the incidents store is unavailable, the handler responds with the unavailable message."""
+    mock_db_ops.IncidentStoreUnavailableError = db_operations.IncidentStoreUnavailableError
+    mock_db_ops.INCIDENT_STORE_UNAVAILABLE_MESSAGE = db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE
+    mock_db_ops.get_incident_by_channel_id.side_effect = db_operations.IncidentStoreUnavailableError(
+        OperationStatus.PERMANENT_ERROR
+    )
+
+    client = MagicMock()
+    body = {"channel_id": "C1234567890"}
+    respond = MagicMock()
+    ack = MagicMock()
+
+    incident_helper.handle_update_status_command(client, body, "new_status", respond, ack)
+
+    respond.assert_called_once_with(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
+
+
+@patch("modules.incident.incident_helper.db_operations")
+def test_open_updates_dialog_opens_unavailable_view_when_store_unavailable(mock_db_ops):
+    """When the incidents store is unavailable, a modal is pushed with the unavailable message."""
+    mock_db_ops.IncidentStoreUnavailableError = db_operations.IncidentStoreUnavailableError
+    mock_db_ops.INCIDENT_STORE_UNAVAILABLE_MESSAGE = db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE
+    mock_db_ops.get_incident_by_channel_id.side_effect = db_operations.IncidentStoreUnavailableError(
+        OperationStatus.PERMANENT_ERROR
+    )
+
+    client = MagicMock()
+    body = {"channel_id": "incident_id", "trigger_id": "trigger_id"}
+    ack = MagicMock()
+
+    incident_helper.open_updates_dialog(client, body, ack)
+
+    client.views_open.assert_called_once()
+    call_kwargs = client.views_open.call_args.kwargs
+    assert call_kwargs["trigger_id"] == "trigger_id"
+    # The view should contain the unavailable message
+    view = call_kwargs["view"]
+    assert isinstance(view, dict)
+    # Verify the view contains text blocks referencing the unavailable message
+    assert db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE in str(view)
+
+
+@patch("modules.incident.incident_helper.incident_folder")
+def test_handle_updates_submission_responds_when_store_unavailable(mock_incident_folder):
+    """When the incidents store is unavailable, the handler responds with the unavailable message."""
+    mock_incident_folder.store_update.side_effect = db_operations.IncidentStoreUnavailableError(OperationStatus.PERMANENT_ERROR)
+
+    client = MagicMock()
+    ack = MagicMock()
+    respond = MagicMock()
+    view = {
+        "private_metadata": json.dumps({"incident_id": "incident_id", "channel_id": "channel_id"}),
+        "state": {"values": {"updates_block": {"updates_input": {"value": "Test update"}}}},
+    }
+
+    with patch("modules.incident.incident_helper.db_operations") as mock_db_ops:
+        mock_db_ops.IncidentStoreUnavailableError = db_operations.IncidentStoreUnavailableError
+        mock_db_ops.INCIDENT_STORE_UNAVAILABLE_MESSAGE = db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE
+
+        incident_helper.handle_updates_submission(client, ack, respond, view)
+
+        respond.assert_called_once_with(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
+
+
+@patch("modules.incident.incident_helper.incident_folder")
+def test_display_current_updates_responds_when_store_unavailable(mock_incident_folder):
+    """When the incidents store is unavailable, the handler responds with the unavailable message."""
+    mock_incident_folder.fetch_updates.side_effect = db_operations.IncidentStoreUnavailableError(OperationStatus.PERMANENT_ERROR)
+
+    client = MagicMock()
+    ack = MagicMock()
+    respond = MagicMock()
+    body = {"channel_id": "incident_id"}
+
+    with patch("modules.incident.incident_helper.db_operations") as mock_db_ops:
+        mock_db_ops.IncidentStoreUnavailableError = db_operations.IncidentStoreUnavailableError
+        mock_db_ops.INCIDENT_STORE_UNAVAILABLE_MESSAGE = db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE
+
+        incident_helper.display_current_updates(client, body, respond, ack)
+
+        respond.assert_called_once_with(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-15 20:09'
-updated_date: '2026-09-16 19:34'
+updated_date: '2026-09-16 19:53'
 labels:
   - clients
   - phase-3
@@ -23,7 +23,7 @@ references:
   - app/tests/modules/incident/test_incident_folder.py
   - app/tests/modules/incident/test_information_display.py
   - app/tests/modules/incident/test_incident_helper.py
-  - app/tests/modules/dev/test_dev_incident.py
+  - app/tests/unit/modules/dev/test_dev_incident_handler.py
 parent_task_id: TASK-25.2.5
 priority: high
 ordinal: 216000
@@ -55,7 +55,7 @@ Error policy (human decisions 2026-09-16, superseding the 2026-09-15 "raises Run
 - ACCEPTED (modules/dev/incident.py:45, load_incidents -> create_missing_incidents): if the duplicate-check scan fails partway through a batch import, incidents already created before the failure are not rolled back. This is intentional, not a gap to close here: create_missing_incidents' own duplicate check makes a re-run of load_incidents safe (already-created incidents are found and skipped), and full rollback/transactional handling is TASK-38's.
 - Webhooks parity: modules/slack/webhooks.py has the identical unclassified-ClientError gap on its reads and ordinary writes. Fixing it here would pull a second subsystem into this PR, so it is split into TASK-25.2.5.6 (parented under TASK-25.2.5, depends on TASK-25.2.5.2, and is itself a dependency of TASK-25.2.5.5 so the legacy module cannot be deleted before it lands).
 
-Tests: tests/modules/incident/test_db_operations.py and test_incident_folder.py keep their legacy names. The adapter is mocked with MagicMock(spec=DynamoDBAdapter) returning OperationResult. The pinned tests (test_db_operations.py :209-:264, test_incident_folder.py :476) are replaced by tests of the new behaviour, and get_incident's tests are removed with it. test_information_display.py and test_incident_helper.py gain a store-unavailable test per surface site; a new tests/modules/dev/test_dev_incident.py covers modules/dev/incident.py's four sites (no prior coverage existed).
+Tests: tests/modules/incident/test_db_operations.py and test_incident_folder.py keep their legacy names. The adapter is mocked with MagicMock(spec=DynamoDBAdapter) returning OperationResult. The pinned tests (test_db_operations.py :209-:264, test_incident_folder.py :476) are replaced by tests of the new behaviour, and get_incident's tests are removed with it. test_information_display.py and test_incident_helper.py gain a store-unavailable test per surface site; a new tests/unit/modules/dev/test_dev_incident_handler.py (unit layer per decisions/testing.md; new files never go in legacy trees) covers modules/dev/incident.py's four sites (no prior coverage existed).
 
 Overlap: TASK-38 later moves incident persistence into packages/incident/common, so keep the diff minimal.
 <!-- SECTION:DESCRIPTION:END -->
@@ -289,7 +289,7 @@ Extend `test_open_incident_info_view` with `test_open_incident_info_view_respond
 STEP 9 -- app/tests/modules/incident/test_incident_helper.py (UNCHANGED BY F4)
 One store-unavailable test per F3 site #4-#8.
 
-STEP 10 -- app/tests/modules/dev/test_dev_incident.py (NEW FILE, UNCHANGED BY F4)
+STEP 10 -- app/tests/unit/modules/dev/test_dev_incident_handler.py (NEW FILE, UNCHANGED BY F4)
 One store-unavailable test per F3 site #9,#10,#11,#12.
 
 TEST MATRIX (file: test_db_operations.py unless noted; F4 changes marked)
@@ -343,7 +343,7 @@ AC#1/#3 store_update
 TEST MATRIX (surface files, F3, UNCHANGED BY F4)
  40 test_information_display.py: test_open_incident_info_view_responds_when_store_unavailable.
  41-45 test_incident_helper.py: one test per site #4-#8.
- 46-49 test_dev_incident.py (new file): one test per site #9,#10,#11,#12.
+ 46-49 test_dev_incident_handler.py (new file): one test per site #9,#10,#11,#12.
 
 AC TRACEABILITY
 - AC#1 <- Steps 1a, 2a (imports) + 1c-1i, 2c (build_dynamodb_adapter() at function entry) <- `rg -n "integrations.aws" modules/incident/db_operations.py modules/incident/incident_folder.py` = 0 hits (recorded in notes).
@@ -375,7 +375,7 @@ BLAST RADIUS AND ROLLBACK
 VERIFICATION (from app/, record commands and actual output in --notes at finalization)
 cd app && uv run ruff check .
 cd app && uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'   (compare against the 85-error baseline recorded on .1/.2; no new errors)
-cd app && uv run pytest tests/modules/incident tests/modules/dev
+cd app && uv run pytest tests/modules/incident tests/unit/modules/dev
 cd app && uv run pytest tests --ignore=tests/smoke
 rg -n "integrations.aws" modules/incident/db_operations.py modules/incident/incident_folder.py   (expect 0 hits)
 rg -n "db_operations\.get_incident\(" --glob '!tests/**' app  (re-confirm 0 hits before finalizing the AC#4 deletion)
