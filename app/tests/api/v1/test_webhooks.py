@@ -3,16 +3,19 @@ from unittest.mock import ANY, MagicMock, PropertyMock, call, patch
 import httpx
 import pytest
 import structlog
+from botocore.exceptions import ClientError
 from fastapi.testclient import TestClient
 from structlog.testing import capture_logs
 
 from api.v1.routes import webhooks
 from infrastructure.logging.settings import LoggingSettings
 from infrastructure.logging.setup import _build_base_processors
+from infrastructure.operations import OperationResult, OperationStatus
 from models.webhooks import (
     WebhookPayload,
     WebhookResult,
 )
+from packages.aws_platform.adapters.dynamodb import DynamoDBAdapter
 from server.body_size_middleware import MaxBodySizeMiddleware
 from utils.tests import create_test_app
 
@@ -147,6 +150,106 @@ def test_handle_webhook_not_found(get_webhook_mock, test_client):
     assert response.status_code == 404
     assert response.json() == {"detail": "Webhook not found"}
     assert get_webhook_mock.call_count == 1
+
+
+@pytest.mark.parametrize(
+    ("retry_after", "expected_retry_after_header"),
+    [(5, "5"), (None, None)],
+    ids=["with_retry_after", "without_retry_after"],
+)
+@patch("api.v1.routes.webhooks.webhooks.increment_invocation_count")
+@patch("api.v1.routes.webhooks.webhooks.get_webhook")
+def test_handle_webhook_lookup_failure_returns_service_unavailable(
+    get_webhook_mock,
+    increment_invocation_mock,
+    retry_after,
+    expected_retry_after_header,
+    test_client,
+):
+    """A failed webhook lookup answers an explicit 503, never 404, so senders such as SNS redeliver.
+
+    The lookup helper is stubbed to raise the store-unavailable error. The default
+    test client re-raises unhandled server exceptions, so a passing request proves the
+    route maps the failure itself rather than leaking it to the ASGI server. The body
+    is generic (no error code) and Retry-After is sent only when a delay is known.
+    """
+    get_webhook_mock.side_effect = webhooks.webhooks.WebhookStoreUnavailableError(
+        OperationStatus.TRANSIENT_ERROR,
+        error_code="ThrottlingException",
+        retry_after=retry_after,
+    )
+
+    response = test_client.post("/hook/id", json={"text": "some text"})
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Service temporarily unavailable"}
+    assert "ThrottlingException" not in response.text
+    assert response.headers.get("retry-after") == expected_retry_after_header
+    increment_invocation_mock.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        {
+            "return_value": OperationResult.error(
+                OperationStatus.TRANSIENT_ERROR,
+                message="boom",
+                error_code="ThrottlingException",
+            )
+        },
+        {
+            "side_effect": ClientError(
+                {"Error": {"Code": "ValidationException", "Message": "missing attribute"}},
+                "UpdateItem",
+            )
+        },
+    ],
+    ids=["classified_error_result", "unclassified_client_error"],
+)
+@patch("api.v1.routes.webhooks.map_emails_to_slack_users")
+@patch("api.v1.routes.webhooks.log_to_sentinel")
+@patch("api.v1.routes.webhooks.append_incident_buttons")
+@patch("api.v1.routes.webhooks.handle_webhook_payload")
+@patch("api.v1.routes.webhooks.webhooks.get_webhook")
+def test_handle_webhook_invocation_counter_failure_still_delivers(
+    mock_get_webhook,
+    mock_handle_webhook_payload,
+    mock_append_incident_buttons,
+    _mock_log_to_sentinel,
+    _mock_map_emails_to_slack_users,
+    failure,
+    bot_mock,
+    test_client,
+):
+    """A failed invocation-counter write is dropped and the message is still posted.
+
+    The real counter helper runs against a spec'd adapter mock whose update either
+    returns a classified error result or raises an SDK error the adapter does not
+    classify, so the route's delivery path is exercised end to end past the counter;
+    the counter write is asserted to use the retries-disabled client.
+    """
+    mock_get_webhook.return_value = {
+        "channel": {"S": "test-channel"},
+        "hook_type": {"S": "alert"},
+        "active": {"BOOL": True},
+    }
+    mock_handle_webhook_payload.return_value = WebhookResult(
+        status="success",
+        action="post",
+        payload=WebhookPayload(text="some text"),
+    )
+    mock_append_incident_buttons.return_value = WebhookPayload(text="some text", channel="test-channel")
+    adapter = MagicMock(spec=DynamoDBAdapter)
+    adapter.update_item.configure_mock(**failure)
+
+    with patch("modules.slack.webhooks.build_dynamodb_adapter", return_value=adapter):
+        response = test_client.post("/hook/id", json={"text": "some text"})
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    assert adapter.update_item.call_args.kwargs["retries"] is False
+    bot_mock.client.api_call.assert_called_once_with("chat.postMessage", json=ANY)
 
 
 class TestWebhookInvocationFingerprint:
@@ -611,7 +714,6 @@ def test_append_incident_buttons_with_str_attachments():
 
 @patch("api.v1.routes.webhooks.handle_webhook_payload")
 @patch("api.v1.routes.webhooks.webhooks.increment_invocation_count")
-@patch("api.v1.routes.webhooks.webhooks.is_active", return_value=True)
 @patch(
     "api.v1.routes.webhooks.webhooks.get_webhook",
     return_value={
@@ -623,7 +725,6 @@ def test_append_incident_buttons_with_str_attachments():
 @pytest.mark.asyncio
 async def test_webhooks_rate_limiting(
     get_webhook_mock,
-    is_active_mock,
     increment_invocation_count_mock,
     handle_webhook_payload_mock,
     bot_mock,

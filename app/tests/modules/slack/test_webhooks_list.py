@@ -1,6 +1,10 @@
 import json
 from unittest.mock import ANY, MagicMock, call, patch
 
+import pytest
+
+from infrastructure.operations import OperationStatus
+from modules.slack import webhooks as webhook_store
 from modules.slack import webhooks_list
 
 
@@ -349,6 +353,151 @@ def test_reveal_webhook(get_webhook_mock, mock_logger):
         "reveal_webhook_called",
     )
     client.views_push.assert_called()
+
+
+@patch("modules.slack.webhooks_list.logger")
+@patch("modules.slack.webhooks_list.webhooks.get_webhook")
+def test_reveal_webhook_missing_logs_and_skips_view(get_webhook_mock, mock_logger):
+    """A webhook deleted since the list was rendered is logged and no modal is pushed.
+
+    The persistence helper is stubbed to report the item as absent; the bound logger
+    is captured to assert the warning instead of a crash on the missing item.
+    """
+    get_webhook_mock.return_value = None
+    ack = MagicMock()
+    client = MagicMock()
+    bound_logger = MagicMock()
+    mock_logger.bind.return_value = bound_logger
+    body = {
+        "actions": [{"value": "id"}],
+        "user": {"username": "username"},
+        "view": {"id": "id"},
+        "trigger_id": "trigger_id",
+    }
+
+    webhooks_list.reveal_webhook(ack, body, client)
+
+    ack.assert_called()
+    bound_logger.warning.assert_called_once_with("reveal_webhook_not_found")
+    client.views_push.assert_not_called()
+
+
+def _store_unavailable():
+    return webhook_store.WebhookStoreUnavailableError(OperationStatus.TRANSIENT_ERROR, error_code="ThrottlingException")
+
+
+def _assert_unavailable_view(view: dict) -> None:
+    rendered = json.dumps(view, ensure_ascii=False)
+    assert "temporarily unavailable" in rendered
+    assert "temporairement indisponibles" in rendered
+    assert "ThrottlingException" not in rendered
+
+
+@patch("modules.slack.webhooks_list.webhooks.get_webhook")
+def test_reveal_webhook_store_unavailable_pushes_bilingual_error_view(get_webhook_mock):
+    """A failed webhook read pushes a bilingual try-again view instead of raising into Bolt.
+
+    The persistence helper is stubbed to raise the store-unavailable error; the pushed
+    view is rendered to text and checked for both languages and for no error code.
+    """
+    get_webhook_mock.side_effect = _store_unavailable()
+    ack = MagicMock()
+    client = MagicMock()
+    body = {
+        "actions": [{"value": "id"}],
+        "user": {"username": "username"},
+        "view": {"id": "id"},
+        "trigger_id": "trigger_id",
+    }
+
+    webhooks_list.reveal_webhook(ack, body, client)
+
+    ack.assert_called()
+    client.views_push.assert_called_once()
+    assert client.views_push.call_args.kwargs["trigger_id"] == "trigger_id"
+    _assert_unavailable_view(client.views_push.call_args.kwargs["view"])
+
+
+@pytest.mark.parametrize("failing_call", ["get_webhook", "toggle_webhook", "list_all_webhooks"])
+@patch("modules.slack.webhooks_list.webhooks")
+def test_toggle_webhook_store_unavailable_updates_view_with_bilingual_error(webhooks_mock, failing_call):
+    """Any failed store call while toggling replaces the modal with a bilingual try-again view.
+
+    The whole persistence module is stubbed; one call at a time raises the
+    store-unavailable error. The announcement is only posted after a successful toggle.
+    """
+    webhooks_mock.WebhookStoreUnavailableError = webhook_store.WebhookStoreUnavailableError
+    webhooks_mock.get_webhook.return_value = helper_generate_webhook("name", "channel", "id")
+    webhooks_mock.list_all_webhooks.return_value = []
+    getattr(webhooks_mock, failing_call).side_effect = _store_unavailable()
+    ack = MagicMock()
+    client = MagicMock()
+    body = {
+        "actions": [{"value": "id"}],
+        "user": {"id": "user_id", "username": "username"},
+        "view": {"id": "view_id", "private_metadata": json.dumps({"channel": None})},
+    }
+
+    webhooks_list.toggle_webhook(ack, body, client)
+
+    ack.assert_called()
+    client.views_update.assert_called_once()
+    assert client.views_update.call_args.kwargs["view_id"] == "view_id"
+    _assert_unavailable_view(client.views_update.call_args.kwargs["view"])
+    if failing_call != "list_all_webhooks":
+        client.chat_postMessage.assert_not_called()
+
+
+@pytest.mark.parametrize("channel", ["C123", None])
+@patch("modules.slack.webhooks_list.webhooks")
+def test_next_page_store_unavailable_updates_view_with_bilingual_error(webhooks_mock, channel):
+    """A failed scan while paginating replaces the modal with a bilingual try-again view.
+
+    Both the channel-filtered lookup and the full list are exercised through the
+    stubbed persistence module raising the store-unavailable error.
+    """
+    webhooks_mock.WebhookStoreUnavailableError = webhook_store.WebhookStoreUnavailableError
+    webhooks_mock.lookup_webhooks.side_effect = _store_unavailable()
+    webhooks_mock.list_all_webhooks.side_effect = _store_unavailable()
+    ack = MagicMock()
+    client = MagicMock()
+    body = {
+        "actions": [{"value": "16,all", "text": {"text": "Next page"}}],
+        "view": {"id": "view_id", "private_metadata": json.dumps({"channel": channel})},
+    }
+
+    webhooks_list.next_page(ack, body, client)
+
+    ack.assert_called()
+    client.views_update.assert_called_once()
+    assert client.views_update.call_args.kwargs["view_id"] == "view_id"
+    _assert_unavailable_view(client.views_update.call_args.kwargs["view"])
+
+
+@patch("modules.slack.webhooks_list.logger")
+@patch("modules.slack.webhooks_list.webhooks.toggle_webhook")
+@patch("modules.slack.webhooks_list.webhooks.get_webhook")
+def test_toggle_webhook_missing_logs_and_skips_toggle(get_webhook_mock, toggle_webhook_mock, logger_mock):
+    """A webhook deleted since the list was rendered is logged; nothing is toggled or announced.
+
+    The persistence helper is stubbed to report the item as absent, and the module
+    logger is captured to assert the warning instead of a crash on the missing item.
+    """
+    get_webhook_mock.return_value = None
+    ack = MagicMock()
+    client = MagicMock()
+    body = {
+        "actions": [{"value": "id"}],
+        "user": {"id": "user_id", "username": "username"},
+        "view": {"id": "id", "private_metadata": json.dumps({"channel": None})},
+    }
+
+    webhooks_list.toggle_webhook(ack, body, client)
+
+    ack.assert_called()
+    logger_mock.warning.assert_called_once_with("toggle_webhook_not_found", user_name="username", webhook_id="id")
+    toggle_webhook_mock.assert_not_called()
+    client.chat_postMessage.assert_not_called()
 
 
 @patch("modules.slack.webhooks_list.logger")

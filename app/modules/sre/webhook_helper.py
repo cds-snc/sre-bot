@@ -37,7 +37,11 @@ def ack_action(ack):
 
 def handle_webhook_command(args, client, body, respond):
     if len(args) == 0:
-        hooks = webhooks.lookup_webhooks("channel", body["channel_id"])
+        try:
+            hooks = webhooks.lookup_webhooks("channel", body["channel_id"])
+        except webhooks.WebhookStoreUnavailableError:
+            respond(webhooks_list.STORE_UNAVAILABLE_MESSAGE)
+            return
         if hooks:
             webhooks_list.list_all_webhooks(
                 client,
@@ -59,7 +63,11 @@ def handle_webhook_command(args, client, body, respond):
         case "help":
             respond(help_text)
         case "list":
-            hooks = webhooks.list_all_webhooks()
+            try:
+                hooks = webhooks.list_all_webhooks()
+            except webhooks.WebhookStoreUnavailableError:
+                respond(webhooks_list.STORE_UNAVAILABLE_MESSAGE)
+                return
             if hooks:
                 webhooks_list.list_all_webhooks(client, body, 0, MAX_BLOCK_SIZE, "all", hooks)
             else:

@@ -1,203 +1,307 @@
-from unittest.mock import ANY, patch
+"""Behaviour of the webhooks persistence helpers over the DynamoDB adapter.
+
+The adapter is replaced with ``MagicMock(spec=DynamoDBAdapter)`` returned from a
+patched ``build_dynamodb_adapter``; each method returns an ``OperationResult``
+so the helpers' branching on success, absence and failure is exercised without
+botocore. Log assertions patch the module logger.
+"""
+
+from typing import Any
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 
+from infrastructure.operations import OperationResult, OperationStatus
 from modules.slack import webhooks
+from packages.aws_platform.adapters.dynamodb import DynamoDBAdapter
+
+WEBHOOK_ITEM: dict[str, Any] = {
+    "id": {"S": "test_id"},
+    "channel": {"S": "test_channel"},
+    "name": {"S": "test_name"},
+    "created_at": {"S": "test_created_at"},
+    "active": {"BOOL": True},
+    "user_id": {"S": "test_user_id"},
+    "invocation_count": {"N": "0"},
+    "acknowledged_count": {"N": "0"},
+    "hook_type": {"S": "alert"},
+}
 
 
-@patch("modules.slack.webhooks.dynamodb")
-def test_create_webhook(dynamodb_mock):
-    dynamodb_mock.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    assert webhooks.create_webhook("test_channel", "test_user_id", "test_name") == ANY
-    dynamodb_mock.put_item.assert_called_once_with(
-        TableName="webhooks",
-        Item={
-            "id": {"S": ANY},
-            "channel": {"S": "test_channel"},
-            "name": {"S": "test_name"},
-            "created_at": {"S": ANY},
-            "active": {"BOOL": True},
-            "user_id": {"S": "test_user_id"},
-            "invocation_count": {"N": "0"},
-            "acknowledged_count": {"N": "0"},
-            "hook_type": {"S": "alert"},
-        },
+def _failure() -> OperationResult[Any]:
+    return OperationResult.error(
+        OperationStatus.TRANSIENT_ERROR,
+        message="boom",
+        error_code="ThrottlingException",
     )
 
 
-@patch("modules.slack.webhooks.dynamodb")
-def test_create_webhook_with_type(dynamodb_mock):
-    dynamodb_mock.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    assert webhooks.create_webhook("test_channel", "test_user_id", "test_name", "test_type") == ANY
-    dynamodb_mock.put_item.assert_called_once_with(
-        TableName="webhooks",
-        Item={
-            "id": {"S": ANY},
-            "channel": {"S": "test_channel"},
-            "name": {"S": "test_name"},
-            "created_at": {"S": ANY},
-            "active": {"BOOL": True},
-            "user_id": {"S": "test_user_id"},
-            "invocation_count": {"N": "0"},
-            "acknowledged_count": {"N": "0"},
-            "hook_type": {"S": "test_type"},
-        },
-    )
+FAILURE_FIELDS = {
+    "status": OperationStatus.TRANSIENT_ERROR.value,
+    "error_code": "ThrottlingException",
+    "error": "boom",
+}
 
 
-@patch("modules.slack.webhooks.dynamodb")
-def test_create_webhook_return_none(dynamodb_mock):
-    dynamodb_mock.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 401}}
+@pytest.fixture
+def adapter():
+    """Patch the module's adapter factory with a spec'd mock and yield the mock."""
+    mock = MagicMock(spec=DynamoDBAdapter)
+    with patch("modules.slack.webhooks.build_dynamodb_adapter", return_value=mock) as factory:
+        mock.factory = factory
+        yield mock
+
+
+@pytest.fixture
+def logger_mock():
+    with patch("modules.slack.webhooks.logger") as mock:
+        yield mock
+
+
+def _expected_item(hook_type: str) -> dict[str, Any]:
+    return {
+        "id": {"S": ANY},
+        "channel": {"S": "test_channel"},
+        "name": {"S": "test_name"},
+        "created_at": {"S": ANY},
+        "active": {"BOOL": True},
+        "user_id": {"S": "test_user_id"},
+        "invocation_count": {"N": "0"},
+        "acknowledged_count": {"N": "0"},
+        "hook_type": {"S": hook_type},
+    }
+
+
+# -- create_webhook -------------------------------------------------------------
+
+
+def test_create_webhook_returns_id_on_success(adapter):
+    """A successful put returns the generated id that was written as the item key."""
+    adapter.put_item.return_value = OperationResult.success()
+
+    webhook_id = webhooks.create_webhook("test_channel", "test_user_id", "test_name")
+
+    adapter.put_item.assert_called_once_with(TableName="webhooks", Item=_expected_item("alert"))
+    assert isinstance(webhook_id, str)
+    assert adapter.put_item.call_args.kwargs["Item"]["id"] == {"S": webhook_id}
+
+
+def test_create_webhook_with_type(adapter):
+    """The hook_type argument is persisted on the item."""
+    adapter.put_item.return_value = OperationResult.success()
+
+    webhooks.create_webhook("test_channel", "test_user_id", "test_name", "info")
+
+    adapter.put_item.assert_called_once_with(TableName="webhooks", Item=_expected_item("info"))
+
+
+def test_create_webhook_returns_none_and_logs_on_failure(adapter, logger_mock):
+    """A failed put keeps the existing failure contract (None) and logs the classified failure."""
+    adapter.put_item.return_value = _failure()
+
     assert webhooks.create_webhook("test_channel", "test_user_id", "test_name") is None
-    dynamodb_mock.put_item.assert_called_once_with(
-        TableName="webhooks",
-        Item={
-            "id": {"S": ANY},
-            "channel": {"S": "test_channel"},
-            "name": {"S": "test_name"},
-            "created_at": {"S": ANY},
-            "active": {"BOOL": True},
-            "user_id": {"S": "test_user_id"},
-            "invocation_count": {"N": "0"},
-            "acknowledged_count": {"N": "0"},
-            "hook_type": {"S": "alert"},
-        },
+    logger_mock.error.assert_called_once_with("webhook_create_failed", **FAILURE_FIELDS)
+
+
+# -- get_webhook ----------------------------------------------------------------
+
+
+def test_get_webhook_returns_item(adapter):
+    """A found item is returned in its AttributeValue shape."""
+    adapter.get_item.return_value = OperationResult.success(data=WEBHOOK_ITEM)
+
+    assert webhooks.get_webhook("test_id") == WEBHOOK_ITEM
+    adapter.get_item.assert_called_once_with(TableName="webhooks", Key={"id": {"S": "test_id"}})
+
+
+def test_get_webhook_returns_none_when_absent(adapter):
+    """An absent item is a success with no data, so the helper keeps returning None."""
+    adapter.get_item.return_value = OperationResult.success(data=None)
+
+    assert webhooks.get_webhook("test_id") is None
+
+
+def test_get_webhook_raises_and_logs_on_failure(adapter, logger_mock):
+    """A failed read raises so it is never mistaken for a missing webhook.
+
+    The raised error carries the classification callers map to a response (status,
+    error code, retry delay) while its message stays generic, without provider text.
+    """
+    adapter.get_item.return_value = OperationResult.error(
+        OperationStatus.TRANSIENT_ERROR,
+        message="boom",
+        error_code="ThrottlingException",
+        retry_after=5,
     )
 
+    with pytest.raises(webhooks.WebhookStoreUnavailableError) as exc_info:
+        webhooks.get_webhook("test_id")
 
-@patch("modules.slack.webhooks.dynamodb")
-def test_delete_webhook(dynamodb_mock):
-    dynamodb_mock.delete_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    assert webhooks.delete_webhook("test_id") == {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    dynamodb_mock.delete_item.assert_called_once_with(TableName="webhooks", Key={"id": {"S": "test_id"}})
-
-
-@patch("modules.slack.webhooks.dynamodb")
-def test_get_webhook(dynamodb_mock):
-    dynamodb_mock.get_item.return_value = {
-        "id": {"S": "test_id"},
-        "channel": {"S": "test_channel"},
-        "name": {"S": "test_name"},
-        "created_at": {"S": "test_created_at"},
-        "active": {"BOOL": True},
-        "user_id": {"S": "test_user_id"},
-        "invocation_count": {"N": "0"},
-        "acknowledged_count": {"N": "0"},
-        "type": {"S": "alert"},
-    }
-    assert webhooks.get_webhook("test_id") == {
-        "id": {"S": "test_id"},
-        "channel": {"S": "test_channel"},
-        "name": {"S": "test_name"},
-        "created_at": {"S": "test_created_at"},
-        "active": {"BOOL": True},
-        "user_id": {"S": "test_user_id"},
-        "invocation_count": {"N": "0"},
-        "acknowledged_count": {"N": "0"},
-        "type": {"S": "alert"},
-    }
-    dynamodb_mock.get_item.assert_called_once_with(TableName="webhooks", Key={"id": {"S": "test_id"}})
+    assert exc_info.value.status is OperationStatus.TRANSIENT_ERROR
+    assert exc_info.value.error_code == "ThrottlingException"
+    assert exc_info.value.retry_after == 5
+    assert "boom" not in str(exc_info.value)
+    logger_mock.error.assert_called_once_with("webhook_get_failed", webhook_id="test_id", **FAILURE_FIELDS)
 
 
-@patch("modules.slack.webhooks.dynamodb")
-def test_get_webhook_with_no_result(dynamodb_mock):
-    dynamodb_mock.get_item.return_value = {}
-    assert webhooks.get_webhook("test_id") is None
-    dynamodb_mock.get_item.assert_called_once_with(TableName="webhooks", Key={"id": {"S": "test_id"}})
+# -- lookup_webhooks ------------------------------------------------------------
 
 
-@patch("modules.slack.webhooks.dynamodb")
-def test_lookup_webhooks(mock_dynamodb):
-    expected_results = [
-        {
-            "id": {"S": "test_id"},
-            "channel": {"S": "test_channel"},
-            "name": {"S": "test_name"},
-            "created_at": {"S": "test_created_at"},
-            "active": {"BOOL": True},
-            "user_id": {"S": "test_user_id"},
-            "invocation_count": {"N": "10"},
-            "acknowledged_count": {"N": "0"},
-        },
-        {
-            "id": {"S": "test_id"},
-            "channel": {"S": "test_channel"},
-            "name": {"S": "test_name"},
-            "created_at": {"S": "test_created_at"},
-            "active": {"BOOL": False},
-            "user_id": {"S": "test_user_id"},
-            "invocation_count": {"N": "0"},
-            "acknowledged_count": {"N": "0"},
-        },
-    ]
-    mock_dynamodb.scan.return_value = expected_results
-    result = webhooks.lookup_webhooks("channel", "test_channel")
-    assert len(result) == 2
-    mock_dynamodb.scan.assert_called_once_with(
+def test_lookup_webhooks_returns_items(adapter):
+    """The scan filters on the field with a string AttributeValue and returns every item."""
+    adapter.scan.return_value = OperationResult.success(data=[WEBHOOK_ITEM, WEBHOOK_ITEM])
+
+    assert webhooks.lookup_webhooks("channel", "test_channel") == [WEBHOOK_ITEM, WEBHOOK_ITEM]
+    adapter.scan.assert_called_once_with(
         TableName="webhooks",
         FilterExpression="channel = :channel",
         ExpressionAttributeValues={":channel": {"S": "test_channel"}},
     )
 
 
-@patch("modules.slack.webhooks.dynamodb")
-def test_increment_acknowledged_count(dynamodb_mock):
-    dynamodb_mock.update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    assert webhooks.increment_acknowledged_count("test_id") == {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    dynamodb_mock.update_item.assert_called_once_with(
+def test_lookup_webhooks_returns_empty_list(adapter):
+    """An empty scan stays an empty list."""
+    adapter.scan.return_value = OperationResult.success(data=[])
+
+    assert webhooks.lookup_webhooks("channel", "test_channel") == []
+
+
+def test_lookup_webhooks_raises_and_logs_on_failure(adapter, logger_mock):
+    """A failed scan raises instead of passing as "no webhooks"."""
+    adapter.scan.return_value = _failure()
+
+    with pytest.raises(webhooks.WebhookStoreUnavailableError):
+        webhooks.lookup_webhooks("channel", "test_channel")
+
+    logger_mock.error.assert_called_once_with("webhook_lookup_failed", field="channel", **FAILURE_FIELDS)
+
+
+# -- list_all_webhooks ----------------------------------------------------------
+
+
+def test_list_all_webhooks_returns_items(adapter):
+    """The full-table scan returns every item."""
+    adapter.scan.return_value = OperationResult.success(data=[WEBHOOK_ITEM])
+
+    assert webhooks.list_all_webhooks() == [WEBHOOK_ITEM]
+    adapter.scan.assert_called_once_with(TableName="webhooks", Select="ALL_ATTRIBUTES")
+
+
+def test_list_all_webhooks_returns_empty_list(adapter):
+    """An empty table stays an empty list."""
+    adapter.scan.return_value = OperationResult.success(data=[])
+
+    assert webhooks.list_all_webhooks() == []
+
+
+def test_list_all_webhooks_raises_and_logs_on_failure(adapter, logger_mock):
+    """A failed scan raises instead of passing as an empty table."""
+    adapter.scan.return_value = _failure()
+
+    with pytest.raises(webhooks.WebhookStoreUnavailableError):
+        webhooks.list_all_webhooks()
+
+    logger_mock.error.assert_called_once_with("webhook_list_failed", **FAILURE_FIELDS)
+
+
+# -- counters -------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("helper", "attribute"),
+    [
+        (webhooks.increment_acknowledged_count, "acknowledged_count"),
+        (webhooks.increment_invocation_count, "invocation_count"),
+    ],
+)
+def test_increment_count_sends_without_retries(adapter, helper, attribute):
+    """Counter increments are not replay-safe, so they go to the retries-disabled client.
+
+    The expression seeds a missing counter at zero in the same atomic write, so items
+    stored without the attribute are counted instead of rejected by DynamoDB.
+    """
+    adapter.update_item.return_value = OperationResult.success()
+
+    assert helper("test_id") is None
+    adapter.update_item.assert_called_once_with(
+        retries=False,
         TableName="webhooks",
         Key={"id": {"S": "test_id"}},
-        UpdateExpression="SET acknowledged_count = acknowledged_count + :inc",
-        ExpressionAttributeValues={":inc": {"N": "1"}},
+        UpdateExpression=f"SET {attribute} = if_not_exists({attribute}, :zero) + :inc",
+        ExpressionAttributeValues={":inc": {"N": "1"}, ":zero": {"N": "0"}},
     )
 
 
-@patch("modules.slack.webhooks.dynamodb")
-def test_increment_invocation_count(dynamodb_mock):
-    dynamodb_mock.update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    assert webhooks.increment_invocation_count("test_id") == {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    dynamodb_mock.update_item.assert_called_once_with(
-        TableName="webhooks",
-        Key={"id": {"S": "test_id"}},
-        UpdateExpression="SET invocation_count = invocation_count + :inc",
-        ExpressionAttributeValues={":inc": {"N": "1"}},
+@pytest.mark.parametrize(
+    ("helper", "event"),
+    [
+        (webhooks.increment_acknowledged_count, "webhook_acknowledged_count_increment_failed"),
+        (webhooks.increment_invocation_count, "webhook_invocation_count_increment_failed"),
+    ],
+)
+def test_increment_count_logs_and_returns_none_on_failure(adapter, logger_mock, helper, event):
+    """A failed increment is logged and dropped so it never blocks webhook delivery."""
+    adapter.update_item.return_value = _failure()
+
+    assert helper("test_id") is None
+    logger_mock.error.assert_called_once_with(event, webhook_id="test_id", **FAILURE_FIELDS)
+
+
+@pytest.mark.parametrize(
+    ("helper", "event"),
+    [
+        (webhooks.increment_acknowledged_count, "webhook_acknowledged_count_increment_failed"),
+        (webhooks.increment_invocation_count, "webhook_invocation_count_increment_failed"),
+    ],
+)
+def test_increment_count_logs_and_returns_none_on_unclassified_client_error(adapter, logger_mock, helper, event):
+    """An SDK error the adapter does not classify is still logged and dropped for counters.
+
+    The adapter mock raises a ClientError with a code outside every classification
+    catalogue, as the adapter re-raises it in production; the helper must swallow it
+    so a counter never blocks webhook delivery.
+    """
+    adapter.update_item.side_effect = ClientError(
+        {"Error": {"Code": "ValidationException", "Message": "missing attribute"}},
+        "UpdateItem",
+    )
+
+    assert helper("test_id") is None
+    logger_mock.error.assert_called_once_with(
+        event,
+        webhook_id="test_id",
+        status="unclassified",
+        error_code="ValidationException",
+        error="missing attribute",
     )
 
 
-@patch("modules.slack.webhooks.dynamodb")
-def test_list_all_webhooks(dynamodb_mock):
-    dynamodb_mock.scan.return_value = [
-        {
-            "id": {"S": "test_id"},
-            "channel": {"S": "test_channel"},
-            "name": {"S": "test_name"},
-            "created_at": {"S": "test_created_at"},
-            "active": {"BOOL": True},
-            "user_id": {"S": "test_user_id"},
-            "invocation_count": {"N": "0"},
-            "acknowledged_count": {"N": "0"},
-        }
-    ]
-    assert webhooks.list_all_webhooks() == [
-        {
-            "id": {"S": "test_id"},
-            "channel": {"S": "test_channel"},
-            "name": {"S": "test_name"},
-            "created_at": {"S": "test_created_at"},
-            "active": {"BOOL": True},
-            "user_id": {"S": "test_user_id"},
-            "invocation_count": {"N": "0"},
-            "acknowledged_count": {"N": "0"},
-        }
-    ]
-    dynamodb_mock.scan.assert_called_once_with(TableName="webhooks", Select="ALL_ATTRIBUTES")
+@pytest.mark.parametrize(
+    "helper",
+    [webhooks.increment_acknowledged_count, webhooks.increment_invocation_count],
+)
+def test_increment_count_propagates_programmer_errors(adapter, helper):
+    """Only SDK errors are swallowed; a programmer error still propagates."""
+    adapter.update_item.side_effect = TypeError("bad call")
+
+    with pytest.raises(TypeError):
+        helper("test_id")
 
 
-@patch("modules.slack.webhooks.dynamodb")
-def test_revoke_webhook(dynamodb_mock):
-    dynamodb_mock.update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    assert webhooks.revoke_webhook("test_id") == {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    dynamodb_mock.update_item.assert_called_once_with(
+# -- toggle_webhook -------------------------------------------------------------
+
+
+def test_toggle_webhook_flips_active_flag(adapter):
+    """The stored active flag is inverted with one adapter for both the read and the write."""
+    adapter.get_item.return_value = OperationResult.success(data=WEBHOOK_ITEM)
+    adapter.update_item.return_value = OperationResult.success()
+
+    assert webhooks.toggle_webhook("test_id") is None
+
+    adapter.factory.assert_called_once_with()
+    adapter.get_item.assert_called_once_with(TableName="webhooks", Key={"id": {"S": "test_id"}})
+    adapter.update_item.assert_called_once_with(
         TableName="webhooks",
         Key={"id": {"S": "test_id"}},
         UpdateExpression="SET active = :active",
@@ -205,128 +309,47 @@ def test_revoke_webhook(dynamodb_mock):
     )
 
 
-@patch("modules.slack.webhooks.dynamodb")
-def test_is_active_returns_true(dynamodb_mock):
-    dynamodb_mock.get_item.return_value = {
-        "id": {"S": "test_id"},
-        "channel": {"S": "test_channel"},
-        "name": {"S": "test_name"},
-        "created_at": {"S": "test_created_at"},
-        "active": {"BOOL": True},
-        "user_id": {"S": "test_user_id"},
-        "invocation_count": {"N": "0"},
-        "acknowledged_count": {"N": "0"},
-    }
-    assert webhooks.is_active("test_id") is True
+def test_toggle_webhook_logs_and_skips_write_when_absent(adapter, logger_mock):
+    """A missing webhook is logged as a warning and nothing is written."""
+    adapter.get_item.return_value = OperationResult.success(data=None)
+
+    assert webhooks.toggle_webhook("test_id") is None
+
+    adapter.update_item.assert_not_called()
+    logger_mock.warning.assert_called_once_with("webhook_toggle_not_found", webhook_id="test_id")
 
 
-@patch("modules.slack.webhooks.dynamodb")
-def test_is_active_returns_false(dynamodb_mock):
-    dynamodb_mock.get_item.return_value = {
-        "id": {"S": "test_id"},
-        "channel": {"S": "test_channel"},
-        "name": {"S": "test_name"},
-        "created_at": {"S": "test_created_at"},
-        "active": {"BOOL": False},
-        "user_id": {"S": "test_user_id"},
-        "invocation_count": {"N": "0"},
-        "acknowledged_count": {"N": "0"},
-    }
-    assert webhooks.is_active("test_id") is False
+def test_toggle_webhook_raises_when_read_fails(adapter):
+    """A failed read raises before any write is attempted."""
+    adapter.get_item.return_value = _failure()
 
-
-@patch("modules.slack.webhooks.dynamodb")
-def test_is_active_not_found(dynamodb_mock):
-    dynamodb_mock.get_item.return_value = {}
-    assert webhooks.is_active("test_id") is False
-
-
-@patch("modules.slack.webhooks.dynamodb")
-@patch("modules.slack.webhooks.get_webhook")
-def test_toggle_webhook(get_webhook_mock, dynamodb_mock):
-    dynamodb_mock.update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    get_webhook_mock.return_value = {
-        "id": {"S": "test_id"},
-        "channel": {"S": "test_channel"},
-        "name": {"S": "test_name"},
-        "created_at": {"S": "test_created_at"},
-        "active": {"BOOL": True},
-        "user_id": {"S": "test_user_id"},
-        "invocation_count": {"N": "0"},
-        "acknowledged_count": {"N": "0"},
-    }
-    assert webhooks.toggle_webhook("test_id") == {"ResponseMetadata": {"HTTPStatusCode": 200}}
-    dynamodb_mock.update_item.assert_called_once_with(
-        TableName="webhooks",
-        Key={"id": {"S": "test_id"}},
-        UpdateExpression="SET active = :active",
-        ExpressionAttributeValues={":active": {"BOOL": ANY}},
-    )
-
-
-@patch("modules.slack.webhooks.dynamodb")
-def test_create_webhook_raises_when_integration_returns_false(dynamodb_mock):
-    """put_item returning the integration's literal False error contract crashes on
-    the unguarded response["ResponseMetadata"] index, unlike the tested 401-status dict.
-    """
-    dynamodb_mock.put_item.return_value = False
-    with pytest.raises(TypeError):
-        webhooks.create_webhook("test_channel", "test_user_id", "test_name")
-
-
-@patch("modules.slack.webhooks.dynamodb")
-def test_delete_webhook_returns_false_unchanged(dynamodb_mock):
-    """delete_webhook is a pure pass-through, so an integration False propagates unchanged."""
-    dynamodb_mock.delete_item.return_value = False
-    assert webhooks.delete_webhook("test_id") is False
-
-
-@patch("modules.slack.webhooks.dynamodb")
-def test_lookup_webhooks_returns_false_unchanged(mock_dynamodb):
-    """lookup_webhooks is a pure pass-through, so an integration False propagates unchanged."""
-    mock_dynamodb.scan.return_value = False
-    assert webhooks.lookup_webhooks("channel", "test_channel") is False
-
-
-@patch("modules.slack.webhooks.dynamodb")
-def test_increment_acknowledged_count_returns_false_unchanged(dynamodb_mock):
-    """increment_acknowledged_count is a pure pass-through, so an integration False
-    propagates unchanged."""
-    dynamodb_mock.update_item.return_value = False
-    assert webhooks.increment_acknowledged_count("test_id") is False
-
-
-@patch("modules.slack.webhooks.dynamodb")
-def test_increment_invocation_count_returns_false_unchanged(dynamodb_mock):
-    """increment_invocation_count is a pure pass-through, so an integration False
-    propagates unchanged."""
-    dynamodb_mock.update_item.return_value = False
-    assert webhooks.increment_invocation_count("test_id") is False
-
-
-@patch("modules.slack.webhooks.dynamodb")
-def test_list_all_webhooks_returns_false_unchanged(dynamodb_mock):
-    """list_all_webhooks is a pure pass-through, so an integration False propagates unchanged."""
-    dynamodb_mock.scan.return_value = False
-    assert webhooks.list_all_webhooks() is False
-
-
-@patch("modules.slack.webhooks.dynamodb")
-def test_revoke_webhook_returns_false_unchanged(dynamodb_mock):
-    """revoke_webhook is a pure pass-through, so an integration False propagates unchanged."""
-    dynamodb_mock.update_item.return_value = False
-    assert webhooks.revoke_webhook("test_id") is False
-
-
-@patch("modules.slack.webhooks.dynamodb")
-def test_toggle_webhook_raises_when_get_webhook_returns_none_due_to_integration_failure(dynamodb_mock):
-    """get_item returning the integration's literal False makes get_webhook return None
-    (its own defended `if response:` branch), and toggle_webhook's inline
-    `get_webhook(id)["active"]` then crashes indexing None.
-    """
-    dynamodb_mock.get_item.return_value = False
-    with pytest.raises(TypeError):
+    with pytest.raises(webhooks.WebhookStoreUnavailableError):
         webhooks.toggle_webhook("test_id")
+
+    adapter.update_item.assert_not_called()
+
+
+def test_toggle_webhook_raises_and_logs_when_update_fails(adapter, logger_mock):
+    """A failed write raises after logging the classified failure."""
+    adapter.get_item.return_value = OperationResult.success(data=WEBHOOK_ITEM)
+    adapter.update_item.return_value = _failure()
+
+    with pytest.raises(webhooks.WebhookStoreUnavailableError):
+        webhooks.toggle_webhook("test_id")
+
+    logger_mock.error.assert_called_once_with("webhook_toggle_failed", webhook_id="test_id", **FAILURE_FIELDS)
+
+
+# -- removed helpers ------------------------------------------------------------
+
+
+@pytest.mark.parametrize("name", ["delete_webhook", "revoke_webhook", "is_active"])
+def test_dead_helpers_are_removed(name):
+    """Helpers with no production caller are not part of the module surface."""
+    assert not hasattr(webhooks, name)
+
+
+# -- validate_string_payload_type -----------------------------------------------
 
 
 @patch("modules.slack.webhooks.model_utils")

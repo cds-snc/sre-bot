@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-15 20:09'
+updated_date: '2026-09-16 17:06'
 labels:
   - clients
   - phase-3
@@ -58,3 +59,15 @@ Overlap: TASK-38 later moves incident persistence into packages/incident/common,
 - [ ] #4 get_incident is deleted after a re-grep confirms no production caller; the pinned False-return tests are replaced by tests of the new behaviour
 - [ ] #5 Per-call-site before/after error-path behaviour is recorded in notes; ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with output recorded
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-16 17:06
+---
+2026-09-16, carried from TASK-25.2.5.2 (read before implementing):
+1. The adapter re-raises unclassified ClientError codes (e.g. ValidationException). A helper whose policy is "log and return None/False" (create_incident, update_incident_field, store_update, log_activity) must decide explicitly whether to catch a raised ClientError as well, or a malformed expression or legacy item turns into an exception for its callers. In .2 the counters catch ClientError, log with status="unclassified", and return; programmer errors still propagate.
+2. db_operations.lookup_incident builds ExpressionAttributeValues with a dynamic {field_type: value} key. mypy rejects that against the adapter's typed kwargs ("Expected TypedDict key to be string literal"). .2 dropped the unused field_type parameter.
+3. log_activity already uses list_append(if_not_exists(logs, :empty_list), :logs), so a missing attribute is handled; point 1 still applies.
+---
+<!-- COMMENTS:END -->

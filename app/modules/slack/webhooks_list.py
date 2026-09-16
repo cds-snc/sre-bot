@@ -9,6 +9,22 @@ logger = get_logger()
 
 MAX_BLOCK_SIZE = 16
 
+STORE_UNAVAILABLE_MESSAGE = (
+    "Webhooks are temporarily unavailable. Please try again later.\n"
+    "Les webhooks sont temporairement indisponibles. Veuillez réessayer plus tard."
+)
+
+
+def _store_unavailable_view() -> dict:
+    """Modal shown when the webhooks store cannot be reached; the failure is already logged."""
+    return {
+        "type": "modal",
+        "callback_id": "webhooks_view",
+        "title": {"type": "plain_text", "text": "SRE - Webhooks"},
+        "close": {"type": "plain_text", "text": "Close"},
+        "blocks": [{"type": "section", "text": {"type": "mrkdwn", "text": STORE_UNAVAILABLE_MESSAGE}}],
+    }
+
 
 # return the list of webhooks based on the type (active or disabled)
 def get_webhooks(all_hooks, type):
@@ -180,7 +196,14 @@ def list_all_webhooks(client, body, start, end, type, all_hooks, channel=None, u
 def reveal_webhook(ack, body, client: WebClient):
     ack()
     log = logger.bind(user_name=body["user"]["username"], webhook_id=body["actions"][0]["value"])
-    hook = webhooks.get_webhook(body["actions"][0]["value"])
+    try:
+        hook = webhooks.get_webhook(body["actions"][0]["value"])
+    except webhooks.WebhookStoreUnavailableError:
+        client.views_push(trigger_id=body["trigger_id"], view=_store_unavailable_view())
+        return
+    if hook is None:
+        log.warning("reveal_webhook_not_found")
+        return
     id = hook["id"]["S"]
     name = hook["name"]["S"]
     channel = hook["channel"]["S"]
@@ -220,7 +243,14 @@ def toggle_webhook(ack, body, client):
     ack()
     username = body["user"]["username"]
     user_id = body["user"]["id"]
-    hook = webhooks.get_webhook(body["actions"][0]["value"])
+    try:
+        hook = webhooks.get_webhook(body["actions"][0]["value"])
+    except webhooks.WebhookStoreUnavailableError:
+        client.views_update(view_id=body["view"]["id"], view=_store_unavailable_view())
+        return
+    if hook is None:
+        logger.warning("toggle_webhook_not_found", user_name=username, webhook_id=body["actions"][0]["value"])
+        return
     id = hook["id"]["S"]
     name = hook["name"]["S"]
     channel = hook["channel"]["S"]
@@ -229,7 +259,11 @@ def toggle_webhook(ack, body, client):
     log.info("toggle_webhook_called")
     private_metadata = json.loads(body["view"]["private_metadata"])
 
-    webhooks.toggle_webhook(id)
+    try:
+        webhooks.toggle_webhook(id)
+    except webhooks.WebhookStoreUnavailableError:
+        client.views_update(view_id=body["view"]["id"], view=_store_unavailable_view())
+        return
     message = f"Webhook {name} has been {'disabled' if hook['active']['BOOL'] else 'enabled'} by <@{username}>"
     client.chat_postMessage(
         channel=channel,
@@ -237,7 +271,11 @@ def toggle_webhook(ack, body, client):
         text=message,
     )
     channel_id = private_metadata.get("channel", None)
-    all_hooks = webhooks.lookup_webhooks("channel", channel_id) if channel_id else webhooks.list_all_webhooks()
+    try:
+        all_hooks = webhooks.lookup_webhooks("channel", channel_id) if channel_id else webhooks.list_all_webhooks()
+    except webhooks.WebhookStoreUnavailableError:
+        client.views_update(view_id=body["view"]["id"], view=_store_unavailable_view())
+        return
 
     list_all_webhooks(client, body, 0, MAX_BLOCK_SIZE, "all", all_hooks, channel_id, update=True)
 
@@ -248,12 +286,12 @@ def next_page(ack, body, client):
     end_index, type = body["actions"][0]["value"].split(",")
     end_index = int(end_index)
     private_metadata = json.loads(body["view"]["private_metadata"])
-    if private_metadata.get("channel"):
-        channel = private_metadata["channel"]
-        hooks = webhooks.lookup_webhooks("channel", channel)
-    else:
-        channel = None
-        hooks = webhooks.list_all_webhooks()
+    channel = private_metadata.get("channel") or None
+    try:
+        hooks = webhooks.lookup_webhooks("channel", channel) if channel else webhooks.list_all_webhooks()
+    except webhooks.WebhookStoreUnavailableError:
+        client.views_update(view_id=body["view"]["id"], view=_store_unavailable_view())
+        return
     # if we go to the next page, then pudate the start and end index to be the next 4 elements. Else, display the results
     # from the beginning
     if body["actions"][0]["text"]["text"] == "Next page":

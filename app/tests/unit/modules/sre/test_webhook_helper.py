@@ -8,6 +8,10 @@ Tests cover:
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from infrastructure.operations import OperationStatus
+from modules.slack import webhooks
 from modules.sre import webhook_helper
 
 
@@ -60,6 +64,36 @@ class TestWebhookHelperCommands:
         respond.assert_called_once_with(
             "No webhooks found for this channel. Type `/sre webhooks help` to see a list of commands."
         )
+        mock_list_view.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("args", "failing_call"),
+        [([], "lookup_webhooks"), (["list"], "list_all_webhooks")],
+        ids=["channel_lookup", "list_all"],
+    )
+    @patch("modules.sre.webhook_helper.webhooks_list.list_all_webhooks")
+    @patch("modules.sre.webhook_helper.webhooks")
+    def test_handle_webhooks_store_unavailable_responds_with_bilingual_error(
+        self, mock_webhooks, mock_list_view, args, failing_call, mock_client, mock_body
+    ):
+        """A failed webhook scan replies with a bilingual try-again message instead of raising into Bolt.
+
+        The persistence module is stubbed so the scan behind the command raises the
+        store-unavailable error; the reply is checked for both languages and no error code.
+        """
+        mock_webhooks.WebhookStoreUnavailableError = webhooks.WebhookStoreUnavailableError
+        getattr(mock_webhooks, failing_call).side_effect = webhooks.WebhookStoreUnavailableError(
+            OperationStatus.TRANSIENT_ERROR, error_code="ThrottlingException"
+        )
+        respond = MagicMock()
+
+        webhook_helper.handle_webhook_command(args, mock_client, mock_body, respond)
+
+        respond.assert_called_once()
+        message = respond.call_args.args[0]
+        assert "temporarily unavailable" in message
+        assert "temporairement indisponibles" in message
+        assert "ThrottlingException" not in message
         mock_list_view.assert_not_called()
 
     @patch("modules.sre.webhook_helper.webhooks_create.create_webhook_modal")

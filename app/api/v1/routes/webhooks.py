@@ -95,7 +95,13 @@ def handle_webhook(
                 log.error("payload_validation_error", error=str(e), payload=str(payload))
                 raise HTTPException(status_code=400, detail=str(e)) from e
 
-        webhook = webhooks.get_webhook(webhook_id)
+        try:
+            webhook = webhooks.get_webhook(webhook_id)
+        except webhooks.WebhookStoreUnavailableError as e:
+            # The store failure is already logged with its classification; answer an
+            # explicit, generic 503 so senders retry and no traceback reaches the server log.
+            headers = {"Retry-After": str(e.retry_after)} if e.retry_after else None
+            raise HTTPException(status_code=503, detail="Service temporarily unavailable", headers=headers) from e
         if not webhook:
             raise HTTPException(status_code=404, detail="Webhook not found")
 
