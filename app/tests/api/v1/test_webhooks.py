@@ -3,6 +3,7 @@ from unittest.mock import ANY, MagicMock, PropertyMock, call, patch
 import httpx
 import pytest
 import structlog
+from botocore.exceptions import ClientError
 from fastapi.testclient import TestClient
 from structlog.testing import capture_logs
 
@@ -151,31 +152,61 @@ def test_handle_webhook_not_found(get_webhook_mock, test_client):
     assert get_webhook_mock.call_count == 1
 
 
+@pytest.mark.parametrize(
+    ("retry_after", "expected_retry_after_header"),
+    [(5, "5"), (None, None)],
+    ids=["with_retry_after", "without_retry_after"],
+)
 @patch("api.v1.routes.webhooks.webhooks.increment_invocation_count")
 @patch("api.v1.routes.webhooks.webhooks.get_webhook")
-def test_handle_webhook_lookup_failure_returns_generic_server_error(
+def test_handle_webhook_lookup_failure_returns_service_unavailable(
     get_webhook_mock,
     increment_invocation_mock,
-    bot_mock,
+    retry_after,
+    expected_retry_after_header,
+    test_client,
 ):
-    """A failed webhook lookup answers a generic 500, never 404, so senders such as SNS redeliver.
+    """A failed webhook lookup answers an explicit 503, never 404, so senders such as SNS redeliver.
 
-    The lookup helper is stubbed to raise with a marker string; the client does not
-    re-raise server exceptions so the real error response is observed, and the body
-    is checked for the marker and exception class to prove nothing leaks.
+    The lookup helper is stubbed to raise the store-unavailable error. The default
+    test client re-raises unhandled server exceptions, so a passing request proves the
+    route maps the failure itself rather than leaking it to the ASGI server. The body
+    is generic (no error code) and Retry-After is sent only when a delay is known.
     """
-    get_webhook_mock.side_effect = RuntimeError("secret-marker")
-    test_app = create_test_app(webhooks.router)
-    test_app.state.bot = bot_mock
-    with TestClient(test_app, raise_server_exceptions=False) as client:
-        response = client.post("/hook/id", json={"text": "some text"})
+    get_webhook_mock.side_effect = webhooks.webhooks.WebhookStoreUnavailableError(
+        OperationStatus.TRANSIENT_ERROR,
+        error_code="ThrottlingException",
+        retry_after=retry_after,
+    )
 
-    assert response.status_code == 500
-    assert "secret-marker" not in response.text
-    assert "RuntimeError" not in response.text
+    response = test_client.post("/hook/id", json={"text": "some text"})
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Service temporarily unavailable"}
+    assert "ThrottlingException" not in response.text
+    assert response.headers.get("retry-after") == expected_retry_after_header
     increment_invocation_mock.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "failure",
+    [
+        {
+            "return_value": OperationResult.error(
+                OperationStatus.TRANSIENT_ERROR,
+                message="boom",
+                error_code="ThrottlingException",
+            )
+        },
+        {
+            "side_effect": ClientError(
+                {"Error": {"Code": "ValidationException", "Message": "missing attribute"}},
+                "UpdateItem",
+            )
+        },
+    ],
+    ids=["classified_error_result", "unclassified_client_error"],
+)
 @patch("api.v1.routes.webhooks.map_emails_to_slack_users")
 @patch("api.v1.routes.webhooks.log_to_sentinel")
 @patch("api.v1.routes.webhooks.append_incident_buttons")
@@ -187,14 +218,16 @@ def test_handle_webhook_invocation_counter_failure_still_delivers(
     mock_append_incident_buttons,
     _mock_log_to_sentinel,
     _mock_map_emails_to_slack_users,
+    failure,
     bot_mock,
     test_client,
 ):
     """A failed invocation-counter write is dropped and the message is still posted.
 
-    The real counter helper runs against a spec'd adapter mock whose update returns
-    an error result, so the route's delivery path is exercised end to end past the
-    counter; the counter write is asserted to use the retries-disabled client.
+    The real counter helper runs against a spec'd adapter mock whose update either
+    returns a classified error result or raises an SDK error the adapter does not
+    classify, so the route's delivery path is exercised end to end past the counter;
+    the counter write is asserted to use the retries-disabled client.
     """
     mock_get_webhook.return_value = {
         "channel": {"S": "test-channel"},
@@ -208,11 +241,7 @@ def test_handle_webhook_invocation_counter_failure_still_delivers(
     )
     mock_append_incident_buttons.return_value = WebhookPayload(text="some text", channel="test-channel")
     adapter = MagicMock(spec=DynamoDBAdapter)
-    adapter.update_item.return_value = OperationResult.error(
-        OperationStatus.TRANSIENT_ERROR,
-        message="boom",
-        error_code="ThrottlingException",
-    )
+    adapter.update_item.configure_mock(**failure)
 
     with patch("modules.slack.webhooks.build_dynamodb_adapter", return_value=adapter):
         response = test_client.post("/hook/id", json={"text": "some text"})

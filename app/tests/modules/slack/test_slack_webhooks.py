@@ -10,6 +10,7 @@ from typing import Any
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 
 from infrastructure.operations import OperationResult, OperationStatus
 from modules.slack import webhooks
@@ -122,12 +123,24 @@ def test_get_webhook_returns_none_when_absent(adapter):
 
 
 def test_get_webhook_raises_and_logs_on_failure(adapter, logger_mock):
-    """A failed read raises so it is never mistaken for a missing webhook."""
-    adapter.get_item.return_value = _failure()
+    """A failed read raises so it is never mistaken for a missing webhook.
 
-    with pytest.raises(RuntimeError) as exc_info:
+    The raised error carries the classification callers map to a response (status,
+    error code, retry delay) while its message stays generic, without provider text.
+    """
+    adapter.get_item.return_value = OperationResult.error(
+        OperationStatus.TRANSIENT_ERROR,
+        message="boom",
+        error_code="ThrottlingException",
+        retry_after=5,
+    )
+
+    with pytest.raises(webhooks.WebhookStoreUnavailableError) as exc_info:
         webhooks.get_webhook("test_id")
 
+    assert exc_info.value.status is OperationStatus.TRANSIENT_ERROR
+    assert exc_info.value.error_code == "ThrottlingException"
+    assert exc_info.value.retry_after == 5
     assert "boom" not in str(exc_info.value)
     logger_mock.error.assert_called_once_with("webhook_get_failed", webhook_id="test_id", **FAILURE_FIELDS)
 
@@ -158,7 +171,7 @@ def test_lookup_webhooks_raises_and_logs_on_failure(adapter, logger_mock):
     """A failed scan raises instead of passing as "no webhooks"."""
     adapter.scan.return_value = _failure()
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(webhooks.WebhookStoreUnavailableError):
         webhooks.lookup_webhooks("channel", "test_channel")
 
     logger_mock.error.assert_called_once_with("webhook_lookup_failed", field="channel", **FAILURE_FIELDS)
@@ -186,7 +199,7 @@ def test_list_all_webhooks_raises_and_logs_on_failure(adapter, logger_mock):
     """A failed scan raises instead of passing as an empty table."""
     adapter.scan.return_value = _failure()
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(webhooks.WebhookStoreUnavailableError):
         webhooks.list_all_webhooks()
 
     logger_mock.error.assert_called_once_with("webhook_list_failed", **FAILURE_FIELDS)
@@ -203,7 +216,11 @@ def test_list_all_webhooks_raises_and_logs_on_failure(adapter, logger_mock):
     ],
 )
 def test_increment_count_sends_without_retries(adapter, helper, attribute):
-    """Counter increments are not replay-safe, so they go to the retries-disabled client."""
+    """Counter increments are not replay-safe, so they go to the retries-disabled client.
+
+    The expression seeds a missing counter at zero in the same atomic write, so items
+    stored without the attribute are counted instead of rejected by DynamoDB.
+    """
     adapter.update_item.return_value = OperationResult.success()
 
     assert helper("test_id") is None
@@ -211,8 +228,8 @@ def test_increment_count_sends_without_retries(adapter, helper, attribute):
         retries=False,
         TableName="webhooks",
         Key={"id": {"S": "test_id"}},
-        UpdateExpression=f"SET {attribute} = {attribute} + :inc",
-        ExpressionAttributeValues={":inc": {"N": "1"}},
+        UpdateExpression=f"SET {attribute} = if_not_exists({attribute}, :zero) + :inc",
+        ExpressionAttributeValues={":inc": {"N": "1"}, ":zero": {"N": "0"}},
     )
 
 
@@ -229,6 +246,47 @@ def test_increment_count_logs_and_returns_none_on_failure(adapter, logger_mock, 
 
     assert helper("test_id") is None
     logger_mock.error.assert_called_once_with(event, webhook_id="test_id", **FAILURE_FIELDS)
+
+
+@pytest.mark.parametrize(
+    ("helper", "event"),
+    [
+        (webhooks.increment_acknowledged_count, "webhook_acknowledged_count_increment_failed"),
+        (webhooks.increment_invocation_count, "webhook_invocation_count_increment_failed"),
+    ],
+)
+def test_increment_count_logs_and_returns_none_on_unclassified_client_error(adapter, logger_mock, helper, event):
+    """An SDK error the adapter does not classify is still logged and dropped for counters.
+
+    The adapter mock raises a ClientError with a code outside every classification
+    catalogue, as the adapter re-raises it in production; the helper must swallow it
+    so a counter never blocks webhook delivery.
+    """
+    adapter.update_item.side_effect = ClientError(
+        {"Error": {"Code": "ValidationException", "Message": "missing attribute"}},
+        "UpdateItem",
+    )
+
+    assert helper("test_id") is None
+    logger_mock.error.assert_called_once_with(
+        event,
+        webhook_id="test_id",
+        status="unclassified",
+        error_code="ValidationException",
+        error="missing attribute",
+    )
+
+
+@pytest.mark.parametrize(
+    "helper",
+    [webhooks.increment_acknowledged_count, webhooks.increment_invocation_count],
+)
+def test_increment_count_propagates_programmer_errors(adapter, helper):
+    """Only SDK errors are swallowed; a programmer error still propagates."""
+    adapter.update_item.side_effect = TypeError("bad call")
+
+    with pytest.raises(TypeError):
+        helper("test_id")
 
 
 # -- toggle_webhook -------------------------------------------------------------
@@ -265,7 +323,7 @@ def test_toggle_webhook_raises_when_read_fails(adapter):
     """A failed read raises before any write is attempted."""
     adapter.get_item.return_value = _failure()
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(webhooks.WebhookStoreUnavailableError):
         webhooks.toggle_webhook("test_id")
 
     adapter.update_item.assert_not_called()
@@ -276,7 +334,7 @@ def test_toggle_webhook_raises_and_logs_when_update_fails(adapter, logger_mock):
     adapter.get_item.return_value = OperationResult.success(data=WEBHOOK_ITEM)
     adapter.update_item.return_value = _failure()
 
-    with pytest.raises(RuntimeError):
+    with pytest.raises(webhooks.WebhookStoreUnavailableError):
         webhooks.toggle_webhook("test_id")
 
     logger_mock.error.assert_called_once_with("webhook_toggle_failed", webhook_id="test_id", **FAILURE_FIELDS)

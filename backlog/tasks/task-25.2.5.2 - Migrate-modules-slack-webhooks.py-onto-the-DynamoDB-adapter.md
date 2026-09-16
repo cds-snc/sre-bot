@@ -1,10 +1,10 @@
 ---
 id: TASK-25.2.5.2
 title: Migrate modules/slack/webhooks.py onto the DynamoDB adapter
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-15 20:09'
-updated_date: '2026-09-16 16:24'
+updated_date: '2026-09-16 17:48'
 labels:
   - clients
   - phase-3
@@ -49,12 +49,12 @@ Overlap: TASK-37.1 later replaces this persistence with a StorageService-backed 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 modules/slack/webhooks.py no longer imports integrations.aws.dynamodb and reaches DynamoDB only through build_dynamodb_adapter() called at function entry
-- [ ] #2 get_webhook, lookup_webhooks, list_all_webhooks and toggle_webhook log status, error_code and error and raise on a non-success result; a missing item returns None and an empty scan returns []
-- [ ] #3 create_webhook logs and returns None on a non-success put; increment_acknowledged_count and increment_invocation_count call update_item(retries=False) and log without raising on a non-success result
-- [ ] #4 POST /hook/{webhook_id} returns a non-leaking 5xx, not 404, when the webhook lookup fails, covered by a test in tests/api/v1/test_webhooks.py
-- [ ] #5 delete_webhook, revoke_webhook and is_active are deleted after a re-grep confirms no production caller; the pinned False-return tests are replaced by tests of the new behaviour
-- [ ] #6 Per-call-site before/after error-path behaviour is recorded in notes; ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with output recorded
+- [x] #1 modules/slack/webhooks.py no longer imports integrations.aws.dynamodb and reaches DynamoDB only through build_dynamodb_adapter() called at function entry
+- [x] #2 get_webhook, lookup_webhooks, list_all_webhooks and toggle_webhook log status, error_code and error and raise on a non-success result; a missing item returns None and an empty scan returns []
+- [x] #3 create_webhook logs and returns None on a non-success put; increment_acknowledged_count and increment_invocation_count call update_item(retries=False) and log without raising on a non-success result
+- [x] #4 POST /hook/{webhook_id} returns a non-leaking 5xx, not 404, when the webhook lookup fails, covered by a test in tests/api/v1/test_webhooks.py
+- [x] #5 delete_webhook, revoke_webhook and is_active are deleted after a re-grep confirms no production caller; the pinned False-return tests are replaced by tests of the new behaviour
+- [x] #6 Per-call-site before/after error-path behaviour is recorded in notes; ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with output recorded
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -165,6 +165,68 @@ uv run pytest tests/modules/slack tests/api/v1/test_webhooks.py tests/integratio
 uv run pytest tests --ignore=tests/smoke
 rg -n "integrations.aws|dynamodb\." modules/slack/webhooks.py ; rg -n "delete_webhook|revoke_webhook|is_active\(" --glob '!tests/**' .
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTATION (2026-09-16)
+- app/modules/slack/webhooks.py: dropped the integrations.aws.dynamodb import. Every DynamoDB helper builds build_dynamodb_adapter() at function entry and branches on OperationResult. Adds private _failure_fields (lambdas.py idiom) and _get_item(adapter, id), so toggle_webhook uses one adapter for its read and write. The migrated helpers are annotated (D3), lookup_webhooks lost field_type (D2), and delete_webhook, revoke_webhook and is_active were deleted after a re-grep found zero production callers (AC#5). The only remaining "dynamodb" text is boto3.dynamodb.types.TypeDeserializer, which deserialize_webhook uses; it is not DynamoDB I/O.
+- app/modules/slack/webhooks_list.py (human decision 2026-09-16, added during implementation): reveal_webhook and toggle_webhook now log a warning (reveal_webhook_not_found / toggle_webhook_not_found) and return when get_webhook returns None. Why: the honest dict | None annotation surfaced 7 mypy index errors at :184-186 and :224-233, which were an existing crash on a missing webhook. Rejected: loosening the annotation, or accepting the new errors.
+- Tests: tests/modules/slack/test_slack_webhooks.py was rewritten (24 adapter-mock tests; the validate_string_payload_type tests are kept); tests/api/v1/test_webhooks.py gained 2 route tests, and the stale webhooks.is_active patch was removed from test_webhooks_rate_limiting; tests/modules/slack/test_webhooks_list.py gained 2 missing-webhook handler tests (written red first: TypeError 'NoneType' object is not subscriptable).
+
+PER-CALL-SITE BEFORE/AFTER ("legacy False" = the error return of handle_aws_api_errors)
+- create_webhook: before, legacy False -> TypeError on the ResponseMetadata index; a non-200 response -> None. After: non-success -> logger.error webhook_create_failed + None.
+- get_webhook: before, a failure -> None -> /hook 404 (and a TypeError in webhooks_list). After: non-success -> webhook_get_failed + RuntimeError (generic message) -> /hook generic 500 so SNS redelivers, and a Bolt error in the Slack handlers; absent -> None as before.
+- lookup_webhooks / list_all_webhooks: before, legacy False was passed through -> webhook_helper answered "No webhooks found" (a failure disguised as empty). After: non-success -> webhook_lookup_failed / webhook_list_failed + RuntimeError; an empty scan -> [].
+- increment_invocation_count / increment_acknowledged_count: before, sent on the retrying client (a replay could double count), and the response or False was returned and ignored. After: update_item(retries=False); non-success -> webhook_*_count_increment_failed logged and dropped; return None.
+- toggle_webhook: before, a failed or missing read -> TypeError; a failed write -> silently None/False. After: failed read -> webhook_get_failed + RuntimeError; missing -> webhook_toggle_not_found warning, no write; failed write -> webhook_toggle_failed + RuntimeError; returns None.
+- webhooks_list.reveal_webhook / toggle_webhook: before, a missing webhook -> TypeError. After: warning + return.
+- delete_webhook / revoke_webhook / is_active: deleted (dead code).
+
+VERIFICATION (from app/)
+- rg -n "integrations.aws|dynamodb\." modules/slack/webhooks.py -> only :7 from boto3.dynamodb.types import TypeDeserializer
+- rg for delete_webhook|revoke_webhook|is_active over production dirs -> only unrelated directory-model is_active fields; rg "webhooks\.(delete_webhook|revoke_webhook|is_active)" tests -> no hits
+- uv run ruff check . -> All checks passed!
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 85 errors in 30 files (checked 353 source files). Same count as the baseline recorded on TASK-25.2.5.1; none are in modules/slack, api/v1/routes/webhooks.py, webhook_helper.py or incident_alert.py. (An intermediate run showed 92 before the webhooks_list guards.)
+- uv run pytest tests/modules/slack tests/api/v1/test_webhooks.py tests/integration/webhooks -> 87 passed (before the 2 handler tests were added)
+- uv run pytest tests --ignore=tests/smoke -> 6 failed, 3460 passed. The 6 are the known order-dependent leaks (test_webhooks_aws_sns.py x3, test_google.py x3), which are unrelated.
+
+FOR THE HUMAN
+- Review the added webhooks_list.py scope (+6 production lines), which the plan did not cover.
+- The seam guard baseline (TASK-25.2.5.5) must include modules/slack/webhooks.py as a packages.aws_platform consumer.
+- TASK-25.2.5.3: db_operations.lookup_incident has the same dynamic field_type key and will hit the same mypy error.
+
+LOCAL MANUAL VERIFICATION AND COUNTER FIX (2026-09-16, human-run against dynamodb-local and dev Slack)
+- Passed on the dev server: seeded hook -> 200, posted to C033L7RGCT0, invocation_count 0->1; unknown id -> 404; "Acknowledge and ignore" -> acknowledged_count +1; /dev-sre webhooks (channel and list), reveal, toggle off (404 "Webhook not active", counter unchanged) and on, create modal (both counters 0).
+- FINDING (the manual step 6 test): an item without invocation_count returned HTTP 500 and nothing was posted. DynamoDB rejects "SET x = x + :inc" on a missing attribute with ValidationException. That code is unclassified, so the adapter re-raised it past the counter's OperationResult branch. Prod before this change swallowed it (legacy False), so this would have been a delivery regression for any prod item missing a counter.
+- FIX (human decision 2026-09-16, "both"): a shared private _increment_counter now (1) uses "SET x = if_not_exists(x, :zero) + :inc", so a missing counter starts at 0 in the same atomic write, still with retries=False; and (2) catches a raised ClientError, logs the same failure event with status="unclassified"/error_code/error, and returns. Programmer errors still propagate. Reads keep raising (the intended 500).
+- Tests (red first, 5 failing): the expression assertion was updated; added test_increment_count_logs_and_returns_none_on_unclassified_client_error x2 and test_increment_count_propagates_programmer_errors x2; the route test test_handle_webhook_invocation_counter_failure_still_delivers is now parametrized over a classified error result and an unclassified ClientError.
+- Probe against real dynamodb-local: increment_invocation_count("no-counters") -> invocation_count None -> {'N': '1'}.
+- Gates: ruff check . -> All checks passed!; mypy . -> Found 85 errors in 30 files (baseline, none new); pytest tests/modules/slack tests/api/v1/test_webhooks.py tests/integration/webhooks -> 94 passed; pytest tests --ignore=tests/smoke -> 6 failed, 3465 passed (the known SNS/google order-dependent leaks).
+- STILL TO DO BY A HUMAN: re-run manual step 6 (expect HTTP 503 "Slack bot not initialized" on :8001) and step 5 (dead endpoint -> generic 500). Before prod, optionally run the read-only prod scan: aws dynamodb scan --table-name webhooks --select COUNT --filter-expression "attribute_not_exists(invocation_count) OR attribute_not_exists(acknowledged_count)".
+
+- Manual step 6 re-run by a human after the fix (2026-09-16): with invocation_count removed from 'no-counters', POST :8001/hook/no-counters -> HTTP 503 {"detail":"Slack bot not initialized"} (the request got past the counter), and invocation_count null -> "1".
+
+- Manual step 5 by a human (2026-09-16): :8001 with AWS_ENDPOINT_URL_DYNAMODB=http://dynamodb-local:1 -> POST /hook/no-counters -> HTTP 500 body 'Internal Server Error' (non-leaking). The log shows the structured webhook_get_failed (status=transient_error, error_code=EndpointConnectionError, webhook_id), then uvicorn's unstructured 'Exception in ASGI application' traceback ending in RuntimeError: webhooks get_item failed.
+
+UNSTRUCTURED TRACEBACK FIX: HUMAN DECISIONS 2026-09-16 (after manual step 5 showed uvicorn's raw 'Exception in ASGI application' traceback)
+Context: decisions/observability.md says exceptions render once, and decisions/errors-and-http.md requires explicit edge mapping, TRANSIENT_ERROR -> 503 + Retry-After and generic 5xx bodies. TASK-28 (app-wide uncaught handler, RFC 9457 helper) and TASK-28.2 (the uvicorn/stdlib pipeline) own the global fix; the human ruled the webhook instances in scope because these files are touched.
+- E1: the read helpers raise a typed WebhookStoreUnavailableError (status, error_code, retry_after) instead of RuntimeError (DirectoryUsersUnavailableError precedent). This supersedes the 09-15 "raises RuntimeError" wording; the log-then-raise policy is unchanged.
+- E2: POST /hook/{id} maps any lookup failure to 503 with a generic detail, plus Retry-After when retry_after is present. The failure is always server-side, so the sender should retry.
+- E3: the Slack surfaces (webhooks_list.py handlers, modules/sre/webhook_helper.py) catch it and reply with a bilingual "try again later" message (modules/aws/lambdas.py precedent), so Bolt never logs a raw traceback.
+
+- IMPLEMENTED E1-E3 (TDD: 15 tests red first with "module 'modules.slack.webhooks' has no attribute 'WebhookStoreUnavailableError'"):
+  - modules/slack/webhooks.py: WebhookStoreUnavailableError(status, error_code, retry_after) with a generic message; get/lookup/list/toggle raise it after the structured log.
+  - api/v1/routes/webhooks.py: catches it around get_webhook and raises HTTPException(503, "Service temporarily unavailable"), with Retry-After only when retry_after is set. The 5xx now comes from the route instead of an unhandled exception reaching uvicorn.
+  - modules/slack/webhooks_list.py: STORE_UNAVAILABLE_MESSAGE (bilingual) and _store_unavailable_view(). reveal_webhook pushes it; toggle_webhook (read, toggle and refresh) and next_page replace the modal with it.
+  - modules/sre/webhook_helper.py: /sre webhooks and "list" respond with the bilingual message.
+  - Tests: RuntimeError assertions became the typed error, plus attribute checks; the route test is now test_handle_webhook_lookup_failure_returns_service_unavailable (with/without Retry-After, run on the default TestClient, which re-raises uncaught exceptions); 3 Slack handler tests (parametrized) in test_webhooks_list.py; 1 parametrized test in tests/unit/modules/sre/test_webhook_helper.py.
+  - Not handled here (owned by TASK-28/TASK-28.2): the app-wide uncaught-exception handler, RFC 9457 bodies (a bare HTTPException is tolerated per errors-and-http.md Migration), and routing uvicorn/stdlib logs through structlog.
+  - Gates: ruff check . -> All checks passed!; mypy . -> Found 85 errors in 30 files (baseline, none in touched files); pytest tests --ignore=tests/smoke -> 6 failed, 3474 passed (the known SNS/google leaks).
+  - Agent live check: not possible from the agent shell (no real AWS credentials; the access-sync startup warmup fails AssumeRole with InvalidClientTokenId before serving). Manual step 5 still needs a human re-run: expect HTTP 503 and no "Exception in ASGI application" traceback.
+
+- Manual step 5 re-run by a human after E1-E3 (2026-09-16): dead-endpoint server on :8001 -> POST /hook/no-counters -> HTTP/1.1 503 {"detail":"Service temporarily unavailable"}, no Retry-After (EndpointConnectionError has no retry_after). Server log: aws_dynamodb_operation_failed (warning) -> webhook_get_failed (error, status=transient_error, error_code=EndpointConnectionError) -> webhook_invocation -> uvicorn access line 503. No 'Exception in ASGI application' traceback. Remaining raw lines ('Found credentials in environment variables.' from botocore, the uvicorn INFO lines) are the stdlib/uvicorn pipeline gap owned by TASK-28.2.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

@@ -2,18 +2,21 @@ import json
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Any
 
 from boto3.dynamodb.types import TypeDeserializer
+from botocore.exceptions import ClientError
 from pydantic import BaseModel
 from structlog import get_logger
 
-from integrations.aws import dynamodb
+from infrastructure.operations import OperationResult, OperationStatus
 from models.webhooks import (
     AccessRequest,
     AwsSnsPayload,
     SimpleTextPayload,
     WebhookPayload,
 )
+from packages.aws_platform.adapters.dynamodb import DynamoDBAdapter, build_dynamodb_adapter
 from utils import models as model_utils
 
 logger = get_logger()
@@ -21,9 +24,45 @@ logger = get_logger()
 table = "webhooks"
 
 
-def create_webhook(channel, user_id, name, hook_type="alert"):
+class WebhookStoreUnavailableError(Exception):
+    """Raised when the webhooks table cannot be read or updated.
+
+    Carries the adapter's classification so callers can map it to a response
+    (e.g. 503 with ``Retry-After``); the message stays generic and never includes
+    provider error text.
+    """
+
+    def __init__(self, status: OperationStatus, error_code: str | None = None, retry_after: int | None = None) -> None:
+        super().__init__("webhooks store unavailable")
+        self.status = status
+        self.error_code = error_code
+        self.retry_after = retry_after
+
+
+def _unavailable(result: OperationResult[Any]) -> WebhookStoreUnavailableError:
+    """Build the store-unavailable error from a non-success adapter result."""
+    return WebhookStoreUnavailableError(result.status, error_code=result.error_code, retry_after=result.retry_after)
+
+
+def _failure_fields(result: OperationResult[Any]) -> dict[str, Any]:
+    """Return the structured log fields describing a non-success adapter result."""
+    return {"status": result.status.value, "error_code": result.error_code, "error": result.message}
+
+
+def _get_item(adapter: DynamoDBAdapter, id: str) -> dict[str, Any] | None:
+    """Read one webhook item; None when absent, raise when the read fails."""
+    result = adapter.get_item(TableName=table, Key={"id": {"S": id}})
+    if not result.is_success:
+        logger.error("webhook_get_failed", webhook_id=id, **_failure_fields(result))
+        raise _unavailable(result)
+    return result.data
+
+
+def create_webhook(channel: str, user_id: str, name: str, hook_type: str = "alert") -> str | None:
+    """Create an active webhook and return its id, or None when the write fails."""
+    adapter = build_dynamodb_adapter()
     id = str(uuid.uuid4())
-    response = dynamodb.put_item(
+    result = adapter.put_item(
         TableName=table,
         Item={
             "id": {"S": id},
@@ -37,87 +76,98 @@ def create_webhook(channel, user_id, name, hook_type="alert"):
             "hook_type": {"S": hook_type},
         },
     )
-
-    if response["ResponseMetadata"]["HTTPStatusCode"] == 200:
-        return id
-    else:
+    if not result.is_success:
+        logger.error("webhook_create_failed", **_failure_fields(result))
         return None
+    return id
 
 
-def delete_webhook(id):
-    response = dynamodb.delete_item(TableName=table, Key={"id": {"S": id}})
-    return response
+def get_webhook(id: str) -> dict[str, Any] | None:
+    """Return the webhook item, None when absent; raise when the read fails."""
+    return _get_item(build_dynamodb_adapter(), id)
 
 
-def get_webhook(id):
-    response = dynamodb.get_item(TableName=table, Key={"id": {"S": id}})
-    if response:
-        return response
-    else:
-        return None
-
-
-def lookup_webhooks(field, value, field_type="S"):
-    """Lookup webhooks by a specific field value."""
-    return dynamodb.scan(
+def lookup_webhooks(field: str, value: str) -> list[dict[str, Any]]:
+    """Lookup webhooks by a string field value; raise when the scan fails."""
+    adapter = build_dynamodb_adapter()
+    result = adapter.scan(
         TableName=table,
         FilterExpression=f"{field} = :{field}",
-        ExpressionAttributeValues={f":{field}": {f"{field_type}": value}},
+        ExpressionAttributeValues={f":{field}": {"S": value}},
     )
+    if not result.is_success:
+        logger.error("webhook_lookup_failed", field=field, **_failure_fields(result))
+        raise _unavailable(result)
+    return result.data or []
 
 
-def increment_acknowledged_count(id):
-    response = dynamodb.update_item(
-        TableName=table,
-        Key={"id": {"S": id}},
-        UpdateExpression="SET acknowledged_count = acknowledged_count + :inc",
-        ExpressionAttributeValues={":inc": {"N": "1"}},
-    )
-    return response
+def _increment_counter(id: str, attribute: str, failure_event: str) -> None:
+    """Increment one counter attribute; every SDK failure is logged and dropped.
+
+    A counter must never block webhook delivery, so a ClientError the adapter does
+    not classify (e.g. ValidationException) is swallowed too; programmer errors
+    still propagate. The increment is not replay-safe, so it is sent without SDK
+    retries, and ``if_not_exists`` seeds a missing counter at zero in the same write.
+    """
+    adapter = build_dynamodb_adapter()
+    try:
+        result = adapter.update_item(
+            retries=False,
+            TableName=table,
+            Key={"id": {"S": id}},
+            UpdateExpression=f"SET {attribute} = if_not_exists({attribute}, :zero) + :inc",
+            ExpressionAttributeValues={":inc": {"N": "1"}, ":zero": {"N": "0"}},
+        )
+    except ClientError as exc:
+        error = exc.response.get("Error", {})
+        logger.error(
+            failure_event,
+            webhook_id=id,
+            status="unclassified",
+            error_code=error.get("Code"),
+            error=error.get("Message"),
+        )
+        return
+    if not result.is_success:
+        logger.error(failure_event, webhook_id=id, **_failure_fields(result))
 
 
-def increment_invocation_count(id):
-    response = dynamodb.update_item(
-        TableName=table,
-        Key={"id": {"S": id}},
-        UpdateExpression="SET invocation_count = invocation_count + :inc",
-        ExpressionAttributeValues={":inc": {"N": "1"}},
-    )
-    return response
+def increment_acknowledged_count(id: str) -> None:
+    """Increment the acknowledged counter; a failure is logged and dropped."""
+    _increment_counter(id, "acknowledged_count", "webhook_acknowledged_count_increment_failed")
 
 
-def list_all_webhooks():
-    response = dynamodb.scan(TableName=table, Select="ALL_ATTRIBUTES")
-    return response
+def increment_invocation_count(id: str) -> None:
+    """Increment the invocation counter; a failure is logged and dropped."""
+    _increment_counter(id, "invocation_count", "webhook_invocation_count_increment_failed")
 
 
-def revoke_webhook(id):
-    response = dynamodb.update_item(
+def list_all_webhooks() -> list[dict[str, Any]]:
+    """Return every webhook item; raise when the scan fails."""
+    adapter = build_dynamodb_adapter()
+    result = adapter.scan(TableName=table, Select="ALL_ATTRIBUTES")
+    if not result.is_success:
+        logger.error("webhook_list_failed", **_failure_fields(result))
+        raise _unavailable(result)
+    return result.data or []
+
+
+def toggle_webhook(id: str) -> None:
+    """Invert the webhook's active flag; skip a missing webhook, raise when a call fails."""
+    adapter = build_dynamodb_adapter()
+    webhook = _get_item(adapter, id)
+    if webhook is None:
+        logger.warning("webhook_toggle_not_found", webhook_id=id)
+        return
+    result = adapter.update_item(
         TableName=table,
         Key={"id": {"S": id}},
         UpdateExpression="SET active = :active",
-        ExpressionAttributeValues={":active": {"BOOL": False}},
+        ExpressionAttributeValues={":active": {"BOOL": not webhook["active"]["BOOL"]}},
     )
-    return response
-
-
-# function to return the status of the webhook (ie if it is active or not). If active, return True, else return False
-def is_active(id):
-    response = dynamodb.get_item(TableName=table, Key={"id": {"S": id}})
-    if response:
-        return response["active"]["BOOL"]
-    else:
-        return False
-
-
-def toggle_webhook(id):
-    response = dynamodb.update_item(
-        TableName=table,
-        Key={"id": {"S": id}},
-        UpdateExpression="SET active = :active",
-        ExpressionAttributeValues={":active": {"BOOL": not get_webhook(id)["active"]["BOOL"]}},
-    )
-    return response
+    if not result.is_success:
+        logger.error("webhook_toggle_failed", webhook_id=id, **_failure_fields(result))
+        raise _unavailable(result)
 
 
 def decimal_default(obj):
