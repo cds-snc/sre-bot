@@ -4,7 +4,7 @@ title: 'Webhooks slice 1: Webhook domain model + StorageService-backed store'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:39'
-updated_date: '2026-07-28 19:16'
+updated_date: '2026-09-16 13:59'
 labels:
   - migration
   - webhooks
@@ -13,6 +13,7 @@ milestone: m-4
 dependencies:
   - TASK-7
   - TASK-36
+  - TASK-27.2
 references:
   - decisions/webhooks.md
   - decisions/layers.md
@@ -48,4 +49,21 @@ Verify before/while implementing: StorageService TypeSerializer returns Decimal 
 - [ ] #2 No caller above the store handles raw DynamoDB item shapes (S/BOOL wrappers); the route and admin surface speak the Webhook model (grep + test)
 - [ ] #3 Webhook URLs and behaviour are unchanged: TASK-36 smoke tests pass before and after
 - [ ] #4 import-linter is green: packages/webhooks imports integrations only inside adapters/ (none in this slice)
+- [ ] #5 Invocation and acknowledgement counters are written with a single atomic storage operation exposed by the StorageService Protocol, never a read-modify-write (decisions/webhooks.md), and the in-memory fake honours the same semantics
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: @claude
+created: 2026-09-16 13:47
+---
+2026-09-16 review of TASK-25.2.5: TASK-27 added as a dependency. Scope item 3 requires the WebhookStore to expose increment_invocation/increment_acknowledged over the StorageService Protocol, but that Protocol (app/infrastructure/storage/protocol.py) offers only put, put_if_not_exists, get, query and delete. There is no update and no atomic counter operation, and decisions/webhooks.md forbids resolving that with a read-modify-write. Without TASK-27 this slice would either grow a vendor-shaped update on the Protocol (the exact leak TASK-27 exists to remove, see decisions/cloud-portability.md contract 4) or hand-roll a race. New AC#5 pins the atomicity requirement. Two further gaps for whoever plans this slice: (a) list_all_webhooks and lookup_webhooks are DynamoDB scans today and the Protocol has no scan or list equivalent either, so the store needs a capability-shaped answer for full-table reads; (b) AC#4 assumes import-linter is running, but it is not installed or wired in app/ today (decisions/toolchain.md still describes it as pending) - the working precedent is the freeze-baseline guard scripts under app/bin/.
+---
+
+author: @claude
+created: 2026-09-16 13:59
+---
+2026-09-16: dependency retargeted from TASK-27 to TASK-27.2 now that TASK-27 is decomposed. TASK-27.2 is the slice that adds the atomic update, the atomic numeric increment and the bounded full-table list this store needs, and it is scoped to land with this task as its first consumer - merge it immediately before this slice, or in the same PR if the size gate allows. TASK-27.1 (the typed key-condition read) is a prerequisite of TASK-27.2 and so is transitively required.
+---
+<!-- COMMENTS:END -->

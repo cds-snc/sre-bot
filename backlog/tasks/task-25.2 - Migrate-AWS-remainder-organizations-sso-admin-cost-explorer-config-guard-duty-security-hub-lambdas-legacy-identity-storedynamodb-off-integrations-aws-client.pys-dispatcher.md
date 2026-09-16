@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:48'
-updated_date: '2026-09-14 15:27'
+updated_date: '2026-09-15 19:55'
 labels:
   - clients
   - phase-3
@@ -86,5 +86,10 @@ created: 2026-09-14 14:05
 created: 2026-09-14 15:27
 ---
 2026-09-14 progress: slice TASK-25.2.3 (Identity Center) is Done. packages/aws_platform/adapters/identity_center.py has Stubber tests, and all Identity Center callers are migrated (provisioning users/groups, modules/aws/identity_center.py, ops_group_assignment get_group_id, scheduled_tasks aws healthcheck). integrations/aws/identity_store.py and its tests are deleted, and its entries are removed from both guard baselines (AC#1 progress: sdk_typing_antipatterns 10 entries left, vendor_package_contract 28 entries left, not all integrations/aws). Per the 2026-09-14 exception, the dead access-request flow (aws_access_requests.py, /aws access, jobs/revoke_aws_sso_access.py) is deleted rather than migrated; the prod table stays in Terraform until TASK-91. Next: TASK-25.2.4.
+---
+
+created: 2026-09-15 19:55
+---
+2026-09-15 progress: slice TASK-25.2.4 is Done (all seven children merged, last one #1486). packages/aws_platform/adapters/{organizations,sso_admin,config,cost_explorer,guard_duty,security_hub,aws_lambda}.py have Stubber tests; ops_group_assignment, spending, aws_account_health and lambdas are on OperationResult; the seven mirrors and their legacy tests are deleted and both guard baselines pruned. Remaining execute_aws_api_call/handle_aws_api_errors users: integrations/aws/{client,dynamodb,sqs}.py (owned by TASK-25.2.5 and TASK-25.2.6). Next: TASK-25.2.5.
 ---
 <!-- COMMENTS:END -->
