@@ -60,6 +60,7 @@ class TestScan:
             stub.assert_no_pending_responses()
 
         assert result.is_success
+        assert result.data is not None
         assert len(result.data) == 2
         assert result.data[0]["id"]["S"] == "item1"
         assert result.data[1]["id"]["S"] == "item2"
@@ -95,6 +96,7 @@ class TestScan:
             stub.assert_no_pending_responses()
 
         assert result.is_success
+        assert result.data is not None
         assert len(result.data) == 2
         assert [item["id"]["S"] for item in result.data] == ["item1", "item2"]
 

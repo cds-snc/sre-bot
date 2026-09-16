@@ -1,10 +1,10 @@
 ---
 id: TASK-25.2.5.1
 title: Build the DynamoDB adapter with Stubber tests
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-15 20:09'
-updated_date: '2026-09-15 23:42'
+updated_date: '2026-09-16 15:15'
 labels:
   - clients
   - phase-3
@@ -44,11 +44,11 @@ Tests (Stubber, the TASK-25.2.4 human decision): tests/unit/packages/aws_platfor
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 packages/aws_platform/adapters/dynamodb.py exposes scan, get_item, put_item and update_item returning OperationResult with AttributeValue request/response shapes unchanged; ClientError/BotoCoreError are classified via classify_aws_error and any other exception propagates
-- [ ] #2 scan returns the Items of every page flattened through get_paginator('scan'); get_item returns success with data None when the item is absent
-- [ ] #3 update_item(retries=False) is sent on the retries-disabled client and every other call on the retrying client; build_dynamodb_adapter builds both only through get_aws_client('dynamodb') with no role ARN
-- [ ] #4 Stubber tests cover success, multi-page scan, absent item, each mapped error family, the retries routing and one unmapped exception propagating; a provider test covers build_dynamodb_adapter
-- [ ] #5 app/.env.example names AWS_ENDPOINT_URL_DYNAMODB; ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with commands and output recorded in notes
+- [x] #1 packages/aws_platform/adapters/dynamodb.py exposes scan, get_item, put_item and update_item returning OperationResult with AttributeValue request/response shapes unchanged; ClientError/BotoCoreError are classified via classify_aws_error and any other exception propagates
+- [x] #2 scan returns the Items of every page flattened through get_paginator('scan'); get_item returns success with data None when the item is absent
+- [x] #3 update_item(retries=False) is sent on the retries-disabled client and every other call on the retrying client; build_dynamodb_adapter builds both only through get_aws_client('dynamodb') with no role ARN
+- [x] #4 Stubber tests cover success, multi-page scan, absent item, each mapped error family, the retries routing and one unmapped exception propagating; a provider test covers build_dynamodb_adapter
+- [x] #5 app/.env.example names AWS_ENDPOINT_URL_DYNAMODB; ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with commands and output recorded in notes
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -155,3 +155,19 @@ cd app && uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'
 cd app && uv run pytest tests --ignore=tests/smoke
 (Known pre-existing order-dependent SNS/google-directory failures under the combined run are a recorded, unrelated leak — not caused by this change.)
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented app/packages/aws_platform/adapters/dynamodb.py (DynamoDBAdapter: scan/get_item/put_item/update_item; build_dynamodb_adapter) per plan. Unpack[...TypeDef] kept for all four methods: mypy accepts keyword-only retries alongside **kwargs: Unpack[UpdateItemInputTypeDef] (plan doubt D1 resolved, no dict[str, Any] fallback needed).
+Tests: tests/unit/packages/aws_platform/test_aws_platform_dynamodb_{operations,provider}.py, 17 cases. Error injection uses patch.object (not direct method assignment as in lambda/identity_center siblings) so mypy reports no attr-defined errors.
+Verification (from app/):
+- uv run ruff check . -> All checks passed!
+- uv run mypy <adapter + both test files> -> Success: no issues found in 3 source files
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 85 errors in 30 files (checked 353 source files); none in the new files (pre-existing)
+- uv run pytest tests/unit/packages/aws_platform/test_aws_platform_dynamodb_*.py -> 17 passed
+- uv run pytest tests --ignore=tests/smoke -> 6 failed, 3456 passed; the 6 are the known order-dependent SNS (test_webhooks_aws_sns.py x3) and google directory (test_google.py x3) leaks, unrelated.
+OPEN (AC#5): app/.env.example line 2 rename to AWS_ENDPOINT_URL_DYNAMODB not applied; the agent session's permission settings deny reading/editing .env.example. Needs a human edit: '# AWS_ENDPOINT_URL=http://dynamodb-local:8000' -> '# AWS_ENDPOINT_URL_DYNAMODB=http://dynamodb-local:8000'.
+
+AC#5: app/.env.example line 2 now reads '# AWS_ENDPOINT_URL_DYNAMODB=http://dynamodb-local:8000' (edited by human; confirmed from the IDE selection).
+<!-- SECTION:NOTES:END -->
