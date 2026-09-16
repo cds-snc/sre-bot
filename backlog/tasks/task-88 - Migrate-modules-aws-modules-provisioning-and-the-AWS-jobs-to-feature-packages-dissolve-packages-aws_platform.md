@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:36'
-updated_date: '2026-09-14 14:05'
+updated_date: '2026-09-16 13:48'
 labels:
   - phase-5
 dependencies:
@@ -46,6 +46,7 @@ EVENTUAL HOMES (recorded 2026-09-11 so the Google-series pattern of vendor-neutr
 - [ ] #2 Every adapter under packages/aws_platform/adapters/ lives in the eventual home stated in the description (feature adapter, capability package with second-feature justification, or infrastructure/storage for DynamoDB callers) and returns typed domain values; no new infrastructure/<service> Protocol was introduced
 - [ ] #3 packages/aws_platform, modules/aws, modules/provisioning and the migrated jobs are deleted
 - [ ] #4 Feature-level AWS settings (permission sets, role ARNs, SSO instance, SERVICE_ROLE_MAP) move from integrations/aws/settings.py into the owning packages' settings.py; integrations/aws/settings.py keeps only the transport fields the client itself needs
+- [ ] #5 The packages/aws_platform seam guard retires with the package: app/bin/check_aws_platform_seam.py, app/bin/baselines/aws_platform_seam_consumers.txt and the make check-aws-platform-seam target are deleted once the baseline is empty (TASK-25.2.5.5 created them)
 <!-- AC:END -->
 
 ## Comments

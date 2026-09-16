@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:36'
-updated_date: '2026-09-15 20:10'
+updated_date: '2026-09-16 13:48'
 labels:
   - clients
   - phase-3
@@ -58,6 +58,7 @@ Deleted: integrations/aws/dynamodb.py and tests/unit/integrations/aws/test_dynam
 - [ ] #3 The non-idempotent write inventory is recorded in notes; the two webhook counter increments and log_activity's list_append are sent with update_item(retries=False) (TASK-25.2.5.1-.3)
 - [ ] #4 The idempotency store's fail-closed IN_PROGRESS on a failed claim re-read is kept, with the decision recorded and a unit test; claim() returns NEW when an SDK replay of its own conditional put fails the condition, via a per-call claim token (TASK-25.2.5.4)
 - [ ] #5 integrations/aws/dynamodb.py and tests/unit/integrations/aws/test_dynamodb_local_endpoint.py are deleted, both guard baselines are pruned, and no boto3.client or boto3.Session construction remains in production code outside integrations/aws/client.py (TASK-25.2.5.5)
+- [ ] #6 The packages/aws_platform transition seam is bounded by a freeze-baseline guard and its baseline, seeded with the production consumers that exist once the migrations have landed and wired as a make target, with TASK-88 named as its retirement owner (TASK-25.2.5.5)
 <!-- AC:END -->
 
 ## Implementation Plan
