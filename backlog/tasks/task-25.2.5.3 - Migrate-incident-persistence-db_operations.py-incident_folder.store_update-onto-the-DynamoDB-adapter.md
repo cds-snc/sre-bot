@@ -3,10 +3,10 @@ id: TASK-25.2.5.3
 title: >-
   Migrate incident persistence (db_operations.py, incident_folder.store_update)
   onto the DynamoDB adapter
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-15 20:09'
-updated_date: '2026-09-16 19:53'
+updated_date: '2026-09-16 20:12'
 labels:
   - clients
   - phase-3
@@ -62,12 +62,12 @@ Overlap: TASK-38 later moves incident persistence into packages/incident/common,
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 modules/incident/db_operations.py and incident_folder.py no longer import integrations.aws.dynamodb and reach DynamoDB only through build_dynamodb_adapter() called at function entry
-- [ ] #2 list_incidents and lookup_incident log status, error_code and error and raise IncidentStoreUnavailableError on a non-success adapter result, including when the adapter raises an unclassified ClientError (caught, logged status="unclassified", re-raised as IncidentStoreUnavailableError(OperationStatus.PERMANENT_ERROR, error_code=...) from exc); get_incident_by_channel_id and create_incident's duplicate check never treat a failed scan as no incident; empty scans still return []
-- [ ] #3 create_incident, update_incident_field and store_update log and return None on a non-success write, including an unclassified ClientError (caught, logged status="unclassified", return None), closing the gap at the source so no caller of update_incident_field needs a change; log_activity sends update_item(retries=False), catches ClientError (classified or not), and returns False with an error log on any non-success result
-- [ ] #4 get_incident is deleted after a re-grep confirms no production caller; the pinned False-return tests are replaced by tests of the new behaviour
-- [ ] #5 Every Slack/Bolt surface reaching list_incidents, lookup_incident or get_incident_by_channel_id (directly, via create_incident's duplicate check, or via store_update's/fetch_updates' read) catches IncidentStoreUnavailableError and gives the user a generic try-again-later response instead of a raw traceback, covering both classified and unclassified failures with no extra surface code; call sites already covered by an existing broad exception handler (core.py) are left unchanged and documented in notes
-- [ ] #6 Per-call-site before/after error-path behaviour, including the surface-handling table, is recorded in notes; ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with output recorded
+- [x] #1 modules/incident/db_operations.py and incident_folder.py no longer import integrations.aws.dynamodb and reach DynamoDB only through build_dynamodb_adapter() called at function entry
+- [x] #2 list_incidents and lookup_incident log status, error_code and error and raise IncidentStoreUnavailableError on a non-success adapter result, including when the adapter raises an unclassified ClientError (caught, logged status="unclassified", re-raised as IncidentStoreUnavailableError(OperationStatus.PERMANENT_ERROR, error_code=...) from exc); get_incident_by_channel_id and create_incident's duplicate check never treat a failed scan as no incident; empty scans still return []
+- [x] #3 create_incident, update_incident_field and store_update log and return None on a non-success write, including an unclassified ClientError (caught, logged status="unclassified", return None), closing the gap at the source so no caller of update_incident_field needs a change; log_activity sends update_item(retries=False), catches ClientError (classified or not), and returns False with an error log on any non-success result
+- [x] #4 get_incident is deleted after a re-grep confirms no production caller; the pinned False-return tests are replaced by tests of the new behaviour
+- [x] #5 Every Slack/Bolt surface reaching list_incidents, lookup_incident or get_incident_by_channel_id (directly, via create_incident's duplicate check, or via store_update's/fetch_updates' read) catches IncidentStoreUnavailableError and gives the user a generic try-again-later response instead of a raw traceback, covering both classified and unclassified failures with no extra surface code; call sites already covered by an existing broad exception handler (core.py) are left unchanged and documented in notes
+- [x] #6 Per-call-site before/after error-path behaviour, including the surface-handling table, is recorded in notes; ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with output recorded
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -381,6 +381,77 @@ rg -n "integrations.aws" modules/incident/db_operations.py modules/incident/inci
 rg -n "db_operations\.get_incident\(" --glob '!tests/**' app  (re-confirm 0 hits before finalizing the AC#4 deletion)
 rg -n "update_incident_field\(" --glob '!tests/**' app  (re-confirm incident_status.py:59 and information_update.py:322 are the only callers and need no catch, per F4)
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTATION NOTES
+
+Per-call-site before/after (AC#6):
+- create_incident: before, a legacy False crashed on response["ResponseMetadata"]; a 400-status dict logged+returned None. After: non-success (classified OR unclassified ClientError) -> log incident_creation_failed + return None. Duplicate-check read (get_incident_by_channel_id) now raises IncidentStoreUnavailableError on a failed scan instead of silently treating failure as "no duplicate".
+- list_incidents: before, pure pass-through; a legacy False reached modules/dev/incident.py:22's len(incidents) and crashed. After: non-success (classified or unclassified) -> log incident_list_failed + raise IncidentStoreUnavailableError; empty scan still returns [].
+- update_incident_field: before, a legacy falsy response was swallowed silently (no log). After: non-success (classified or unclassified) -> log incident_update_failed + return None; no caller needs a catch (F4 closes the information_update.py:322 / incident_status.py:59 gap at the source, re-grepped, no code change needed at either).
+- log_activity: before, a legacy falsy response logged activity_log_failed and returned False. After: same contract; also catches an unclassified ClientError (log status="unclassified", return False); write sent with retries=False.
+- get_incident: deleted (dead code, zero production callers, re-grepped `db_operations\.get_incident\(` = 0 hits outside tests).
+- lookup_incident / get_incident_by_channel_id: before, a legacy False crashed len(...) call sites. After: non-success (classified or unclassified) -> log incident_lookup_failed + raise IncidentStoreUnavailableError; empty scan still returns [] / None. field_type param dropped (literal {"S": value} used, matching test_lookup_incident).
+- incident_folder.store_update: before, a legacy False crashed on response.get("ResponseMetadata", {}); a 400-status dict returned None silently. After: non-success (classified or unclassified) -> log incident_update_store_failed + return None; read half (lookup_incident) now raises, caught at incident_helper.py:696 (handle_updates_submission) and :704 (display_current_updates, via fetch_updates).
+
+Surface-handling table (AC#5, F3 re-grep, 12 sites):
+1. core.py:303 (_create_database_record, create_incident) - already inside try/except Exception (:288-317). NO CHANGE.
+2. core.py:364 (recreate_missing_resources, get_incident_by_channel_id) - its only caller incident_helper.recreate_missing_incident_resources wraps the whole call in try/except Exception. NO CHANGE.
+3. information_display.py:17 (open_incident_info_view) - ADDED try/except IncidentStoreUnavailableError -> respond(INCIDENT_STORE_UNAVAILABLE_MESSAGE); return.
+4. incident_helper.py close_incident (get_incident_by_channel_id) - ADDED same catch.
+5. incident_helper.py handle_update_status_command (get_incident_by_channel_id) - ADDED same catch.
+6. incident_helper.py open_updates_dialog (get_incident_by_channel_id) - no respond param; ADDED local _store_unavailable_view() helper; on catch, client.views_open(trigger_id=..., view=_store_unavailable_view()).
+7. incident_helper.py handle_updates_submission (incident_folder.store_update) - ADDED catch around the call.
+8. incident_helper.py display_current_updates (incident_folder.fetch_updates) - ADDED same catch.
+9. modules/dev/incident.py list_incidents (db_operations.list_incidents) - ADDED same catch.
+10. modules/dev/incident.py load_incidents (incident_folder.create_missing_incidents) - ADDED same catch. Accepted: partial-batch incidents already created before a mid-loop scan failure are not rolled back (create_missing_incidents' own duplicate check makes a re-run safe).
+11. modules/dev/incident.py add_incident (get_incident_by_channel_id) - ADDED catch.
+12. modules/dev/incident.py add_incident (create_incident) - ADDED a second, separate catch.
+F4 confirms no 13th surface site is needed: reads' unclassified case raises the same typed exception the above catches already target; ordinary writes never raise at all.
+
+Re-greps recorded:
+- `rg -n "integrations.aws" modules/incident/db_operations.py modules/incident/incident_folder.py` -> 0 hits.
+- `rg -n "db_operations\.get_incident\(" --glob '!tests/**' app` -> 0 hits (AC#4 deletion confirmed safe).
+- `rg -n "update_incident_field\(" --glob '!tests/**' app` -> only incident_status.py:59 and information_update.py:322 (plus the def itself); neither needs a change (both ignore the return value already).
+
+Deviations from the plan's literal pseudocode (behavior unchanged, only implementation mechanics differ from the sketch, needed to satisfy the pre-authored tests' mocking strategy):
+1. information_display.py imports IncidentStoreUnavailableError and INCIDENT_STORE_UNAVAILABLE_MESSAGE directly from modules.incident.db_operations (`from modules.incident.db_operations import INCIDENT_STORE_UNAVAILABLE_MESSAGE, IncidentStoreUnavailableError`) rather than referencing `db_operations.IncidentStoreUnavailableError` in the except clause. Reason: test_information_display.py's `@patch("modules.incident.information_display.db_operations")` replaces the whole db_operations name with an unspec'd MagicMock and never sets `.IncidentStoreUnavailableError` on it (unlike the incident_helper.py/dev-incident.py tests, which explicitly do `mock_db_ops.IncidentStoreUnavailableError = db_operations.IncidentStoreUnavailableError`). Catching `except <MagicMock attribute>:` raises `TypeError: catching classes that do not inherit from BaseException` (verified empirically). incident_helper.py and modules/dev/incident.py keep the plan's literal `db_operations.IncidentStoreUnavailableError` form since their tests do set that attribute.
+2. modules/dev/incident.py: fixed a pre-existing bug in list_incidents and add_incident where `incident_conversation.is_incident_channel(client, logger, channel_id)` was called with 3 positional args against the real 2-arg signature `is_incident_channel(client, channel_id, notify=True)` (logger was being passed as channel_id). Simple bug fix in a touched file per standing preference; corrected to `is_incident_channel(client, channel_id)`.
+
+Test changes (with reasons):
+1. tests/modules/incident/test_db_operations.py: test_update_incident_field and test_update_incident_field_with_type now patch `db_operations.log_activity` and assert it was called (test_update_incident_field only), instead of asserting `adapter.update_item.assert_called_once()` against the unmocked real log_activity. Reason: update_incident_field's success path calls log_activity per the plan (STEP 1e, unchanged behavior), and log_activity issues its own adapter.update_item call against the same fixture-provided adapter mock, so the original assertion of exactly one call was unsatisfiable without mocking log_activity out. This is a test authoring gap, not a plan/architecture conflict.
+2. tests/modules/incident/test_incident_helper.py:
+   - test_close_incident_responds_when_store_unavailable: fixed the call to `incident_helper.close_incident(client, body, ack, respond)` (was `(client, body, respond, ack)`, swapped vs. the real signature `close_incident(client, body, ack, respond)`).
+   - test_handle_update_status_command_responds_when_store_unavailable: fixed the call to `incident_helper.handle_update_status_command(client, body, respond, ack, ["Closed"])` (was `(client, body, "new_status", respond, ack)` -- wrong order/type against the real signature `(client, body, respond, ack, args)`; "new_status" is also not a valid status so the original call would never have reached get_incident_by_channel_id, and would in fact crash on `str.join(" ", ack)` since `args` was bound to the ack MagicMock).
+   - test_open_updates_dialog_opens_unavailable_view_when_store_unavailable: replaced `assert db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE in str(view)` with `assert view["blocks"][0]["text"]["text"] == db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE`. Reason: `str()` of a dict reprs nested strings, escaping the message's real newline as the two-character sequence `\n`, so the raw (real-newline) message can never be a substring of `str(view)` for any multi-line message -- verified empirically. Structural assertion is equivalent in intent and actually verifies the right field.
+3. tests/unit/modules/dev/test_dev_incident_handler.py: rewritten. The pre-authored file called `incident.list_incidents(respond)`, `incident.load_incidents(test_incidents, respond)`, `incident.add_incident("C001", respond)` -- none of which match the real signatures `list_incidents(ack, logger, respond, client, body)`, `load_incidents(ack, logger, respond, client, body)`, `add_incident(ack, logger, respond, client, body)` (the plan's own F3 site descriptions reference these same unchanged signatures/line numbers). Rewrote all 4 tests to call with the real 5-arg signature, added MagicMock ack/logger/client and a body dict, and stubbed `incident_conversation`/`incident_folder` collaborators only where needed to reach the store call cleanly without invoking real Slack/Drive logic against bare MagicMocks. `test_list_incidents_responds_when_store_unavailable` uses `respond.assert_called_with(...)` (last call) instead of `assert_called_once_with(...)` because list_incidents legitimately responds once with the "Is this an incident channel?" message before reaching db_operations.list_incidents(), unchanged pre-existing behavior. Same file also got a ruff-format pass (line wrapping only).
+
+VERIFICATION (from app/):
+- `uv run ruff check .` -> All checks passed!
+- `uv run ruff format --check .` -> 734 files already formatted
+- `uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'` -> Found 82 errors in 30 files (checked 353 source files); baseline from TASK-25.2.5.1/.2 was 85; net -3, zero new errors in db_operations.py, incident_folder.py, information_display.py, incident_helper.py, modules/dev/incident.py (the touched files' remaining errors -- db_operations.py:75, incident_folder.py:425/453/455/463/466/467, incident_helper.py:682 -- are pre-existing, in code/lines this task did not change).
+- `uv run pytest tests/modules/incident tests/unit/modules/dev -q` -> 336 passed
+- `uv run pytest tests --ignore=tests/smoke -q` -> 6 failed, 3498 passed. The 6 failures are the known pre-existing order-dependent leaks: tests/modules/webhooks/test_webhooks_aws_sns.py (3) and tests/unit/infrastructure/directory/test_google.py (3), unrelated to this change (TASK-90).
+- `rg -n "integrations.aws" modules/incident/db_operations.py modules/incident/incident_folder.py` -> 0 hits.
+- `rg -n "db_operations\.get_incident\(" --glob '!tests/**' app` -> 0 hits.
+- `rg -n "update_incident_field\(" --glob '!tests/**' app` -> only incident_status.py:59 and information_update.py:322 as callers (plus the definition); neither needs a change.
+
+core.py and information_update.py: confirmed unchanged (`git diff --stat` shows no modification to either file).
+
+REVIEW FOLLOW-UP (2026-09-16), supersedes deviation 1 and the mypy line above:
+- information_display.py now uses the same form as the other surfaces (`except db_operations.IncidentStoreUnavailableError: respond(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)`), with no direct import and no extra log line (the store already logs the failure). Its test sets the real error class and message constant on the patched db_operations mock, as the incident_helper and dev tests do.
+- INCIDENT_STORE_UNAVAILABLE_MESSAGE moved to the top of db_operations.py, and its French text now has accents ("données", "réessayer"), matching webhooks_list.STORE_UNAVAILABLE_MESSAGE.
+- store_update: removed the redundant trailing `return None` after the failure branch.
+- mypy fixes in touched code: create_incident's duplicate-check return is annotated str (no-any-return from the new return type). open_updates_dialog no longer calls .get on a None incident; incident_id falls back to "Unknown" (pre-existing runtime crash on a channel with no record).
+- Verification after follow-up:
+  - `uv run ruff check .` -> All checks passed!
+  - `uv run ruff format --check modules/incident modules/dev tests/modules/incident tests/unit/modules/dev` -> 41 files already formatted
+  - `uv run pytest tests/modules/incident tests/unit/modules/dev -q` -> 336 passed
+  - `uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'` -> Found 80 errors in 28 files (baseline 85). The remaining errors in incident_folder.py (:425, :453-:467) are pre-existing in functions this task does not touch; none are in db_operations.py, information_display.py, incident_helper.py, modules/dev/incident.py or store_update.
+  - `uv run pytest tests --ignore=tests/smoke -q` -> 6 failed, 3498 passed (before the two mypy fixes; the targeted suite was re-run after). The 6 are the known order-dependent SNS/google-directory leaks (TASK-90).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

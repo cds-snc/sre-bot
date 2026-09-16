@@ -1186,7 +1186,7 @@ def test_close_incident_responds_when_store_unavailable(mock_db_ops):
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.close_incident(client, body, respond, ack)
+    incident_helper.close_incident(client, body, ack, respond)
 
     respond.assert_called_once_with(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
 
@@ -1205,7 +1205,7 @@ def test_handle_update_status_command_responds_when_store_unavailable(mock_db_op
     respond = MagicMock()
     ack = MagicMock()
 
-    incident_helper.handle_update_status_command(client, body, "new_status", respond, ack)
+    incident_helper.handle_update_status_command(client, body, respond, ack, ["Closed"])
 
     respond.assert_called_once_with(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
 
@@ -1232,7 +1232,7 @@ def test_open_updates_dialog_opens_unavailable_view_when_store_unavailable(mock_
     view = call_kwargs["view"]
     assert isinstance(view, dict)
     # Verify the view contains text blocks referencing the unavailable message
-    assert db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE in str(view)
+    assert view["blocks"][0]["text"]["text"] == db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE
 
 
 @patch("modules.incident.incident_helper.incident_folder")

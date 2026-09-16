@@ -15,11 +15,15 @@ def list_incidents(ack, logger, respond, client: WebClient, body):
         respond("Channel not found")
         return
     else:
-        is_incident, is_dev_incident = incident_conversation.is_incident_channel(client, logger, channel_id)
+        is_incident, is_dev_incident = incident_conversation.is_incident_channel(client, channel_id)
         message = f"Is this an incident channel? {is_incident}\nIs dev channel? {is_dev_incident}"
         respond(message)
     logger.info("listing_incidents_initialized")
-    incidents = db_operations.list_incidents()
+    try:
+        incidents = db_operations.list_incidents()
+    except db_operations.IncidentStoreUnavailableError:
+        respond(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
+        return
     respond(f"Found {len(incidents)} incidents")
     if len(incidents) > 10:
         incidents = incidents[:10]
@@ -42,7 +46,11 @@ def load_incidents(ack, logger, respond, client: WebClient, body):
     logger.info("get_incidents_from_sheet_completed", payload=incidents, count=len(incidents))
     incidents = incident_folder.complete_incidents_details(client, incidents)
     logger.info("complete_incidents_details_completed", payload=incidents, count=len(incidents))
-    count = incident_folder.create_missing_incidents(incidents)
+    try:
+        count = incident_folder.create_missing_incidents(incidents)
+    except db_operations.IncidentStoreUnavailableError:
+        respond(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
+        return
     respond(f"Created {count} new incidents")
     logger.info("create_missing_incidents_completed", count=count)
     logger.info("load_incidents_completed")
@@ -50,11 +58,15 @@ def load_incidents(ack, logger, respond, client: WebClient, body):
 
 def add_incident(ack, logger, respond, client: WebClient, body):
     """Add an incident to local DB from a channel"""
-    is_incident, is_dev_incident = incident_conversation.is_incident_channel(client, logger, body["channel_id"])
+    is_incident, is_dev_incident = incident_conversation.is_incident_channel(client, body["channel_id"])
     if not (is_incident and is_dev_incident):
         respond("This is not an incident dev channel")
         return
-    incident_id = db_operations.get_incident_by_channel_id(body["channel_id"])
+    try:
+        incident_id = db_operations.get_incident_by_channel_id(body["channel_id"])
+    except db_operations.IncidentStoreUnavailableError:
+        respond(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
+        return
     if incident_id:
         respond(f"This channel is already associated with incident:\n{incident_id}")
         return
@@ -91,4 +103,8 @@ def add_incident(ack, logger, respond, client: WebClient, body):
         incident_data["name"] = incident_data["name"].rsplit("/", 1)[0].strip()
 
     logger.info("incident_data_created", payload=incident_data)
-    db_operations.create_incident(incident_data)
+    try:
+        db_operations.create_incident(incident_data)
+    except db_operations.IncidentStoreUnavailableError:
+        respond(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
+        return

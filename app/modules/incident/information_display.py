@@ -14,7 +14,11 @@ logger = get_logger()
 def open_incident_info_view(client: WebClient, body, respond: Respond):
     """Open the incident information view. This view displays the incident details where certain fields can be updated."""
     log = logger.bind(operation="open_incident_info_view", channel_id=body.get("channel_id"))
-    incident = db_operations.get_incident_by_channel_id(body["channel_id"])
+    try:
+        incident = db_operations.get_incident_by_channel_id(body["channel_id"])
+    except db_operations.IncidentStoreUnavailableError:
+        respond(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
+        return
     if not incident:
         log.warning("no_incident_record", channel_id=body.get("channel_id"))
         respond("This command is only available in incident channels. No incident records found for this channel.")

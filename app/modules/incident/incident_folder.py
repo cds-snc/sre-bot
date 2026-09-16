@@ -9,16 +9,17 @@ import time
 from typing import Any
 
 import pytz
+from botocore.exceptions import ClientError
 from slack_bolt import Ack
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web import WebClient
 from structlog import get_logger
 
 from infrastructure.configuration.integrations.google import get_google_resources_config
-from infrastructure.operations import OperationStatus
+from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.spreadsheets import RANGE_NOT_FOUND, get_spreadsheet_provider
-from integrations.aws import dynamodb
 from modules.incident import db_operations
+from packages.aws_platform.adapters.dynamodb import build_dynamodb_adapter
 from packages.incident.drive.adapters import google_drive as incident_drive
 
 google_resources = get_google_resources_config()
@@ -36,6 +37,17 @@ class IncidentSheetError(Exception):
         super().__init__(message)
         self.message = message
         self.error_code = error_code
+
+
+def _failure_fields(result: OperationResult[Any]) -> dict[str, Any]:
+    """Return the structured log fields describing a non-success adapter result."""
+    return {"status": result.status.value, "error_code": result.error_code, "error": result.message}
+
+
+def _unclassified_fields(exc: ClientError) -> dict[str, Any]:
+    """Return the structured log fields for a ClientError the adapter did not classify."""
+    error = exc.response.get("Error", {})
+    return {"status": "unclassified", "error_code": error.get("Code"), "error": error.get("Message")}
 
 
 def list_incident_folders():
@@ -530,38 +542,42 @@ def current_time_est():
     return current_time_est.strftime("%Y-%m-%d %H:%M:%S")
 
 
-def store_update(incident_id, update_text):
-    existing_incident = db_operations.lookup_incident("id", incident_id)
+def store_update(incident_id, update_text) -> None:
+    existing_incidents = db_operations.lookup_incident("id", incident_id)
     # Check if the incident exists and has incident_updates
     current_updates = ""
-    if existing_incident:
-        existing_incident = existing_incident[0]
+    if existing_incidents:
+        existing_incident = existing_incidents[0]
         if "incident_updates" in existing_incident and (existing_incident["incident_updates"]["L"] != []):
             current_updates = existing_incident["incident_updates"]["L"][0]["S"]
 
     current_time_in_est = current_time_est() + " EST\n"
     update_text = current_time_in_est + update_text + "\n" + current_updates
-    current_updates = [{"S": update_text}]
+    updated_records = [{"S": update_text}]
 
-    response = dynamodb.update_item(
-        TableName="incidents",
-        Key={"id": {"S": incident_id}},
-        UpdateExpression="SET incident_updates = :updates",
-        ExpressionAttributeValues={":updates": {"L": current_updates}},
-        ReturnValues="UPDATED_NEW",
-    )
-    if response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 200:
-        return response
-    else:
+    adapter = build_dynamodb_adapter()
+    try:
+        result = adapter.update_item(
+            TableName="incidents",
+            Key={"id": {"S": incident_id}},
+            UpdateExpression="SET incident_updates = :updates",
+            ExpressionAttributeValues={":updates": {"L": updated_records}},
+            ReturnValues="UPDATED_NEW",
+        )
+    except ClientError as exc:
+        logger.error("incident_update_store_failed", incident_id=incident_id, **_unclassified_fields(exc))
         return None
+
+    if not result.is_success:
+        logger.error("incident_update_store_failed", incident_id=incident_id, **_failure_fields(result))
 
 
 def fetch_updates(channel_id):
-    response = db_operations.lookup_incident("channel_id", channel_id)
-    if response:
-        response = response[0]
-        if "incident_updates" in response and response["incident_updates"]["L"] != []:
-            updates = [update["S"] for update in response["incident_updates"]["L"]]
+    results = db_operations.lookup_incident("channel_id", channel_id)
+    if results:
+        record = results[0]
+        if "incident_updates" in record and record["incident_updates"]["L"] != []:
+            updates = [update["S"] for update in record["incident_updates"]["L"]]
             return updates
     else:
         return []

@@ -305,10 +305,11 @@ def test_list_incidents_propagates_programmer_error(adapter, logger_mock):
 
 
 def test_update_incident_field(adapter, logger_mock):
-    """A successful update writes the field with the default type 'S'."""
+    """A successful update writes the field with the default type 'S' and fires log_activity."""
     adapter.update_item.return_value = OperationResult.success()
 
-    result = db_operations.update_incident_field("foo", "bar", "baz", "user_id")
+    with patch("modules.incident.db_operations.log_activity") as mock_log_activity:
+        result = db_operations.update_incident_field("foo", "bar", "baz", "user_id")
 
     assert result is None
     adapter.update_item.assert_called_once()
@@ -316,13 +317,15 @@ def test_update_incident_field(adapter, logger_mock):
     assert call_kwargs["TableName"] == "incidents"
     assert call_kwargs["Key"] == {"id": {"S": "foo"}}
     assert call_kwargs["ExpressionAttributeValues"] == {":bar": {"S": "baz"}}
+    mock_log_activity.assert_called_once()
 
 
 def test_update_incident_field_with_type(adapter, logger_mock):
     """The type parameter specifies the DynamoDB type."""
     adapter.update_item.return_value = OperationResult.success()
 
-    db_operations.update_incident_field("foo", "bar", "baz", "user_id", type="M")
+    with patch("modules.incident.db_operations.log_activity"):
+        db_operations.update_incident_field("foo", "bar", "baz", "user_id", type="M")
 
     adapter.update_item.assert_called_once()
     call_kwargs = adapter.update_item.call_args.kwargs

@@ -293,6 +293,8 @@ def test_open_incident_info_view_responds_when_store_unavailable(mock_db_operati
         "trigger_id": "T12345",
         "view": {"id": "V12345"},
     }
+    mock_db_operations.IncidentStoreUnavailableError = db_operations.IncidentStoreUnavailableError
+    mock_db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE = db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE
     mock_db_operations.get_incident_by_channel_id.side_effect = db_operations.IncidentStoreUnavailableError(
         OperationStatus.PERMANENT_ERROR,
         error_code="ValidationException",
