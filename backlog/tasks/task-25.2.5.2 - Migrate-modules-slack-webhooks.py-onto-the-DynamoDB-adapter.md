@@ -4,7 +4,7 @@ title: Migrate modules/slack/webhooks.py onto the DynamoDB adapter
 status: To Do
 assignee: []
 created_date: '2026-09-15 20:09'
-updated_date: '2026-09-16 16:15'
+updated_date: '2026-09-16 16:24'
 labels:
   - clients
   - phase-3
@@ -165,3 +165,19 @@ uv run pytest tests/modules/slack tests/api/v1/test_webhooks.py tests/integratio
 uv run pytest tests --ignore=tests/smoke
 rg -n "integrations.aws|dynamodb\." modules/slack/webhooks.py ; rg -n "delete_webhook|revoke_webhook|is_active\(" --glob '!tests/**' .
 <!-- SECTION:PLAN:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-16 16:24
+---
+2026-09-16 tests authored ahead of implementation.
+- tests/modules/slack/test_slack_webhooks.py: every dynamodb-patched test was replaced with 24 tests over MagicMock(spec=DynamoDBAdapter). This covers plan matrix 1-20, with the counter cases parametrized, plus test_dead_helpers_are_removed x3. The validate_string_payload_type tests are unchanged.
+- tests/api/v1/test_webhooks.py: added test_handle_webhook_lookup_failure_returns_generic_server_error and test_handle_webhook_invocation_counter_failure_still_delivers.
+- Plan gap found: test_webhooks_rate_limiting patched webhooks.is_active, which would raise AttributeError once is_active is deleted. That patch and its argument were removed in this pass.
+Red state (uv run pytest tests/modules/slack/test_slack_webhooks.py tests/api/v1/test_webhooks.py): 4 failed, 24 passed, 20 errors.
+- 21 fail with "AttributeError: modules.slack.webhooks does not have the attribute 'build_dynamodb_adapter'".
+- The 3 dead-helper tests fail with "assert not True" (the helpers still exist).
+- The lookup-failure route test already passes: it stubs get_webhook to raise, and the route already turns that into a generic 500. It guards the non-leaking body once get_webhook raises for real.
+---
+<!-- COMMENTS:END -->

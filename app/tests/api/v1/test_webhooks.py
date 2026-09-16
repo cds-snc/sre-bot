@@ -9,10 +9,12 @@ from structlog.testing import capture_logs
 from api.v1.routes import webhooks
 from infrastructure.logging.settings import LoggingSettings
 from infrastructure.logging.setup import _build_base_processors
+from infrastructure.operations import OperationResult, OperationStatus
 from models.webhooks import (
     WebhookPayload,
     WebhookResult,
 )
+from packages.aws_platform.adapters.dynamodb import DynamoDBAdapter
 from server.body_size_middleware import MaxBodySizeMiddleware
 from utils.tests import create_test_app
 
@@ -147,6 +149,78 @@ def test_handle_webhook_not_found(get_webhook_mock, test_client):
     assert response.status_code == 404
     assert response.json() == {"detail": "Webhook not found"}
     assert get_webhook_mock.call_count == 1
+
+
+@patch("api.v1.routes.webhooks.webhooks.increment_invocation_count")
+@patch("api.v1.routes.webhooks.webhooks.get_webhook")
+def test_handle_webhook_lookup_failure_returns_generic_server_error(
+    get_webhook_mock,
+    increment_invocation_mock,
+    bot_mock,
+):
+    """A failed webhook lookup answers a generic 500, never 404, so senders such as SNS redeliver.
+
+    The lookup helper is stubbed to raise with a marker string; the client does not
+    re-raise server exceptions so the real error response is observed, and the body
+    is checked for the marker and exception class to prove nothing leaks.
+    """
+    get_webhook_mock.side_effect = RuntimeError("secret-marker")
+    test_app = create_test_app(webhooks.router)
+    test_app.state.bot = bot_mock
+    with TestClient(test_app, raise_server_exceptions=False) as client:
+        response = client.post("/hook/id", json={"text": "some text"})
+
+    assert response.status_code == 500
+    assert "secret-marker" not in response.text
+    assert "RuntimeError" not in response.text
+    increment_invocation_mock.assert_not_called()
+
+
+@patch("api.v1.routes.webhooks.map_emails_to_slack_users")
+@patch("api.v1.routes.webhooks.log_to_sentinel")
+@patch("api.v1.routes.webhooks.append_incident_buttons")
+@patch("api.v1.routes.webhooks.handle_webhook_payload")
+@patch("api.v1.routes.webhooks.webhooks.get_webhook")
+def test_handle_webhook_invocation_counter_failure_still_delivers(
+    mock_get_webhook,
+    mock_handle_webhook_payload,
+    mock_append_incident_buttons,
+    _mock_log_to_sentinel,
+    _mock_map_emails_to_slack_users,
+    bot_mock,
+    test_client,
+):
+    """A failed invocation-counter write is dropped and the message is still posted.
+
+    The real counter helper runs against a spec'd adapter mock whose update returns
+    an error result, so the route's delivery path is exercised end to end past the
+    counter; the counter write is asserted to use the retries-disabled client.
+    """
+    mock_get_webhook.return_value = {
+        "channel": {"S": "test-channel"},
+        "hook_type": {"S": "alert"},
+        "active": {"BOOL": True},
+    }
+    mock_handle_webhook_payload.return_value = WebhookResult(
+        status="success",
+        action="post",
+        payload=WebhookPayload(text="some text"),
+    )
+    mock_append_incident_buttons.return_value = WebhookPayload(text="some text", channel="test-channel")
+    adapter = MagicMock(spec=DynamoDBAdapter)
+    adapter.update_item.return_value = OperationResult.error(
+        OperationStatus.TRANSIENT_ERROR,
+        message="boom",
+        error_code="ThrottlingException",
+    )
+
+    with patch("modules.slack.webhooks.build_dynamodb_adapter", return_value=adapter):
+        response = test_client.post("/hook/id", json={"text": "some text"})
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    assert adapter.update_item.call_args.kwargs["retries"] is False
+    bot_mock.client.api_call.assert_called_once_with("chat.postMessage", json=ANY)
 
 
 class TestWebhookInvocationFingerprint:
@@ -611,7 +685,6 @@ def test_append_incident_buttons_with_str_attachments():
 
 @patch("api.v1.routes.webhooks.handle_webhook_payload")
 @patch("api.v1.routes.webhooks.webhooks.increment_invocation_count")
-@patch("api.v1.routes.webhooks.webhooks.is_active", return_value=True)
 @patch(
     "api.v1.routes.webhooks.webhooks.get_webhook",
     return_value={
@@ -623,7 +696,6 @@ def test_append_incident_buttons_with_str_attachments():
 @pytest.mark.asyncio
 async def test_webhooks_rate_limiting(
     get_webhook_mock,
-    is_active_mock,
     increment_invocation_count_mock,
     handle_webhook_payload_mock,
     bot_mock,
