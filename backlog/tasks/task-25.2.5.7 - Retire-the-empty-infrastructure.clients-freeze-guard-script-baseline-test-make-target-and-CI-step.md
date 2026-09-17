@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-09-17 15:13'
-updated_date: '2026-09-17 16:58'
+updated_date: '2026-09-17 17:09'
 labels:
   - clients
   - phase-3
@@ -41,11 +41,11 @@ No ADR edit: decisions/toolchain.md already prescribes retirement. Out of scope:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 check_deprecated_infra_client_imports.py, its baseline and its test no longer exist; app/Makefile has no check-deprecated-client-imports target or .PHONY entry; ci_code.yml has no step calling it
-- [ ] #2 rg over the repo (excluding backlog/) for check_deprecated_infra_client_imports|check-deprecated-client-imports|deprecated_infra_client_imports returns zero hits
-- [ ] #3 make check-sdk-typing, make check-vendor-package-contract and make check-runtime-imports still print OK; ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with output recorded in notes
-- [ ] #4 ADR text no longer describes the retired guard (human decision 2026-09-17): decisions/migration.md coexistence rule 3 covers import-linter ignore lists and every freeze baseline under app/bin/baselines/, its Checks bullet describes freeze guards generally, and a dated change note records both; decisions/outbound-clients.md drops the closed 'seven baselined deprecated-client consumers' tolerance, with a dated entry in its Changes list
-- [ ] #5 app/Makefile .PHONY lists exactly the defined make targets: the retired target and the undefined test-coverage are removed, and the 8 missing targets (check-runtime-imports, debug, install-ci, lint-types, lock-check, test-coverage-all, test-coverage-integration, test-new) are added (pre-existing drift fixed on the touched line, human decision 2026-09-17)
+- [x] #1 check_deprecated_infra_client_imports.py, its baseline and its test no longer exist; app/Makefile has no check-deprecated-client-imports target or .PHONY entry; ci_code.yml has no step calling it
+- [x] #2 rg over the repo (excluding backlog/) for check_deprecated_infra_client_imports|check-deprecated-client-imports|deprecated_infra_client_imports returns zero hits
+- [x] #3 make check-sdk-typing, make check-vendor-package-contract and make check-runtime-imports still print OK; ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with output recorded in notes
+- [x] #4 ADR text no longer describes the retired guard (human decision 2026-09-17): decisions/migration.md coexistence rule 3 covers import-linter ignore lists and every freeze baseline under app/bin/baselines/, its Checks bullet describes freeze guards generally, and a dated change note records both; decisions/outbound-clients.md drops the closed 'seven baselined deprecated-client consumers' tolerance, with a dated entry in its Changes list
+- [x] #5 app/Makefile .PHONY lists exactly the defined make targets: the retired target and the undefined test-coverage are removed, and the 8 missing targets (check-runtime-imports, debug, install-ci, lint-types, lock-check, test-coverage-all, test-coverage-integration, test-new) are added (pre-existing drift fixed on the touched line, human decision 2026-09-17)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -155,3 +155,33 @@ BLAST RADIUS AND ROLLBACK
 SIZE
 Production/tooling (tests excluded): 6 files. Deleted: the script (-103) and the baseline (-8). Edited: Makefile (the .PHONY line rewritten, -3), ci_code.yml (-4), migration.md (2 lines rewritten, +2), outbound-clients.md (-1/+1). Roughly -120 / +5. Tests: -1 file (94 lines). One subsystem (tooling) plus ADR bookkeeping, well within the size gate.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTATION (2026-09-17)
+- Deleted app/bin/check_deprecated_infra_client_imports.py, app/bin/baselines/deprecated_infra_client_imports.txt and app/tests/unit/bin/test_check_deprecated_infra_client_imports.py (8 tests). Also removed their untracked __pycache__ .pyc files locally.
+- app/Makefile: removed the check-deprecated-client-imports target (3 lines). The .PHONY line now lists exactly the defined targets: dropped the retired target and the undefined test-coverage, and added check-runtime-imports, debug, install-ci, lint-types, lock-check, test-coverage-integration, test-coverage-all and test-new. No recipe changed, and no file in app/ shares a name with the added targets.
+- .github/workflows/ci_code.yml: removed the 'Deprecated client import freeze check' step. Format is now followed by 'SDK typing anti-pattern freeze check'.
+- decisions/migration.md: rule 3 now reads 'import-linter ignore lists and every freeze baseline under app/bin/baselines/ never gain entries; a new baseline is seeded once, when its guard lands.' The Checks bullet describes freeze guards under app/bin/ generally, with retirement once a baseline is empty. A '**Change note (2026-09-17, freeze baselines generalized):**' was appended. Lines 35 (Done means) and toolchain.md:24 are unchanged, per the human decision.
+- decisions/outbound-clients.md: removed the '- the seven baselined deprecated-client consumers;' tolerance and appended '- 2026-09-17: …' to its **Changes:** list. Plan correction: that list sits at the end of the file, not the top.
+
+RED/GREEN (temporary pytest module in the session scratchpad, never in the repo, deleted after use)
+- Before edits: 10 failed, 15 passed. The failures were file removal x3, module spec, Makefile target, CI step, migration wording x2, the outbound tolerance, and .PHONY == defined targets. The 15 passes were retention guards plus the .PHONY duplicate check.
+- After edits, first run: 2 failed, 23 passed. Both failures were a defect in the temporary test, not the change: it asserted the old phrases appear nowhere in each ADR, but the new dated notes quote them on purpose. Narrowed to the rule 3 line, the Checks bullet and the tolerance list.
+- After the fix: 25 passed.
+
+EVIDENCE (from app/ unless noted)
+- Precondition rg (repo root, --hidden, excluding backlog/.git/.venv/__pycache__) before edits: exactly the 3 files, Makefile:1, :97, :98 and ci_code.yml:48. make check-deprecated-client-imports -> OK: no net-new infrastructure.clients imports (0 baselined consumer(s) remain).
+- Same rg after edits -> no hits (exit 1) (AC#2).
+- make -n check-deprecated-client-imports -> make: *** No rule to make target 'check-deprecated-client-imports'.  Stop.
+- uv run python -c "import yaml; yaml.safe_load(open('../.github/workflows/ci_code.yml'))" -> parses.
+- uv run ruff check . -> All checks passed!
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> before: Found 80 errors in 28 files (checked 354 source files); after: Found 80 errors in 28 files (checked 353 source files). No new errors.
+- uv run pytest tests --ignore=tests/smoke -> before: 6 failed, 3514 passed; after: 6 failed, 3506 passed (8 fewer, the deleted guard tests). The 6 are the known single-process order leaks (TASK-90), not caused here: test_webhooks_aws_sns.py x3 and infrastructure/directory/test_google.py x3.
+- make check-sdk-typing -> OK: no net-new SDK anti-patterns (3 baselined file(s) remain). make check-vendor-package-contract -> OK: no net-new vendor-package contract violations (21 baselined entry(ies) remain). make check-runtime-imports -> OK: every shipped import resolves to the standard library, first-party code, or a runtime dependency. Identical before and after.
+
+FOR THE HUMAN
+- 7 files changed, 6 insertions and 216 deletions. No runtime, settings, env or terraform change.
+- Next: TASK-25.2.5.8 (shared guard plumbing) is unblocked. The task is left In Progress.
+<!-- SECTION:NOTES:END -->

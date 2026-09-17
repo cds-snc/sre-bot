@@ -1,8 +1,0 @@
-# Freeze baseline for deprecated `infrastructure.clients` imports.
-#
-# Enforced by app/bin/check_deprecated_infra_client_imports.py (see decisions/toolchain.md
-# "deprecated-import guardrail" and decisions/migration.md coexistence rule 3: baselines
-# only ratchet down). One repo-relative path (from app/) per line. Net-new files that import
-# infrastructure.clients and are not listed here fail the check; entries that no longer
-# import it are reported as stale (safe to remove) but do not fail the check.
-#
