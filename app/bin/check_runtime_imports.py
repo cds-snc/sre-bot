@@ -74,7 +74,9 @@ def runtime_distributions(pyproject: dict) -> set[str]:
     extras it was reached under, so an extra-gated dependency of a runtime
     package is not mistaken for a runtime dependency itself.
     """
-    stack = [(canonicalize_name(req.name), frozenset(req.extras)) for req in map(Requirement, pyproject["project"]["dependencies"])]
+    stack = [
+        (canonicalize_name(req.name), frozenset(req.extras)) for req in map(Requirement, pyproject["project"]["dependencies"])
+    ]
     seen: set[tuple[str, frozenset[str]]] = set()
     while stack:
         entry = stack.pop()
@@ -151,7 +153,10 @@ def iter_unguarded_imports(tree: ast.Module) -> Iterator[tuple[ast.stmt, str]]:
 def find_violations(pyproject: dict) -> list[tuple[str, int, str]]:
     """Return (path, line, module) for every shipped import production cannot resolve."""
     allowed = (
-        runtime_modules(runtime_distributions(pyproject)) | first_party_names(pyproject) | sys.stdlib_module_names | ALWAYS_AVAILABLE
+        runtime_modules(runtime_distributions(pyproject))
+        | first_party_names(pyproject)
+        | sys.stdlib_module_names
+        | ALWAYS_AVAILABLE
     )
     violations = []
     for root in shipped_roots(pyproject):
