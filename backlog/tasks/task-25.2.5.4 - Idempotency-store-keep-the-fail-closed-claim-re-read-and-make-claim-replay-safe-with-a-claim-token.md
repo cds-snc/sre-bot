@@ -3,10 +3,11 @@ id: TASK-25.2.5.4
 title: >-
   Idempotency store: keep the fail-closed claim re-read and make claim
   replay-safe with a claim token
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-15 20:09'
-updated_date: '2026-09-17 20:42'
+updated_date: '2026-09-17 20:53'
 labels:
   - clients
   - phase-3
