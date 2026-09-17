@@ -44,6 +44,27 @@ FAILURE_FIELDS = {
 }
 
 
+def _unclassified_client_error(operation: str) -> ClientError:
+    """Build a ClientError whose code sits outside every adapter classification catalogue."""
+    return ClientError({"Error": {"Code": "ValidationException", "Message": "missing attribute"}}, operation)
+
+
+UNCLASSIFIED_FIELDS = {
+    "status": "unclassified",
+    "error_code": "ValidationException",
+    "error": "missing attribute",
+}
+
+
+def _assert_unclassified_unavailable(error: Exception) -> None:
+    """Assert the raised store error classifies an unmapped SDK code as permanent with no provider text."""
+    assert isinstance(error, webhooks.WebhookStoreUnavailableError)
+    assert error.status is OperationStatus.PERMANENT_ERROR
+    assert error.error_code == "ValidationException"
+    assert error.retry_after is None
+    assert "missing attribute" not in str(error)
+
+
 @pytest.fixture
 def adapter():
     """Patch the module's adapter factory with a spec'd mock and yield the mock."""
@@ -104,6 +125,19 @@ def test_create_webhook_returns_none_and_logs_on_failure(adapter, logger_mock):
     logger_mock.error.assert_called_once_with("webhook_create_failed", **FAILURE_FIELDS)
 
 
+def test_create_webhook_returns_none_and_logs_on_unclassified_client_error(adapter, logger_mock):
+    """An SDK error the adapter does not classify follows the classified failure contract.
+
+    The adapter mock raises a ClientError with a code outside every classification
+    catalogue, as the adapter re-raises it in production. The helper returns None,
+    which the create flow already reports to the user, and logs the raw code.
+    """
+    adapter.put_item.side_effect = _unclassified_client_error("PutItem")
+
+    assert webhooks.create_webhook("test_channel", "test_user_id", "test_name") is None
+    logger_mock.error.assert_called_once_with("webhook_create_failed", **UNCLASSIFIED_FIELDS)
+
+
 # -- get_webhook ----------------------------------------------------------------
 
 
@@ -145,6 +179,24 @@ def test_get_webhook_raises_and_logs_on_failure(adapter, logger_mock):
     logger_mock.error.assert_called_once_with("webhook_get_failed", webhook_id="test_id", **FAILURE_FIELDS)
 
 
+def test_get_webhook_raises_and_logs_on_unclassified_client_error(adapter, logger_mock):
+    """An SDK error the adapter does not classify surfaces as the store-unavailable error.
+
+    The adapter mock raises a ClientError with a code outside every classification
+    catalogue. Callers only catch the store-unavailable error, so the unmapped case
+    must reach them in that shape: permanent, carrying the code, no retry delay and
+    no provider text in the message.
+    """
+    adapter.get_item.side_effect = _unclassified_client_error("GetItem")
+
+    with pytest.raises(webhooks.WebhookStoreUnavailableError) as exc_info:
+        webhooks.get_webhook("test_id")
+
+    _assert_unclassified_unavailable(exc_info.value)
+    assert isinstance(exc_info.value.__cause__, ClientError)
+    logger_mock.error.assert_called_once_with("webhook_get_failed", webhook_id="test_id", **UNCLASSIFIED_FIELDS)
+
+
 # -- lookup_webhooks ------------------------------------------------------------
 
 
@@ -177,6 +229,17 @@ def test_lookup_webhooks_raises_and_logs_on_failure(adapter, logger_mock):
     logger_mock.error.assert_called_once_with("webhook_lookup_failed", field="channel", **FAILURE_FIELDS)
 
 
+def test_lookup_webhooks_raises_and_logs_on_unclassified_client_error(adapter, logger_mock):
+    """An unclassified SDK error on the filtered scan raises the store-unavailable error and is logged."""
+    adapter.scan.side_effect = _unclassified_client_error("Scan")
+
+    with pytest.raises(webhooks.WebhookStoreUnavailableError) as exc_info:
+        webhooks.lookup_webhooks("channel", "test_channel")
+
+    _assert_unclassified_unavailable(exc_info.value)
+    logger_mock.error.assert_called_once_with("webhook_lookup_failed", field="channel", **UNCLASSIFIED_FIELDS)
+
+
 # -- list_all_webhooks ----------------------------------------------------------
 
 
@@ -203,6 +266,17 @@ def test_list_all_webhooks_raises_and_logs_on_failure(adapter, logger_mock):
         webhooks.list_all_webhooks()
 
     logger_mock.error.assert_called_once_with("webhook_list_failed", **FAILURE_FIELDS)
+
+
+def test_list_all_webhooks_raises_and_logs_on_unclassified_client_error(adapter, logger_mock):
+    """An unclassified SDK error on the full-table scan raises the store-unavailable error and is logged."""
+    adapter.scan.side_effect = _unclassified_client_error("Scan")
+
+    with pytest.raises(webhooks.WebhookStoreUnavailableError) as exc_info:
+        webhooks.list_all_webhooks()
+
+    _assert_unclassified_unavailable(exc_info.value)
+    logger_mock.error.assert_called_once_with("webhook_list_failed", **UNCLASSIFIED_FIELDS)
 
 
 # -- counters -------------------------------------------------------------------
@@ -338,6 +412,18 @@ def test_toggle_webhook_raises_and_logs_when_update_fails(adapter, logger_mock):
         webhooks.toggle_webhook("test_id")
 
     logger_mock.error.assert_called_once_with("webhook_toggle_failed", webhook_id="test_id", **FAILURE_FIELDS)
+
+
+def test_toggle_webhook_raises_and_logs_on_unclassified_client_error_on_write(adapter, logger_mock):
+    """An unclassified SDK error on the update mirrors the classified write failure: logged, then raised."""
+    adapter.get_item.return_value = OperationResult.success(data=WEBHOOK_ITEM)
+    adapter.update_item.side_effect = _unclassified_client_error("UpdateItem")
+
+    with pytest.raises(webhooks.WebhookStoreUnavailableError) as exc_info:
+        webhooks.toggle_webhook("test_id")
+
+    _assert_unclassified_unavailable(exc_info.value)
+    logger_mock.error.assert_called_once_with("webhook_toggle_failed", webhook_id="test_id", **UNCLASSIFIED_FIELDS)
 
 
 # -- removed helpers ------------------------------------------------------------

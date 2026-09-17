@@ -4,10 +4,10 @@ title: >-
   Webhooks store: map unclassified ClientError to WebhookStoreUnavailableError
   on reads and log-and-return-None on ordinary writes (parity with TASK-25.2.5.3
   F4)
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-16 19:31'
-updated_date: '2026-09-17 13:11'
+updated_date: '2026-09-17 13:51'
 labels:
   - clients
   - phase-3
@@ -34,10 +34,10 @@ Parity follow-up for TASK-25.2.5.2's modules/slack/webhooks.py, matching the F4 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 _get_item, lookup_webhooks and list_all_webhooks wrap their adapter call in try/except ClientError, log the failure event with status="unclassified", error_code and error (from exc.response["Error"]), and raise WebhookStoreUnavailableError(OperationStatus.PERMANENT_ERROR, error_code=code) from exc instead of letting an unmapped ClientError propagate raw
-- [ ] #2 Every existing webhooks_list.py/webhook_helper.py catch site (which only catches WebhookStoreUnavailableError) needs no code change, since it now also covers the unclassified case; confirmed by re-grep and by the updated test matrix
-- [ ] #3 create_webhook's write catches ClientError, logs status="unclassified"/error_code/error and returns None; toggle_webhook's write catches ClientError, logs the same fields and raises WebhookStoreUnavailableError(OperationStatus.PERMANENT_ERROR, error_code=code) from exc — each mirrors its own classified-failure branch
-- [ ] #4 Test matrix updated: an unclassified ClientError on a read raises WebhookStoreUnavailableError with PERMANENT_ERROR and error_code, logged status=unclassified (replacing any "ClientError propagates" test); on create_webhook's write it is logged and returns None; on toggle_webhook's write it is logged and raises WebhookStoreUnavailableError; ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with output recorded
+- [x] #1 _get_item, lookup_webhooks and list_all_webhooks wrap their adapter call in try/except ClientError, log the failure event with status="unclassified", error_code and error (from exc.response["Error"]), and raise WebhookStoreUnavailableError(OperationStatus.PERMANENT_ERROR, error_code=code) from exc instead of letting an unmapped ClientError propagate raw
+- [x] #2 Every existing webhooks_list.py/webhook_helper.py catch site (which only catches WebhookStoreUnavailableError) needs no code change, since it now also covers the unclassified case; confirmed by re-grep and by the updated test matrix
+- [x] #3 create_webhook's write catches ClientError, logs status="unclassified"/error_code/error and returns None; toggle_webhook's write catches ClientError, logs the same fields and raises WebhookStoreUnavailableError(OperationStatus.PERMANENT_ERROR, error_code=code) from exc — each mirrors its own classified-failure branch
+- [x] #4 Test matrix updated: an unclassified ClientError on a read raises WebhookStoreUnavailableError with PERMANENT_ERROR and error_code, logged status=unclassified (replacing any "ClientError propagates" test); on create_webhook's write it is logged and returns None; on toggle_webhook's write it is logged and raises WebhookStoreUnavailableError; ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with output recorded
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -229,3 +229,30 @@ BLAST RADIUS AND ROLLBACK
 - Ordering constraint that DOES bind: this must merge before TASK-25.2.5.5 deletes `integrations/aws/dynamodb.py` (already wired -- TASK-25.2.5.5 lists TASK-25.2.5.6 in its `dependencies`, verified 2026-09-17). No dependency on TASK-25.2.5.3 merging first: this task touches none of its files, so the two PRs cannot conflict.
 - Branch hygiene: one task, one branch, one PR. Cut this branch from main, NOT from the in-flight `feat/migrate_incident_persistence_dynamodb_adapter`.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## Implementation
+
+Single production file: `app/modules/slack/webhooks.py` (plan steps 1b-1h). Added `_unclassified_fields` (byte-identical to `modules/incident/db_operations.py`); wrapped the adapter call in `_get_item`, `lookup_webhooks`, `list_all_webhooks` (log `status=unclassified`, raise `WebhookStoreUnavailableError(PERMANENT_ERROR, error_code=...) from exc`), `create_webhook` (log, return None) and `toggle_webhook`'s write (log, raise). `_increment_counter` now calls `_unclassified_fields` (no behavior change; its two unclassified tests pass unedited). No new imports.
+
+Tests: `app/tests/modules/slack/test_slack_webhooks.py` +5 tests (T1-T5), no deletions (W6: there was no "ClientError propagates" test to replace). The ClientError is built by a `_unclassified_client_error(operation)` factory instead of the planned `UNCLASSIFIED_ERROR` dict constant, because a `dict[str, Any]` variable passed to `ClientError` fails mypy `arg-type`.
+
+## AC#2 catch sites (re-grep 2026-09-17, `rg -n "WebhookStoreUnavailableError" --glob '!tests/**' .` from app/)
+
+Unchanged, all catch the bare type:
+- api/v1/routes/webhooks.py:100
+- modules/sre/webhook_helper.py:42, :68
+- modules/slack/webhooks_list.py:201, :248, :264, :276, :292
+
+Remaining hits are in modules/slack/webhooks.py: class :27, `_unavailable` :42/:44, and the four new unclassified raises :65, :117, :166, :190.
+`rg -n "exc.response" modules/slack/webhooks.py` -> `54:    error = exc.response.get("Error", {})` (only inside `_unclassified_fields`).
+
+## Verification (from app/)
+
+- `uv run ruff check .` -> `All checks passed!`
+- `uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'` -> `Found 80 errors in 28 files (checked 354 source files)`; none in `modules/slack/webhooks.py` or `tests/modules/slack/test_slack_webhooks.py`, so no new errors from this change.
+- `uv run pytest tests --ignore=tests/smoke` -> `6 failed, 3514 passed in 39.93s`. The 6 failures are the known single-process ordering leaks (TASK-90), not caused by this task: 3 in tests/modules/webhooks/test_webhooks_aws_sns.py, 3 in tests/unit/infrastructure/directory/test_google.py.
+- Before the production change, the 5 new tests failed with a raw `botocore.exceptions.ClientError (ValidationException)`; after it, `pytest tests/modules/slack/test_slack_webhooks.py tests/api/v1/test_webhooks.py` -> `59 passed`.
+<!-- SECTION:NOTES:END -->

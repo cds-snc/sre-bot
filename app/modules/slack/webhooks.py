@@ -49,9 +49,20 @@ def _failure_fields(result: OperationResult[Any]) -> dict[str, Any]:
     return {"status": result.status.value, "error_code": result.error_code, "error": result.message}
 
 
+def _unclassified_fields(exc: ClientError) -> dict[str, Any]:
+    """Return the structured log fields for a ClientError the adapter did not classify."""
+    error = exc.response.get("Error", {})
+    return {"status": "unclassified", "error_code": error.get("Code"), "error": error.get("Message")}
+
+
 def _get_item(adapter: DynamoDBAdapter, id: str) -> dict[str, Any] | None:
     """Read one webhook item; None when absent, raise when the read fails."""
-    result = adapter.get_item(TableName=table, Key={"id": {"S": id}})
+    try:
+        result = adapter.get_item(TableName=table, Key={"id": {"S": id}})
+    except ClientError as exc:
+        fields = _unclassified_fields(exc)
+        logger.error("webhook_get_failed", webhook_id=id, **fields)
+        raise WebhookStoreUnavailableError(OperationStatus.PERMANENT_ERROR, error_code=fields["error_code"]) from exc
     if not result.is_success:
         logger.error("webhook_get_failed", webhook_id=id, **_failure_fields(result))
         raise _unavailable(result)
@@ -62,20 +73,24 @@ def create_webhook(channel: str, user_id: str, name: str, hook_type: str = "aler
     """Create an active webhook and return its id, or None when the write fails."""
     adapter = build_dynamodb_adapter()
     id = str(uuid.uuid4())
-    result = adapter.put_item(
-        TableName=table,
-        Item={
-            "id": {"S": id},
-            "channel": {"S": channel},
-            "name": {"S": name},
-            "created_at": {"S": str(datetime.now())},
-            "active": {"BOOL": True},
-            "user_id": {"S": user_id},
-            "invocation_count": {"N": "0"},
-            "acknowledged_count": {"N": "0"},
-            "hook_type": {"S": hook_type},
-        },
-    )
+    try:
+        result = adapter.put_item(
+            TableName=table,
+            Item={
+                "id": {"S": id},
+                "channel": {"S": channel},
+                "name": {"S": name},
+                "created_at": {"S": str(datetime.now())},
+                "active": {"BOOL": True},
+                "user_id": {"S": user_id},
+                "invocation_count": {"N": "0"},
+                "acknowledged_count": {"N": "0"},
+                "hook_type": {"S": hook_type},
+            },
+        )
+    except ClientError as exc:
+        logger.error("webhook_create_failed", **_unclassified_fields(exc))
+        return None
     if not result.is_success:
         logger.error("webhook_create_failed", **_failure_fields(result))
         return None
@@ -90,11 +105,16 @@ def get_webhook(id: str) -> dict[str, Any] | None:
 def lookup_webhooks(field: str, value: str) -> list[dict[str, Any]]:
     """Lookup webhooks by a string field value; raise when the scan fails."""
     adapter = build_dynamodb_adapter()
-    result = adapter.scan(
-        TableName=table,
-        FilterExpression=f"{field} = :{field}",
-        ExpressionAttributeValues={f":{field}": {"S": value}},
-    )
+    try:
+        result = adapter.scan(
+            TableName=table,
+            FilterExpression=f"{field} = :{field}",
+            ExpressionAttributeValues={f":{field}": {"S": value}},
+        )
+    except ClientError as exc:
+        fields = _unclassified_fields(exc)
+        logger.error("webhook_lookup_failed", field=field, **fields)
+        raise WebhookStoreUnavailableError(OperationStatus.PERMANENT_ERROR, error_code=fields["error_code"]) from exc
     if not result.is_success:
         logger.error("webhook_lookup_failed", field=field, **_failure_fields(result))
         raise _unavailable(result)
@@ -119,14 +139,7 @@ def _increment_counter(id: str, attribute: str, failure_event: str) -> None:
             ExpressionAttributeValues={":inc": {"N": "1"}, ":zero": {"N": "0"}},
         )
     except ClientError as exc:
-        error = exc.response.get("Error", {})
-        logger.error(
-            failure_event,
-            webhook_id=id,
-            status="unclassified",
-            error_code=error.get("Code"),
-            error=error.get("Message"),
-        )
+        logger.error(failure_event, webhook_id=id, **_unclassified_fields(exc))
         return
     if not result.is_success:
         logger.error(failure_event, webhook_id=id, **_failure_fields(result))
@@ -145,7 +158,12 @@ def increment_invocation_count(id: str) -> None:
 def list_all_webhooks() -> list[dict[str, Any]]:
     """Return every webhook item; raise when the scan fails."""
     adapter = build_dynamodb_adapter()
-    result = adapter.scan(TableName=table, Select="ALL_ATTRIBUTES")
+    try:
+        result = adapter.scan(TableName=table, Select="ALL_ATTRIBUTES")
+    except ClientError as exc:
+        fields = _unclassified_fields(exc)
+        logger.error("webhook_list_failed", **fields)
+        raise WebhookStoreUnavailableError(OperationStatus.PERMANENT_ERROR, error_code=fields["error_code"]) from exc
     if not result.is_success:
         logger.error("webhook_list_failed", **_failure_fields(result))
         raise _unavailable(result)
@@ -159,12 +177,17 @@ def toggle_webhook(id: str) -> None:
     if webhook is None:
         logger.warning("webhook_toggle_not_found", webhook_id=id)
         return
-    result = adapter.update_item(
-        TableName=table,
-        Key={"id": {"S": id}},
-        UpdateExpression="SET active = :active",
-        ExpressionAttributeValues={":active": {"BOOL": not webhook["active"]["BOOL"]}},
-    )
+    try:
+        result = adapter.update_item(
+            TableName=table,
+            Key={"id": {"S": id}},
+            UpdateExpression="SET active = :active",
+            ExpressionAttributeValues={":active": {"BOOL": not webhook["active"]["BOOL"]}},
+        )
+    except ClientError as exc:
+        fields = _unclassified_fields(exc)
+        logger.error("webhook_toggle_failed", webhook_id=id, **fields)
+        raise WebhookStoreUnavailableError(OperationStatus.PERMANENT_ERROR, error_code=fields["error_code"]) from exc
     if not result.is_success:
         logger.error("webhook_toggle_failed", webhook_id=id, **_failure_fields(result))
         raise _unavailable(result)
