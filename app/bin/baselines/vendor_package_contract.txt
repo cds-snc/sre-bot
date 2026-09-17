@@ -5,7 +5,6 @@
 # Moving logic out of a vendor package removes its entries. Removing an entry is always safe.
 # Do NOT add new entries; net-new violations fail CI. Non-vendor directories (utils/) are
 # reported as warnings and are never listed here.
-module:integrations/aws/dynamodb.py
 module:integrations/aws/schemas.py
 module:integrations/aws/shield.py
 module:integrations/aws/sqs.py

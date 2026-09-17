@@ -4,10 +4,10 @@ title: >-
   Extract shared freeze-baseline guard plumbing into app/bin; move sdk-typing,
   vendor-contract and runtime-imports guards onto it; standardize their test
   names
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-17 15:13'
-updated_date: '2026-09-17 18:05'
+updated_date: '2026-09-17 18:27'
 labels:
   - clients
   - phase-3

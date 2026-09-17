@@ -1,0 +1,21 @@
+# packages/aws_platform transition-seam consumer baseline — only ratchets down
+# (see decisions/migration.md coexistence rule 3).
+# Enforced by bin/check_aws_platform_seam.py (make check-aws-platform-seam).
+# One app-relative path per line: a file that reaches into packages/aws_platform,
+# the provisional namespace holding adapters for legacy AWS callers. Each caller
+# moved into its owning feature package removes its entry; entries that no longer
+# reference the seam are reported as stale and never fail the check.
+# Do NOT add new entries; net-new consumers fail CI.
+# Retired by TASK-88, which dissolves packages/aws_platform along with this
+# baseline, the script, the make target and the CI step.
+jobs/scheduled_tasks.py
+modules/aws/aws_account_health.py
+modules/aws/identity_center.py
+modules/aws/lambdas.py
+modules/aws/ops_group_assignment.py
+modules/aws/spending.py
+modules/incident/db_operations.py
+modules/incident/incident_folder.py
+modules/provisioning/groups.py
+modules/provisioning/users.py
+modules/slack/webhooks.py
