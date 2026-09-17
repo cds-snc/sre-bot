@@ -27,21 +27,21 @@ violations fail the check; baseline entries with no matching violation are
 reported as stale but never fail it — the baseline only ratchets down.
 
 Usage:
-    python3 bin/check_vendor_package_contract.py
+    python3 -m bin.check_vendor_package_contract
 
 Retirement: delete this script and its baseline once the baseline is empty.
 """
 
 import ast
 import sys
-from collections.abc import Iterator
 from pathlib import Path
 from typing import Literal
+
+from bin.freeze_guard import iter_python_files, load_baseline, report
 
 APP_ROOT = Path(__file__).resolve().parent.parent
 INTEGRATIONS_ROOT = APP_ROOT / "integrations"
 BASELINE_PATH = Path(__file__).resolve().parent / "baselines" / "vendor_package_contract.txt"
-EXCLUDED_DIR_NAMES = {"__pycache__", ".mypy_cache", ".pytest_cache", ".venv"}
 ALLOWED_VENDOR_MODULES = frozenset({"__init__.py", "client.py", "settings.py"})
 NON_VENDOR_DIRS = frozenset({"utils"})
 RULE_MODULE = "module"
@@ -49,14 +49,6 @@ RULE_OPERATION_RESULT = "operation-result"
 FORBIDDEN_NAME = "OperationResult"
 
 type ModuleVerdict = Literal["ok", "violation", "warn"]
-
-
-def iter_python_files(root: Path) -> Iterator[Path]:
-    """Yield every .py file under root, skipping cache/venv directories."""
-    for path in sorted(root.rglob("*.py")):
-        if any(part in EXCLUDED_DIR_NAMES for part in path.relative_to(root).parts):
-            continue
-        yield path
 
 
 def classify_module(path: Path) -> ModuleVerdict:
@@ -109,46 +101,28 @@ def find_warnings() -> list[str]:
     return [_app_relative(path) for path in iter_python_files(INTEGRATIONS_ROOT) if classify_module(path) == "warn"]
 
 
-def load_baseline() -> set[str]:
-    """Return the set of baselined (grandfathered) entries, ignoring comments/blank lines."""
-    if not BASELINE_PATH.exists():
-        return set()
-    lines = BASELINE_PATH.read_text(encoding="utf-8").splitlines()
-    return {line.strip() for line in lines if line.strip() and not line.strip().startswith("#")}
-
-
 def main() -> int:
     warnings = find_warnings()
-    current = find_current_violations()
-    baseline = load_baseline()
-    net_new = sorted(current - baseline)
-    stale = sorted(baseline - current)
-
     if warnings:
         print("WARN: modules in non-vendor directories under integrations/ (not failing, never baselined):")
         for entry in warnings:
             print(f"  - {entry}")
         print("integrations/ holds vendor packages only; shared helpers belong with their consumer.")
 
-    if stale:
-        print("INFO: baseline entries with no remaining violation (safe to remove):")
-        for entry in stale:
-            print(f"  - {entry}")
-
-    if net_new:
-        print("FAIL: vendor-package contract violations not in the baseline:")
-        for entry in net_new:
-            print(f"  - {entry}")
-        print(f"\nBaseline: {BASELINE_PATH.relative_to(APP_ROOT.parent)}")
-        print(
+    return report(
+        current=find_current_violations(),
+        baseline=load_baseline(BASELINE_PATH),
+        baseline_path=BASELINE_PATH,
+        app_root=APP_ROOT,
+        stale_label="baseline entries with no remaining violation (safe to remove)",
+        fail_label="vendor-package contract violations not in the baseline",
+        remediation=(
             "Vendor packages export only client factories, classify_<vendor>_error and settings "
             "(decisions/outbound-clients.md); move the logic into an adapter or infrastructure "
             "capability instead of widening the baseline."
-        )
-        return 1
-
-    print(f"OK: no net-new vendor-package contract violations ({len(current)} baselined entry(ies) remain).")
-    return 0
+        ),
+        ok_template="no net-new vendor-package contract violations ({count} baselined entry(ies) remain).",
+    )
 
 
 if __name__ == "__main__":

@@ -3,10 +3,10 @@ id: TASK-25.2.5.7
 title: >-
   Retire the empty infrastructure.clients freeze guard: script, baseline, test,
   make target and CI step
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-17 15:13'
-updated_date: '2026-09-17 17:09'
+updated_date: '2026-09-17 17:34'
 labels:
   - clients
   - phase-3

@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from bin import check_vendor_package_contract as checker
+from bin import freeze_guard
 
 COMPLIANT_VENDOR = {
     "__init__.py": "",
@@ -196,27 +197,9 @@ def test_main_fails_when_baselined_extra_module_newly_references_operation_resul
 
     assert exit_code == 1
     assert "operation-result:integrations/vendor/extra.py" in capsys.readouterr().out
-    assert checker.find_current_violations() - checker.load_baseline() == {"operation-result:integrations/vendor/extra.py"}
-
-
-def test_load_baseline_ignores_blank_and_comment_lines(tmp_path, monkeypatch):
-    baseline_path = tmp_path / "baseline.txt"
-    _write(
-        baseline_path,
-        "# header\n\nmodule:integrations/aws/sqs.py\n  \n# another comment\noperation-result:integrations/aws/shield.py\n",
-    )
-    monkeypatch.setattr(checker, "BASELINE_PATH", baseline_path)
-
-    assert checker.load_baseline() == {
-        "module:integrations/aws/sqs.py",
-        "operation-result:integrations/aws/shield.py",
+    assert checker.find_current_violations() - freeze_guard.load_baseline(checker.BASELINE_PATH) == {
+        "operation-result:integrations/vendor/extra.py"
     }
-
-
-def test_load_baseline_missing_file_returns_empty_set(tmp_path, monkeypatch):
-    monkeypatch.setattr(checker, "BASELINE_PATH", tmp_path / "does-not-exist.txt")
-
-    assert checker.load_baseline() == set()
 
 
 def test_find_current_violations_ignores_non_python_files_and_cache_directories(tmp_path, monkeypatch):
@@ -236,7 +219,7 @@ def test_find_current_violations_ignores_non_python_files_and_cache_directories(
 
 def test_real_baseline_lists_no_google_workspace_or_non_vendor_entries():
     """Widening the baseline is the only way around the check, so the cleaned vendor and utils/ must stay out of it."""
-    baseline = checker.load_baseline()
+    baseline = freeze_guard.load_baseline(checker.BASELINE_PATH)
 
     assert checker.BASELINE_PATH.exists()
     assert sorted(entry for entry in baseline if "integrations/google_workspace/" in entry) == []

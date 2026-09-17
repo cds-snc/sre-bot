@@ -1,28 +1,28 @@
 """Behavior tests for SDK typing guardrail and stub dependency wiring."""
 
-from __future__ import annotations
-
 import importlib.util
 import tomllib
 from pathlib import Path
+from typing import Any
 
 from bin import check_sdk_typing as checker
+from bin import freeze_guard
 
 APP_ROOT = Path(__file__).resolve().parents[3]
 
 
-def _pyproject_data() -> dict:
+def _pyproject_data() -> dict[str, Any]:
     return tomllib.loads((APP_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 
 
 def _dev_dependencies() -> list[str]:
-    data = _pyproject_data()
-    return data["dependency-groups"]["dev"]
+    dependencies: list[str] = _pyproject_data()["dependency-groups"]["dev"]
+    return dependencies
 
 
 def _runtime_dependencies() -> list[str]:
-    data = _pyproject_data()
-    return data["project"]["dependencies"]
+    dependencies: list[str] = _pyproject_data()["project"]["dependencies"]
+    return dependencies
 
 
 def test_check_sdk_typing_checker_module_exists() -> None:
@@ -38,7 +38,7 @@ def test_sdk_typing_baseline_file_exists() -> None:
 
 
 def test_sdk_typing_baseline_lists_no_google_workspace_files() -> None:
-    baseline = checker.load_baseline()
+    baseline = freeze_guard.load_baseline(checker.BASELINE_PATH)
 
     assert sorted(entry for entry in baseline if entry.startswith("integrations/google_workspace/")) == []
 

@@ -24,7 +24,7 @@ There is deliberately no baseline: the tree is clean, so any violation is
 net-new and is fixed by moving the import under ``if TYPE_CHECKING:``.
 
 Usage:
-    python3 bin/check_runtime_imports.py
+    python3 -m bin.check_runtime_imports
 """
 
 import ast
@@ -37,9 +37,10 @@ from pathlib import Path
 from packaging.requirements import Requirement
 from packaging.utils import canonicalize_name
 
+from bin.freeze_guard import iter_python_files
+
 APP_ROOT = Path(__file__).resolve().parent.parent
 PYPROJECT_PATH = APP_ROOT / "pyproject.toml"
-EXCLUDED_DIR_NAMES = {"__pycache__", ".mypy_cache", ".pytest_cache", ".venv", "node_modules"}
 
 # Shipped modules that are not declared anywhere but are always importable.
 ALWAYS_AVAILABLE = {"__future__"}
@@ -105,17 +106,6 @@ def runtime_modules(distributions: set[str]) -> set[str]:
         if any(canonicalize_name(provider) in distributions for provider in providers):
             modules.add(module)
     return modules
-
-
-def iter_python_files(root: Path) -> Iterator[Path]:
-    """Yield every .py file under root (or root itself), skipping cache directories."""
-    if root.is_file():
-        yield root
-        return
-    for path in sorted(root.rglob("*.py")):
-        if any(part in EXCLUDED_DIR_NAMES for part in path.parts):
-            continue
-        yield path
 
 
 def _is_type_checking_test(test: ast.expr) -> bool:

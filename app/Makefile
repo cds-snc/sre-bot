@@ -95,13 +95,13 @@ audit-client-usage-matrix:
 client-usage-matrix: audit-client-usage-matrix
 
 check-sdk-typing:
-	uv run python bin/check_sdk_typing.py
+	uv run python -m bin.check_sdk_typing
 
 check-vendor-package-contract:
-	uv run python bin/check_vendor_package_contract.py
+	uv run python -m bin.check_vendor_package_contract
 
 check-runtime-imports:
-	uv run python bin/check_runtime_imports.py
+	uv run python -m bin.check_runtime_imports
 
 backlog-board: # Backlog.md web UI (Kanban board) at http://localhost:6421
 	cd .. && backlog browser --no-open --port 6421
