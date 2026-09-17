@@ -4,10 +4,10 @@ title: >-
   Extract shared freeze-baseline guard plumbing into app/bin; move sdk-typing,
   vendor-contract and runtime-imports guards onto it; standardize their test
   names
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-17 15:13'
-updated_date: '2026-09-17 17:47'
+updated_date: '2026-09-17 17:53'
 labels:
   - clients
   - phase-3
@@ -66,7 +66,7 @@ GROUNDING (verified 2026-09-17 on main @ 51509443, after TASK-25.2.5.7 merged)
 - Wiring: app/Makefile:97-104 defines the three targets, each 'uv run python bin/check_x.py'; Makefile:1 .PHONY already lists all three (synced by .7). .github/workflows/ci_code.yml:46-57 runs them as make targets from ./app. No other caller anywhere in the repo (rg over /workspace excluding backlog/, .git, .venv).
 - Tests today: tests/unit/bin/test_check_sdk_typing.py (6 tests), test_check_vendor_package_contract.py (21), test_check_runtime_imports.py (11) = 38 passed. All import via 'from bin import check_x as checker' (works: pytest runs from app/). The vendor tests monkeypatch checker.APP_ROOT / INTEGRATIONS_ROOT / BASELINE_PATH onto tmp_path trees, so every module constant must stay a module-level name read at call time.
 - Direct callers of the moved functions in tests: test_check_sdk_typing.py:41; test_check_vendor_package_contract.py:199, :202-213, :216-219, :239. Nothing outside tests/unit/bin and bin/ references them.
-- test_check_sdk_typing.py:3 carries 'from __future__ import annotations', which CLAUDE.md's 3.14 baseline marks unnecessary and itself deprecated. The file is being renamed anyway, so it goes (fix-in-touched-file, kept to one line).
+- Deprecation sweep over all eight files this task touches (the three guards, their three test files, bin/__init__.py, tests/unit/bin/__init__.py), looking for __future__ imports, legacy typing aliases (List/Dict/Optional/Union/...), datetime.utcnow, imp/distutils/pkg_resources, asyncio.get_event_loop, warnings.warn and the deprecated collections ABC paths. Exactly one hit: test_check_sdk_typing.py:3 'from __future__ import annotations', which CLAUDE.md's 3.14 baseline marks unnecessary and itself deprecated. check_runtime_imports.py:9 names the same import inside its module docstring on purpose, explaining that PEP 649 makes it unnecessary; that is documentation of the rule, not a use of it, and stays.
 - ruff: line-length 130, E501 ignored, isort known-first-party includes "bin", so 'from bin.freeze_guard import ...' sorts into the first-party block. mypy checks bin/ (it excludes only ^tests/).
 - Pre-edit gate reference: ruff clean; mypy 'Found 80 errors in 28 files (checked 353 source files)'; pytest tests/unit/bin -> 38 passed; make check-sdk-typing -> 'OK: no net-new SDK anti-patterns (3 baselined file(s) remain).'; make check-vendor-package-contract -> 'OK: no net-new vendor-package contract violations (21 baselined entry(ies) remain).'; make check-runtime-imports -> 'OK: every shipped import resolves to the standard library, first-party code, or a runtime dependency.'
 
@@ -76,6 +76,7 @@ HUMAN DECISIONS 2026-09-17
 - D3 Report granularity: the full net-new/stale report moves into freeze_guard.report(...), message-parameterized and returning the exit code, so each guard's main() shrinks to one call. TASK-25.2.5.5's seam guard consumes it directly rather than re-copying the logic (its plan's A1 contingency does not fire).
 - D4 Excluded directories: one shared default constant, the union {__pycache__, .mypy_cache, .pytest_cache, .venv, node_modules}, overridable by parameter but overridden by nobody. Behaviour-identical today: no node_modules exists under integrations/ or any shipped root.
 - D5 Test names: test_bin_sdk_typing_check.py, test_bin_vendor_package_contract_check.py, test_bin_runtime_imports_check.py (decided 2026-09-17), plus the new helper file from D1.
+- D6 Deprecation is a must-fix, not a note (general rule stated 2026-09-17): anything deprecated in a file this task touches - deprecated import, dependency, stdlib call or language construct - is removed in this task, because there is no sense maintaining a deprecated dependency in a file that is already open. The sweep in GROUNDING is the record of what that covers here: one removal, test_check_sdk_typing.py:3. The rule also binds anything the sweep missed and implementation later uncovers in these eight files.
 
 ORDERED STEPS (all commands from app/)
 Step 0 - Preconditions. No edits.
@@ -114,7 +115,7 @@ Step 5 - check_runtime_imports.py (AC#1, AC#2). Delete EXCLUDED_DIR_NAMES and it
 Step 6 - Wiring (AC#2). app/Makefile:97-104: the three recipes become 'uv run python -m bin.check_sdk_typing', '... -m bin.check_vendor_package_contract', '... -m bin.check_runtime_imports'. Target names and .PHONY:1 are unchanged, so .github/workflows/ci_code.yml needs no edit and the existing test asserting "make check-runtime-imports" in the workflow keeps passing.
 
 Step 7 - Test renames (AC#4). Plain mv, no git commands.
-  a. test_check_sdk_typing.py -> test_bin_sdk_typing_check.py. Remove 'from __future__ import annotations' (grounding). Line 41 'checker.load_baseline()' -> 'freeze_guard.load_baseline(checker.BASELINE_PATH)', adding 'from bin import freeze_guard'. The module-exists test keeps find_spec("bin.check_sdk_typing"). 6 tests.
+  a. test_check_sdk_typing.py -> test_bin_sdk_typing_check.py. Remove 'from __future__ import annotations' (D6). Line 41 'checker.load_baseline()' -> 'freeze_guard.load_baseline(checker.BASELINE_PATH)', adding 'from bin import freeze_guard'. The module-exists test keeps find_spec("bin.check_sdk_typing"). 6 tests.
   b. test_check_vendor_package_contract.py -> test_bin_vendor_package_contract_check.py. The two tests that exercise load_baseline as such (test_load_baseline_ignores_blank_and_comment_lines, test_load_baseline_missing_file_returns_empty_set) move to the helper file, since the behaviour is now the helper's. The two remaining call sites (:199, :239) become 'freeze_guard.load_baseline(checker.BASELINE_PATH)'. test_find_current_violations_ignores_non_python_files_and_cache_directories stays: it is the guard-level proof that the shared walker is actually wired in. 19 tests.
   c. test_check_runtime_imports.py -> test_bin_runtime_imports_check.py. No body change; it touches none of the moved functions. 11 tests.
   d. No __init__.py change; tests/unit/bin/__init__.py already exists. Delete the stale tests/unit/bin/__pycache__ entries for the old names so a rename cannot be masked locally.
@@ -176,3 +177,23 @@ BLAST RADIUS AND ROLLBACK
 SIZE
 Production/tooling (tests excluded): 5 files. Added: bin/freeze_guard.py (~95 LOC). Edited: check_sdk_typing.py (-35/+12), check_vendor_package_contract.py (-40/+14), check_runtime_imports.py (-14/+2), Makefile (3 recipe lines rewritten). Roughly +125 / -92. Tests: 3 renames with small edits, +1 file (~150 lines), net +10 tests. One subsystem (bin guard tooling), no behaviour change, comfortably inside the single-PR size gate.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTATION (2026-09-17)
+
+Step 1 - RED. Created app/tests/unit/bin/test_bin_freeze_guard_check.py (16 tests, 3 classes) against the not-yet-existing bin/freeze_guard module.
+- TestIterPythonFiles (6): .py yielded and .md not; each of the five excluded directory names skipped (parametrized); an excluded name ABOVE the scan root does not empty the scan (the root-relative fix, AC#3); a file root yields itself; results sorted; an explicit excluded= replaces the default rather than widening it.
+- TestLoadBaseline (2): blanks/whitespace/# comments ignored and entries stripped; a missing file is an empty set. Both relocated in substance from test_check_vendor_package_contract.py, whose copies are removed in Step 7b.
+- TestReport (5): clean run prints exactly one OK line with {count} filled; stale-only reports INFO and exits 0; net-new fails with the FAIL block, the app-relative Baseline line and the remediation; INFO precedes FAIL when both apply; entries printed sorted.
+- Every helper takes its paths as arguments, so the file monkeypatches nothing and touches no real repository path.
+
+Evidence: uv run pytest tests/unit/bin/test_bin_freeze_guard_check.py -q ->
+  ImportError while importing test module ... tests/unit/bin/test_bin_freeze_guard_check.py:14: from bin import freeze_guard
+  E   ImportError: cannot import name 'freeze_guard' from 'bin' (/workspace/app/bin/__init__.py)
+  1 error in 0.16s
+uv run ruff check <file> -> All checks passed!   uv run ruff format --check <file> -> 1 file already formatted
+
+Plan amendment recorded before implementation: D6 (deprecation is a must-fix in any file the task touches, general rule stated by the human 2026-09-17), with the sweep of all eight touched files recorded in GROUNDING. One hit: test_check_sdk_typing.py:3 'from __future__ import annotations', removed in Step 7a.
+<!-- SECTION:NOTES:END -->
