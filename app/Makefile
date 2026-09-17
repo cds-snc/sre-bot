@@ -103,6 +103,9 @@ check-sdk-typing:
 check-vendor-package-contract:
 	uv run python bin/check_vendor_package_contract.py
 
+check-runtime-imports:
+	uv run python bin/check_runtime_imports.py
+
 backlog-board: # Backlog.md web UI (Kanban board) at http://localhost:6421
 	cd .. && backlog browser --no-open --port 6421
 

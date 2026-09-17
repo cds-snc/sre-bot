@@ -1,14 +1,16 @@
 import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
 from structlog import get_logger
-from types_boto3_dynamodb.literals import SelectType
 
 from infrastructure.operations import OperationResult, OperationStatus
 from models.incidents import Incident
 from packages.aws_platform.adapters.dynamodb import build_dynamodb_adapter
+
+if TYPE_CHECKING:
+    from types_boto3_dynamodb.literals import SelectType
 
 logger = get_logger()
 

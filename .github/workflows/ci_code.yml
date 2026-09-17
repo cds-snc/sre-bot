@@ -55,6 +55,10 @@ jobs:
         working-directory: ./app
         run: make check-vendor-package-contract
 
+      - name: Runtime import check
+        working-directory: ./app
+        run: make check-runtime-imports
+
       - name: Test
         working-directory: ./app
         run: make test
