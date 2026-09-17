@@ -1,4 +1,4 @@
-.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage test-coverage-unit backlog-board audit-client-usage-matrix client-usage-matrix check-deprecated-client-imports check-sdk-typing check-vendor-package-contract
+.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage-unit backlog-board audit-client-usage-matrix client-usage-matrix check-sdk-typing check-vendor-package-contract check-runtime-imports debug install-ci lint-types lock-check test-coverage-integration test-coverage-all test-new
 
 dev:
 	SLACK__COMMAND_PREFIX="dev-" uv run uvicorn main:server_app --reload
@@ -93,9 +93,6 @@ audit-client-usage-matrix:
 	bash bin/generate_client_usage_matrix.sh
 
 client-usage-matrix: audit-client-usage-matrix
-
-check-deprecated-client-imports:
-	uv run python bin/check_deprecated_infra_client_imports.py
 
 check-sdk-typing:
 	uv run python bin/check_sdk_typing.py

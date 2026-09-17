@@ -3,10 +3,10 @@ id: TASK-25.2.5.3
 title: >-
   Migrate incident persistence (db_operations.py, incident_folder.store_update)
   onto the DynamoDB adapter
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-15 20:09'
-updated_date: '2026-09-16 20:12'
+updated_date: '2026-09-17 14:00'
 labels:
   - clients
   - phase-3

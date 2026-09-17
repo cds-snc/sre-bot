@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:36'
-updated_date: '2026-09-16 13:48'
+updated_date: '2026-09-17 15:15'
 labels:
   - clients
   - phase-3
@@ -165,5 +165,10 @@ created: 2026-09-14 14:05
 created: 2026-09-14 14:08
 ---
 2026-09-14: title no longer mentions access-request persistence, and the aws_access_requests.py frontmatter reference was removed, following the re-scope above.
+---
+
+created: 2026-09-17 15:15
+---
+2026-09-17 (human decisions while planning TASK-25.2.5.5): two enabling subtasks added. TASK-25.2.5.7 retires the empty infrastructure.clients freeze guard. TASK-25.2.5.8 (after .7) extracts shared freeze-baseline plumbing and standardizes guard test names. TASK-25.2.5.5 now depends on .8 and builds the aws_platform seam guard on the shared module, wires it into CI, and generalizes decisions/migration.md rule 3. TASK-25.2.5.4 remains independent; parent AC#4 stays open until it lands.
 ---
 <!-- COMMENTS:END -->
