@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:36'
-updated_date: '2026-09-17 15:15'
+updated_date: '2026-09-17 19:36'
 labels:
   - clients
   - phase-3
@@ -53,12 +53,12 @@ Deleted: integrations/aws/dynamodb.py and tests/unit/integrations/aws/test_dynam
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 packages/aws_platform/adapters/dynamodb.py exposes scan, get_item, put_item and update_item returning OperationResult with AttributeValue shapes unchanged, builds its retrying and retries-disabled clients only through get_aws_client, and has Stubber unit tests (TASK-25.2.5.1)
-- [ ] #2 modules/slack/webhooks.py, modules/incident/db_operations.py and modules/incident/incident_folder.py reach DynamoDB only through the adapter. Non-success on a read raises after logging, while not-found keeps None/[]. Existing failure branches keep returning None/False with a log. The pinned False-return characterization tests are replaced, and per-call-site before/after behaviour is recorded in notes (TASK-25.2.5.2, TASK-25.2.5.3)
-- [ ] #3 The non-idempotent write inventory is recorded in notes; the two webhook counter increments and log_activity's list_append are sent with update_item(retries=False) (TASK-25.2.5.1-.3)
+- [x] #1 packages/aws_platform/adapters/dynamodb.py exposes scan, get_item, put_item and update_item returning OperationResult with AttributeValue shapes unchanged, builds its retrying and retries-disabled clients only through get_aws_client, and has Stubber unit tests (TASK-25.2.5.1)
+- [x] #2 modules/slack/webhooks.py, modules/incident/db_operations.py and modules/incident/incident_folder.py reach DynamoDB only through the adapter. Non-success on a read raises after logging, while not-found keeps None/[]. Existing failure branches keep returning None/False with a log. The pinned False-return characterization tests are replaced, and per-call-site before/after behaviour is recorded in notes (TASK-25.2.5.2, TASK-25.2.5.3)
+- [x] #3 The non-idempotent write inventory is recorded in notes; the two webhook counter increments and log_activity's list_append are sent with update_item(retries=False) (TASK-25.2.5.1-.3)
 - [ ] #4 The idempotency store's fail-closed IN_PROGRESS on a failed claim re-read is kept, with the decision recorded and a unit test; claim() returns NEW when an SDK replay of its own conditional put fails the condition, via a per-call claim token (TASK-25.2.5.4)
-- [ ] #5 integrations/aws/dynamodb.py and tests/unit/integrations/aws/test_dynamodb_local_endpoint.py are deleted, both guard baselines are pruned, and no boto3.client or boto3.Session construction remains in production code outside integrations/aws/client.py (TASK-25.2.5.5)
-- [ ] #6 The packages/aws_platform transition seam is bounded by a freeze-baseline guard and its baseline, seeded with the production consumers that exist once the migrations have landed and wired as a make target, with TASK-88 named as its retirement owner (TASK-25.2.5.5)
+- [x] #5 integrations/aws/dynamodb.py and tests/unit/integrations/aws/test_dynamodb_local_endpoint.py are deleted, both guard baselines are pruned, and no boto3.client or boto3.Session construction remains in production code outside integrations/aws/client.py (TASK-25.2.5.5)
+- [x] #6 The packages/aws_platform transition seam is bounded by a freeze-baseline guard and its baseline, seeded with the production consumers that exist once the migrations have landed and wired as a make target, with TASK-88 named as its retirement owner (TASK-25.2.5.5)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -170,5 +170,19 @@ created: 2026-09-14 14:08
 created: 2026-09-17 15:15
 ---
 2026-09-17 (human decisions while planning TASK-25.2.5.5): two enabling subtasks added. TASK-25.2.5.7 retires the empty infrastructure.clients freeze guard. TASK-25.2.5.8 (after .7) extracts shared freeze-baseline plumbing and standardizes guard test names. TASK-25.2.5.5 now depends on .8 and builds the aws_platform seam guard on the shared module, wires it into CI, and generalizes decisions/migration.md rule 3. TASK-25.2.5.4 remains independent; parent AC#4 stays open until it lands.
+---
+
+created: 2026-09-17 19:36
+---
+CLOSE-OUT 2026-09-17 by TASK-25.2.5.5. ACs #1, #2, #3, #5 and #6 checked with traceability; #4 left unchecked and status left for a human (agents do not move a task to Done).
+
+- #1 -> TASK-25.2.5.1 (DynamoDB adapter with Stubber tests).
+- #2 -> TASK-25.2.5.2 (webhooks), TASK-25.2.5.3 (incident persistence) and TASK-25.2.5.6 (unclassified ClientError parity on the webhooks store).
+- #3 -> TASK-25.2.5.1 through .3 (non-idempotent write inventory; retries=False on the two webhook counter increments and log_activity's list_append).
+- #4 NOT CHECKED: owned by TASK-25.2.5.4 (idempotency store fail-closed claim re-read and claim token), still To Do, with no dependency in either direction on .5. It is the only parent AC outstanding.
+- #5 -> TASK-25.2.5.5: integrations/aws/dynamodb.py (164 LOC) and tests/unit/integrations/aws/test_dynamodb_local_endpoint.py deleted; sdk_typing_antipatterns.txt 3 -> 2 entries and vendor_package_contract.txt 21 -> 20 entries, one line removed from each and every other entry byte-identical; boto3.client/Session/resource in production code now appears only in integrations/aws/client.py.
+- #6 -> TASK-25.2.5.5: bin/check_aws_platform_seam.py built on bin/freeze_guard.py (TASK-25.2.5.8), baseline bin/baselines/aws_platform_seam_consumers.txt seeded with the 11 production consumers present after .2, .3 and .6, wired as make check-aws-platform-seam and as a CI step in ci_code.yml, with TASK-88 named as retirement owner in both the script docstring and the baseline header.
+
+Two enabling subtasks were added under this parent while planning .5 and have since merged: TASK-25.2.5.7 (retire the empty infrastructure.clients freeze guard) and TASK-25.2.5.8 (extract the shared freeze-baseline plumbing, standardize guard test names). Neither maps to a parent AC; both exist so .5's guard work built on a single shared module instead of a fourth copy.
 ---
 <!-- COMMENTS:END -->

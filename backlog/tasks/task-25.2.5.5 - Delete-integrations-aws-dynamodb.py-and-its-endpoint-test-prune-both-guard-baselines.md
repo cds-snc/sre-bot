@@ -3,10 +3,11 @@ id: TASK-25.2.5.5
 title: >-
   Delete integrations/aws/dynamodb.py and its endpoint test; prune both guard
   baselines; add the packages/aws_platform seam freeze guard
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-09-15 20:09'
-updated_date: '2026-09-17 18:42'
+updated_date: '2026-09-17 19:37'
 labels:
   - clients
   - phase-3
@@ -43,12 +44,12 @@ Slice 5 (contract) of TASK-25.2.5, in the shape of TASK-25.2.4.7. Runs once .2 a
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/aws/dynamodb.py and tests/unit/integrations/aws/test_dynamodb_local_endpoint.py no longer exist; rg over app/ (production, tests and mock.patch strings) for integrations.aws.dynamodb or 'from integrations.aws import dynamodb' returns zero hits outside tests/unit/bin/test_bin_freeze_guard_check.py, where the string is synthetic stale-baseline fixture data landed by TASK-25.2.5.8 and is not a reference to the module (narrowing approved by the human 2026-09-17)
-- [ ] #2 Neither guard baseline carries an integrations/aws/dynamodb.py entry and every other entry is unchanged; make check-sdk-typing and make check-vendor-package-contract print OK with no stale line naming it
-- [ ] #3 rg for execute_aws_api_call|handle_aws_api_errors hits only integrations/aws/{client,sqs}.py, their legacy tests, bin/check_sdk_typing.py, the sdk_typing_antipatterns.txt header and decisions/sdk-typing.md, recorded in notes as owned by TASK-25.2.6; rg for boto3.(client|Session|resource) in production code hits only integrations/aws/client.py
-- [ ] #4 TASK-25.2.5 ACs #1, #2, #3, #5 and #6 are checked with a traceability note to its children, AC #4 is left for TASK-25.2.5.4 with a note, and the parent's status is left for a human; ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with output recorded
-- [ ] #5 A freeze-baseline guard bounds the packages/aws_platform transition seam: app/bin/check_aws_platform_seam.py, built on app/bin/freeze_guard.py from TASK-25.2.5.8 (iter_python_files, load_baseline, report), plus app/bin/baselines/aws_platform_seam_consumers.txt. It scans every .py file under app/ except app/tests/, packages/aws_platform/ and the guard script itself, and fails on any unbaselined file that references the seam through absolute imports, 'from packages import aws_platform', relative imports resolved against the file's package, or non-docstring string constants naming packages.aws_platform (plus any pyproject.toml entry-point naming it); an unparsable file fails loudly; stale entries are reported without failing. The baseline is seeded once with exactly the 11 production consumers present after .2, .3 and .6 (it only ratchets down), and the docstring names TASK-88 as retirement owner and records the auto_discover_plugins blind spot. Unit tests live in tests/unit/bin/test_bin_aws_platform_seam_check.py
-- [ ] #6 The guard is wired as make check-aws-platform-seam (with its .PHONY entry, recipe 'uv run python -m bin.check_aws_platform_seam' per TASK-25.2.5.8) and as a CI step in .github/workflows/ci_code.yml next to the other freeze checks; it prints OK on the PR branch
+- [x] #1 integrations/aws/dynamodb.py and tests/unit/integrations/aws/test_dynamodb_local_endpoint.py no longer exist; rg over app/ (production, tests and mock.patch strings) for integrations.aws.dynamodb or 'from integrations.aws import dynamodb' returns zero hits outside tests/unit/bin/test_bin_freeze_guard_check.py, where the string is synthetic stale-baseline fixture data landed by TASK-25.2.5.8 and is not a reference to the module (narrowing approved by the human 2026-09-17)
+- [x] #2 Neither guard baseline carries an integrations/aws/dynamodb.py entry and every other entry is unchanged; make check-sdk-typing and make check-vendor-package-contract print OK with no stale line naming it
+- [x] #3 rg for execute_aws_api_call|handle_aws_api_errors hits only integrations/aws/{client,sqs}.py, their legacy tests, bin/check_sdk_typing.py, the sdk_typing_antipatterns.txt header and decisions/sdk-typing.md, recorded in notes as owned by TASK-25.2.6; rg for boto3.(client|Session|resource) in production code hits only integrations/aws/client.py
+- [x] #4 TASK-25.2.5 ACs #1, #2, #3, #5 and #6 are checked with a traceability note to its children, AC #4 is left for TASK-25.2.5.4 with a note, and the parent's status is left for a human; ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with output recorded
+- [x] #5 A freeze-baseline guard bounds the packages/aws_platform transition seam: app/bin/check_aws_platform_seam.py, built on app/bin/freeze_guard.py from TASK-25.2.5.8 (iter_python_files, load_baseline, report), plus app/bin/baselines/aws_platform_seam_consumers.txt. It scans every .py file under app/ except app/tests/, packages/aws_platform/ and the guard script itself, and fails on any unbaselined file that references the seam through absolute imports, 'from packages import aws_platform', relative imports resolved against the file's package, or non-docstring string constants naming packages.aws_platform (plus any pyproject.toml entry-point naming it); an unparsable file fails loudly; stale entries are reported without failing. The baseline is seeded once with exactly the 11 production consumers present after .2, .3 and .6 (it only ratchets down), and the docstring names TASK-88 as retirement owner and records the auto_discover_plugins blind spot. Unit tests live in tests/unit/bin/test_bin_aws_platform_seam_check.py
+- [x] #6 The guard is wired as make check-aws-platform-seam (with its .PHONY entry, recipe 'uv run python -m bin.check_aws_platform_seam' per TASK-25.2.5.8) and as a CI step in .github/workflows/ci_code.yml next to the other freeze checks; it prints OK on the PR branch
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -157,6 +158,46 @@ BLAST RADIUS AND ROLLBACK
 - Ordering: no prerequisite outside the repo. .2, .3, .6, .7 and .8 are all merged.
 - Rollback: a single git revert restores dynamodb.py, both baseline lines, and removes the guard, its baseline, the make target and the CI step together. Nothing depends on the guard existing.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTATION 2026-09-17, branch feat/delete_aws_dynamodb_integration. All six ACs verified individually. Task left In Progress for human review.
+
+STEP 0 - Preconditions. bin/freeze_guard.py present; bin/check_deprecated_infra_client_imports.py gone (.7); all three Makefile recipes already 'uv run python -m bin.check_x' (.8); decisions/migration.md carries the 2026-09-17 "freeze baselines generalized" note, which already names this task's seam baseline, so no ADR edit was made. Re-greps matched the plan exactly: dynamodb referenced only by its own test plus the two baseline lines (and the .8 fixture string), and 11 seam consumers. Pre-edit mypy: Found 80 errors in 28 files (checked 354 source files).
+
+STEP 1 - RED. Created tests/unit/bin/test_bin_aws_platform_seam_check.py (30 tests, 4 classes) against the not-yet-existing module. TestReferencesSeam (17) covers one detection form per test: absolute import at two depths, ImportFrom inside the seam, 'from packages import aws_platform', a relative 'from .. import aws_platform' resolved against the file's package, three unrelated-import negatives, three boundary negatives (packages.aws_platformer as import, from-import and string), three string-constant positives (module constant, importlib.import_module, mock.patch target), three docstring negatives (module, function, class) and a SyntaxError-propagates case. TestFindCurrentConsumers (6) pins the scan scope: app-relative posix output, bin/ in scope, tests/ excluded, the seam tree excluded, the guard script excluded, non-.py ignored. TestPyprojectEntryPoints (3) and TestMain (4) complete it. Every test points the checker's constants at a tmp_path tree, so none depends on the real repository.
+Evidence: uv run pytest tests/unit/bin/test_bin_aws_platform_seam_check.py -q -> ImportError: cannot import name 'check_aws_platform_seam' from 'bin'; 1 error in 0.25s.
+
+STEP 2 - GREEN. Created bin/check_aws_platform_seam.py (185 LOC, stdlib only, fully typed), importing iter_python_files, load_baseline and report from bin.freeze_guard; no plumbing re-copied. Detection is AST-based: _names_seam does the dotted-boundary check, _import_from_base resolves relative imports against the file's own package parts, _docstring_node_ids exempts docstrings by node identity rather than by text, and a SyntaxError propagates. pyproject_references_seam reads project.scripts and project.entry-points.* (today's pyproject declares neither, so it is insurance). -> 30 passed.
+
+STEP 3 - Baseline seeded once from the guard's own output against an absent baseline (load_baseline returns an empty set precisely so a first baseline can be seeded this way). The 11 entries were diffed against the independent Step 0b rg list and are identical. Header follows the other two baselines and names TASK-88 as retirement owner.
+
+STEP 4 - Wiring. Makefile: check-aws-platform-seam added to .PHONY:1 and a target with recipe 'uv run python -m bin.check_aws_platform_seam'. ci_code.yml: step "packages/aws_platform seam freeze check" (working-directory ./app) inserted directly after "Vendor package contract freeze check" and before "Runtime import check".
+
+STEP 5 - Contract deletion. Removed integrations/aws/dynamodb.py (164 LOC) and tests/unit/integrations/aws/test_dynamodb_local_endpoint.py, plus their stale __pycache__ entries. Pruned one line from each baseline (asserted single-occurrence before replacing); git diff --cached --stat shows exactly 1 deletion in each file and no other change.
+
+EVIDENCE (all from app/)
+- AC#1: integrations/aws/dynamodb.py and tests/unit/integrations/aws/test_dynamodb_local_endpoint.py no longer exist. rg over app/ for the module hits only tests/unit/bin/test_bin_freeze_guard_check.py:127,:132, the synthetic stale-baseline fixture landed by .8 and explicitly excluded by this AC (human decision D8); that file was not touched.
+- AC#2: sdk_typing_antipatterns.txt 3 -> 2 entries, vendor_package_contract.txt 21 -> 20. make check-sdk-typing -> "OK: no net-new SDK anti-patterns (2 baselined file(s) remain)."; make check-vendor-package-contract -> "OK: no net-new vendor-package contract violations (20 baselined entry(ies) remain)." Full output of both captured: no INFO stale line naming dynamodb.py, because the entry was removed in the same change as the file.
+- AC#3: rg -l execute_aws_api_call|handle_aws_api_errors over the repo (backlog excluded) -> app/integrations/aws/{client,sqs}.py, app/tests/integrations/aws/{test_legacy_aws_client,test_sqs}.py, app/bin/check_sdk_typing.py, app/bin/baselines/sdk_typing_antipatterns.txt (header) and decisions/sdk-typing.md. All owned by TASK-25.2.6. rg for boto3.(client|Session|resource) in production code -> only integrations/aws/client.py.
+- AC#4: parent ACs #1, #2, #3, #5, #6 checked with a per-AC traceability comment on TASK-25.2.5; #4 left for TASK-25.2.5.4 with a note; parent status untouched. Gates below.
+- AC#5: 30 tests in tests/unit/bin/test_bin_aws_platform_seam_check.py pass. Baseline holds the 11 production consumers, proven equal to an independent rg list. Guard built on freeze_guard (rg confirms it defines no walker, loader or report of its own).
+- AC#6: make check-aws-platform-seam -> "OK: no net-new packages.aws_platform consumers (11 baselined consumer(s) remain)." make check-runtime-imports still OK. .PHONY updated; CI step added.
+
+GATES
+- uv run ruff check . -> All checks passed! (one SIM102 in the new script was fixed at source by flattening the Constant branch into the elif chain, not suppressed.)
+- uv run ruff format --check . -> 736 files already formatted.
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 78 errors in 27 files (checked 354 source files). Pre-edit was 80 in 28 across 354. Exactly the two dynamodb.py errors (:102 no-any-return, :108 return-value) are gone, the file count drops by one, and the source count is unchanged because the new guard replaces the deleted module. Zero errors in check_aws_platform_seam.py.
+- uv run pytest tests --ignore=tests/smoke -> 6 failed, 3546 passed. The 6 are the known TASK-90 single-process order leaks (test_webhooks_aws_sns.py x3, unit/infrastructure/directory/test_google.py x3): they pass in isolation (111 passed) and make test, the project gate, is green at 2763 + 789 passed with zero failures. Pre-existing and unrelated; not fixed here.
+
+DESIGN NOTE. The guard's docstring records a blind spot rather than pretending to cover it: server/lifespan.py:188 calls auto_discover_plugins(pm, base_paths=["packages", "modules"]), which walks the whole packages/ tree and imports every sub-package, so packages.aws_platform is imported at startup with no literal reference that any AST or string scan could see. The guard bounds net-new NAMED dependents, which is what TASK-88 must migrate.
+
+FOR THE HUMAN
+- 10 files: 2 added (bin/check_aws_platform_seam.py, bin/baselines/aws_platform_seam_consumers.txt), 1 added test file, 4 modified (Makefile, ci_code.yml, both baselines), 2 deleted (integrations/aws/dynamodb.py, tests/unit/integrations/aws/test_dynamodb_local_endpoint.py) and this task file. No ADR, runtime, settings or terraform change.
+- No git command was run beyond read-only inspection. The test file and the test deletion are already in HEAD (commit 2a724ef4); the remaining eight files are staged and uncommitted.
+- Task left In Progress. TASK-25.2.5's status is also left for a human, with only its AC#4 (TASK-25.2.5.4) outstanding.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
