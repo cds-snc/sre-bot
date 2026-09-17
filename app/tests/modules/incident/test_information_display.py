@@ -2,8 +2,9 @@ import json
 import uuid
 from unittest.mock import MagicMock, patch
 
+from infrastructure.operations import OperationStatus
 from models.incidents import Incident
-from modules.incident import information_display
+from modules.incident import db_operations, information_display
 
 
 @patch("modules.incident.information_display.incident_information_view")
@@ -278,3 +279,28 @@ def generate_incident_data(
             incident_data[key] = value
 
     return incident_data
+
+
+@patch("modules.incident.information_display.db_operations")
+def test_open_incident_info_view_responds_when_store_unavailable(mock_db_operations):
+    """When the incidents store is unavailable, the handler responds with the unavailable message."""
+    mock_client = MagicMock()
+    mock_respond = MagicMock()
+    body = {
+        "channel_id": "C12345",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+        "trigger_id": "T12345",
+        "view": {"id": "V12345"},
+    }
+    mock_db_operations.IncidentStoreUnavailableError = db_operations.IncidentStoreUnavailableError
+    mock_db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE = db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE
+    mock_db_operations.get_incident_by_channel_id.side_effect = db_operations.IncidentStoreUnavailableError(
+        OperationStatus.PERMANENT_ERROR,
+        error_code="ValidationException",
+    )
+
+    information_display.open_incident_info_view(mock_client, body, mock_respond)
+
+    mock_respond.assert_called_once_with(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
+    mock_client.views_open.assert_not_called()

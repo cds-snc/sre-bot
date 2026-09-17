@@ -471,7 +471,11 @@ def close_incident(client: WebClient, body, ack, respond):
     channel_name = body["channel_name"]
     user_id = slack_users.get_user_id_from_request(body)
     incident_id = None
-    incident = db_operations.get_incident_by_channel_id(channel_id)
+    try:
+        incident = db_operations.get_incident_by_channel_id(channel_id)
+    except db_operations.IncidentStoreUnavailableError:
+        respond(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
+        return
     if incident:
         incident_id = incident.get("id", {}).get("S", None)
     # ensure the bot is actually in the channel before performing actions
@@ -616,7 +620,11 @@ def handle_update_status_command(client: WebClient, body, respond: Respond, ack:
     if status not in valid_statuses:
         respond("A valid status must be used with this command:\n" + ", ".join(valid_statuses))
         return
-    incident = db_operations.get_incident_by_channel_id(body["channel_id"])
+    try:
+        incident = db_operations.get_incident_by_channel_id(body["channel_id"])
+    except db_operations.IncidentStoreUnavailableError:
+        respond(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
+        return
 
     if not incident:
         respond("No incident found for this channel. Will not update status in DB record.")
@@ -652,11 +660,26 @@ def convert_timestamp(timestamp: str) -> str:
     return datetime_str
 
 
+def _store_unavailable_view() -> dict:
+    """Modal shown when the incidents store cannot be reached; the failure is already logged."""
+    return {
+        "type": "modal",
+        "callback_id": "incident_updates_view",
+        "title": {"type": "plain_text", "text": "SRE - Incident Updates"},
+        "close": {"type": "plain_text", "text": "Close"},
+        "blocks": [{"type": "section", "text": {"type": "mrkdwn", "text": db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE}}],
+    }
+
+
 def open_updates_dialog(client: WebClient, body, ack: Ack):
     ack()
     channel_id = body["channel_id"]  # Extract channel_id directly from body
-    incident = db_operations.get_incident_by_channel_id(channel_id)
-    incident_id = incident.get("id", "Unknown").get("S", "Unknown")
+    try:
+        incident = db_operations.get_incident_by_channel_id(channel_id)
+    except db_operations.IncidentStoreUnavailableError:
+        client.views_open(trigger_id=body["trigger_id"], view=_store_unavailable_view())
+        return
+    incident_id = incident.get("id", {}).get("S", "Unknown") if incident else "Unknown"
     dialog = {
         "type": "modal",
         "callback_id": "incident_updates_view",
@@ -693,7 +716,11 @@ def handle_updates_submission(client: WebClient, ack, respond: Respond, view):
     private_metadata = json.loads(view["private_metadata"])
     incident_id = private_metadata["incident_id"]
     updates_text = view["state"]["values"]["updates_block"]["updates_input"]["value"]
-    incident_folder.store_update(incident_id, updates_text)
+    try:
+        incident_folder.store_update(incident_id, updates_text)
+    except db_operations.IncidentStoreUnavailableError:
+        respond(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
+        return
     channel_id = private_metadata["channel_id"]
     client.chat_postMessage(channel=channel_id, text="Summary has been updated.")
 
@@ -701,7 +728,11 @@ def handle_updates_submission(client: WebClient, ack, respond: Respond, view):
 def display_current_updates(client: WebClient, body, respond: Respond, ack: Ack):
     ack()
     incident_id = body["channel_id"]
-    updates = incident_folder.fetch_updates(incident_id)
+    try:
+        updates = incident_folder.fetch_updates(incident_id)
+    except db_operations.IncidentStoreUnavailableError:
+        respond(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
+        return
     if updates:
         updates_text = "\n".join(updates)
         client.chat_postMessage(channel=incident_id, text=f"Current updates:\n{updates_text}")

@@ -1,10 +1,44 @@
+from typing import Any
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
+from botocore.exceptions import ClientError
 
 from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.spreadsheets import RANGE_NOT_FOUND, SheetCell
 from modules.incident import incident_folder
+from packages.aws_platform.adapters.dynamodb import DynamoDBAdapter
+
+
+def _failure() -> OperationResult[Any]:
+    return OperationResult.error(
+        OperationStatus.TRANSIENT_ERROR,
+        message="boom",
+        error_code="ThrottlingException",
+    )
+
+
+FAILURE_FIELDS = {
+    "status": OperationStatus.TRANSIENT_ERROR.value,
+    "error_code": "ThrottlingException",
+    "error": "boom",
+}
+
+
+@pytest.fixture
+def adapter():
+    """Patch the module's adapter factory with a spec'd mock and yield the mock."""
+    mock = MagicMock(spec=DynamoDBAdapter)
+    with patch("modules.incident.incident_folder.build_dynamodb_adapter", return_value=mock) as factory:
+        mock.factory = factory
+        yield mock
+
+
+@pytest.fixture
+def logger_mock():
+    with patch("modules.incident.incident_folder.logger") as mock:
+        mock.bind.return_value = mock
+        yield mock
 
 
 @patch("modules.incident.incident_folder.SRE_INCIDENT_FOLDER", "SRE_INCIDENT_FOLDER")
@@ -437,67 +471,117 @@ def test_channel_slug(channel_name, expected):
     assert incident_folder.channel_slug(channel_name) == expected
 
 
-@patch("modules.incident.incident_folder.dynamodb.scan")
-@patch("modules.incident.incident_folder.dynamodb.update_item")
 @patch("modules.incident.incident_folder.current_time_est")
-def test_store_update(mock_current_time_est, mock_update_item, mock_scan_item):
+def test_store_update_success(mock_current_time_est, adapter, logger_mock):
+    """A successful store_update returns None and logs nothing on success."""
     mock_current_time_est.return_value = "2025-01-31 11:17:06"
-    mock_scan_item.return_value = [{"incident_updates": {"L": [{"S": "Previous update"}]}}]
-    mock_update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
-    response = incident_folder.store_update("incident_id", "New update")
-    assert response is not None
-    mock_scan_item.assert_called_once()
-    mock_update_item.assert_called_once()
+    with patch("modules.incident.incident_folder.db_operations.lookup_incident") as mock_lookup:
+        mock_lookup.return_value = [{"incident_updates": {"L": [{"S": "Previous update"}]}}]
+        adapter.update_item.return_value = OperationResult.success()
 
-    expected_update = "2025-01-31 11:17:06 EST\nNew update\nPrevious update"
-    actual_updates = mock_update_item.call_args[1]["ExpressionAttributeValues"][":updates"]["L"]
-    assert len(actual_updates) == 1
-    assert actual_updates[0]["S"] == expected_update
+        response = incident_folder.store_update("incident_id", "New update")
+
+        assert response is None
+        adapter.update_item.assert_called_once()
+        mock_lookup.assert_called_once()
 
 
-@patch("modules.incident.incident_folder.dynamodb.scan")
-@patch("modules.incident.incident_folder.dynamodb.update_item")
 @patch("modules.incident.incident_folder.current_time_est")
-def test_store_update_failed(mock_current_time_est, mock_update_item, mock_scan_item):
+def test_store_update_no_previous_updates(mock_current_time_est, adapter, logger_mock):
+    """When no previous updates exist, current_updates is empty."""
     mock_current_time_est.return_value = "2025-01-31 11:17:06"
-    mock_scan_item.return_value = [{"incident_updates": {"L": [{"S": "Previous update"}]}}]
-    mock_update_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 400}}
 
-    response = incident_folder.store_update("incident_id", "New update")
-    assert response is None
-    mock_scan_item.assert_called_once()
-    mock_update_item.assert_called_once()
+    with patch("modules.incident.incident_folder.db_operations.lookup_incident") as mock_lookup:
+        mock_lookup.return_value = []
+        adapter.update_item.return_value = OperationResult.success()
+
+        response = incident_folder.store_update("incident_id", "New update")
+
+        assert response is None
+        adapter.update_item.assert_called_once()
 
 
-@patch("modules.incident.incident_folder.dynamodb.scan")
-@patch("modules.incident.incident_folder.dynamodb.update_item")
 @patch("modules.incident.incident_folder.current_time_est")
-def test_store_update_raises_when_update_item_returns_false(mock_current_time_est, mock_update_item, mock_scan_item):
-    """update_item returning the integration's literal False error contract crashes on
-    the unguarded response.get("ResponseMetadata", {}) call, unlike the tested
-    400-status dict.
-    """
+def test_store_update_returns_none_and_logs_on_non_success(mock_current_time_est, adapter, logger_mock):
+    """A failed update returns None and logs the classified failure."""
     mock_current_time_est.return_value = "2025-01-31 11:17:06"
-    mock_scan_item.return_value = [{"incident_updates": {"L": [{"S": "Previous update"}]}}]
-    mock_update_item.return_value = False
 
-    with pytest.raises(AttributeError):
-        incident_folder.store_update("incident_id", "New update")
+    with patch("modules.incident.incident_folder.db_operations.lookup_incident") as mock_lookup:
+        mock_lookup.return_value = [{"incident_updates": {"L": [{"S": "Previous update"}]}}]
+        adapter.update_item.return_value = _failure()
+
+        response = incident_folder.store_update("incident_id", "New update")
+
+        assert response is None
+        logger_mock.error.assert_called_once()
+        assert "incident_update_store_failed" in logger_mock.error.call_args[0]
 
 
-@patch("modules.incident.incident_folder.dynamodb.scan")
-def test_fetch_updates(mock_scan_item):
-    mock_scan_item.return_value = [{"incident_updates": {"L": [{"S": "Update 1\n Update 2"}]}}]
+@patch("modules.incident.incident_folder.current_time_est")
+def test_store_update_logs_and_returns_none_on_unclassified_client_error(mock_current_time_est, adapter, logger_mock):
+    """An unclassified ClientError is logged with status='unclassified' and returns None."""
+    mock_current_time_est.return_value = "2025-01-31 11:17:06"
 
-    updates = incident_folder.fetch_updates("incident_id")
-    assert updates == ["Update 1\n Update 2"]
+    with patch("modules.incident.incident_folder.db_operations.lookup_incident") as mock_lookup:
+        mock_lookup.return_value = [{"incident_updates": {"L": [{"S": "Previous update"}]}}]
+        adapter.update_item.side_effect = ClientError(
+            {"Error": {"Code": "ValidationException", "Message": "bad value"}},
+            "UpdateItem",
+        )
 
-    # Test case when no updates are found
-    mock_scan_item.return_value = {}
-    updates = incident_folder.fetch_updates("incident_id")
-    assert updates == []
-    assert mock_scan_item.call_count == 2
+        response = incident_folder.store_update("incident_id", "New update")
+
+        assert response is None
+        logger_mock.error.assert_called_once()
+        call_kwargs = logger_mock.error.call_args.kwargs
+        assert call_kwargs.get("status") == "unclassified"
+        assert call_kwargs.get("error_code") == "ValidationException"
+
+
+@patch("modules.incident.incident_folder.current_time_est")
+def test_store_update_propagates_programmer_error(mock_current_time_est, adapter, logger_mock):
+    """Only SDK errors are swallowed; a programmer error still propagates."""
+    mock_current_time_est.return_value = "2025-01-31 11:17:06"
+
+    with patch("modules.incident.incident_folder.db_operations.lookup_incident") as mock_lookup:
+        mock_lookup.return_value = [{"incident_updates": {"L": [{"S": "Previous update"}]}}]
+        adapter.update_item.side_effect = KeyError("bad call")
+
+        with pytest.raises(KeyError):
+            incident_folder.store_update("incident_id", "New update")
+
+
+def test_store_update_propagates_when_lookup_fails(adapter, logger_mock):
+    """When lookup_incident raises, the error is not caught."""
+    with patch("modules.incident.incident_folder.db_operations.lookup_incident") as mock_lookup:
+        from modules.incident import db_operations
+
+        mock_lookup.side_effect = db_operations.IncidentStoreUnavailableError(
+            OperationStatus.PERMANENT_ERROR,
+            error_code="ValidationException",
+        )
+
+        with pytest.raises(db_operations.IncidentStoreUnavailableError):
+            incident_folder.store_update("incident_id", "New update")
+
+        adapter.update_item.assert_not_called()
+
+
+def test_fetch_updates(adapter, logger_mock):
+    """Mechanical fix: patch db_operations.lookup_incident instead of dynamodb.scan."""
+    with patch("modules.incident.incident_folder.db_operations.lookup_incident") as mock_lookup:
+        mock_lookup.return_value = [{"incident_updates": {"L": [{"S": "Update 1\n Update 2"}]}}]
+
+        updates = incident_folder.fetch_updates("incident_id")
+
+        assert updates == ["Update 1\n Update 2"]
+
+        # Test case when no updates are found
+        mock_lookup.return_value = []
+        updates = incident_folder.fetch_updates("incident_id")
+        assert updates == []
+        assert mock_lookup.call_count == 2
 
 
 def _incident_row_data():
