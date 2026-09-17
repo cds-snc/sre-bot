@@ -4,10 +4,10 @@ title: >-
   Webhooks store: map unclassified ClientError to WebhookStoreUnavailableError
   on reads and log-and-return-None on ordinary writes (parity with TASK-25.2.5.3
   F4)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-16 19:31'
-updated_date: '2026-09-17 13:51'
+updated_date: '2026-09-17 14:36'
 labels:
   - clients
   - phase-3
