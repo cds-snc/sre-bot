@@ -7,7 +7,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-09-17 15:13'
-updated_date: '2026-09-17 17:53'
+updated_date: '2026-09-17 18:05'
 labels:
   - clients
   - phase-3
@@ -45,11 +45,11 @@ Out of scope: changing any guard's detection rules or baseline contents; new gua
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A single typed shared module in app/bin provides the file walker, baseline loading and the net-new/stale report; no guard script defines its own iter_python_files or load_baseline
-- [ ] #2 make check-sdk-typing, make check-vendor-package-contract and make check-runtime-imports print the same OK/INFO lines as before the change (before/after output recorded in notes), and the CI steps calling them are unchanged or updated in the same PR
-- [ ] #3 Excluded directories are matched on paths relative to the scan root, pinned by a unit test with an excluded-name directory above the root
-- [ ] #4 The three guard test files are renamed to test_bin_<guard>_check.py and the helper has its own test file; failing-baseline, stale-only and walker cases are covered
-- [ ] #5 ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with output recorded in notes
+- [x] #1 A single typed shared module in app/bin provides the file walker, baseline loading and the net-new/stale report; no guard script defines its own iter_python_files or load_baseline
+- [x] #2 make check-sdk-typing, make check-vendor-package-contract and make check-runtime-imports print the same OK/INFO lines as before the change (before/after output recorded in notes), and the CI steps calling them are unchanged or updated in the same PR
+- [x] #3 Excluded directories are matched on paths relative to the scan root, pinned by a unit test with an excluded-name directory above the root
+- [x] #4 The three guard test files are renamed to test_bin_<guard>_check.py and the helper has its own test file; failing-baseline, stale-only and walker cases are covered
+- [x] #5 ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with output recorded in notes
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -196,4 +196,32 @@ Evidence: uv run pytest tests/unit/bin/test_bin_freeze_guard_check.py -q ->
 uv run ruff check <file> -> All checks passed!   uv run ruff format --check <file> -> 1 file already formatted
 
 Plan amendment recorded before implementation: D6 (deprecation is a must-fix in any file the task touches, general rule stated by the human 2026-09-17), with the sweep of all eight touched files recorded in GROUNDING. One hit: test_check_sdk_typing.py:3 'from __future__ import annotations', removed in Step 7a.
+
+Steps 2-8 - GREEN (2026-09-17, branch feat/extract_shared_baseline_guard)
+
+Step 2 - Created app/bin/freeze_guard.py (108 LOC, stdlib only, fully typed). EXCLUDED_DIR_NAMES is the union frozenset (D4). iter_python_files(root, excluded=EXCLUDED_DIR_NAMES) yields root itself when root is a file (shipped main.py) and matches exclusions on path.relative_to(root).parts, with the docstring recording why absolute matching silently turned a guard into a no-op. load_baseline(baseline_path) returns an empty set for a missing file so a new guard can seed its first baseline from its own output. report(...) is keyword-only over current/baseline/baseline_path/app_root plus the four message arguments, prints INFO then FAIL then Baseline then remediation, else the OK line with {count}, and returns the exit code. app_root is passed rather than a pre-rendered string so a monkeypatched APP_ROOT still yields a tmp-relative Baseline line.
+
+Step 3 - check_sdk_typing.py: dropped EXCLUDED_DIR_NAMES, iter_python_files (which was also the untyped copy) and load_baseline; main() is now one report(...) call carrying the four original message strings verbatim. Step 4 - check_vendor_package_contract.py: same removals; main() keeps its WARN block (warnings are not part of the baseline report) and then returns report(...); the now-unused collections.abc.Iterator import is gone. Step 5 - check_runtime_imports.py: dropped EXCLUDED_DIR_NAMES and iter_python_files and imports the shared walker; no baseline, no report, no message changed. Step 6 - the three Makefile recipes are now 'uv run python -m bin.check_x' (D2); target names, .PHONY:1 and .github/workflows/ci_code.yml are untouched, so no CI edit was needed.
+
+Step 7 - Renamed (plain mv) test_check_{sdk_typing,vendor_package_contract,runtime_imports}.py to test_bin_{sdk_typing,vendor_package_contract,runtime_imports}_check.py. The two load_baseline tests moved out of the vendor file into the helper file; its four remaining call sites use freeze_guard.load_baseline(checker.BASELINE_PATH). test_find_current_violations_ignores_non_python_files_and_cache_directories stayed, as the guard-level proof the shared walker is wired in. test_bin_runtime_imports_check.py needed no body change. Stale __pycache__ entries for the old names were deleted.
+
+D6 applied - deprecations removed from touched files: 'from __future__ import annotations' is gone from test_bin_sdk_typing_check.py. While there, its two pyproject helpers returned Any from functions declared -> list[str] (2 mypy errors, pre-existing, invisible to the project gate because mypy excludes ^tests/ but shown in the IDE); annotated _pyproject_data -> dict[str, Any] and bound each result to a typed local. 'uv run mypy tests/unit/bin/test_bin_sdk_typing_check.py' -> Success: no issues found in 1 source file (was: 2 errors).
+
+EVIDENCE (from app/)
+- AC#1: rg -n '^def (iter_python_files|load_baseline)' bin/ -> only bin/freeze_guard.py:33 and :55. rg -n '^EXCLUDED_DIR_NAMES' bin/ -> only bin/freeze_guard.py:30.
+- AC#2: make check-sdk-typing -> 'OK: no net-new SDK anti-patterns (3 baselined file(s) remain).'; make check-vendor-package-contract -> 'OK: no net-new vendor-package contract violations (21 baselined entry(ies) remain).'; make check-runtime-imports -> 'OK: every shipped import resolves to the standard library, first-party code, or a runtime dependency.' Byte-identical to the Step 0b pre-edit capture. ci_code.yml unchanged (not in the diff).
+- AC#2 negative probe (not committed): integrations/_probe_tmp/{mirror,dispatch}.py -> vendor guard exit 1 listing module:_probe_tmp/dispatch.py, module:_probe_tmp/mirror.py and operation-result:_probe_tmp/mirror.py with the Baseline and remediation lines; sdk guard exit 1 listing integrations/_probe_tmp/dispatch.py. Directory deleted; both guards print OK again.
+- AC#3: the fix is in iter_python_files and is pinned by test_an_excluded_name_above_the_scan_root_does_not_empty_the_scan, which scans tmp_path/.venv/project/integrations and asserts the file under it is still yielded. It cannot change output on this checkout, so the make output stays byte-identical (plan A3).
+- AC#4: pytest tests/unit/bin --collect-only -> test_bin_freeze_guard_check.py 17, test_bin_runtime_imports_check.py 11, test_bin_sdk_typing_check.py 6, test_bin_vendor_package_contract_check.py 19. uv run pytest tests/unit/bin -q -> 53 passed (was 38).
+- AC#5: uv run ruff check . -> All checks passed! ; uv run ruff format --check . -> 736 files already formatted. uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 80 errors in 28 files (checked 354 source files); before was 80 errors in 28 files (checked 353 source files), so no new error and one more file checked (freeze_guard.py). uv run pytest tests --ignore=tests/smoke -> 6 failed, 3521 passed; the 6 are the known TASK-90 single-process order leaks (test_webhooks_aws_sns.py x3, infrastructure/directory/test_google.py x3), unrelated and not fixed here.
+- Belt and braces: 'uv run python bin/check_sdk_typing.py' still prints the OK line, confirming the -m switch is hardening rather than a repair (plan A1).
+
+FOR TASK-25.2.5.5
+- Shared module: app/bin/freeze_guard.py. API as built: iter_python_files(root: Path, excluded: Iterable[str] = EXCLUDED_DIR_NAMES) -> Iterator[Path]; load_baseline(baseline_path: Path) -> set[str]; report(*, current, baseline, baseline_path, app_root, stale_label, fail_label, remediation, ok_template) -> int. The message-parameterized report exists, so that task's A1 contingency does not fire and it must not re-copy the report logic.
+- Guards are invoked as 'uv run python -m bin.check_x'; check-aws-platform-seam follows the same shape.
+- ok_template is formatted with {count} and must contain no other brace.
+
+FOR THE HUMAN
+- 9 files: 1 added (bin/freeze_guard.py), 4 modified (three guards + Makefile), 3 renamed with edits, and the new test file committed earlier as b1eefac7. No baseline, ADR, CI, runtime, settings or terraform change.
+- Task left In Progress.
 <!-- SECTION:NOTES:END -->
