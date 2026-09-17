@@ -4,7 +4,7 @@ title: 'Webhooks slice 2: source-declared typed parsing + idempotent ingest'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:39'
-updated_date: '2026-07-28 19:16'
+updated_date: '2026-09-17 20:48'
 labels:
   - migration
   - webhooks
@@ -52,3 +52,20 @@ Verify: that every live webhook_id can be assigned a source from TASK-46 data; w
 - [ ] #5 SNS signature verification in all environments and generic non-leaking 5xx bodies from TASK-7 are preserved (test)
 - [ ] #6 Webhook URLs and behaviour are unchanged for known senders: TASK-36 smoke tests pass before and after
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-17 20:48
+---
+2026-09-17, from planning TASK-25.2.5.4 - a guard this task needs and cannot see from its own description.
+
+This is the FIRST production consumer of the idempotency store for DEDUP rather than for a lease. Verified 2026-09-17: get_idempotency_store() has no production caller today; every live claim() goes through the lease helpers.
+
+That matters because the store's read-failure policy is about to become use-dependent. When the ConsistentRead after a contended claim fails, dedup needs FAIL-CLOSED (the record is the only evidence that an effect already happened, and the protected operation is explicitly not assumed idempotent - that is the point of the key). Under fail-open, a COMPLETED record plus a failed re-read means re-executing a completed operation and then overwriting its recorded outcome.
+
+TASK-100 flips that policy to fail-OPEN for the lease use, which is correct there for the opposite reason (the job body is idempotent, so failing closed just skips a scheduled period). Its AC#3 requires the dedup use to keep fail-closed and the two policies to be an explicit choice rather than one shared default - but if this task lands first and simply calls claim(), whichever default exists at the time is inherited silently.
+
+ACTION FOR THIS TASK'S PLANNER: state explicitly which read-failure policy the webhook ingest claim uses, and assert it rather than inheriting it. TASK-58 is where the per-use choice naturally lives (it builds the idempotency and lease facades over the one primitive); a comment there records the split. No dependency wired in either direction - just do not assume the default.
+---
+<!-- COMMENTS:END -->
