@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-28 13:19'
-updated_date: '2026-09-17 20:40'
+updated_date: '2026-09-18 15:28'
 labels:
   - infrastructure
   - phase-4
@@ -14,6 +14,7 @@ labels:
 milestone: m-4
 dependencies:
   - TASK-6
+  - TASK-102
 references:
   - decisions/reliability.md
   - decisions/cloud-portability.md
@@ -69,5 +70,10 @@ The facade split this task builds is where the conditional-claim READ-FAILURE PO
 So the primitive should not carry a read-failure policy at all: each facade should choose, at construction or at the call, and the choice should be visible in the type rather than inherited. Reviewed against current lease and idempotent-consumer guidance on 2026-09-17, which makes the same point - one default cannot serve both.
 
 Also for this task to carry forward: TASK-25.2.5.4 adds a fourth conditional-check-failure branch to claim() (an IN_PROGRESS record bearing the caller's own claim token resolves to NEW, defeating the SDK-replay hazard) and records it in decisions/reliability.md. It is an implementation-level defence against botocore's retry, deliberately NOT on the Protocol, so a Redis or Postgres adapter can answer the same hazard its own way. Keep it off the ConditionalWriteStore Protocol during the rename. TASK-102 is the separate, Protocol-level ownership question (release/complete gated on the token) and is the one that genuinely belongs with this task.
+---
+
+created: 2026-09-18 15:27
+---
+2026-09-18 (human decision): order is TASK-102, then this task, then TASK-100. This task is where the read-failure policy becomes explicit per use: the lease facade and the dedup facade each choose it at construction, and the primitive carries none. TASK-37.2 and TASK-100 now depend on this task. Not yet linked, needs coordinating: TASK-64 moves run_if_leased out of lease.py into the scheduler registry, and TASK-65 later deletes the _tier2 wrapper. Both touch the lease surface this task renames.
 ---
 <!-- COMMENTS:END -->

@@ -6,16 +6,17 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-17 20:39'
-updated_date: '2026-09-17 20:47'
+updated_date: '2026-09-18 15:27'
 labels:
   - infrastructure
   - reliability
   - phase-4
 milestone: m-4
 dependencies:
-  - TASK-99
   - TASK-25.2.5.4
+  - TASK-99
   - TASK-102
+  - TASK-58
 references:
   - decisions/reliability.md
   - app/infrastructure/idempotency/dynamodb.py
@@ -49,3 +50,12 @@ The unclassified-error path is NOT part of this flip: classify_aws_error re-rais
 - [ ] #4 An unclassified error on the re-read still propagates unchanged
 - [ ] #5 TASK-25.2.5.4's AC#1 and its unit test are updated in this PR rather than left contradicting the new behaviour
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-18 15:27
+---
+2026-09-18 (human decision): order is TASK-102, then TASK-58, then TASK-100. TASK-58 creates the per-use read-failure policy in the lease and dedup facades, set at construction. This task then only flips the lease facade to fail-open. AC#3 is satisfied by TASK-58's facade split rather than by a new parameter on today's IdempotencyStore. TASK-101 folds into this task's policy decision afterwards.
+---
+<!-- COMMENTS:END -->

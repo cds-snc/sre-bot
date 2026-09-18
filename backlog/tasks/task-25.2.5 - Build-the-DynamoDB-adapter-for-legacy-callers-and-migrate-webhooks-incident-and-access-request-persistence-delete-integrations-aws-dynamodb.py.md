@@ -3,10 +3,10 @@ id: TASK-25.2.5
 title: >-
   Build the DynamoDB adapter for legacy callers and migrate webhooks and
   incident persistence; delete integrations/aws/dynamodb.py
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-11 15:36'
-updated_date: '2026-09-17 23:21'
+updated_date: '2026-09-18 15:40'
 labels:
   - clients
   - phase-3
@@ -56,7 +56,7 @@ Deleted: integrations/aws/dynamodb.py and tests/unit/integrations/aws/test_dynam
 - [x] #1 packages/aws_platform/adapters/dynamodb.py exposes scan, get_item, put_item and update_item returning OperationResult with AttributeValue shapes unchanged, builds its retrying and retries-disabled clients only through get_aws_client, and has Stubber unit tests (TASK-25.2.5.1)
 - [x] #2 modules/slack/webhooks.py, modules/incident/db_operations.py and modules/incident/incident_folder.py reach DynamoDB only through the adapter. Non-success on a read raises after logging, while not-found keeps None/[]. Existing failure branches keep returning None/False with a log. The pinned False-return characterization tests are replaced, and per-call-site before/after behaviour is recorded in notes (TASK-25.2.5.2, TASK-25.2.5.3)
 - [x] #3 The non-idempotent write inventory is recorded in notes; the two webhook counter increments and log_activity's list_append are sent with update_item(retries=False) (TASK-25.2.5.1-.3)
-- [ ] #4 The idempotency store's fail-closed IN_PROGRESS on a failed claim re-read is kept, with the decision recorded and a unit test; claim() returns NEW when an SDK replay of its own conditional put fails the condition, via a per-call claim token (TASK-25.2.5.4)
+- [x] #4 The idempotency store's fail-closed IN_PROGRESS on a failed claim re-read is kept, with the decision recorded and a unit test; claim() returns NEW when an SDK replay of its own conditional put fails the condition, via a per-call claim token (TASK-25.2.5.4)
 - [x] #5 integrations/aws/dynamodb.py and tests/unit/integrations/aws/test_dynamodb_local_endpoint.py are deleted, both guard baselines are pruned, and no boto3.client or boto3.Session construction remains in production code outside integrations/aws/client.py (TASK-25.2.5.5)
 - [x] #6 The packages/aws_platform transition seam is bounded by a freeze-baseline guard and its baseline, seeded with the production consumers that exist once the migrations have landed and wired as a make target, with TASK-88 named as its retirement owner (TASK-25.2.5.5)
 <!-- AC:END -->
@@ -203,5 +203,10 @@ Parent AC#4 is still owned by .4 and is still the only outstanding parent AC. No
 created: 2026-09-17 23:21
 ---
 TASK-25.2.5.4 is implemented and its gates are recorded in its own notes (ruff clean, mypy no new errors, 82 passed across tests/unit + tests/integration infrastructure/idempotency including the moto conformance suite). Its AC#4 pointed here for the two 2026-09-15 decisions: the fail-closed re-read downgrade and the claim-token self-replay fix. Both are now implemented, with the self-replay branch recorded in decisions/reliability.md. The fail-closed downgrade is documented as provisional and lease-scoped, sequenced behind TASK-99 (duplicate-safe job bodies) and TASK-100 (flip to fail-open).
+---
+
+created: 2026-09-18 15:27
+---
+2026-09-18: AC#4 checked. TASK-25.2.5.4 is Done and its notes record both 2026-09-15 decisions as implemented: the fail-closed claim re-read and the claim-token fix for SDK replays. Every AC is now checked. Status is left for a human to move to Done, which unblocks TASK-25.2.6.
 ---
 <!-- COMMENTS:END -->

@@ -4,7 +4,7 @@ title: 'Webhooks slice 2: source-declared typed parsing + idempotent ingest'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:39'
-updated_date: '2026-09-17 20:48'
+updated_date: '2026-09-18 15:27'
 labels:
   - migration
   - webhooks
@@ -13,6 +13,7 @@ milestone: m-4
 dependencies:
   - TASK-37.1
   - TASK-46
+  - TASK-58
 references:
   - decisions/webhooks.md
   - decisions/plugins.md
@@ -67,5 +68,10 @@ That matters because the store's read-failure policy is about to become use-depe
 TASK-100 flips that policy to fail-OPEN for the lease use, which is correct there for the opposite reason (the job body is idempotent, so failing closed just skips a scheduled period). Its AC#3 requires the dedup use to keep fail-closed and the two policies to be an explicit choice rather than one shared default - but if this task lands first and simply calls claim(), whichever default exists at the time is inherited silently.
 
 ACTION FOR THIS TASK'S PLANNER: state explicitly which read-failure policy the webhook ingest claim uses, and assert it rather than inheriting it. TASK-58 is where the per-use choice naturally lives (it builds the idempotency and lease facades over the one primitive); a comment there records the split. No dependency wired in either direction - just do not assume the default.
+---
+
+created: 2026-09-18 15:27
+---
+2026-09-18 (human decision): TASK-58 is now a real dependency, replacing the advisory comment of 2026-09-17. TASK-58 builds the dedup facade with an explicit fail-closed read-failure policy, and this task's ingest claim consumes that facade. The claim therefore cannot inherit whatever default exists at the time. Order agreed for the primitive: TASK-102, then TASK-58, then TASK-100.
 ---
 <!-- COMMENTS:END -->
