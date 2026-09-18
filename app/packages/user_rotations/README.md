@@ -21,3 +21,8 @@ Create one JSON file per rotation in `rotations/`:
 `members` is a list of Slack user IDs. The first member starts at `rotation_start`, and each member receives `weeks_per_shift` weeks before the next member is selected. `rotation_type` currently supports only `weekly`.
 
 Every five minutes, the on-call sync job reads the current assignment and updates the UserGroup named by `slack-usergroup-handle`. The UserGroup is created automatically when missing. Adding, removing, or reordering members changes subsequent assignments.
+
+## Slack commands
+
+- `/sre rotations` or `/sre rotations help`: List user-rotation commands.
+- `/sre rotations view <usergroup-handle>`: Open the current and next 12 weeks of shifts.

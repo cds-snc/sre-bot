@@ -3,6 +3,7 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from freezegun import freeze_time
 
 from packages.user_rotations.service import UserRotationsService, whos_on
 from packages.user_rotations.settings import RotationConfig
@@ -51,3 +52,32 @@ def test_get_current_rotations_returns_each_rotation_and_its_current_slack_user(
         ),
         ("release-duty", "Release duty", "U3"),
     ]
+
+
+@pytest.mark.unit
+def test_get_rotation_shifts_returns_the_active_and_next_twelve_weeks() -> None:
+    rotation = _rotation()
+
+    with freeze_time(rotation.rotation_start + timedelta(days=3)):
+        shifts = UserRotationsService(rotations=[rotation]).get_rotation_shifts("fielding-questions")
+
+    assert [(shift.slack_user_id, shift.start, shift.end) for shift in shifts] == [
+        ("U1", rotation.rotation_start, rotation.rotation_start + timedelta(weeks=1)),
+        ("U2", rotation.rotation_start + timedelta(weeks=1), rotation.rotation_start + timedelta(weeks=2)),
+        ("U1", rotation.rotation_start + timedelta(weeks=2), rotation.rotation_start + timedelta(weeks=3)),
+        ("U2", rotation.rotation_start + timedelta(weeks=3), rotation.rotation_start + timedelta(weeks=4)),
+        ("U1", rotation.rotation_start + timedelta(weeks=4), rotation.rotation_start + timedelta(weeks=5)),
+        ("U2", rotation.rotation_start + timedelta(weeks=5), rotation.rotation_start + timedelta(weeks=6)),
+        ("U1", rotation.rotation_start + timedelta(weeks=6), rotation.rotation_start + timedelta(weeks=7)),
+        ("U2", rotation.rotation_start + timedelta(weeks=7), rotation.rotation_start + timedelta(weeks=8)),
+        ("U1", rotation.rotation_start + timedelta(weeks=8), rotation.rotation_start + timedelta(weeks=9)),
+        ("U2", rotation.rotation_start + timedelta(weeks=9), rotation.rotation_start + timedelta(weeks=10)),
+        ("U1", rotation.rotation_start + timedelta(weeks=10), rotation.rotation_start + timedelta(weeks=11)),
+        ("U2", rotation.rotation_start + timedelta(weeks=11), rotation.rotation_start + timedelta(weeks=12)),
+        ("U1", rotation.rotation_start + timedelta(weeks=12), rotation.rotation_start + timedelta(weeks=13)),
+    ]
+
+
+@pytest.mark.unit
+def test_get_rotation_shifts_returns_none_for_an_unknown_handle() -> None:
+    assert UserRotationsService(rotations=[_rotation()]).get_rotation_shifts("unknown") is None
