@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 13:59'
+updated_date: '2026-09-18 15:27'
 labels:
   - clients
 dependencies: []
@@ -66,3 +67,14 @@ NOT IN SCOPE: the Google timeout; retry counts for reads; AWS writes; BatchHttpR
 - [ ] #8 decisions/outbound-clients.md's Migration section no longer lists non-idempotent Google writes on the retrying handle or the per-call num_retries override
 - [ ] #9 Full test suite, ruff, mypy and app/bin/check_sdk_typing.py pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-18 15:27
+---
+2026-09-18 (human decision): split instead of deferring whole, so decisions/outbound-clients.md can close before the capability-package work (decisions/workplace-systems.md, decisions/capability-packages.md).
+NOW (to be planned as a subtask): a retries-disabled Google service handle configured once at construction in app/integrations/google_workspace/client.py, replacing the six per-call num_retries=0 overrides (AC#5). Directory members.insert returning 409 duplicate is reported as success (AC#4). outbound-clients.md drops the per-call override tolerance.
+LATER, with the capability packages: vendor idempotency mechanisms, namely the Calendar client-supplied event id (with TASK-86) and Drive files.generateIds for folder create. Drive copy and the remaining writes move onto the retries-disabled handle wherever their owning adapter lands. The retrying-handle tolerance in outbound-clients.md narrows to these.
+---
+<!-- COMMENTS:END -->

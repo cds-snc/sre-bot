@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:36'
-updated_date: '2026-09-11 15:56'
+updated_date: '2026-09-18 15:36'
 labels:
   - clients
   - phase-3
@@ -52,3 +52,33 @@ Guardrails: bin/baselines/vendor_package_contract.txt and bin/baselines/sdk_typi
 - [ ] #3 infrastructure/configuration/integrations/aws.py and its barrel export are deleted, with packages/access repointed to integrations/aws/settings.py
 - [ ] #4 Both guard baselines have no integrations/aws entries and the three make checks pass with output recorded in notes
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+COORDINATOR (decomposed 2026-09-18; see the comment above for full rationale and grep evidence). This task's own direct implementation work is retired in favor of three dependency-chained subtasks, each individually planned and sized under the single-PR gate:
+
+1. TASK-25.2.6.1 — delete integrations/aws/sqs.py and schemas.py (zero production consumers) and their orphaned test.
+2. TASK-25.2.6.2 (depends on .1) — delete client.py's legacy dispatcher tier and shield.py; empty the sdk_typing_antipatterns baseline; close decisions/sdk-typing.md's four tolerated anti-patterns.
+3. TASK-25.2.6.3 (depends on .2) — delete infrastructure/configuration/integrations/aws.py and its barrel export; repoint packages/access; close decisions/outbound-clients.md's shield tolerance.
+
+This task's four ACs map onto the subtasks as: AC#1+AC#2 -> .1 and .2 together (integrations/aws/ ends as __init__.py+client.py+settings.py, shield grep-clean); AC#3 -> .3; AC#4 -> .1+.2 for the baselines, .2+.3 for the two ADR edits and the standard gates. Do not check any of this task's ACs directly — check them off only once every subtask that contributes to that AC is Done and verified, per each subtask's own AC traceability. Work each subtask through its own branch/PR in dependency order; do not batch them into one PR.
+<!-- SECTION:PLAN:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-18 15:36
+---
+2026-09-18 DECOMPOSED per the single-PR size gate. A combined single-PR estimate came to ~639 production LOC across 11 production files (client.py edit, shield.py/sqs.py/schemas.py/infrastructure aws.py deletes, the infra barrel edit, the packages/access repoint, two baseline edits, two ADR edits) — over both the ~400 LOC and ~10 file thresholds, so it must not be handed off as one plan. Repo-wide grep (2026-09-18) confirmed the task's prose was still accurate: shield.py/sqs.py/schemas.py have zero production consumers, the infra aws.py module has exactly one remaining reader (packages/access/sync/adapters/aws_identity_center.py) with confirmed field-name parity to integrations/aws/settings.py, and the Google-side sdk-typing anti-patterns (execute_google_api_call, get_google_api_command_parameters, google_service.py, *_next.py) and the AWSClients facade are already fully gone repo-wide.
+
+Split into three dependency-ordered subtasks, each independently shippable/revertible and under the size gate:
+- TASK-25.2.6.1: delete integrations/aws/sqs.py + schemas.py (zero consumers) and their test file; prune the vendor_package_contract baseline's schemas/sqs lines. ~2 production files.
+- TASK-25.2.6.2 (deps: .1): delete client.py's legacy dispatcher tier (lines 224-432: handle_aws_api_errors, assume_role_session, get_aws_service_client, execute_aws_api_call, paginator, the five re-exported constants) and shield.py; empty the sdk_typing_antipatterns baseline and prune shield's vendor_package_contract lines; close all four of decisions/sdk-typing.md's tolerated anti-patterns in its Migration section (with a dated Changes line, not a status/applies flip). ~4 production files.
+- TASK-25.2.6.3 (deps: .2, since client.py's own import of the legacy infra module must be gone first): delete infrastructure/configuration/integrations/aws.py and its barrel export; repoint packages/access/sync/adapters/aws_identity_center.py's single import; remove decisions/outbound-clients.md's closed 'shield-shaped AWS client' tolerance bullet with a dated Changes line. ~4 production files.
+
+Each subtask's --plan carries full grep-grounded steps, AC traceability, a test matrix, assumptions/doubts and blast-radius/rollback notes. This task (TASK-25.2.6) is now a coordinator: its four ACs are satisfied once all three subtasks are Done — do not re-check them here directly, and do not move this task's own status past To Do (an agent stops at In Progress with notes; only a human moves a task to Done, and that applies to the coordinator once its children close).
+
+Two deliberate scope boundaries carried into the subtasks, flagged for human awareness rather than decided here: (1) decisions/sdk-typing.md's `applies: target` frontmatter is NOT flipped to `now` even though its Checks appear to all pass after TASK-25.2.6.2 — that's a broader claim (e.g. re-verifying MaxMind/Slack have no vendor-facade class) than this task's grep scope covers. (2) bin/check_sdk_typing.py's own "Retirement" docstring says to delete the script once its baseline is empty (which it will be after .2) — not done here, left for a human to decide since the task's AC only asks for an empty baseline and passing checks, not script retirement.
+---
+<!-- COMMENTS:END -->
