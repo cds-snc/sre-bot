@@ -5,7 +5,6 @@
 # Moving logic out of a vendor package removes its entries. Removing an entry is always safe.
 # Do NOT add new entries; net-new violations fail CI. Non-vendor directories (utils/) are
 # reported as warnings and are never listed here.
-module:integrations/aws/shield.py
 module:integrations/openai/summarizer.py
 module:integrations/slack/blocks.py
 module:integrations/slack/bootstrap.py
@@ -17,7 +16,6 @@ module:integrations/slack/models.py
 module:integrations/slack/parser.py
 module:integrations/slack/provider.py
 module:integrations/slack/users.py
-operation-result:integrations/aws/shield.py
 operation-result:integrations/maxmind/client.py
 operation-result:integrations/openai/client.py
 operation-result:integrations/openai/summarizer.py

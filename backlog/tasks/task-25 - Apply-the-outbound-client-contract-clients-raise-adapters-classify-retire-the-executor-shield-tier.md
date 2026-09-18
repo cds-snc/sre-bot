@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-14 15:27'
+updated_date: '2026-09-18 16:47'
 labels:
   - clients
   - phase-3
@@ -126,5 +126,10 @@ APPLIES TO THE OTHER VENDORS TOO: TASK-25.2.x (AWS) is migrating the same way - 
 created: 2026-09-14 15:27
 ---
 2026-09-14 progress: TASK-25.2.3 is Done (Identity Center adapter + caller migration; integrations/aws/identity_store.py deleted). Note: the plan's AWS-remainder slice list (lines ~63 and ~103) predates the 2026-09-11 TASK-25.2 re-scope and still describes TASK-25.2.3 as 'Lambda + delete sqs.py' and TASK-25.2.4 as 'Organizations+SSO-Admin+legacy IdentityStore'. The current mapping is on TASK-25.2: .2.1 characterization, .2.2 client.py, .2.3 Identity Center (done), .2.4 Organizations/SSO-Admin/Config/CostExplorer/GuardDuty/SecurityHub/Lambda, .2.5 DynamoDB, .2.6 deletions.
+---
+
+created: 2026-09-18 16:47
+---
+2026-09-18 ID NOTE: TASK-25.5 is now 'Retire MaxMindClient' (created 2026-09-18). The CLI reused the ID of the archived AWSShield-deletion task that this task's plan still calls TASK-25.5; that work was folded into TASK-25.2.6 and done in TASK-25.2.6.2. Also 2026-09-18: TASK-25.4 re-scoped to delete SlackClientManager and bring every Slack Web-client construction site onto one factory. TASK-25.4 and the new TASK-25.5 are the two tasks decisions/sdk-typing.md waits on before applies: now.
 ---
 <!-- COMMENTS:END -->

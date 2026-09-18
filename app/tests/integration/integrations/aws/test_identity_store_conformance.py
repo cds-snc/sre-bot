@@ -20,7 +20,7 @@ import pytest
 from botocore.exceptions import ClientError
 
 from integrations.aws import client as aws_client
-from integrations.aws.client import AWS_REGION
+from integrations.aws.settings import get_aws_settings
 from packages.access.sync.adapters.aws_identity_center import AwsIdentityCenterAdapter
 
 _IDENTITY_STORE_ID = "d-1234567890"
@@ -34,7 +34,7 @@ def _set_moto_aws_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
     monkeypatch.setenv("AWS_SECURITY_TOKEN", "testing")
     monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
-    monkeypatch.setenv("AWS_DEFAULT_REGION", AWS_REGION)
+    monkeypatch.setenv("AWS_DEFAULT_REGION", get_aws_settings().AWS_REGION)
     monkeypatch.delenv("AWS_ENDPOINT_URL_DYNAMODB", raising=False)
     aws_client.get_aws_settings.cache_clear()
 
@@ -46,7 +46,7 @@ def identitystore_client(monkeypatch: pytest.MonkeyPatch) -> Iterator:
     _set_moto_aws_credentials(monkeypatch)
 
     with moto.mock_aws():
-        yield boto3.client("identitystore", region_name=AWS_REGION)
+        yield boto3.client("identitystore", region_name=get_aws_settings().AWS_REGION)
 
 
 def _create_user(client, username: str) -> Any:

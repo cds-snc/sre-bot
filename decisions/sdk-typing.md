@@ -51,8 +51,11 @@ The discovery client does not need to stay untyped. **[`google-api-python-client
 
 ## Migration
 
-Tickets: TASK-70 (adopt `types-boto3` **and** `google-api-python-client-stubs` + wire these checks — both are dev-only stub adoptions of the same shape), TASK-22.2 / TASK-22.3 (AWS DynamoDB + Identity Store surfaces), TASK-22.4 (Google Directory surface — factory now annotates the discovery `Resource` with the stub-provided type instead of leaving it dynamic), TASK-23 (delete the residual `*_next` dispatcher generation), TASK-25 (remaining vendors + `AWSShield`/executor retirement + final sweep). Tolerated until those close: the `execute_*_api_call` dispatchers, the `*_next` twins, the docstring-param scraper, and the `AWSClients` facade — each named in its owning ticket.
+Ticket: TASK-25. The four divergences this record first tolerated are deleted: the `execute_*_api_call` dispatchers, the `*_next` twins, the docstring-param scraper and the `AWSClients` facade (TASK-22.x, TASK-23, TASK-25.1, TASK-25.2). The SDK-typing guard baseline is empty. Tolerated until their tickets close:
+- `MaxMindClient`, a wrapper class over the geoip2 `Reader` that returns `OperationResult` (TASK-25.5);
+- the `SlackClientManager` singleton, and four separate Slack Web-client construction sites instead of one factory (TASK-25.4).
 
 **Changes:**
 - 2026-07-31: Google discovery `Resource`s are typed at construction with `google-api-python-client-stubs`.
 - 2026-09-10: corrected the Admin Directory stub import path.
+- 2026-09-18: the four original anti-patterns are deleted and the SDK-typing guard baseline is empty (TASK-25.2.6.2); the MaxMind and Slack client facades are recorded as tolerated divergences.
