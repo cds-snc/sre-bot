@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 15:34'
-updated_date: '2026-09-18 15:35'
+updated_date: '2026-09-18 15:47'
 labels:
   - clients
   - phase-3
@@ -42,13 +42,11 @@ Second slice of TASK-25.2.6's deletion sweep, depends on TASK-25.2.6.1 (sqs.py, 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-GROUNDING (2026-09-18, after TASK-25.2.6.1 lands). app/integrations/aws/client.py:224-432 is a single contiguous block starting with the comment "# --- Legacy dispatcher helpers ---... Kept only for the per-service mirror modules and deleted together with the last of them" and containing, in order: the five re-exported constants (229-233), handle_aws_api_errors (236), assume_role_session (289), get_aws_service_client (311), execute_aws_api_call (336), paginator (392). After TASK-25.2.6.1, sqs.py (their only production caller) is gone, so this block's only remaining callers are tests/integrations/aws/test_legacy_aws_client.py and tests/unit/integrations/aws/{test_executor,test_shield}.py and tests/smoke/integrations/aws/test_shield_smoke.py. Deleting lines 224-432 leaves these imports unused and must be removed too: line 12 `from functools import wraps` (only used by handle_aws_api_errors's @wraps), line 16 `import structlog` and line 38 `logger = structlog.get_logger()` (only used inside the deleted block), line 17 `from botocore.client import BaseClient` (only used as paginator's parameter type), and line 21 `from infrastructure.configuration.integrations.aws import get_aws_settings as _get_legacy_aws_settings` (only used to build _legacy_settings at line 228). Confirmed by grepping lines 1-223 of client.py for each name: none appear outside the deleted block. shield.py's AWSShield has zero production consumers (only its own three dedicated test files reference it). Google-side anti-patterns (execute_google_api_call, get_google_api_command_parameters, google_service.py, *_next.py) are already fully gone repo-wide (2026-09-18 grep), and no AWSClients facade class exists anywhere (only two docstring/comment mentions confirming its absence, in test_aws_identity_center_adapter.py:4,465 and tests/integration/packages/access/sync/adapters/aws/conftest.py:8).
-
 STEPS
 1. In app/integrations/aws/client.py: delete lines 224-432 in full (the legacy-helpers comment block through the end of the file). Delete the now-unused imports: `from functools import wraps` (line 12), `import structlog` (line 16), `from botocore.client import BaseClient` (line 17), `from infrastructure.configuration.integrations.aws import get_aws_settings as _get_legacy_aws_settings` (line 21), and the module-level `logger = structlog.get_logger()` (line 38). Leave `from typing import TYPE_CHECKING, Any, Literal, overload` as-is (Any/Literal/overload/TYPE_CHECKING all still used by get_aws_client's overloads). Run ruff after to catch anything missed (F401 unused import).
 2. Delete app/integrations/aws/shield.py (124 lines: AWSShield class — __init__, client(), execute(), _classify_client_error()).
 3. Delete the four now-orphaned test files: tests/unit/integrations/aws/test_executor.py, tests/unit/integrations/aws/test_shield.py, tests/integrations/aws/test_legacy_aws_client.py, tests/smoke/integrations/aws/test_shield_smoke.py.
-4. Edit app/bin/baselines/sdk_typing_antipatterns.txt: remove the two data lines `integrations/aws/client.py` and `integrations/aws/sqs.py` (the second is already stale after TASK-25.2.6.1 but was left for this slice to remove together). Leave the header comment block; the file becomes header-only (zero entries), which `make check-sdk-typing` treats as passing. Do not delete bin/check_sdk_typing.py itself — its own "Retirement" docstring note ties that decision to a human reading decisions/sdk-typing.md's "migration complete" criteria, not to this task's scope.
+4. Edit app/bin/baselines/sdk_typing_antipatterns.txt: remove the last data line, `integrations/aws/client.py` (TASK-25.2.6.1 already removed `integrations/aws/sqs.py`). Leave the header comment block; the file becomes header-only (zero entries), which `make check-sdk-typing` treats as passing. Do not delete bin/check_sdk_typing.py itself — its own "Retirement" docstring note ties that decision to a human reading decisions/sdk-typing.md's "migration complete" criteria, not to this task's scope.
 5. Edit app/bin/baselines/vendor_package_contract.txt: remove `module:integrations/aws/shield.py` and `operation-result:integrations/aws/shield.py` (the two remaining aws lines after TASK-25.2.6.1 pruned the schemas/sqs module lines).
 6. Edit decisions/sdk-typing.md's Migration section. Replace the final two sentences ("Tolerated until those close: the execute_*_api_call dispatchers, the *_next twins, the docstring-param scraper, and the AWSClients facade — each named in its owning ticket.") with text stating all four tolerated anti-patterns are now closed repo-wide (cite: no execute_aws_api_call/execute_google_api_call, no *_next.py twin, no __doc__-based parameter discovery, no AWSClients facade), while TASK-25 stays open for TASK-25.3 (MaxMind) and TASK-25.4 (Slack), which never carried these four anti-patterns. Do not change the `applies: target` frontmatter field — flag in the PR description that all of sdk-typing.md's Checks now appear to pass on main, but leave the applies-field decision to a human review (it is a broader claim than this task's grep scope covers, e.g. it doesn't re-verify MaxMind/Slack have no vendor-facade class). Add one dated Changes line: "- 2026-09-18: AWS execute_aws_api_call/AWSShield deleted (TASK-25.2.6); all four tolerated anti-patterns are closed repo-wide, TASK-25 stays open for MaxMind/Slack."
 
@@ -78,3 +76,12 @@ cd app && make check-vendor-package-contract
 cd app && make client-usage-matrix
 Record command output in --notes. The 6 SNS/google-directory order-dependent failures in the single-process pytest run are known (TASK-90) and pre-existing; call them out explicitly if seen, do not fix them here.
 <!-- SECTION:PLAN:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-18 15:47
+---
+2026-09-18: step 4 reworded. TASK-25.2.6.1 now removes integrations/aws/sqs.py from sdk_typing_antipatterns.txt, so this slice removes only the last entry, integrations/aws/client.py.
+---
+<!-- COMMENTS:END -->

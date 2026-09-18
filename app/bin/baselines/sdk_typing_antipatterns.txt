@@ -4,4 +4,3 @@
 # (TASK-22.x / TASK-25.x) removes the entry. Removing a file from this list is always safe.
 # Do NOT add new entries; net-new occurrences fail CI.
 integrations/aws/client.py
-integrations/aws/sqs.py
