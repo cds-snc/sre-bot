@@ -16,6 +16,15 @@ class CurrentUserRotation:
     slack_user_id: str
 
 
+@dataclass(frozen=True)
+class UserRotationShift:
+    """One scheduled user-rotation shift."""
+
+    slack_user_id: str
+    start: datetime
+    end: datetime
+
+
 def whos_on(rotation: RotationConfig, t: datetime | None = None) -> str:
     """Return the configured member responsible at a given time."""
     current_time = t or datetime.now(UTC)
@@ -40,3 +49,22 @@ class UserRotationsService:
             )
             for rotation in self._rotations
         ]
+
+    def get_rotation_shifts(
+        self,
+        handle: str,
+    ) -> list[UserRotationShift] | None:
+        """Return the active shift and shifts starting in the next 12 weeks."""
+        rotation = next((rotation for rotation in self._rotations if rotation.slack_usergroup_handle == handle), None)
+        if rotation is None:
+            return None
+
+        current_time = datetime.now(UTC)
+        period = timedelta(weeks=rotation.weeks_per_shift)
+        shift_start = rotation.rotation_start + int((current_time - rotation.rotation_start) // period) * period
+        end_time = current_time + timedelta(weeks=12)
+        shifts: list[UserRotationShift] = []
+        while shift_start < end_time:
+            shifts.append(UserRotationShift(whos_on(rotation, shift_start), shift_start, shift_start + period))
+            shift_start += period
+        return shifts
