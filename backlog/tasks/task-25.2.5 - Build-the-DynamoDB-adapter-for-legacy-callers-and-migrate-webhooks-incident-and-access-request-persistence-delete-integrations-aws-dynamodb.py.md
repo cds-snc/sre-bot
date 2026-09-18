@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:36'
-updated_date: '2026-09-17 20:41'
+updated_date: '2026-09-17 23:21'
 labels:
   - clients
   - phase-3
@@ -198,5 +198,10 @@ Three further tasks came out of planning .4, none of them in .4's scope:
 - TASK-99 and TASK-100: decisions/reliability.md's rule that a Tier-2 lease is a duplication optimization and job bodies are idempotent regardless is a mandate the code does not meet - notify_stale_incident_channels double-posts an interactive nag into every stale incident channel. TASK-99 fixes the bodies; TASK-100 then flips the contended re-read to fail-open, which that doctrine actually implies. .4 keeps the fail-closed behaviour and records it in the docstring as provisional and lease-scoped.
 
 Parent AC#4 is still owned by .4 and is still the only outstanding parent AC. None of the four new tasks blocks it.
+---
+
+created: 2026-09-17 23:21
+---
+TASK-25.2.5.4 is implemented and its gates are recorded in its own notes (ruff clean, mypy no new errors, 82 passed across tests/unit + tests/integration infrastructure/idempotency including the moto conformance suite). Its AC#4 pointed here for the two 2026-09-15 decisions: the fail-closed re-read downgrade and the claim-token self-replay fix. Both are now implemented, with the self-replay branch recorded in decisions/reliability.md. The fail-closed downgrade is documented as provisional and lease-scoped, sequenced behind TASK-99 (duplicate-safe job bodies) and TASK-100 (flip to fail-open).
 ---
 <!-- COMMENTS:END -->

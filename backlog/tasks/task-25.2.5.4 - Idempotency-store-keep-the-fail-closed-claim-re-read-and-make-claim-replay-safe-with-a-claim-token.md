@@ -3,11 +3,11 @@ id: TASK-25.2.5.4
 title: >-
   Idempotency store: keep the fail-closed claim re-read and make claim
   replay-safe with a claim token
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-15 20:09'
-updated_date: '2026-09-17 20:53'
+updated_date: '2026-09-18 14:09'
 labels:
   - clients
   - phase-3
@@ -39,11 +39,11 @@ Overlap: TASK-58 later renames this module with identical behaviour; nothing her
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A classified failure of the ConsistentRead after a contended claim still returns IN_PROGRESS; the claim() docstring records the fail-closed lease rationale and a unit test pins the behaviour
-- [ ] #2 claim() writes a per-call claim_token; when the conditional put fails and the re-read item is IN_PROGRESS with the same token it returns NEW, and with a different or missing token it returns IN_PROGRESS; both cases have unit tests
-- [ ] #3 The moto conformance suite under tests/integration/infrastructure/idempotency passes unchanged; the IdempotencyStore Protocol, the in-memory store, complete() and release() are unchanged
-- [ ] #4 Both decisions are recorded in TASK-25.2.5 notes; ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with output recorded
-- [ ] #5 decisions/reliability.md's conditional-check-failure branch list gains the self-replay branch (an IN_PROGRESS record bearing the caller's own claim token resolves to NEW), phrased backend-neutrally so it survives the ConditionalWriteStore rename
+- [x] #1 A classified failure of the ConsistentRead after a contended claim still returns IN_PROGRESS; the claim() docstring records the fail-closed lease rationale and a unit test pins the behaviour
+- [x] #2 claim() writes a per-call claim_token; when the conditional put fails and the re-read item is IN_PROGRESS with the same token it returns NEW, and with a different or missing token it returns IN_PROGRESS; both cases have unit tests
+- [x] #3 The moto conformance suite under tests/integration/infrastructure/idempotency passes unchanged; the IdempotencyStore Protocol, the in-memory store, complete() and release() are unchanged
+- [x] #4 Both decisions are recorded in TASK-25.2.5 notes; ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass with output recorded
+- [x] #5 decisions/reliability.md's conditional-check-failure branch list gains the self-replay branch (an IN_PROGRESS record bearing the caller's own claim token resolves to NEW), phrased backend-neutrally so it survives the ConditionalWriteStore rename
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -256,6 +256,35 @@ Production: 1 Python file, ~8 LOC of logic plus ~14 of docstring; 1 ADR, ~2 line
 ~65 LOC. One subsystem. No mechanical refactor mixed in. Single revert restores service. Well inside
 the ~400 LOC / ~10 file gate.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTATION 2026-09-17. Plan followed exactly; three files touched, no others.
+
+CODE (app/infrastructure/idempotency/dynamodb.py)
+- step 1: `import uuid`; `claim_token = uuid.uuid4().hex` after expires_at; `"claim_token": {"S": claim_token}` in the Item. ConditionExpression and both ExpressionAttribute maps unchanged - the token is written, never matched on.
+- step 2: after the COMPLETED branch, `status == IN_PROGRESS and item.get("claim_token", {}).get("S") == claim_token -> NEW`. COMPLETED stays first; a missing attribute yields None and never equals a hex string.
+- step 3: claim() docstring gains the fourth outcome plus the CLAIM TOKEN and FAIL-CLOSED RE-READ paragraphs, naming TASK-99/TASK-100 so the provisional downgrade cannot become permanent by default, and recording why the token stays off the Protocol.
+- Lines 88-95 (the fail-closed re-read) are untouched, as AC#1 requires.
+
+ADR (decisions/reliability.md)
+- The conditional-check-failure branch list gains a fourth branch: an IN_PROGRESS record bearing the caller's own claim token is that caller's own retried write, not a competitor, and resolves to NEW. Phrased backend-neutrally (DynamoDB attribute / Redis SET NX value / Postgres owner column) so it survives TASK-58's ConditionalWriteStore rename, and it notes the lease-vs-dedup asymmetry. Line 30's lease doctrine untouched (TASK-100 owns it).
+
+TESTS (app/tests/unit/infrastructure/idempotency/test_dynamodb_store.py)
+- All six matrix tests T1-T6 authored ahead of the code, in the existing MagicMock style; no new file, no new fixtures. Before the code change T1 and T2 failed on KeyError: 'claim_token' / result mismatch; T3-T6 passed from the start because they pin behaviour that already existed (foreign token, missing token, classified read failure, unclassified propagation) - they are regression pins protecting TASK-100.
+- T2 reads the token out of put_item.call_args inside the get_item side_effect, so nothing is hardcoded and no uuid patching is needed.
+
+VERIFICATION (from app/)
+- `uv run ruff check .` -> All checks passed!
+- `uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'` -> Found 78 errors in 27 files (checked 354 source files); all pre-existing, none in idempotency (grep -i idempotency over the output: no hits). No new errors.
+- `uv run pytest tests/unit/infrastructure/idempotency tests/integration/infrastructure/idempotency -q` -> 82 passed. This is AC#3's evidence: the moto conformance suite passes with its file, its conftest, protocol.py, in_memory.py, complete() and release() all unchanged.
+- `uv run pytest tests --ignore=tests/smoke -q` -> 6 failed, 3551 passed. The 6 are the known order-dependent leaks recorded on the parent (3x tests/modules/webhooks/test_webhooks_aws_sns.py, 3x tests/unit/infrastructure/directory/test_google.py); re-running just those two files in isolation gives 111 passed, confirming they are unrelated to this change.
+
+AC#4's recording half was already satisfied by TASK-25.2.5's notes items 3 and 4 (2026-09-15); the gate output above completes it.
+
+Stopping at In Progress for human review. No git operations performed.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
