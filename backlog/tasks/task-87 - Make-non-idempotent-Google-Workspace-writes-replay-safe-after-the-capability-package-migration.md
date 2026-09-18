@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 13:59'
-updated_date: '2026-09-18 15:27'
+updated_date: '2026-09-18 15:44'
 labels:
   - clients
 dependencies: []
@@ -76,5 +76,14 @@ created: 2026-09-18 15:27
 2026-09-18 (human decision): split instead of deferring whole, so decisions/outbound-clients.md can close before the capability-package work (decisions/workplace-systems.md, decisions/capability-packages.md).
 NOW (to be planned as a subtask): a retries-disabled Google service handle configured once at construction in app/integrations/google_workspace/client.py, replacing the six per-call num_retries=0 overrides (AC#5). Directory members.insert returning 409 duplicate is reported as success (AC#4). outbound-clients.md drops the per-call override tolerance.
 LATER, with the capability packages: vendor idempotency mechanisms, namely the Calendar client-supplied event id (with TASK-86) and Drive files.generateIds for folder create. Drive copy and the remaining writes move onto the retries-disabled handle wherever their owning adapter lands. The retrying-handle tolerance in outbound-clients.md narrows to these.
+---
+
+created: 2026-09-18 15:44
+---
+2026-09-18: now a coordinator with three subtasks.
+- TASK-87.1: a retries-disabled Google handle configured at construction replaces the six per-call num_retries=0 overrides. Satisfies AC#5 and AC#6, plus the per-call half of AC#8.
+- TASK-87.2: Directory members.insert 409 counts as success, and the members.delete replay response is settled. Satisfies AC#4. Found while scoping: classify_google_error does not map 409 at all, so today a replayed insert raises an unhandled HttpError rather than returning a failure.
+- TASK-87.3 (depends on 87.1; deferred until the capability-package adapters exist): Calendar client-supplied event id with TASK-86, Drive generateIds, Drive copy on the retries-disabled handle. Satisfies AC#1-#3 and the rest of AC#8.
+AC#7 and AC#9 are satisfied by each slice for its own sites.
 ---
 <!-- COMMENTS:END -->
