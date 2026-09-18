@@ -40,6 +40,17 @@ def test_updates_existing_user_group() -> None:
 
 
 @pytest.mark.unit
+def test_updates_existing_user_group_with_supplied_slack_id() -> None:
+    client = MagicMock()
+    client.usergroups_list.return_value = {"usergroups": [{"id": "S123", "handle": "oncall-x", "date_delete": 0}]}
+
+    SlackUserGroupTarget(client).sync_user_group_ids("oncall-x", "On-call X", "desc", ["U123"])
+
+    client.users_lookupByEmail.assert_not_called()
+    client.usergroups_users_update.assert_called_once_with(usergroup="S123", users="U123")
+
+
+@pytest.mark.unit
 def test_creates_user_group_when_missing() -> None:
     client = MagicMock()
     client.users_lookupByEmail.return_value = {"ok": True, "user": {"id": "U1"}}

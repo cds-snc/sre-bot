@@ -1,0 +1,6 @@
+{
+  "slack-usergroup-handle": "canadalogin-website-atc",
+  "slack-usergroup-name": "CanadaLogin Website ATC",
+  "members": ["U09E9LBGN7P", "U084FJKLE3V"],
+  "rotation_type": "weekly"
+}

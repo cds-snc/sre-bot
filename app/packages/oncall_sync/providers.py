@@ -21,6 +21,8 @@ from packages.oncall_sync.ports import (
 )
 from packages.oncall_sync.service import OnCallSyncService
 from packages.oncall_sync.settings import get_oncall_schedules, get_oncall_sync_settings
+from packages.user_rotations.service import UserRotationsService
+from packages.user_rotations.settings import get_rotations
 
 
 @lru_cache(maxsize=1)
@@ -43,9 +45,16 @@ def get_user_group_sync_target() -> UserGroupSyncTarget:
 
 
 @lru_cache(maxsize=1)
+def get_user_rotations_provider() -> UserRotationsService:
+    """Build the self-managed rotation source consumed by the on-call sync job."""
+    return UserRotationsService(rotations=get_rotations())
+
+
+@lru_cache(maxsize=1)
 def get_oncall_sync_service() -> OnCallSyncService:
     return OnCallSyncService(
         on_call=get_oncall_schedule_provider(),
         target=get_user_group_sync_target(),
         schedules=get_oncall_schedules(),
+        user_rotations=get_user_rotations_provider(),
     )
