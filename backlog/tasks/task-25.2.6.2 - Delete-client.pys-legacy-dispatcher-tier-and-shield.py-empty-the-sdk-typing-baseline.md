@@ -3,10 +3,10 @@ id: TASK-25.2.6.2
 title: >-
   Delete client.py's legacy dispatcher tier and shield.py; empty the sdk-typing
   baseline
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-18 15:34'
-updated_date: '2026-09-18 15:47'
+updated_date: '2026-09-18 16:37'
 labels:
   - clients
   - phase-3
@@ -33,10 +33,10 @@ Second slice of TASK-25.2.6's deletion sweep, depends on TASK-25.2.6.1 (sqs.py, 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/aws/ contains only __init__.py, client.py and settings.py; client.py exports get_aws_client and classify_aws_error only; grep -rn shield app/integrations returns zero code hits
-- [ ] #2 tests/unit/integrations/aws/test_executor.py, test_shield.py, tests/integrations/aws/test_legacy_aws_client.py and tests/smoke/integrations/aws/test_shield_smoke.py are deleted
-- [ ] #3 bin/baselines/sdk_typing_antipatterns.txt and the shield entries in bin/baselines/vendor_package_contract.txt are empty of integrations/aws entries
-- [ ] #4 decisions/sdk-typing.md's Migration section records the four tolerated anti-patterns as closed, with a dated Changes line; ruff, mypy and pytest tests --ignore=tests/smoke pass; make check-sdk-typing, make check-vendor-package-contract and make client-usage-matrix output is recorded in notes
+- [x] #1 integrations/aws/ contains only __init__.py, client.py and settings.py; client.py exports get_aws_client and classify_aws_error only; grep -rn shield app/integrations returns zero code hits
+- [x] #2 tests/unit/integrations/aws/test_executor.py, test_shield.py, tests/integrations/aws/test_legacy_aws_client.py and tests/smoke/integrations/aws/test_shield_smoke.py are deleted
+- [x] #3 bin/baselines/sdk_typing_antipatterns.txt and the shield entries in bin/baselines/vendor_package_contract.txt are empty of integrations/aws entries
+- [x] #4 decisions/sdk-typing.md's Migration section records the four tolerated anti-patterns as closed, with a dated Changes line; ruff, mypy and pytest tests --ignore=tests/smoke pass; make check-sdk-typing, make check-vendor-package-contract and make client-usage-matrix output is recorded in notes
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -76,6 +76,33 @@ cd app && make check-vendor-package-contract
 cd app && make client-usage-matrix
 Record command output in --notes. The 6 SNS/google-directory order-dependent failures in the single-process pytest run are known (TASK-90) and pre-existing; call them out explicitly if seen, do not fix them here.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+CHANGES
+- app/integrations/aws/client.py: deleted the legacy dispatcher block through the end of the file (five re-exported constants; handle_aws_api_errors, assume_role_session, get_aws_service_client, execute_aws_api_call, paginator). Also removed the imports it orphaned: functools.wraps, structlog, botocore.client.BaseClient, the infrastructure.configuration.integrations.aws import, and the module logger. 432 -> 211 lines. The module now defines only get_aws_client (overloads), classify_aws_error and the private helpers _build_config, _session_for and _assume_role_credentials.
+- Deleted app/integrations/aws/shield.py.
+- Deleted tests/unit/integrations/aws/test_executor.py, tests/unit/integrations/aws/test_shield.py, tests/integrations/aws/test_legacy_aws_client.py and tests/smoke/integrations/aws/test_shield_smoke.py. Also removed the two directories this emptied: tests/integrations/aws/ (only __pycache__ left) and tests/smoke/integrations/aws/ (only __init__.py left).
+- Baselines: sdk_typing_antipatterns.txt lost its last entry (integrations/aws/client.py) and is now header-only. vendor_package_contract.txt lost module:integrations/aws/shield.py and operation-result:integrations/aws/shield.py.
+- decisions/sdk-typing.md: Migration section rewritten; the four tolerated anti-patterns are deleted and no divergence is tolerated. Dated Changes line added. applies stays target (see below).
+
+DEVIATION FROM PLAN (grep before deletion, found and fixed in scope)
+- Three moto integration test modules imported the deleted AWS_REGION constant from integrations.aws.client: tests/integration/infrastructure/idempotency/conftest.py, tests/integration/infrastructure/storage/conftest.py and tests/integration/integrations/aws/test_identity_store_conformance.py. The plan's survey missed them. They now read get_aws_settings().AWS_REGION from integrations.aws.settings. Equivalence checked at runtime: both settings classes default to ca-central-1 and both follow the AWS_REGION env var (us-west-2 override -> us-west-2 in both).
+- The plan's ADR wording 'TASK-25 left open for MaxMind/Slack' was stale: TASK-25.3 (MaxMind) is Done, and on 2026-09-18 the human decided the remaining vendors get new tasks. The text says 'the remaining vendors' instead.
+
+APPLIES FIELD (not changed, for human decision). decisions/governance.md: applies: now requires every Check to pass on main, and target requires listing tolerated divergences, of which there are now none. Every grep Check passes (0 baselined files; no *_next.py; no __doc__ scraping; both stub packages present since TASK-70). The one open item is the review Check 'no per-vendor client facade class exposing an SDK handle': integrations/maxmind MaxMindClient and integrations/slack SlackClientManager.get_client() need a human judgement.
+
+VERIFICATION (from app/)
+- uv run ruff check . -> All checks passed!
+- make check-sdk-typing -> OK: no net-new SDK anti-patterns (0 baselined file(s) remain).
+- make check-vendor-package-contract -> OK: no net-new vendor-package contract violations (16 baselined entry(ies) remain).
+- make client-usage-matrix -> generated tmp/client_{callsite_audit_sorted,external_usage_sorted,usage_matrix}.tsv. rg for execute_aws_api_call|handle_aws_api_errors|assume_role_session|get_aws_service_client|AWSShield|integrations.aws.(shield|sqs|schemas) across all three returns no match (tmp/ is gitignored).
+- rg -i shield app/integrations -> no hits. ls integrations/aws -> __init__.py, client.py, settings.py.
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 78 errors in 27 files. Same count as before this slice, all pre-existing and in untouched files; none in integrations/aws or tests/integration. mypy is not blocking yet (TASK-16).
+- uv run pytest tests --ignore=tests/smoke -> 6 failed, 3503 passed. The 6 are the known order-dependent failures from the single-process run (TASK-90): 3 in tests/modules/webhooks/test_webhooks_aws_sns.py and 3 in tests/unit/infrastructure/directory/test_google.py. The deleted files held 59 tests (collected and passed 59/59 from a git-archive export of HEAD 3ce72e35). The net fall from 3555 (the TASK-25.2.6.1 run) is 52, because #1496, the user-rotations slash command, landed between the two runs and added tests.
+- uv run pytest tests/integration/infrastructure/storage tests/integration/infrastructure/idempotency tests/integration/integrations/aws -> 32 passed (the three repointed moto suites).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

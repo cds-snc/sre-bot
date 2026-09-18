@@ -7,7 +7,7 @@ import pytest
 
 from infrastructure.storage.service import DynamoDBStorageService
 from integrations.aws import client as aws_client
-from integrations.aws.client import AWS_REGION
+from integrations.aws.settings import get_aws_settings
 
 STORAGE_TEST_TABLE_NAME = "test-sre-bot-storage-service"
 
@@ -18,7 +18,7 @@ def _set_moto_aws_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
     monkeypatch.setenv("AWS_SECURITY_TOKEN", "testing")
     monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
-    monkeypatch.setenv("AWS_DEFAULT_REGION", AWS_REGION)
+    monkeypatch.setenv("AWS_DEFAULT_REGION", get_aws_settings().AWS_REGION)
     monkeypatch.delenv("AWS_ENDPOINT_URL_DYNAMODB", raising=False)
     aws_client.get_aws_settings.cache_clear()
 
@@ -45,6 +45,6 @@ def storage_service(monkeypatch: pytest.MonkeyPatch) -> Iterator[DynamoDBStorage
     _set_moto_aws_credentials(monkeypatch)
 
     with moto.mock_aws():
-        client = boto3.client("dynamodb", region_name=AWS_REGION)
+        client = boto3.client("dynamodb", region_name=get_aws_settings().AWS_REGION)
         _create_storage_table(client)
         yield DynamoDBStorageService(dynamodb=client)
