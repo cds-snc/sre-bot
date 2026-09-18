@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-09-18 15:34'
-updated_date: '2026-09-18 16:37'
+updated_date: '2026-09-18 16:47'
 labels:
   - clients
   - phase-3
@@ -102,6 +102,11 @@ VERIFICATION (from app/)
 - uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 78 errors in 27 files. Same count as before this slice, all pre-existing and in untouched files; none in integrations/aws or tests/integration. mypy is not blocking yet (TASK-16).
 - uv run pytest tests --ignore=tests/smoke -> 6 failed, 3503 passed. The 6 are the known order-dependent failures from the single-process run (TASK-90): 3 in tests/modules/webhooks/test_webhooks_aws_sns.py and 3 in tests/unit/infrastructure/directory/test_google.py. The deleted files held 59 tests (collected and passed 59/59 from a git-archive export of HEAD 3ce72e35). The net fall from 3555 (the TASK-25.2.6.1 run) is 52, because #1496, the user-rotations slash command, landed between the two runs and added tests.
 - uv run pytest tests/integration/infrastructure/storage tests/integration/infrastructure/idempotency tests/integration/integrations/aws -> 32 passed (the three repointed moto suites).
+
+UPDATE 2026-09-18 (human decision, replaces the APPLIES FIELD paragraph above). sdk-typing.md must not imply the decision is fully in place. The review confirmed two real client facades. The Migration section now lists them as tolerated divergences with owners, instead of saying 'No divergence is tolerated':
+- MaxMindClient -> TASK-25.5 (new);
+- SlackClientManager and the four Slack Web-client construction sites -> TASK-25.4 (re-scoped).
+applies stays target until both close.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

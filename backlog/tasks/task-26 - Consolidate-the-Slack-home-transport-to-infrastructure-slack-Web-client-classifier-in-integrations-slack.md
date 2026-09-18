@@ -6,14 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-10 16:18'
+updated_date: '2026-09-18 16:51'
 labels:
   - slack
   - phase-3
   - architecture
 milestone: m-3
 dependencies:
-  - TASK-25
+  - TASK-25.4
 references:
   - decisions/transport-slack.md
   - decisions/platform-transports.md
@@ -79,5 +79,10 @@ ARCHITECTURE CONSTRAINT ADDED 2026-09-10 (human-directed). Chat platforms are sp
 Features never receive SDK runtime objects such as the Bolt App. Do not move a runtime into app/infrastructure/<platform>/ in the meantime, so it moves only once.
 
 This task's AC#1 conflicts with the split. The runtime, verification and dispatch go to app/server/slack/; infrastructure/slack/ keeps only the handler contract. The acceptance criteria are left unchanged; re-scope when the Draft records are accepted (TASK-83.1).
+---
+
+created: 2026-09-18 16:51
+---
+2026-09-18: dependency narrowed from the TASK-25 umbrella to TASK-25.4. This task needs only the Slack Web-client factory and classify_slack_error that 25.4 now owns. TASK-25 grew five unrelated vendor subtasks (25.6-25.10, Opsgenie/Sentinel/Notify/Trello/OpenAI) plus MaxMind (25.5), none of which this move needs.
 ---
 <!-- COMMENTS:END -->
