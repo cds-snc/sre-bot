@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-28 13:19'
-updated_date: '2026-07-28 14:40'
+updated_date: '2026-09-17 20:40'
 labels:
   - infrastructure
   - phase-4
@@ -53,3 +53,21 @@ This is a rename + facade split with no wire-behavior change; a planner agent sh
 - [ ] #1 All consumers migrated; tests green; no back-compat shim remains
 - [ ] #2 PR references decisions/reliability.md and decisions/cloud-portability.md
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-17 20:40
+---
+2026-09-17, from planning TASK-25.2.5.4 (human decision to record it here).
+
+The facade split this task builds is where the conditional-claim READ-FAILURE POLICY has to become an explicit per-use choice. Today one implicit default serves both uses, and the two uses want opposite defaults:
+
+- LEASE facade: when the ConsistentRead after a contended claim fails, fail OPEN (return NEW). Per decisions/reliability.md a Tier-2 lease is a duplication optimization and the body is idempotent, so an unreadable read means only "cannot confirm exclusivity" - failing closed silently skips a whole scheduled period for no correctness gain. TASK-100 owns the flip; TASK-99 is its precondition (the bodies are not actually duplicate-safe yet, verified 2026-09-17).
+- IDEMPOTENCY/DEDUP facade: fail CLOSED. The dedup record is the only evidence that an effect already happened, and the protected operation is explicitly NOT assumed idempotent - that is the whole point of the key. Under fail-open, a COMPLETED record plus a failed re-read means re-executing a completed operation and then overwriting its recorded outcome. TASK-37.2 is the first production dedup consumer; there is none today (get_idempotency_store has no production caller, verified 2026-09-17).
+
+So the primitive should not carry a read-failure policy at all: each facade should choose, at construction or at the call, and the choice should be visible in the type rather than inherited. Reviewed against current lease and idempotent-consumer guidance on 2026-09-17, which makes the same point - one default cannot serve both.
+
+Also for this task to carry forward: TASK-25.2.5.4 adds a fourth conditional-check-failure branch to claim() (an IN_PROGRESS record bearing the caller's own claim token resolves to NEW, defeating the SDK-replay hazard) and records it in decisions/reliability.md. It is an implementation-level defence against botocore's retry, deliberately NOT on the Protocol, so a Redis or Postgres adapter can answer the same hazard its own way. Keep it off the ConditionalWriteStore Protocol during the rename. TASK-102 is the separate, Protocol-level ownership question (release/complete gated on the token) and is the one that genuinely belongs with this task.
+---
+<!-- COMMENTS:END -->

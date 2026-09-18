@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:36'
-updated_date: '2026-09-17 19:36'
+updated_date: '2026-09-17 23:21'
 labels:
   - clients
   - phase-3
@@ -184,5 +184,24 @@ CLOSE-OUT 2026-09-17 by TASK-25.2.5.5. ACs #1, #2, #3, #5 and #6 checked with tr
 - #6 -> TASK-25.2.5.5: bin/check_aws_platform_seam.py built on bin/freeze_guard.py (TASK-25.2.5.8), baseline bin/baselines/aws_platform_seam_consumers.txt seeded with the 11 production consumers present after .2, .3 and .6, wired as make check-aws-platform-seam and as a CI step in ci_code.yml, with TASK-88 named as retirement owner in both the script docstring and the baseline header.
 
 Two enabling subtasks were added under this parent while planning .5 and have since merged: TASK-25.2.5.7 (retire the empty infrastructure.clients freeze guard) and TASK-25.2.5.8 (extract the shared freeze-baseline plumbing, standardize guard test names). Neither maps to a parent AC; both exist so .5's guard work built on a single shared module instead of a fourth copy.
+---
+
+created: 2026-09-17 20:41
+---
+2026-09-17, from planning TASK-25.2.5.4.
+
+REPOINTS A DANGLING POINTER IN THIS TASK'S NOTES. The non-idempotent write inventory says of infrastructure/storage/service.py:138 put_if_not_exists: "no production caller today, so no action; it will be relevant to TASK-27." Verified 2026-09-17 that neither TASK-27 nor TASK-27.1/27.2/27.3 records that hazard - TASK-27.2 names put_if_not_exists only as an existing Protocol operation. The finding had nowhere to land once this task closes. It now has its own task: TASK-103.
+
+Three further tasks came out of planning .4, none of them in .4's scope:
+- TASK-101: the orphan-lease window when the SDK exhausts its retries AFTER the conditional put landed. .4's claim token only rescues the replay that reaches ConditionalCheckFailedException; a run of transient failures exits through the RuntimeError at dynamodb.py:79 instead, with the lease held and no runner.
+- TASK-102: release() and complete() write unconditionally, so a claimant whose TTL elapsed mid-run destroys the record of the holder that took over. Distinct from .4's hazard (mistaken identity, solved by an owner token) - this is staleness, and needs the token on the Protocol, which .4's AC#3 freezes.
+- TASK-99 and TASK-100: decisions/reliability.md's rule that a Tier-2 lease is a duplication optimization and job bodies are idempotent regardless is a mandate the code does not meet - notify_stale_incident_channels double-posts an interactive nag into every stale incident channel. TASK-99 fixes the bodies; TASK-100 then flips the contended re-read to fail-open, which that doctrine actually implies. .4 keeps the fail-closed behaviour and records it in the docstring as provisional and lease-scoped.
+
+Parent AC#4 is still owned by .4 and is still the only outstanding parent AC. None of the four new tasks blocks it.
+---
+
+created: 2026-09-17 23:21
+---
+TASK-25.2.5.4 is implemented and its gates are recorded in its own notes (ruff clean, mypy no new errors, 82 passed across tests/unit + tests/integration infrastructure/idempotency including the moto conformance suite). Its AC#4 pointed here for the two 2026-09-15 decisions: the fail-closed re-read downgrade and the claim-token self-replay fix. Both are now implemented, with the self-replay branch recorded in decisions/reliability.md. The fail-closed downgrade is documented as provisional and lease-scoped, sequenced behind TASK-99 (duplicate-safe job bodies) and TASK-100 (flip to fail-open).
 ---
 <!-- COMMENTS:END -->

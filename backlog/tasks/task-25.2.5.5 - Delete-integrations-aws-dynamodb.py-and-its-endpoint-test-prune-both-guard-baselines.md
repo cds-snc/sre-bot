@@ -3,11 +3,11 @@ id: TASK-25.2.5.5
 title: >-
   Delete integrations/aws/dynamodb.py and its endpoint test; prune both guard
   baselines; add the packages/aws_platform seam freeze guard
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-15 20:09'
-updated_date: '2026-09-17 19:37'
+updated_date: '2026-09-17 19:55'
 labels:
   - clients
   - phase-3
