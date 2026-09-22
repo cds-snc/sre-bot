@@ -92,6 +92,22 @@ def test_sync_all_updates_rotation_and_schedule_groups() -> None:
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("schedule_values", [{}, {"slack_handle": "oncall"}, {"slack_name": "On-call"}])
+def test_sync_all_updates_rotation_without_schedule_group_when_aggregate_details_omitted(schedule_values: dict[str, str]) -> None:
+    schedule = OnCallScheduleConfig(
+        opsgenie_schedule_id="abc",
+        rotations=[_rotation_config("a")],
+        **schedule_values,
+    )
+    on_call = _FakeOnCall(emails={"a": "alice@x.ca"})
+    target = _FakeTarget()
+
+    OnCallSyncService(on_call=on_call, target=target, schedules=[schedule]).sync_all()
+
+    assert target.calls == [("a", ["alice@x.ca"])]
+
+
+@pytest.mark.unit
 def test_sync_all_skips_empty_rotation_in_schedule_group() -> None:
     schedule = _schedule(handle="oncall", rotation_handles=["a", "b"])
     on_call = _FakeOnCall(emails={"a": "alice@x.ca", "b": None})

@@ -80,6 +80,10 @@ class OnCallSyncService:
             if email is not None:
                 on_call_emails.append(email)
 
+        if schedule.slack_handle is None or schedule.slack_name is None:
+            log.info("oncall_sync_schedule_group_skipped", reason="missing_schedule_slack_details")
+            return
+
         if any_rotation_failed:
             log.error(
                 "oncall_sync_schedule_group_skipped",

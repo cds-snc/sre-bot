@@ -44,14 +44,14 @@ class OnCallRotationConfig(BaseModel):
 class OnCallScheduleConfig(BaseModel):
     """An on-call schedule with its child rotations and an aggregate user group.
 
-    The ``slack_handle`` / ``slack_name`` fields (vendor-prefixed) describe the
-    schedule-level aggregate user group, which mirrors all currently on-call
-    users across every rotation in this schedule.
+    When both ``slack_handle`` and ``slack_name`` are configured, they describe
+    a schedule-level aggregate user group that mirrors all currently on-call
+    users across every rotation. Omit either field to sync only rotations.
     """
 
     opsgenie_schedule_id: str
-    slack_handle: str
-    slack_name: str
+    slack_handle: str | None = None
+    slack_name: str | None = None
     slack_description: str = "Auto-synced from OpsGenie"
     rotations: list[OnCallRotationConfig] = Field(default_factory=list)
 
@@ -65,7 +65,8 @@ class OnCallSchedules(BaseModel):
     def _validate_unique_handles(self) -> OnCallSchedules:
         handles: list[str] = []
         for schedule in self.schedules:
-            handles.append(schedule.slack_handle)
+            if schedule.slack_handle is not None:
+                handles.append(schedule.slack_handle)
             handles.extend(r.slack_handle for r in schedule.rotations)
         duplicates = {h for h in handles if handles.count(h) > 1}
         if duplicates:
