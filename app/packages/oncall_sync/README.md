@@ -4,7 +4,9 @@ Sync OpsGenie on-call schedules and self-managed user rotations to Slack UserGro
 
 ## How it works
 
-Synced rotations are defined in [rotations.json](./rotations.json).
+Synced rotations are defined in [rotations.json](./rotations.json). A schedule-level
+Slack UserGroup is created only when both its `slack_handle` and `slack_name` are set;
+omit either field to sync only its rotation groups.
 
 Self-managed rotations are defined in [user_rotations](../user_rotations/).
 
@@ -14,7 +16,7 @@ The optional top-level `approved_email_domains` list in [rotations.json](./rotat
 
 ## Getting started
 
-1. Figure out your OpsGenie schedule ID and rotation names. To find the schedule ID, navigate to OpsGenie, click "Who is on-call" at the top, click on your schedule, then grab the ID from the URL. The rotation names are copied directly from this schedule view.
+1. Figure out your OpsGenie schedule ID and rotation names. To find the schedule ID, navigate to OpsGenie, click "Who is on-call" at the top, click on your schedule, then grab the ID from the URL. The rotation names are copied directly from this schedule view. Set schedule-level `slack_handle` and `slack_name` only when you want an aggregate group for every rotation.
 2. Update [rotations.json](./rotations.json). **The Slack UserGroup handle and name does not need to already exist. SRE Bot will create the group automatically**.
 3. Push up a PR, get it approved, and merge. Your group should be created and live within 10-15 minutes.
 
