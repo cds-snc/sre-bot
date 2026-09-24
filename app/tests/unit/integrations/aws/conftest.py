@@ -1,10 +1,8 @@
 """Isolation fixtures for AWS integration unit tests.
 
-Clears cached settings/shield providers and AWS_* environment variables
+Clears the cached settings provider and AWS_* environment variables
 between tests so that each test observes a clean configuration surface.
 """
-
-from __future__ import annotations
 
 import os
 from collections.abc import Iterator
@@ -15,7 +13,7 @@ from integrations.aws.settings import AWSSettings, get_aws_settings
 
 
 def _clear_aws_caches() -> None:
-    """Reset cached singleton providers used by the AWS shield."""
+    """Reset the cached AWS settings provider."""
     get_aws_settings.cache_clear()
 
 

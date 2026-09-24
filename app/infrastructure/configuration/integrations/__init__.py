@@ -1,6 +1,5 @@
 """Integration settings __init__ - exports all integration settings."""
 
-from infrastructure.configuration.integrations.aws import AwsSettings, get_aws_settings
 from infrastructure.configuration.integrations.google import (
     GoogleResourcesConfig,
     GoogleWorkspaceSettings,
@@ -34,7 +33,6 @@ from infrastructure.configuration.integrations.trello import (
 
 __all__ = [
     "SlackSettings",
-    "AwsSettings",
     "GoogleWorkspaceSettings",
     "GoogleResourcesConfig",
     "MaxMindSettings",
@@ -43,7 +41,6 @@ __all__ = [
     "SentinelSettings",
     "TrelloSettings",
     "get_slack_settings",
-    "get_aws_settings",
     "get_google_workspace_settings",
     "get_google_resources_config",
     "get_maxmind_settings",
