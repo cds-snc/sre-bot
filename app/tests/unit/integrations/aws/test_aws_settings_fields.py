@@ -3,16 +3,11 @@
 Covers transport fields, the dynamodb-only local endpoint, the transient retry
 hint, the feature-level fields (SSO permission sets, per-account role ARNs,
 SSO instance identifiers, the service-to-role map) and the cached provider.
-Environment aliases are exercised with real environment variables; the
-service-to-role map is compared against the infrastructure settings module
-that still defines it, so both stay identical while both exist.
+Environment aliases are exercised with real environment variables.
 """
-
-from __future__ import annotations
 
 import pytest
 
-from infrastructure.configuration.integrations.aws import AwsSettings as InfrastructureAwsSettings
 from integrations.aws.settings import AWSSettings, get_aws_settings
 
 pytestmark = pytest.mark.unit
@@ -127,14 +122,6 @@ class TestFeatureFields:
             "guardduty": "arn:logging",
             "securityhub": "arn:logging",
         }
-
-    def test_service_role_map_matches_the_infrastructure_module_while_both_exist(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setitem(InfrastructureAwsSettings.model_config, "env_file", None)
-        monkeypatch.setenv("AWS_AUDIT_ACCOUNT_ROLE_ARN", "arn:audit")
-        monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:org")
-        monkeypatch.setenv("AWS_LOGGING_ACCOUNT_ROLE_ARN", "arn:logging")
-
-        assert AWSSettings().SERVICE_ROLE_MAP == InfrastructureAwsSettings().SERVICE_ROLE_MAP
 
 
 class TestProvider:

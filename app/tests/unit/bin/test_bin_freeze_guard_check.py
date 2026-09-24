@@ -99,12 +99,12 @@ class TestLoadBaseline:
     def test_blank_lines_and_comments_are_ignored_and_entries_are_stripped(self, tmp_path):
         baseline_path = _write(
             tmp_path / "baseline.txt",
-            "# header\n\nmodule:integrations/aws/sqs.py\n  \n# another comment\noperation-result:integrations/aws/shield.py\n",
+            "# header\n\nmodule:integrations/vendor/legacy.py\n  \n# another comment\noperation-result:integrations/vendor/wrapper.py\n",
         )
 
         assert freeze_guard.load_baseline(baseline_path) == {
-            "module:integrations/aws/sqs.py",
-            "operation-result:integrations/aws/shield.py",
+            "module:integrations/vendor/legacy.py",
+            "operation-result:integrations/vendor/wrapper.py",
         }
 
     def test_a_missing_baseline_file_is_an_empty_set(self, tmp_path):

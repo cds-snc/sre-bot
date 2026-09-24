@@ -43,8 +43,7 @@ while IFS= read -r file; do
   hits=$(grep -RInE "$pattern" app --include='*.py' --exclude-dir='__pycache__' 2>/dev/null \
     | grep -v "^${file}:" \
     | grep -v '^app/tests/' \
-    | grep -v '^app/integrations/' \
-    | grep -v '^app/infrastructure/clients/' || true)
+    | grep -v '^app/integrations/' || true)
   count=$(printf '%s\n' "$hits" | sed '/^$/d' | wc -l | tr -d ' ')
   printf '%s\t%s\n' "$count" "$file" >> tmp/client_external_usage.tsv
 done < "$all_modules_file"

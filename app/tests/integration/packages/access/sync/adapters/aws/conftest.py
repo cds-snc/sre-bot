@@ -5,7 +5,7 @@ Provides ``make_aws_adapter`` — a factory that builds an
 
 The mock is restricted (via ``spec``) to the real boto3 IdentityStore
 operation surface plus ``get_paginator`` — matching the production contract
-(``get_aws_client("identitystore")``), never an ``AWSClients`` facade:
+(``get_aws_client("identitystore")``):
 
     fake_identitystore  →  MagicMock(spec=[...boto3 operations...])
 
