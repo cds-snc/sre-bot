@@ -3,10 +3,10 @@ id: TASK-25.2.6
 title: >-
   Delete the legacy AWS dispatcher, shield, sqs, schemas and the infrastructure
   AWS settings module; prune the guard baselines
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-11 15:36'
-updated_date: '2026-09-18 15:36'
+updated_date: '2026-09-24 20:35'
 labels:
   - clients
   - phase-3
@@ -47,10 +47,10 @@ Guardrails: bin/baselines/vendor_package_contract.txt and bin/baselines/sdk_typi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/aws/ contains only __init__.py, client.py and settings.py; client.py exports get_aws_client and classify_aws_error only
-- [ ] #2 shield.py, sqs.py, schemas.py and the listed tests are deleted; grep -rn shield app/integrations returns zero code hits
-- [ ] #3 infrastructure/configuration/integrations/aws.py and its barrel export are deleted, with packages/access repointed to integrations/aws/settings.py
-- [ ] #4 Both guard baselines have no integrations/aws entries and the three make checks pass with output recorded in notes
+- [x] #1 integrations/aws/ contains only __init__.py, client.py and settings.py; client.py exports get_aws_client and classify_aws_error only
+- [x] #2 shield.py, sqs.py, schemas.py and the listed tests are deleted; grep -rn shield app/integrations returns zero code hits
+- [x] #3 infrastructure/configuration/integrations/aws.py and its barrel export are deleted, with packages/access repointed to integrations/aws/settings.py
+- [x] #4 Both guard baselines have no integrations/aws entries and the three make checks pass with output recorded in notes
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -64,6 +64,17 @@ COORDINATOR (decomposed 2026-09-18; see the comment above for full rationale and
 
 This task's four ACs map onto the subtasks as: AC#1+AC#2 -> .1 and .2 together (integrations/aws/ ends as __init__.py+client.py+settings.py, shield grep-clean); AC#3 -> .3; AC#4 -> .1+.2 for the baselines, .2+.3 for the two ADR edits and the standard gates. Do not check any of this task's ACs directly — check them off only once every subtask that contributes to that AC is Done and verified, per each subtask's own AC traceability. Work each subtask through its own branch/PR in dependency order; do not batch them into one PR.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Coordinator closed by its subtasks TASK-25.2.6.1, TASK-25.2.6.2 and TASK-25.2.6.3 (all Done; TASK-25.2.6.3 landed in #1501). Verified on 2026-09-24 against the working tree:
+- AC1: app/integrations/aws/ holds only __init__.py, client.py and settings.py. The only public functions in client.py are get_aws_client (Literal overloads) and classify_aws_error; the rest are private helpers.
+- AC2: shield.py, sqs.py and schemas.py are gone; rg -i shield app/integrations returns no hits.
+- AC3: infrastructure/configuration/integrations/aws.py is gone, with no importer; packages/access/sync/adapters/aws_identity_center.py imports integrations.aws.settings.get_aws_settings.
+- AC4: neither app/bin/baselines file has an integrations/aws entry. make check-sdk-typing reported "OK: no net-new SDK anti-patterns (0 baselined file(s) remain)". make check-vendor-package-contract reported "OK: no net-new vendor-package contract violations (16 baselined entry(ies) remain)", none of them AWS. make check-aws-platform-seam reported "OK: no net-new packages.aws_platform consumers (11 baselined consumer(s) remain)"; that seam is owned by TASK-88.
+Left for the human: move to Done.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

@@ -58,7 +58,7 @@ Clients **raise typed SDK exceptions**. They do not return `OperationResult`, im
 ## Migration
 
 Ticket: TASK-25 (per-vendor contract) and TASK-87 (Google write replay safety). Only AWS follows this decision in full today; every other vendor diverges as listed. Tolerated until closed:
-- `integrations/` importing `infrastructure.operations` instead of `contracts/`, plus 13 other `infrastructure` imports (settings under `infrastructure.configuration`, `infrastructure.audit.models`, `infrastructure.i18n`, `infrastructure.slack.settings`), listed as import-linter ignores (TASK-18);
+- `integrations/` importing `infrastructure.operations` instead of `contracts/`, plus 11 other `infrastructure` imports (settings under `infrastructure.configuration`, `infrastructure.audit.models`, `infrastructure.i18n`, `infrastructure.slack.settings`); import-linter is not enforced yet, and these become its ignore entries when TASK-18 lands;
 - non-idempotent Google writes (Drive create and copy) issued on the retrying handle;
 - a per-call `num_retries=0` override at six Google writes (Calendar event insert, Meet space create, incident_draft Drive copy and Docs batchUpdate, incident documents apply_document_edits, Sheets values.append): a call-site exception to "no retry decision repeated at call sites";
 - a replayed Directory `members.insert` that returns 409 is not treated as success;
@@ -76,4 +76,4 @@ Ticket: TASK-25 (per-vendor contract) and TASK-87 (Google write replay safety). 
 - 2026-09-10: added explicit timeout, non-idempotent write and thread-safety rules, and corrected how Google retries are configured.
 - 2026-09-11: Google factories set an explicit per-attempt timeout; recorded the per-call `num_retries=0` override at six non-idempotent Google writes as a tolerated divergence.
 - 2026-09-17: removed the closed 'seven baselined deprecated-client consumers' tolerance (TASK-22.5 migrated them; TASK-25.2.5.7 retired the guard).
-- 2026-09-24: removed the closed AWS wrapper-class tolerance; Migration lists every open divergence under its epic ticket; integrations import only `contracts/` shared types, and adapters live in a feature's or capability's `adapters/` or in `infrastructure/`.
+- 2026-09-24: removed the closed AWS wrapper-class tolerance and references to deleted code; Migration lists every open divergence under its epic ticket; integrations import only `contracts/` shared types, and adapters live in a feature's or capability's `adapters/` or in `infrastructure/`.

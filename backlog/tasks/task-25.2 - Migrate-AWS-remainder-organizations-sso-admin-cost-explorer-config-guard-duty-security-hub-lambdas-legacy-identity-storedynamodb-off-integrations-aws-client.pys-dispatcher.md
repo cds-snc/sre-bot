@@ -3,10 +3,10 @@ id: TASK-25.2
 title: >-
   Retire integrations/aws to client.py: typed factory, SDK-native
   retry/pagination/AssumeRole, adapters own classification
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-31 18:48'
-updated_date: '2026-09-24 20:11'
+updated_date: '2026-09-24 20:35'
 labels:
   - clients
   - phase-3
@@ -51,13 +51,26 @@ SEQUENCING. 25.2.1 characterization gate -> 25.2.2 client.py + settings consolid
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/integrations/aws/ contains only __init__.py, client.py (get_aws_client + classify_aws_error) and settings.py; bin/baselines/vendor_package_contract.txt and bin/baselines/sdk_typing_antipatterns.txt carry no integrations/aws entries; make client-usage-matrix and a repo-wide grep show zero callers of execute_aws_api_call, handle_aws_api_errors, paginator, assume_role_session and get_aws_service_client
-- [ ] #2 Every legacy AWS call site listed in the description reaches AWS through a packages/aws_platform adapter that returns OperationResult, with per-call-site error-path behaviour documented and human-reviewed in the owning subtask
-- [ ] #3 get_aws_client returns typed clients via Literal overloads with SDK-native retries, timeouts, eager AssumeRole and a retries-disabled option, reading every AWS setting from integrations/aws/settings.py; infrastructure/configuration/integrations/aws.py and its barrel export no longer exist; no boto3.client or boto3.Session construction exists outside client.py in production code
-- [ ] #4 TASK-25 AC#3, AC#4 and AC#5 hold for AWS: classification tests per mapped family with one unmapped exception propagating, zero shield code hits under app/integrations, no hand-rolled retry in app/integrations
-- [ ] #5 No new app/infrastructure/<service>/ package or Protocol is introduced by this series; TASK-88 records the eventual home of each adapter (capability package for Identity Center, feature adapters for the Path B services, infrastructure/storage for DynamoDB callers)
-- [ ] #6 A follow-up top-level task (TASK-88) and a hosting-outside-AWS spike (TASK-89) exist
+- [x] #1 app/integrations/aws/ contains only __init__.py, client.py (get_aws_client + classify_aws_error) and settings.py; bin/baselines/vendor_package_contract.txt and bin/baselines/sdk_typing_antipatterns.txt carry no integrations/aws entries; make client-usage-matrix and a repo-wide grep show zero callers of execute_aws_api_call, handle_aws_api_errors, paginator, assume_role_session and get_aws_service_client
+- [x] #2 Every legacy AWS call site listed in the description reaches AWS through a packages/aws_platform adapter that returns OperationResult, with per-call-site error-path behaviour documented and human-reviewed in the owning subtask
+- [x] #3 get_aws_client returns typed clients via Literal overloads with SDK-native retries, timeouts, eager AssumeRole and a retries-disabled option, reading every AWS setting from integrations/aws/settings.py; infrastructure/configuration/integrations/aws.py and its barrel export no longer exist; no boto3.client or boto3.Session construction exists outside client.py in production code
+- [x] #4 TASK-25 AC#3, AC#4 and AC#5 hold for AWS: classification tests per mapped family with one unmapped exception propagating, zero shield code hits under app/integrations, no hand-rolled retry in app/integrations
+- [x] #5 No new app/infrastructure/<service>/ package or Protocol is introduced by this series; TASK-88 records the eventual home of each adapter (capability package for Identity Center, feature adapters for the Path B services, infrastructure/storage for DynamoDB callers)
+- [x] #6 A follow-up top-level task (TASK-88) and a hosting-outside-AWS spike (TASK-89) exist
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Coordinator closed by its six subtasks TASK-25.2.1 to TASK-25.2.6 (all complete). Verified on 2026-09-24 against the working tree:
+- AC1: integrations/aws/ holds only __init__.py, client.py (get_aws_client, classify_aws_error) and settings.py. Neither guard baseline has an integrations/aws entry. rg for execute_aws_api_call, handle_aws_api_errors, assume_role_session, get_aws_service_client and paginator( in production code finds only the ban patterns inside app/bin/check_sdk_typing.py.
+- AC2: legacy call sites reach AWS through packages/aws_platform adapters. Per-call-site error paths were reviewed in TASK-25.2.3 to TASK-25.2.5. make check-aws-platform-seam passes with 11 baselined consumers (TASK-88).
+- AC3: typed Literal-overloaded factory with SDK-native retry, timeouts, eager AssumeRole and a retries-disabled option (TASK-25.2.2). infrastructure/configuration/integrations/aws.py and its barrel export are gone (TASK-25.2.6.3, #1501). No boto3.client/Session/resource construction exists outside integrations/aws/client.py in production code.
+- AC4: tests/unit/integrations/aws/ covers classification (test_aws_client_classify_error.py), factory config and AssumeRole. rg -i shield app/integrations finds no hits, and rg for time.sleep, tenacity or backoff in app/integrations finds none.
+- AC5: no new app/infrastructure/<service>/ package or Protocol was added. TASK-88 records the eventual homes, updated 2026-09-24 to the plugin-architecture layers: feature adapters, a capability for Identity Center only with a second consumer, and the storage contract for DynamoDB callers.
+- AC6: TASK-88 and TASK-89 exist.
+Left for the human: move to Done. The parent TASK-25 stays open for TASK-25.4 to TASK-25.10.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

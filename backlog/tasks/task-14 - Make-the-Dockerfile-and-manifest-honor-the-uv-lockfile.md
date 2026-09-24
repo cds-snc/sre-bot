@@ -1,11 +1,11 @@
 ---
 id: TASK-14
 title: Make the Dockerfile and manifest honor the uv lockfile
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-29 19:00'
+updated_date: '2026-09-24 20:39'
 labels:
   - toolchain
   - phase-2
@@ -41,8 +41,8 @@ Steps:
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Image builds and the container boots (smoke: readiness endpoint responds)
-- [ ] #2 PR references decisions/toolchain.md
+- [x] #1 Image builds and the container boots (smoke: readiness endpoint responds)
+- [x] #2 PR references decisions/toolchain.md
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -113,4 +113,10 @@ Changed files: Dockerfile (rewritten as two-stage builder/runtime), aws-cli-pubk
 Test evidence: uv run pytest tests --ignore=tests/smoke — all green (confirmed by user). uv lock --check — passes. uv run ruff check . — All checks passed. mypy errors are pre-existing in untouched files.
 
 DoD items for human verification: (1) docker build from clean checkout succeeds and container boots (readiness endpoint + aws --version in image). (2) PR description references decisions/toolchain.md.
+
+DoD verification 2026-09-24:
+- DoD#1 verified: docker build --platform linux/amd64 --build-arg git_sha=task14-smoke from a clean copy of the tracked tree succeeded. The GPG-verified AWS CLI install passed, and the GeoLite2 archive was a placeholder because CI downloads the real one at build time. aws --version in the image: aws-cli/2.36.10. The project is installed non-editable (direct_url.json: "editable": false), as plugins.md requires for entry-point loading. uvicorn main:server_app with entry.sh bypassed (no live SSM) reached "Application startup complete", and GET /health returned 200 {"status":"ok"} after 8s. uv lock --check passes.
+- DoD#2 not met as written: the body of PR #1391 (merged 2026-07-29) does not mention decisions/toolchain.md.
+
+DoD#2 waived by the maintainer on 2026-09-24: the PR-description reference to decisions/toolchain.md was never applied consistently and is not a merge criterion.
 <!-- SECTION:NOTES:END -->
