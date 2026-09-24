@@ -9,9 +9,9 @@ scope: The three-tier layer model, import direction, and the two integration pat
 
 ## Context
 
-Feature code changes when business requirements change; vendor code changes when providers or SDKs change. When the two are coupled, either change forces rewrites of the other. We also need one more distinction the old corpus missed: **some external systems are the app's front door** (Slack today, Teams likely tomorrow — the platform runtime lives *in our process* and drives the application), while **others are services we call at a boundary** (AWS, Google Workspace, MaxMind — invoked outbound, sometimes). Conflating these two produced the contradictory "shield" decisions.
+Feature code changes when business requirements change; vendor code changes when providers or SDKs change. When the two are coupled, either change forces rewrites of the other. We also need one more distinction the old corpus missed: **some external systems are the app's front door** (Slack today, Teams likely tomorrow — the platform runtime lives *in our process* and drives the application), while **others are services we call at a boundary** (AWS, Google Workspace, MaxMind — invoked outbound, sometimes). Conflating these two produced contradictory decisions in the old corpus.
 
-Current state: `app/integrations/` is the current client layer and still contains `_next.py` twins; `integrations/slack/` contains a full transport (Bolt runtime, parser, formatter), most of which belongs in `infrastructure/slack/` while the Web API client stays as the `integrations/` primitive; `integrations/` imports upward into `infrastructure` ~38 times.
+Current state: `app/integrations/` is the current client layer; `integrations/slack/` contains a full transport (Bolt runtime, parser, formatter), most of which belongs in `infrastructure/slack/` while the Web API client stays as the `integrations/` primitive; `integrations/` imports upward into `infrastructure` ~38 times.
 
 ## Decision
 
@@ -68,7 +68,8 @@ app/integrations/     Outbound clients. Thin, vendor-specific, raise SDK excepti
 
 ## Migration
 
-Ticket: architecture epic. Tolerated divergences until closed: `_next.py` twins, Slack content still in `integrations/slack/`, the upward imports from `integrations/` into `infrastructure/`, the non-tier top-level directories listed above (each held by its own ticket), and legacy features that still call their existing vendor integration until their own migration task cuts them over. Introducing a Path A capability does not make such a legacy module an infrastructure consumer, and does not move its vendor-specific behavior into the shared contract.
+Ticket: architecture epic. Tolerated divergences until closed: Slack content still in `integrations/slack/`, the upward imports from `integrations/` into `infrastructure/`, the non-tier top-level directories listed above (each held by its own ticket), and legacy features that still call their existing vendor integration until their own migration task cuts them over. Introducing a Path A capability does not make such a legacy module an infrastructure consumer, and does not move its vendor-specific behavior into the shared contract.
 
 **Changes:**
 - 2026-09-08: Path A contracts are limited to operations shared by at least two plausible providers.
+- 2026-09-24: removed the closed `_next.py` twins divergence (deleted under TASK-25).

@@ -9,7 +9,7 @@ scope: How the app calls external services — clients, retry, and exception cla
 
 ## Context
 
-Vendor SDKs each have their own retry knobs and exception hierarchies. The legacy executors hand-rolled retry loops (blocking `time.sleep` in an async app, nested retries over SDKs that already retried) — a real antipattern we correctly diagnosed. The correction then over-corrected into a "shield" layer: a standing wrapper class exposing the raw SDK handle it forbade you to use, stacked under a second adapter tier that mostly passed results through. Two wrapping tiers, both speaking `OperationResult`, is wrapper-around-wrapper. This applies to every **outbound boundary call** (AWS, Google Workspace, MaxMind, Opsgenie, Notify, Sentinel, Trello) — **including a platform's Web API when a feature acts on it as a target** (e.g. Slack usergroup writes; the platform's *inbound transport* is separately governed by [platform-transports.md](platform-transports.md)). In that case `integrations/<platform>/` is the vendor package and the feature's adapter classifies its errors exactly as below.
+Vendor SDKs each have their own retry knobs and exception hierarchies. The legacy executors hand-rolled retry loops (blocking `time.sleep` in an async app, nested retries over SDKs that already retried) — a real antipattern we correctly diagnosed. The correction then over-corrected into a standing wrapper class exposing the raw SDK handle it forbade you to use, stacked under a second adapter tier that mostly passed results through. Two wrapping tiers, both speaking `OperationResult`, is wrapper-around-wrapper. This applies to every **outbound boundary call** (AWS, Google Workspace, MaxMind, Opsgenie, Notify, Sentinel, Trello) — **including a platform's Web API when a feature acts on it as a target** (e.g. Slack usergroup writes; the platform's *inbound transport* is separately governed by [platform-transports.md](platform-transports.md)). In that case `integrations/<platform>/` is the vendor package and the feature's adapter classifies its errors exactly as below.
 
 ## Decision
 
@@ -32,7 +32,7 @@ Clients **raise typed SDK exceptions**. They do not return `OperationResult`, do
 
 **The adapter is the boundary.** The Protocol implementation — a Path A composed service in `infrastructure/`, or a Path B feature adapter in `packages/<feature>/adapters/` — calls the client inside `try/except`, uses the vendor's classification function, and returns `OperationResult`. It also translates payloads into domain/capability types. That is the whole Gateway (Fowler) / Anti-Corruption Layer role, in one tier. The adapter must not leak vendor-only concepts (Google Drive `appProperties`, Drive `q` expressions, SDK field projection strings) through a vendor-neutral Path A Protocol. Those stay in the provider implementation, or in a Path B adapter whose feature explicitly depends on them. A Path A contract is portable only when its operation names and models stay meaningful for at least one other plausible provider ([layers.md](layers.md)).
 
-**No standing wrapper class** exposing the SDK handle. Adapters hold the SDK client directly (they are allowed to — the adapter file *is* the boundary), which keeps the vendor's typed surface, IDE completion, and documentation examples intact with zero mirror-maintenance. The term "shield" is retired.
+**No standing wrapper class** exposing the SDK handle. Adapters hold the SDK client directly (they are allowed to — the adapter file *is* the boundary), which keeps the vendor's typed surface, IDE completion, and documentation examples intact with zero mirror-maintenance.
 
 **Pure-data SDK model imports** (typed request/response shapes with no I/O) are permitted anywhere payload construction happens — forbidding them would force features back to dict literals.
 
@@ -43,7 +43,6 @@ Clients **raise typed SDK exceptions**. They do not return `OperationResult`, do
 - One place per vendor answers "how are errors of this vendor interpreted"; adding a call site means adding a `try/except classify` in an adapter, not learning a wrapper API.
 - Within one outbound call, retry has exactly one owner: the SDK, configured at construction. Retries above the adapter (job re-runs, redelivered events) still multiply attempts, which is why non-idempotent writes follow the rule above.
 - Cost: adapter authors write the `try/except` themselves. That five-line pattern is the price of not maintaining a wrapper layer, and it keeps programmer errors crashing instead of becoming `PERMANENT_ERROR` data.
-- The existing `AWSShield` is refactored into a classification function + factory config; `_next.py` twins resolve into this shape.
 - `google-api-python-client` is in maintenance mode and still requires `google-auth-httplib2`, which was archived on 2026-02-09 and is no longer maintained. That transport is a known supply-chain risk, watched through [dependency-scanning.md](dependency-scanning.md).
 
 ## Checks
@@ -58,13 +57,23 @@ Clients **raise typed SDK exceptions**. They do not return `OperationResult`, do
 
 ## Migration
 
-Ticket: client-layer convergence (delete `infrastructure/clients/`, resolve `_next` twins, refactor `AWSShield`). Tolerated until closed:
-- the shield-shaped AWS client;
-- non-idempotent Google writes (Drive create and copy, Directory members.insert) issued on the retrying handle (TASK-87);
-- a per-call `num_retries=0` override at six Google writes (Calendar event insert, Meet space create, incident_draft Drive copy and Docs batchUpdate, incident documents apply_document_edits, Sheets values.append): a call-site exception to "no retry decision repeated at call sites", tolerated until TASK-87's construction-time retries-disabled handle replaces it.
+Ticket: TASK-25 (per-vendor contract) and TASK-87 (Google write replay safety). Only AWS follows this decision in full today; every other vendor diverges as listed. Tolerated until closed:
+- non-idempotent Google writes (Drive create and copy) issued on the retrying handle;
+- a per-call `num_retries=0` override at six Google writes (Calendar event insert, Meet space create, incident_draft Drive copy and Docs batchUpdate, incident documents apply_document_edits, Sheets values.append): a call-site exception to "no retry decision repeated at call sites";
+- a replayed Directory `members.insert` that returns 409 is not treated as success;
+- `MaxMindClient` classifies and returns `OperationResult` inside the vendor package;
+- Slack has no `classify_slack_error` and builds its Web client at four sites; its transport modules still live in `integrations/slack/` (TASK-26);
+- Opsgenie: business operations in the vendor package, no classifier, no explicit timeout;
+- Sentinel: the audit sink lives in the vendor package, which has no classifier and imports `infrastructure.audit`;
+- Notify: `revoke_api_key` lives in the vendor package, which has no classifier;
+- Trello: ATIP operations in the vendor package, no classifier, no explicit timeout or retry;
+- OpenAI, added during this migration: the `Summarizer` port and implementation live in the vendor package, and `classify_openai_error` returns `OperationResult`;
+- every vendor's settings except AWS's still live in `infrastructure/configuration/integrations/`, so `integrations/google_workspace/` imports infrastructure configuration (TASK-24);
+- the import-linter check is not enforced yet (TASK-18).
 
 **Changes:**
 - 2026-09-08: adapters must not leak vendor-only concepts through Path A Protocols.
 - 2026-09-10: added explicit timeout, non-idempotent write and thread-safety rules, and corrected how Google retries are configured.
 - 2026-09-11: Google factories set an explicit per-attempt timeout; recorded the per-call `num_retries=0` override at six non-idempotent Google writes as a tolerated divergence.
 - 2026-09-17: removed the closed 'seven baselined deprecated-client consumers' tolerance (TASK-22.5 migrated them; TASK-25.2.5.7 retired the guard).
+- 2026-09-24: removed the closed AWS wrapper-class tolerance and references to deleted code; Migration lists every open divergence under its epic ticket.
