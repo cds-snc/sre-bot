@@ -87,10 +87,9 @@ The set of supported sources and their parsers is a **declarative table** in `ro
 
 This feature is migrated **refactor-first, ahead of the general `app/modules/` strangler**: the payload-guessing and filesystem-walk antipatterns must not be lifted-and-shifted into `packages/`, and the Phase-4 authenticity hardening (HMAC, secure-by-default issuance) is built on the target design rather than on the legacy DynamoDB CRUD and re-written later. The webhooks migration is therefore pulled into m-4, sequenced before the HMAC work, and decomposed into single-PR slices; the external contract (webhook URLs and behaviour) is held by the smoke suite (TASK-36) across every slice, per [migration.md](migration.md).
 
-Sequence and tickets:
-
-- Phase-0 hardening on the legacy code lands first and carries forward unchanged: SNS signature verification in all environments, exception-leak removal, and the body-size cap (TASK-7); origin-fingerprint observability that seeds each record's `source` (TASK-46).
-- Package extraction and rearchitecture (coordinator **TASK-37**, slices **TASK-37.1**–**TASK-37.5**): frozen `Webhook` model + `StorageService` store (behaviour-preserving); source-declared typed parsing + idempotent ingest (delete the guessers); transport-neutral intent + Slack renderer (delete the walk registries); cutover and delete `app/modules/webhooks/`; then the multi-sink dispatch abstraction (event/enqueue targets built on demand, the enqueue target gated on `QueueService`, TASK-34).
-- Lifecycle + secure-by-default HMAC on the new package (**TASK-47**), enforcement burn-down of the legacy unsigned population (**TASK-48**), and per-`webhook_id` rate limiting with per-webhook overrides (**TASK-49**).
+Tickets: TASK-37 (package extraction and rearchitecture), TASK-47 (lifecycle and secure-by-default HMAC), TASK-48 (burn-down of legacy unsigned senders), TASK-49 (per-webhook rate limiting).
 
 Tolerated until the slices close: the legacy `modules/webhooks` guessers, walk registries, and Slack-terminal shape; the `modules/slack/webhooks.py` CRUD; and the risk-accepted legacy unsigned population ([security.md](security.md)).
+
+**Changes:**
+- 2026-09-24: Migration names epic tickets only; the backlog owns the breakdown.

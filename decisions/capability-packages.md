@@ -77,6 +77,9 @@ Each adapter port has an in-memory fake, as [cloud-portability.md](cloud-portabi
 Tickets are created on acceptance:
 - amend [feature-packages.md](feature-packages.md) (dependency rules, layout table, `api.py`) and [layers.md](layers.md) (promotion);
 - add the packages layer contract to TASK-18's scope;
-- build the first capability package, people and accounts ([people-and-accounts.md](people-and-accounts.md), TASK-83.4).
+- build the first capability package, people and accounts ([people-and-accounts.md](people-and-accounts.md), TASK-83).
 
 Tolerated until then: no capability packages exist.
+
+**Changes:**
+- 2026-09-24: Migration names epic tickets only; the backlog owns the breakdown.

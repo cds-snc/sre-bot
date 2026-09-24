@@ -35,4 +35,7 @@ Renovate (`renovate.json`, extends `cds-snc/renovate-config`) opens dependency-u
 
 ## Migration
 
-Ticket: TASK-66 — wire `pip-audit` into `ci_code.yml` as a blocking step for Critical/High findings on direct dependencies; re-enable `docker_vulnerability_scan.yml`'s schedule once the upstream Trivy architecture limitation is confirmed resolved; flip this record's `applies` to `now` once the Checks pass on `main`. Tolerated until closed: no automated dependency-vulnerability gate exists; Renovate PRs are reviewed with no extra scanning.
+Ticket: TASK-66. Tolerated until closed: no automated dependency-vulnerability gate exists; Renovate PRs are reviewed with no extra scanning.
+
+**Changes:**
+- 2026-09-24: Migration names epic tickets only; the backlog owns the breakdown.

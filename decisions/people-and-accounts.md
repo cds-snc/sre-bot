@@ -30,7 +30,7 @@ Current state and known gaps:
 - **The Slack runtime lives in `integrations/slack/`,** so callers can't yet be resolved at an entry point ([platform-entrypoints.md](platform-entrypoints.md)).
 - **Directory access is Google-only.** `infrastructure/directory/` reads a single Google directory, and there is no Microsoft Graph client.
 
-Open before acceptance (TASK-83.1):
+Open before acceptance (TASK-83):
 
 - **Which verified-link mechanisms come first:** SRE admin links; self-service linking, where the person signs in to both accounts; or an HR employee number, if one is populated in both directories (Microsoft Graph `employeeId`, Google Directory `externalIds` of type `organization`).
 - **The authoritative source for contractors:** who creates them, and where their kind is recorded.
@@ -95,20 +95,13 @@ Open before acceptance (TASK-83.1):
 
 ## Migration
 
-Coordinator: TASK-83, in order:
-1. Accept the Drafts and answer the open questions (TASK-83.1). Add the atomic multi-item write after TASK-27 (TASK-83.2).
-2. Provision the table (TASK-83.3), then build the people capability package (TASK-83.4).
-3. Populate:
-   - import Google Directory employees (TASK-83.5);
-   - import Slack accounts (TASK-83.6);
-   - add SRE link administration (TASK-83.7);
-   - add the Microsoft Graph client (TASK-83.12), then import Entra accounts (TASK-83.13).
-4. Observe in shadow mode: entry-point caller resolution after TASK-26 (TASK-83.8), and the retro attendee comparison (TASK-83.9).
-5. Cut over retro attendees with fallback (TASK-83.10).
-6. Inventory and migrate email-keyed stored references (TASK-83.11).
+Coordinator: TASK-83. Its slices follow the Decision's adoption order (expand, shadow, cut over, contract).
 
 Tolerated until then:
 - no people table and no person record;
 - email-based resolution in legacy modules;
 - `actor_email` sort keys in access request decisions and the `user_email` audit index;
 - existing records that refer to humans by email or Slack id.
+
+**Changes:**
+- 2026-09-24: Migration names epic tickets only; the backlog owns the breakdown.

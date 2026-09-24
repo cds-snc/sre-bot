@@ -49,4 +49,7 @@ Settings are split across ~47 classes with two homes per vendor (`integrations/<
 
 ## Migration
 
-Ticket: settings consolidation. Tolerated until closed: dual vendor settings homes; security config still carried on a shared server-settings object rather than its own `SecuritySettings` slice; `AppSettings.PREFIX` retained as the legacy Slack command-namespace (no environment meaning) only until its per-module retirement completes (TASK-45; [transport-slack.md](transport-slack.md) owns its replacement, `COMMAND_PREFIX`), deleted when the last legacy module cuts over. The aggregator itself (`Settings`/`get_settings()`/`settings_map`) is being deleted in the same consolidation effort (separate open PR); TASK-45.6's teardown of the `PREFIX` aggregator mirror must first verify whether that file still exists before editing specific lines.
+Ticket: TASK-24. Tolerated until closed: dual vendor settings homes; security config still carried on a shared server-settings object rather than its own `SecuritySettings` slice.
+
+**Changes:**
+- 2026-09-24: Migration drops the closed `PREFIX` and aggregator items and names epic tickets only.

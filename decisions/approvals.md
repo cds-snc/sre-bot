@@ -40,4 +40,7 @@ Several features need the same shape: a human submits a request, one or more app
 
 ## Migration
 
-Tickets: extract the generic engine to `infrastructure/approvals/` behind `ApprovalWorkflowService` + fake; refactor `access/request` onto `ApprovalPolicy` / `EffectHandler` strategies (behavior-preserving); route the Access Sync result step onto the outbox / `QueueService` (this folds in the events-review `SYNC_COMPLETED` reclassification); then build `saas-subscriptions` and `ai-keys` on the capability. Tolerated until closed: the approval machinery living inside `access/request`; the sync-result advance on `dispatch_background`.
+Tickets: TASK-60 to TASK-63, with TASK-34 for the queue step. Tolerated until closed: the approval machinery living inside `access/request`; the sync-result advance on `dispatch_background`.
+
+**Changes:**
+- 2026-09-24: Migration names epic tickets only; the backlog owns the breakdown.

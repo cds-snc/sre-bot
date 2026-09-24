@@ -36,4 +36,7 @@ Features announce facts ("access request approved") that other features react to
 
 ## Migration
 
-Ticket: retire the blinker-backed string-keyed dispatcher and its `ThreadPoolExecutor` path now; move `SYNC_COMPLETED` / `SYNC_FAILED` onto the approval workflow's queue step and operator alerts onto the notifications capability. The owned typed dispatcher is deferred until the first genuine best-effort cross-feature reactor exists (build-on-demand). Tolerated until closed: the current blinker-backed dispatcher.
+Ticket: TASK-30. The owned typed dispatcher is deferred until the first genuine best-effort cross-feature reactor exists (build-on-demand). Tolerated until closed: the current blinker-backed dispatcher.
+
+**Changes:**
+- 2026-09-24: Migration names epic tickets only; the backlog owns the breakdown.

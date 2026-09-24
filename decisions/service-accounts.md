@@ -44,4 +44,7 @@ The naive unblock — reuse a real employee's personal admin account to mint the
 
 ## Migration
 
-Ticket: TASK-71 — `oncall_sync` admin-scoped Slack credential (add a `SLACK_ONCALL_ADMIN_TOKEN` field to the Slack integration settings slice; build a separate admin-scoped Web client; rewire `get_user_group_sync_target()` in `app/packages/oncall_sync/providers.py` to use it behind `UserGroupSyncTarget`; document the Slack service-identity provisioning in the feature README). Tolerated until closed: `oncall_sync` reusing the shared inbound bot token for usergroup writes — the current cause of its `permission_denied` failures.
+Ticket: TASK-71 (closed: `oncall_sync` writes user groups with its own `SLACK_USER_TOKEN`). No divergence is tolerated; `applies` stays `target` until the Checks are confirmed on `main`.
+
+**Changes:**
+- 2026-09-24: Migration records that TASK-71 closed the `oncall_sync` shared-token divergence.
