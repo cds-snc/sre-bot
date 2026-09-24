@@ -31,7 +31,6 @@ from infrastructure.configuration.infrastructure.server import (
     get_server_settings,
 )
 from infrastructure.configuration.integrations import (
-    AwsSettings,
     GoogleResourcesConfig,
     GoogleWorkspaceSettings,
     MaxMindSettings,
@@ -132,7 +131,6 @@ class TestSettingsStructure:
         # Test that all integration settings classes are functional
         instances = [
             SlackSettings(),
-            AwsSettings(),
             GoogleWorkspaceSettings(),
             GoogleResourcesConfig(),
             MaxMindSettings(),

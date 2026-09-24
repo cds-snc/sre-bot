@@ -1,6 +1,5 @@
 """Unit tests for integration settings singleton providers (PR-2)."""
 
-from infrastructure.configuration.integrations.aws import AwsSettings, get_aws_settings
 from infrastructure.configuration.integrations.google import (
     GoogleResourcesConfig,
     GoogleWorkspaceSettings,
@@ -47,22 +46,6 @@ class TestSlackSettingsSingleton:
         monkeypatch.setenv("SLACK_TOKEN", "xoxb-test")
         settings = SlackSettings()
         assert settings.SLACK_TOKEN == "xoxb-test"
-
-
-class TestAwsSettingsSingleton:
-    def test_singleton_returns_same_instance(self):
-        get_aws_settings.cache_clear()
-        assert get_aws_settings() is get_aws_settings()
-
-    def test_has_required_model_config(self):
-        config = AwsSettings.model_config
-        assert config.get("env_file") == ".env"
-        assert config.get("extra") == "ignore"
-
-    def test_reads_from_env(self, monkeypatch):
-        monkeypatch.setenv("AWS_REGION", "us-east-1")
-        settings = AwsSettings()
-        assert settings.AWS_REGION == "us-east-1"
 
 
 class TestGoogleWorkspaceSettingsSingleton:

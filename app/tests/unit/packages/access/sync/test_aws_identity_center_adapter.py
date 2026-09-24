@@ -1,10 +1,10 @@
 """Unit tests for the AWS Identity Center access-sync adapter.
 
-The adapter is injected with a typed boto3 ``identitystore`` client — never
-an ``AWSClients`` facade. Fakes here are ``MagicMock(spec=...)`` instances
-restricted to the real boto3 IdentityStore operation surface (plus
-``get_paginator``), so any facade-only helper (e.g. ``list_groups_with_memberships``)
-is absent by construction, matching production.
+The adapter is injected with a typed boto3 ``identitystore`` client. Fakes
+here are ``MagicMock(spec=...)`` instances restricted to the real boto3
+IdentityStore operation surface (plus ``get_paginator``), so any helper that
+is not a boto3 operation (e.g. ``list_groups_with_memberships``) is absent by
+construction, matching production.
 """
 
 from typing import Any
@@ -448,7 +448,7 @@ def test_resolve_group_id_token_direct_lookup() -> None:
 
 
 # ---------------------------------------------------------------------------
-# build_aws_identity_center_adapter() factory tests (AC#1, AC#5)
+# build_aws_identity_center_adapter() factory tests
 # ---------------------------------------------------------------------------
 
 
@@ -462,7 +462,7 @@ class _FakeAwsSettings:
 
 @pytest.mark.unit
 def test_build_aws_identity_center_adapter_wires_typed_client_no_facade(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AC#1: the factory must build the adapter from get_aws_client("identitystore"), not an AWSClients facade."""
+    """The factory builds the adapter from get_aws_client("identitystore") and the configured instance id."""
     from packages.access.sync.adapters import aws_identity_center as module
 
     fake_client = make_client()
@@ -490,7 +490,7 @@ def test_build_aws_identity_center_adapter_wires_typed_client_no_facade(monkeypa
 
 @pytest.mark.unit
 def test_build_aws_identity_center_adapter_assumes_org_role_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
-    """AC#5: identitystore must be assumed under SERVICE_ROLE_MAP's org role, not the bot's own credentials."""
+    """identitystore must be assumed under SERVICE_ROLE_MAP's org role, not the bot's own credentials."""
     from packages.access.sync.adapters import aws_identity_center as module
 
     captured: dict[str, Any] = {}

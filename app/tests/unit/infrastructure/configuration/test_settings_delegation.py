@@ -20,7 +20,6 @@ from infrastructure.configuration.infrastructure import (
     get_server_settings,
 )
 from infrastructure.configuration.integrations import (
-    get_aws_settings,
     get_google_resources_config,
     get_google_workspace_settings,
     get_maxmind_settings,
@@ -39,7 +38,6 @@ def clear_all_caches():
     """Clear all singleton caches before and after each test."""
     get_app_settings.cache_clear()
     get_slack_settings.cache_clear()
-    get_aws_settings.cache_clear()
     get_google_workspace_settings.cache_clear()
     get_google_resources_config.cache_clear()
     get_maxmind_settings.cache_clear()
@@ -60,7 +58,6 @@ def clear_all_caches():
     yield
     get_app_settings.cache_clear()
     get_slack_settings.cache_clear()
-    get_aws_settings.cache_clear()
     get_google_workspace_settings.cache_clear()
     get_google_resources_config.cache_clear()
     get_maxmind_settings.cache_clear()
