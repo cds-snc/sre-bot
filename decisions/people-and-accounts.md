@@ -23,11 +23,11 @@ Vendors agree that addresses are not identities:
 
 Current state and known gaps:
 
-- **No person record or people table exists.** DynamoDB is provisioned (`terraform/dynamodb.tf`) and already used through `StorageService` by the access feature, idempotency and audit.
+- **No person record or people table exists.** DynamoDB is provisioned (`terraform/dynamodb.tf`) and already used through `StorageService` (`infrastructure/storage/`) by the access feature, idempotency and audit.
 - **Storage can't yet claim an account atomically.** `StorageService` offers `put_if_not_exists` on a single item, but no atomic write across several items, and a unique account claim plus its link needs one.
 - **Humans are keyed by email in stored data.** Access request decisions put `actor_email` in their sort key (`packages/access/request/store.py`), and the audit trail table indexes `user_email`.
 - **Retro attendees are resolved from Slack profile emails** (`modules/incident/schedule_retro.py`).
-- **The Slack runtime lives in `integrations/slack/`,** so callers can't yet be resolved at an entry point ([platform-entrypoints.md](platform-entrypoints.md)).
+- **The Slack runtime lives in `integrations/slack/`,** not in `server/slack/`, so callers can't yet be resolved at an entry point ([platform-entrypoints.md](platform-entrypoints.md)).
 - **Directory access is Google-only.** `infrastructure/directory/` reads a single Google directory, and there is no Microsoft Graph client.
 
 Open before acceptance (TASK-83):
@@ -61,7 +61,9 @@ Open before acceptance (TASK-83):
 
 **Authoritative sources.** For now, Google Directory is the authoritative source of employees: employee persons are created from it. Microsoft and Slack accounts are imported unlinked and linked to existing people.
 
-**Storage.** People, accounts and links live in a dedicated DynamoDB table owned by the people capability package ([capability-packages.md](capability-packages.md)), written through the storage capability. Each account is claimed by exactly one person: the claim and the link go in one atomic conditional write, so two people can never hold the same account. Vendors are only read; the people table is the only place identity data is written.
+**Home.** People and accounts is a capability at `app/capabilities/people/` ([plugin-architecture.md](plugin-architecture.md)). Its public surface is `api.py` (the Protocol, `Person` and `Account` types, and a provider function) plus its hookspecs; everything else in it is private.
+
+**Storage.** People, accounts and links live in a dedicated table owned by the people capability, written through the storage contract in `contracts/`. Each account is claimed by exactly one person: the claim and the link go in one atomic conditional write, so two people can never hold the same account. Vendors are only read; the people table is the only place identity data is written.
 
 **Homes.** A person has a home account per service kind: chat, calendar and mail, files.
 - A home defaults to the account the person actually uses; for chat, that is the platform their requests come from.
@@ -81,7 +83,7 @@ Open before acceptance (TASK-83):
 - Microsoft-only employees become first-class instead of hiding behind an unused Google account.
 - Contractor access can be limited by kind, not by address guesswork.
 - Cost: linking needs tooling. That means an SRE admin view, bulk review of suggested links, and later self-service verification.
-- Cost: the storage capability needs a new atomic multi-item write before the people store can be built.
+- Cost: the storage contract needs a new atomic multi-item write before the people store can be built.
 - A wrong link routes messages or access to the wrong human. Provenance, audit logging, atomic claims and the no-automatic-match rule are the mitigation.
 - Person records are personal data: [observability.md](observability.md) redaction rules and [security.md](security.md) least privilege apply.
 
@@ -98,10 +100,11 @@ Open before acceptance (TASK-83):
 Coordinator: TASK-83. Its slices follow the Decision's adoption order (expand, shadow, cut over, contract).
 
 Tolerated until then:
+- no `app/capabilities/people/` package;
 - no people table and no person record;
 - email-based resolution in legacy modules;
 - `actor_email` sort keys in access request decisions and the `user_email` audit index;
 - existing records that refer to humans by email or Slack id.
 
 **Changes:**
-- 2026-09-24: Migration names epic tickets only; the backlog owns the breakdown.
+- 2026-09-24: Migration names epic tickets only, and the capability's home is `app/capabilities/people/` per plugin-architecture.md.

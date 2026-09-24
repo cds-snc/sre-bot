@@ -2,65 +2,82 @@
 status: Accepted
 date: 2026-07-08
 applies: target
-scope: How feature packages register with the host.
+scope: How features and capabilities register with the host, and how extension points collect their strategies.
 ---
 
 # Plugins
 
 ## Context
 
-Features attach handlers (Slack, HTTP, jobs, i18n resources) to the host at startup. pluggy provides hookspec/hookimpl registration and is already in use. pluggy offers exactly two ways to register a plugin: explicit `pm.register(module)` and `pm.load_setuptools_entrypoints(group)`, which enumerates entry points declared in installed distributions. It offers no filesystem-scan primitive; a directory walk is a project invention.
+Features and capabilities attach handlers (Slack, HTTP, jobs, i18n resources) and strategies to the host at startup ([plugin-architecture.md](plugin-architecture.md)). pluggy provides hookspec/hookimpl registration and is already in use. It offers two ways to register a plugin: explicit `pm.register(module)` and `pm.load_setuptools_entrypoints(group)`, which reads entry points from installed distribution metadata. It has no filesystem-scan primitive.
 
-The shipped code walks `app/packages/` with `pkgutil.walk_packages`, imports every subpackage, and registers it — and it catches import errors and *continues*, so a broken feature silently fails to load. That is implicit registration (any directory on disk is a plugin) and it is not fail-fast. It contradicts the intent recorded when this system was designed: **which plugins load should be a declarative, reviewed statement, not a side effect of what happens to sit in a folder.** A prior revision of this record blessed the walk as "reality"; that was the wrong call — it optimized for zero-config over intent and diverged from how every mature pluggy host (pytest, datasette, tox) actually works. This record restores the intended design and supersedes that revision.
+Current code:
+- `infrastructure/plugins/base.py`'s `auto_discover_plugins` walks `packages/` and `modules/` with `pkgutil.walk_packages`, imports every subpackage and registers it. It logs and skips a package that fails to import, so a broken feature silently does not load.
+- `pyproject.toml` declares no entry points.
+- Hookspecs live in `infrastructure/plugins/specs.py`: `register_slack_commands`, `register_slack_listeners`, `register_routes`, `register_i18n_resources`, `register_event_handlers`, `register_background_jobs`, `startup_warmup`.
+- `register_event_handlers` has no implementations. `access/request` and `access/sync` subscribe to the blinker-backed dispatcher by calling `register_handler` inside `startup_warmup`.
+- The marker name is `"sre_bot"` in code; `[project] name` is `sre-bot`. `server/lifespan.py` imports `pluggy.PluginManager` directly.
+
+Which plugins load should be a reviewed statement, not a side effect of what sits in a folder. Every mature pluggy host (pytest, datasette, tox) uses a declared list or entry points, never a scan.
 
 ## Decision
 
-**pluggy, confined to startup.** Hookspecs are host-owned, defined centrally in `app/infrastructure/plugins/specs.py`; adding one is a reviewed change. Hooks fire during lifespan phases to *register* things; nothing pluggy runs on the request path — FastAPI `Depends` owns that, and the two never compete.
+**pluggy, confined to startup.** Hooks fire only during lifespan ([lifecycle.md](lifecycle.md)) to register handlers and collect strategies. Nothing pluggy runs on the request path; pluggy hooks are synchronous and are never called per request.
 
-**Discovery: entry-points declared in `pyproject.toml`.** Each feature advertises itself under `[project.entry-points."<marker_namespace>"]`; the host calls `pm.load_setuptools_entrypoints("<marker_namespace>")` once, in the plugin-discovery phase of the lifespan. The plugin set is declarative metadata — version-controlled, reviewable in one place, and the same mechanism for first-party features and any future third-party distribution. The filesystem walk (`auto_discover_plugins`) is removed.
+**Hookspecs are public API.** The host's registration hookspecs and extension points live in `contracts/`. A capability's extension points live in its own hookspecs module. Adding or changing a hookspec is a reviewed change that follows [hookspec-deprecation.md](hookspec-deprecation.md).
+
+**Discovery: entry points declared in `pyproject.toml`.** Each feature and each capability declares one entry point per plugin module under the host's group. Capabilities register exactly like features.
 
 ```toml
 [project.entry-points."sre_bot"]
-"access.catalog" = "packages.access.catalog"
-"access.request" = "packages.access.request"
-"access.sync"    = "packages.access.sync"
-geolocate        = "packages.geolocate"
+"access.request" = "features.access.request"
+"incident.draft" = "features.incident.draft"
+approvals        = "capabilities.approvals"
 ```
 
-An umbrella feature's own package is never an entry point — it holds no hookimpls ([feature-packages.md](feature-packages.md)). Subdomain entry-point names carry the dotted `<feature>.<subdomain>` prefix so the flat per-group name registry cannot collide.
+Entry-point names are dotted `<package>.<subdomain>` for subdomains, so the flat per-group name registry cannot collide. An umbrella feature's own package holds no hookimpls and is never an entry point ([feature-packages.md](feature-packages.md)).
 
-This is why pytest — the canonical pluggy host — uses an explicit builtin list plus the `pytest11` entry-point group, never a scan; declarative registration is the documented pluggy posture.
+**Enablement comes from configuration.** Each entry point has an enablement key in the base configuration file; the environment's file may override it ([configuration.md](configuration.md)). The host reads the entry points, skips every plugin disabled in the environment's configuration before registering it (`pm.set_blocked(name)` or filtering the entry-point list), and registers the rest. A disabled plugin registers nothing: no routes, no OpenAPI entries, no strategies, no settings reads.
 
-**Packaging requirement.** `load_setuptools_entrypoints` reads installed-distribution metadata (`importlib.metadata`), so the app must be installed as a distribution for its own entry points to resolve — editable (`uv sync`) in dev, non-editable in the image. [toolchain.md](toolchain.md)'s uv workflow already installs the project, so this needs no new packaging posture; it is a footgun only if someone runs from bare source without syncing, which loads zero plugins and must fail loudly (see Checks). Entry-point object references use the repo's **flat import names** (`packages.<feature>`, not `app.packages.<feature>`); this is orthogonal to and compatible with the deferred `app.`-rooted layout in [toolchain.md](toolchain.md) — entry points advertise import paths regardless of the root name.
+**Extension points collect strategies at startup.** For each capability, in its declared order, the host calls that capability's hookspecs once, collects the returned strategy objects, and passes them to the capability before it initializes. At runtime the capability awaits the strategies' async methods. A plugin reacts to something in another package only through such an extension point, or through a queue contract when the reaction must reach every replica or survive a restart. The in-process event dispatcher and the `register_event_handlers` hookspec are not a supported mechanism.
 
-**Marker / group namespace.** One constant, sourced from project metadata, used in all four places: `HookspecMarker`, `HookimplMarker`, `PluginManager(...)`, and the `[project.entry-points."..."]` group. Reconcile the current split (code uses `sre_bot`; `[project] name` is `sre-bot`) onto that single constant so a plugin's `@hookimpl` binds to this host only.
+**Packaging requirement.** `load_setuptools_entrypoints` reads installed-distribution metadata, so the app must be installed as a distribution: editable (`uv sync`) in development, non-editable in the image ([toolchain.md](toolchain.md)). Running from bare source without syncing loads zero plugins and must fail loudly. Entry-point targets use the flat import names (`features.<feature>`, not `app.features.<feature>`).
 
-**Plugin granularity:** each package under `app/packages/` that ships hookimpls is a plugin and declares one entry-point line. A complex feature (like `access`) may register its subdomains as separate plugins, provided they live under the feature's directory and share its settings namespace — each subdomain plugin gets its own entry-point line.
+**One namespace constant.** A single constant, sourced from project metadata, names the `HookspecMarker`, the `HookimplMarker`, the `PluginManager` and the entry-point group, so a plugin's `@hookimpl` binds to this host only.
 
-**Hookimpl signatures** may receive the platform's runtime context where the platform requires it (the FastAPI app for route mounting, the Bolt app for listener attachment). The purity rule is scoped honestly: *cross-platform* hookspecs (i18n, jobs) take Protocols and value types only. Recurring background jobs attach **only** through the `register_background_jobs` hookspec — carrying schedule, Tier classification, and lease TTL as value types — exactly as routes attach through `register_routes`; the host never hand-imports a feature's job body, and the legacy pull-hub that does is retired as `app/modules/` jobs migrate to packages ([reliability.md](reliability.md)).
+**Hookimpl signatures** may receive a platform runtime object where the platform requires it (the FastAPI app for routes, the Bolt app for listeners). Cross-platform hookspecs (i18n, jobs, extension points) take contracts and value types only. Recurring jobs attach only through `register_background_jobs`, carrying schedule, tier and lease TTL as value types; the host never imports a feature's job body directly ([reliability.md](reliability.md)).
 
-**Feature flags:** `pm.set_blocked(name)` before `load_setuptools_entrypoints`, driven by settings. A blocked feature registers nothing — no routes, no OpenAPI entries, no further settings reads.
+**Marker discipline.** Plugins import `hookimpl` from `contracts`, never from `pluggy` directly.
 
-**Marker discipline:** features import `hookimpl` from `infrastructure.plugins`, never from `pluggy` directly (already implemented — keep it).
-
-**Failure is fatal.** An entry-point target that will not import, or a hookimpl that raises during a hook call, terminates the lifespan. No catch-and-continue: the running app's plugin set is a known invariant, not a partial-success collection. This replaces the current swallow-and-log walk.
+**Failure is fatal.** An entry-point target that will not import, or a hookimpl that raises during a hook call, aborts the lifespan. The running app's plugin set is a known invariant, not a partial-success collection.
 
 ## Consequences
 
-- New feature = new directory + hookimpls + **one entry-point line**, reviewed in the PR. Adding a plugin is a declarative metadata edit, not an implicit disk placement. The legacy hard-coded list in `lifespan.py` dies with the migration.
-- One mechanism covers first-party and any future separately-distributed plugin; the door the old entry-points ADR opened stays open without extra machinery.
-- Cost, accepted: a feature added to `app/packages/` without its entry-point line is dead code. Mitigated by review and a CI check that every `app/packages/` feature has a matching entry point (see Checks).
-- Registry is frozen after startup: hooks never fire per-event ([platform-transports.md](platform-transports.md)).
-- `app/server/lifespan.py` importing `pluggy.PluginManager` directly is tolerated until its cleanup ticket closes (host plumbing predating the re-export rule).
+- A new feature or capability is a directory, hookimpls, one entry-point line and one enablement key, all reviewed in the PR.
+- The same mechanism serves first-party packages and any future separately distributed plugin.
+- Cost: a package without its entry-point line is dead code. The boot test and the CI check below catch it.
+- Registries freeze after startup; hooks never fire per event ([platform-transports.md](platform-transports.md)).
 
 ## Checks
 
-- No `import pluggy` outside `app/infrastructure/plugins/` (tolerated: `app/server/lifespan.py` until its cleanup ticket closes).
-- Plugin registration goes through `pm.load_setuptools_entrypoints("<marker_namespace>")`; no `pkgutil`/`walk_packages`-based discovery remains, and `pm.register()` for a first-party feature appears only in test fixtures.
-- Boot fails loudly on a plugin import error or a raising hookimpl (test with a poisoned package) — not swallowed.
-- A boot test asserts every expected first-party feature is registered; a missing entry-point surfaces as a test failure, not a runtime surprise. A CI check enumerates `app/packages/` and confirms each feature has a matching entry-point line.
-- The marker namespace and the entry-point group name are the same constant, sourced from project metadata.
+- Plugin registration goes through `pm.load_setuptools_entrypoints`; no `pkgutil`/`walk_packages` discovery remains, and `pm.register()` for a first-party plugin appears only in test fixtures.
+- No `import pluggy` outside `contracts/` and the host's plugin manager in `server/`.
+- Boot test: a poisoned package or a raising hookimpl aborts boot.
+- Boot test: every expected plugin is registered; every entry point has an enablement key in the base configuration file; a disabled plugin is never registered.
+- CI check: every package under `features/` and `capabilities/` that ships hookimpls has a matching entry-point line.
+- The marker namespace and the entry-point group are the same constant, sourced from project metadata.
+- grep: no new `register_event_handlers` hookimpl or `register_handler` call.
 
 ## Migration
 
-Ticket: plugin-registration convergence. Steps: add `[project.entry-points."sre_bot"]` lines for every current feature; replace `auto_discover_plugins` with `load_setuptools_entrypoints` in the discovery phase; make failure fatal; add the boot test and the `app/packages/`-vs-entry-points CI check; reconcile the `sre_bot`/`sre-bot` namespace onto one constant. `app/modules/` keeps its legacy hard-coded registration until [migration.md](migration.md) removes it — it is not migrated to entry points. Tolerated until the ticket closes: the current filesystem walk.
+Tickets: TASK-18 (contracts, including hookspecs). Plugin-registration convergence and the package moves are tickets to create, listed in [plugin-architecture.md](plugin-architecture.md). `modules/` keeps its hand-written registration until each surface is rebuilt ([migration.md](migration.md)).
+
+Tolerated until closed:
+- the filesystem walk in `auto_discover_plugins`, with import errors logged and skipped;
+- hookspecs and the `hookimpl` marker in `infrastructure/plugins/`;
+- the `register_event_handlers` hookspec, and `access/request` and `access/sync` subscribing to the in-process dispatcher in `startup_warmup`;
+- plugins under `packages/` rather than `features/`;
+- the `sre_bot`/`sre-bot` split, and `server/lifespan.py` importing `pluggy.PluginManager`.
+
+**Changes:**
+- 2026-09-24: entry points target `features.*` and `capabilities.*`; enablement comes from configuration files; extension points replace the in-process event hook.

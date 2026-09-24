@@ -1,5 +1,5 @@
 ---
-status: Draft
+status: Accepted
 date: 2026-09-24
 applies: target
 scope: The app's layers (host, contracts, features, capabilities, infrastructure, integrations), what each holds and what each may import.
@@ -9,12 +9,12 @@ scope: The app's layers (host, contracts, features, capabilities, infrastructure
 
 ## Context
 
-[layers.md](layers.md) sorts code by one question: how close is it to a vendor? That put three different kinds of code in `app/infrastructure/`:
+The former three-tier model (`packages/`, `infrastructure/`, `integrations/`) sorted code by one question: how close is it to a vendor? That put three different kinds of code in `app/infrastructure/`:
 - hosting adapters: `storage`, `idempotency`, `resilience`, logging setup;
 - framework services that features plug into: `plugins`, `i18n`, `security`, `events`, `audit`, and the planned `approvals` engine ([approvals.md](approvals.md));
 - workplace systems: `directory`, `drive`, `spreadsheets` ([workplace-systems.md](workplace-systems.md)).
 
-[capability-packages.md](capability-packages.md) (Draft) adds a shared business layer, but its tests require organization policy, which excludes a generic engine such as approvals. So a domain-agnostic engine that features extend has no home.
+A draft capability-packages record added a shared business layer inside `packages/`, but its tests required organization policy, which excluded a generic engine such as approvals. So a domain-agnostic engine that features extend had no home.
 
 The app is a platform: other teams add features to it, today in this repository. They need a small, stable surface to build on. Hosting has to become portable across clouds, and features must not see which cloud they run on.
 
@@ -88,7 +88,7 @@ Whether it is generic or supporting is recorded in its README, not by its direct
 
 **Enforcement comes before any move.** Import-linter contracts for this table land first. Existing violations are listed as `ignore_imports` entries, which may only be removed (`unmatched_ignore_imports_alerting = error`). Layers that don't exist yet are marked optional.
 
-On acceptance, this record supersedes [layers.md](layers.md)'s tiers and its placement of Path A capabilities, [capability-packages.md](capability-packages.md), [approvals.md](approvals.md)'s placement in `infrastructure/`, [events.md](events.md), the provider-import rules of [dependency-injection.md](dependency-injection.md), and [migration.md](migration.md)'s per-module recipe. Path B adapters are unchanged.
+This record replaces the former three-tier layers record, the capability-packages draft and the events record. Path B adapters are unchanged ([outbound-clients.md](outbound-clients.md)).
 
 ## Consequences
 
@@ -113,8 +113,8 @@ On acceptance, this record supersedes [layers.md](layers.md)'s tiers and its pla
 
 ## Migration
 
-Tickets are created on acceptance:
-- amend [layers.md](layers.md), [approvals.md](approvals.md), [workplace-systems.md](workplace-systems.md), [cloud-portability.md](cloud-portability.md), [dependency-injection.md](dependency-injection.md), [feature-packages.md](feature-packages.md), [migration.md](migration.md) (its per-module recipe), [plugins.md](plugins.md) and [configuration.md](configuration.md), plus `CLAUDE.md`'s import boundaries; mark [capability-packages.md](capability-packages.md) and [events.md](events.md) superseded;
+Tickets to create:
+- update `CLAUDE.md`'s architecture and import-boundary sections, and the skills that restate them;
 - rescope TASK-18 to these contracts;
 - hold TASK-60 and rescope it to `capabilities/approvals/`;
 - build the package generator and the shape check;
@@ -130,3 +130,6 @@ Tolerated until then:
 - feature switches and settings read from environment variables;
 - legacy `modules/` surfaces not yet rebuilt;
 - the in-house i18n implementation.
+
+**Changes:**
+- 2026-09-24: accepted; the layers, capability-packages and events records are deleted and the related records rewritten to match.

@@ -13,11 +13,13 @@ scope: How to obtain type/IDE resolution from rich vendor SDKs without building 
 
 Reaching for IDE/type resolution over dynamic SDK handles, the codebase grew a **generic stringly-typed dispatcher** per vendor and then **hand-mirrored every SDK method on top of it**:
 
-- `integrations/aws/client_next.py::execute_aws_api_call(service_name, method, **kwargs)` — dispatch by string, plus a hand-rolled `time.sleep` retry loop — with `dynamodb_next.py` / `identity_store_next.py` wrapping one passthrough function per method.
-- `integrations/google_workspace/google_service.py::execute_google_api_call(service, version, resource_path, method, **kwargs)` — walks the discovery tree by `getattr`, and **scrapes the method's `__doc__` to discover valid parameters** (`get_google_api_command_parameters`) — with legacy Google Workspace modules wrapping each method again.
-- `infrastructure/clients/aws/facade.py` — an `AWSClients` facade composing per-service classes whose every method is a passthrough returning `OperationResult`.
+- an `execute_<vendor>_api_call(service, method, **kwargs)` dispatcher per vendor: AWS's added a hand-rolled `time.sleep` retry loop, and Google's walked the discovery tree by `getattr` and **scraped each method's `__doc__` to discover valid parameters**;
+- `*_next` modules wrapping one passthrough function per SDK method on top of those dispatchers;
+- an AWS facade composing per-service classes whose every method was a passthrough returning `OperationResult`.
 
-Each layer discards the SDK's real surface, rebuilds a *worse* dynamic dispatch, and commits the team to mirror-maintenance forever. 2026 reality: **boto3** has first-class stubs (`types-boto3`, the maintained successor to `boto3-stubs`, versioned in lockstep with boto3) giving full Pylance/pyright completion, `TypedDict` request/response shapes, and typed paginators with zero wrappers. **`google-api-python-client`** is officially "complete and in maintenance mode" (critical fixes only) and is untyped by design; Google recommends the typed `google-cloud-*` libraries (Cloud Client Libraries) for *new* surfaces — but those libraries cover **GCP resources** (Cloud Storage, Pub/Sub, BigQuery, etc.), not **Google Workspace resources** (Admin SDK Directory, Gmail, Groups Settings). There is no Cloud Client Library for the Admin/Directory API we use; it is discovery-only, full stop, regardless of which client family is chosen.
+All three are deleted (see Migration); the Checks below keep them from coming back.
+
+Each layer discarded the SDK's real surface, rebuilt a *worse* dynamic dispatch, and committed the team to mirror-maintenance forever. 2026 reality: **boto3** has first-class stubs (`types-boto3`, the maintained successor to `boto3-stubs`, versioned in lockstep with boto3) giving full Pylance/pyright completion, `TypedDict` request/response shapes, and typed paginators with zero wrappers. **`google-api-python-client`** is officially "complete and in maintenance mode" (critical fixes only) and is untyped by design; Google recommends the typed `google-cloud-*` libraries (Cloud Client Libraries) for *new* surfaces — but those libraries cover **GCP resources** (Cloud Storage, Pub/Sub, BigQuery, etc.), not **Google Workspace resources** (Admin SDK Directory, Gmail, Groups Settings). There is no Cloud Client Library for the Admin/Directory API we use; it is discovery-only, full stop, regardless of which client family is chosen.
 
 The discovery client does not need to stay untyped. **[`google-api-python-client-stubs`](https://github.com/henribru/google-api-python-client-stubs)** is a community-maintained PyPI package (not written by Google) of type stubs for `googleapiclient`, generated from Google's Discovery Documents. It provides an overload of `discovery.build()` per service and version, plus `TypedDict`/class stubs for every request and response shape, covering the discovery APIs bundled in `google-api-python-client` (including `admin/directory_v1` and `drive/v3`). It is dev-only: its symbols live under `googleapiclient._apis`, are imported only under `TYPE_CHECKING`, and don't exist at runtime. That is the same shape as `types-boto3` for boto3, so the discovery `Resource` can be typed where it is built, not only translated at the adapter.
 
@@ -51,11 +53,12 @@ The discovery client does not need to stay untyped. **[`google-api-python-client
 
 ## Migration
 
-Ticket: TASK-25. The four divergences this record first tolerated are deleted: the `execute_*_api_call` dispatchers, the `*_next` twins, the docstring-param scraper and the `AWSClients` facade (TASK-22.x, TASK-23, TASK-25.1, TASK-25.2). The SDK-typing guard baseline is empty. Tolerated until their tickets close:
-- `MaxMindClient`, a wrapper class over the geoip2 `Reader` that returns `OperationResult` (TASK-25.5);
-- the `SlackClientManager` singleton, and four separate Slack Web-client construction sites instead of one factory (TASK-25.4).
+Ticket: TASK-25. The four divergences this record first tolerated are deleted: the `execute_*_api_call` dispatchers, the `*_next` twins, the docstring-param scraper and the AWS facade. The SDK-typing guard baseline is empty. Tolerated until their tickets close:
+- `MaxMindClient`, a wrapper class over the geoip2 `Reader` that returns `OperationResult`;
+- the `SlackClientManager` singleton, and four separate Slack Web-client construction sites instead of one factory.
 
 **Changes:**
 - 2026-07-31: Google discovery `Resource`s are typed at construction with `google-api-python-client-stubs`.
 - 2026-09-10: corrected the Admin Directory stub import path.
 - 2026-09-18: the four original anti-patterns are deleted and the SDK-typing guard baseline is empty (TASK-25.2.6.2); the MaxMind and Slack client facades are recorded as tolerated divergences.
+- 2026-09-24: Context describes the deleted anti-patterns without dead file paths; Migration names epic tickets only.

@@ -2,54 +2,78 @@
 status: Accepted
 date: 2026-07-24
 applies: target
-scope: Settings ownership, environment identity, and secrets.
+scope: Settings ownership, configuration files, plugin enablement, environment identity, and secrets.
 ---
 
 # Configuration
 
 ## Context
 
-Settings are split across ~47 classes with two homes per vendor (`integrations/<vendor>/settings.py` and `infrastructure/configuration/integrations/<vendor>.py`), the security domain reads its config from `ServerSettings`, and "is this production?" is derived from `PREFIX == ""` — one overloaded bit driving prod detection, CORS shape, dev-bypass, and SNS validation.
+Every setting is read from environment variables today, through about three dozen `BaseSettings` classes with no configuration files.
+
+Current code:
+- Vendor settings have two homes for AWS and Slack: `integrations/<vendor>/settings.py` and `infrastructure/configuration/integrations/<vendor>.py`. Other vendors (Google, OpsGenie, Trello and more) live only in the second.
+- Some feature settings sit with their feature (`packages/access/common`, `incident_draft`, `incident_summary`, `oncall_sync`, `user_rotations`); others sit in `infrastructure/configuration/features/` (`atip`, `aws_ops`, `groups`, `incident`, `sre_ops`).
+- Security settings are split: `CORS_ALLOWED_ORIGINS` and `DEV_BYPASS_ENABLED` on `AppSettings`, `ISSUER_CONFIG` and `DEV_BYPASS_TOKEN` on `ServerSettings`. No `SecuritySettings` slice exists.
+- `AppSettings.ENVIRONMENT` is typed `Literal["local", "ci", "dev", "staging", "production"]` and drives environment-conditional behaviour. `AppSettings.PREFIX` no longer exists, and the `Settings` aggregator in `infrastructure/configuration/settings.py` is gone.
+- Which features and jobs run is decided by environment variables and `ENVIRONMENT` checks in code.
+
+The app is promoted as one image through every environment, and plugins are enabled per environment ([plugin-architecture.md](plugin-architecture.md)). Environment variables are a poor home for non-secret, reviewable configuration: they are invisible in the repo and differ silently between environments.
 
 ## Decision
 
-**Ownership: settings live with the code they configure.** Each domain defines one `pydantic_settings.BaseSettings` slice next to its service, with a cached `get_<domain>_settings()` provider:
+**Settings live with their owner.** Each owner defines one typed `pydantic_settings.BaseSettings` slice next to its code:
+- features: `features/<feature>/settings.py`;
+- capabilities: `capabilities/<capability>/settings.py`;
+- hosting services: `infrastructure/<service>/settings.py`;
+- vendor clients: `integrations/<vendor>/settings.py`.
 
-- Vendor credentials → `app/integrations/<vendor>/settings.py` (single home; the `infrastructure/configuration/integrations/` twins are deleted). A system reached in more than one role holds **one least-privilege credential per role**, not one shared login: e.g. Slack's inbound bot token + Socket Mode app token (transport) are distinct from an admin/`usergroups:write` token used by a feature that mutates Slack (per [platform-transports.md](platform-transports.md); OWASP API5 BFLA).
-- Transport settings → `app/infrastructure/<platform>/settings.py`.
-- Capability/service settings → with the service; feature settings → in the feature package. A recurring job's schedule and lease TTL are **feature-partitioned** settings owned by the job's feature (short, domain-namespaced names), not a central scheduler aggregator with one field per job; the scheduler capability owns only a single shared **default** lease TTL for not-yet-migrated jobs ([reliability.md](reliability.md)).
-- The security domain owns a `SecuritySettings` slice covering its own config — allowed issuers/JWKS, CORS allow-list, rate-limit storage backend, and the dev-bypass flag — rather than borrowing fields from a shared server-settings object.
-- One env var has exactly one owning class. Namespaced env names (`SLACK__…`, `AWS__…`) via `env_nested_delimiter`.
+A system reached in more than one role holds one least-privilege credential per role, not one shared login. For example, Slack's bot and Socket Mode tokens (transport) are separate from an admin token used by a feature that changes Slack ([platform-transports.md](platform-transports.md)). A recurring job's schedule and lease TTL belong to the job's feature, not a central scheduler slice ([reliability.md](reliability.md)). The security domain owns a `SecuritySettings` slice: issuers and JWKS, the CORS allow-list, the rate-limit backend and the dev-bypass settings. One key has exactly one owning slice.
 
-**Environment identity:** one typed field, `ENVIRONMENT: Literal["local","ci","dev","staging","production"]`, on the app settings. All environment-conditional behavior reads it; deriving environment from `PREFIX`, hostname, or `sys.modules` is prohibited. Security-relevant toggles (dev-bypass) additionally require their own explicit boolean that defaults off — two independent guards.
+**Values come from checked-in TOML configuration files.** A base file holds defaults for every slice; one file per environment overrides it. `ENVIRONMENT` selects the environment file. pydantic-settings' TOML source loads both, and each slice reads its own table. Files are reviewed like code and validated at boot.
 
-**Environment identity is orthogonal to platform-presentation config.** `ENVIRONMENT` answers "which deployment am I?" and is a portable, cross-cutting signal any layer may read for *legitimate* environment-conditional behavior (dev-only commands, local DynamoDB endpoint, prod-only side effects, SNS-validation posture). It does **not** answer "what is this command *named* so a dev and prod bot coexist in one Slack workspace" — that is a transport-owned setting (`COMMAND_PREFIX`, [transport-slack.md](transport-slack.md)), explicit and **never** derived from `ENVIRONMENT`. A transport-agnostic feature therefore reads `ENVIRONMENT` when it genuinely must branch on deployment, but never reaches into platform settings; the transport applies command naming centrally at registration. `AppSettings.PREFIX` carries **no** environment meaning after TASK-1.2.3 — it survives only as the legacy Slack command-namespace string, and is being **actively retired** per-module, replaced by the transport's `COMMAND_PREFIX` (TASK-45; [transport-slack.md](transport-slack.md)), deleted when the last legacy module cuts over — no longer gated on full `app/modules/` deletion ([migration.md](migration.md) carve-out).
+**Environment variables carry only secrets and deployment identity.** Identity is `ENVIRONMENT` plus values the platform injects (such as `GIT_SHA`). Everything else is in the configuration files.
 
-**Fail fast:** settings validate at import of their provider during lifespan phase 2; a missing required credential fails boot with a message naming the variable.
+**Plugin enablement lives in the configuration files.** Every plugin's entry point has an enablement key in the base file; an environment file may override it. The host skips a disabled plugin before registering it ([plugins.md](plugins.md)).
 
-**Secrets:** secret material resolves through the `SecretsService` port ([cloud-portability.md](cloud-portability.md)) or is platform-injected at deploy time (ECS task-definition `secrets:` → Secrets Manager); plain env-var secrets are a **tolerated divergence, not the target** — OWASP's Secrets Management guidance recommends against env vars where a managed alternative exists. Secrets never appear in defaults, logs ([observability.md](observability.md)), or repr. Rotation contract: JWKS refreshes at runtime; static secrets rotate by redeploy.
+**Runtime flags use OpenFeature.** Gradual rollout or a kill switch without a deploy uses [OpenFeature](https://openfeature.dev/) with the self-hosted flagd provider, added only when a feature needs one. Configuration files are not reloaded at runtime.
 
-**Consumers receive slices,** not a god-settings object: a service constructor takes its own `BaseSettings` class, nothing wider.
+**Environment identity.** `ENVIRONMENT: Literal["local", "ci", "dev", "staging", "production"]` is the only source of "which deployment am I?". Deriving it from hostnames, prefixes or `sys.modules` is prohibited. Security-relevant toggles (dev bypass) also need their own explicit boolean that defaults off: two independent guards. Command naming, so a dev and a prod bot coexist in one Slack workspace, is a transport setting (`COMMAND_PREFIX`) and is never derived from `ENVIRONMENT` ([transport-slack.md](transport-slack.md)).
 
-**The god-settings aggregator is being removed, not grown.** `app/infrastructure/configuration/settings.py`'s `Settings` class (`settings_map`, `get_settings()`) is a legacy facade over the per-domain providers, not a home for new config; an open PR deletes it outright. New settings slices are never added to its `settings_map` or fields, and no new or open task may take a dependency on it, whether or not that removal has merged yet — this holds even where an older task description mentions wiring a slice into it.
+**Fail fast.** Every slice validates in lifespan's configuration phase ([lifecycle.md](lifecycle.md)); an invalid file or a missing required secret fails boot with a message naming the key.
 
-**Migration rides with whatever work already touches the domain — it does not wait for the consolidation sweep.** TASK-24 exists to close out whichever dual-home settings nothing else has touched by the time everything else is done; it is a shrinking backlog of stragglers, not a checkpoint other tasks block on. Any task that rewrites, fixes, or extends a domain's service — for any reason — migrates that domain's settings slice to its target home (`app/infrastructure/<service>/settings.py` or `app/packages/<feature>/settings.py`) in the same change, deleting the old `infrastructure/configuration/...` home rather than leaving both to be reconciled later. Genuinely blocked exceptions (the target slice doesn't exist yet and creating it is out of scope for the touching task) get an explicit interim-home comment on the owning task naming the future slice and the task that will create it — the pattern already used for `CORS_ALLOWED_ORIGINS`/`CORS_ALLOWED_METHODS`/`CORS_ALLOWED_HEADERS` landing on `AppSettings` pending TASK-24's `SecuritySettings` — but that is the tolerated fallback, not the default path.
+**Secrets.** Secret material resolves through the secrets contract ([cloud-portability.md](cloud-portability.md)) or is injected by the platform at deploy time (ECS task-definition `secrets:` from Secrets Manager). Plain environment-variable secrets are tolerated, not the target. Secrets never appear in configuration files, defaults, logs ([observability.md](observability.md)) or `repr`. JWKS refreshes at runtime; static secrets rotate by redeploy.
+
+**Consumers receive slices.** A service constructor takes its own settings slice, nothing wider. No aggregator of all settings exists.
+
+**Migration rides with the work.** Any task that touches a domain's service moves that domain's slice to its target home in the same change and deletes the old one.
 
 ## Consequences
 
-- "Where is this configured?" has one answer per domain; deleting a feature deletes its config.
-- The typed environment enum turns the current one-character-typo security hazard into an enum validation error at boot.
-- Migration is mechanical but wide (many import edits); doing it per-domain alongside other work in each area means TASK-24 shrinks continuously instead of landing as one large, late, high-risk PR.
+- "Where is this configured?" has one answer per owner; deleting a feature deletes its configuration.
+- Differences between environments are visible in a diff of two files.
+- A typo in `ENVIRONMENT` or a configuration key is a validation error at boot.
+- Cost: a change to non-secret configuration needs a PR and a deploy; runtime changes need a flag.
 
 ## Checks
 
-- CI script: each env var referenced by exactly one `BaseSettings` class.
-- grep/CI guardrail (TASK-1.3): no `PREFIX ==`/`is_production` environment derivation anywhere; `AppSettings.PREFIX` is read only by the **shrinking** set of not-yet-migrated `app/modules/` command registrations — a ratcheting whitelist that only loses entries — and by nothing else; no `os.environ` reads outside settings classes.
-- Boot test: missing required credential → clean failure naming the variable.
+- CI: each key is owned by exactly one settings slice.
+- CI: no secret-shaped key (token, password, key) appears in a configuration file.
+- Boot test: every plugin entry point has an enablement key in the base file.
+- Boot test: missing required secret → clean failure naming it.
+- grep: no environment derivation outside `ENVIRONMENT`; no `os.environ` reads outside settings classes.
+- Review: no feature or capability reads an environment variable directly.
 
 ## Migration
 
-Ticket: TASK-24. Tolerated until closed: dual vendor settings homes; security config still carried on a shared server-settings object rather than its own `SecuritySettings` slice.
+Ticket: TASK-24 (single home per vendor, `SecuritySettings` slice). Configuration files and TOML loading are a ticket to create ([plugin-architecture.md](plugin-architecture.md)).
+
+Tolerated until closed:
+- dual vendor homes in `infrastructure/configuration/integrations/` and `integrations/<vendor>/settings.py`;
+- feature slices in `infrastructure/configuration/features/`;
+- security settings split across `AppSettings` and `ServerSettings`;
+- all non-secret settings, and feature and job switches, read from environment variables;
+- plain environment-variable secrets.
 
 **Changes:**
-- 2026-09-24: Migration drops the closed `PREFIX` and aggregator items and names epic tickets only.
+- 2026-09-24: Migration names epic tickets only; values move to per-environment TOML files with plugin enablement, and the closed `PREFIX` and aggregator items are removed.
