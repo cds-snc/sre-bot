@@ -4,6 +4,7 @@ title: Move packages/geolocate to app/features/geolocate/
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:01'
+updated_date: '2026-09-24 20:17'
 labels:
   - plugin-architecture
   - features
@@ -13,6 +14,7 @@ dependencies:
   - TASK-110
   - TASK-114
   - TASK-118
+  - TASK-25.5
 references:
   - decisions/feature-packages.md
   - decisions/plugin-architecture.md
@@ -25,9 +27,7 @@ ordinal: 272000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Child of TASK-124. geolocate puts Slack handlers in platforms/ and has a routes.py; both move into entrypoints/ (slack.py, http.py). It waits for the translator contract (TASK-118) and for the active TASK-25.5 (Retire MaxMindClient), so its MaxMind adapter already owns classification.
-
-TASK-25.5 is not in this task's dependency list only because its ID collides with an archived TASK-25.5 (Delete dead AWSShield), which makes the CLI reject --dep TASK-25.5. Add it once the collision is resolved.
+Child of TASK-124. geolocate puts Slack handlers in platforms/ and has a routes.py; both move into entrypoints/ (slack.py, http.py). It waits for the translator contract (TASK-118) and for TASK-25.5 (Retire MaxMindClient), so its MaxMind adapter already owns classification.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
