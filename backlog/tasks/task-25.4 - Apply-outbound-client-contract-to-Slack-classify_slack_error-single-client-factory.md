@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-05 16:13'
-updated_date: '2026-09-18 16:47'
+updated_date: '2026-09-24 20:10'
 labels:
   - clients
   - phase-3
@@ -62,5 +62,10 @@ BOUNDARY WITH TASK-26. TASK-26 moves the transport (Bolt runtime, parser, format
 created: 2026-09-18 16:47
 ---
 2026-09-18 (human decision): scope corrected to match decisions/sdk-typing.md. The original AC#2 wrapped SlackClientManager.get_client() call sites, which would have kept a standing client facade. Now: delete SlackClientManager and bring all four Web-client construction sites (client.py, bootstrap.py x2, packages/oncall_sync/providers.py) onto one factory. sdk-typing.md lists this as a tolerated divergence owned by this task.
+---
+
+created: 2026-09-24 20:10
+---
+2026-09-24: the boundary with TASK-26 is unchanged in substance, but TASK-26 now moves the transport to app/server/slack/ (not app/infrastructure/slack/) in two slices (TASK-26.1 handler contract, TASK-26.2 runtime move), both depending on this task's factory and classifier. packages/oncall_sync's WebClient construction moves into its adapters/ in TASK-124.2.
 ---
 <!-- COMMENTS:END -->

@@ -4,7 +4,7 @@ title: Make StorageService.put_if_not_exists replay-safe against its own SDK ret
 status: To Do
 assignee: []
 created_date: '2026-09-17 20:40'
-updated_date: '2026-09-17 20:47'
+updated_date: '2026-09-24 20:11'
 labels:
   - infrastructure
   - reliability
@@ -14,7 +14,7 @@ dependencies:
   - TASK-25.2.5.4
 references:
   - app/infrastructure/storage/service.py
-  - decisions/layers.md
+  - decisions/plugin-architecture.md
 priority: low
 ordinal: 231000
 ---
@@ -39,3 +39,12 @@ FIX SHAPE: whatever TASK-25.2.5.4 settles on for the idempotency claim, applied 
 - [ ] #2 The behaviour is covered by a test at the same level as the idempotency store's claim-token tests
 - [ ] #3 If the method still has no production caller when this is picked up, that is recorded and the task is deferred again rather than implemented speculatively
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:11
+---
+2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). put_if_not_exists is on the StorageService contract, which moves to app/contracts/ (TASK-108); the replay-safety fix lands with its first consumer as planned.
+---
+<!-- COMMENTS:END -->

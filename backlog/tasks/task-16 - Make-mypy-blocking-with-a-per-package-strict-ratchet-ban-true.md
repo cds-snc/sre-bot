@@ -4,7 +4,7 @@ title: Make mypy blocking with a per-package strict ratchet; ban || true
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 16:57'
+updated_date: '2026-09-24 20:10'
 labels:
   - toolchain
   - phase-2
@@ -42,3 +42,12 @@ Steps:
 - [ ] #1 CI green with mypy blocking
 - [ ] #2 PR references decisions/toolchain.md
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:10
+---
+2026-09-24 alignment with decisions/plugin-architecture.md and toolchain.md: the per-package strict list should include the new layers as they are created (contracts/, server/, features/, capabilities/). New code there is strict from its first commit, so no legacy exemption is ever seeded for those trees.
+---
+<!-- COMMENTS:END -->

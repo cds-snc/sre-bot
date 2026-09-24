@@ -4,7 +4,7 @@ title: Implement the Teams transport and re-validate the composition pattern at 
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-10 16:18'
+updated_date: '2026-09-24 20:10'
 labels:
   - teams
   - phase-6
@@ -14,6 +14,7 @@ dependencies:
 references:
   - decisions/platform-transports.md
   - 'https://github.com/cds-snc/sre-bot/issues/1297'
+  - decisions/plugin-architecture.md
 priority: low
 ordinal: 43000
 ---
@@ -56,5 +57,10 @@ ARCHITECTURE CONSTRAINT ADDED 2026-09-10 (human-directed). Chat platforms are sp
 Features never receive SDK runtime objects such as the Bolt App. Do not move a runtime into app/infrastructure/<platform>/ in the meantime, so it moves only once.
 
 Implementation step 1 conflicts with the split. The runtime and lifecycle go to app/server/teams/, and the handler contract to app/infrastructure/teams/. Re-scope when the Draft records are accepted (TASK-83.1).
+---
+
+created: 2026-09-24 20:10
+---
+2026-09-24 alignment: implement Teams per the split in decisions/plugin-architecture.md and platform-entrypoints.md: runtime in app/server/teams/, handler contract in app/contracts/, client in app/integrations/. Features register Teams handlers through a registrar Protocol, never the SDK runtime; there is no unified Platform Protocol. The Slack split from TASK-26 is the template.
 ---
 <!-- COMMENTS:END -->

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-10 17:25'
+updated_date: '2026-09-24 20:11'
 labels:
   - clients
   - cleanup
@@ -13,6 +14,7 @@ milestone: m-3
 dependencies: []
 references:
   - app/infrastructure/directory/google.py
+  - decisions/plugin-architecture.md
 priority: low
 ordinal: 182000
 ---
@@ -35,3 +37,12 @@ CHECK BEFORE COLLAPSING: the inline copy returns permanent_error with message 'i
 - [ ] #2 Existing get_group_members tests pass unchanged, including the invalid include_member_types error (same status, message and error_code) and the non-dict item skip
 - [ ] #3 No OAuth scope, request parameter or pagination change in get_group_members
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:11
+---
+2026-09-24: app/infrastructure/directory/ moves to app/capabilities/directory/ (TASK-119, decisions/plugin-architecture.md and workplace-systems.md). This fix is independent of the move: land it in whichever home the provider has at the time, and the move carries it mechanically.
+---
+<!-- COMMENTS:END -->

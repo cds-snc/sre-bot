@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 13:59'
-updated_date: '2026-09-18 15:44'
+updated_date: '2026-09-24 20:11'
 labels:
   - clients
 dependencies: []
@@ -17,6 +17,7 @@ references:
   - >-
     https://developers.google.com/workspace/calendar/api/v3/reference/events/insert
   - 'https://developers.google.com/workspace/drive/api/guides/create-file'
+  - decisions/plugin-architecture.md
 priority: medium
 type: enhancement
 ordinal: 187000
@@ -85,5 +86,10 @@ created: 2026-09-18 15:44
 - TASK-87.2: Directory members.insert 409 counts as success, and the members.delete replay response is settled. Satisfies AC#4. Found while scoping: classify_google_error does not map 409 at all, so today a replayed insert raises an unhandled HttpError rather than returning a failure.
 - TASK-87.3 (depends on 87.1; deferred until the capability-package adapters exist): Calendar client-supplied event id with TASK-86, Drive generateIds, Drive copy on the retries-disabled handle. Satisfies AC#1-#3 and the rest of AC#8.
 AC#7 and AC#9 are satisfied by each slice for its own sites.
+---
+
+created: 2026-09-24 20:11
+---
+2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). The Drive, Sheets and Directory write paths it names move from app/infrastructure/ to app/capabilities/ (TASK-119, TASK-120, TASK-121). Children that land before a move edit the current home, and the move carries the change mechanically.
 ---
 <!-- COMMENTS:END -->

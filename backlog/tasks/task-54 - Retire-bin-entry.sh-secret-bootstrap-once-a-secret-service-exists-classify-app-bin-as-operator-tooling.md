@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-27 16:07'
-updated_date: '2026-07-27 16:13'
+updated_date: '2026-09-24 20:10'
 labels:
   - architecture
   - layers
@@ -14,10 +14,10 @@ labels:
 milestone: m-4
 dependencies: []
 references:
-  - decisions/layers.md
   - decisions/configuration.md
   - decisions/security.md
   - 'https://github.com/cds-snc/sre-bot/issues/1358'
+  - decisions/migration.md
 priority: medium
 ordinal: 82000
 ---
@@ -41,3 +41,12 @@ Depends on the secret service capability existing; until then this is the placeh
 - [ ] #3 Once the secret service is available, entry.sh no longer sources secrets itself and the container entrypoint is simplified or removed, with the change verified against the deployment manifest
 - [ ] #4 No new secret-fetching logic is added to app/bin/ after the secret service exists
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:10
+---
+2026-09-24 alignment: decisions/layers.md is deleted; decisions/migration.md's directory table now owns bin/'s disposition (operator tooling, exempt from layer contracts; entry.sh's boot-time secret fetch retires once the secrets contract has an implementation). Per decisions/configuration.md, secret material may instead be injected by the platform at deploy time (ECS task-definition secrets: from Secrets Manager). If that removes entry.sh's fetch without a secrets Protocol, no speculative SecretsService is built. If a Protocol is needed, it is born in app/contracts/ and implemented in app/infrastructure/secrets/.
+---
+<!-- COMMENTS:END -->

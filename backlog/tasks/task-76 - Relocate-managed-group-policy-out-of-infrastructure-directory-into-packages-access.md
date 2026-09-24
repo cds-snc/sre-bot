@@ -3,23 +3,23 @@ id: TASK-76
 title: >-
   Relocate managed-group policy out of infrastructure/directory into
   packages/access
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-03 18:02'
-updated_date: '2026-09-04 23:06'
+updated_date: '2026-09-24 20:11'
 labels:
   - layering
 milestone: m-3
 dependencies:
   - TASK-25.1.6.3
 references:
-  - decisions/layers.md
   - decisions/feature-packages.md
   - decisions/configuration.md
   - app/infrastructure/directory/google.py
   - app/infrastructure/configuration/infrastructure/directory.py
   - app/packages/access/catalog/service.py
   - app/packages/access/sync/desired_state.py
+  - decisions/plugin-architecture.md
 priority: medium
 ordinal: 145000
 ---
@@ -206,5 +206,10 @@ WHY IT SITS UNDER TASK-76. Confirming TASK-76.2's org-agnostic rule (no default 
 AC#6 AMENDED accordingly: the all-children bar now reads TASK-76.1 through TASK-76.5 rather than 76.1 through 76.4. The other five ACs are unchanged (restated verbatim, since --acceptance-criteria replaces the whole list). No plan rewrite: the slice sequence in the plan still describes the managed-group relocation itself, which TASK-76.5 does not change - it is adjacent cleanup parked here rather than a sixth step of the relocation.
 
 DELIBERATELY EXCLUDED FROM TASK-76.5, needs its own task with a deployment step: AWS_ADMIN_GROUPS=['sre-ifs@cds-snc.ca'] (infrastructure/configuration/features/aws_ops.py:28). Same defect class, different risk - plan fact F7 already grep-verified that no terraform or Makefile override exists, so that default is what every environment actually uses today at modules/permissions/handler.py:40. Removing it without first provisioning the value breaks a live feature, and its consumer sits in app/modules/, frozen under decisions/migration.md rule 1.
+---
+
+created: 2026-09-24 20:11
+---
+2026-09-24 review: all 6/6 acceptance criteria are checked but the status is still To Do; only a human moves a task to Done. decisions/layers.md, which it cites, was deleted; directory moves to app/capabilities/directory/ (TASK-119).
 ---
 <!-- COMMENTS:END -->

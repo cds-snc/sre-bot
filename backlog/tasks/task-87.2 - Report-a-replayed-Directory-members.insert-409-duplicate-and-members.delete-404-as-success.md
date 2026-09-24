@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 15:43'
-updated_date: '2026-09-18 15:44'
+updated_date: '2026-09-24 20:11'
 labels:
   - clients
   - reliability
@@ -15,6 +15,7 @@ references:
   - decisions/outbound-clients.md
   - app/infrastructure/directory/google.py
   - app/integrations/google_workspace/client.py
+  - decisions/plugin-architecture.md
 parent_task_id: TASK-87
 priority: medium
 ordinal: 236000
@@ -46,3 +47,12 @@ NOT IN SCOPE: the retries-disabled handle (sibling slice), and Drive and Calenda
 - [ ] #4 Whether 409 is mapped in classify_google_error or handled only at the call site is recorded, and every other Google adapter is checked against that choice
 - [ ] #5 ruff, mypy and pytest tests --ignore=tests/smoke pass, with output recorded in notes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:11
+---
+2026-09-24: app/infrastructure/directory/ moves to app/capabilities/directory/ (TASK-119, decisions/plugin-architecture.md and workplace-systems.md). This fix is independent of the move: land it in whichever home the provider has at the time, and the move carries it mechanically.
+---
+<!-- COMMENTS:END -->

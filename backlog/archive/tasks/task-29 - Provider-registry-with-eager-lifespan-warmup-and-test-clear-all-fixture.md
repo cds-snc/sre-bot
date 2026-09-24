@@ -4,7 +4,7 @@ title: Provider registry with eager lifespan warmup and test clear-all fixture
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-14 14:55'
+updated_date: '2026-09-24 20:04'
 labels:
   - infrastructure
   - phase-4
@@ -51,5 +51,10 @@ Steps:
 created: 2026-09-14 14:55
 ---
 2026-09-14 (human decision): now depends on TASK-92. Eager phase-2 invocation of every provider would perform network I/O at boot (eager STS AssumeRole in integrations/aws/client.py get_aws_client, jwks_manager.warmup, directory warmup), which conflicts with research advice to keep startup validation static. TASK-92 decides whether construction at boot may call vendors; revisit this task's steps and ACs against that decision before planning.
+---
+
+created: 2026-09-24 20:04
+---
+Retired 2026-09-24: superseded by TASK-109 (svcs service registry in app/server/). decisions/dependency-injection.md now rejects this ticket's design, an @lru_cache @provider registry plus an autouse fixture clearing global provider caches: 'No lru_cache provider functions across layers' and 'No test clears global caches'. TASK-109 carries the eager boot validation from this ticket's AC#1 and replaces AC#2 with fixtures that register fakes. Archived rather than implemented to avoid building the pattern the record replaces.
 ---
 <!-- COMMENTS:END -->

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-27 16:08'
-updated_date: '2026-07-27 16:13'
+updated_date: '2026-09-24 20:11'
 labels:
   - architecture
   - layers
@@ -14,9 +14,10 @@ labels:
 milestone: m-4
 dependencies: []
 references:
-  - decisions/layers.md
   - decisions/cloud-portability.md
   - 'https://github.com/cds-snc/sre-bot/issues/1361'
+  - decisions/plugin-architecture.md
+  - decisions/migration.md
 priority: medium
 ordinal: 85000
 ---
@@ -44,3 +45,12 @@ This is an architecture task: it needs a decision (or a layers.md/cloud-portabil
 - [ ] #3 The image-bake path (Dockerfile COPY/extract), the committed app/geodb/GeoLite2-City.mmdb dev copy, and .github/workflows/refresh_geodb.yml are re-evaluated and either removed or made optional/configurable per the recorded model
 - [ ] #4 layers.md non-tier-directories section records app/geodb/ disposition and this ticket; geolocate healthcheck/tests pass against the new provisioning path
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:11
+---
+2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). decisions/migration.md's directory table now owns geodb/'s disposition (rebuilt as a configurable, cloud-agnostic source).
+---
+<!-- COMMENTS:END -->

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-16 13:57'
+updated_date: '2026-09-24 20:11'
 labels:
   - infrastructure
   - phase-4
@@ -17,7 +18,7 @@ references:
   - app/infrastructure/audit/service.py
   - app/packages/access/request/store.py
   - decisions/cloud-portability.md
-  - decisions/layers.md
+  - decisions/plugin-architecture.md
 parent_task_id: TASK-27
 priority: high
 ordinal: 219000
@@ -57,3 +58,12 @@ SIZE. About 165 production LOC: protocol.py ~35, service.py query ~40 changed, t
 - [ ] #6 The conformance suite runs the same cases against the fake and the moto-backed DynamoDB implementation and passes on both
 - [ ] #7 ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass, with the commands and their output recorded in notes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:11
+---
+2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). After this slice the StorageService Protocol moves to app/contracts/ (TASK-108).
+---
+<!-- COMMENTS:END -->

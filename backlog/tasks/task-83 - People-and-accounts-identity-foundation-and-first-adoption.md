@@ -4,14 +4,15 @@ title: 'People and accounts: identity foundation and first adoption'
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
+updated_date: '2026-09-24 20:09'
 labels:
   - identity
 dependencies: []
 references:
   - decisions/people-and-accounts.md
-  - decisions/capability-packages.md
   - decisions/workplace-systems.md
   - decisions/platform-entrypoints.md
+  - decisions/plugin-architecture.md
 priority: medium
 ordinal: 167000
 ---
@@ -55,3 +56,12 @@ RULES FOR EVERY CHILD:
 - [ ] #2 No consumer switches to person-based resolution before SRE has reviewed a shadow comparison
 - [ ] #3 decisions/people-and-accounts.md is Accepted, and its Migration section lists only the gaps still tolerated
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:09
+---
+2026-09-24 alignment with decisions/plugin-architecture.md: decisions/capability-packages.md is deleted. The people capability lives at app/capabilities/people/ (TASK-83.4). Directory reads go through app/capabilities/directory/ (TASK-119). Caller resolution happens at the Slack entry point in app/server/slack/ (TASK-26.2). The retro shadow and cutover steps (TASK-83.9, TASK-83.10) run on the rebuilt retro surface in app/features/incident/ (TASK-38), because modules/incident is frozen to bug fixes (migration.md rule 1). TASK-83.1 no longer owns the cascade, which commit 3407cd5c applied.
+---
+<!-- COMMENTS:END -->

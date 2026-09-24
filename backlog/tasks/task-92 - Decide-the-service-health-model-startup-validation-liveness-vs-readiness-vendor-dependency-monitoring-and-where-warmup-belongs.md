@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-14 14:55'
-updated_date: '2026-09-17 19:22'
+updated_date: '2026-09-24 20:10'
 labels:
   - architecture
   - clients
@@ -22,7 +22,6 @@ references:
   - decisions/plugins.md
   - decisions/observability.md
   - decisions/outbound-clients.md
-  - decisions/layers.md
   - decisions/security.md
   - app/jobs/scheduled_tasks.py
   - app/server/lifespan.py
@@ -34,6 +33,7 @@ references:
   - terraform/alb.tf
   - terraform/route53.tf
   - terraform/templates/sre-bot.json.tpl
+  - decisions/plugin-architecture.md
 priority: medium
 ordinal: 199000
 ---
@@ -156,5 +156,10 @@ AC#2 now additionally covers: the sre-bot-config / sre-bot-config-infrastructure
 This also supersedes the open action in section 7 of the field-evidence comment: reading the two SSM parameters and recording whether ACCESS_SYNC_ENABLED, AWS_ORG_ACCOUNT_ROLE_ARN and DIRECTORY_REQUIRE_STARTUP_WARMUP are set in production is now AC#2 work, not a loose note. Until it is done, AC#1 must treat the boot-time AssumeRole as possibly live in production rather than dormant.
 
 No other feature was found to need separate tracking: every feature's settings flow through the same two SSM parameters, so this is one gap, not one per package. Access sync is simply the first feature whose enablement is blocked by it.
+---
+
+created: 2026-09-24 20:10
+---
+2026-09-24 alignment: two questions this record was to answer are now decided. (1) Startup validation and where warmup belongs: decisions/dependency-injection.md and lifecycle.md phase 2 resolve every registered core service once from a startup container and run its health check before yield; per-feature startup_warmup hookimpls and lru_cache providers are the pattern being replaced (TASK-109, which depends on this task). (2) Plugin enablement moves to checked-in configuration files (TASK-112). Remaining open: liveness vs readiness semantics, which dependency checks a boot health check may call (for example eager AssumeRole) versus runtime vendor monitoring, and the Route53/ALB layering (TASK-68). References to decisions/layers.md read as decisions/plugin-architecture.md.
 ---
 <!-- COMMENTS:END -->

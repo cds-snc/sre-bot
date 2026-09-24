@@ -3,10 +3,10 @@ id: TASK-25.2.6.2
 title: >-
   Delete client.py's legacy dispatcher tier and shield.py; empty the sdk-typing
   baseline
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-18 15:34'
-updated_date: '2026-09-18 16:47'
+updated_date: '2026-09-24 20:04'
 labels:
   - clients
   - phase-3

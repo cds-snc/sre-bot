@@ -1,10 +1,12 @@
 ---
 id: TASK-38
-title: Migrate modules/incident to a feature package
+title: >-
+  Rebuild the legacy incident surfaces, surface by surface, in the
+  app/features/incident/ umbrella per the TASK-97 decision
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-16 14:38'
+updated_date: '2026-09-24 20:06'
 labels:
   - migration
   - phase-5
@@ -13,12 +15,15 @@ dependencies:
   - TASK-36
   - TASK-37
   - TASK-27.2
+  - TASK-97
+  - TASK-124.5
 references:
   - decisions/migration.md
   - decisions/feature-packages.md
   - 'https://github.com/cds-snc/sre-bot/issues/1292'
   - decisions/workplace-systems.md
   - decisions/people-and-accounts.md
+  - decisions/plugin-architecture.md
 priority: medium
 ordinal: 38000
 ---
@@ -26,56 +31,40 @@ ordinal: 38000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Second strangler target (largest user surface; 51 files, plus the incident_helper legacy-list entry). Same recipe as task-37; the webhooks migration (task-37) establishes the pattern to copy.
+Rescoped 2026-09-24 to decisions/plugin-architecture.md and migration.md: legacy modules are rebuilt by surface, not moved.
+- Each user-facing surface of modules/incident is assigned to its target in the TASK-36 inventory, pinned by smoke tests, rebuilt in the standard shape, and cut over.
+- The module is deleted when its last surface has moved.
+- Vendor concepts leave the feature on the way: an incident works with documents and a chat channel through capability contracts (capabilities/drive, capabilities/spreadsheets and future documents, calendar and chat capabilities), not with Google Drive folders.
+Human direction (2026-09-16, recorded on TASK-97): incident is redesigned from the ground up.
 
-SEQUENCING (human, 2026-09-03): this task runs AFTER the TASK-25* vendor-integration cleanup. Its exact position in the queue is decided once that cleanup is done, so treat the m-5 milestone and the TASK-36/TASK-37 dependencies as necessary-but-not-sufficient.
+What changed from the earlier scope:
+- The relocation of packages/incident_draft, packages/incident_summary and packages/incident/scheduling into the umbrella is now TASK-124.5, so this ticket builds on features/incident/ and never on packages/.
+- This ticket now follows TASK-97 instead of preceding it. TASK-97 decides what the bot owns and where the record of truth lives, and its implementation packet names the right-sized rebuild tickets. Rebuilding before that decision would carry the Google-shaped design into the new layer and rebuild it again.
 
-STRUCTURE DECIDED (2026-09-03, decisions/feature-packages.md "Complex features: an umbrella directory, never a flat prefix"). incident is genuinely complex (app/modules/incident is 4636 LOC across 17 modules), so it is an umbrella, not a single flat package and not a family of flat incident_* packages:
+Current surface (modules/incident, about 4636 LOC across 17 modules): the declare flow, channel lifecycle and status updates, the information display and update modals, roles, documents and folders, retro scheduling, alerts and stale-channel nudges (a Tier-2 scheduled job, see TASK-65 and TASK-99). The candidate subdomain split (declare/, channel/, documents/, retro/, alerts/, beside the relocated draft/, summary/ and scheduling/) is confirmed by the TASK-97 packet, not here.
 
-  app/packages/incident/
-  |-- __init__.py   EMPTY (0 bytes) - namespace only, no hookimpls, no entry-point line
-  |-- common/       shared kernel: incident domain vocabulary + IncidentSettings tree, no I/O
-  \-- <subdomain>/  each shaped like the feature-packages layout table; each is a plugin
-
-Entry-point names carry the dotted prefix ("incident.draft" = "packages.incident.draft", never "draft") because entry-point names are a flat per-group registry.
-
-Candidate subdomain split (to be confirmed during planning, not settled here): declare/ (core.py + incident.py), channel/ (incident_conversation, incident_status, information_display, information_update, incident_roles), documents/ (incident_document, incident_folder), retro/ (schedule_retro), alerts/ (incident_alert, notify_stale_incident_channels), plus draft/ summary/ relocated in and the already-correct scheduling/. db_operations.py and utils.py land in common/.
-
-RECONCILIATION OWED BY THIS TASK. decisions/migration.md rule 5's open shape/naming question is now closed, which makes two shipped packages named deviations this task must relocate:
-- packages/incident_draft  -> packages/incident/draft
-- packages/incident_summary -> packages/incident/summary
-These are import-path + entry-point-name changes with no runtime surface change. Sequence the incident_draft move AFTER TASK-25.1.6.6, which rewrites the same 1704-line test file's patch targets - otherwise those strings get rewritten twice. Note that a rename is NOT sufficient on its own: unittest.mock patch string literals fail at patch time rather than import time, so every "packages.incident_draft..." / "packages.incident_summary..." patch target must be swept too (TASK-25.1.6.2 hit exactly this).
-
-ALREADY CORRECT, NOT THIS TASK'S WORK: app/packages/incident/scheduling/ is created directly in its umbrella position by TASK-25.1.6.2 (redirected 2026-09-03), which also creates the empty app/packages/incident/__init__.py. This task inherits that umbrella rather than creating it, and must not regress it.
-
-Settings consolidation onto a common/settings.py IncidentSettings tree (ACCESS-style, INCIDENT_{SUB}_{FIELD}) renames INCIDENT_SUMMARY__* and incident_draft's aliased env vars. That touches terraform/SSM, so it is deployment-coordinated and belongs in this task's series, not in a layout-only PR.
-
-Steps:
-1. Confirm smoke coverage of every incident command/action (task-36 inventory).
-2. Fill out app/packages/incident/ as an umbrella per decisions/feature-packages.md (copy the access/ shape); confirm the subdomain split before writing code.
-3. Slack handlers via register_slack_commands hookspec; parsing via the shared parser; rendering via the shared renderer; locales/ EN+FR per decisions/i18n.md (parity gate from task-21 applies).
-4. Relocate incident_draft and incident_summary into the umbrella, repoint their entry-point names to the dotted form, and sweep mock patch string literals.
-5. Consolidate settings onto common/settings.py; coordinate the env-var rename with terraform/SSM.
-6. Cut over, delete app/modules/incident/, smoke green pre/post, command names unchanged.
-7. Add "packages.incident" as a container on TASK-18's contract (e) with exhaustive = true, and land it green as the final step.
+Rules carried forward:
+- Handlers register through the Slack handler contract (TASK-26.1).
+- Strings go through the translator contract with EN and FR catalogues (TASK-118, and the TASK-21 parity gate).
+- Settings consolidate onto features/incident/common/settings.py, with values in the TOML files. The env-var rename of INCIDENT_SUMMARY__* and incident_draft's aliases is deployment-coordinated and belongs to this series.
+- Each rebuild PR ships smoke tests pinned before cutover and removes that surface's legacy registration in the same series.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/packages/incident/ matches the layout; handlers pass the five-step review
-- [ ] #2 Smoke tests pass pre and post cutover; command names and responses unchanged
-- [ ] #3 app/modules/incident/ deleted; legacy list entry removed; baselines never grew
+- [ ] #1 Every modules/incident surface in the TASK-36 inventory is rebuilt in a features/incident/<subdomain>/ package matching the layout, with handlers passing the five-step review, or is recorded as deliberately dropped under the TASK-97 decision
+- [ ] #2 Smoke tests pass before and after each surface cutover; command names and responses unchanged
+- [ ] #3 app/modules/incident/ is deleted, its legacy list entry is removed, and no baseline grew
 - [ ] #4 EN/FR catalogues complete (parity check green)
-- [ ] #5 app/packages/incident/__init__.py is empty (no hookimpls, no re-exports, no entry-point line); every subdomain declares its own entry point under the dotted name incident.<subdomain>
-- [ ] #6 Shared incident vocabulary lives in packages/incident/common/ with no I/O and at least two subdomain consumers per item; no subdomain imports another subdomain
-- [ ] #7 TASK-18 contract (e) gains a packages.incident container with exhaustive = true and lint-imports is green
-- [ ] #8 packages/incident_draft and packages/incident_summary no longer exist; their code, tests and locales live under packages/incident/ and no packages/incident_* directory remains anywhere under app/packages/
-- [ ] #9 The packages/incident/{documents,drive,meet,scheduling} Google adapters return frozen domain dataclasses instead of dicts once their modules/incident callers move into the package (decisions/sdk-typing.md item 3; handed off by TASK-25.1.6 AC#3)
-- [ ] #10 No module under packages/incident/ imports a vendor SDK or an app/integrations client outside its own adapters/ directory; whichever external systems the redesign turns out to use, each is reached through a feature-owned adapter, enforced by the lint-imports contract from AC#7 plus review
-- [ ] #11 No workplace concern gains a new app/infrastructure/<service>/ Protocol (decisions/workplace-systems.md rule 1); where the redesigned feature uses a workplace system there is one adapter per system behind a feature-owned port whose surface is only what the feature actually does, and which system applies is data - the artifact's stored reference, the conversation's platform, the person's linked account - never a global provider setting (rule 3)
-- [ ] #12 Incident owns a partitioned settings module naming its own resources per decisions/configuration.md; no incident setting is read from a root aggregator and no vendor-specific resource configuration (for example get_google_resources_config) is read outside an adapter
-- [ ] #13 The core incident concepts (the incident itself, its status lifecycle, its participants and its artifact references) are expressed as vendor-agnostic frozen dataclasses in packages/incident; no raw vendor payload, SDK type or DynamoDB AttributeValue shape crosses out of an adapter into domain or application code, so a later change of backend or workplace suite touches adapters only
-- [ ] #14 Relocation stays behaviour-preserving and introduces no new persistence design: the record of truth is left where it is, and deciding where it should live is owned by TASK-97
+- [ ] #5 Shared incident vocabulary lives in features/incident/common/ with no I/O and at least two subdomain consumers per item; no subdomain imports another subdomain
+- [ ] #6 The TASK-18 umbrella contract for features.incident stays green with exhaustive = true as subdomains are added
+- [ ] #7 Google adapters used by incident subdomains return frozen domain dataclasses instead of dicts (decisions/sdk-typing.md item 3)
+- [ ] #8 No module under features/incident/ imports a vendor SDK or an app/integrations client outside its own adapters/; workplace systems are reached through capability api.py contracts or a feature-owned adapter
+- [ ] #9 No workplace concern gains an app/infrastructure/<service>/ Protocol; which system applies is data (the artifact's stored reference, the conversation's platform, the person's linked account), never a global provider setting
+- [ ] #10 Incident owns a partitioned settings module; no incident setting is read from a root aggregator or app/infrastructure/configuration/features/incident.py, and no vendor resource configuration is read outside an adapter
+- [ ] #11 Core incident concepts (the incident, its status lifecycle, participants and artifact references) are vendor-agnostic frozen dataclasses; no raw vendor payload, SDK type or DynamoDB AttributeValue shape crosses out of an adapter
+- [ ] #12 Records of truth live where the TASK-97 decision puts them; no workplace document or spreadsheet is read back as a source of truth (decisions/workplace-systems.md rule 5)
+- [ ] #13 No incident list, folder list or picker in the rebuilt surfaces silently truncates results: long lists paginate or filter within Slack's block and option limits (supersedes TASK-81)
 <!-- AC:END -->
 
 ## Definition of Done

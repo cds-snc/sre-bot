@@ -4,7 +4,7 @@ title: Fix the dev/sre double registration (one registration path per module)
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 16:58'
+updated_date: '2026-09-24 20:10'
 labels:
   - migration
   - phase-5
@@ -41,3 +41,12 @@ Steps:
 - [ ] #1 Tests green
 - [ ] #2 PR references decisions/migration.md rule 4
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:10
+---
+2026-09-24 interaction with TASK-110 (entry-point plugin loading): TASK-110 removes the pkgutil walk over packages/ and modules/ entirely, and legacy modules/ keep hand-written registration until each surface is rebuilt (decisions/migration.md, plugins.md). Choosing the legacy _register_legacy_handlers() list as dev/sre's single path, rather than their hookimpls, keeps them registered after the walk is gone without adding modules.* entry points. Confirm the choice during planning; TASK-110 depends on this task.
+---
+<!-- COMMENTS:END -->

@@ -6,20 +6,19 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-16 14:24'
-updated_date: '2026-09-16 14:38'
+updated_date: '2026-09-24 20:05'
 labels:
   - architecture
   - incident
   - phase-5
 milestone: m-5
-dependencies:
-  - TASK-38
+dependencies: []
 references:
   - decisions/workplace-systems.md
   - decisions/feature-packages.md
   - decisions/outbound-clients.md
-  - decisions/layers.md
   - app/modules/incident
+  - decisions/plugin-architecture.md
 priority: high
 ordinal: 222000
 ---
@@ -79,5 +78,10 @@ created: 2026-09-16 14:37
 What can still start immediately, in parallel with TASK-38: the DFIR-IRIS evaluation (API surface, auth, hosting, licence, data residency, operational cost, reachability from the deployment), and the inventory of user-visible capabilities separated from their current implementation. Those are research, not design, and neither waits.
 
 What must NOT start before this decision lands: any new persistence design for incident - a storage schema, a migration off the incident sheet, a richer app-owned domain beyond what TASK-38 needs to de-vendorize what already exists. If an external platform ends up owning the case, that work shrinks to a thin coordination record.
+---
+
+created: 2026-09-24 20:05
+---
+2026-09-24: dependency on TASK-38 removed and inverted. TASK-38 is now the by-surface rebuild and depends on this decision (decisions/migration.md: vendor concepts leave the feature on the way, which needs the system-of-record answer first). The relocation of the shipped incident packages is TASK-124.5 and is independent of this decision. The dead record decisions/layers.md cited in the description is replaced by decisions/plugin-architecture.md; workplace capabilities live in app/capabilities/.
 ---
 <!-- COMMENTS:END -->

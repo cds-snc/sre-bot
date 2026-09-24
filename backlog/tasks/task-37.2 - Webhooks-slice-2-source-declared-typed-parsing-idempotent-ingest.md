@@ -4,7 +4,7 @@ title: 'Webhooks slice 2: source-declared typed parsing + idempotent ingest'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:39'
-updated_date: '2026-09-18 15:27'
+updated_date: '2026-09-24 20:03'
 labels:
   - migration
   - webhooks
@@ -14,11 +14,13 @@ dependencies:
   - TASK-37.1
   - TASK-46
   - TASK-58
+  - TASK-109
 references:
   - decisions/webhooks.md
   - decisions/plugins.md
   - decisions/reliability.md
   - 'https://github.com/cds-snc/sre-bot/issues/1377'
+  - decisions/plugin-architecture.md
 parent_task_id: TASK-37
 priority: high
 ordinal: 97000
@@ -27,6 +29,8 @@ ordinal: 97000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+Rescoped 2026-09-24: webhooks is a capability at app/capabilities/webhooks/ (decisions/webhooks.md, decisions/plugin-architecture.md), not a feature package. It reaches storage, coordination, the queue and the Slack reply surface only through contracts resolved from the service registry, and imports no infrastructure/ or server/ module, so no slice adds an import-linter ignore entry. There is no in-process event bus: features react through the capability's extension point.
+
 Slice 2 of the webhooks rearchitecture (decisions/webhooks.md; coordinator TASK-37). Deletes the probabilistic payload-typing antipattern and adds ingest idempotency. Behaviour-preserving for known senders (TASK-36 smoke green); a generic/simple-text fallback source preserves acceptance for unclassified senders.
 
 Goal: parse each inbound body by the webhook record's DECLARED source, never by guessing.
@@ -36,7 +40,7 @@ Scope:
 2. router.py: a DECLARATIVE table mapping WebhookSource -> parser -> intent-builder (a plain registry populated in-module or registered at startup via a hookspec per decisions/plugins.md). NO os.listdir, NO importlib.import_module of handler strings, no catch-and-continue.
 3. service.ingest(): load the Webhook record (TASK-37.1), select the parser by record.source, parse the normalized body, produce the interim result. Assign source to existing records: default to the fallback source, seeding known records from the TASK-46 fingerprint inventory where available (document the mapping).
 4. Remove the guessers from the ACTIVE request path: modules/webhooks/base.py::validate_payload / select_best_model and modules/slack/webhooks.py::validate_string_payload_type / has_parameters_in_model must no longer be called by the route (final dead-code deletion may defer to TASK-37.4 if entangled).
-5. Idempotency (decisions/reliability.md): before dispatch, claim webhooks:<webhook_id>:<provider_delivery_id> via infrastructure.idempotency (IdempotencyStore, shipped by TASK-5.1; get_idempotency_store()). provider_delivery_id = SNS MessageId, else a provider delivery header, else - documented last resort only - a stable hash of (webhook_id, body). Branch per reliability.md: NEW -> proceed; COMPLETED -> return recorded outcome; IN_PROGRESS -> reject/defer.
+5. Idempotency (decisions/reliability.md): before dispatch, claim webhooks:<webhook_id>:<provider_delivery_id> via the coordination contract (ConditionalWriteStore, TASK-58) resolved from the service registry (TASK-109). provider_delivery_id = SNS MessageId, else a provider delivery header, else - documented last resort only - a stable hash of (webhook_id, body). Branch per reliability.md: NEW -> proceed; COMPLETED -> return recorded outcome; IN_PROGRESS -> reject/defer.
 6. Carry forward TASK-7 into verification.py / the SNS parser path: SNS signature verification in ALL environments and generic (non-leaking) 5xx bodies - do not regress.
 
 Out of scope: transport-neutral intent + renderer (TASK-37.3 - this slice may still hand the parsed result to the existing Slack posting path via a temporary adapter shim), cutover/delete (TASK-37.4), HMAC (TASK-47).

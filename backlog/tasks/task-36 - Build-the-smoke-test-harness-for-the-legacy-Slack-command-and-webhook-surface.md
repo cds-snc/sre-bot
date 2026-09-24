@@ -4,7 +4,7 @@ title: Build the smoke-test harness for the legacy Slack command and webhook sur
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-08 16:58'
+updated_date: '2026-09-24 20:05'
 labels:
   - migration
   - phase-5
@@ -14,6 +14,7 @@ dependencies: []
 references:
   - decisions/migration.md
   - 'https://github.com/cds-snc/sre-bot/issues/1290'
+  - decisions/plugin-architecture.md
 priority: high
 ordinal: 36000
 ---
@@ -21,6 +22,8 @@ ordinal: 36000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+Rescoped 2026-09-24. decisions/migration.md step 1 (Inventory) now asks for more than a smoke-test list: every user-facing surface of modules/ (slash commands and subcommands, interactions, webhook routes, HTTP routes under app/api/, and scheduled jobs in app/jobs/) is listed with a target feature or capability, so each rebuild ticket knows where its surface lands. Surfaces are assigned by what they do, not by which module holds them today: modules/sre and modules/aws are grab-bags, and incident surfaces follow the TASK-97 decision.
+
 Aligns with decisions/migration.md recipe step 1: capture the external compatibility contract (Slack command surface + webhook URLs) BEFORE touching any module. Other teams depend on this surface.
 
 Steps:
@@ -35,6 +38,8 @@ Steps:
 - [ ] #1 A checked-in inventory lists every legacy command/action/webhook with its owning module
 - [ ] #2 Each inventoried surface has at least one smoke test that passes against current main
 - [ ] #3 Runbook note: how to run the suite pre- and post-cutover for a module
+- [ ] #4 The checked-in inventory assigns every surface (commands, interactions, webhook and HTTP routes, scheduled jobs) a target feature under app/features/ or capability under app/capabilities/, or marks it for deletion with the reason
+- [ ] #5 The inventory records, per surface, the rebuild ticket that owns it (TASK-37, TASK-38, TASK-39, TASK-40, TASK-88, TASK-52/TASK-65 for jobs, TASK-53 for app/api/ routes)
 <!-- AC:END -->
 
 ## Definition of Done

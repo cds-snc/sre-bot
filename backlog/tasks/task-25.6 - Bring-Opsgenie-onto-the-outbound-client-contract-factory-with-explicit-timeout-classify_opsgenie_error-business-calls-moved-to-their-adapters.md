@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 16:51'
+updated_date: '2026-09-24 20:11'
 labels:
   - clients
   - phase-3
@@ -14,9 +15,9 @@ dependencies: []
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
-  - decisions/layers.md
   - app/integrations/opsgenie/client.py
   - app/packages/oncall_sync/adapters/opsgenie.py
+  - decisions/plugin-architecture.md
 parent_task_id: TASK-25
 priority: high
 ordinal: 239000
@@ -51,3 +52,12 @@ TARGET. The vendor package exports an authenticated HTTP client factory with an 
 - [ ] #4 Classification tests cover each mapped failure family plus one unmapped exception propagating; factory tests assert the timeout and retry settings
 - [ ] #5 ruff, mypy, pytest tests --ignore=tests/smoke and make check-vendor-package-contract pass, with output recorded in notes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:11
+---
+2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). Opsgenie business operations move to the adapters/ of their consumers: packages/oncall_sync (moving to features/oncall_sync in TASK-124.2) and the incident surfaces.
+---
+<!-- COMMENTS:END -->

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 16:51'
+updated_date: '2026-09-24 20:11'
 labels:
   - clients
   - phase-3
@@ -14,9 +15,9 @@ dependencies: []
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
-  - decisions/layers.md
   - app/integrations/trello/client.py
   - app/modules/atip/atip.py
+  - decisions/plugin-architecture.md
 parent_task_id: TASK-25
 priority: low
 ordinal: 242000
@@ -41,3 +42,12 @@ DESIGN INPUT FOR THE PLANNER. The TrelloApi library is untyped and exposes no ti
 - [ ] #3 No import-time settings read remains in the vendor package; classification tests cover mapped failure families plus one unmapped exception propagating
 - [ ] #4 ruff, mypy, pytest tests --ignore=tests/smoke and make check-vendor-package-contract pass, with output recorded in notes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:11
+---
+2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). The ATIP card operations move to the atip caller; TASK-39 rebuilds atip into app/features/atip/, and its adapters/ inherit them.
+---
+<!-- COMMENTS:END -->

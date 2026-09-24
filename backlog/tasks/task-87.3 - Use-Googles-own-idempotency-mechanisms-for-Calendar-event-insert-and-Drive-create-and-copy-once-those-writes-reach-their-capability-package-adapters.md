@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 15:43'
+updated_date: '2026-09-24 20:11'
 labels:
   - clients
   - reliability
@@ -14,8 +15,8 @@ dependencies:
 references:
   - decisions/outbound-clients.md
   - decisions/workplace-systems.md
-  - decisions/capability-packages.md
   - app/infrastructure/drive/google.py
+  - decisions/plugin-architecture.md
 parent_task_id: TASK-87
 priority: low
 ordinal: 237000
@@ -41,3 +42,12 @@ When this lands, decisions/outbound-clients.md's Migration section drops its las
 - [ ] #3 Unit tests at each changed adapter's SDK seam cover a 409 duplicate after a timed-out first attempt
 - [ ] #4 Every Google Workspace write call site is recorded in notes as naturally idempotent, protected by a vendor mechanism, or retries-disabled, and outbound-clients.md's Migration section no longer lists non-idempotent Google writes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:11
+---
+2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). The Calendar and Drive writes reach their final adapters in app/capabilities/drive/ (TASK-120) and the rebuilt incident surfaces (TASK-38), not a capability-packages.md package.
+---
+<!-- COMMENTS:END -->

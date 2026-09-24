@@ -1,23 +1,27 @@
 ---
 id: TASK-26
 title: >-
-  Consolidate the Slack home: transport to infrastructure/slack/, Web client +
-  classifier in integrations/slack/
+  Split the Slack platform by direction: runtime to app/server/slack/, handler
+  contract to app/contracts/, integrations/slack/ shrinks to client factory,
+  classifier and settings
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-18 16:51'
+updated_date: '2026-09-24 19:58'
 labels:
   - slack
   - phase-3
   - architecture
-milestone: m-3
+  - plugin-architecture
+milestone: m-7
 dependencies:
   - TASK-25.4
 references:
   - decisions/transport-slack.md
   - decisions/platform-transports.md
   - 'https://github.com/cds-snc/sre-bot/issues/1280'
+  - decisions/platform-entrypoints.md
+  - decisions/plugin-architecture.md
 priority: high
 ordinal: 26000
 ---
@@ -25,22 +29,29 @@ ordinal: 26000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Aligns with decisions/transport-slack.md (Home) and decisions/platform-transports.md. Today the whole Slack transport (Bolt runtime in provider.py, parser.py, formatter.py, help.py, commands.py) lives in app/integrations/slack/, importing upward into infrastructure - the wrong home.
+COORDINATOR (rescoped 2026-09-24). Implemented by its subtasks; closes when they are Done and the acceptance criteria below hold.
 
-Steps:
-1. Create app/infrastructure/slack/ owning: Bolt runtime + Socket Mode lifecycle, verification (from task-9), dispatch, parser, formatter, help rendering, and the SlackService reply Protocol backed by the bot-scoped Web client.
-2. app/integrations/slack/ shrinks to: build_slack_web_client (authenticated AsyncWebClient factory, no lifecycle), classify_slack_error (from task-25), and settings.
-3. Leave import shims at the old integrations/slack/ module paths (re-export with a deprecation comment) so app/modules/ keeps working until Phase 5; add the shims to the import-linter ignore baseline so new code cannot use them.
-4. Parser tokenizer delegates to shlex.split per decisions/transport-slack.md (Parsing).
-5. Slack command names and behavior unchanged - this is a code move, not a behavior change.
+Target homes (decisions/platform-entrypoints.md, platform-transports.md, transport-slack.md, plugin-architecture.md):
+- app/server/slack/: the Bolt runtime and Socket Mode lifecycle, verification, dispatch, parser, formatter, help, and the transport settings (COMMAND_PREFIX).
+- app/contracts/ (the Slack part under app/contracts/slack/): registration hookspecs, typed request and reply models, the registrar Protocol features register through, and the outbound messaging Protocol. It imports no SDK runtime; pure-data slack_sdk model types are allowed.
+- app/integrations/slack/: the authenticated AsyncWebClient factory, classify_slack_error (TASK-25.4) and credentials only.
+
+The earlier scope moved the transport to app/infrastructure/slack/ and left re-export shims at the old paths. Both are dropped. infrastructure/ is hosting-only, so no inbound runtime belongs there. Shims are the lingering migration state this backlog avoids: every importer is rewritten in the subtask that moves its target.
+
+Constraint for planning: legacy modules/ import integrations.slack (models, parser, provider, bootstrap, channels, users, blocks) in about 25 places. A legacy module importing app/server/ adds an import-linter ignore entry, which migration.md rule 3 forbids. The subtasks must therefore choose, for each helper:
+- pure-data models go to app/contracts/slack/;
+- anything a handler reaches at runtime (parser, renderer, reply) is exposed through the handler contract;
+- vendor-calling helpers (channels.py, users.py) move to the adapters of their consumers, or stay in their legacy consumer until that surface is rebuilt.
+Record that disposition in the plan.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/infrastructure/slack/ owns runtime, verification, dispatch, parser, formatter, help, SlackService; app/integrations/slack/ contains only client factory, classifier, settings (plus temporary shims)
-- [ ] #2 Existing Slack commands behave identically (smoke tests or manual checklist recorded in the PR)
-- [ ] #3 Shims are baseline-listed so import-linter blocks new consumers
-- [ ] #4 Parser uses shlex.split; parser test suite still green
+- [ ] #1 The Slack runtime, verification, dispatch, parser, formatter, help and COMMAND_PREFIX live only under app/server/slack/; app/infrastructure/slack/ no longer exists
+- [ ] #2 app/integrations/slack/ exports only the client factory, classify_slack_error and settings; the vendor_package_contract baseline has no Slack entry left
+- [ ] #3 No shim or re-export remains at any old integrations.slack or infrastructure.slack path, and no import-linter ignore entry was added
+- [ ] #4 Existing Slack commands behave identically: the TASK-36 smoke suite is green before and after
+- [ ] #5 Parser uses shlex.split; parser test suite still green
 <!-- AC:END -->
 
 ## Definition of Done
@@ -84,5 +95,10 @@ This task's AC#1 conflicts with the split. The runtime, verification and dispatc
 created: 2026-09-18 16:51
 ---
 2026-09-18: dependency narrowed from the TASK-25 umbrella to TASK-25.4. This task needs only the Slack Web-client factory and classify_slack_error that 25.4 now owns. TASK-25 grew five unrelated vendor subtasks (25.6-25.10, Opsgenie/Sentinel/Notify/Trello/OpenAI) plus MaxMind (25.5), none of which this move needs.
+---
+
+created: 2026-09-24 19:58
+---
+2026-09-24 rescope: target homes follow decisions/platform-entrypoints.md and plugin-architecture.md (server/slack, contracts), not infrastructure/slack; shims dropped. Decomposed into ordered subtasks; the existing plan predates the split and must be re-planned per subtask.
 ---
 <!-- COMMENTS:END -->

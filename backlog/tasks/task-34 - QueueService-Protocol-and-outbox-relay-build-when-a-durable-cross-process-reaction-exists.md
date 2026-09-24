@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-28 14:34'
+updated_date: '2026-09-24 20:10'
 labels:
   - infrastructure
   - phase-4
@@ -14,10 +14,13 @@ labels:
 milestone: m-4
 dependencies:
   - TASK-5
+  - TASK-106
+  - TASK-109
 references:
   - decisions/reliability.md
   - claude-research-outcome.md
   - 'https://github.com/cds-snc/sre-bot/issues/1288'
+  - decisions/plugin-architecture.md
 priority: low
 ordinal: 34000
 ---
@@ -59,5 +62,10 @@ Scope refinement from a 2026-07-28 architecture review: (1) Relay choice - prefe
 created: 2026-07-28 14:34
 ---
 2026-07-28 approvals architecture (decisions/approvals.md): the generic approval-workflow capability adds a third concrete, non-speculative consumer for this task. Its cross-package effect steps and the reclassified access/sync -> access/request advance (SYNC_COMPLETED/SYNC_FAILED, moved off the event bus per events.md) are durable workflow steps that ride the outbox/QueueService. TASK-61 (access/request refactor) depends on this; TASK-60 (approvals capability) designs its steps to hand off over this queue. Alongside notifications (TASK-32) and retry consolidation (TASK-59), the durable-work triggers now clearly exist.
+---
+
+created: 2026-09-24 20:10
+---
+2026-09-24 alignment with decisions/plugin-architecture.md and reliability.md: the queue (and publish-subscribe) Protocol is a core-service contract born in app/contracts/, implemented in app/infrastructure/queue/ with a transactional outbox, and resolved from the service registry (TASK-109). decisions/events.md is deleted and there is no in-process event bus; this contract is the only path for reactions that must reach every replica or survive a restart. First concrete consumer: the approvals continuation (TASK-61).
 ---
 <!-- COMMENTS:END -->

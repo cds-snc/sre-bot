@@ -4,7 +4,7 @@ title: Assess the impact on the AWS integration of hosting the app outside AWS
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:49'
-updated_date: '2026-09-17 19:15'
+updated_date: '2026-09-24 20:11'
 labels:
   - architecture
 dependencies: []
@@ -12,8 +12,8 @@ references:
   - app/integrations/aws/client.py
   - decisions/cloud-portability.md
   - decisions/workplace-systems.md
-  - decisions/layers.md
   - decisions/outbound-clients.md
+  - decisions/plugin-architecture.md
 priority: medium
 type: spike
 ordinal: 190000
@@ -87,5 +87,10 @@ terraform/iam.tf:32-33 grants read on exactly those two ARNs, but terraform/ssm.
 WHAT SURVIVES THE CORRECTION, and is in fact sharper for this spike. The only credential the deployment injects through a managed, reviewable channel is the Google service-account key (terraform/ssm.tf, surfaced as the GCP_SRE_SERVICE_ACCOUNT_KEY_FILE secret in the task definition). AWS needs no such channel today only because the app runs inside AWS and inherits the task role. That is the implicit assumption AC#3 asks to document, and it is the one that breaks on a non-AWS host: AWS would then need a managed credential channel of its own, and the Google key is the worked example of what that looks like in this deployment.
 
 ALSO RELEVANT TO AC#1's "which settings would then become required". Those settings would land in a hand-edited SSM blob that no terraform resource manages and no review covers. The assessment should say where AWS credential settings belong in the deployment, not only where they belong in the code (integrations/aws/settings.py vs feature settings).
+---
+
+created: 2026-09-24 20:11
+---
+2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). Leaving AWS touches only app/infrastructure/ implementations of app/contracts/ Protocols plus integrations/aws; features and capabilities never see the cloud (plugin-architecture.md Consequences).
 ---
 <!-- COMMENTS:END -->

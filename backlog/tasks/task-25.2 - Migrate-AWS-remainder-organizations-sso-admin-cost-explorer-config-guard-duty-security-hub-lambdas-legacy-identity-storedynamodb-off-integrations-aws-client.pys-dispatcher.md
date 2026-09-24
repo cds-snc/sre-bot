@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-31 18:48'
-updated_date: '2026-09-15 19:55'
+updated_date: '2026-09-24 20:11'
 labels:
   - clients
   - phase-3
@@ -18,11 +18,10 @@ references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
   - decisions/feature-packages.md
-  - decisions/capability-packages.md
   - decisions/workplace-systems.md
-  - decisions/layers.md
   - app/integrations/aws/client.py
   - app/integrations/google_workspace/client.py
+  - decisions/plugin-architecture.md
 parent_task_id: TASK-25
 priority: high
 ordinal: 117000
@@ -91,5 +90,10 @@ created: 2026-09-14 15:27
 created: 2026-09-15 19:55
 ---
 2026-09-15 progress: slice TASK-25.2.4 is Done (all seven children merged, last one #1486). packages/aws_platform/adapters/{organizations,sso_admin,config,cost_explorer,guard_duty,security_hub,aws_lambda}.py have Stubber tests; ops_group_assignment, spending, aws_account_health and lambdas are on OperationResult; the seven mirrors and their legacy tests are deleted and both guard baselines pruned. Remaining execute_aws_api_call/handle_aws_api_errors users: integrations/aws/{client,dynamodb,sqs}.py (owned by TASK-25.2.5 and TASK-25.2.6). Next: TASK-25.2.5.
+---
+
+created: 2026-09-24 20:11
+---
+2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). Its adapters' eventual homes are owned by TASK-88 (rebuilt into app/features/, DynamoDB callers onto the storage contract).
 ---
 <!-- COMMENTS:END -->
