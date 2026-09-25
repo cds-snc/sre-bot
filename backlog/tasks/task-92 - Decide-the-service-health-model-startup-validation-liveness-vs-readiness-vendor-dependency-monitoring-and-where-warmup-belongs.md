@@ -3,10 +3,10 @@ id: TASK-92
 title: >-
   Decide the service health model: no network I/O at boot, static liveness and
   readiness, and plugin boot-failure policy
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-14 14:55'
-updated_date: '2026-09-25 15:54'
+updated_date: '2026-09-25 16:13'
 labels:
   - architecture
   - clients

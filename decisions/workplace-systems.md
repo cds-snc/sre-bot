@@ -1,6 +1,6 @@
 ---
-status: Draft
-date: 2026-09-10
+status: Accepted
+date: 2026-09-25
 applies: target
 scope: Which external systems are hosting services chosen per deployment, which are workplace systems chosen per person or artifact, and where records of truth live.
 ---
@@ -9,7 +9,7 @@ scope: Which external systems are hosting services chosen per deployment, which 
 
 ## Context
 
-The organization will run Google Workspace with Slack, and Microsoft 365 with Teams, side by side for the long term. The bot coordinates the whole user base. Some employees work only in Google, others only in Microsoft, and contractors need narrower access than employees. One app instance serves one organization.
+The organization will run Google Workspace with Slack, and Microsoft 365 with Teams, side by side for the long term. The bot coordinates the whole user base. Some employees work only in Google, others only in Microsoft. Who a person is comes from the organization's identity provider, and what they may do from its groups ([people-and-accounts.md](people-and-accounts.md)). One app instance serves one organization.
 
 Hosting services fit a "one provider per deployment, chosen by configuration" model ([cloud-portability.md](cloud-portability.md)). Systems where people, their accounts and their artifacts live don't: several vendors are live at once, and the right one depends on who or what is involved.
 
@@ -61,7 +61,7 @@ Current state:
 
 ## Migration
 
-Tickets to create: move incident and talent-role records into storage (related: TASK-27, TASK-38); move `directory`, `drive` and `spreadsheets` to `app/capabilities/`.
+Tickets: TASK-38 (incident records into storage) and TASK-39 (talent-role records, with the role surface rebuild); TASK-119, TASK-120 and TASK-121 (`directory`, `drive` and `spreadsheets` to `app/capabilities/`).
 
 Tolerated until then:
 - the three workplace providers in `infrastructure/directory/`, `infrastructure/drive/` and `infrastructure/spreadsheets/`;
@@ -71,3 +71,4 @@ Tolerated until then:
 
 **Changes:**
 - 2026-09-24: workplace systems are capabilities and infrastructure is hosting only, per plugin-architecture.md.
+- 2026-09-25: Accepted; Migration names its tickets.

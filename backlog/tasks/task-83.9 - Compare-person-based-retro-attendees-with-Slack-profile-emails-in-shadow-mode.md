@@ -4,11 +4,11 @@ title: Compare person-based retro attendees with Slack profile emails in shadow 
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
-updated_date: '2026-09-24 20:09'
+updated_date: '2026-09-25 17:06'
 labels:
   - identity
 dependencies:
-  - TASK-83.7
+  - TASK-83.6
   - TASK-38
 references:
   - app/modules/incident/schedule_retro.py

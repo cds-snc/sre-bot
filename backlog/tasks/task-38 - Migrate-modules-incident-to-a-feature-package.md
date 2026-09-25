@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-24 20:06'
+updated_date: '2026-09-25 17:06'
 labels:
   - migration
   - phase-5
@@ -72,6 +72,14 @@ Rules carried forward:
 - [ ] #1 Smoke suite green post-cutover
 - [ ] #2 PR series references decisions/migration.md
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-25: decisions/workplace-systems.md, people-and-accounts.md and platform-entrypoints.md are Accepted. Earlier mentions of their Draft status in this task are historical.
+
+Because workplace-systems.md is now Accepted, its rules bind this task directly and the acceptance-first dependency is resolved.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
