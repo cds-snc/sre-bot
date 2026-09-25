@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
-updated_date: '2026-09-25 17:05'
+updated_date: '2026-09-25 19:59'
 labels:
   - identity
 dependencies:
@@ -38,4 +38,11 @@ It reads Google through the directory capability (app/capabilities/directory/api
 - [ ] #4 The job makes no writes to Google, runs behind a setting that defaults to off, and logs counts without personal data
 - [ ] #5 The job registers through the register_background_jobs hookspec from app/capabilities/people/ as a Tier-2 job with a lease; its body is idempotent when run twice
 - [ ] #6 Full test suite, ruff and mypy pass
+- [ ] #7 The job runs hourly by default, with the interval set in the people capability's settings slice
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-25 human decision: the import runs hourly by default, and the interval is configurable in the capability's settings slice. A run costs users ÷ 500 Directory list calls. Suspensions still take effect through authorization.md's 15-minute re-check, not through the import. The on-demand trigger and the per-change import are TASK-83.15, so this foundation slice doesn't wait for the authorization policy.
+<!-- SECTION:NOTES:END -->

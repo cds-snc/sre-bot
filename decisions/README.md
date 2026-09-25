@@ -25,6 +25,7 @@ The app is a platform that other teams extend: a host (`app/server/`) loads feat
 | [plugin-architecture.md](plugin-architecture.md) | The six layers, their import rules, the service registry, extension points and plugin enablement | target |
 | [workplace-systems.md](workplace-systems.md) | Hosting services vs workplace systems, records of truth in storage | target |
 | [people-and-accounts.md](people-and-accounts.md) | People, IdP identities and linked platform accounts, caller resolution, conversation origin | target |
+| [authorization.md](authorization.md) | Declared permissions, IdP groups mapped to roles, decision lifetime, membership requests written to the IdP | target |
 | [platform-entrypoints.md](platform-entrypoints.md) | Chat platforms split into server entry points, handler contracts and outbound messaging | target |
 | [interaction-toolkits.md](interaction-toolkits.md) | Draft: a per-platform toolkit for rich chat interactions that never wraps the SDK | target |
 | [cloud-portability.md](cloud-portability.md) | The four portability contracts | target |

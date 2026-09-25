@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-28 14:33'
-updated_date: '2026-09-24 20:07'
+updated_date: '2026-09-25 19:58'
 labels:
   - access
   - approvals
@@ -20,6 +20,7 @@ references:
   - decisions/approvals.md
   - 'https://github.com/cds-snc/sre-bot/issues/1369'
   - decisions/plugin-architecture.md
+  - decisions/authorization.md
 priority: high
 ordinal: 91000
 ---
@@ -47,6 +48,8 @@ Depends on the approvals capability extraction, the QueueService/outbox (TASK-34
 - [ ] #3 The 'no approvers found' operator alert goes through app/capabilities/notifications/api.py, not the event bus
 - [ ] #4 Submit -> approve -> grant, rejection, expiry and sync-driven advance all behave as before (tests green)
 - [ ] #5 grep: access/request and access/sync contain no dispatch_background, register_handler or infrastructure.events import
+- [ ] #6 Requestable groups come from a git-reviewed catalogue keyed by group id; an approval by the requester or by someone outside the catalogue's approver group is refused
+- [ ] #7 An approved privileged grant is written to the IdP with an expiry no later than the catalogue's maximum duration
 <!-- AC:END -->
 
 ## Definition of Done
@@ -54,3 +57,19 @@ Depends on the approvals capability extraction, the QueueService/outbox (TASK-34
 - [ ] #1 No access-request logic flows through the in-process event dispatcher
 - [ ] #2 PR references decisions/approvals.md
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-25: decisions/authorization.md is Accepted and sets this task's target.
+- access/catalog becomes a git-reviewed catalogue of requestable groups, keyed by group id rather than a naming convention. Each entry states who may request, the approver group, whether a justification is required, and whether the group is privileged, with its maximum duration.
+- The ApprovalPolicy takes approvers from the catalogue and refuses self-approval.
+- The EffectHandler writes the membership to the IdP and sets Cloud Identity expireTime on privileged grants.
+- The access routes declare permissions instead of Backstage scopes (TASK-131).
+- The task-planner should re-assess the size gate with this scope.
+
+2026-09-25 correction (authorization.md amended): the app uses only the Admin SDK Directory API, so no Cloud Identity expireTime.
+- A privileged grant records expires_at in the bot's grant record, and that record ends the role in the bot.
+- At expiry, a scheduled, idempotent removal writes the membership removal to the IdP, with retries.
+- This replaces the earlier note about setting expireTime.
+<!-- SECTION:NOTES:END -->

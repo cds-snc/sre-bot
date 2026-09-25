@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
-updated_date: '2026-09-25 17:06'
+updated_date: '2026-09-25 19:43'
 labels:
   - identity
 dependencies:
@@ -41,3 +41,9 @@ Who counts as SRE is an IdP-group access policy (TASK-129). The interface (a Sla
 - [ ] #5 Resolving a flagged sso_email link either keeps it (audited) or removes it, leaving the account unlinked
 - [ ] #6 Full test suite, ruff and mypy pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-25: an SRE join takes a recorded reason and leaves the absorbed person as a merged_into tombstone. SRE can split a join by reversing the tombstone, with an audit record. The self-service join is TASK-83.14.
+<!-- SECTION:NOTES:END -->

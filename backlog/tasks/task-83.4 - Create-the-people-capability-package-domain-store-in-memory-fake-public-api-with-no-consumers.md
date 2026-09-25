@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
-updated_date: '2026-09-25 17:05'
+updated_date: '2026-09-25 19:43'
 labels:
   - identity
 dependencies:
@@ -52,4 +52,11 @@ Nothing consumes it yet, so it can merge without changing behavior.
 - [ ] #5 An in-memory fake passes the same contract tests as the storage-backed store
 - [ ] #6 The capability is declared by an entry point with an enablement key, registers at startup without import-time side effects, persists only through the storage contract from the registry, and no feature imports it yet
 - [ ] #7 Full test suite, ruff, mypy and lint-imports pass
+- [ ] #8 A Person can be a merged_into tombstone that resolves to its survivor; provenance includes verified
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-25 (people-and-accounts.md amendment): the domain also needs verified link provenance and a merged_into tombstone on Person, so a merged person still resolves to its survivor. The join flow itself is TASK-83.14.
+<!-- SECTION:NOTES:END -->

@@ -47,13 +47,27 @@ Deferred: whether the Backstage resolver adds the IdP subject as a claim or the 
   - `idp`: the person was created from this identity by the IdP import;
   - `idp_subject`: the platform delivered the IdP subject itself (Teams `aadObjectId`, a Backstage claim or catalog annotation holding the subject). This is an exact link;
   - `sso_email`: the account signs in through SSO against a trusted IdP, so its email was set by the IdP, and it matched exactly one active identity in an allowed domain of that IdP. For Slack this means a full member of an SSO-enforced workspace, never a guest (`is_restricted` or `is_ultra_restricted`). For Backstage it means every caller, because sign-in requires IdP SSO. The link is keyed by the platform account id from then on, and the email is only the evidence recorded for it;
-  - `admin`: SRE made the link, with an audit record.
+  - `admin`: SRE made the link, with an audit record;
+  - `verified`: the person proved control of the identity by signing in to its IdP in the linking flow (joins only, below).
 - An `sso_email` link is re-checked on each import. If the platform email and the identity's email diverge, the link is flagged for SRE and the link's use is logged. It is never silently moved to another person.
 - A platform without SSO enforcement, or an account outside it such as a Slack guest, never gets an `sso_email` link. It stays unlinked unless SRE links it.
 - Accounts may exist unlinked. The entry point passes handlers an unlinked marker for them. An unlinked caller isn't refused: each feature's access policy says whether it serves everyone, only callers resolved to an active person, or only people in named IdP groups (TASK-129).
 - Creating or removing a link is audit-logged.
 
-**Several IdPs.** A human with identities in two IdPs starts as two people, one per identity. They become one person only through an explicit join: an SRE action with an audit record, or later a self-service join where the person signs in to both IdPs in one session. A shared email may *suggest* a join for SRE to review; it never makes one.
+**Joining identities across IdPs.** A human with identities in two IdPs starts as two people, one per identity. They become one person only through a join, and the person is offered one.
+- **Offered, never automatic.** The bot offers a join to someone it has resolved:
+  - when a shared attribute such as an email suggests another person is the same human;
+  - when the person asks to link another identity;
+  - when they act from a platform tied to an IdP their person has no identity in, such as a Teams caller whose Entra identity is a separate person.
+  A suggestion never makes a join.
+- **Proof of control, self-service.** The person proves they control both identities by signing in to each IdP in one linking flow. The bot runs OpenID Connect as a relying party for that flow only, with `state`, `nonce` and PKCE, and it takes the subject from each validated ID token. This is the practice Auth0 documents: authenticate both accounts before linking. An SSO session on a chat platform is not proof for another IdP.
+- **SRE join.** SRE can join two people without the sign-in proof, with a recorded reason. This covers a person who can't complete the flow.
+- **Merge semantics.**
+  - The older person survives. The other becomes a tombstone that points to the survivor (`merged_into`), so every stored reference to it still resolves, and no feature record is rewritten.
+  - Identities, accounts and homes move to the survivor in one atomic write.
+  - The join is recorded with `verified` (self-service) or `admin` provenance, audit-logged, and announced to the person on every linked chat home.
+- **Unjoin.** SRE can split a join by reversing the tombstone, with an audit record. Records written after the join stay on the survivor.
+- **Authorization.** A join can add roles, because roles are the union across linked identities ([authorization.md](authorization.md)). The person's cached verdict is discarded when a join commits.
 
 **No person kind, no permissions on the person.** The person record holds identity and links only. Whether someone is an employee or a contractor is an organization-level concern the app doesn't model. Access to a feature or role comes from membership in IdP groups, evaluated per linked identity, decided in TASK-129.
 
@@ -77,8 +91,9 @@ Deferred: whether the Backstage resolver adds the IdP subject as a claim or the 
 
 - Email joins stop, so renamed users, typos and differing Google and Microsoft addresses no longer break resolution.
 - Moving from Google to Entra, or adding Entra beside Google, touches the people capability, its directory adapters and entry-point resolution. No feature and no stored reference changes.
-- Linking needs almost no manual work in the single-IdP case: people come from the IdP, and accounts link through what the IdP asserted. Manual work is limited to cross-IdP joins, flagged `sso_email` links and accounts outside SSO.
-- Until an SRE join, a human with identities in two IdPs appears as two people in audit, approvals and on-call.
+- Linking needs almost no manual work in the single-IdP case: people come from the IdP, and accounts link through what the IdP asserted. Manual work is limited to joins a person can't complete themselves, flagged `sso_email` links and accounts outside SSO.
+- Until they join, a human with identities in two IdPs appears as two people in audit, approvals and on-call.
+- Cost: the self-service join adds the bot's first browser sign-in flow, an OIDC relying-party registration per IdP and its callback endpoint. It is built only when a second IdP is trusted.
 - Slack resolution rests on SSO enforcement. If a workspace stops enforcing SSO, its `sso_email` links lose their basis and must be re-reviewed.
 - Cost: the storage contract needs a new atomic multi-item write before the people store can be built.
 - A wrong link routes messages or access to the wrong human. Provenance, audit logging, atomic claims, deprovisioning on IdP deletion and the no-join-on-email rule are the mitigation.
@@ -93,6 +108,7 @@ Deferred: whether the Backstage resolver adds the IdP subject as a claim or the 
 - Tests: an `sso_email` link is refused when the email matches no active identity, matches more than one, or falls outside the trusted IdP's allowed domains.
 - Tests: a Slack guest account (`is_restricted` or `is_ultra_restricted`) is never given an `sso_email` link.
 - Tests: two identities from different IdPs with the same email produce two people and one suggested join, never one person.
+- Tests: a self-service join commits only after both ID tokens validate (signature, `iss`, `aud`, `nonce`) in one flow; the absorbed person becomes a tombstone that resolves to the survivor; the survivor's cached authorization verdict is discarded.
 - grep: the people capability's `api.py` exports no field named `kind` and no role or permission field.
 
 ## Migration
@@ -110,3 +126,4 @@ Tolerated until then:
 **Changes:**
 - 2026-09-24: Migration names epic tickets only, and the capability's home is `app/capabilities/people/` per plugin-architecture.md.
 - 2026-09-25: Accepted. The IdP decides who exists, accounts link only through what the IdP asserted, and person kind and permissions move to per-feature access policies (TASK-129).
+- 2026-09-25: A person is offered a join across IdPs, proved by signing in to both, and merges leave a tombstone that resolves to the survivor.
