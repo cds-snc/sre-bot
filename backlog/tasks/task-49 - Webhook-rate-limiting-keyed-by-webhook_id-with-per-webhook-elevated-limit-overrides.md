@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-24 15:02'
-updated_date: '2026-07-28 18:41'
+updated_date: '2026-09-24 20:03'
 labels:
   - security
   - phase-4
@@ -20,6 +20,7 @@ references:
   - decisions/security.md
   - decisions/configuration.md
   - 'https://github.com/cds-snc/sre-bot/issues/1344'
+  - decisions/plugin-architecture.md
 priority: medium
 ordinal: 73000
 ---
@@ -27,6 +28,8 @@ ordinal: 73000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+Rescoped 2026-09-24: webhooks is a capability at app/capabilities/webhooks/ (decisions/webhooks.md, decisions/plugin-architecture.md), not a feature package. It reaches storage, coordination, the queue and the Slack reply surface only through contracts resolved from the service registry, and imports no infrastructure/ or server/ module, so no slice adds an import-linter ignore entry. There is no in-process event bus: features react through the capability's extension point.
+
 Aligns with decisions/security.md (Webhooks, amended 2026-07-24): 'rate limits are keyed per webhook_id' ... 'default limits apply to all routes' but nothing implements this yet. Today POST /hook/{webhook_id} in app/api/v1/routes/webhooks.py is rate-limited via the global Limiter key_func (get_remote_address, per-IP once TASK-3 lands) at a flat 30/minute - every webhook_id sharing one source IP shares one bucket; there is no per-webhook_id key and no way to grant a specific known sender a higher ceiling without a header-based exemption (the pattern TASK-3 removes).
 
 This closes that gap using the identity TASK-47 introduces: once a webhook has a verified per-webhook secret (auth_mode=hmac), its webhook_id is a trustworthy key - keying the limiter by webhook_id (not IP) and allowing a configured elevated ceiling for specific migrated webhook_ids (e.g. the Sentinel alerting webhook, once TASK-48 migrates it off the legacy unsigned tier) becomes safe, spoof-proof, and requires no Entra ID/JWT work - superseding the Entra-ID/per-principal-JWT idea floated in TASK-3 comments #1/#2, which does not fit this webhook ingress path (that path is for authenticated API routes per decisions/security.md's general Rate limiting clause, not for webhooks, which have their own clause).

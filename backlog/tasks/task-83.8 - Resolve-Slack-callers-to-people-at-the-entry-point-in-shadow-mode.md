@@ -4,11 +4,12 @@ title: Resolve Slack callers to people at the entry point in shadow mode
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
+updated_date: '2026-09-24 20:08'
 labels:
   - identity
 dependencies:
   - TASK-83.7
-  - TASK-26
+  - TASK-26.2
 references:
   - decisions/platform-entrypoints.md
   - decisions/observability.md
@@ -33,3 +34,12 @@ In shadow mode, handlers receive the resolved person as optional context, but no
 - [ ] #4 A setting disables resolution entirely
 - [ ] #5 Full test suite, ruff and mypy pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:08
+---
+2026-09-24: depends on TASK-26.2, the slice of the rescoped TASK-26 that puts the Slack entry point in app/server/slack/ (decisions/platform-entrypoints.md). The resolved person or unlinked marker reaches handlers through the Slack handler contract in app/contracts/slack/ (TASK-26.1).
+---
+<!-- COMMENTS:END -->

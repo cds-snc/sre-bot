@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-16 13:59'
+updated_date: '2026-09-24 20:09'
 labels:
   - infrastructure
   - phase-4
@@ -15,10 +15,10 @@ milestone: m-4
 dependencies: []
 references:
   - decisions/cloud-portability.md
-  - decisions/layers.md
   - 'https://github.com/cds-snc/sre-bot/issues/1281'
   - app/infrastructure/idempotency/factory.py
   - app/infrastructure/storage/protocol.py
+  - decisions/plugin-architecture.md
 priority: high
 ordinal: 27000
 ---
@@ -41,9 +41,8 @@ Steps:
 <!-- AC:BEGIN -->
 - [ ] #1 StorageService signatures contain no vendor query strings or vendor types; grep KeyConditionExpression appears only inside the DynamoDB implementation (TASK-27.1)
 - [ ] #2 The vendor-neutral surface covers what its consumers actually need: a typed key-condition read (TASK-27.1), and an atomic single-attribute update, an atomic numeric increment and a bounded full-table list (TASK-27.2); every operation lands with a real consumer and a two-plausible-provider justification, never speculatively
-- [ ] #3 Every app/infrastructure/<service>/ Path A package contains an in-package fake exercised by tests, and the CI fake-coverage check reads the package tree rather than app/tests/ (TASK-27.1 for storage, TASK-27.3 for directory, audit and the check)
+- [ ] #3 Every hosting contract and every externally facing capability api.py Protocol has an in-memory fake exercised by tests, enforced by the CI fake-coverage check (TASK-27.1 for storage, TASK-27.3 for the check; directory and audit fakes land with their capability moves, TASK-119 and TASK-122)
 - [ ] #4 Conformance suites pass against fake and DynamoDB implementations (TASK-27.1, TASK-27.2, TASK-27.3)
-- [ ] #5 infrastructure/storage/ matches the Path A package shape used by directory/, drive/, spreadsheets/ and idempotency/: provider in factory.py, partitioned settings.py, concrete class named in exactly one place (TASK-27.3)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -96,5 +95,10 @@ author: @claude
 created: 2026-09-16 13:59
 ---
 2026-09-16: decomposed into TASK-27.1/.2/.3 following the TASK-25.2.5 review. The review question was whether the legacy DynamoDB callers in TASK-25.2.5 should move onto the storage capability instead of onto a provisional adapter; the answer was no (they need vendor-specific scan, counter and list-append behaviour that decisions/layers.md keeps out of a Path A contract, and their downstream callers read raw AttributeValue shapes), but it surfaced that TASK-37.1 and TASK-38 were both planned against a Protocol that cannot serve them. Both now depend on TASK-27.2. TASK-27.1 is pulled forward because its blast radius is currently zero and only grows.
+---
+
+created: 2026-09-24 20:09
+---
+2026-09-24 alignment with decisions/plugin-architecture.md: the StorageService Protocol moves to app/contracts/ after TASK-27.1 (TASK-108). The fake contract now covers hosting contracts and capability api.py Protocols. Former AC#5 (storage package shape with a cached factory.py provider) is dropped, because the service registry (TASK-109) replaces cached provider functions. decisions/layers.md references in the children read as decisions/plugin-architecture.md.
 ---
 <!-- COMMENTS:END -->

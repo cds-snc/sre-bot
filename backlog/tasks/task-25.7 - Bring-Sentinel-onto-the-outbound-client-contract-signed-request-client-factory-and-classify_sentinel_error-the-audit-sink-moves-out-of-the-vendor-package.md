@@ -7,17 +7,20 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 16:51'
+updated_date: '2026-09-24 20:10'
 labels:
   - clients
   - phase-3
 milestone: m-3
-dependencies: []
+dependencies:
+  - TASK-106
+  - TASK-122
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
-  - decisions/layers.md
   - app/integrations/sentinel/client.py
   - app/infrastructure/audit
+  - decisions/plugin-architecture.md
 parent_task_id: TASK-25
 priority: medium
 ordinal: 240000
@@ -44,8 +47,17 @@ TARGET. The vendor package exports a factory for the signed HTTP client (explici
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/sentinel/ exports only the client factory (explicit timeout, retry configured once) and classify_sentinel_error; it imports nothing from infrastructure above infrastructure.operations and reads no settings at import time
-- [ ] #2 The audit-sink behaviour (log_to_sentinel, log_audit_event, never-raise policy) lives in its decided owner, and all current consumers are repointed with behaviour unchanged
+- [ ] #1 integrations/sentinel/ exports only the client factory (explicit timeout, retry configured once) and classify_sentinel_error; it imports nothing from the app except app/contracts/ shared types and reads no settings at import time
+- [ ] #2 The audit-sink behaviour (log_to_sentinel, log_audit_event, never-raise policy) lives in app/capabilities/audit/adapters/ as the audit capability's Sentinel sink, and all current consumers are repointed with behaviour unchanged
 - [ ] #3 Classification tests cover each mapped failure family plus one unmapped exception propagating; the signature construction keeps its existing test coverage
 - [ ] #4 ruff, mypy, pytest tests --ignore=tests/smoke and make check-vendor-package-contract pass, with output recorded in notes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:10
+---
+2026-09-24: the owner of the audit sink is decided by decisions/plugin-architecture.md. The audit trail is a capability (app/capabilities/audit/, TASK-122), and Sentinel is one of its sinks, so the sink goes to that capability's adapters/. It does not go to infrastructure/, which is hosting-only. Integrations may import only app/contracts/ shared types (TASK-106).
+---
+<!-- COMMENTS:END -->

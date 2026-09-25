@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-18 16:47'
+updated_date: '2026-09-24 20:10'
 labels:
   - clients
   - phase-3
@@ -20,6 +20,7 @@ references:
   - decisions/operation-result.md
   - decisions/sdk-typing.md
   - 'https://github.com/cds-snc/sre-bot/issues/1279'
+  - decisions/plugin-architecture.md
 priority: high
 ordinal: 25000
 ---
@@ -131,5 +132,10 @@ created: 2026-09-14 15:27
 created: 2026-09-18 16:47
 ---
 2026-09-18 ID NOTE: TASK-25.5 is now 'Retire MaxMindClient' (created 2026-09-18). The CLI reused the ID of the archived AWSShield-deletion task that this task's plan still calls TASK-25.5; that work was folded into TASK-25.2.6 and done in TASK-25.2.6.2. Also 2026-09-18: TASK-25.4 re-scoped to delete SlackClientManager and bring every Slack Web-client construction site onto one factory. TASK-25.4 and the new TASK-25.5 are the two tasks decisions/sdk-typing.md waits on before applies: now.
+---
+
+created: 2026-09-24 20:10
+---
+2026-09-24 alignment with decisions/plugin-architecture.md and outbound-clients.md: integrations import nothing from the app except app/contracts/ shared types. The infrastructure.operations import becomes a contracts import through TASK-106, and vendor settings leave app/infrastructure/configuration/ through TASK-24. Business operations leaving a vendor package go to a feature's or capability's adapters/, never to app/infrastructure/: Sentinel audit sink -> capabilities/audit (TASK-25.7); Opsgenie -> oncall_sync and incident adapters (TASK-25.6); Notify revoke_api_key -> its webhooks caller (TASK-25.8); Trello ATIP ops -> features/atip adapters (TASK-25.9); OpenAI Summarizer -> decided in TASK-25.10. The workplace providers named in the description (infrastructure/directory, drive, spreadsheets) move to app/capabilities/ (TASK-119, TASK-120, TASK-121).
 ---
 <!-- COMMENTS:END -->

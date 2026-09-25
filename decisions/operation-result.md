@@ -13,7 +13,7 @@ Consumers of external calls need to branch on expected outcomes (success, not-fo
 
 ## Decision
 
-`OperationResult` (in `infrastructure/operations/`, the shared kernel) is a **frozen dataclass** carrying:
+`OperationResult` is a shared type of the public plugin API in `app/contracts/` ([plugin-architecture.md](plugin-architecture.md)), importable from every layer, `integrations/` included. It is a **frozen dataclass** carrying:
 
 - `status: OperationStatus` — closed enum: `SUCCESS`, `NOT_FOUND`, `TRANSIENT_ERROR`, `PERMANENT_ERROR`, `UNAUTHORIZED`.
 - `data` — the typed payload; present only on `SUCCESS`.
@@ -42,4 +42,7 @@ Consumers of external calls need to branch on expected outcomes (success, not-fo
 
 ## Migration
 
-Ticket: envelope shape fix (one PR: freeze the dataclass, remove `map`/`bind`, make `message` optional on success, add `cause`, resolve `provider`/`operation`, fix the stale docstring pointer). Tolerated until closed: the current mutable shape.
+Tickets: envelope shape fix (one PR: freeze the dataclass, remove `map`/`bind`, make `message` optional on success, add `cause`, resolve `provider`/`operation`, fix the stale docstring pointer); the `contracts/` move ([plugin-architecture.md](plugin-architecture.md)). Tolerated until closed: the current mutable shape; `OperationResult` and `OperationStatus` living in `app/infrastructure/operations/`.
+
+**Changes:**
+- 2026-09-24: `OperationResult` moves to `app/contracts/` as a shared type of the plugin API.

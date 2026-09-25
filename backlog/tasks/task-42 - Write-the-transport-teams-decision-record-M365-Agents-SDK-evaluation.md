@@ -4,7 +4,7 @@ title: Write the transport-teams decision record (M365 Agents SDK evaluation)
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-10 16:18'
+updated_date: '2026-09-24 20:10'
 labels:
   - teams
   - phase-6
@@ -13,6 +13,7 @@ dependencies: []
 references:
   - decisions/platform-transports.md
   - 'https://github.com/cds-snc/sre-bot/issues/1296'
+  - decisions/plugin-architecture.md
 priority: low
 ordinal: 42000
 ---
@@ -53,5 +54,10 @@ ARCHITECTURE CONSTRAINT ADDED 2026-09-10 (human-directed). Chat platforms are sp
 Features never receive SDK runtime objects such as the Bolt App. Do not move a runtime into app/infrastructure/<platform>/ in the meantime, so it moves only once.
 
 The Teams decision record should adopt this split from the start: Bot Framework runtime in app/server/teams/, Teams handler contract in app/infrastructure/teams/. Acceptance of the Drafts is tracked in TASK-83.1.
+---
+
+created: 2026-09-24 20:10
+---
+2026-09-24 alignment: decisions/capability-packages.md is deleted; decisions/plugin-architecture.md and platform-entrypoints.md fix the Teams split: runtime in app/server/teams/, handler contract in app/contracts/ (with Teams model types only in its own contracts subpackage, per interaction-toolkits.md Draft), Web API client and classifier in app/integrations/<teams package>/. The platform-entrypoints.md Draft is accepted or rejected in TASK-83.1.
 ---
 <!-- COMMENTS:END -->

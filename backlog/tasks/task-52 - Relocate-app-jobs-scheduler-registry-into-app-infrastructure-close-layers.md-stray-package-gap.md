@@ -1,25 +1,28 @@
 ---
 id: TASK-52
 title: >-
-  Relocate app/jobs/ scheduler registry into app/infrastructure/ (close
-  layers.md stray-package gap)
+  Move the scheduler runtime from app/jobs/ into app/server/scheduler/ and
+  delete app/jobs/
 status: To Do
 assignee: []
 created_date: '2026-07-27 15:48'
-updated_date: '2026-07-28 16:33'
+updated_date: '2026-09-24 20:06'
 labels:
   - architecture
   - layers
   - reliability
-milestone: m-4
+  - plugin-architecture
+milestone: m-7
 dependencies:
   - TASK-6
   - TASK-64
+  - TASK-107
 references:
-  - decisions/layers.md
   - decisions/reliability.md
   - decisions/plugins.md
   - 'https://github.com/cds-snc/sre-bot/issues/1356'
+  - decisions/migration.md
+  - decisions/plugin-architecture.md
 priority: medium
 ordinal: 80000
 ---
@@ -27,25 +30,22 @@ ordinal: 80000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-decisions/layers.md defines exactly three tiers under app/ (packages -> infrastructure -> integrations, downward-only imports) plus the server/ host process; app/jobs/ is a fourth, undeclared top-level package that fits neither role and is imported sideways/upward by a genuine infrastructure module.
+Rescoped 2026-09-24. decisions/layers.md was deleted. decisions/migration.md's directory table now gives jobs/ its disposition: "Each job moves to its owning feature or capability and registers through the scheduler contract in contracts/; the runtime moves to server/ and runs each job once across replicas on a coordination lease." decisions/reliability.md: the scheduler is a clock-driven host capability, composed like a transport.
 
-Evidence:
-- app/infrastructure/plugins/specs.py:17 does `from jobs import BackgroundJobRegistry` - an infrastructure module importing a Protocol from a package outside the three-tier model. Per layers.md, infrastructure may only import integrations (+ the infrastructure/operations shared-kernel exception); importing from a sibling top-level package like jobs/ is not a sanctioned path.
-- app/jobs/models.py defines BackgroundJobRegistry - a scheduler-agnostic registration Protocol. This is capability-shaped (vendor-neutral: 'register a recurring job by name/schedule'), exactly the Path A / infrastructure-capability shape layers.md describes, not feature/domain logic.
-- app/jobs/scheduled_tasks.py hosts the generic scheduler bootstrap (init(), safe_run() error-boundary wrapper, _ScheduleBackgroundJobRegistry adapter binding to the schedule library, hook.register_background_jobs dispatch) interleaved with specific job bodies/imports across modules.*, packages.access.sync.*, and integrations.* - a cross-cutting capability several unrelated features depend on, which decisions/layers.md and .github/copilot-instructions.md both say belongs in app/infrastructure/, never in a standalone package.
-- decisions/plugins.md: hookspecs are host-owned and centrally defined in app/infrastructure/plugins/specs.py; the Protocol types a hookspec's signature depends on (BackgroundJobRegistry) should live alongside that host-owned surface, not in a separate ad hoc package.
+Split of the old jobs/ package:
+- The BackgroundJobRegistry Protocol and the register_background_jobs hookspec are the scheduler contract. TASK-107 moves them into app/contracts/ with the other hookspecs.
+- The runtime is host code and moves to app/server/scheduler/ here: init(), the safe_run error boundary, the schedule-library adapter, the Tier-2 lease wrapper, shutdown, and the two host-owned Tier-1 jobs (heartbeat, integration health-check sweep).
+- The legacy pull-hub's hand-imports of modules/ and packages/ job bodies move with the runtime into server/, which may import everything as the composition root. TASK-65 strangles them job by job as each owning surface is rebuilt.
 
-TASK-6 (m-0) already rewrites the Tier-1/Tier-2 lease-gating behavior inside app/jobs/scheduled_tasks.py in place; this task is the structural follow-up that relocates the generic scheduler capability (Protocol + bootstrap/dispatch machinery) into app/infrastructure/, leaving only feature-owned job bodies where their owning code currently lives (modules/ today, migrating to packages/ per decisions/migration.md's own schedule - not blocked on that migration completing). Depends on TASK-6 so the relocation carries forward the corrected lease/Tier classification rather than migrating then immediately rewriting.
-
-This task itself needs a human-approved implementation plan (backlog task edit TASK-XX --plan) via the task-planner workflow before implementation starts, per the single-PR size gate.
+After this ticket, no app/jobs/ package remains. Depends on TASK-64, so the widened registry moves rather than the narrow one, and on TASK-107, so the contract is already in contracts/.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The BackgroundJobRegistry Protocol and the generic scheduler bootstrap/dispatch machinery (safe_run wrapper, schedule-library adapter, plugin hook.register_background_jobs call) move from app/jobs/ into app/infrastructure/ (exact module name decided at planning time); app/infrastructure/plugins/specs.py imports BackgroundJobRegistry from app/infrastructure/, not from a top-level jobs package
-- [ ] #2 No top-level app/jobs/ package remains outside the packages -> infrastructure -> integrations layer model (plus server/ as the host process); feature-owned job bodies stay with their owning code (modules/ now, packages/ once migrated) rather than in a standalone jobs/ directory
-- [ ] #3 import-linter (or an equivalent grep-based check, pending TASK-18) has no exception/baseline entry needed for this import path post-migration
-- [ ] #4 Existing scheduler tests (app/tests covering scheduled_tasks.py / BackgroundJobRegistry) pass unchanged in behavior, updated only for the new import paths
+- [ ] #1 The scheduler runtime (init, safe_run, schedule adapter, Tier-2 lease enforcement, shutdown, heartbeat and health-check jobs) lives in app/server/scheduler/; the BackgroundJobRegistry Protocol is imported from app/contracts/
+- [ ] #2 app/jobs/ no longer exists; the remaining legacy job hand-imports live only in app/server/scheduler/ until TASK-65 strangles them
+- [ ] #3 import-linter needs no new ignore entry for the moved paths
+- [ ] #4 Existing scheduler tests pass unchanged in behavior, updated only for the new import paths
 <!-- AC:END -->
 
 ## Definition of Done

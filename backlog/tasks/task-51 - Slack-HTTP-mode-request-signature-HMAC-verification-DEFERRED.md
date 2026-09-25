@@ -4,20 +4,20 @@ title: Slack HTTP-mode request-signature (HMAC) verification (DEFERRED)
 status: To Do
 assignee: []
 created_date: '2026-07-27 14:02'
-updated_date: '2026-07-27 16:13'
+updated_date: '2026-09-24 20:10'
 labels:
   - security
   - slack
   - phase-4
 milestone: m-4
 dependencies:
-  - TASK-26
-  - TASK-9
+  - TASK-26.2
 references:
   - decisions/transport-slack.md
   - decisions/security.md
   - 'https://github.com/cds-snc/sre-bot/issues/1263'
   - 'https://github.com/cds-snc/sre-bot/issues/1355'
+  - decisions/platform-entrypoints.md
 priority: low
 ordinal: 79000
 ---
@@ -57,5 +57,10 @@ Depends on TASK-26 (the Slack transport home in app/infrastructure/slack/ where 
 created: 2026-07-27 14:03
 ---
 DEFER - do not start until further notice. Split out of TASK-9 on 2026-07-27. The app runs Slack Socket Mode (WebSocket) today, where request authenticity is carried by the connection handshake, so this per-request HMAC verification is latent and not live-exposed. Un-defer only when HTTP Events mode (SLACK__SOCKET_MODE=false) is actually going to be enabled, and after TASK-26 has moved the Slack transport into app/infrastructure/slack/.
+---
+
+created: 2026-09-24 20:10
+---
+2026-09-24 alignment with decisions/platform-entrypoints.md and transport-slack.md: HTTP-mode verification lives in the Slack runtime in app/server/slack/ (after TASK-26.2), never in app/infrastructure/slack/ or in handlers.
 ---
 <!-- COMMENTS:END -->

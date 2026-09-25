@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-17 19:06'
+updated_date: '2026-09-24 20:11'
 labels:
   - clients
   - architecture
@@ -17,6 +18,7 @@ references:
   - app/modules/aws/ops_group_assignment.py
   - app/jobs/scheduled_tasks.py
   - decisions/outbound-clients.md
+  - decisions/dependency-injection.md
 priority: medium
 ordinal: 226000
 ---
@@ -53,3 +55,12 @@ OUT OF SCOPE: the boot-time failure itself (TASK-92), off-AWS credential acquisi
 - [ ] #5 The integrations/aws/client.py module docstring claim 'Clients are built per call and never cached, so assumed credentials never need refreshing' is corrected or explicitly defended, and decisions/outbound-clients.md records the outcome if it changes the contract
 - [ ] #6 The chosen mechanism does not reintroduce AssumeRole at import or boot time in a way that conflicts with TASK-92 AC#1; the conflict check is recorded in notes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:11
+---
+2026-09-24 alignment with decisions/dependency-injection.md: construction moves to the svcs service registry (TASK-109). The service's lifetime (a value or factory closing over one instance) is the host's registration choice, not an lru_cache on a provider function. Whether AssumeRole runs eagerly at boot is decided in TASK-92.
+---
+<!-- COMMENTS:END -->

@@ -6,12 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-04 14:19'
-updated_date: '2026-09-10 15:45'
+updated_date: '2026-09-24 20:11'
 labels:
   - layering
 milestone: m-3
 dependencies:
   - TASK-76.4
+references:
+  - decisions/plugin-architecture.md
 priority: medium
 ordinal: 152000
 ---
@@ -82,5 +84,10 @@ Until those are accepted:
 - do not create capability packages yet.
 
 Organization-owned domains are directory and identity data for an organization with both Google and Microsoft tenants. Do not implement them as a new infrastructure capability, or as new operations on infrastructure/directory. Under decisions/people-and-accounts.md (Draft), tenants and domains belong with people and accounts. Hold planning until the Draft records are decided, or keep the change feature-local.
+---
+
+created: 2026-09-24 20:11
+---
+2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). Owned domains become part of the directory capability's api.py in app/capabilities/directory/ (TASK-119) rather than app/infrastructure/directory/. If this lands before TASK-119, add it where the provider lives then; TASK-119 moves it mechanically.
 ---
 <!-- COMMENTS:END -->

@@ -7,20 +7,21 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 16:51'
+updated_date: '2026-09-24 20:10'
 labels:
   - clients
   - phase-3
 milestone: m-3
-dependencies: []
+dependencies:
+  - TASK-106
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
-  - decisions/layers.md
-  - decisions/capability-packages.md
   - app/integrations/openai/client.py
   - app/integrations/openai/summarizer.py
   - app/packages/incident_draft/service.py
   - app/packages/incident_summary/service.py
+  - decisions/plugin-architecture.md
 parent_task_id: TASK-25
 priority: medium
 ordinal: 243000
@@ -55,3 +56,12 @@ TARGET. integrations/openai/ exports build_openai_client (timeout plus a retry p
 - [ ] #4 Classification tests cover each mapped HTTP status family and Retry-After, plus one unmapped exception propagating; no 'from __future__ import annotations' remains in touched files
 - [ ] #5 decisions/outbound-clients.md no longer lists OpenAI as a tolerated divergence; ruff, mypy, pytest tests --ignore=tests/smoke and make check-vendor-package-contract pass, with output recorded in notes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:10
+---
+2026-09-24 (human decision): the Summarizer's home is decided during this task's planning. decisions/plugin-architecture.md narrows the options to two, and app/infrastructure/ is not one of them (hosting-only). (a) Per-subdomain adapters: features/incident/draft and features/incident/summary each own a small adapters/openai.py behind their own port. Subdomains may not import each other, and common/ holds no I/O, so one shared adapter inside the incident umbrella is not an option. (b) A summarization capability at app/capabilities/summarization/ with api.py, justified only if it passes the three capability tests. TASK-124.5 (incident umbrella move) depends on this task, so the Summarizer moves once, to its final home.
+---
+<!-- COMMENTS:END -->

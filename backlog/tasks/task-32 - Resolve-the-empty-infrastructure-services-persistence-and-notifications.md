@@ -1,18 +1,19 @@
 ---
 id: TASK-32
-title: 'Resolve the empty infrastructure services: persistence/ and notifications/'
+title: Delete the README-only app/infrastructure/notifications/ placeholder
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-10 15:45'
+updated_date: '2026-09-24 20:04'
 labels:
   - infrastructure
   - phase-4
-milestone: m-4
+  - plugin-architecture
+milestone: m-7
 dependencies: []
 references:
-  - decisions/layers.md
   - 'https://github.com/cds-snc/sre-bot/issues/1286'
+  - decisions/plugin-architecture.md
 priority: low
 ordinal: 32000
 ---
@@ -20,18 +21,17 @@ ordinal: 32000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-app/infrastructure/persistence/ is empty (0 files) and app/infrastructure/notifications/ is a README saying "to be rebuilt". Empty services make the "composed services behind Protocols" claim false and confuse contributors.
+Rescoped 2026-09-24. app/infrastructure/persistence/ no longer exists (verified 2026-09-24). app/infrastructure/notifications/ holds only a README saying "to be rebuilt".
 
-Steps:
-1. For each: decide with the maintainer - build it now (only if a concrete consumer exists), or delete the directory and record the deletion rationale in the PR (it can be recreated when a real consumer appears, per the second-consumer promotion rule in decisions/layers.md).
-2. Default recommendation: delete both; storage covers persistence needs today and notifications has no consumer.
-3. Also declare which infrastructure services are deliberately Protocol-less framework concerns (logging, plugins, configuration) in decisions/layers.md or a README, so the Protocol-coverage claim is honest.
+decisions/plugin-architecture.md lists notifications among the shared business capabilities, so its home is app/capabilities/notifications/, not infrastructure/, and it is built with its first consumer (the "no approvers found" operator alert rehomed by TASK-61). A placeholder in infrastructure/ points contributors at the wrong layer. Delete it.
+
+The former second AC (a note on which infrastructure services are deliberately Protocol-less) is obsolete. Framework services move to app/server/ with their contracts in app/contracts/ (TASK-107, TASK-115, TASK-116, TASK-118), and the reference to the deleted decisions/layers.md no longer applies.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Neither an empty package nor a README-only package exists under app/infrastructure/
-- [ ] #2 A one-paragraph note records which services are deliberately Protocol-less and why
+- [ ] #1 app/infrastructure/notifications/ does not exist, and no empty or README-only package exists under app/infrastructure/
+- [ ] #2 No doc or task points contributors at infrastructure/ for notifications; decisions/ and README references name app/capabilities/notifications/
 <!-- AC:END -->
 
 ## Definition of Done

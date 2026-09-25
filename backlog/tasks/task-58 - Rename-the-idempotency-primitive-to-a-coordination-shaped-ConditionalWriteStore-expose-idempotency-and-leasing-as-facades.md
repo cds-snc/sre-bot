@@ -6,19 +6,22 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-28 13:19'
-updated_date: '2026-09-18 15:28'
+updated_date: '2026-09-24 20:09'
 labels:
   - infrastructure
   - phase-4
   - reliability
-milestone: m-4
+  - plugin-architecture
+milestone: m-7
 dependencies:
   - TASK-6
   - TASK-102
+  - TASK-106
 references:
   - decisions/reliability.md
   - decisions/cloud-portability.md
   - 'https://github.com/cds-snc/sre-bot/issues/1366'
+  - decisions/plugin-architecture.md
 priority: medium
 ordinal: 88000
 ---
@@ -42,9 +45,9 @@ This is a rename + facade split with no wire-behavior change; a planner agent sh
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The single atomic conditional-write primitive is exposed as one coordination-shaped Protocol (e.g. ConditionalWriteStore) with claim/complete/release; DynamoDB and in-memory implementations behave identically to today
+- [ ] #1 The single atomic conditional-write primitive is exposed as one coordination-shaped Protocol (e.g. ConditionalWriteStore) with claim/complete/release in app/contracts/; the DynamoDB and in-memory implementations live in app/infrastructure/coordination/ and behave identically to today
 - [ ] #2 IdempotencyStore and the lease helpers exist only as thin facades over that primitive; no second implementation of the conditional-write logic remains
-- [ ] #3 All consumers import the new coordination module; the old app/infrastructure/idempotency/ path and every transitional alias/shim are deleted (grep finds no idempotency-module import path)
+- [ ] #3 All consumers import the new coordination paths; the old app/infrastructure/idempotency/ path and every transitional alias/shim are deleted (grep finds no idempotency-module import path)
 - [ ] #4 The Access Sync job-status store remains a separate StorageService-backed keyed-record capability, not folded into the primitive
 - [ ] #5 decisions/reliability.md lease.py path reference and any other decisions/ cross-references are updated to the new module path in the same PR
 <!-- AC:END -->
@@ -75,5 +78,10 @@ Also for this task to carry forward: TASK-25.2.5.4 adds a fourth conditional-che
 created: 2026-09-18 15:27
 ---
 2026-09-18 (human decision): order is TASK-102, then this task, then TASK-100. This task is where the read-failure policy becomes explicit per use: the lease facade and the dedup facade each choose it at construction, and the primitive carries none. TASK-37.2 and TASK-100 now depend on this task. Not yet linked, needs coordinating: TASK-64 moves run_if_leased out of lease.py into the scheduler registry, and TASK-65 later deletes the _tier2 wrapper. Both touch the lease surface this task renames.
+---
+
+created: 2026-09-24 20:09
+---
+2026-09-24 alignment with decisions/plugin-architecture.md: the coordination contract is a core-service Protocol in app/contracts/, implemented in app/infrastructure/coordination/. AC#1 now names both homes, and this task depends on TASK-106 (contracts created). Consumers switch from the facades' module paths to registry resolution when the service registry lands (TASK-109, which depends on this task).
 ---
 <!-- COMMENTS:END -->

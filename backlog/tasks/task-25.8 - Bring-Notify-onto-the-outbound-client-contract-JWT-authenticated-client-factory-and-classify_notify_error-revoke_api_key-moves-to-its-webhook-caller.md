@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 16:51'
+updated_date: '2026-09-24 20:11'
 labels:
   - clients
   - phase-3
@@ -14,9 +15,9 @@ dependencies: []
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
-  - decisions/layers.md
   - app/integrations/notify/client.py
   - app/modules/webhooks/patterns/aws_sns_notification/api_key_detected.py
+  - decisions/plugin-architecture.md
 parent_task_id: TASK-25
 priority: medium
 ordinal: 241000
@@ -45,3 +46,12 @@ TARGET. The vendor package exports a factory for an authenticated HTTP client (J
 - [ ] #3 Classification tests cover each mapped failure family plus one unmapped exception propagating; JWT header construction keeps its test coverage
 - [ ] #4 ruff, mypy, pytest tests --ignore=tests/smoke and make check-vendor-package-contract pass, with output recorded in notes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:11
+---
+2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). revoke_api_key moves to its caller. Today that is the modules/webhooks SNS pattern. When TASK-37 rebuilds webhooks as a capability, the key-revocation reaction belongs to the feature that registers a handler through the webhooks extension point (TASK-37.5), not the capability core.
+---
+<!-- COMMENTS:END -->

@@ -3,11 +3,11 @@ id: TASK-25.2.6.3
 title: >-
   Retire infrastructure/configuration/integrations/aws.py; repoint
   packages/access; close the outbound-clients.md shield tolerance
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-18 15:34'
-updated_date: '2026-09-24 16:00'
+updated_date: '2026-09-24 20:32'
 labels:
   - clients
   - phase-3

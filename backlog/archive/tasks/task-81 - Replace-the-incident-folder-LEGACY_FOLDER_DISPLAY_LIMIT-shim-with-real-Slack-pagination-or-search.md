@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-08 18:57'
+updated_date: '2026-09-24 20:06'
 labels:
   - incident
   - slack
@@ -32,3 +33,12 @@ This task designs and implements the real product fix — pagination (Slack "Loa
 - [ ] #2 The chosen UX (pagination or search) is implemented within Slack's 100-block modal and 100-option static_select limits
 - [ ] #3 LEGACY_FOLDER_DISPLAY_LIMIT is deleted from incident_folder.py
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:06
+---
+Retired 2026-09-24 into TASK-38. This is a product redesign (pagination or search) of a modules/incident surface. migration.md rule 1 freezes that module to bug fixes, and the incident rebuild removes Google Drive folders as an incident concept (plugin-architecture.md: an incident works with documents and a chat channel through capability contracts). The requirement survives as a TASK-38 acceptance criterion: no rebuilt list or picker silently truncates. The LEGACY_FOLDER_DISPLAY_LIMIT shim stays on the legacy surface until that surface is cut over.
+---
+<!-- COMMENTS:END -->

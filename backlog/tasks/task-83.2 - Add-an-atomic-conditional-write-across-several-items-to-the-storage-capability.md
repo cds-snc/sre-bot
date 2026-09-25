@@ -4,11 +4,13 @@ title: Add an atomic conditional write across several items to the storage capab
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
+updated_date: '2026-09-24 20:08'
 labels:
   - identity
   - storage
 dependencies:
   - TASK-27
+  - TASK-108
 references:
   - decisions/reliability.md
   - decisions/cloud-portability.md
@@ -36,3 +38,12 @@ This is a hosting-storage primitive with no identity vocabulary. It builds on th
 - [ ] #4 The operation's contract names no DynamoDB syntax
 - [ ] #5 Full test suite, ruff and mypy pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:08
+---
+2026-09-24: the storage Protocol moves to app/contracts/ (TASK-108, decisions/plugin-architecture.md). This ticket adds the atomic multi-item write to it there, after the move, so the Protocol is not changed in two homes.
+---
+<!-- COMMENTS:END -->

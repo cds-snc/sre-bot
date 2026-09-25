@@ -4,7 +4,7 @@ title: Monitor-then-enforce migration of legacy unsigned webhook senders
 status: To Do
 assignee: []
 created_date: '2026-07-24 13:59'
-updated_date: '2026-07-28 18:41'
+updated_date: '2026-09-24 20:03'
 labels:
   - security
   - webhooks
@@ -15,6 +15,7 @@ references:
   - decisions/webhooks.md
   - decisions/security.md
   - 'https://github.com/cds-snc/sre-bot/issues/1343'
+  - decisions/plugin-architecture.md
 priority: medium
 ordinal: 72000
 ---
@@ -22,6 +23,8 @@ ordinal: 72000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+Rescoped 2026-09-24: webhooks is a capability at app/capabilities/webhooks/ (decisions/webhooks.md, decisions/plugin-architecture.md), not a feature package. It reaches storage, coordination, the queue and the Slack reply surface only through contracts resolved from the service registry, and imports no infrastructure/ or server/ module, so no slice adds an import-linter ignore entry. There is no in-process event bus: features react through the capability's extension point.
+
 Phase 4 behaviour change: retires the Hardened secret-URL (legacy/unsigned) tier from decisions/security.md (Webhooks, amended 2026-07-24) by migrating each live sender identified by TASK-46 onto the HMAC tier delivered by TASK-47. This is the burn-down that lets the risk-accepted-in-writing exception be closed.
 
 Approach (per-webhook_id, never big-bang):

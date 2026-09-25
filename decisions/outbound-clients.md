@@ -28,9 +28,9 @@ Vendor SDKs each have their own retry knobs and exception hierarchies. The legac
    **No hand-rolled retry loops anywhere, ever.** Blocking SDK calls invoked from async code are offloaded with `asyncio.to_thread`, which is where the thread rule matters.
 2. **A classification function** — `classify_<vendor>_error(exc) -> tuple[OperationStatus, error_code, retry_after]`, one table per vendor mapping the SDK's *expected* exception families onto the closed status set. Unexpected exceptions (a `KeyError` is a bug, not an outcome) are **not** classified — they propagate and crash loudly.
 
-Clients **raise typed SDK exceptions**. They do not return `OperationResult`, do not import feature or infrastructure code (except the `infrastructure.operations` shared kernel, needed only for the classification function's return type), and contain no business logic.
+Clients **raise typed SDK exceptions**. They do not return `OperationResult`, import nothing from the app except the shared types in `contracts/` (`OperationStatus`, needed only for the classification function's return type), and contain no business logic. `integrations/` holds outbound clients only: a platform's inbound runtime (Bolt, Socket Mode) is host code in `server/` ([platform-transports.md](platform-transports.md)), while its Web API client lives here, because a feature may act on the platform as a target.
 
-**The adapter is the boundary.** The Protocol implementation — a Path A composed service in `infrastructure/`, or a Path B feature adapter in `packages/<feature>/adapters/` — calls the client inside `try/except`, uses the vendor's classification function, and returns `OperationResult`. It also translates payloads into domain/capability types. That is the whole Gateway (Fowler) / Anti-Corruption Layer role, in one tier. The adapter must not leak vendor-only concepts (Google Drive `appProperties`, Drive `q` expressions, SDK field projection strings) through a vendor-neutral Path A Protocol. Those stay in the provider implementation, or in a Path B adapter whose feature explicitly depends on them. A Path A contract is portable only when its operation names and models stay meaningful for at least one other plausible provider ([layers.md](layers.md)).
+**The adapter is the boundary.** The Protocol implementation — a file in a feature's or capability's `adapters/`, or a hosting implementation in `infrastructure/` of a `contracts/` Protocol ([plugin-architecture.md](plugin-architecture.md)) — calls the client inside `try/except`, uses the vendor's classification function, and returns `OperationResult`. It also translates payloads into domain types. That is the whole Gateway (Fowler) / Anti-Corruption Layer role, in one tier. `adapters/` files are the only feature or capability files that import `integrations/`. A Path B adapter serves a feature that exists to act on one specific system, so its Protocol may be shaped by that system. An adapter behind a vendor-neutral Protocol (a hosting contract, or a capability's `api.py`) must not leak vendor-only concepts (Google Drive `appProperties`, Drive `q` expressions, SDK field projection strings) through it. Those stay in the implementation. Such a Protocol is portable only when its operation names and models stay meaningful for at least one other plausible provider.
 
 **No standing wrapper class** exposing the SDK handle. Adapters hold the SDK client directly (they are allowed to — the adapter file *is* the boundary), which keeps the vendor's typed surface, IDE completion, and documentation examples intact with zero mirror-maintenance.
 
@@ -50,7 +50,7 @@ Clients **raise typed SDK exceptions**. They do not return `OperationResult`, do
 - grep: no `time.sleep`/`tenacity`/`backoff` retry loops in `app/integrations/`.
 - Each vendor package exports exactly: factories, `classify_<vendor>_error`, settings ([configuration.md](configuration.md)).
 - Classification tests per vendor: each mapped exception family → expected status/`error_code`/`retry_after`; one unmapped exception → propagates.
-- import-linter: `integrations` imports nothing above `infrastructure.operations`.
+- import-linter: `integrations` imports nothing from the app except the shared types in `contracts/`; features and capabilities import `integrations` only inside `adapters/`.
 - Factory tests assert explicit resilience settings. For boto3, `Config` sets `mode`, `max_attempts`, `connect_timeout` and `read_timeout`. Google services are built with a `requestBuilder` retry default and an `Http` that has an explicit timeout.
 - Review: every non-idempotent write names its idempotency mechanism or uses a retries-disabled handle.
 - Review: no Google `Resource` is cached and shared across threads unless each request builds its own `Http`.
@@ -58,6 +58,7 @@ Clients **raise typed SDK exceptions**. They do not return `OperationResult`, do
 ## Migration
 
 Ticket: TASK-25 (per-vendor contract) and TASK-87 (Google write replay safety). Only AWS follows this decision in full today; every other vendor diverges as listed. Tolerated until closed:
+- `integrations/` importing `infrastructure.operations` instead of `contracts/`, plus 11 other `infrastructure` imports (settings under `infrastructure.configuration`, `infrastructure.audit.models`, `infrastructure.i18n`, `infrastructure.slack.settings`); import-linter is not enforced yet, and these become its ignore entries when TASK-18 lands;
 - non-idempotent Google writes (Drive create and copy) issued on the retrying handle;
 - a per-call `num_retries=0` override at six Google writes (Calendar event insert, Meet space create, incident_draft Drive copy and Docs batchUpdate, incident documents apply_document_edits, Sheets values.append): a call-site exception to "no retry decision repeated at call sites";
 - a replayed Directory `members.insert` that returns 409 is not treated as success;
@@ -67,13 +68,12 @@ Ticket: TASK-25 (per-vendor contract) and TASK-87 (Google write replay safety). 
 - Sentinel: the audit sink lives in the vendor package, which has no classifier and imports `infrastructure.audit`;
 - Notify: `revoke_api_key` lives in the vendor package, which has no classifier;
 - Trello: ATIP operations in the vendor package, no classifier, no explicit timeout or retry;
-- OpenAI, added during this migration: the `Summarizer` port and implementation live in the vendor package, and `classify_openai_error` returns `OperationResult`;
-- every vendor's settings except AWS's still live in `infrastructure/configuration/integrations/`, so `integrations/google_workspace/` imports infrastructure configuration (TASK-24);
-- the import-linter check is not enforced yet (TASK-18).
+- OpenAI: the `Summarizer` port and implementation live in the vendor package, and `classify_openai_error` returns `OperationResult`;
+- every vendor's settings except AWS's still live in `infrastructure/configuration/integrations/` (TASK-24).
 
 **Changes:**
 - 2026-09-08: adapters must not leak vendor-only concepts through Path A Protocols.
 - 2026-09-10: added explicit timeout, non-idempotent write and thread-safety rules, and corrected how Google retries are configured.
 - 2026-09-11: Google factories set an explicit per-attempt timeout; recorded the per-call `num_retries=0` override at six non-idempotent Google writes as a tolerated divergence.
 - 2026-09-17: removed the closed 'seven baselined deprecated-client consumers' tolerance (TASK-22.5 migrated them; TASK-25.2.5.7 retired the guard).
-- 2026-09-24: removed the closed AWS wrapper-class tolerance and references to deleted code; Migration lists every open divergence under its epic ticket.
+- 2026-09-24: removed the closed AWS wrapper-class tolerance and references to deleted code; Migration lists every open divergence under its epic ticket; integrations import only `contracts/` shared types, and adapters live in a feature's or capability's `adapters/` or in `infrastructure/`.

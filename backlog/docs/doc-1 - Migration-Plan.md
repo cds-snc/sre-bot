@@ -3,17 +3,30 @@ id: doc-1
 title: Migration Plan
 type: specification
 created_date: '2026-07-07 20:00'
+updated_date: '2026-09-24 20:12'
 ---
+# Migration Plan
 
-# Migration Plan — verified against the codebase on 2026-07-07
-
-This is the operational plan behind the backlog. Source analyses: `ADR-REVIEW-AND-MIGRATION-PLAN.md` (§10) and `claude-research-outcome.md`, reconciled against the `decisions/` corpus (the architectural source of truth) and re-verified claim-by-claim against the code on branch `docs/gaps_reconciliation`. Every finding below was confirmed at the cited location; three counts were corrected (the deprecated client tree is 72 files, not ~24; `modules/webhooks` is 57 files; `modules/incident` is 51 files) and one assumption removed (`.python-version` does not exist yet — TASK-13 creates it).
+This is the operational plan behind the backlog. It was first verified against the codebase on 2026-07-07, and realigned on 2026-09-24 to decisions/plugin-architecture.md. That record replaced the three-tier model (packages -> infrastructure -> integrations) and deleted decisions/layers.md, capability-packages.md and events.md. The `decisions/` corpus remains the architectural source of truth; this document only sequences the work.
 
 ## Structure
 
-- **One milestone per phase** (`m-0` … `m-6`), matching plan §10's waves.
-- **One task per reviewable outcome.** Each task carries its acceptance criteria (what a reviewer checks), definition of done (what must be true to merge), dependencies, and a `--ref` to the decision record it implements. Several tasks are explicitly "PR series" — land them as multiple small PRs (per consumer, per vendor, per module) rather than one.
+- **One milestone per phase** (`m-0` … `m-7`). m-7 ("Phase 2b - Plugin Architecture Foundation") runs between Phase 2 and the legacy strangler: every package move and legacy rebuild depends on it.
+- **One task per reviewable outcome**, with acceptance criteria, definition of done, dependencies (recorded with the backlog CLI) and a `--ref` to the record it implements. Coordinator tasks hold no implementation; their children are the PRs.
+- **No lingering migration state.** No task leaves a shim, a re-export, a second home, or a new import-linter ignore entry. A package moves only after every service it uses is reachable in its final form (a contract from the service registry, or a capability's `api.py`); that is encoded as dependencies.
 - `backlog sequence list` computes the parallelizable waves from the dependency graph; `backlog board` shows status.
+
+## Target (decisions/plugin-architecture.md)
+
+Six layers under `app/`:
+- `server/`: host, lifespan, plugin manager, Slack runtime, scheduler runtime, framework services.
+- `features/`: business plugins.
+- `capabilities/`: engines and shared business capabilities (approvals, webhooks, notifications, audit, people, rotations, workplace systems).
+- `infrastructure/`: hosting implementations only.
+- `integrations/`: vendor clients (factory + classifier + settings).
+- `contracts/`: the public plugin API (hookspecs, core-service Protocols, shared types).
+
+Features and capabilities never import `infrastructure/` or `server/`; features never import each other. Core services come from an svcs registry. Plugins load from pyproject entry points and are enabled per environment in TOML configuration files. Reactions go through capability extension points or the queue contract; there is no in-process event bus. Legacy `modules/` is rebuilt by surface, not moved.
 
 ## Phase 0 — Security hotfixes (m-0, TASK-1…9) — do first, days not weeks
 
@@ -35,40 +48,57 @@ Order inside the phase: TASK-1 first (TASK-2/6/7 read the typed `ENVIRONMENT`); 
 
 **Exit:** all nine closed or explicitly risk-accepted in writing.
 
-## Phase 1 — Decision corpus adoption (m-1, TASK-10…12) — writing, no code
+## Phase 1 — Decision corpus adoption (m-1) — done
 
-`decisions/*.md` becomes the only source of truth; `docs/adr/` (47 files, still present) is banner-archived; the four root-level analysis documents move to history; the two open policy deltas (dependency-scanning gate ownership, hookspec deprecation lifecycle) get their own short records.
+`decisions/*.md` is the only source of truth; `docs/adr/` is retired.
 
-**Exit:** zero dangling references; no document claims a decision is missing that now exists.
+## Phase 2 — Mechanical enforcement (m-2)
 
-## Phase 2 — Mechanical enforcement (m-2, TASK-13…21) — mostly config
+Toolchain per decisions/toolchain.md: Python 3.14 everywhere, uv lockfile end to end (TASK-14), ruff, blocking mypy with a strict ratchet (TASK-16), pre-commit (TASK-17), test gates (TASK-20), the EN/FR parity gate (TASK-21), the dependency-vulnerability gate (TASK-66).
 
-Align tooling with `decisions/toolchain.md` before refactors, so later phases are held by CI instead of discipline: Python 3.14 everywhere (today: CI 3.11 / venv 3.12 / image 3.14, no `.python-version`); Dockerfile honors `uv.lock` (today it globs the lock and installs editable); ruff replaces black + standalone bandit; mypy blocking (kill the `|| true` at `app/Makefile:80`); pre-commit; import-linter with the four layer contracts and a ratcheting `ignore_imports` baseline; the two `app/bin/` guardrail scripts committed and enforced; test gates (`--strict-markers`, `fail_under` ratchet, single test tree); the EN/FR parity gate.
+## Phase 2b — Plugin architecture foundation (m-7)
 
-**Exit:** CI enforces the boundaries the decisions claim; baselines only ratchet down.
+Enforcement first, then the layers, in dependency order:
+1. **Contract and rules:** CLAUDE.md, the Copilot instructions and the skills restate the six layers (TASK-104). import-linter lands with the six-layer contracts and a shrink-only ignore list (TASK-18).
+2. **contracts/:** OperationResult envelope fix (TASK-105), then `app/contracts/` with OperationResult/OperationStatus (TASK-106). The Slack handler contract (TASK-26.1), then all hookspecs, the hookimpl marker and the scheduler Protocol (TASK-107). The storage Protocol after its redesign (TASK-27.1 -> TASK-108). The coordination Protocol with its rename (TASK-58).
+3. **Host:** svcs service registry with eager boot validation (TASK-109, replaces the retired TASK-29), entry-point plugin loading (TASK-110), TOML configuration (TASK-111), per-environment enablement (TASK-112), the extension-point phase (TASK-113), the package generator and shape check (TASK-114).
+4. **Framework services to server/:** Slack runtime (TASK-26.2, then async Bolt TASK-33), logging (TASK-115), security plus the current-user contract (TASK-116), i18n library decision and translator contract (TASK-117 -> TASK-118), scheduler runtime (TASK-64 -> TASK-52).
+5. **Capabilities:** directory, drive and spreadsheets (TASK-119, TASK-120, TASK-121), audit (TASK-122), rotations, which removes the oncall_sync -> user_rotations import (TASK-123), notifications with its first consumer (TASK-125), approvals (TASK-60, on hold behind 1-3).
+6. **Features:** existing packages move to `features/` one per PR (TASK-124 and children); `packages/` is deleted last.
 
-## Phase 3 — Client layer convergence (m-3, TASK-22…26) — mechanical, low risk
+**Exit:** the six layers exist; import-linter enforces them with a shrinking ignore list; no package imports `infrastructure/`, `server/` or another feature.
 
-One client generation. Migrate the six verified consumers of the deprecated 72-file `infrastructure/clients/` tree, then delete it plus the empty `app/clients/`; resolve the six `_next.py` twins; one settings home per vendor plus a wired `SecuritySettings` slice; apply the clients-raise/adapters-classify contract (`classify_<vendor>_error`, retire `AWSShield` and the executor tier); consolidate Slack (transport → `infrastructure/slack/`, Web client + classifier stay in `integrations/slack/`, shims keep `modules/` working).
+## Phase 3 — Client layer convergence (m-3)
 
-**Exit:** usage matrix reports zero deprecated consumers; no `_next` files; `integrations/` imports nothing above the shared kernel.
+One client generation per decisions/outbound-clients.md and sdk-typing.md. Done: the deprecated `infrastructure/clients` tree, the `_next` twins, the Google dispatcher and mirror layer, and the AWS dispatcher, shield and mirrors. Remaining: the AWS cleanup (TASK-25.2.6 series), Slack factory and classifier (TASK-25.4), MaxMind, Opsgenie, Sentinel, Notify, Trello and OpenAI (TASK-25.5 to 25.10), one settings home per vendor (TASK-24), Google write replay safety (TASK-87 series). Business operations leaving a vendor package go to a feature's or capability's `adapters/`, never to `infrastructure/`. Integrations import only `contracts/` shared types.
 
-## Phase 4 — Infrastructure hardening (m-4, TASK-27…34) — parallel with Phase 3
+**Exit:** every vendor package exports only factories, a classifier and settings; the vendor-contract baseline is empty.
 
-Make the `applies: target` records true: capability-shaped `StorageService` (the current Protocol leaks DynamoDB `KeyConditionExpression` strings) + in-memory fakes per Path A Protocol; the middleware/edge trio (correlation `request_id`, security headers, RFC 9457) + logging pipeline; provider registry with eager phase-2 warmup; the owned ~50-line event dispatcher replacing blinker; distributed rate limiting; resolve the empty `persistence/`/`notifications/` packages; async Bolt after the Slack home move. TASK-34 (QueueService + outbox) is deliberately deferred until a real durable consumer exists — per `claude-research-outcome.md`, cross the cloud boundary only when a reaction must outlive a crash.
+## Phase 4 — Infrastructure hardening (m-4)
 
-**Exit:** the security/ops decisions' Checks pass; records flip `applies: target` → `now`.
+Hosting contracts made real: capability-shaped storage (TASK-27 series), the coordination rename and lease hardening (TASK-58, TASK-99 to TASK-103), the queue contract and outbox when its first consumer exists (TASK-34), the RetryStore consolidation (TASK-59), the middleware trio and logging pipeline (TASK-28 series), distributed rate limiting (TASK-31), the service health model (TASK-92), the event-bus deletion with no replacement (TASK-30, after TASK-61), the webhooks capability (TASK-37 series, then TASK-47 to TASK-49 for HMAC and rate limits). The approvals consumers follow: access (TASK-61), SaaS subscriptions (TASK-62), AI keys (TASK-63).
 
-## Phase 5 — Legacy modules strangler (m-5, TASK-35…41) — quarters, background pace
+**Exit:** the security and operations records' Checks pass; records flip `applies: target` -> `now`.
 
-Per `decisions/migration.md`. Fix the double-registration first (TASK-35, live bug risk), capture the external contract in smoke tests (TASK-36 — the oracle for every cutover), then migrate module by module: `webhooks` (57 files, security-sensitive), `incident` (51 files), the small wins (`role`, `secret`, `atip`), then the remainder (`aws`, `ops`, `permissions`, `provisioning`, `reports`, `slack`, residual `dev`/`sre`). Each module: smoke first → feature package → cutover → delete, no zombie halves. TASK-41 executes the "Done means" checklist (delete `modules/`, the legacy list, `python-i18n`; retire the guardrail scripts).
+## Phase 5 — Legacy strangler (m-5) — rebuild by surface
+
+Per decisions/migration.md: fix the double registration (TASK-35), inventory every legacy surface with its target feature or capability and pin it with smoke tests (TASK-36), then rebuild surface by surface:
+- webhooks (TASK-37);
+- incident, after the architecture decision (TASK-97 -> TASK-38);
+- role, secret and atip (TASK-39);
+- AWS and provisioning (TASK-88);
+- the remainder (TASK-40);
+- jobs, strangled as their surfaces move (TASK-65);
+- system endpoints and `app/api/` (TASK-53);
+- `models/` and `utils/` (TASK-55, TASK-56).
+TASK-41 executes the "Done means" checklist.
 
 **Exit:** `app/modules/` gone; other teams verifiably unaffected (smoke suite green throughout).
 
-## Phase 6 — Multi-transport (m-6, TASK-42…43) — blocked until Teams is funded
+## Phase 6 — Multi-transport (m-6) — blocked until Teams is funded
 
-Do not start speculatively. Write `transport-teams` properly, implement, and only then promote the composition pattern with n=2 learnings.
+Teams follows the Slack split: runtime in `server/teams/`, handler contract in `contracts/`, client in `integrations/` (TASK-42, TASK-43).
 
 ## Review-batch guidance
 
-Small-PR seams are built into the tasks: per-consumer (TASK-22), per-vendor (TASK-23, 25), per-module (TASK-37–40), reformat-only commits isolated (TASK-15). A task is the unit of *acceptance*, not necessarily one PR. Keep `main` releasable after every merge — that constraint is inherited from plan §10 and non-negotiable.
+A task is the unit of acceptance, not necessarily one PR. Keep `main` releasable after every merge. Never mix a mechanical move with a behaviour change in one PR. A mechanical move rewrites every importer in the same change, because a split that needs a re-export shim is the brittle state this plan avoids.

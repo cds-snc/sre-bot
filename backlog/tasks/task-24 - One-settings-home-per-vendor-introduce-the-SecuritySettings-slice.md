@@ -4,7 +4,7 @@ title: One settings home per vendor; introduce the SecuritySettings slice
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-07-24 13:35'
+updated_date: '2026-09-24 20:10'
 labels:
   - clients
   - phase-3
@@ -14,6 +14,7 @@ dependencies: []
 references:
   - decisions/configuration.md
   - 'https://github.com/cds-snc/sre-bot/issues/1278'
+  - decisions/plugin-architecture.md
 priority: medium
 ordinal: 24000
 ---
@@ -51,5 +52,10 @@ author: task-planner
 created: 2026-07-24 13:35
 ---
 Cross-task note from TASK-2 planning (2026-07-24): TASK-2 lands CORS_ALLOWED_ORIGINS, CORS_ALLOWED_METHODS, CORS_ALLOWED_HEADERS plus a boot-time model_validator (rejects '*' with allow_credentials=True) on AppSettings (app/infrastructure/configuration/app.py) as an interim home, since this task (TASK-24 / SecuritySettings) had not landed yet. When this task is implemented, migrate those three fields and their boot validator from AppSettings into SecuritySettings (app/infrastructure/security/settings.py) rather than re-deriving the CORS policy/validator from scratch - this satisfies this task's existing AC #2 ('SecuritySettings owns issuers/JWKS, CORS, rate-limit, dev-bypass config...'). Update app/server/server.py's CORSMiddleware wiring and the corresponding tests (app/tests/unit/infrastructure/configuration/test_app_settings.py TestAppSettingsCors, app/tests/unit/server/test_server.py) to read from the new SecuritySettings location at that time.
+---
+
+created: 2026-09-24 20:10
+---
+2026-09-24 alignment with decisions/plugin-architecture.md and configuration.md: the SecuritySettings slice belongs to the security framework service, which moves to app/server/security/ (TASK-116, which depends on this task). Build the slice where security lives today, and TASK-116 carries it. Feature slices in app/infrastructure/configuration/features/ (atip, aws_ops, groups, incident, sre_ops) are not moved by this task: they move with their surface rebuilds (TASK-38, TASK-39, TASK-40, TASK-88; configuration.md: migration rides with the work). Moving them into frozen modules/ would widen legacy code. Values move into TOML files later (TASK-111, which depends on this task).
 ---
 <!-- COMMENTS:END -->

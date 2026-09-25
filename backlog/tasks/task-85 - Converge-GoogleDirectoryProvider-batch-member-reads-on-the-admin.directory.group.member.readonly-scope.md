@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-10 17:25'
+updated_date: '2026-09-24 20:11'
 labels:
   - clients
   - cleanup
@@ -13,6 +14,7 @@ milestone: m-3
 dependencies: []
 references:
   - app/infrastructure/directory/google.py
+  - decisions/plugin-architecture.md
 priority: low
 ordinal: 183000
 ---
@@ -38,3 +40,12 @@ VERIFY WHEN PLANNING: current consumers of get_group_members_batch (grep); that 
 - [ ] #2 A unit test asserts the scope passed to the provider's service factory for get_group_members_batch; group-level reads keep admin.directory.group.readonly
 - [ ] #3 The implementation notes record that the domain-wide delegation grant covering member.readonly was confirmed for every deployed environment before merge
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:11
+---
+2026-09-24: app/infrastructure/directory/ moves to app/capabilities/directory/ (TASK-119, decisions/plugin-architecture.md and workplace-systems.md). This fix is independent of the move: land it in whichever home the provider has at the time, and the move carries it mechanically.
+---
+<!-- COMMENTS:END -->

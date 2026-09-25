@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-16 13:58'
+updated_date: '2026-09-24 20:11'
 labels:
   - infrastructure
   - phase-4
@@ -15,8 +16,8 @@ dependencies:
   - TASK-27.1
 references:
   - decisions/webhooks.md
-  - decisions/layers.md
   - app/modules/slack/webhooks.py
+  - decisions/plugin-architecture.md
 parent_task_id: TASK-27
 priority: high
 ordinal: 220000
@@ -50,3 +51,12 @@ CONDITIONS FROM SLICE 1. gt and between sort-key conditions are still gated on a
 - [ ] #5 Appending to a list attribute is explicitly NOT added to the Protocol; the note recording why, and pointing the incident activity log at TASK-38, is on this task
 - [ ] #6 ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass, with the commands and their output recorded in notes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-24 20:11
+---
+2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md).
+---
+<!-- COMMENTS:END -->

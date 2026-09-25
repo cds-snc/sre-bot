@@ -13,7 +13,7 @@ The previous corpus (`docs/adr/`) failed in specific, diagnosed ways: records gr
 
 ## Decision
 
-**Format.** One decision per file, flat kebab-case filename, **two pages maximum**. Frontmatter has exactly four fields: `status`, `date`, `applies`, `scope`. Body sections: **Context** (including the *current state of the code*, honestly), **Decision**, **Consequences** (tradeoffs included), **Checks**, and — when `applies: target` — **Migration** (ticket link + divergences currently tolerated). Amendments rewrite the body in place so it states the current decision. Git holds the history, so a record ends with at most one short dated sentence per change, under **Changes:**.
+**Format.** One decision per file, flat kebab-case filename, **two pages maximum**. Frontmatter has exactly four fields: `status`, `date`, `applies`, `scope`. Body sections: **Context** (including the *current state of the code*, honestly), **Decision**, **Consequences** (tradeoffs included), **Checks**, and — when `applies: target` — **Migration** (ticket link + divergences currently tolerated). Migration names the owning epic tickets, never their subtasks, and describes each divergence in code terms: the backlog owns the breakdown, order and status of the work. Amendments rewrite the body in place so it states the current decision. Git holds the history, so a record ends with at most one short dated sentence per change, under **Changes:**.
 
 **Statuses.** `Draft` → `Accepted` → `Superseded` (with a pointer) or `Rejected` (with the real reason) — a trimmed variant of the MADR 4 / Nygard vocabulary (`proposed/rejected/accepted/deprecated/superseded`): `Draft` stands in for `proposed`, and `deprecated` folds into `Superseded`. There are no tiers, domains, or concern tags. (MADR frontmatter is explicitly extensible, so the extra `applies` field is an extension, not a fork.)
 
@@ -43,3 +43,4 @@ The previous corpus (`docs/adr/`) failed in specific, diagnosed ways: records gr
 
 **Changes:**
 - 2026-09-10: amendments are made in place, with one short dated sentence per change.
+- 2026-09-24: Migration sections name epic tickets, not subtasks; the backlog owns the breakdown.

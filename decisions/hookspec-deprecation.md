@@ -38,4 +38,7 @@ scope: How a hookspec is deprecated and later removed.
 
 ## Migration
 
-Ticket: TASK-67 — reformat `register_slack_commands`'s docstring to the new marker format (`DEPRECATED (since m-1, replacement: register_slack_listeners).`); once every current implementer (`dev`, `sre`, `access/sync`, `geolocate`, `access/request`) has migrated to `register_slack_listeners` and at least one milestone boundary has passed since `m-1`, remove the hookspec per the checklist above. Tolerated until closed: the current ad hoc docstring wording; four hookimpls still on the deprecated spec.
+Ticket: TASK-67. Tolerated until closed: the current ad hoc docstring wording; four hookimpls still on the deprecated spec.
+
+**Changes:**
+- 2026-09-24: Migration names epic tickets only; the backlog owns the breakdown.
