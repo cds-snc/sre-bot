@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-27 16:07'
-updated_date: '2026-09-24 20:06'
+updated_date: '2026-09-25 15:00'
 labels:
   - architecture
   - layers
@@ -29,7 +29,7 @@ ordinal: 81000
 Rescoped 2026-09-24. The architecture decision this ticket used to ask for is made: decisions/migration.md's directory table says app/api/ is the legacy HTTP surface, feature routes move to their owning packages, and system endpoints (health, version, landing) move to server/. HTTP is the app's own protocol and its inbound boundary is FastAPI and ASGI middleware in app/server/ (decisions/platform-transports.md). decisions/layers.md, which the old text cited, is deleted.
 
 Scope:
-1. Move the feature-agnostic system endpoints (GET /health, GET /version, the landing page, favicon) into app/server/, with success and error-path route tests. Keep them consistent with the readiness and liveness contract decided by TASK-92 and decisions/health-checks.md.
+1. Move the feature-agnostic system endpoints (GET /health, GET /version, the landing page, favicon) into app/server/, with success and error-path route tests. Keep them static, per decisions/health-checks.md (2026-09-25): no dependency call, and they serve as both liveness and readiness because uvicorn answers only after lifespan startup completes. Route tests assert no outbound connection.
 2. List every feature route under app/api/v1/routes/ with the rebuild ticket that moves it (for example the webhook routes with TASK-37.4). The TASK-36 inventory carries this; routes are not moved ahead of their surface.
 3. Delete app/api/ once the last route has moved.
 <!-- SECTION:DESCRIPTION:END -->

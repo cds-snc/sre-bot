@@ -23,6 +23,7 @@ Vendor SDKs each have their own retry knobs and exception hierarchies. The legac
      - boto3: `Config(retries={"mode": "standard", "max_attempts": N})`, always setting `mode`, because the SDK default is still `legacy` ([boto3 retries guide](https://docs.aws.amazon.com/boto3/latest/guide/retries.html)).
      - `google-api-python-client`: `num_retries` is an argument of each `execute()`, so the factory applies a default through `build(requestBuilder=...)`. `build(num_retries=...)` only retries fetching the discovery document. Google's retry loop ignores `Retry-After` and doesn't cap backoff, so keep the count small.
    - **Non-idempotent writes.** Neither SDK checks idempotency before retrying: both re-send writes after 5xx, throttling or timeouts ([AWS Builders' Library](https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/)). A write that isn't naturally idempotent (create, copy, send) must either use the vendor's idempotency mechanism (client token, conditional write) or go through a factory variant with retries disabled. See [reliability.md](reliability.md).
+   - **No network I/O at construction.** A factory builds the handle and returns. Credentials, including an assumed role, resolve on the first API call and refresh themselves before they expire. For boto3 that is botocore's `DeferredRefreshableCredentials` with an `AssumeRoleCredentialFetcher`, not an `sts.assume_role` call in the factory. Building a client therefore never fails because a vendor or STS is down, and building one at boot is safe. Verifying credentials at boot is an explicit, classified credential check that alerts and never aborts ([lifecycle.md](lifecycle.md)), never a side effect of construction.
    - **Threads.** boto3 clients are generally thread-safe; sessions and resources are not. A Google `Resource` runs on `httplib2.Http`, which is [not thread-safe](https://github.com/googleapis/google-api-python-client/blob/main/docs/thread_safety.md). Share a `Resource` across threads only when each request builds its own `Http`.
 
    **No hand-rolled retry loops anywhere, ever.** Blocking SDK calls invoked from async code are offloaded with `asyncio.to_thread`, which is where the thread rule matters.
@@ -51,13 +52,15 @@ Clients **raise typed SDK exceptions**. They do not return `OperationResult`, im
 - Each vendor package exports exactly: factories, `classify_<vendor>_error`, settings ([configuration.md](configuration.md)).
 - Classification tests per vendor: each mapped exception family → expected status/`error_code`/`retry_after`; one unmapped exception → propagates.
 - import-linter: `integrations` imports nothing from the app except the shared types in `contracts/`; features and capabilities import `integrations` only inside `adapters/`.
+- Factory tests: building every factory, including a role-bearing AWS client, opens no outbound connection (`socket.connect` spy).
 - Factory tests assert explicit resilience settings. For boto3, `Config` sets `mode`, `max_attempts`, `connect_timeout` and `read_timeout`. Google services are built with a `requestBuilder` retry default and an `Http` that has an explicit timeout.
 - Review: every non-idempotent write names its idempotency mechanism or uses a retries-disabled handle.
 - Review: no Google `Resource` is cached and shared across threads unless each request builds its own `Http`.
 
 ## Migration
 
-Ticket: TASK-25 (per-vendor contract) and TASK-87 (Google write replay safety). Only AWS follows this decision in full today; every other vendor diverges as listed. Tolerated until closed:
+Tickets: TASK-25 (per-vendor contract), TASK-87 (Google write replay safety) and TASK-98 (lazy, refreshable AWS role credentials). Every vendor diverges as listed. Tolerated until closed:
+- `integrations/aws/client.py` assumes a role through STS while building a client and never reuses the credentials, so a role-bearing client costs one STS call per build and fails at construction when STS or credentials fail (TASK-98);
 - `integrations/` importing `infrastructure.operations` instead of `contracts/`, plus 11 other `infrastructure` imports (settings under `infrastructure.configuration`, `infrastructure.audit.models`, `infrastructure.i18n`, `infrastructure.slack.settings`); import-linter is not enforced yet, and these become its ignore entries when TASK-18 lands;
 - non-idempotent Google writes (Drive create and copy) issued on the retrying handle;
 - a per-call `num_retries=0` override at six Google writes (Calendar event insert, Meet space create, incident_draft Drive copy and Docs batchUpdate, incident documents apply_document_edits, Sheets values.append): a call-site exception to "no retry decision repeated at call sites";
@@ -77,3 +80,4 @@ Ticket: TASK-25 (per-vendor contract) and TASK-87 (Google write replay safety). 
 - 2026-09-11: Google factories set an explicit per-attempt timeout; recorded the per-call `num_retries=0` override at six non-idempotent Google writes as a tolerated divergence.
 - 2026-09-17: removed the closed 'seven baselined deprecated-client consumers' tolerance (TASK-22.5 migrated them; TASK-25.2.5.7 retired the guard).
 - 2026-09-24: removed the closed AWS wrapper-class tolerance and references to deleted code; Migration lists every open divergence under its epic ticket; integrations import only `contracts/` shared types, and adapters live in a feature's or capability's `adapters/` or in `infrastructure/`.
+- 2026-09-25: factories do no network I/O; assumed-role credentials are deferred and refreshable; boot credential verification is an explicit check.

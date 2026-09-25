@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:36'
-updated_date: '2026-09-24 20:09'
+updated_date: '2026-09-25 19:43'
 labels:
   - phase-5
 dependencies:
@@ -24,6 +24,7 @@ references:
   - app/integrations/aws/settings.py
   - decisions/plugin-architecture.md
   - decisions/migration.md
+  - decisions/authorization.md
 priority: medium
 ordinal: 189000
 ---
@@ -60,6 +61,12 @@ EVENTUAL HOMES (recorded 2026-09-11 so the Google-series pattern of vendor-neutr
 - [ ] #4 Feature-level AWS settings (permission sets, role ARNs, SSO instance, SERVICE_ROLE_MAP) move from integrations/aws/settings.py into the owning features' settings slices (values in the TOML files); integrations/aws/settings.py keeps only the transport fields the client itself needs
 - [ ] #5 The packages/aws_platform seam guard retires with the package: app/bin/check_aws_platform_seam.py, app/bin/baselines/aws_platform_seam_consumers.txt and the make check-aws-platform-seam target are deleted once the baseline is empty (TASK-25.2.5.5 created them)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-25 (decisions/authorization.md): the rebuilt AWS surfaces declare permissions and get roles from the central configuration. modules/permissions is_user_member_of_groups and the AWS_ADMIN_GROUPS setting are deleted, not carried over.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

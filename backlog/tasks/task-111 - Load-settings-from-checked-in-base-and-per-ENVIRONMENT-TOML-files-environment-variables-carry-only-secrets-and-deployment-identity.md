@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
+updated_date: '2026-09-25 15:00'
 labels:
   - plugin-architecture
   - configuration
@@ -41,4 +42,5 @@ Feature and capability slices move their values into the files when their packag
 - [ ] #3 Boot test: an invalid file or an unknown key fails boot with a message naming the key; a missing required secret fails naming it
 - [ ] #4 CI checks: no secret-shaped key appears in a configuration file; each key is owned by exactly one settings slice
 - [ ] #5 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [ ] #6 Before any value moves, the current contents of the sre-bot-config and sre-bot-config-infrastructure SSM parameters (read by app/bin/entry.sh into .env) are inventoried by key, with secret values omitted, and each key is mapped to its owning slice and to a file, a secret or deletion; the inventory records whether production sets ACCESS_SYNC_ENABLED, AWS_ORG_ACCOUNT_ROLE_ARN and DIRECTORY_REQUIRE_STARTUP_WARMUP
 <!-- AC:END -->

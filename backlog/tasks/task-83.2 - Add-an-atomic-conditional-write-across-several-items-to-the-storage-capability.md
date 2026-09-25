@@ -4,7 +4,7 @@ title: Add an atomic conditional write across several items to the storage capab
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
-updated_date: '2026-09-24 20:08'
+updated_date: '2026-09-25 17:06'
 labels:
   - identity
   - storage
@@ -38,6 +38,12 @@ This is a hosting-storage primitive with no identity vocabulary. It builds on th
 - [ ] #4 The operation's contract names no DynamoDB syntax
 - [ ] #5 Full test suite, ruff and mypy pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-25: decisions/workplace-systems.md, people-and-accounts.md and platform-entrypoints.md are Accepted. Earlier mentions of their Draft status in this task are historical. The atomic claim now covers IdP identities as well as platform accounts: each identity and each account is claimed by exactly one person, with the claim and its link in one conditional write.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
