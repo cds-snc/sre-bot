@@ -35,7 +35,7 @@ The app is a platform that other teams extend: a host (`app/server/`) loads feat
 | [sdk-typing.md](sdk-typing.md) | Typing rich vendor SDKs without a wrapper tier (boto3 stubs, Google discovery) | target |
 | [operation-result.md](operation-result.md) | The boundary return envelope | target |
 | [errors-and-http.md](errors-and-http.md) | RFC 9457 mapping at the HTTP edge | target |
-| [dependency-injection.md](dependency-injection.md) | Core services from a type-keyed registry, constructor injection, eager validation | target |
+| [dependency-injection.md](dependency-injection.md) | Core services from a type-keyed registry, constructor injection, eager static validation | target |
 | [plugins.md](plugins.md) | Plugin declaration, per-environment enablement and registration via pluggy | target |
 | [feature-packages.md](feature-packages.md) | The one package shape for features and capabilities, handler discipline | target |
 | [configuration.md](configuration.md) | Settings slices, per-environment TOML files, secrets | target |
@@ -44,10 +44,10 @@ The app is a platform that other teams extend: a host (`app/server/`) loads feat
 | [hookspec-deprecation.md](hookspec-deprecation.md) | How a hookspec is deprecated and removed | target |
 | [webhooks.md](webhooks.md) | Incoming-webhook capability: pipeline, source-declared parsing, handler extension point | target |
 | [observability.md](observability.md) | Logging, redaction, correlation | target |
-| [health-checks.md](health-checks.md) | Container, ECS, ALB, and Route53 health-check layering | target |
+| [health-checks.md](health-checks.md) | Static liveness and readiness; container, ECS, ALB and Route53 health-check layering | target |
 | [reliability.md](reliability.md) | Idempotency, queuing, background jobs | target |
 | [approvals.md](approvals.md) | Generic human-approval workflow capability | target |
-| [lifecycle.md](lifecycle.md) | Phased startup and shutdown across replicas | target |
+| [lifecycle.md](lifecycle.md) | Phased startup, which failures abort boot, credential checks, shutdown across replicas | target |
 | [toolchain.md](toolchain.md) | uv, Python version, lint, types, CI gates | target |
 | [testing.md](testing.md) | Test layers, doubles, coverage | target |
 | [i18n.md](i18n.md) | EN/FR translation | target |

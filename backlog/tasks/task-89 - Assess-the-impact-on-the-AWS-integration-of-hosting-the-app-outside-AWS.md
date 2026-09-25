@@ -4,7 +4,7 @@ title: Assess the impact on the AWS integration of hosting the app outside AWS
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:49'
-updated_date: '2026-09-24 20:11'
+updated_date: '2026-09-25 15:00'
 labels:
   - architecture
 dependencies: []
@@ -92,5 +92,10 @@ ALSO RELEVANT TO AC#1's "which settings would then become required". Those setti
 created: 2026-09-24 20:11
 ---
 2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). Leaving AWS touches only app/infrastructure/ implementations of app/contracts/ Protocols plus integrations/aws; features and capabilities never see the cloud (plugin-architecture.md Consequences).
+---
+
+created: 2026-09-25 15:00
+---
+2026-09-25: TASK-92 and decisions/outbound-clients.md settled the factory question: get_aws_client does no network I/O at construction, and assumed-role credentials are deferred and refreshable (TASK-98). Assess off-AWS credential acquisition against that design, not against eager AssumeRole.
 ---
 <!-- COMMENTS:END -->

@@ -16,11 +16,13 @@ Four independent health-check mechanisms exist for the one running service, each
 - **ALB target-group health check** (`terraform/alb.tf`) — routing/failover; `interval=10s`, `path=/version`, `healthy_threshold=2`/`unhealthy_threshold=2` (faster than AWS's defaults of 30s/5/2).
 - **Route53 health check** (`terraform/route53.tf`, `aws_route53_health_check.sre_bot_healthcheck`) — DNS-level; `request_interval=30s`, `resource_path=/version`.
 
-`/version`/`/health` (`app/api/routes/system.py`) are cheap liveness checks with no dependency calls, already rate-limited (50/min) with a code comment naming the ALB/Route53 cadence explicitly. The combined volume (≈3 ALB nodes × 2 tasks × 6/min, plus ≈15-18 Route53 checkers × 2/min) accounts for the observed ~35 req/min — expected, not a defect.
+`/version`/`/health` (`app/api/routes/system.py`) are static endpoints with no dependency calls, already rate-limited (50/min) with a code comment naming the ALB/Route53 cadence explicitly. The combined volume (≈3 ALB nodes × 2 tasks × 6/min, plus ≈15-18 Route53 checkers × 2/min) accounts for the observed ~35 req/min — expected, not a defect.
 
 The Route53 health check is currently **unwired**: `aws_route53_record.sre_bot` is a plain ALIAS with `evaluate_target_health = false` and no failover/weighted routing policy, and no `aws_cloudwatch_metric_alarm` consumes its auto-published `AWS/Route53` `HealthCheckStatus` metric. As configured, it generates background `/version` traffic with no operational payoff today.
 
 ## Decision
+
+**Every health check is static.** `/health` and `/version` return from process memory and call no dependency. They serve as liveness and as readiness. uvicorn opens its listening socket only after lifespan startup returns, so a response already means every startup phase completed ([lifecycle.md](lifecycle.md)). There is no deep or dependency health check behind the Dockerfile, ECS, ALB or Route53 checks. A dependency in those checks turns it into a hard dependency: a shared vendor failure marks every task unhealthy at once, ECS replaces them, and the ALB fails open when all targets are unhealthy ([AWS Builders' Library](https://aws.amazon.com/builders-library/implementing-health-checks/), [ALB](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/target-group-health-checks.html)). Kubernetes allows backend checks in a readiness probe ([probes](https://kubernetes.io/docs/concepts/configuration/liveness-readiness-startup-probes/)). On Kubernetes or OpenShift, both probes still point at the static endpoint. Vendor dependency health is monitored separately and never decides whether a task receives traffic.
 
 Keep all four layers — each answers a genuinely different question (image-local, ECS-container, LB-routing, DNS-external) and none is redundant given ECS's override behavior. The Route53 health check must either (a) feed a `aws_cloudwatch_metric_alarm` with a notification action, giving it a real external-reachability signal distinct from the ALB's inside view, or (b) be removed if that signal isn't wanted — left unwired is not an acceptable end state. Do not loosen the ALB's check interval/thresholds to cut request volume: AWS does not bill per health-check request, and faster failure detection outweighs log-noise concerns (log noise is addressed separately, at the logging layer — [observability.md](observability.md)).
 
@@ -31,9 +33,14 @@ Keep all four layers — each answers a genuinely different question (image-loca
 
 ## Checks
 
+- Route test: `/health` and `/version` open no outbound connection (`socket.connect` spy) and return 200 with every dependency unreachable.
+- The Dockerfile `HEALTHCHECK`, the ECS `healthCheck`, the ALB target group and the Route53 check target only `/health` or `/version`.
 - `aws_route53_health_check.sre_bot_healthcheck` is consumed by exactly one `aws_cloudwatch_metric_alarm`, or the resource no longer exists.
 - `terraform fmt -check` / `terraform validate` clean on `terraform/route53.tf`.
 
 ## Migration
 
-Ticket: TASK-68 (wire or remove the unwired Route53 health check). Tolerated until closed: the health check exists with no alarm consumer.
+Tickets: TASK-68 (wire or remove the unwired Route53 health check), TASK-53 (the system endpoints move to `server/`), TASK-127 (vendor dependency monitoring). Tolerated until closed: the Route53 health check exists with no alarm consumer.
+
+**Changes:**
+- 2026-09-25: every health check is static and serves as liveness and readiness; no dependency check stands behind the platform checks.

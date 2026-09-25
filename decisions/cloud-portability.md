@@ -22,7 +22,7 @@ Four contracts:
 
    **Scope — and the anti-dead-code rule.** The fake contract applies to two kinds of Protocol ([plugin-architecture.md](plugin-architecture.md)): **hosting contracts** (Protocols in `contracts/` implemented in `infrastructure/`: storage, queue, coordination, secrets) and **capability `api.py` Protocols** that face an external system (people and directory lookups, workplace systems, the approval-workflow store per [approvals.md](approvals.md)). It does **not** apply to a feature's Path B adapter, which exists to act on one vendor and is not portable by design; nor to in-process mechanisms with no vendor to substitute (logging, the plugin manager), which *are* their own implementation and are exercised directly in tests. And a fake is required only where the Protocol has a real consumer (capabilities are never built speculatively). Where consumers exist their tests already hand-roll ad-hoc doubles — the Access Sync suite's inline `DirectoryProvider` stub, the audit `write_audit_event` monkeypatch — so the shared fake *removes* duplication rather than adding code.
 
-Deployment machinery (ECS circuit breaker, CloudWatch) may be AWS-native, but the *contract* the pipeline validates must be provider-neutral: deploy success = readiness probe green, not a CloudWatch log-line tail.
+Deployment machinery (ECS circuit breaker, CloudWatch) may be AWS-native, but the *contract* the pipeline validates must be provider-neutral: deploy success = readiness probe green, not a CloudWatch log-line tail. The readiness probe is the static endpoint in [health-checks.md](health-checks.md), which answers only after lifespan startup completes.
 
 ## Consequences
 
@@ -42,3 +42,4 @@ Tickets: storage-protocol redesign + portable-Protocol fakes + the CI fake-cover
 
 **Changes:**
 - 2026-09-24: the fake contract covers hosting contracts and capability `api.py` Protocols; feature Path B adapters are not portable.
+- 2026-09-25: the readiness probe is the static health endpoint, answering after lifespan startup.
