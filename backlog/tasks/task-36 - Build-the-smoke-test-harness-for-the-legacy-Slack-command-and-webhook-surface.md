@@ -1,10 +1,10 @@
 ---
 id: TASK-36
 title: Build the smoke-test harness for the legacy Slack command and webhook surface
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-28 20:19'
+updated_date: '2026-09-28 20:59'
 labels:
   - migration
   - phase-5
@@ -39,18 +39,18 @@ Steps:
 3. These are decisions/testing.md "integration" tests (<500ms, external deps stubbed), not "smoke" (on-demand, live backends, excluded from the PR gate by `pytest tests --ignore=tests/smoke`). They live in app/tests/integration/legacy_surface/ and run in the normal CI gate, because TASK-26.1 AC#4 needs them green in the standard `pytest tests --ignore=tests/smoke` run, before and after its change. The task title/labels predate this correction; decisions/testing.md is authoritative over the task's original "smoke layer" framing.
 4. These tests are the pass/fail oracle for every TASK-37..40, TASK-52/TASK-65 and TASK-53 cutover, and for TASK-26.1 specifically.
 
-Single-PR size gate: the full surface (6 slash commands, 31 interactions, 1 webhook route, 5 job entry points - see plan) is too large for one reviewable PR of pinning tests. This task is Slice 1: the full inventory (all surfaces, documentation only) plus pinning tests for exactly the Slack command/listener registration surface that TASK-26.1 rewrites (the 8 register_slack_commands hookimpls under modules/ and packages/). Remaining rows are inventoried with an owning ticket and a "pinned" column marking them not-yet-covered, naming their follow-up task: TASK-36.1 (the 6 hard-coded legacy slash commands plus the 31 interactions), TASK-36.2 (the webhook route), TASK-36.3 (the 5 job entry points).
+Single-PR size gate: the full surface (6 slash commands, 34 interactions, 1 webhook route, 5 job entry points - see plan) is too large for one reviewable PR of pinning tests. This task is Slice 1: the full inventory (all surfaces, documentation only) plus pinning tests for exactly the Slack command/listener registration surface that TASK-26.1 rewrites (the 8 register_slack_commands hookimpls under modules/ and packages/). Remaining rows are inventoried with an owning ticket and a "pinned" column marking them not-yet-covered, naming their follow-up task: TASK-36.1 (the 6 hard-coded legacy slash commands plus the 34 interactions), TASK-36.2 (the webhook route), TASK-36.3 (the 5 job entry points).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A checked-in inventory lists every legacy command/action/webhook with its owning module
-- [ ] #2 Runbook note: how to run the suite pre- and post-cutover for a module
-- [ ] #3 The checked-in inventory assigns every surface (commands, interactions, webhook and HTTP routes, scheduled jobs) a target feature under app/features/ or capability under app/capabilities/, or marks it for deletion with the reason
-- [ ] #4 The inventory records, per surface, the rebuild ticket that owns it (TASK-37, TASK-38, TASK-39, TASK-40, TASK-88, TASK-52/TASK-65 for jobs, TASK-53 for app/api/ routes)
-- [ ] #5 Every register_slack_commands hookimpl under app/modules/ and app/packages/ (the 8 hookimpls: modules/sre, modules/dev, packages/rant, packages/user_rotations, packages/access/sync, packages/incident_draft, packages/incident_summary, packages/geolocate) has a pinning test that dispatches through slack_bolt's public App.dispatch/AsyncApp.async_dispatch boundary and asserts ack, response shape/text and a side-effect fake invoked
-- [ ] #6 Pinning tests live under app/tests/integration/legacy_surface/ and pass in the normal 'pytest tests --ignore=tests/smoke' run (not under app/tests/smoke/, and not excluded from the PR gate)
-- [ ] #7 Every inventory row not covered by this task's pinning tests (the 6 hard-coded slash commands and 31 interactions, the webhook route, the 5 job entry points) is marked not-yet-pinned in the inventory and named to its owning follow-up task: TASK-36.1, TASK-36.2 or TASK-36.3 respectively
+- [x] #1 A checked-in inventory lists every legacy command/action/webhook with its owning module
+- [x] #2 Runbook note: how to run the suite pre- and post-cutover for a module
+- [x] #3 The checked-in inventory assigns every surface (commands, interactions, webhook and HTTP routes, scheduled jobs) a target feature under app/features/ or capability under app/capabilities/, or marks it for deletion with the reason
+- [x] #4 The inventory records, per surface, the rebuild ticket that owns it (TASK-37, TASK-38, TASK-39, TASK-40, TASK-88, TASK-52/TASK-65 for jobs, TASK-53 for app/api/ routes)
+- [x] #5 Every register_slack_commands hookimpl under app/modules/ and app/packages/ (the 8 hookimpls: modules/sre, modules/dev, packages/rant, packages/user_rotations, packages/access/sync, packages/incident_draft, packages/incident_summary, packages/geolocate) has a pinning test that dispatches through slack_bolt's public App.dispatch/AsyncApp.async_dispatch boundary and asserts ack, response shape/text and a side-effect fake invoked
+- [x] #6 Pinning tests live under app/tests/integration/legacy_surface/ and pass in the normal 'pytest tests --ignore=tests/smoke' run (not under app/tests/smoke/, and not excluded from the PR gate)
+- [x] #7 Every inventory row not covered by this task's pinning tests (the 6 hard-coded slash commands and 34 interactions, the webhook route, the 5 job entry points) is marked not-yet-pinned in the inventory and named to its owning follow-up task: TASK-36.1, TASK-36.2 or TASK-36.3 respectively
 <!-- AC:END -->
 
 ## Definition of Done
@@ -77,8 +77,8 @@ Confirmed inventory (codebase-researcher, 2026-09-28):
   (modules/secret/secret.py:24), /atip + /aiprp (modules/atip/atip.py:39-40), /incident
   (modules/incident/incident.py:38). Owned by TASK-36.1. (/sre is hookimpl-only after TASK-35
   deletes modules/sre/sre.py; it is covered by this task's register_slack_commands row.)
-- 31 interactions (17 actions, 10 views, 4 events) across modules/incident/incident.py,
-  modules/incident/incident_helper.py (14), modules/sre/webhook_helper.py (6),
+- 34 interactions (18 actions, 12 views, 4 events) across modules/incident/incident.py,
+  modules/incident/incident_helper.py (18), modules/sre/webhook_helper.py (6),
   modules/aws/aws.py, modules/role/role.py, modules/secret/secret.py, modules/atip/atip.py —
   all wired inside each module's register(bot) called from
   server/lifespan.py _register_legacy_handlers(). Owned by TASK-36.1.
@@ -117,13 +117,13 @@ app/tests/integration/legacy_surface/ and run in the standard gate.
 ## Steps
 
 1. **Inventory** — app/tests/integration/legacy_surface/INVENTORY.md: one table row per surface
-   from the confirmed inventory above (44 rows: 7 commands + 31 interactions + 1 webhook route +
+   from the confirmed inventory above (46 rows: 6 commands + 34 interactions + 1 webhook route +
    5 job entries), columns: surface, defining file:line, registration mechanism (hard-coded
    register(bot) vs hookimpl), target feature/capability (features/incident, features/role,
    features/secret, features/atip, capabilities/webhooks, features/access... per
    decisions/migration.md's ordering and TASK-97 for incident), owning rebuild ticket (TASK-37,
    TASK-38, TASK-39, TASK-40, TASK-88, TASK-52/TASK-65 for jobs), and a "pinned by" column: this
-   task's test name for the 8 hookimpl rows, "TASK-36.1" for the 6 hard-coded commands and 31
+   task's test name for the 8 hookimpl rows, "TASK-36.1" for the 6 hard-coded commands and 34
    interactions, "TASK-36.2" for the webhook row (noting existing partial coverage at
    tests/api/v1/test_webhooks.py), "TASK-36.3" for the 5 job rows. Satisfies AC#1, AC#3, AC#4.
 2. **Runbook section** — same file, a "Running this suite" section: `cd app && uv run pytest
@@ -160,7 +160,7 @@ app/tests/integration/legacy_surface/ and run in the standard gate.
    response, one side-effect call per dispatch) — do not construct a case around the old bug.
    modules/dev is pinned with a minimal "registers and acks" case (dev-only, no production
    traffic, no response-shape assertion needed). Satisfies AC#5, AC#6.
-5. **Mark deferred rows** — in INVENTORY.md, tag the 6 hard-coded commands + 31 interactions as
+5. **Mark deferred rows** — in INVENTORY.md, tag the 6 hard-coded commands + 34 interactions as
    owned by TASK-36.1, the webhook row as owned by TASK-36.2 (crediting its existing partial
    coverage), and the 5 job rows as owned by TASK-36.3, each explicitly out of scope for this PR.
    Satisfies AC#7.
@@ -222,6 +222,23 @@ if a fixture is flaky, only this suite's tests fail, not other suites. TASK-26.1
 until this task's suite is green on main, per its AC#4. This task must not merge until TASK-35
 is merged, per its new dependency.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Added app/tests/integration/legacy_surface/ (__init__.py, conftest.py, INVENTORY.md, test_slack_command_registration_surface.py). No production code changed.
+
+Harness: registers the 8 register_slack_commands hookimpls through a fresh pluggy PluginManager (FeatureLifecycleSpecs) onto a real SlackPlatformProvider bound to a real slack_bolt App, then drives form-encoded slash commands through App.dispatch(BoltRequest). Fakes only at the edges: a recording Web API client on the provider, WebhookClient.send_dict (where Bolt's respond posts to response_url), and each package's service seam via monkeypatch. Bolt runs with a static authorize function (no auth.test) and an inline listener executor so the production ack-then-run ordering is kept but side effects are observable when dispatch returns.
+
+Findings:
+- tests/conftest.py pytest_configure replaces slack_bolt.App.__init__ session-wide with a stub that registers nothing. The harness restores the library's own __init__ (loaded from a private copy of slack_bolt.app.app) for its fixture only, via monkeypatch. The shared stub was left untouched (out of scope); it is a candidate for removal once nothing constructs App at import time.
+- Interaction count was 34 (18 actions, 12 views, 4 events), not 31: incident_helper.register has 18 registrations, not 14. TASK-36 and TASK-36.1 counts corrected; inventory has 46 legacy rows.
+- The inventory also lists the other app/api/ routes (GET /geolocate/{ip}, /version, /health, /) for TASK-53, marked as covered by their existing route tests.
+
+Deviation from plan: 17 named tests grouped per hookimpl instead of one parametrized case each, so each surface keeps its happy path plus boundary/failure cases; INVENTORY.md "Pinned by" gives the -k keyword selecting each surface's tests (verified each keyword selects only that surface). modules/dev is pinned with the plan's minimal registers-and-acks case (no side-effect fake), and /sre version is exercised by the prefix test.
+
+Gates: ruff check clean, ruff format applied; mypy 69 errors repo-wide, 0 in touched files (tests/ is outside mypy's configured scope); pytest tests --ignore=tests/smoke 3494 passed, 6 failed (known TASK-90 order leaks, unchanged); make test 2740 + 760 passed.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
