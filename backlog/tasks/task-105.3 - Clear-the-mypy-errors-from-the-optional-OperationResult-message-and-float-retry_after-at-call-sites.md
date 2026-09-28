@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-09-28 15:36'
-updated_date: '2026-09-28 17:16'
+updated_date: '2026-09-28 18:14'
 labels:
   - plugin-architecture
   - operation-result
@@ -116,6 +116,8 @@ Production (11 files, +25/-23):
 Tests (7 files, in place, no new files): fallback tests for catalog discovery, AWS IC group resolution and action execution, fake platform action execution, desired_state user-groups lookup; schema test for the nullable, described message; route test for a null message on success; legacy tests/modules/incident/test_incident_folder.py gets a regression test for the empty created-at row (fails with TypeError without the fix).
 
 Gates (from app/): ruff check . -> All checks passed; ruff format --check on touched files -> clean; lint-imports -> 7 kept, 0 broken; mypy -> 69 errors in 25 files repo-wide (was 102 in 37 before this layer: the 25 widening errors and 8 older ones in touched files are gone), 0 in touched files; pytest tests --ignore=tests/smoke -> 3476 passed, 6 failed (known single-process order leaks in test_webhooks_aws_sns.py and directory/test_google.py); make test -> 2724 passed + 758 passed.
+
+Review follow-up (PR #1507/#1510 questions on retry_after being a float): the webhook route (api/v1/routes/webhooks.py) wrote WebhookStoreUnavailableError.retry_after straight into the HTTP Retry-After header, which only accepts whole seconds (RFC 9110); a float would have rendered as '1.5' or '60.0'. Commit 1260d70b on #1510 renders math.ceil(retry_after) and adds fractional (1.5 -> '2') and whole-float (60.0 -> '60') cases to the existing 503 test in tests/api/v1/test_webhooks.py. No other retry_after consumer needs whole seconds (IncidentStoreUnavailableError's is never read). Gates: ruff clean, lint-imports 7 kept, 0 mypy errors in touched production files (tests are excluded from mypy by config), make test 2724 + 760 passed; CI green on #1510 and #1511.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
