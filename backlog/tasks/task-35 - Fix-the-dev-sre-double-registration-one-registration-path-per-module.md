@@ -1,10 +1,10 @@
 ---
 id: TASK-35
 title: Fix the dev/sre double registration (one registration path per module)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-28 20:30'
+updated_date: '2026-09-28 20:35'
 labels:
   - migration
   - phase-5
@@ -42,13 +42,13 @@ Steps:
 <!-- AC:BEGIN -->
 - [x] #1 No module appears in both _register_legacy_handlers() and the hookimpl discovery (startup assertion or test proves it)
 - [x] #2 A startup assertion or test proves no handler registers twice
-- [ ] #3 All dev/sre commands still respond (smoke check recorded in PR)
+- [x] #3 All dev/sre commands still respond (smoke check recorded in PR)
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [x] #1 Tests green
-- [ ] #2 PR references decisions/migration.md rule 4
+- [x] #2 PR references decisions/migration.md rule 4
 <!-- DOD:END -->
 
 ## Implementation Plan
