@@ -1,10 +1,10 @@
 ---
 id: TASK-35
 title: Fix the dev/sre double registration (one registration path per module)
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-28 14:55'
+updated_date: '2026-09-28 20:20'
 labels:
   - migration
   - phase-5

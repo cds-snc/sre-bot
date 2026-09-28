@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-28 14:36'
+updated_date: '2026-09-28 20:19'
 labels:
   - migration
   - testing
@@ -24,7 +25,7 @@ ordinal: 285000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-TASK-36 pins only the 8 register_slack_commands hookimpls TASK-26.1 rewrites. The legacy surface registered through the hard-coded _register_legacy_handlers() list in app/server/lifespan.py is not yet pinned: 7 slash commands (sre, aws, talent-role, secret, atip/aiprp, incident) and 31 interactions (17 actions, 10 views, 4 events).
+TASK-36 pins only the 8 register_slack_commands hookimpls TASK-26.1 rewrites. The legacy surface registered through the hard-coded _register_legacy_handlers() list in app/server/lifespan.py is not yet pinned: 6 slash commands (aws, talent-role, secret, atip/aiprp, incident; /sre is hookimpl-only after TASK-35 and pinned by TASK-36) and 31 interactions (17 actions, 10 views, 4 events).
 
 Add pinning tests for those rows of the TASK-36 inventory in app/tests/integration/legacy_surface/, reusing the TASK-36 harness: build a real slack_bolt App, register through the real startup path, drive it with App.dispatch(BoltRequest) and assert on ack, response and faked side effects only. These tests gate TASK-26.2 (runtime move) and the TASK-38, TASK-39 and TASK-88 surface rebuilds. Split by module group if the size gate requires it.
 <!-- SECTION:DESCRIPTION:END -->
