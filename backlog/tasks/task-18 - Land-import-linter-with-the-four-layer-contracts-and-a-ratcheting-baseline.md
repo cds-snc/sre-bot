@@ -3,10 +3,11 @@ id: TASK-18
 title: >-
   Land import-linter with the six-layer plugin-architecture contracts and a
   ratcheting ignore list
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-28 14:55'
+updated_date: '2026-09-28 15:14'
 labels:
   - toolchain
   - phase-2
@@ -47,10 +48,10 @@ Seed each contract's ignore_imports with every current violation so the suite la
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 lint-imports runs as a blocking CI step with contracts a-h from the description configured over the flat root packages
-- [ ] #2 contracts, features and capabilities are declared optional, so each contract binds the moment that directory is created
-- [ ] #3 A deliberate new violation (draft commit) fails CI; reverted
-- [ ] #4 ignore_imports entries are per-contract, dated/attributed in comments, and unmatched alerting is on
+- [x] #1 lint-imports runs as a blocking CI step with contracts a-h from the description configured over the flat root packages
+- [x] #2 contracts, features and capabilities are declared optional, so each contract binds the moment that directory is created
+- [x] #3 A deliberate new violation (draft commit) fails CI; reverted
+- [x] #4 ignore_imports entries are per-contract, dated/attributed in comments, and unmatched alerting is on
 <!-- AC:END -->
 
 ## Definition of Done
@@ -118,6 +119,26 @@ Blast radius and rollback:
 - Risk if seeded incorrectly: a too-narrow ignore list makes CI red on merge (caught immediately, blocks nothing else since main isn't yet relying on this gate); a too-broad wildcard silently masks future violations (caught later by whoever eventually tightens the ratchet, mitigated by the narrow-wildcard rule above and by TASK-106+ needing every ignore entry to still resolve to real code they can point at when they migrate it).
 - No ordering constraint on other in-flight PRs: this task only adds a new CI gate and touches no shared code paths, so it can land independently of everything except needing an accurate `ls app/packages` snapshot at write time.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented 2026-09-28 on stack-a/task-18-import-linter (Stack A layer 1).
+
+Changes: import-linter 2.15 added to the dev group (uv.lock updated); [tool.importlinter] in app/pyproject.toml with contracts a, b, d, e, f, g, h; make check-import-contracts; CI step 'Import contract check' after the runtime import check; tests/unit/tooling/test_tooling_import_contracts_config.py.
+
+Deviations from the plan, all verified empirically:
+- Contract (a) puts modules, api and jobs in one non-independent layer ('(modules) : (api) : (jobs)'). The plan's '|' would have made them mutually independent, which no decision requires, and would have seeded ignores for api/jobs -> modules.
+- Contracts (b) and (e) set allow_indirect_imports = true: they are rules about direct imports, and indirect chains through integrations -> infrastructure are already tracked once by (d) and (a). Without it the same violation was listed under several contracts.
+- Contract (e) has one permanent ignore, 'packages.**.adapters.** -> integrations.**', for the adapters/ exemption the rule itself states (27 imports).
+- Seeded ignores are exact edges, no wildcards: (a) 20, (b) 86, (d) 19, (e) 15, (f) 3 = 143. (g) and (h) are clean. packages/incident exists and is in (f); it has no common/, so no container contract (TASK-38).
+- Contract (c) is not configured: app/contracts/ does not exist and a forbidden contract cannot name a missing package. TASK-106 adds it (its AC #6).
+- AC #2: optional layers do not bind by themselves. import-linter only analyses root_packages and rejects a missing one, so a created features/ with a forbidden import still passed (verified). The new test fails when contracts/, features/ or capabilities/ exists without being in root_packages, so the PR that creates a layer must switch its contracts on.
+
+Verification (cd app): lint-imports 'Contracts: 7 kept, 0 broken'. A temporary packages.rant -> server.lifespan import made make check-import-contracts exit 2 (a, b, f, g broken), reverted. A temporary stale ignore entry exited 2 ('No matches for ignored import'), reverted. ruff check: all passed. mypy: 78 pre-existing errors in 27 files, 0 in touched files. make test: 2754 + 757 passed. make lock-check: ok.
+
+DoD open until the human commits and opens the PR: baseline committed, CI observed blocking on the PR, PR description references decisions/toolchain.md and decisions/plugin-architecture.md.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

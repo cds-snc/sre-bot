@@ -190,7 +190,262 @@ dev = [
     "moto[dynamodb]>=5.2.2",
     "types-boto3[ce,config,dynamodb,guardduty,identitystore,lambda,organizations,securityhub,sqs,sso-admin,sts]>=1.43.63",
     "google-api-python-client-stubs>=1.39.0",
+    "import-linter>=2.15",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["api", "infrastructure", "integrations", "jobs", "models", "modules", "packages", "server", "utils"]
+
+[tool.importlinter]
+# Enforces decisions/plugin-architecture.md (six layers) with the transitional
+# packages from decisions/migration.md. contracts, features and capabilities are
+# listed as optional layers; add each to root_packages in the PR that creates it
+# (import-linter rejects a root package that does not exist).
+root_packages = ["server", "packages", "infrastructure", "integrations", "modules", "api", "jobs", "models", "utils"]
+
+[[tool.importlinter.contracts]]
+id = "layers"
+name = "(a) Six-layer plugin architecture"
+type = "layers"
+layers = [
+    "server",
+    "(modules) : (api) : (jobs)",
+    "(features) | packages",
+    "(capabilities)",
+    "infrastructure",
+    "integrations",
+    "(contracts)",
+]
+unmatched_ignore_imports_alerting = "error"
+ignore_imports = [
+    # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/plugin-architecture.md Migration and decisions/outbound-clients.md Migration).
+    # Shrink-only: remove an entry when its import is fixed; never add one.
+    "infrastructure.plugins.specs -> jobs",
+    "integrations.aws.client -> infrastructure.operations.status",
+    "integrations.google_workspace.client -> infrastructure.configuration.integrations.google",
+    "integrations.google_workspace.client -> infrastructure.operations.status",
+    "integrations.maxmind.client -> infrastructure.configuration.integrations.maxmind",
+    "integrations.maxmind.client -> infrastructure.operations",
+    "integrations.notify.client -> infrastructure.configuration.app",
+    "integrations.notify.client -> infrastructure.configuration.integrations.notify",
+    "integrations.openai.client -> infrastructure.operations.result",
+    "integrations.openai.client -> infrastructure.operations.status",
+    "integrations.openai.summarizer -> infrastructure.operations.result",
+    "integrations.opsgenie.client -> infrastructure.configuration.integrations.opsgenie",
+    "integrations.sentinel.client -> infrastructure.audit.models",
+    "integrations.sentinel.client -> infrastructure.configuration.integrations.sentinel",
+    "integrations.slack.formatter -> infrastructure.i18n",
+    "integrations.slack.formatter -> infrastructure.operations",
+    "integrations.slack.provider -> infrastructure.i18n",
+    "integrations.slack.provider -> infrastructure.operations",
+    "integrations.slack.provider -> infrastructure.slack.settings",
+    "integrations.trello.client -> infrastructure.configuration.integrations.trello",
+]
+
+[[tool.importlinter.contracts]]
+id = "no-host-imports"
+name = "(b) Packages, features and capabilities never import infrastructure or server"
+type = "forbidden"
+source_modules = ["packages"]
+forbidden_modules = ["infrastructure", "server"]
+# Direct imports only: chains through integrations are tracked by contract (d).
+allow_indirect_imports = true
+unmatched_ignore_imports_alerting = "error"
+ignore_imports = [
+    # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/plugin-architecture.md Migration).
+    # Shrink-only: remove an entry when its import is fixed; never add one.
+    "packages.access.catalog -> infrastructure.plugins",
+    "packages.access.catalog.interactions.http -> infrastructure.operations",
+    "packages.access.catalog.interactions.http -> infrastructure.security",
+    "packages.access.catalog.interactions.http -> infrastructure.security.models",
+    "packages.access.catalog.providers -> infrastructure.directory",
+    "packages.access.catalog.service -> infrastructure.directory.provider",
+    "packages.access.catalog.service -> infrastructure.operations",
+    "packages.access.common.config.loaders -> infrastructure.operations",
+    "packages.access.common.group_policy -> infrastructure.directory.models",
+    "packages.access.common.providers -> infrastructure.operations",
+    "packages.access.request -> infrastructure.events",
+    "packages.access.request -> infrastructure.plugins",
+    "packages.access.request.interactions.http -> infrastructure.operations",
+    "packages.access.request.interactions.http -> infrastructure.security",
+    "packages.access.request.interactions.http -> infrastructure.security.models",
+    "packages.access.request.policies -> infrastructure.directory.models",
+    "packages.access.request.policies -> infrastructure.directory.provider",
+    "packages.access.request.providers -> infrastructure.directory",
+    "packages.access.request.providers -> infrastructure.events",
+    "packages.access.request.providers -> infrastructure.storage",
+    "packages.access.request.service -> infrastructure.directory.models",
+    "packages.access.request.service -> infrastructure.directory.provider",
+    "packages.access.request.service -> infrastructure.events",
+    "packages.access.request.service -> infrastructure.operations",
+    "packages.access.request.store -> infrastructure.storage.protocol",
+    "packages.access.sync -> infrastructure.events",
+    "packages.access.sync -> infrastructure.i18n.resources",
+    "packages.access.sync -> infrastructure.plugins",
+    "packages.access.sync.adapters -> infrastructure.operations",
+    "packages.access.sync.adapters.aws_identity_center -> infrastructure.operations",
+    "packages.access.sync.adapters.fake_platform -> infrastructure.operations",
+    "packages.access.sync.application -> infrastructure.events",
+    "packages.access.sync.application -> infrastructure.operations",
+    "packages.access.sync.desired_state -> infrastructure.directory.provider",
+    "packages.access.sync.desired_state -> infrastructure.operations",
+    "packages.access.sync.interactions.http -> infrastructure.operations",
+    "packages.access.sync.interactions.http -> infrastructure.security",
+    "packages.access.sync.interactions.http -> infrastructure.security.models",
+    "packages.access.sync.interactions.ingress -> infrastructure.idempotency",
+    "packages.access.sync.interactions.ingress -> infrastructure.operations",
+    "packages.access.sync.interactions.slack -> infrastructure.i18n",
+    "packages.access.sync.job_runner -> infrastructure.idempotency",
+    "packages.access.sync.job_status_store -> infrastructure.storage",
+    "packages.access.sync.platform_lock -> infrastructure.idempotency",
+    "packages.access.sync.presenters -> infrastructure.i18n",
+    "packages.access.sync.providers -> infrastructure.directory",
+    "packages.access.sync.providers -> infrastructure.events",
+    "packages.access.sync.providers -> infrastructure.idempotency",
+    "packages.access.sync.providers -> infrastructure.storage",
+    "packages.access.sync.store -> infrastructure.storage.protocol",
+    "packages.aws_platform.adapters.aws_lambda -> infrastructure.operations",
+    "packages.aws_platform.adapters.config -> infrastructure.operations",
+    "packages.aws_platform.adapters.cost_explorer -> infrastructure.operations",
+    "packages.aws_platform.adapters.dynamodb -> infrastructure.operations",
+    "packages.aws_platform.adapters.guard_duty -> infrastructure.operations",
+    "packages.aws_platform.adapters.identity_center -> infrastructure.operations",
+    "packages.aws_platform.adapters.organizations -> infrastructure.operations",
+    "packages.aws_platform.adapters.security_hub -> infrastructure.operations",
+    "packages.aws_platform.adapters.sso_admin -> infrastructure.operations",
+    "packages.geolocate -> infrastructure.i18n.resources",
+    "packages.geolocate -> infrastructure.plugins",
+    "packages.geolocate.platforms.slack -> infrastructure.i18n",
+    "packages.geolocate.platforms.slack -> infrastructure.operations",
+    "packages.geolocate.routes -> infrastructure.operations",
+    "packages.geolocate.service -> infrastructure.operations",
+    "packages.incident.drive.adapters.google_drive -> infrastructure.configuration.integrations.google",
+    "packages.incident.drive.adapters.google_drive -> infrastructure.drive",
+    "packages.incident.drive.adapters.google_drive -> infrastructure.drive.factory",
+    "packages.incident.drive.adapters.google_drive -> infrastructure.drive.models",
+    "packages.incident.drive.adapters.google_drive -> infrastructure.operations",
+    "packages.incident_draft -> infrastructure.i18n.resources",
+    "packages.incident_draft -> infrastructure.plugins",
+    "packages.incident_draft.adapters.google_docs -> infrastructure.configuration.integrations.google",
+    "packages.incident_draft.adapters.google_docs -> infrastructure.drive",
+    "packages.incident_draft.platforms.slack -> infrastructure.i18n",
+    "packages.incident_draft.service -> infrastructure.operations",
+    "packages.incident_summary -> infrastructure.i18n.resources",
+    "packages.incident_summary -> infrastructure.plugins",
+    "packages.incident_summary.platforms.slack -> infrastructure.i18n",
+    "packages.incident_summary.service -> infrastructure.operations",
+    "packages.oncall_sync -> infrastructure.plugins",
+    "packages.rant -> infrastructure.plugins",
+    "packages.talent.adapters.google_drive -> infrastructure.configuration.integrations.google",
+    "packages.talent.adapters.google_drive -> infrastructure.drive.factory",
+    "packages.talent.adapters.google_drive -> infrastructure.operations",
+    "packages.user_rotations -> infrastructure.plugins",
+]
+
+# (c) "contracts imports nothing else from the app" is added by TASK-106 with
+# app/contracts/: a forbidden contract cannot name a package that does not exist.
+
+[[tool.importlinter.contracts]]
+id = "integrations-leaf"
+name = "(d) integrations imports nothing from the app except contracts"
+type = "forbidden"
+source_modules = ["integrations"]
+forbidden_modules = ["server", "packages", "infrastructure", "modules", "api", "jobs", "models", "utils"]
+unmatched_ignore_imports_alerting = "error"
+ignore_imports = [
+    # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/outbound-clients.md Migration).
+    # Shrink-only: remove an entry when its import is fixed; never add one.
+    "integrations.aws.client -> infrastructure.operations.status",
+    "integrations.google_workspace.client -> infrastructure.configuration.integrations.google",
+    "integrations.google_workspace.client -> infrastructure.operations.status",
+    "integrations.maxmind.client -> infrastructure.configuration.integrations.maxmind",
+    "integrations.maxmind.client -> infrastructure.operations",
+    "integrations.notify.client -> infrastructure.configuration.app",
+    "integrations.notify.client -> infrastructure.configuration.integrations.notify",
+    "integrations.openai.client -> infrastructure.operations.result",
+    "integrations.openai.client -> infrastructure.operations.status",
+    "integrations.openai.summarizer -> infrastructure.operations.result",
+    "integrations.opsgenie.client -> infrastructure.configuration.integrations.opsgenie",
+    "integrations.sentinel.client -> infrastructure.audit.models",
+    "integrations.sentinel.client -> infrastructure.configuration.integrations.sentinel",
+    "integrations.slack.formatter -> infrastructure.i18n",
+    "integrations.slack.formatter -> infrastructure.operations",
+    "integrations.slack.provider -> infrastructure.i18n",
+    "integrations.slack.provider -> infrastructure.operations",
+    "integrations.slack.provider -> infrastructure.slack.settings",
+    "integrations.trello.client -> infrastructure.configuration.integrations.trello",
+]
+
+[[tool.importlinter.contracts]]
+id = "integrations-via-adapters"
+name = "(e) packages import integrations only from adapters/ modules"
+type = "forbidden"
+source_modules = ["packages"]
+forbidden_modules = ["integrations"]
+# Direct imports only: chains through infrastructure are tracked by contracts (a) and (b).
+allow_indirect_imports = true
+unmatched_ignore_imports_alerting = "error"
+ignore_imports = [
+    # Permanent: adapters/ is where a package may import integrations (decisions/outbound-clients.md).
+    "packages.**.adapters.** -> integrations.**",
+    # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/outbound-clients.md Migration).
+    # Shrink-only: remove an entry when its import is fixed; never add one.
+    "packages.access.sync.interactions.slack -> integrations.slack.models",
+    "packages.access.sync.interactions.slack -> integrations.slack.parser",
+    "packages.geolocate.platforms.slack -> integrations.slack.models",
+    "packages.geolocate.platforms.slack -> integrations.slack.parser",
+    "packages.incident_draft.platforms.slack -> integrations.slack.models",
+    "packages.incident_draft.platforms.slack -> integrations.slack.provider",
+    "packages.incident_draft.service -> integrations.openai",
+    "packages.incident_summary.platforms.slack -> integrations.slack.models",
+    "packages.incident_summary.platforms.slack -> integrations.slack.provider",
+    "packages.incident_summary.service -> integrations.openai",
+    "packages.oncall_sync.providers -> integrations.slack.settings",
+    "packages.rant.platforms.slack -> integrations.slack.models",
+    "packages.rant.platforms.slack -> integrations.slack.provider",
+    "packages.user_rotations.platforms.slack -> integrations.slack.models",
+    "packages.user_rotations.platforms.slack -> integrations.slack.provider",
+]
+
+[[tool.importlinter.contracts]]
+id = "feature-independence"
+name = "(f) Top-level packages are independent of each other"
+type = "independence"
+modules = [
+    "packages.access",
+    "packages.aws_platform",
+    "packages.geolocate",
+    "packages.incident",
+    "packages.incident_draft",
+    "packages.incident_summary",
+    "packages.oncall_sync",
+    "packages.rant",
+    "packages.talent",
+    "packages.user_rotations",
+]
+unmatched_ignore_imports_alerting = "error"
+ignore_imports = [
+    # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/feature-packages.md; TASK-123 removes the oncall_sync -> user_rotations coupling).
+    # Shrink-only: remove an entry when its import is fixed; never add one.
+    "packages.oncall_sync -> packages.user_rotations.settings",
+    "packages.oncall_sync.ports -> packages.user_rotations.service",
+    "packages.oncall_sync.providers -> packages.user_rotations.providers",
+]
+
+[[tool.importlinter.contracts]]
+id = "no-legacy-imports"
+name = "(g) Nothing outside the legacy tree imports modules"
+type = "forbidden"
+source_modules = ["packages", "infrastructure", "integrations"]
+forbidden_modules = ["modules"]
+
+[[tool.importlinter.contracts]]
+id = "access-umbrella"
+name = "(h) Access subdomains are independent siblings over a shared kernel"
+type = "layers"
+containers = ["packages.access"]
+layers = [
+    "catalog | request | sync",
+    "common",
+]
+exhaustive = true
