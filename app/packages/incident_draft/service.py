@@ -289,7 +289,7 @@ async def draft_incident_document(
         )
         return OperationResult.error(
             status=result.status,
-            message=result.message,
+            message=result.message or "Incident draft summarizer failed",
             error_code=result.error_code,
         )
 
@@ -358,8 +358,6 @@ async def draft_incident_document(
     )
     return OperationResult.success(
         data=outcome,
-        provider="openai",
-        operation="draft_incident_document",
     )
 
 

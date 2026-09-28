@@ -123,8 +123,6 @@ class OpenAISummarizer:
 
         return OperationResult.success(
             data=summary,
-            provider="openai",
-            operation="summarize",
         )
 
 

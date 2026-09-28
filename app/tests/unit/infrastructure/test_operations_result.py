@@ -72,39 +72,25 @@ class TestOperationResultEdgeCases:
 
 
 @pytest.mark.unit
-class TestOperationResultObservability:
-    """Test provider and operation fields for observability."""
+class TestOperationResultCanonicalFields:
+    """The envelope carries exactly the fields decisions/operation-result.md defines."""
 
-    def test_success_with_provider_and_operation(self):
-        result = OperationResult.success(
-            data={"users": []},
-            provider="google",
-            operation="list_users",
-        )
-        assert result.provider == "google"
-        assert result.operation == "list_users"
-        assert result.is_success
+    def test_fields_match_the_decision_record(self):
+        """Field names are compared as a set, so adding or dropping any field fails loudly."""
+        names = {f.name for f in dataclasses.fields(OperationResult)}
+        assert names == {"status", "message", "data", "error_code", "retry_after", "cause"}
 
-    def test_error_with_provider_and_operation(self):
-        result = OperationResult.error(
-            OperationStatus.TRANSIENT_ERROR,
-            "Rate limited",
-            error_code="RATE_LIMITED",
-            retry_after=60,
-            provider="aws",
-            operation="list_groups",
-        )
-        assert result.provider == "aws"
-        assert result.operation == "list_groups"
-        assert result.retry_after == 60
+    @pytest.mark.parametrize("kwarg", ["provider", "operation"])
+    def test_success_rejects_observability_kwargs(self, kwarg):
+        """Provider/operation context belongs in structured logs, so the factory refuses it."""
+        with pytest.raises(TypeError):
+            OperationResult.success(data={}, **{kwarg: "x"})
 
-    def test_provider_defaults_to_none(self):
-        result = OperationResult.success(data={"test": "value"})
-        assert result.provider is None
-
-    def test_operation_defaults_to_none(self):
-        result = OperationResult.permanent_error("Failed")
-        assert result.operation is None
+    @pytest.mark.parametrize("kwarg", ["provider", "operation"])
+    def test_error_rejects_observability_kwargs(self, kwarg):
+        """The error factory refuses the same kwargs as the success factory."""
+        with pytest.raises(TypeError):
+            OperationResult.error(OperationStatus.PERMANENT_ERROR, "Failed", **{kwarg: "x"})
 
 
 @pytest.mark.unit

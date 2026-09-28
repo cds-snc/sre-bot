@@ -32,7 +32,6 @@ Consumers of external calls need to branch on expected outcomes (success, not-fo
 
 - One page of contract answers "what do I get back and what do I do with it" for every boundary in the app.
 - The five statuses are deliberately coarse; fidelity lives in `error_code`. Adding a status amends this record; adding a code is routine.
-- Divergence still to fix in code: the undocumented `provider`/`operation` fields are dropped by TASK-105.1.
 
 ## Checks
 
@@ -42,8 +41,9 @@ Consumers of external calls need to branch on expected outcomes (success, not-fo
 
 ## Migration
 
-Tickets: drop the `provider`/`operation` fields (TASK-105.1); the `contracts/` move ([plugin-architecture.md](plugin-architecture.md), TASK-106). Tolerated until closed: the `provider`/`operation` fields; `OperationResult` and `OperationStatus` living in `app/infrastructure/operations/`.
+Tickets: the `contracts/` move ([plugin-architecture.md](plugin-architecture.md), TASK-106). Tolerated until closed: `OperationResult` and `OperationStatus` living in `app/infrastructure/operations/`.
 
 **Changes:**
 - 2026-09-24: `OperationResult` moves to `app/contracts/` as a shared type of the plugin API.
 - 2026-09-28: TASK-105 froze the dataclass, removed `map`/`bind`/`unwrap`/`unwrap_or`, made `message` optional on success, added `cause`, widened `retry_after` to `float` and fixed the stale docstring pointer; `provider`/`operation` deferred to TASK-105.1.
+- 2026-09-28: TASK-105.1 dropped the `provider`/`operation` fields; adapters log that context as structured fields instead.

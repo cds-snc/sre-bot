@@ -3,6 +3,7 @@
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING, Any, Literal, cast
 
+import structlog
 from googleapiclient.errors import HttpError
 
 from infrastructure.operations import OperationResult
@@ -16,6 +17,8 @@ RANGE_NOT_FOUND = "RANGE_NOT_FOUND"
 
 _VALUE_INPUT_OPTION = "USER_ENTERED"
 _INSERT_DATA_OPTION = "INSERT_ROWS"
+
+logger = structlog.get_logger()
 
 if TYPE_CHECKING:
     from googleapiclient._apis.sheets.v4 import (  # pyright: ignore[reportMissingModuleSource]
@@ -37,44 +40,45 @@ class GoogleSpreadsheetProvider:
 
     def _map_sdk_exception(self, exc: HttpError, operation: str) -> OperationResult[Any]:
         if int(exc.resp.status) == 400 and "Unable to parse range" in str(exc):
+            logger.warning(
+                "google_spreadsheets_operation_failed",
+                operation=operation,
+                status=OperationStatus.NOT_FOUND.value,
+                error_code=RANGE_NOT_FOUND,
+            )
             return OperationResult.error(
                 status=OperationStatus.NOT_FOUND,
                 message=str(exc),
                 error_code=RANGE_NOT_FOUND,
-                provider="google",
-                operation=operation,
             )
 
         status, error_code, retry_after = classify_google_error(exc)
+        logger.warning(
+            "google_spreadsheets_operation_failed",
+            operation=operation,
+            status=status.value,
+            error_code=error_code,
+        )
         return OperationResult.error(
             status=status,
             message=str(exc),
             error_code=error_code,
             retry_after=retry_after,
-            provider="google",
-            operation=operation,
         )
 
     def _call(self, operation: str, fn: Callable[[], Any]) -> OperationResult[Any]:
         try:
-            return OperationResult.success(data=fn(), provider="google", operation=operation)
+            return OperationResult.success(data=fn())
         except HttpError as exc:
             return self._map_sdk_exception(exc, operation)
 
     def _service(self) -> SheetsResource:
         return self._get_service(SHEETS_SCOPES, None)
 
-    def _success_or_error(self, result: OperationResult[Any], operation: str) -> OperationResult[None]:
+    def _success_or_error(self, result: OperationResult[Any]) -> OperationResult[None]:
         if not result.is_success:
-            return OperationResult.error(
-                status=result.status,
-                message=result.message,
-                error_code=result.error_code,
-                retry_after=result.retry_after,
-                provider=result.provider,
-                operation=result.operation,
-            )
-        return OperationResult.success(provider="google", operation=operation)
+            return cast("OperationResult[None]", result)
+        return OperationResult.success()
 
     def read_values(self, spreadsheet_id: str, a1_range: str) -> OperationResult[list[list[str]]]:
         """Read a string matrix from an A1 range."""
@@ -89,8 +93,6 @@ class GoogleSpreadsheetProvider:
         values = raw_values if isinstance(raw_values, list) else []
         return OperationResult.success(
             data=[[str(cell) for cell in row] for row in values if isinstance(row, list)],
-            provider="google",
-            operation="read_values",
         )
 
     def update_values(self, spreadsheet_id: str, a1_range: str, values: list[list[Any]]) -> OperationResult[None]:
@@ -116,7 +118,7 @@ class GoogleSpreadsheetProvider:
                 .execute()
             ),
         )
-        return self._success_or_error(result, "update_values")
+        return self._success_or_error(result)
 
     def append_values(self, spreadsheet_id: str, a1_range: str, values: list[list[Any]]) -> OperationResult[None]:
         """Append rows to an A1 range using user-entered values."""
@@ -140,7 +142,7 @@ class GoogleSpreadsheetProvider:
                 .execute(num_retries=0)
             ),
         )
-        return self._success_or_error(result, "append_values")
+        return self._success_or_error(result)
 
     def read_cells(self, spreadsheet_id: str, a1_range: str) -> OperationResult[list[list[SheetCell]]]:
         """Read canonical cells and links from an A1 range."""
@@ -163,7 +165,7 @@ class GoogleSpreadsheetProvider:
         for row in row_data if isinstance(row_data, list) else []:
             raw_cells = row.get("values", []) if isinstance(row, Mapping) else []
             cells.append([self._build_cell(cell) for cell in raw_cells] if isinstance(raw_cells, list) else [])
-        return OperationResult.success(data=cells, provider="google", operation="read_cells")
+        return OperationResult.success(data=cells)
 
     def _build_cell(self, payload: Mapping[str, Any]) -> SheetCell:
         formatted_value = payload.get("formattedValue")

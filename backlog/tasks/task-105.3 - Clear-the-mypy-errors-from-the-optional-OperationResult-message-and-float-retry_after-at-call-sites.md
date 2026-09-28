@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-28 15:36'
+updated_date: '2026-09-28 15:52'
 labels:
   - plugin-architecture
   - operation-result
@@ -34,3 +35,9 @@ Measure the list again after TASK-105.1 lands, then fix each site at its own bou
 - [ ] #2 Runtime behaviour on error paths is unchanged: the fallback text is used only where message is None
 - [ ] #3 ruff, lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-28, measured after TASK-105.1: 26 errors remain in 13 files. TASK-105.1 cleared infrastructure/{directory,drive,spreadsheets}/google.py and packages/incident_draft/service.py. Remaining: modules/{aws/identity_center.py (1), incident/db_operations.py (1, retry_after), incident/incident_folder.py (4), permissions/handler.py (1), provisioning/groups.py (2), provisioning/users.py (2), slack/webhooks.py (1, retry_after)}, packages/access/{catalog/service.py (1), request/interactions/http.py (1), sync/adapters/aws_identity_center.py (2), sync/adapters/fake_platform.py (1), sync/desired_state.py (8)}. 12 production files, 2 subsystems (legacy modules/, packages/access).
+<!-- SECTION:NOTES:END -->

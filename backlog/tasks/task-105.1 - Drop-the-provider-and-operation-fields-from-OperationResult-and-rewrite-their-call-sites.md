@@ -3,10 +3,10 @@ id: TASK-105.1
 title: >-
   Drop the provider and operation fields from OperationResult and rewrite their
   call sites
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-28 14:35'
-updated_date: '2026-09-28 14:55'
+updated_date: '2026-09-28 15:52'
 labels:
   - plugin-architecture
   - operation-result
@@ -35,11 +35,11 @@ Stack A layer between TASK-105 and TASK-105.2 (doc-2). Mechanical and behaviour-
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 OperationResult has no provider or operation field; grep finds no provider=/operation= argument or .provider/.operation read on an OperationResult under app/
-- [ ] #2 Context previously carried in provider/operation that callers still need is emitted as structured log fields at the call site; no new envelope field is added
-- [ ] #3 decisions/operation-result.md no longer lists provider/operation as a tolerated divergence
-- [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #5 infrastructure/operations/classifiers.py and its tests are deleted; nothing imports classify_http_error, classify_integration_error or the operations-layer classify_aws_error
+- [x] #1 OperationResult has no provider or operation field; grep finds no provider=/operation= argument or .provider/.operation read on an OperationResult under app/
+- [x] #2 Context previously carried in provider/operation that callers still need is emitted as structured log fields at the call site; no new envelope field is added
+- [x] #3 decisions/operation-result.md no longer lists provider/operation as a tolerated divergence
+- [x] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #5 infrastructure/operations/classifiers.py and its tests are deleted; nothing imports classify_http_error, classify_integration_error or the operations-layer classify_aws_error
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -129,6 +129,29 @@ Blast radius and rollback
   - A single `git revert` of this PR fully restores prior behavior (field removal, log additions, and the classifiers.py deletion are all independent, reversible edits with no data migration or persisted state involved).
   - Ordering: must land after TASK-105 (dependency already declared) and before TASK-105.2/TASK-106 (dependents already declared) -- no other ordering constraints. Kept as a single PR per explicit instruction.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented per the approved plan on stack-a/task-105.1-drop-provider-operation (Stack A layer 3). 18 production files, as planned: 16 edited, 2 deleted (classifiers.py and its test).
+
+- result.py: provider/operation fields, factory params, docstrings and pass-throughs removed.
+- operations/__init__.py: classifier re-exports and the docstring line removed. classifiers.py and tests/unit/infrastructure/operations/test_classifiers.py deleted; the grep before deleting found no other importer.
+- 9 aws_platform adapters, openai client/summarizer, incident_draft/service.py: kwargs dropped. These sites already logged operation context, so no logging was added.
+- directory/drive/spreadsheets google.py: kwargs dropped; logger.warning(<x>_operation_failed, operation, status, error_code) added in each _map_sdk_exception, both branches in spreadsheets; spreadsheets gains a module logger.
+- decisions/operation-result.md: provider/operation divergence removed from Consequences and Migration; Changes entry added.
+
+Deviations from plan:
+- directory _typed_error returns cast(OperationResult[T], replace(result, data=None)) rather than a plain cast. The method's docstring requires dropping provider payload data, which a plain cast would keep. It now also carries cause through.
+- drive warmup and spreadsheets _success_or_error return cast(result) as planned. Error results from _call never carry data. _success_or_error's operation parameter became unused and was removed, with its 2 callers updated.
+- incident_draft/service.py:292 now reads message=result.message or 'Incident draft summarizer failed'. This is a TASK-105 mypy error in a file this layer touches. There is no runtime change: summarizer error results always carry a message.
+
+Tests: test_operations_result.py swaps TestOperationResultObservability for TestOperationResultCanonicalFields (field set equals the decision record; success()/error() reject provider/operation kwargs).
+
+Gates: ruff check . -> All checks passed; ruff format --check . -> 737 files already formatted; lint-imports -> 7 kept, 0 broken; pytest tests --ignore=tests/smoke -> 3465 passed, 6 failed. The 6 are the same known TASK-90 order leaks (test_webhooks_aws_sns.py, directory/test_google.py), unchanged from layer 2.
+mypy on touched files -> 0 errors in them. The 17 reported come from imported untouched files (i18n, openai/settings, slack/help), all already in the baseline. Full run: 103 errors. Against the pre-TASK-105 baseline, new errors dropped from 29 to 26, so the three google.py files and incident_draft are now clean.
+AC #1 grep: the only remaining provider= hits are the DirectoryUser/DriveFile/SheetCell domain field, out of scope. AC #5 grep over app/, bin/ and scripts/ for operations.classifiers, classify_http_error and classify_integration_error: zero hits.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
