@@ -3,10 +3,10 @@ id: TASK-105.3
 title: >-
   Clear the mypy errors from the optional OperationResult message and float
   retry_after at call sites
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-28 15:36'
-updated_date: '2026-09-28 16:40'
+updated_date: '2026-09-28 17:16'
 labels:
   - plugin-architecture
   - operation-result

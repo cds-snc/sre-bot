@@ -3,10 +3,10 @@ id: TASK-105.1
 title: >-
   Drop the provider and operation fields from OperationResult and rewrite their
   call sites
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-28 14:35'
-updated_date: '2026-09-28 15:52'
+updated_date: '2026-09-28 17:16'
 labels:
   - plugin-architecture
   - operation-result

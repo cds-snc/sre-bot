@@ -3,7 +3,7 @@ id: doc-2
 title: Delivery Sequence and Stacked Pull Requests
 type: guide
 created_date: '2026-09-24 20:23'
-updated_date: '2026-09-28 16:00'
+updated_date: '2026-09-28 17:11'
 ---
 # Delivery Sequence and Stacked Pull Requests
 
@@ -49,10 +49,11 @@ These are git write operations and are run by the developer; agents do not run t
 - Never mix a mechanical move with a behaviour change in one layer.
 - A mechanical move rewrites every importer in the same PR. A split that needs a re-export shim is not allowed.
 - Each stack has a handoff doc under `backlog/docs/stacks/` that records its current state. Sessions start and end with the `stacked-pr-session` skill, which ends every session with a resume prompt.
+- When a stack's next layer is blocked on work outside the stack, pause the stack rather than build around the blocker. The handoff doc then records the resume conditions, and the submitted layers go through review and merge on their own.
 
 ## Critical path
 
-TASK-18, TASK-105 -> TASK-105.1 -> TASK-105.2 and TASK-25.4 -> TASK-106 -> TASK-26.1 (also after TASK-35 -> TASK-36) -> TASK-107 -> TASK-110 -> TASK-112 (with TASK-111) -> TASK-114.
+TASK-18, TASK-105 -> TASK-105.1 -> TASK-105.2 -> TASK-105.3 -> TASK-106 -> TASK-26.1 (also after TASK-25.4, and TASK-35 -> TASK-36) -> TASK-107 -> TASK-110 -> TASK-112 (with TASK-111) -> TASK-114.
 
 TASK-109 (the service registry) is also required before the capability and feature moves. It follows TASK-108, TASK-58 and the TASK-92 decision. Almost every later task depends on TASK-114 and TASK-109.
 
@@ -63,7 +64,7 @@ TASK-109 (the service registry) is also required before the capability and featu
 | Lane | Tasks | Form |
 | --- | --- | --- |
 | Decisions (docs only) | TASK-92 (health model, gates TASK-109), TASK-117 (i18n library, gates TASK-118), TASK-97 (incident architecture, gates TASK-38), TASK-83.1 (identity Draft records), TASK-104 (CLAUDE.md and skills) | single PRs |
-| Critical-path prerequisites | TASK-25.4 (Slack client factory and classifier), TASK-24 (vendor settings, SecuritySettings), TASK-35 (sre single registration) -> TASK-36 (legacy-surface inventory and pinning tests for the 8 Slack command hookimpls) | single PRs |
+| Critical-path prerequisites | TASK-25.4 (Slack client factory and classifier), TASK-24 (vendor settings, SecuritySettings), TASK-35 (sre single registration) -> TASK-36 (legacy-surface inventory and pinning tests for the 8 Slack command hookimpls) | single PRs; TASK-25.4 and TASK-36 are what Stack A waits on to resume |
 | Legacy-surface pinning | TASK-36.1 (hard-coded slash commands and interactions), TASK-36.2 (webhook route), TASK-36.3 (scheduled jobs), each after TASK-36 | parallel single PRs; each gates the rebuilds that change its surface |
 | Storage | TASK-27.1 (vendor-neutral read) | single PR, behaviour change |
 | Live defects | TASK-99 (Tier-2 jobs safe to run twice), TASK-72 (i18n memory growth), TASK-86, TASK-95, TASK-96 | single PRs |
@@ -73,8 +74,10 @@ TASK-109 (the service registry) is also required before the capability and featu
 
 | Stack | Layers (bottom -> top) | Risk |
 | --- | --- | --- |
-| A: contracts spine | TASK-18 (import-linter) -> TASK-105 (OperationResult envelope) -> TASK-105.1 (drop provider/operation, delete the unused operations classifiers) -> TASK-105.2 (error-code registry) -> TASK-106 (create contracts/, adds the contracts import-linter contract) -> TASK-26.1 (Slack handler contract; requires TASK-25.4 and TASK-36 merged) -> TASK-107 (hookspecs to contracts/) | low: configuration, types, codemod moves. TASK-26.1 changes every Slack hookimpl signature and gets the closest review. |
+| A: contracts spine | TASK-18 (import-linter) -> TASK-105 (OperationResult envelope) -> TASK-105.1 (drop provider/operation, delete the unused operations classifiers) -> TASK-105.2 (error-code registry) -> TASK-105.3 (clear the call-site mypy errors from TASK-105's optional message) -> TASK-106 (create contracts/, adds the contracts import-linter contract) -> TASK-26.1 (Slack handler contract; requires TASK-25.4 and TASK-36 merged) -> TASK-107 (hookspecs to contracts/) | low: configuration, types, codemod moves. TASK-26.1 changes every Slack hookimpl signature and gets the closest review. |
 | B: logging | TASK-28.2 -> TASK-28.3 -> TASK-115 (logging setup to server/) | low |
+
+Stack A status (2026-09-28): layers through TASK-106 are submitted (#1504-#1511, stack #1506) and in review. The stack is paused until TASK-25.4 and TASK-36 merge; the resume conditions are in doc-3 (Stack A handoff).
 
 Single PRs: TASK-28.1; TASK-94 (alarm filters, Terraform) after TASK-28.2; TASK-133 (AWS and Google classifiers emit registry codes) after TASK-105.2, standalone because it changes the codes callers see.
 

@@ -3,10 +3,10 @@ id: TASK-106
 title: >-
   Create app/contracts/ and move OperationResult, OperationStatus and the
   error-code registry into it
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-24 19:57'
-updated_date: '2026-09-28 16:56'
+updated_date: '2026-09-28 17:17'
 labels:
   - plugin-architecture
   - contracts
@@ -14,6 +14,7 @@ milestone: m-7
 dependencies:
   - TASK-18
   - TASK-105.2
+  - TASK-105.3
 references:
   - decisions/plugin-architecture.md
   - decisions/operation-result.md
