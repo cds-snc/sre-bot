@@ -1,10 +1,10 @@
 ---
 id: TASK-105.2
 title: Create the error-code registry next to OperationResult
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-28 14:35'
-updated_date: '2026-09-28 14:55'
+updated_date: '2026-09-28 16:05'
 labels:
   - plugin-architecture
   - operation-result
@@ -39,11 +39,11 @@ TASK-106 moves the registry to app/contracts/, so it must exist first. Stack A l
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/infrastructure/operations/ exposes an error-code registry (StrEnum) containing every SCREAMING_SNAKE error_code value produced by production code today, after TASK-105.1 deletes classifiers.py (the AWS-raw and Google-numeric-status codes in integrations/aws/client.py and integrations/google_workspace/client.py are a separate, non-SCREAMING_SNAKE scheme and are explicitly out of scope)
-- [ ] #2 A test scans production code and fails when a static SCREAMING_SNAKE error_code literal (or same-module constant) is not a registry member; the test is green on this PR
-- [ ] #3 No production call site changes; behaviour is unchanged
-- [ ] #4 The registry covers UNAUTHENTICATED and FORBIDDEN as the error_code pair that distinguishes UNAUTHORIZED, per decisions/operation-result.md
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 app/infrastructure/operations/ exposes an error-code registry (StrEnum) containing every SCREAMING_SNAKE error_code value produced by production code today, after TASK-105.1 deletes classifiers.py (the AWS-raw and Google-numeric-status codes in integrations/aws/client.py and integrations/google_workspace/client.py are a separate, non-SCREAMING_SNAKE scheme and are explicitly out of scope)
+- [x] #2 A test scans production code and fails when a static SCREAMING_SNAKE error_code literal (or same-module constant) is not a registry member; the test is green on this PR
+- [x] #3 No production call site changes; behaviour is unchanged
+- [x] #4 The registry covers UNAUTHENTICATED and FORBIDDEN as the error_code pair that distinguishes UNAUTHORIZED, per decisions/operation-result.md
+- [x] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -211,6 +211,20 @@ Blast radius and rollback:
 - Single subsystem (app/infrastructure/operations/), well under the size gate: ~2 production
   files (~95 LOC) plus 1 new test file.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented on stack-a/task-105.2-error-code-registry (Stack A layer 4).
+
+- app/infrastructure/operations/codes.py: ErrorCode(StrEnum), 76 members, alphabetical, NAME = "NAME". Exported from infrastructure.operations.
+- Seed verified against the AST scan: 73 codes are found statically, GEOIP2_ERROR and IP_NOT_FOUND come from classify_maxmind_error's returned tuple (not an error_code= keyword), and UNAUTHENTICATED has no producer yet. That accounts for all 76; no over-seeding.
+- MISSING_APP_TOKEN and MISSING_BOT_TOKEN carry an inline '# noqa: S105 -- error-code name, not a credential', following the precedent in packages/access/common/config/{settings,loaders}.py.
+- app/tests/unit/infrastructure/operations/test_error_code_registry.py: production scan (literals, same-module constants, or-fallback operands; pass-through values skipped), a resolver test on an inline snippet so the scan cannot pass vacuously (added beyond the plan), and the UNAUTHENTICATED/FORBIDDEN pair test.
+- No call sites changed.
+
+Gates (from app/): ruff check . -> All checks passed; lint-imports -> 7 kept, 0 broken; mypy -> 102 errors in 37 files repo-wide, 0 in touched files; pytest tests --ignore=tests/smoke -> 3468 passed, 6 failed (the known single-process order leaks in test_webhooks_aws_sns.py and directory/test_google.py; those two files alone: 111 passed); make test -> 2717 passed + 757 passed.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
