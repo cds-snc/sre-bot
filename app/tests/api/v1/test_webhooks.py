@@ -154,8 +154,8 @@ def test_handle_webhook_not_found(get_webhook_mock, test_client):
 
 @pytest.mark.parametrize(
     ("retry_after", "expected_retry_after_header"),
-    [(5, "5"), (None, None)],
-    ids=["with_retry_after", "without_retry_after"],
+    [(5, "5"), (1.5, "2"), (60.0, "60"), (None, None)],
+    ids=["with_retry_after", "fractional_retry_after_rounds_up", "whole_float_retry_after", "without_retry_after"],
 )
 @patch("api.v1.routes.webhooks.webhooks.increment_invocation_count")
 @patch("api.v1.routes.webhooks.webhooks.get_webhook")
@@ -171,7 +171,8 @@ def test_handle_webhook_lookup_failure_returns_service_unavailable(
     The lookup helper is stubbed to raise the store-unavailable error. The default
     test client re-raises unhandled server exceptions, so a passing request proves the
     route maps the failure itself rather than leaking it to the ASGI server. The body
-    is generic (no error code) and Retry-After is sent only when a delay is known.
+    is generic (no error code) and Retry-After is sent only when a delay is known,
+    as whole seconds rounded up because the header does not accept fractions.
     """
     get_webhook_mock.side_effect = webhooks.webhooks.WebhookStoreUnavailableError(
         OperationStatus.TRANSIENT_ERROR,
