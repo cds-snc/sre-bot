@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 import structlog
 from googleapiclient.errors import HttpError
 
+from contracts.operations import OperationResult
 from infrastructure.directory.models import (
     DirectoryGroup,
     DirectoryGroupFailure,
@@ -17,7 +18,6 @@ from infrastructure.directory.models import (
     MembershipCheckResult,
 )
 from infrastructure.directory.settings import DirectorySettings
-from infrastructure.operations import OperationResult
 from integrations.google_workspace.client import classify_google_error
 
 if TYPE_CHECKING:

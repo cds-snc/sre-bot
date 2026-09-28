@@ -15,7 +15,7 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.status import OperationStatus
 from integrations.aws.settings import AWSSettings, get_aws_settings
 
 if TYPE_CHECKING:

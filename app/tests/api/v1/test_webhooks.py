@@ -8,9 +8,9 @@ from fastapi.testclient import TestClient
 from structlog.testing import capture_logs
 
 from api.v1.routes import webhooks
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.logging.settings import LoggingSettings
 from infrastructure.logging.setup import _build_base_processors
-from infrastructure.operations import OperationResult, OperationStatus
 from models.webhooks import (
     WebhookPayload,
     WebhookResult,

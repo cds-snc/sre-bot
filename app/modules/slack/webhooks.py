@@ -9,7 +9,7 @@ from botocore.exceptions import ClientError
 from pydantic import BaseModel
 from structlog import get_logger
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from models.webhooks import (
     AccessRequest,
     AwsSnsPayload,

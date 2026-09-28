@@ -5,7 +5,7 @@ from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
 from structlog import get_logger
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from models.incidents import Incident
 from packages.aws_platform.adapters.dynamodb import build_dynamodb_adapter
 

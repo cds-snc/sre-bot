@@ -19,8 +19,8 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import HttpRequest
 
+from contracts.operations.status import OperationStatus
 from infrastructure.configuration.integrations.google import get_google_workspace_settings
-from infrastructure.operations.status import OperationStatus
 
 if TYPE_CHECKING:
     from googleapiclient._apis.admin.directory_v1 import (  # pyright: ignore[reportMissingModuleSource]

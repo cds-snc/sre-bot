@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from packages.access.sync.job_status_store import JobStatusStore
 
 

@@ -11,10 +11,10 @@ from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import MagicMock
 
+from contracts.operations.result import OperationResult
 from infrastructure.audit.models import AuditEvent
 from infrastructure.audit.protocol import AuditTrailService
 from infrastructure.audit.service import DynamoDBAuditTrailService
-from infrastructure.operations.result import OperationResult
 from infrastructure.storage.protocol import StorageService
 
 

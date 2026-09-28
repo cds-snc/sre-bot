@@ -9,8 +9,8 @@ from typing import Any
 import structlog
 from structlog.stdlib import BoundLogger
 
+from contracts.operations import OperationResult
 from infrastructure.directory import get_directory_provider
-from infrastructure.operations import OperationResult
 from integrations.slack.models import CommandPayload
 from integrations.slack.parser import (
     Argument,

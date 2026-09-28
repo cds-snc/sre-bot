@@ -48,8 +48,8 @@ Scenarios covered:
 
 import pytest
 
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.directory.models import DirectoryGroup
-from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 from packages.access.common.config import PlatformPolicy
 from packages.access.common.group_policy import ManagedGroupPolicy

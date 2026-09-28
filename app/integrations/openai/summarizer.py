@@ -15,7 +15,7 @@ from typing import Any, Protocol, runtime_checkable
 
 import structlog
 
-from infrastructure.operations.result import OperationResult
+from contracts.operations.result import OperationResult
 from integrations.openai.client import build_openai_client, classify_openai_error
 from integrations.openai.settings import OpenAISettings, get_openai_settings
 

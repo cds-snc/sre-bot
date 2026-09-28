@@ -9,7 +9,7 @@ import ipaddress
 
 import structlog
 
-from infrastructure.operations import OperationResult
+from contracts.operations import OperationResult
 from packages.geolocate.adapters.maxmind import get_maxmind_client
 
 logger = structlog.get_logger()

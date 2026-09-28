@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.sync.domain import DesiredPlatformState, DesiredUserState
 from packages.access.sync.policies import EffectivePlatformPolicy, EntitlementRule

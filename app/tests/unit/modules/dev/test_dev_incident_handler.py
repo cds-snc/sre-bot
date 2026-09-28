@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrastructure.operations import OperationStatus
+from contracts.operations import OperationStatus
 from modules.dev import incident
 from modules.incident import db_operations
 

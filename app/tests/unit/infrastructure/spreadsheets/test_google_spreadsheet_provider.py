@@ -8,7 +8,7 @@ import pytest
 from googleapiclient.errors import HttpError
 from googleapiclient.http import HttpRequest
 
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.status import OperationStatus
 from infrastructure.spreadsheets.google import GoogleSpreadsheetProvider
 from infrastructure.spreadsheets.models import SheetCell
 from infrastructure.spreadsheets.provider import SpreadsheetProvider

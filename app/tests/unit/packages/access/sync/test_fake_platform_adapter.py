@@ -2,7 +2,7 @@
 
 import pytest
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from packages.access.sync.adapters.fake_platform import FakePlatformAdapter
 from packages.access.sync.domain import (
     DesiredPlatformState,

@@ -14,8 +14,8 @@ from typing import Protocol
 
 import structlog
 
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.idempotency import IdempotencyStore
-from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.sync.application import AccessSyncApplicationServicePort
 from packages.access.sync.job_runner import (
     spawn_platform_sync_thread,

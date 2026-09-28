@@ -25,7 +25,7 @@ from typing import Any, Protocol, runtime_checkable
 
 import structlog
 
-from infrastructure.operations import OperationResult
+from contracts.operations import OperationResult
 from integrations.openai import Summarizer, get_summarizer
 from packages.incident_draft.domain import (
     AI_AUTHOR,

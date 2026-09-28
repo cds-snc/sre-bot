@@ -10,13 +10,13 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.directory.models import (
     DirectoryGroup,
     DirectoryMember,
     MembershipCheckResult,
 )
 from infrastructure.events import Event
-from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig, PlatformPolicy
 from packages.access.common.events import SYNC_COMPLETED, SYNC_FAILED
 from packages.access.common.group_policy import ManagedGroupPolicy

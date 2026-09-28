@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from modules.incident import db_operations
 from packages.aws_platform.adapters.dynamodb import DynamoDBAdapter
 

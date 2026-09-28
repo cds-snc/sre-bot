@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING, Any, cast
 import structlog
 from googleapiclient.errors import HttpError
 
+from contracts.operations import OperationResult
 from infrastructure.drive.models import DriveFile
 from infrastructure.drive.settings import DriveSettings
-from infrastructure.operations import OperationResult
 from integrations.google_workspace.client import classify_google_error
 
 # Shared with Google Path B adapters via infrastructure.drive; revisit when another Drive provider is added.

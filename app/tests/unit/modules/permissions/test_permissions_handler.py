@@ -6,8 +6,8 @@ local Protocol-conformant fake rather than a MagicMock (decisions/testing.md).
 
 import pytest
 
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.directory.models import DirectoryMember
-from infrastructure.operations import OperationResult, OperationStatus
 from modules.permissions import handler
 
 _ERROR_CODE = "rateLimitExceeded"

@@ -16,7 +16,7 @@ import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
 from botocore.stub import Stubber
 
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.status import OperationStatus
 from packages.aws_platform.adapters.config import ConfigAdapter
 
 pytestmark = pytest.mark.unit

@@ -14,8 +14,8 @@ import structlog
 from slack_bolt import Ack, App, Respond
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
+from contracts.operations import OperationResult
 from infrastructure.i18n import Locale, TranslationKey, Translator
-from infrastructure.operations import OperationResult
 from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.slack import LegacySlackBootstrap
 from integrations.slack.formatter import SlackBlockKitFormatter

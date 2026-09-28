@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import structlog
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from packages.access.catalog.domain import (
     EntitlementEntry,
     PlatformSummary,

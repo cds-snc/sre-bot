@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from packages.access.sync.domain import ReconciliationOutcome, SyncOutcome
 from packages.access.sync.job_models import JobStatus, SyncJobError
 from packages.access.sync.job_runner import (

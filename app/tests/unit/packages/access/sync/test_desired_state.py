@@ -8,13 +8,13 @@ decisions/testing.md — never MagicMock.
 
 import pytest
 
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.directory.models import (
     DirectoryGroup,
     DirectoryMember,
     MembershipCheckResult,
 )
 from infrastructure.directory.provider import DirectoryProvider
-from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import EntitlementRule
 from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.sync.desired_state import DirectoryMembershipBuilder

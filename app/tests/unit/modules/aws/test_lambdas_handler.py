@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from modules.aws import lambdas
 from packages.aws_platform.adapters.aws_lambda import LambdaAdapter
 

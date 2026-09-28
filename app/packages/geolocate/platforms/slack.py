@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from contracts.operations import OperationStatus
 from infrastructure.i18n import t
-from infrastructure.operations import OperationStatus
 from integrations.slack.models import CommandPayload, CommandResponse
 from integrations.slack.parser import Argument, ArgumentType
 from packages.geolocate.schemas import GeolocateResponse

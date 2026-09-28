@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrastructure.operations import OperationResult
+from contracts.operations import OperationResult
 from jobs import scheduled_tasks
 
 

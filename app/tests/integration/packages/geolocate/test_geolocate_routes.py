@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 
 
 @pytest.mark.integration

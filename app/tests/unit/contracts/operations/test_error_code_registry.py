@@ -11,7 +11,7 @@ skipped by design.
 import ast
 from pathlib import Path
 
-from infrastructure.operations import ErrorCode
+from contracts.operations import ErrorCode
 
 APP_ROOT = Path(__file__).resolve().parents[4]
 EXCLUDED_DIRS = {"tests", ".venv", "__pycache__", ".mypy_cache"}

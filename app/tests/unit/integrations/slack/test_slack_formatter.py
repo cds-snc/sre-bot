@@ -2,7 +2,7 @@
 
 import pytest
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from integrations.slack.formatter import SlackBlockKitFormatter
 
 

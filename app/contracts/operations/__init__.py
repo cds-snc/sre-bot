@@ -5,9 +5,9 @@ the application: the status enum, the result dataclass and the error-code
 registry.
 """
 
-from infrastructure.operations.codes import ErrorCode
-from infrastructure.operations.result import OperationResult
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.codes import ErrorCode
+from contracts.operations.result import OperationResult
+from contracts.operations.status import OperationStatus
 
 __all__ = [
     "ErrorCode",

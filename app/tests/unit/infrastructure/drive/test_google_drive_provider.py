@@ -6,10 +6,10 @@ from unittest.mock import MagicMock
 import pytest
 from googleapiclient.errors import HttpError
 
+from contracts.operations.status import OperationStatus
 from infrastructure.drive.google import GoogleDriveProvider
 from infrastructure.drive.models import DriveFile
 from infrastructure.drive.provider import DriveProvider
-from infrastructure.operations.status import OperationStatus
 
 
 class FakeResp(dict):

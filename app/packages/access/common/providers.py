@@ -12,7 +12,7 @@ sub-features.  Bootstrap config (which loader source/ref) lives there under
 
 from functools import lru_cache
 
-from infrastructure.operations import OperationResult
+from contracts.operations import OperationResult
 from packages.access.common.config import (
     AccessRuntimeConfig,
     get_access_config_loader,

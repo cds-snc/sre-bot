@@ -2,8 +2,8 @@
 
 from dataclasses import dataclass
 
+from contracts.operations import OperationResult
 from infrastructure.directory.models import DirectoryGroup, MembershipCheckResult
-from infrastructure.operations import OperationResult
 from packages.access.catalog.service import CatalogService
 from packages.access.common.config import AccessRuntimeConfig, PlatformPolicy
 from packages.access.common.group_policy import ManagedGroupPolicy

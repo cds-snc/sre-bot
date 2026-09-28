@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionError
 
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.status import OperationStatus
 from integrations.aws import client as aws_client
 from integrations.aws.settings import get_aws_settings
 

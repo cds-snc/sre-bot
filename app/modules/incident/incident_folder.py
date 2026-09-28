@@ -15,8 +15,8 @@ from slack_sdk.errors import SlackApiError
 from slack_sdk.web import WebClient
 from structlog import get_logger
 
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.configuration.integrations.google import get_google_resources_config
-from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.spreadsheets import RANGE_NOT_FOUND, get_spreadsheet_provider
 from modules.incident import db_operations
 from packages.aws_platform.adapters.dynamodb import build_dynamodb_adapter

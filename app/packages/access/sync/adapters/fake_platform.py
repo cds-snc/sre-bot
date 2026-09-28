@@ -6,7 +6,7 @@ orchestration paths without external API dependencies.
 
 import structlog
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from packages.access.sync.domain import (
     AdapterAssessment,
     CurrentPlatformState,

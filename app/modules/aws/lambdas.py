@@ -4,7 +4,7 @@ import structlog
 from slack_bolt import Respond
 from slack_sdk.web import WebClient
 
-from infrastructure.operations import OperationResult
+from contracts.operations import OperationResult
 from packages.aws_platform.adapters.aws_lambda import build_lambda_adapter
 
 logger = structlog.get_logger()

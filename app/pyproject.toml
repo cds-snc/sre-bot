@@ -58,6 +58,9 @@ mccabe.max-complexity = 16
 known-first-party = [
     "api",
     "bin",
+    "capabilities",
+    "contracts",
+    "features",
     "infrastructure",
     "integrations",
     "jobs",
@@ -194,14 +197,14 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["api", "infrastructure", "integrations", "jobs", "models", "modules", "packages", "server", "utils"]
+packages = ["api", "contracts", "infrastructure", "integrations", "jobs", "models", "modules", "packages", "server", "utils"]
 
 [tool.importlinter]
 # Enforces decisions/plugin-architecture.md (six layers) with the transitional
-# packages from decisions/migration.md. contracts, features and capabilities are
-# listed as optional layers; add each to root_packages in the PR that creates it
+# packages from decisions/migration.md. features and capabilities are listed as
+# optional layers; add each to root_packages in the PR that creates it
 # (import-linter rejects a root package that does not exist).
-root_packages = ["server", "packages", "infrastructure", "integrations", "modules", "api", "jobs", "models", "utils"]
+root_packages = ["server", "packages", "infrastructure", "integrations", "modules", "api", "jobs", "models", "utils", "contracts"]
 
 [[tool.importlinter.contracts]]
 id = "layers"
@@ -214,30 +217,22 @@ layers = [
     "(capabilities)",
     "infrastructure",
     "integrations",
-    "(contracts)",
+    "contracts",
 ]
 unmatched_ignore_imports_alerting = "error"
 ignore_imports = [
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/plugin-architecture.md Migration and decisions/outbound-clients.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one.
     "infrastructure.plugins.specs -> jobs",
-    "integrations.aws.client -> infrastructure.operations.status",
     "integrations.google_workspace.client -> infrastructure.configuration.integrations.google",
-    "integrations.google_workspace.client -> infrastructure.operations.status",
     "integrations.maxmind.client -> infrastructure.configuration.integrations.maxmind",
-    "integrations.maxmind.client -> infrastructure.operations",
     "integrations.notify.client -> infrastructure.configuration.app",
     "integrations.notify.client -> infrastructure.configuration.integrations.notify",
-    "integrations.openai.client -> infrastructure.operations.result",
-    "integrations.openai.client -> infrastructure.operations.status",
-    "integrations.openai.summarizer -> infrastructure.operations.result",
     "integrations.opsgenie.client -> infrastructure.configuration.integrations.opsgenie",
     "integrations.sentinel.client -> infrastructure.audit.models",
     "integrations.sentinel.client -> infrastructure.configuration.integrations.sentinel",
     "integrations.slack.formatter -> infrastructure.i18n",
-    "integrations.slack.formatter -> infrastructure.operations",
     "integrations.slack.provider -> infrastructure.i18n",
-    "integrations.slack.provider -> infrastructure.operations",
     "integrations.slack.provider -> infrastructure.slack.settings",
     "integrations.trello.client -> infrastructure.configuration.integrations.trello",
 ]
@@ -255,18 +250,13 @@ ignore_imports = [
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/plugin-architecture.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one.
     "packages.access.catalog -> infrastructure.plugins",
-    "packages.access.catalog.interactions.http -> infrastructure.operations",
     "packages.access.catalog.interactions.http -> infrastructure.security",
     "packages.access.catalog.interactions.http -> infrastructure.security.models",
     "packages.access.catalog.providers -> infrastructure.directory",
     "packages.access.catalog.service -> infrastructure.directory.provider",
-    "packages.access.catalog.service -> infrastructure.operations",
-    "packages.access.common.config.loaders -> infrastructure.operations",
     "packages.access.common.group_policy -> infrastructure.directory.models",
-    "packages.access.common.providers -> infrastructure.operations",
     "packages.access.request -> infrastructure.events",
     "packages.access.request -> infrastructure.plugins",
-    "packages.access.request.interactions.http -> infrastructure.operations",
     "packages.access.request.interactions.http -> infrastructure.security",
     "packages.access.request.interactions.http -> infrastructure.security.models",
     "packages.access.request.policies -> infrastructure.directory.models",
@@ -277,23 +267,15 @@ ignore_imports = [
     "packages.access.request.service -> infrastructure.directory.models",
     "packages.access.request.service -> infrastructure.directory.provider",
     "packages.access.request.service -> infrastructure.events",
-    "packages.access.request.service -> infrastructure.operations",
     "packages.access.request.store -> infrastructure.storage.protocol",
     "packages.access.sync -> infrastructure.events",
     "packages.access.sync -> infrastructure.i18n.resources",
     "packages.access.sync -> infrastructure.plugins",
-    "packages.access.sync.adapters -> infrastructure.operations",
-    "packages.access.sync.adapters.aws_identity_center -> infrastructure.operations",
-    "packages.access.sync.adapters.fake_platform -> infrastructure.operations",
     "packages.access.sync.application -> infrastructure.events",
-    "packages.access.sync.application -> infrastructure.operations",
     "packages.access.sync.desired_state -> infrastructure.directory.provider",
-    "packages.access.sync.desired_state -> infrastructure.operations",
-    "packages.access.sync.interactions.http -> infrastructure.operations",
     "packages.access.sync.interactions.http -> infrastructure.security",
     "packages.access.sync.interactions.http -> infrastructure.security.models",
     "packages.access.sync.interactions.ingress -> infrastructure.idempotency",
-    "packages.access.sync.interactions.ingress -> infrastructure.operations",
     "packages.access.sync.interactions.slack -> infrastructure.i18n",
     "packages.access.sync.job_runner -> infrastructure.idempotency",
     "packages.access.sync.job_status_store -> infrastructure.storage",
@@ -304,46 +286,34 @@ ignore_imports = [
     "packages.access.sync.providers -> infrastructure.idempotency",
     "packages.access.sync.providers -> infrastructure.storage",
     "packages.access.sync.store -> infrastructure.storage.protocol",
-    "packages.aws_platform.adapters.aws_lambda -> infrastructure.operations",
-    "packages.aws_platform.adapters.config -> infrastructure.operations",
-    "packages.aws_platform.adapters.cost_explorer -> infrastructure.operations",
-    "packages.aws_platform.adapters.dynamodb -> infrastructure.operations",
-    "packages.aws_platform.adapters.guard_duty -> infrastructure.operations",
-    "packages.aws_platform.adapters.identity_center -> infrastructure.operations",
-    "packages.aws_platform.adapters.organizations -> infrastructure.operations",
-    "packages.aws_platform.adapters.security_hub -> infrastructure.operations",
-    "packages.aws_platform.adapters.sso_admin -> infrastructure.operations",
     "packages.geolocate -> infrastructure.i18n.resources",
     "packages.geolocate -> infrastructure.plugins",
     "packages.geolocate.platforms.slack -> infrastructure.i18n",
-    "packages.geolocate.platforms.slack -> infrastructure.operations",
-    "packages.geolocate.routes -> infrastructure.operations",
-    "packages.geolocate.service -> infrastructure.operations",
     "packages.incident.drive.adapters.google_drive -> infrastructure.configuration.integrations.google",
     "packages.incident.drive.adapters.google_drive -> infrastructure.drive",
     "packages.incident.drive.adapters.google_drive -> infrastructure.drive.factory",
     "packages.incident.drive.adapters.google_drive -> infrastructure.drive.models",
-    "packages.incident.drive.adapters.google_drive -> infrastructure.operations",
     "packages.incident_draft -> infrastructure.i18n.resources",
     "packages.incident_draft -> infrastructure.plugins",
     "packages.incident_draft.adapters.google_docs -> infrastructure.configuration.integrations.google",
     "packages.incident_draft.adapters.google_docs -> infrastructure.drive",
     "packages.incident_draft.platforms.slack -> infrastructure.i18n",
-    "packages.incident_draft.service -> infrastructure.operations",
     "packages.incident_summary -> infrastructure.i18n.resources",
     "packages.incident_summary -> infrastructure.plugins",
     "packages.incident_summary.platforms.slack -> infrastructure.i18n",
-    "packages.incident_summary.service -> infrastructure.operations",
     "packages.oncall_sync -> infrastructure.plugins",
     "packages.rant -> infrastructure.plugins",
     "packages.talent.adapters.google_drive -> infrastructure.configuration.integrations.google",
     "packages.talent.adapters.google_drive -> infrastructure.drive.factory",
-    "packages.talent.adapters.google_drive -> infrastructure.operations",
     "packages.user_rotations -> infrastructure.plugins",
 ]
 
-# (c) "contracts imports nothing else from the app" is added by TASK-106 with
-# app/contracts/: a forbidden contract cannot name a package that does not exist.
+[[tool.importlinter.contracts]]
+id = "contracts-leaf"
+name = "(c) contracts imports nothing else from the app"
+type = "forbidden"
+source_modules = ["contracts"]
+forbidden_modules = ["server", "packages", "infrastructure", "integrations", "modules", "api", "jobs", "models", "utils"]
 
 [[tool.importlinter.contracts]]
 id = "integrations-leaf"
@@ -355,23 +325,15 @@ unmatched_ignore_imports_alerting = "error"
 ignore_imports = [
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/outbound-clients.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one.
-    "integrations.aws.client -> infrastructure.operations.status",
     "integrations.google_workspace.client -> infrastructure.configuration.integrations.google",
-    "integrations.google_workspace.client -> infrastructure.operations.status",
     "integrations.maxmind.client -> infrastructure.configuration.integrations.maxmind",
-    "integrations.maxmind.client -> infrastructure.operations",
     "integrations.notify.client -> infrastructure.configuration.app",
     "integrations.notify.client -> infrastructure.configuration.integrations.notify",
-    "integrations.openai.client -> infrastructure.operations.result",
-    "integrations.openai.client -> infrastructure.operations.status",
-    "integrations.openai.summarizer -> infrastructure.operations.result",
     "integrations.opsgenie.client -> infrastructure.configuration.integrations.opsgenie",
     "integrations.sentinel.client -> infrastructure.audit.models",
     "integrations.sentinel.client -> infrastructure.configuration.integrations.sentinel",
     "integrations.slack.formatter -> infrastructure.i18n",
-    "integrations.slack.formatter -> infrastructure.operations",
     "integrations.slack.provider -> infrastructure.i18n",
-    "integrations.slack.provider -> infrastructure.operations",
     "integrations.slack.provider -> infrastructure.slack.settings",
     "integrations.trello.client -> infrastructure.configuration.integrations.trello",
 ]

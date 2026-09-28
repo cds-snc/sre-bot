@@ -3,7 +3,7 @@ from unittest.mock import ANY, MagicMock, call, patch
 
 import pytest
 
-from infrastructure.operations import OperationStatus
+from contracts.operations import OperationStatus
 from modules.slack import webhooks as webhook_store
 from modules.slack import webhooks_list
 

@@ -8,7 +8,7 @@ import pytest
 from botocore.exceptions import BotoCoreError, ClientError
 from freezegun import freeze_time
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from modules.aws import aws_account_health
 from packages.aws_platform.adapters.config import ConfigAdapter
 from packages.aws_platform.adapters.cost_explorer import CostExplorerAdapter

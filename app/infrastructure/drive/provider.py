@@ -2,8 +2,8 @@
 
 from typing import Protocol, runtime_checkable
 
+from contracts.operations import OperationResult
 from infrastructure.drive.models import DriveFile
-from infrastructure.operations import OperationResult
 
 
 @runtime_checkable

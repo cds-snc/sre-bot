@@ -4,7 +4,7 @@ from unittest.mock import ANY, MagicMock, call, patch
 
 import pytest
 
-from infrastructure.operations import OperationStatus
+from contracts.operations import OperationStatus
 from modules import incident_helper
 from modules.incident import db_operations
 

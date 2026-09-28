@@ -8,8 +8,8 @@ from typing import Any, assert_never
 
 from structlog import get_logger
 
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.i18n import Locale, TranslationKey, TranslationService
-from infrastructure.operations import OperationResult, OperationStatus
 
 logger = get_logger(__name__)
 
