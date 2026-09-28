@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-27 15:48'
-updated_date: '2026-09-24 20:06'
+updated_date: '2026-09-28 14:36'
 labels:
   - architecture
   - layers
@@ -17,6 +17,7 @@ dependencies:
   - TASK-6
   - TASK-64
   - TASK-107
+  - TASK-36.3
 references:
   - decisions/reliability.md
   - decisions/plugins.md

@@ -4,7 +4,7 @@ title: 'Webhooks slice 1: Webhook domain model + StorageService-backed store'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:39'
-updated_date: '2026-09-24 20:03'
+updated_date: '2026-09-28 14:36'
 labels:
   - migration
   - webhooks
@@ -12,7 +12,7 @@ labels:
 milestone: m-4
 dependencies:
   - TASK-7
-  - TASK-36
+  - TASK-36.2
   - TASK-27.2
   - TASK-108
   - TASK-109

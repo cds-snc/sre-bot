@@ -6,13 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:58'
+updated_date: '2026-09-28 14:36'
 labels:
   - plugin-architecture
   - slack
 milestone: m-7
 dependencies:
   - TASK-26.1
-  - TASK-36
+  - TASK-36.1
 references:
   - decisions/platform-entrypoints.md
   - decisions/platform-transports.md

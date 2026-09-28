@@ -6,13 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-27 16:07'
-updated_date: '2026-09-25 15:00'
+updated_date: '2026-09-28 14:36'
 labels:
   - architecture
   - layers
 milestone: m-5
 dependencies:
-  - TASK-36
+  - TASK-36.2
   - TASK-92
 references:
   - decisions/feature-packages.md

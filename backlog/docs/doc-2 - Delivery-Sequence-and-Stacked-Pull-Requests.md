@@ -3,7 +3,7 @@ id: doc-2
 title: Delivery Sequence and Stacked Pull Requests
 type: guide
 created_date: '2026-09-24 20:23'
-updated_date: '2026-09-24 20:23'
+updated_date: '2026-09-28 16:00'
 ---
 # Delivery Sequence and Stacked Pull Requests
 
@@ -48,10 +48,11 @@ These are git write operations and are run by the developer; agents do not run t
 - Changes that don't depend on each other ship as parallel single PRs. Stacking them would only make each wait for the ones below it.
 - Never mix a mechanical move with a behaviour change in one layer.
 - A mechanical move rewrites every importer in the same PR. A split that needs a re-export shim is not allowed.
+- Each stack has a handoff doc under `backlog/docs/stacks/` that records its current state. Sessions start and end with the `stacked-pr-session` skill, which ends every session with a resume prompt.
 
 ## Critical path
 
-TASK-18, TASK-105 and TASK-25.4 -> TASK-106 -> TASK-26.1 -> TASK-107 -> TASK-110 -> TASK-112 (with TASK-111) -> TASK-114.
+TASK-18, TASK-105 -> TASK-105.1 -> TASK-105.2 and TASK-25.4 -> TASK-106 -> TASK-26.1 (also after TASK-35 -> TASK-36) -> TASK-107 -> TASK-110 -> TASK-112 (with TASK-111) -> TASK-114.
 
 TASK-109 (the service registry) is also required before the capability and feature moves. It follows TASK-108, TASK-58 and the TASK-92 decision. Almost every later task depends on TASK-114 and TASK-109.
 
@@ -62,7 +63,8 @@ TASK-109 (the service registry) is also required before the capability and featu
 | Lane | Tasks | Form |
 | --- | --- | --- |
 | Decisions (docs only) | TASK-92 (health model, gates TASK-109), TASK-117 (i18n library, gates TASK-118), TASK-97 (incident architecture, gates TASK-38), TASK-83.1 (identity Draft records), TASK-104 (CLAUDE.md and skills) | single PRs |
-| Critical-path prerequisites | TASK-25.4 (Slack client factory and classifier), TASK-24 (vendor settings, SecuritySettings), TASK-35 (dev/sre registration), TASK-36 (smoke harness), TASK-14 | single PRs |
+| Critical-path prerequisites | TASK-25.4 (Slack client factory and classifier), TASK-24 (vendor settings, SecuritySettings), TASK-35 (sre single registration) -> TASK-36 (legacy-surface inventory and pinning tests for the 8 Slack command hookimpls) | single PRs |
+| Legacy-surface pinning | TASK-36.1 (hard-coded slash commands and interactions), TASK-36.2 (webhook route), TASK-36.3 (scheduled jobs), each after TASK-36 | parallel single PRs; each gates the rebuilds that change its surface |
 | Storage | TASK-27.1 (vendor-neutral read) | single PR, behaviour change |
 | Live defects | TASK-99 (Tier-2 jobs safe to run twice), TASK-72 (i18n memory growth), TASK-86, TASK-95, TASK-96 | single PRs |
 | Vendor cleanup (m-3) | TASK-25.2.6.3, TASK-25.5, TASK-25.6, TASK-25.8, TASK-25.9, TASK-84, TASK-85, TASK-87.1 -> TASK-87.3, TASK-87.2 | parallel single PRs |
@@ -71,10 +73,10 @@ TASK-109 (the service registry) is also required before the capability and featu
 
 | Stack | Layers (bottom -> top) | Risk |
 | --- | --- | --- |
-| A: contracts spine | TASK-18 (import-linter) -> TASK-105 (OperationResult envelope) -> TASK-106 (create contracts/) -> TASK-26.1 (Slack handler contract; requires TASK-25.4 merged) -> TASK-107 (hookspecs to contracts/) | low: configuration, types, codemod moves. TASK-26.1 changes every Slack hookimpl signature and gets the closest review. |
+| A: contracts spine | TASK-18 (import-linter) -> TASK-105 (OperationResult envelope) -> TASK-105.1 (drop provider/operation, delete the unused operations classifiers) -> TASK-105.2 (error-code registry) -> TASK-106 (create contracts/, adds the contracts import-linter contract) -> TASK-26.1 (Slack handler contract; requires TASK-25.4 and TASK-36 merged) -> TASK-107 (hookspecs to contracts/) | low: configuration, types, codemod moves. TASK-26.1 changes every Slack hookimpl signature and gets the closest review. |
 | B: logging | TASK-28.2 -> TASK-28.3 -> TASK-115 (logging setup to server/) | low |
 
-Single PRs: TASK-28.1; TASK-94 (alarm filters, Terraform) after TASK-28.2.
+Single PRs: TASK-28.1; TASK-94 (alarm filters, Terraform) after TASK-28.2; TASK-133 (AWS and Google classifiers emit registry codes) after TASK-105.2, standalone because it changes the codes callers see.
 
 ### Wave 2: registry and plugin host
 
@@ -91,11 +93,11 @@ Single PRs: TASK-28.1; TASK-94 (alarm filters, Terraform) after TASK-28.2.
 
 | Stack or PR | Content | Form |
 | --- | --- | --- |
-| TASK-26.2 | Slack runtime, parser, formatter and help to server/slack/ | single PR (mechanical, large) |
+| TASK-26.2 | Slack runtime, parser, formatter and help to server/slack/ | single PR (mechanical, large), after TASK-36.1 |
 | TASK-33 | async Bolt | single PR with a soak period; highest-risk runtime change in the plan |
 | TASK-116 | security to server/security/ with the current-user contract | single PR |
 | TASK-118 | translator contract and implementation | single PR, after TASK-117 |
-| E: scheduler | TASK-64 (widen the registry) -> TASK-52 (runtime to server/scheduler/) | stack |
+| E: scheduler | TASK-64 (widen the registry) -> TASK-52 (runtime to server/scheduler/, after TASK-36.3) | stack |
 
 ### Wave 4: capability and feature moves
 
@@ -108,10 +110,10 @@ These are mechanical moves with no dependencies between them. Ship them as paral
 
 | Track | Order | Form |
 | --- | --- | --- |
-| Webhooks | Stack F: TASK-37.1 -> TASK-37.2 -> TASK-37.3 (behaviour-preserving, held by the smoke suite); then TASK-37.4 (cutover), TASK-47 (HMAC), TASK-48 and TASK-49 in parallel, TASK-37.5 | stack F, then single PRs |
+| Webhooks | Stack F: TASK-37.1 -> TASK-37.2 -> TASK-37.3 (behaviour-preserving, held by the TASK-36.2 pinning tests); then TASK-37.4 (cutover), TASK-47 (HMAC), TASK-48 and TASK-49 in parallel, TASK-37.5 | stack F, then single PRs |
 | Approvals | TASK-60 -> TASK-125 -> TASK-61 -> TASK-30; then TASK-62 and TASK-63; TASK-124.1 (access) after TASK-61 and TASK-30 | single PRs |
 | Identity | TASK-83.3 and TASK-83.12 early; TASK-83.2 -> TASK-83.4 -> TASK-83.5 and TASK-83.6 -> TASK-83.7 -> TASK-83.8; TASK-83.9 -> TASK-83.10 after TASK-38 | single PRs |
-| Legacy rebuild by surface | TASK-38 (per the TASK-97 packet), TASK-39, TASK-88, TASK-40, then TASK-41; TASK-53, TASK-55, TASK-56 and TASK-65 ride with the surfaces that own them | single PRs per surface |
+| Legacy rebuild by surface | TASK-38 (per the TASK-97 packet), TASK-39, TASK-88, TASK-40, then TASK-41, each held by the TASK-36.1 and TASK-36.3 pinning tests for its surface; TASK-53, TASK-55, TASK-56 and TASK-65 ride with the surfaces that own them | single PRs per surface |
 
 ## Standalone merges
 
