@@ -1,7 +1,8 @@
 """Google Workspace implementation of DirectoryProvider."""
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypeVar
+from dataclasses import replace
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import structlog
 from googleapiclient.errors import HttpError
@@ -68,13 +69,17 @@ class GoogleDirectoryProvider:
     def _map_sdk_exception(self, exc: Exception, operation: str) -> OperationResult[Any]:
         """Classify a raised googleapiclient exception into an OperationResult error."""
         status, error_code, retry_after = classify_google_error(exc)
+        self._logger.warning(
+            "directory_operation_failed",
+            operation=operation,
+            status=status.value,
+            error_code=error_code,
+        )
         return OperationResult.error(
             status=status,
             message=str(exc),
             error_code=error_code,
             retry_after=retry_after,
-            provider="google",
-            operation=operation,
         )
 
     def _call(self, operation: str, fn: Callable[[], Any]) -> OperationResult[Any]:
@@ -303,15 +308,7 @@ class GoogleDirectoryProvider:
 
     def _typed_error(self, result: OperationResult[Any]) -> OperationResult[T]:
         """Rebox an error result without leaking provider-native payload data."""
-
-        return OperationResult.error(
-            status=result.status,
-            message=result.message,
-            error_code=result.error_code,
-            retry_after=result.retry_after,
-            provider=result.provider,
-            operation=result.operation,
-        )
+        return cast("OperationResult[T]", replace(result, data=None))
 
     def _build_directory_user(self, item: dict[str, Any]) -> OperationResult[DirectoryUser]:
         """Convert a Google user record into a canonical directory user."""

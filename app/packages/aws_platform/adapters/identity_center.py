@@ -70,14 +70,12 @@ class IdentityCenterAdapter:
             message=str(exc),
             error_code=error_code,
             retry_after=retry_after,
-            provider="aws",
-            operation=operation,
         )
 
     def _call[T](self, operation: str, fn: Callable[[], T]) -> OperationResult[T]:
         """Run one SDK call, classifying ClientError/BotoCoreError; anything else propagates."""
         try:
-            return OperationResult.success(data=fn(), provider="aws", operation=operation)
+            return OperationResult.success(data=fn())
         except (ClientError, BotoCoreError) as exc:
             return self._map_sdk_exception(operation, exc)
 
@@ -236,7 +234,7 @@ class IdentityCenterAdapter:
         groups = groups_result.data or []
         log.info("aws_identity_store_groups_fetched", count=len(groups))
         if not groups:
-            return OperationResult.success(data=[], provider="aws", operation="list_groups_with_memberships")
+            return OperationResult.success(data=[])
 
         if groups_filters is not None:
             original_count = len(groups)
@@ -290,7 +288,7 @@ class IdentityCenterAdapter:
                 groups_with_memberships.append(group)
 
         log.info("aws_identity_store_operation_complete", count=len(groups_with_memberships))
-        return OperationResult.success(data=groups_with_memberships, provider="aws", operation="list_groups_with_memberships")
+        return OperationResult.success(data=groups_with_memberships)
 
 
 def build_identity_center_adapter() -> IdentityCenterAdapter:

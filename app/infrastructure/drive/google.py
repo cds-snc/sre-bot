@@ -1,7 +1,7 @@
 """Google Workspace implementation of the DriveProvider contract."""
 
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from googleapiclient.errors import HttpError
@@ -31,18 +31,22 @@ class GoogleDriveProvider:
 
     def _map_sdk_exception(self, exc: HttpError, operation: str) -> OperationResult[Any]:
         status, error_code, retry_after = classify_google_error(exc)
+        logger.warning(
+            "google_drive_operation_failed",
+            operation=operation,
+            status=status.value,
+            error_code=error_code,
+        )
         return OperationResult.error(
             status=status,
             message=str(exc),
             error_code=error_code,
             retry_after=retry_after,
-            provider="google",
-            operation=operation,
         )
 
     def _call(self, operation: str, fn: Callable[[], Any]) -> OperationResult[Any]:
         try:
-            return OperationResult.success(data=fn(), provider="google", operation=operation)
+            return OperationResult.success(data=fn())
         except HttpError as exc:
             return self._map_sdk_exception(exc, operation)
 
@@ -75,19 +79,12 @@ class GoogleDriveProvider:
             lambda: self._service(None).files().list(pageSize=1, fields="files(id)").execute(),
         )
         if result.is_success:
-            return OperationResult.success(provider="google", operation="warmup")
-        return OperationResult.error(
-            status=result.status,
-            message=result.message,
-            error_code=result.error_code,
-            retry_after=result.retry_after,
-            provider=result.provider,
-            operation=result.operation,
-        )
+            return OperationResult.success()
+        return cast("OperationResult[None]", result)
 
     def health_check(self) -> OperationResult[None]:
         """Return local liveness without making a Drive API call."""
-        return OperationResult.success(provider="google", operation="health_check")
+        return OperationResult.success()
 
     def create_folder(
         self, name: str, parent_folder_id: str, *, fields: str | None = None, delegated_user_email: str | None = None

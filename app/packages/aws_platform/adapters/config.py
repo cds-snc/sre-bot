@@ -54,14 +54,12 @@ class ConfigAdapter:
             message=str(exc),
             error_code=error_code,
             retry_after=retry_after,
-            provider="aws",
-            operation=operation,
         )
 
     def _call[T](self, operation: str, fn: Callable[[], T]) -> OperationResult[T]:
         """Run one SDK call, classifying ClientError/BotoCoreError; anything else propagates."""
         try:
-            return OperationResult.success(data=fn(), provider="aws", operation=operation)
+            return OperationResult.success(data=fn())
         except (ClientError, BotoCoreError) as exc:
             return self._map_sdk_exception(operation, exc)
 

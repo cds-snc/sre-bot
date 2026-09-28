@@ -22,12 +22,6 @@ class OperationResult[T]:
         data: T | None -- optional payload for successful results
         error_code: str | None -- optional machine error code
         retry_after: float | None -- seconds until retry, only when upstream gave a hint
-        provider: str | None -- provider name for observability (e.g., 'google', 'aws').
-            Kept for observability; scheduled for removal in TASK-105.1, which is not part
-            of the decisions/operation-result.md canonical shape.
-        operation: str | None -- operation name for observability (e.g., 'list_members').
-            Kept for observability; scheduled for removal in TASK-105.1, which is not part
-            of the decisions/operation-result.md canonical shape.
         cause: BaseException | None -- internal-only diagnostic preserving the original
             exception and its traceback; excluded from repr and equality, and never
             rendered or serialized.
@@ -38,8 +32,6 @@ class OperationResult[T]:
     data: T | None = None
     error_code: str | None = None
     retry_after: float | None = None
-    provider: str | None = None
-    operation: str | None = None
     cause: BaseException | None = field(default=None, repr=False, compare=False)
 
     @property
@@ -56,16 +48,12 @@ class OperationResult[T]:
         cls,
         data: T | None = None,
         message: str | None = None,
-        provider: str | None = None,
-        operation: str | None = None,
     ) -> OperationResult[T]:
         """Create a SUCCESS OperationResult with optional data.
 
         Args:
             data: Optional payload to include with the result
             message: Optional success message for logs/operators
-            provider: Optional provider name for observability
-            operation: Optional operation name for observability
 
         Returns:
             OperationResult with SUCCESS status
@@ -74,8 +62,6 @@ class OperationResult[T]:
             status=OperationStatus.SUCCESS,
             message=message,
             data=data,
-            provider=provider,
-            operation=operation,
         )
 
     @classmethod
@@ -86,8 +72,6 @@ class OperationResult[T]:
         error_code: str | None = None,
         retry_after: float | None = None,
         data: T | None = None,
-        provider: str | None = None,
-        operation: str | None = None,
     ) -> OperationResult[T]:
         """Create an error OperationResult.
 
@@ -97,8 +81,6 @@ class OperationResult[T]:
             error_code: Optional machine error code
             retry_after: Optional seconds until retry (for rate limiting)
             data: Optional payload to include with the error
-            provider: Optional provider name for observability
-            operation: Optional operation name for observability
 
         Returns:
             OperationResult with specified error status
@@ -109,8 +91,6 @@ class OperationResult[T]:
             error_code=error_code,
             retry_after=retry_after,
             data=data,
-            provider=provider,
-            operation=operation,
         )
 
     @classmethod
