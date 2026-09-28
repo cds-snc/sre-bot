@@ -154,7 +154,7 @@ class CatalogService:
             )
             return OperationResult.error(
                 discovery_result.status,
-                message=discovery_result.message,
+                message=discovery_result.message or "Group discovery failed",
                 error_code=discovery_result.error_code or "GROUP_DISCOVERY_FAILED",
             )
 
@@ -236,7 +236,7 @@ class CatalogService:
         self,
         group_email: str,
         user_email: str,
-        log: object,
+        log: structlog.stdlib.BoundLogger,
         token: str,
     ) -> bool | None:
         """Return membership status; None on IDP error (non-fatal)."""

@@ -618,6 +618,23 @@ def test_get_incidents_from_sheet_returns_parsed_incidents():
     ]
 
 
+def test_get_incidents_from_sheet_skips_row_without_created_at_when_looking_back():
+    """A row with an empty created-at cell is skipped by the lookback filter.
+
+    The fake provider returns one row whose first cell has no formatted value;
+    with days > 0 the row is treated as outside the window instead of comparing
+    None to the lookback date string.
+    """
+    rows = _incident_row_data()
+    rows[1][0] = SheetCell(None)
+    provider = FakeSpreadsheetProvider()
+    provider.read_cells_result = OperationResult.success(data=rows)
+    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
+        incidents = incident_folder.get_incidents_from_sheet(days=30)
+
+    assert incidents == []
+
+
 @patch("modules.incident.incident_folder.logger")
 def test_get_incidents_from_sheet_swallows_range_not_found(mock_logger):
     provider = FakeSpreadsheetProvider()

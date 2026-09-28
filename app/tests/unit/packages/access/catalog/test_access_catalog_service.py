@@ -277,6 +277,29 @@ def test_list_entitlements_should_return_error_when_group_discovery_fails():
     assert result.status == OperationStatus.PERMANENT_ERROR
 
 
+def test_list_entitlements_should_fall_back_to_default_message_when_discovery_error_has_none():
+    """A discovery error without a message yields a fixed operator message.
+
+    The directory stub returns an error result built directly with message=None,
+    which the envelope allows; the forwarded error keeps the upstream status and
+    error_code so only the missing message is filled in.
+    """
+    directory = _FakeDirectory(
+        groups_result=OperationResult(
+            status=OperationStatus.TRANSIENT_ERROR,
+            message=None,
+            error_code="RATE_LIMITED",
+        )
+    )
+    service = make_service(directory=directory)
+
+    result = service.list_entitlements(platform="aws", user_email="u@x.com")
+
+    assert result.status == OperationStatus.TRANSIENT_ERROR
+    assert result.message == "Group discovery failed"
+    assert result.error_code == "RATE_LIMITED"
+
+
 # ---------------------------------------------------------------------------
 # list_entitlements — happy path
 # ---------------------------------------------------------------------------

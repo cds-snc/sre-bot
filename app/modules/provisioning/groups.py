@@ -12,7 +12,7 @@ logger = get_logger()
 class DirectoryGroupsUnavailableError(Exception):
     """Raised when a directory provider cannot supply the group list."""
 
-    def __init__(self, message: str, error_code: str | None = None) -> None:
+    def __init__(self, message: str | None, error_code: str | None = None) -> None:
         super().__init__(message)
         self.message = message
         self.error_code = error_code

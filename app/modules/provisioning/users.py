@@ -15,7 +15,7 @@ logger = get_logger()
 class DirectoryUsersUnavailableError(Exception):
     """Raised when the directory cannot supply the user list."""
 
-    def __init__(self, message: str, error_code: str | None = None) -> None:
+    def __init__(self, message: str | None, error_code: str | None = None) -> None:
         super().__init__(message)
         self.message = message
         self.error_code = error_code

@@ -32,7 +32,7 @@ class WebhookStoreUnavailableError(Exception):
     provider error text.
     """
 
-    def __init__(self, status: OperationStatus, error_code: str | None = None, retry_after: int | None = None) -> None:
+    def __init__(self, status: OperationStatus, error_code: str | None = None, retry_after: float | None = None) -> None:
         super().__init__("webhooks store unavailable")
         self.status = status
         self.error_code = error_code
