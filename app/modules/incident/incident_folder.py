@@ -33,7 +33,7 @@ LEGACY_FOLDER_DISPLAY_LIMIT = 25
 
 
 class IncidentSheetError(Exception):
-    def __init__(self, message: str, error_code: str | None = None) -> None:
+    def __init__(self, message: str | None, error_code: str | None = None) -> None:
         super().__init__(message)
         self.message = message
         self.error_code = error_code
@@ -409,7 +409,7 @@ def get_incidents_from_sheet(days=0) -> list:
                 channel_id = match.group(1)
         channel_name = channel_cell.formatted_value
         channel_name = "TBC" if not channel_name else channel_name[1:]
-        incident_details = {
+        incident_details: dict[str, Any] = {
             "channel_id": channel_id,
             "channel_name": channel_name,
             "name": row[1].formatted_value,
@@ -422,7 +422,7 @@ def get_incidents_from_sheet(days=0) -> list:
         }
         if incident_details["channel_id"] is None:
             continue
-        if days > 0 and incident_details["created_at"] < date_lookback_str:
+        if days > 0 and (incident_details["created_at"] or "") < date_lookback_str:
             continue
         incidents_details.append(incident_details)
     return incidents_details
@@ -449,7 +449,7 @@ def get_incident_details(client: WebClient, incident):
         try:
             response = client.conversations_info(channel=incident["channel_id"])
             if response.get("ok"):
-                channel_info = response.get("channel")
+                channel_info = response["channel"]
                 incident["channel_name"] = channel_info.get("name")
 
                 creator = channel_info.get("creator")

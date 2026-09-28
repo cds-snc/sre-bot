@@ -2,6 +2,7 @@
 
 import pytest
 
+from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.sync.adapters.fake_platform import FakePlatformAdapter
 from packages.access.sync.domain import (
     DesiredPlatformState,
@@ -64,6 +65,34 @@ def test_fake_adapter_reconcile_user_provisions_new_user():
     assert isinstance(result.data, SyncOutcome)
     assert "provision_user" in result.data.applied_actions
     assert "newuser@example.com" in adapter._users
+
+
+@pytest.mark.unit
+def test_fake_adapter_reconcile_user_falls_back_to_default_message_when_action_error_has_none(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """A failed action whose result has no message yields a fixed operator message.
+
+    ensure_user is replaced on the instance with a stub returning an error built
+    with message=None; the reconcile result keeps the action's status and
+    error_code and only fills in the missing message.
+    """
+    adapter = FakePlatformAdapter()
+    monkeypatch.setattr(
+        adapter,
+        "ensure_user",
+        lambda _email: OperationResult(
+            status=OperationStatus.TRANSIENT_ERROR,
+            message=None,
+            error_code="TIMEOUT",
+        ),
+    )
+
+    result = adapter.reconcile_user("newuser@example.com", DesiredUserState(user_should_exist=True), _EFFECTIVE)
+
+    assert result.status == OperationStatus.TRANSIENT_ERROR
+    assert result.message == "Action execution failed"
+    assert result.error_code == "TIMEOUT"
 
 
 @pytest.mark.unit

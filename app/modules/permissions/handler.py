@@ -12,7 +12,7 @@ class PermissionCheckError(Exception):
     caller as "not authorized".
     """
 
-    def __init__(self, group_key: str, message: str, error_code: str | None = None) -> None:
+    def __init__(self, group_key: str, message: str | None, error_code: str | None = None) -> None:
         super().__init__(message)
         self.group_key = group_key
         self.message = message

@@ -160,7 +160,9 @@ class FakePlatformAdapter:
             elif result.error_code == "UNSUPPORTED_OPERATION":
                 requires_manual_action = True
             else:
-                return OperationResult.error(result.status, message=result.message, error_code=result.error_code)
+                return OperationResult.error(
+                    result.status, message=result.message or "Action execution failed", error_code=result.error_code
+                )
         return OperationResult.success(
             data=SyncOutcome(
                 planned_actions=[a.action for a in planned],

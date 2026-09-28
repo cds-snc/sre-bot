@@ -118,4 +118,4 @@ class SubmitAccessRequestResponse(BaseModel):
 
     request_id: str
     status: str
-    message: str
+    message: str | None = Field(description="Optional note about the submission; null when the service returns none.")

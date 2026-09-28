@@ -252,6 +252,31 @@ def test_build_user_state_should_error_when_authn_group_is_outside_managed_domai
 
 
 @pytest.mark.unit
+def test_build_user_state_should_fall_back_to_default_message_when_user_groups_error_has_none():
+    """A user-groups lookup error with no message yields a fixed operator message.
+
+    The fake returns an authn member, then a get_user_groups error built with
+    message=None; the forwarded error keeps its status and error_code and only
+    fills in the missing message.
+    """
+    directory = FakeDirectory(
+        groups={"sg-aws-authn@example.com": AUTHN_GROUP},
+        user_groups=OperationResult(
+            status=OperationStatus.TRANSIENT_ERROR,
+            message=None,
+            error_code="RATE_LIMITED",
+        ),
+    )
+    builder = make_builder(directory)
+
+    result = builder.build_user_state_from_effective("user@example.com", make_effective())
+
+    assert result.status == OperationStatus.TRANSIENT_ERROR
+    assert result.message == "User groups lookup failed"
+    assert result.error_code == "RATE_LIMITED"
+
+
+@pytest.mark.unit
 def test_build_user_state_should_check_membership_against_canonical_alias_email():
     directory = FakeDirectory(
         groups={

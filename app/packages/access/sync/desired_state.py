@@ -77,7 +77,7 @@ class DirectoryMembershipBuilder:
         if not authn_result.is_success:
             return OperationResult.error(
                 authn_result.status,
-                message=authn_result.message,
+                message=authn_result.message or "Authentication group membership check failed",
                 error_code=authn_result.error_code,
             )
 
@@ -89,7 +89,7 @@ class DirectoryMembershipBuilder:
             if not user_groups_result.is_success:
                 return OperationResult.error(
                     user_groups_result.status,
-                    message=user_groups_result.message,
+                    message=user_groups_result.message or "User groups lookup failed",
                     error_code=user_groups_result.error_code,
                 )
 
@@ -161,7 +161,7 @@ class DirectoryMembershipBuilder:
         if not authn_members_result.is_success:
             return OperationResult.error(
                 authn_members_result.status,
-                message=authn_members_result.message,
+                message=authn_members_result.message or "Authentication group members lookup failed",
                 error_code=authn_members_result.error_code,
             )
 
@@ -174,7 +174,7 @@ class DirectoryMembershipBuilder:
             if not group_result.is_success and group_result.status != OperationStatus.NOT_FOUND:
                 return OperationResult.error(
                     group_result.status,
-                    message=group_result.message,
+                    message=group_result.message or "Group lookup failed",
                     error_code=group_result.error_code,
                     retry_after=group_result.retry_after,
                 )
@@ -208,7 +208,7 @@ class DirectoryMembershipBuilder:
                 )
                 return OperationResult.error(
                     batch_result.status,
-                    message=batch_result.message,
+                    message=batch_result.message or "Batch group members lookup failed",
                     error_code=batch_result.error_code,
                     retry_after=batch_result.retry_after,
                 )
@@ -251,7 +251,7 @@ class DirectoryMembershipBuilder:
             )
             return OperationResult.error(
                 list_result.status,
-                message=list_result.message,
+                message=list_result.message or "Group discovery failed",
                 error_code=list_result.error_code,
                 retry_after=list_result.retry_after,
             )
@@ -288,7 +288,7 @@ class DirectoryMembershipBuilder:
         if not group_result.is_success:
             return OperationResult.error(
                 group_result.status,
-                message=group_result.message,
+                message=group_result.message or "Group lookup failed",
                 error_code=group_result.error_code,
             )
 
@@ -315,7 +315,7 @@ class DirectoryMembershipBuilder:
         if not membership_result.is_success:
             return OperationResult.error(
                 membership_result.status,
-                message=membership_result.message,
+                message=membership_result.message or "Membership check failed",
                 error_code=membership_result.error_code,
             )
 

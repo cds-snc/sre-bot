@@ -804,7 +804,7 @@ class AwsIdentityCenterAdapter:
             else:
                 return OperationResult.error(
                     result.status,
-                    message=result.message,
+                    message=result.message or "Failed to resolve group",
                     error_code=result.error_code,
                 )
         return OperationResult.success(data=canonical)
@@ -849,7 +849,7 @@ class AwsIdentityCenterAdapter:
             else:
                 return OperationResult.error(
                     result.status,
-                    message=result.message,
+                    message=result.message or "Action execution failed",
                     error_code=result.error_code,
                 )
 

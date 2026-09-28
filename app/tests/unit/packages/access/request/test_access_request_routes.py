@@ -143,6 +143,31 @@ def test_submit_request_maps_permanent_error_to_400() -> None:
 
 
 @pytest.mark.unit
+def test_submit_request_returns_null_message_when_service_success_has_none() -> None:
+    """A successful submission without a service message returns message=None.
+
+    The fake service's default submit result is a SUCCESS carrying the request
+    and no message; the route passes that through instead of inventing text.
+    """
+    response = submit_request(
+        body=SubmitAccessRequestBody(
+            platform="aws",
+            group_slug="sg-aws-admins",
+            entitlement_type="group",
+            actor_type="self",
+            request_type="grant",
+            justification="Need access",
+        ),
+        service=_FakeAccessRequestService(),
+        settings=_FakeSettings(enabled=True),
+        current_user=_make_user("caller@example.com"),
+    )
+
+    assert response.request_id == "req-1"
+    assert response.message is None
+
+
+@pytest.mark.unit
 def test_approve_request_includes_decisions_in_response() -> None:
     service = _FakeAccessRequestService()
 
