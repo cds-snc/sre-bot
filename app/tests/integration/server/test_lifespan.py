@@ -124,7 +124,6 @@ def test_lifespan_register_legacy_handlers_calls_register(mock_bot):
         patch("server.lifespan.atip") as mock_atip,
         patch("server.lifespan.aws") as mock_aws,
         patch("server.lifespan.secret") as mock_secret,
-        patch("server.lifespan.sre") as mock_sre,
         patch("server.lifespan.webhook_helper") as mock_webhook,
         patch("server.lifespan.incident") as mock_incident,
         patch("server.lifespan.incident_helper") as mock_incident_helper,
@@ -137,7 +136,6 @@ def test_lifespan_register_legacy_handlers_calls_register(mock_bot):
         mock_atip.register.assert_called_once_with(mock_bot)
         mock_aws.register.assert_called_once_with(mock_bot)
         mock_secret.register.assert_called_once_with(mock_bot)
-        mock_sre.register.assert_called_once_with(mock_bot)
         mock_webhook.register.assert_called_once_with(mock_bot)
         mock_incident.register.assert_called_once_with(mock_bot)
         mock_incident_helper.register.assert_called_once_with(mock_bot)
