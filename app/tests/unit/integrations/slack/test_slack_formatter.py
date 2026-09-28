@@ -258,8 +258,42 @@ class TestFormatOperationResult:
         formatted = formatter.format_operation_result(result)
 
         assert "blocks" in formatted
-        # Should use default "ok" message from OperationResult.success()
-        # or handle None gracefully
+        header_text = formatted["blocks"][0]["text"]["text"]
+        assert header_text == ":white_check_mark: Success"
+
+    @pytest.mark.parametrize(
+        ("status", "expected_prefix"),
+        [
+            (OperationStatus.SUCCESS, ":white_check_mark: "),
+            (OperationStatus.NOT_FOUND, ":x: "),
+            (OperationStatus.TRANSIENT_ERROR, ":x: "),
+            (OperationStatus.PERMANENT_ERROR, ":x: "),
+            (OperationStatus.UNAUTHORIZED, ":x: "),
+        ],
+    )
+    def test_format_operation_result_routes_every_status(self, status, expected_prefix):
+        """Every status renders: SUCCESS via the success header, all others via the error header.
+
+        Built directly with the constructor so each status is exercised with an identical
+        message; the header prefix identifies which formatter branch produced the blocks.
+        """
+        formatter = SlackBlockKitFormatter()
+        result = OperationResult(status=status, message="Outcome", error_code="CODE")
+
+        formatted = formatter.format_operation_result(result)
+
+        header_text = formatted["blocks"][0]["text"]["text"]
+        assert header_text == f"{expected_prefix}Outcome"
+
+    def test_format_error_operation_result_without_message_uses_fallback(self):
+        """A non-success result with no message still renders a generic error header."""
+        formatter = SlackBlockKitFormatter()
+        result = OperationResult(status=OperationStatus.PERMANENT_ERROR, message=None)
+
+        formatted = formatter.format_operation_result(result)
+
+        header_text = formatted["blocks"][0]["text"]["text"]
+        assert header_text == ":x: An error occurred"
 
 
 @pytest.mark.unit

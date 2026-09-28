@@ -3,10 +3,10 @@ id: TASK-105
 title: >-
   Fix the OperationResult envelope: frozen, no map/bind, optional success
   message, cause field
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-24 19:57'
-updated_date: '2026-09-28 14:55'
+updated_date: '2026-09-28 15:37'
 labels:
   - plugin-architecture
   - operation-result
@@ -36,12 +36,12 @@ Divergences (operation-result.md Consequences and Migration):
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 OperationResult is frozen=True and a unit test asserts immutability
-- [ ] #2 map and bind are removed and grep finds no .map( or .bind( call site on an OperationResult
-- [ ] #3 message is optional on SUCCESS; cause exists, is excluded from repr and serialization, and is never rendered
-- [ ] #4 The provider/operation fields are kept unchanged, with a docstring note that TASK-105.1 removes them
-- [ ] #5 The shared OperationResult renderer (SlackBlockKitFormatter.format_operation_result in app/integrations/slack/formatter.py -- the only cross-feature renderer that branches on OperationResult.status found in the codebase) is rewritten to match result.status: covering all five OperationStatus values plus typing.assert_never on the fall-through, preserving today's formatting behaviour (all non-SUCCESS statuses still render via format_error); mypy passes with no new errors in the touched files
-- [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 OperationResult is frozen=True and a unit test asserts immutability
+- [x] #2 map and bind are removed and grep finds no .map( or .bind( call site on an OperationResult
+- [x] #3 message is optional on SUCCESS; cause exists, is excluded from repr and serialization, and is never rendered
+- [x] #4 The provider/operation fields are kept unchanged, with a docstring note that TASK-105.1 removes them
+- [x] #5 The shared OperationResult renderer (SlackBlockKitFormatter.format_operation_result in app/integrations/slack/formatter.py -- the only cross-feature renderer that branches on OperationResult.status found in the codebase) is rewritten to match result.status: covering all five OperationStatus values plus typing.assert_never on the fall-through, preserving today's formatting behaviour (all non-SUCCESS statuses still render via format_error); mypy passes with no new errors in the touched files
+- [x] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -155,6 +155,20 @@ Blast radius and rollback:
 - Removing map/bind/unwrap/unwrap_or is a source-breaking change for any external/future caller,
   but survey confirms zero current callers outside the type's own tests.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented per the approved plan on stack-a/task-105-operation-result-envelope (Stack A layer 2).
+
+Production: app/infrastructure/operations/result.py (frozen=True; map/bind/unwrap/unwrap_or, Callable/Any/TypeVar U removed; message: str | None with success() defaulting to None; cause: BaseException | None = field(default=None, repr=False, compare=False); retry_after: float | None; provider/operation kept with a docstring note pointing at TASK-105.1; docstring now points at decisions/operation-result.md). app/integrations/slack/formatter.py: format_operation_result uses match result.status with SUCCESS, an or-pattern over the four non-success statuses that still call format_error, and case _ -> assert_never.
+Docs: decisions/operation-result.md (message: str | None in Decision; closed divergences removed from Consequences/Migration; 2026-09-28 Changes entry).
+Tests: test_operations_result.py drops the Map/Bind/Unwrap/UnwrapOr/Railway classes and adds TestOperationResultEnvelopeShape (immutability, message None default, cause round trip, absent from repr, ignored by equality, float retry_after, helpers absent). test_slack_formatter.py parametrizes over all five statuses and adds a None-message error fallback test.
+
+Gates: ruff check . -> All checks passed. ruff format --check -> clean. lint-imports -> 7 kept, 0 broken. pytest tests --ignore=tests/smoke -> 3500 passed, 6 failed, and all 6 are the known TASK-90 order leaks (test_webhooks_aws_sns.py, directory/test_google.py; 111 passed when rerun alone). make test -> 2749 + 757 passed. The CI freeze checks (fmt-ci, check-sdk-typing, check-vendor-package-contract, check-aws-platform-seam, check-runtime-imports, check-import-contracts) all pass.
+mypy: 0 errors in touched files. Against a HEAD baseline (79 -> 106), the widening adds 29 arg-type errors in 16 untouched files: 27 forward message: str | None, 2 forward float retry_after to int-typed legacy exceptions. The plan assumed both changes were additive, and it was wrong. CI does not block because lint-ci runs mypy with || true. The human chose to track them in the new subtask TASK-105.3 (depends on TASK-105.1) rather than widen this layer.
+AC #2 grep: rg '\.(map|bind|unwrap|unwrap_or)\(' over app/ returns only structlog .bind() hits.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

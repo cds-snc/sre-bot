@@ -1,46 +1,46 @@
 """Operation result dataclass.
 
-Uniform result type returned from operations across the application,
-including status, data, and error information.
+Uniform, immutable result envelope returned at integration and service
+boundaries, carrying status, data and error information. Consumers branch with
+``match result.status:`` and ``typing.assert_never`` on the fall-through.
 
-Implements Railway-Oriented Programming pattern for type-safe error handling.
-See: docs/decisions/tier-1-foundation/ADR-001-operation-result-pattern.md
+See: decisions/operation-result.md
 """
 
-from collections.abc import Callable
-from dataclasses import dataclass
-from typing import Any, TypeVar
+from dataclasses import dataclass, field
 
 from infrastructure.operations.status import OperationStatus
 
-# Type variable for generic helper methods
-U = TypeVar("U")
 
-
-@dataclass
+@dataclass(frozen=True)
 class OperationResult[T]:
     """Uniform result returned from operations.
 
-    Implements Railway-Oriented Programming pattern for functional error handling.
-    Provides type-safe composition via map() and bind() methods.
-
     Attributes:
         status: OperationStatus -- high-level outcome
-        message: str -- human-friendly message for logs/troubleshooting
-        data: Optional[T] -- optional payload for successful results
-        error_code: Optional[str] -- optional machine error code
-        retry_after: Optional[int] -- seconds until retry when rate-limited
-        provider: Optional[str] -- provider name for observability (e.g., 'google', 'aws')
-        operation: Optional[str] -- operation name for observability (e.g., 'list_members')
+        message: str | None -- message for logs/operators; optional on SUCCESS
+        data: T | None -- optional payload for successful results
+        error_code: str | None -- optional machine error code
+        retry_after: float | None -- seconds until retry, only when upstream gave a hint
+        provider: str | None -- provider name for observability (e.g., 'google', 'aws').
+            Kept for observability; scheduled for removal in TASK-105.1, which is not part
+            of the decisions/operation-result.md canonical shape.
+        operation: str | None -- operation name for observability (e.g., 'list_members').
+            Kept for observability; scheduled for removal in TASK-105.1, which is not part
+            of the decisions/operation-result.md canonical shape.
+        cause: BaseException | None -- internal-only diagnostic preserving the original
+            exception and its traceback; excluded from repr and equality, and never
+            rendered or serialized.
     """
 
     status: OperationStatus
-    message: str
+    message: str | None
     data: T | None = None
     error_code: str | None = None
-    retry_after: int | None = None
+    retry_after: float | None = None
     provider: str | None = None
     operation: str | None = None
+    cause: BaseException | None = field(default=None, repr=False, compare=False)
 
     @property
     def is_success(self) -> bool:
@@ -55,7 +55,7 @@ class OperationResult[T]:
     def success(
         cls,
         data: T | None = None,
-        message: str = "ok",
+        message: str | None = None,
         provider: str | None = None,
         operation: str | None = None,
     ) -> OperationResult[T]:
@@ -63,7 +63,7 @@ class OperationResult[T]:
 
         Args:
             data: Optional payload to include with the result
-            message: Human-friendly success message
+            message: Optional success message for logs/operators
             provider: Optional provider name for observability
             operation: Optional operation name for observability
 
@@ -84,7 +84,7 @@ class OperationResult[T]:
         status: OperationStatus,
         message: str,
         error_code: str | None = None,
-        retry_after: int | None = None,
+        retry_after: float | None = None,
         data: T | None = None,
         provider: str | None = None,
         operation: str | None = None,
@@ -118,7 +118,7 @@ class OperationResult[T]:
         cls,
         message: str,
         error_code: str | None = None,
-        retry_after: int | None = None,
+        retry_after: float | None = None,
     ) -> OperationResult[T]:
         """Create a transient (retryable) error result.
 
@@ -155,122 +155,3 @@ class OperationResult[T]:
             OperationResult with PERMANENT_ERROR status
         """
         return cls.error(OperationStatus.PERMANENT_ERROR, message, error_code)
-
-    def map(self, fn: Callable[[T], U]) -> OperationResult[U]:
-        """Apply a function to the success value (Railway-Oriented Programming).
-
-        If the result is successful, applies the function to data and returns
-        a new OperationResult with the transformed data. If the result is an
-        error, returns self unchanged.
-
-        Args:
-            fn: Function to apply to the success value
-
-        Returns:
-            New OperationResult with transformed data, or self if error
-
-        Example:
-            result = OperationResult.success(data=5)
-            doubled = result.map(lambda x: x * 2)  # Success with data=10
-
-            error = OperationResult.permanent_error("failed")
-            still_error = error.map(lambda x: x * 2)  # Still an error
-        """
-        if not self.is_success:
-            return self  # type: ignore[return-value]
-
-        if self.data is None:
-            return OperationResult.error(
-                status=OperationStatus.PERMANENT_ERROR,
-                message="No data to map",
-                provider=self.provider,
-                operation=self.operation,
-            )
-
-        return OperationResult.success(
-            data=fn(self.data),
-            message=self.message,
-            provider=self.provider,
-            operation=self.operation,
-        )
-
-    def bind(self, fn: Callable[[T], OperationResult[U]]) -> OperationResult[U]:
-        """Chain operations that return OperationResult (Railway-Oriented Programming).
-
-        If the result is successful, applies the function to data and returns
-        the resulting OperationResult. If the result is an error, returns self
-        unchanged. This enables chaining multiple operations that may fail.
-
-        Args:
-            fn: Function that takes the success value and returns OperationResult
-
-        Returns:
-            OperationResult from fn, or self if error
-
-        Example:
-            def validate_user(user_id: int) -> OperationResult[int]:
-                if user_id > 0:
-                    return OperationResult.success(data=user_id)
-                return OperationResult.permanent_error("Invalid ID")
-
-            def fetch_user(user_id: int) -> OperationResult[dict]:
-                # ... fetch from database
-                return OperationResult.success(data={"id": user_id, "name": "Alice"})
-
-            result = (
-                OperationResult.success(data=123)
-                .bind(validate_user)
-                .bind(fetch_user)
-            )
-        """
-        if not self.is_success:
-            return self  # type: ignore[return-value]
-
-        if self.data is None:
-            return OperationResult.error(
-                status=OperationStatus.PERMANENT_ERROR,
-                message="No data to bind",
-                provider=self.provider,
-                operation=self.operation,
-            )
-        return fn(self.data)
-
-    def unwrap_or(self, default: Any) -> Any:
-        """Get the success value or return a default.
-
-        Args:
-            default: Value to return if this is an error
-
-        Returns:
-            The data if successful, otherwise the default value
-
-        Example:
-            result = OperationResult.success(data=42)
-            value = result.unwrap_or(0)  # Returns 42
-
-            error = OperationResult.permanent_error("failed")
-            value = error.unwrap_or(0)  # Returns 0
-        """
-        return self.data if self.is_success else default
-
-    def unwrap(self) -> Any:
-        """Get the success value or raise an exception.
-
-        Returns:
-            The data if successful
-
-        Raises:
-            ValueError: If the result is an error
-
-        Example:
-            result = OperationResult.success(data=42)
-            value = result.unwrap()  # Returns 42
-
-            error = OperationResult.permanent_error("failed")
-            value = error.unwrap()  # Raises ValueError
-        """
-        if not self.is_success:
-            raise ValueError(
-                f"Called unwrap() on error result: {self.message} (code: {self.error_code}, status: {self.status.value})"
-            )
-        return self.data

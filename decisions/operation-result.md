@@ -18,7 +18,7 @@ Consumers of external calls need to branch on expected outcomes (success, not-fo
 - `status: OperationStatus` — closed enum: `SUCCESS`, `NOT_FOUND`, `TRANSIENT_ERROR`, `PERMANENT_ERROR`, `UNAUTHORIZED`.
 - `data` — the typed payload; present only on `SUCCESS`.
 - `error_code: str` — machine-readable, mandatory on non-success, drawn from the project registry (`SCREAMING_SNAKE`; the registry is the enum-like module next to the dataclass — adding a code is a reviewed one-line change). `UNAUTHORIZED` distinguishes `UNAUTHENTICATED` vs `FORBIDDEN` via `error_code`, mapping to 401/403 at the HTTP edge.
-- `message: str` — for logs/operators, never for end users; capability-level, no SDK internals.
+- `message: str | None` — for logs/operators, never for end users; capability-level, no SDK internals. Optional on `SUCCESS`.
 - `retry_after: float | None` — only when the upstream provided a hint; consumers apply their own backoff when absent.
 - `cause: BaseException | None` — internal-only diagnostic; never rendered or serialized; preserves the traceback that string-flattening destroys.
 
@@ -32,7 +32,7 @@ Consumers of external calls need to branch on expected outcomes (success, not-fo
 
 - One page of contract answers "what do I get back and what do I do with it" for every boundary in the app.
 - The five statuses are deliberately coarse; fidelity lives in `error_code`. Adding a status amends this record; adding a code is routine.
-- Divergences to fix in code: dataclass currently mutable; undocumented `provider`/`operation` fields (keep, document, or drop — decide in the fix PR); `message` required on success (make optional); stale docstring pointer to the extinct ADR tree.
+- Divergence still to fix in code: the undocumented `provider`/`operation` fields are dropped by TASK-105.1.
 
 ## Checks
 
@@ -42,7 +42,8 @@ Consumers of external calls need to branch on expected outcomes (success, not-fo
 
 ## Migration
 
-Tickets: envelope shape fix (one PR: freeze the dataclass, remove `map`/`bind`, make `message` optional on success, add `cause`, resolve `provider`/`operation`, fix the stale docstring pointer); the `contracts/` move ([plugin-architecture.md](plugin-architecture.md)). Tolerated until closed: the current mutable shape; `OperationResult` and `OperationStatus` living in `app/infrastructure/operations/`.
+Tickets: drop the `provider`/`operation` fields (TASK-105.1); the `contracts/` move ([plugin-architecture.md](plugin-architecture.md), TASK-106). Tolerated until closed: the `provider`/`operation` fields; `OperationResult` and `OperationStatus` living in `app/infrastructure/operations/`.
 
 **Changes:**
 - 2026-09-24: `OperationResult` moves to `app/contracts/` as a shared type of the plugin API.
+- 2026-09-28: TASK-105 froze the dataclass, removed `map`/`bind`/`unwrap`/`unwrap_or`, made `message` optional on success, added `cause`, widened `retry_after` to `float` and fixed the stale docstring pointer; `provider`/`operation` deferred to TASK-105.1.

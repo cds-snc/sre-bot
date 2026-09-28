@@ -3,6 +3,8 @@
 Moved from tests/unit/modules/groups/providers/test_base_provider.py (OperationResult/Status parts).
 """
 
+import dataclasses
+
 import pytest
 
 from infrastructure.operations.result import OperationResult
@@ -106,300 +108,50 @@ class TestOperationResultObservability:
 
 
 @pytest.mark.unit
-class TestOperationResultMap:
-    """Test map() method for transforming success values."""
+class TestOperationResultEnvelopeShape:
+    """Frozen envelope, optional success message and internal-only cause."""
 
-    def test_map_transforms_success_value(self):
-        result = OperationResult.success(data=5)
-        doubled = result.map(lambda x: x * 2)
-        assert doubled.is_success
-        assert doubled.data == 10
+    def test_result_is_immutable(self):
+        """Assigning to a field raises, so a result cannot change after it is returned."""
+        result = OperationResult.success(data={"id": "123"})
+        with pytest.raises(dataclasses.FrozenInstanceError):
+            result.status = OperationStatus.PERMANENT_ERROR  # type: ignore[misc]
 
-    def test_map_preserves_error(self):
-        error = OperationResult.permanent_error("Failed", error_code="ERR")
-        mapped = error.map(lambda x: x * 2)
-        assert not mapped.is_success
-        assert mapped.status == OperationStatus.PERMANENT_ERROR
-        assert mapped.error_code == "ERR"
+    def test_success_message_defaults_to_none(self):
+        """A success built without a message carries None rather than a placeholder string."""
+        result = OperationResult.success(data={"id": "123"})
+        assert result.message is None
 
-    def test_map_preserves_observability_on_success(self):
-        result = OperationResult.success(
-            data="hello",
-            provider="test",
-            operation="greet",
-        )
-        mapped = result.map(str.upper)
-        assert mapped.data == "HELLO"
-        assert mapped.provider == "test"
-        assert mapped.operation == "greet"
+    def test_cause_round_trips_through_constructor(self):
+        """The exact exception instance is kept so its traceback survives for diagnostics."""
+        exc = RuntimeError("upstream exploded")
+        result = OperationResult(status=OperationStatus.TRANSIENT_ERROR, message="Upstream failed", cause=exc)
+        assert result.cause is exc
 
-    def test_map_preserves_all_error_fields(self):
-        error = OperationResult.error(
-            OperationStatus.TRANSIENT_ERROR,
-            "Rate limited",
-            error_code="RATE_LIMITED",
-            retry_after=60,
-            provider="google",
-            operation="list_members",
-        )
-        mapped = error.map(lambda x: x * 2)
-        assert mapped.status == OperationStatus.TRANSIENT_ERROR
-        assert mapped.message == "Rate limited"
-        assert mapped.error_code == "RATE_LIMITED"
-        assert mapped.retry_after == 60
-        assert mapped.provider == "google"
-        assert mapped.operation == "list_members"
+    def test_cause_defaults_to_none(self):
+        """Factories never attach a cause unless one is passed explicitly."""
+        assert OperationResult.permanent_error("Failed").cause is None
 
-    def test_map_with_complex_transformation(self):
-        result = OperationResult.success(data={"count": 5})
-        transformed = result.map(lambda d: {**d, "doubled": d["count"] * 2})
-        assert transformed.data == {"count": 5, "doubled": 10}
+    def test_cause_is_absent_from_repr(self):
+        """repr is what reaches logs, so the diagnostic exception must not leak through it."""
+        exc = RuntimeError("secret-token-in-message")
+        result = OperationResult(status=OperationStatus.PERMANENT_ERROR, message="Failed", cause=exc)
+        text = repr(result)
+        assert "cause" not in text
+        assert "secret-token-in-message" not in text
 
+    def test_equality_ignores_cause(self):
+        """Two results with the same outcome compare equal whatever exception was attached."""
+        first = OperationResult(status=OperationStatus.PERMANENT_ERROR, message="Failed", cause=ValueError("a"))
+        second = OperationResult(status=OperationStatus.PERMANENT_ERROR, message="Failed", cause=KeyError("b"))
+        assert first == second
 
-@pytest.mark.unit
-class TestOperationResultBind:
-    """Test bind() method for Railway-Oriented Programming."""
+    def test_retry_after_accepts_fractional_seconds(self):
+        """Upstream retry hints may be fractional and are stored without truncation."""
+        result = OperationResult.transient_error("Rate limited", retry_after=1.5)
+        assert result.retry_after == 1.5
 
-    def test_bind_chains_successful_operations(self):
-        def add_one(x: int) -> OperationResult:
-            return OperationResult.success(data=x + 1)
-
-        def multiply_two(x: int) -> OperationResult:
-            return OperationResult.success(data=x * 2)
-
-        result = OperationResult.success(data=5).bind(add_one).bind(multiply_two)
-
-        assert result.is_success
-        assert result.data == 12  # (5 + 1) * 2
-
-    def test_bind_stops_at_first_error(self):
-        def add_one(x: int) -> OperationResult:
-            return OperationResult.success(data=x + 1)
-
-        def fail_always(x: int) -> OperationResult:
-            return OperationResult.permanent_error("Failed", error_code="ERR")
-
-        def should_not_run(x: int) -> OperationResult:
-            # This should never execute
-            raise AssertionError("Should not be called")
-
-        result = OperationResult.success(data=5).bind(add_one).bind(fail_always).bind(should_not_run)
-
-        assert not result.is_success
-        assert result.message == "Failed"
-        assert result.error_code == "ERR"
-
-    def test_bind_with_validation_pattern(self):
-        def validate_positive(x: int) -> OperationResult:
-            if x > 0:
-                return OperationResult.success(data=x)
-            return OperationResult.permanent_error("Must be positive", error_code="INVALID")
-
-        # Valid case
-        result = OperationResult.success(data=10).bind(validate_positive)
-        assert result.is_success
-        assert result.data == 10
-
-        # Invalid case
-        result = OperationResult.success(data=-5).bind(validate_positive)
-        assert not result.is_success
-        assert result.error_code == "INVALID"
-
-    def test_bind_preserves_initial_error(self):
-        def should_not_run(x: int) -> OperationResult:
-            raise AssertionError("Should not be called")
-
-        error = OperationResult.permanent_error("Initial error")
-        result = error.bind(should_not_run)
-
-        assert not result.is_success
-        assert result.message == "Initial error"
-
-    def test_bind_with_fetch_enrich_pattern(self):
-        """Simulates real-world pattern: fetch → validate → enrich."""
-
-        def fetch_user(user_id: int) -> OperationResult:
-            if user_id == 999:
-                return OperationResult.error(
-                    OperationStatus.NOT_FOUND,
-                    "User not found",
-                    error_code="NOT_FOUND",
-                )
-            return OperationResult.success(data={"id": user_id, "name": f"User{user_id}"})
-
-        def enrich_profile(user: dict) -> OperationResult:
-            enriched = {**user, "display_name": f"Profile: {user['name']}"}
-            return OperationResult.success(data=enriched)
-
-        # Success path
-        result = OperationResult.success(data=123).bind(fetch_user).bind(enrich_profile)
-        assert result.is_success
-        assert result.data["display_name"] == "Profile: User123"
-
-        # Not found path
-        result = OperationResult.success(data=999).bind(fetch_user).bind(enrich_profile)
-        assert not result.is_success
-        assert result.status == OperationStatus.NOT_FOUND
-
-
-@pytest.mark.unit
-class TestOperationResultUnwrapOr:
-    """Test unwrap_or() for safe value extraction."""
-
-    def test_unwrap_or_returns_value_on_success(self):
-        result = OperationResult.success(data=42)
-        value = result.unwrap_or(0)
-        assert value == 42
-
-    def test_unwrap_or_returns_default_on_error(self):
-        error = OperationResult.permanent_error("Failed")
-        value = error.unwrap_or(0)
-        assert value == 0
-
-    def test_unwrap_or_with_none_default(self):
-        error = OperationResult.permanent_error("Failed")
-        value = error.unwrap_or(None)
-        assert value is None
-
-    def test_unwrap_or_with_complex_default(self):
-        error = OperationResult.permanent_error("Failed")
-        default = {"fallback": True}
-        value = error.unwrap_or(default)
-        assert value == {"fallback": True}
-
-    def test_unwrap_or_with_none_data(self):
-        result = OperationResult.success(data=None)
-        value = result.unwrap_or("default")
-        assert value is None  # Returns actual None, not default
-
-
-@pytest.mark.unit
-class TestOperationResultUnwrap:
-    """Test unwrap() for value extraction with exceptions."""
-
-    def test_unwrap_returns_value_on_success(self):
-        result = OperationResult.success(data=42)
-        value = result.unwrap()
-        assert value == 42
-
-    def test_unwrap_raises_on_error(self):
-        error = OperationResult.permanent_error("Failed", error_code="ERR")
-        with pytest.raises(ValueError) as exc_info:
-            error.unwrap()
-
-        assert "Called unwrap() on error result" in str(exc_info.value)
-        assert "Failed" in str(exc_info.value)
-        assert "ERR" in str(exc_info.value)
-
-    def test_unwrap_raises_on_transient_error(self):
-        error = OperationResult.transient_error("Timeout")
-        with pytest.raises(ValueError):
-            error.unwrap()
-
-    def test_unwrap_with_none_data(self):
-        result = OperationResult.success(data=None)
-        value = result.unwrap()
-        assert value is None
-
-    def test_unwrap_error_message_includes_status(self):
-        error = OperationResult.error(OperationStatus.NOT_FOUND, "Not found", error_code="404")
-        with pytest.raises(ValueError) as exc_info:
-            error.unwrap()
-
-        assert "not_found" in str(exc_info.value)
-
-
-@pytest.mark.unit
-class TestOperationResultRailwayPattern:
-    """Test complete Railway-Oriented Programming workflows."""
-
-    def test_map_and_bind_composition(self):
-        """Combine map and bind for complex workflows."""
-
-        def double(x: int) -> int:
-            return x * 2
-
-        def validate_positive(x: int) -> OperationResult:
-            if x > 0:
-                return OperationResult.success(data=x)
-            return OperationResult.permanent_error("Must be positive")
-
-        def to_string(x: int) -> str:
-            return f"Result: {x}"
-
-        # Success path
-        result = (
-            OperationResult.success(data=5)
-            .map(double)  # 10
-            .bind(validate_positive)  # Still 10 (valid)
-            .map(to_string)  # "Result: 10"
-        )
-
-        assert result.is_success
-        assert result.data == "Result: 10"
-
-        # Error path - negative after doubling
-        result = (
-            OperationResult.success(data=-3)
-            .map(double)  # -6
-            .bind(validate_positive)  # Fails here
-            .map(to_string)  # Skipped
-        )
-
-        assert not result.is_success
-        assert result.message == "Must be positive"
-
-    def test_complex_chain_with_multiple_operations(self):
-        """Test longer chain simulating real-world scenario."""
-
-        def validate_id(user_id: int) -> OperationResult:
-            if user_id > 0:
-                return OperationResult.success(data=user_id, operation="validate")
-            return OperationResult.permanent_error("Invalid ID")
-
-        def fetch_user(user_id: int) -> OperationResult:
-            users = {1: "Alice", 2: "Bob"}
-            if user_id in users:
-                return OperationResult.success(
-                    data={"id": user_id, "name": users[user_id]},
-                    provider="database",
-                    operation="fetch",
-                )
-            return OperationResult.error(OperationStatus.NOT_FOUND, "User not found", error_code="NOT_FOUND")
-
-        def check_active(user: dict) -> OperationResult:
-            # Simulate active check
-            user["is_active"] = True
-            return OperationResult.success(data=user, operation="check_active")
-
-        # Success path
-        result = (
-            OperationResult.success(data=1).bind(validate_id).bind(fetch_user).bind(check_active).map(lambda u: u["name"].upper())
-        )
-
-        assert result.is_success
-        assert result.data == "ALICE"
-
-        # Not found path
-        result = (
-            OperationResult.success(data=999)
-            .bind(validate_id)
-            .bind(fetch_user)
-            .bind(check_active)
-            .map(lambda u: u["name"].upper())
-        )
-
-        assert not result.is_success
-        assert result.status == OperationStatus.NOT_FOUND
-
-        # Invalid ID path
-        result = (
-            OperationResult.success(data=-1)
-            .bind(validate_id)
-            .bind(fetch_user)
-            .bind(check_active)
-            .map(lambda u: u["name"].upper())
-        )
-
-        assert not result.is_success
-        assert result.message == "Invalid ID"
+    @pytest.mark.parametrize("method", ["map", "bind", "unwrap", "unwrap_or"])
+    def test_railway_helpers_are_absent(self, method):
+        """The envelope exposes no monad helpers; callers branch on status instead."""
+        assert not hasattr(OperationResult, method)
