@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
+updated_date: '2026-09-25 15:00'
 labels:
   - plugin-architecture
   - plugins
@@ -38,3 +39,12 @@ Today which features and jobs run is decided by environment variables and ENVIRO
 - [ ] #3 grep finds no environment-variable feature switch or ENVIRONMENT check deciding whether a plugin runs
 - [ ] #4 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-25 15:00
+---
+2026-09-25: an enabled feature whose settings slice fails validation is skipped rather than aborting boot (decisions/plugins.md); TASK-126 implements that on top of this ticket. The plugin's configuration table carries only the enablement key: there is no per-plugin boot-failure override.
+---
+<!-- COMMENTS:END -->

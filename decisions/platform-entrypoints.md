@@ -1,6 +1,6 @@
 ---
-status: Draft
-date: 2026-09-10
+status: Accepted
+date: 2026-09-25
 applies: target
 scope: Where chat-platform entry points, handler contracts and outbound platform messaging live, split by direction the way HTTP already is.
 ---
@@ -9,7 +9,7 @@ scope: Where chat-platform entry points, handler contracts and outbound platform
 
 ## Context
 
-[plugin-architecture.md](plugin-architecture.md) puts transport runtimes in the host (`app/server/`) and the public plugin API in `app/contracts/`. HTTP already works this way: its inbound boundary is in `app/server/`. The Draft [people-and-accounts.md](people-and-accounts.md) needs every inbound caller resolved to a person, and only the host may call a capability on a caller's behalf before a feature runs.
+[plugin-architecture.md](plugin-architecture.md) puts transport runtimes in the host (`app/server/`) and the public plugin API in `app/contracts/`. HTTP already works this way: its inbound boundary is in `app/server/`. [people-and-accounts.md](people-and-accounts.md) needs every inbound caller resolved to a person, and only the host may call a capability on a caller's behalf before a feature runs.
 
 Ports and adapters separates the two directions:
 - Cockburn distinguishes primary (driving) adapters from secondary (driven) ones ([Hexagonal Architecture](https://alistair.cockburn.us/hexagonal-architecture/)).
@@ -35,7 +35,7 @@ Current state:
 
 Rules:
 
-1. **Callers are resolved at the entry point.** The entry point resolves the caller's platform account through the people capability, then passes handlers the resolved person, or an unlinked marker, with the request. `app/server/` may import capabilities because it is the composition root. Handlers and services don't resolve callers themselves.
+1. **Callers are resolved at the entry point.** The entry point resolves the caller's platform account through the people capability, then passes handlers the resolved person, or an unlinked marker, with the request. An unlinked caller isn't refused here; the feature's access policy decides (TASK-129). `app/server/` may import capabilities because it is the composition root. Handlers and services don't resolve callers themselves.
 2. **Features never receive SDK runtime objects.** Registration hookspecs take the platform's registrar Protocol from the handler contract, never the Bolt `App` or a Bot Framework adapter.
 3. **Feature handlers import only `contracts/`.** Never `app/server/`, never an SDK runtime. Pure-data SDK models stay allowed per [outbound-clients.md](outbound-clients.md).
 4. **Platforms stay independent.** There is no unified `Platform` Protocol. A feature serving Slack and Teams writes two thin handlers over one service. A conversation is handled on the platform it started on ([people-and-accounts.md](people-and-accounts.md)).
@@ -69,3 +69,4 @@ Tolerated until then:
 
 **Changes:**
 - 2026-09-24: the handler contract moves to `app/contracts/`, per plugin-architecture.md.
+- 2026-09-25: Accepted; an unlinked caller reaches the feature's access policy instead of being refused at the entry point.

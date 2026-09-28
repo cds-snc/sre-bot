@@ -1,59 +1,48 @@
 ---
 id: TASK-98
 title: >-
-  Stop re-assuming the AWS role on every adapter build: eager AssumeRole runs
-  uncached per call site
+  Make AWS assumed-role credentials lazy and refreshable: no STS call when a
+  client is built, one per credential lifetime
 status: To Do
 assignee: []
 created_date: '2026-09-17 19:06'
-updated_date: '2026-09-24 20:11'
+updated_date: '2026-09-25 15:53'
 labels:
   - clients
   - architecture
 dependencies:
   - TASK-92
 references:
-  - app/integrations/aws/client.py
-  - app/integrations/aws/settings.py
-  - app/modules/aws/ops_group_assignment.py
-  - app/jobs/scheduled_tasks.py
   - decisions/outbound-clients.md
-  - decisions/dependency-injection.md
-priority: medium
+  - decisions/lifecycle.md
+priority: high
 ordinal: 226000
 ---
 
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Found 2026-09-17 while investigating the make dev boot crash for TASK-92. Not covered by TASK-89 (portability), TASK-92 (health/startup model), TASK-25.2.6 (dispatcher removal) or TASK-88 (dissolve aws_platform): those own the BOOT-time consequence of eager AssumeRole, this owns the PER-CALL runtime cost.
+decisions/outbound-clients.md and lifecycle.md (2026-09-25): a factory does no network I/O at construction, and the only vendor call before yield is a declared, classified credential check. Assumed-role credentials resolve on the first API call and refresh themselves before they expire.
 
-MECHANISM (verified on main @ 27fb2bda). integrations/aws/client.py:154 -> :181 -> :192 performs a live sts:AssumeRole inside get_aws_client whenever role_arn is truthy, at client CONSTRUCTION. client.py:7-9 states the deliberate design: "Clients are built per call and never cached, so assumed credentials never need refreshing." No build_*_adapter() in packages/aws_platform/adapters/ is lru_cached, so every call site pays a fresh STS round-trip.
+TODAY. integrations/aws/client.py get_aws_client calls sts.assume_role while it builds a client whenever role_arn is set (_session_for). client.py's module docstring gives the reason: 'Clients are built per call and never cached, so assumed credentials never need refreshing.' That has two effects:
+1. BOOT CRASH (live in development, possibly in production). packages/access/sync's startup_warmup builds the Identity Center adapter, which assumes AWS_ORG_ACCOUNT_ROLE_ARN through STS. With ACCESS_SYNC_ENABLED=true, a non-empty role ARN and no valid ambient credentials, boot aborts with ClientError InvalidClientTokenId, so one business feature the SRE Bot does not require takes the whole app down. Reproduced on main @ 27fb2bda (2026-09-17). app/pyproject.toml pins ACCESS_SYNC_ENABLED=false for tests to work around it.
+2. PER-CALL COST. No build_*_adapter() is cached, so every build pays an STS round-trip, and builders that make a retrying and a retries-disabled client pay two (identity_center.py, dynamodb.py). modules/aws/ops_group_assignment.py makes four AssumeRole calls per invocation; jobs/scheduled_tasks.py's 5-minute integration_healthchecks makes two. AssumeRole is account-throttled.
 
-MEASURED. Repeated build_identity_center_adapter() calls each opened a new STS socket connection (1, 1, 1 over three calls; no caching). Builders that construct BOTH a retrying and a retries-disabled client make it two AssumeRole calls per build: identity_center.py:304-305 and dynamodb.py:132-133.
+TARGET. The factory builds a boto3 Session whose credentials are botocore DeferredRefreshableCredentials fed by an AssumeRoleCredentialFetcher (botocore 1.42 ships both): no STS call until the first API call, then refresh before expiry, handled by botocore. Sessions are reused per (role_arn, session_name) so repeated builds share one credential lifetime, created in a thread-safe way, since boto3 Sessions are not thread-safe to share for creation. The retrying and retries-disabled clients share the session. Affected services are those in SERVICE_ROLE_MAP with a non-empty ARN; dynamodb has no entry and is unaffected.
 
-AFFECTED SERVICES. Only those with a SERVICE_ROLE_MAP entry resolving to a non-empty ARN (integrations/aws/settings.py:113-125): audit, organizations, identitystore, sso-admin, logging, ce, config, guardduty, securityhub. dynamodb has NO entry, so role_arn is None and storage/idempotency pay nothing — which is why local DynamoDB work is unaffected.
+BOOT BEHAVIOUR. Today a misconfigured credential aborts boot as a side effect of construction. After this change it must not abort (decisions/lifecycle.md: credential checks alert, they never abort), but it must still be reported at boot: access/sync's startup_warmup runs one explicit credential check, identitystore ListUsers with MaxResults=1 through the adapter (one attempt, bounded timeout). UNAUTHORIZED, PERMANENT_ERROR or NOT_FOUND logs ERROR credential_check_failed; TRANSIENT_ERROR logs WARNING credential_check_inconclusive. Boot completes either way and access sync stays registered. TASK-126 later moves this check onto the generic credential-check hookspec.
 
-CALL SITES THAT AMPLIFY (build inside a request or job, not once):
-- modules/aws/ops_group_assignment.py:24, :49, :63 - three builders in one flow (identity_center + organizations + sso_admin) = 4 AssumeRole calls per invocation.
-- jobs/scheduled_tasks.py:127 - build_identity_center_adapter().healthcheck() on the 5-minute integration_healthchecks loop = 2 AssumeRole calls every 5 minutes, for a probe whose result is only logged.
-- modules/provisioning/users.py:61, modules/provisioning/groups.py:142, modules/aws/lambdas.py:56 and :85, plus the aws_account_health.py and spending.py builders.
-
-WHY IT MATTERS. STS AssumeRole is account-throttled and adds a serialized network round-trip to the front of every AWS operation, so the cost is latency and a throttling ceiling that scales with traffic rather than with the number of roles. The current design trades that for never having to refresh credentials.
-
-SCOPE. Decide and implement how assumed credentials are reused: botocore's own refreshable credential provider, a TTL cache keyed on (role_arn, session_name, retries), or caching the adapter rather than the client. Expiry, refresh-before-expiry and thread/async safety must be explicit, and the "never need refreshing" docstring claim in client.py must be updated or defended. TASK-92 AC#1 decides whether AssumeRole may happen at boot at all; this task must not contradict that outcome, which is why it depends on TASK-92.
-
-OUT OF SCOPE: the boot-time failure itself (TASK-92), off-AWS credential acquisition (TASK-89), and the fate of the integration_healthchecks loop (TASK-92 AC#4).
+OUT OF SCOPE: off-AWS credential acquisition (TASK-89), the fate of integration_healthchecks (TASK-127).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The per-call AssumeRole amplification is measured and recorded before any change: STS calls per build for each affected builder, and per invocation for ops_group_assignment.py and the 5-minute healthcheck loop
-- [ ] #2 A credential-reuse mechanism is chosen and recorded with alternatives and tradeoffs (botocore refreshable provider vs TTL cache keyed on role_arn/session_name/retries vs adapter-level caching), covering expiry, refresh-before-expiry and concurrency safety
-- [ ] #3 After the change, repeated builds of the same adapter make at most one AssumeRole call per credential lifetime, proven by a test that counts STS calls across repeated builds; the two-client builders (identity_center.py:304-305, dynamodb.py:132-133) do not double it
-- [ ] #4 Credentials are not shared across different role_arn or session_name values, pinned by a test
-- [ ] #5 The integrations/aws/client.py module docstring claim 'Clients are built per call and never cached, so assumed credentials never need refreshing' is corrected or explicitly defended, and decisions/outbound-clients.md records the outcome if it changes the contract
-- [ ] #6 The chosen mechanism does not reintroduce AssumeRole at import or boot time in a way that conflicts with TASK-92 AC#1; the conflict check is recorded in notes
+- [ ] #1 Building any role-bearing AWS client opens no outbound connection (socket.connect spy test); the first API call performs the AssumeRole
+- [ ] #2 Repeated builds for the same (role_arn, session_name) make at most one AssumeRole call per credential lifetime, and the two-client builders do not double it (test counting STS calls with botocore Stubber or a fake fetcher)
+- [ ] #3 Credentials are never shared across different role_arn or session_name values, and expiry triggers a refresh (tests)
+- [ ] #4 The client.py module docstring states the deferred, refreshable credential design; decisions/outbound-clients.md Migration drops the eager AssumeRole tolerance and lifecycle.md drops access sync's boot-time AssumeRole
+- [ ] #5 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [ ] #6 Access sync enabled with invalid credentials or an unassumable role completes boot and logs ERROR credential_check_failed; a TRANSIENT_ERROR result (Stubber throttling or timeout) logs WARNING credential_check_inconclusive; a later sync call after the credential is fixed succeeds without a restart (tests); the app/pyproject.toml ACCESS_SYNC_ENABLED=false test pin comment no longer cites construction-time AssumeRole
 <!-- AC:END -->
 
 ## Comments

@@ -4,7 +4,7 @@ title: Migrate the Slack transport to async Bolt (AsyncApp + AsyncSocketModeHand
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-24 20:04'
+updated_date: '2026-09-25 17:06'
 labels:
   - slack
   - phase-4
@@ -44,6 +44,12 @@ Steps:
 - [ ] #1 No behavior change on the command surface; modules/ handlers still work
 - [ ] #2 PR references decisions/transport-slack.md
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-25: decisions/workplace-systems.md, people-and-accounts.md and platform-entrypoints.md are Accepted. Earlier mentions of their Draft status in this task are historical.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

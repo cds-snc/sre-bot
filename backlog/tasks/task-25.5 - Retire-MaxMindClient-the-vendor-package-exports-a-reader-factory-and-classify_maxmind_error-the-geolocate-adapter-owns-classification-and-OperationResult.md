@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 16:47'
+updated_date: '2026-09-25 15:00'
 labels:
   - clients
   - phase-3
@@ -55,3 +56,12 @@ OUT OF SCOPE: moving MaxMind settings out of infrastructure/configuration/integr
 - [ ] #6 decisions/sdk-typing.md and decisions/outbound-clients.md no longer list MaxMindClient as a tolerated divergence
 - [ ] #7 ruff, mypy, pytest tests --ignore=tests/smoke and make check-vendor-package-contract pass, with output recorded in notes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-25 15:00
+---
+2026-09-25: whether the scheduled integration_healthchecks probe for this vendor survives is decided by TASK-127 (split from TASK-92). Migrate the probe's call path only; do not add or redesign a vendor probe here.
+---
+<!-- COMMENTS:END -->

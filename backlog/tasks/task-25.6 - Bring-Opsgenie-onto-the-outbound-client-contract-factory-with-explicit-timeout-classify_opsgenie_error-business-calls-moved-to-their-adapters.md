@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 16:51'
-updated_date: '2026-09-24 20:11'
+updated_date: '2026-09-25 15:00'
 labels:
   - clients
   - phase-3
@@ -59,5 +59,10 @@ TARGET. The vendor package exports an authenticated HTTP client factory with an 
 created: 2026-09-24 20:11
 ---
 2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). Opsgenie business operations move to the adapters/ of their consumers: packages/oncall_sync (moving to features/oncall_sync in TASK-124.2) and the incident surfaces.
+---
+
+created: 2026-09-25 15:00
+---
+2026-09-25: whether the scheduled integration_healthchecks probe for this vendor survives is decided by TASK-127 (split from TASK-92). Migrate the probe's call path only; do not add or redesign a vendor probe here.
 ---
 <!-- COMMENTS:END -->

@@ -6,14 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-28 16:29'
-updated_date: '2026-09-24 20:07'
+updated_date: '2026-09-25 15:00'
 labels:
   - architecture
   - reliability
   - layers
 milestone: m-4
 dependencies:
-  - TASK-6
+  - TASK-127
 references:
   - decisions/reliability.md
   - decisions/plugins.md
@@ -74,5 +74,10 @@ created: 2026-09-14 15:27
 created: 2026-09-24 20:07
 ---
 2026-09-24 alignment with decisions/plugin-architecture.md: the widened BackgroundJobRegistry Protocol is the scheduler contract and moves to app/contracts/ with the hookspecs (TASK-107). The runtime that applies safe_run and the Tier-2 lease moves to app/server/scheduler/ (TASK-52, rescoped: server/, not infrastructure/). The lease comes from the coordination contract (TASK-58). This task still lands in place under app/jobs/ first, as planned; its placeholder reference 'TASK-B' is TASK-65.
+---
+
+created: 2026-09-25 15:00
+---
+2026-09-25: TASK-92 was narrowed to the service health model; the fate of integration_healthchecks moved to TASK-127, now a dependency. Re-check AC#4 against TASK-127 before planning.
 ---
 <!-- COMMENTS:END -->

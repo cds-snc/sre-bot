@@ -34,13 +34,13 @@ A system reached in more than one role holds one least-privilege credential per 
 
 **Environment variables carry only secrets and deployment identity.** Identity is `ENVIRONMENT` plus values the platform injects (such as `GIT_SHA`). Everything else is in the configuration files.
 
-**Plugin enablement lives in the configuration files.** Every plugin's entry point has an enablement key in the base file; an environment file may override it. The host skips a disabled plugin before registering it ([plugins.md](plugins.md)).
+**Plugin enablement lives in the configuration files.** Every plugin's entry point has an enablement key in the base file; an environment file may override it. The host skips a disabled plugin before registering it and never validates its settings slice ([plugins.md](plugins.md)).
 
 **Runtime flags use OpenFeature.** Gradual rollout or a kill switch without a deploy uses [OpenFeature](https://openfeature.dev/) with the self-hosted flagd provider, added only when a feature needs one. Configuration files are not reloaded at runtime.
 
 **Environment identity.** `ENVIRONMENT: Literal["local", "ci", "dev", "staging", "production"]` is the only source of "which deployment am I?". Deriving it from hostnames, prefixes or `sys.modules` is prohibited. Security-relevant toggles (dev bypass) also need their own explicit boolean that defaults off: two independent guards. Command naming, so a dev and a prod bot coexist in one Slack workspace, is a transport setting (`COMMAND_PREFIX`) and is never derived from `ENVIRONMENT` ([transport-slack.md](transport-slack.md)).
 
-**Fail fast.** Every slice validates in lifespan's configuration phase ([lifecycle.md](lifecycle.md)); an invalid file or a missing required secret fails boot with a message naming the key.
+**Fail fast, on static checks only.** Every slice validates in lifespan's configuration phase ([lifecycle.md](lifecycle.md)); an invalid file or a missing required secret fails boot with a message naming the key. A setting a feature needs only when it is enabled is required by that feature's slice, which is validated only when the plugin is enabled. An invalid feature slice skips that feature; an invalid host or capability slice fails boot ([plugins.md](plugins.md)). Validation checks presence and shape and never calls a service. Whether a credential actually works is the plugin's credential check, run after registration ([lifecycle.md](lifecycle.md)). `access/request`'s `ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG` validator is the pattern.
 
 **Secrets.** Secret material resolves through the secrets contract ([cloud-portability.md](cloud-portability.md)) or is injected by the platform at deploy time (ECS task-definition `secrets:` from Secrets Manager). Plain environment-variable secrets are tolerated, not the target. Secrets never appear in configuration files, defaults, logs ([observability.md](observability.md)) or `repr`. JWKS refreshes at runtime; static secrets rotate by redeploy.
 
@@ -60,20 +60,23 @@ A system reached in more than one role holds one least-privilege credential per 
 - CI: each key is owned by exactly one settings slice.
 - CI: no secret-shaped key (token, password, key) appears in a configuration file.
 - Boot test: every plugin entry point has an enablement key in the base file.
+- Boot test: a disabled plugin's slice is never validated; an enabled feature with a missing required key is skipped with an event naming the key.
 - Boot test: missing required secret → clean failure naming it.
 - grep: no environment derivation outside `ENVIRONMENT`; no `os.environ` reads outside settings classes.
 - Review: no feature or capability reads an environment variable directly.
 
 ## Migration
 
-Ticket: TASK-24 (single home per vendor, `SecuritySettings` slice). Configuration files and TOML loading are a ticket to create ([plugin-architecture.md](plugin-architecture.md)).
+Tickets: TASK-24 (single home per vendor, `SecuritySettings` slice), TASK-111 (configuration files and TOML loading).
 
 Tolerated until closed:
 - dual vendor homes in `infrastructure/configuration/integrations/` and `integrations/<vendor>/settings.py`;
 - feature slices in `infrastructure/configuration/features/`;
 - security settings split across `AppSettings` and `ServerSettings`;
 - all non-secret settings, and feature and job switches, read from environment variables;
-- plain environment-variable secrets.
+- plain environment-variable secrets;
+- production values held in the `sre-bot-config` and `sre-bot-config-infrastructure` SSM parameters, which `app/bin/entry.sh` writes to `.env` at container start and terraform reads but does not manage.
 
 **Changes:**
 - 2026-09-24: Migration names epic tickets only; values move to per-environment TOML files with plugin enablement, and the closed `PREFIX` and aggregator items are removed.
+- 2026-09-25: settings validation stays static and runs only for enabled plugins; an invalid feature slice skips that feature; credential validity is a separate boot check.

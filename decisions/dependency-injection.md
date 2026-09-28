@@ -14,7 +14,7 @@ Features need core services (storage, queue, coordination, secrets, scheduler, t
 Current code:
 - Each infrastructure service exposes a module-level provider function (`get_storage_service()`, `get_event_dispatcher()`, `get_directory_provider()`), and features import these directly from `infrastructure.*`. `packages/access/request/providers.py`, for example, calls `get_storage_service()` and `get_event_dispatcher()`.
 - Feature `providers.py` files (`access/*`, `incident_draft`, `oncall_sync`, `user_rotations`) build service objects in `@lru_cache` functions, so each is process-global state that tests must reset.
-- Construction is lazy, on first call. Lifespan warms up a few services explicitly (JWKS, directory, translator) and each feature's `startup_warmup` hookimpl warms its own; nothing guarantees every service is built before traffic.
+- Construction is lazy, on first call. Lifespan builds a few services explicitly (JWKS clients, directory, translator) and each feature's `startup_warmup` hookimpl builds its own; nothing guarantees every service is built before traffic. Two of these paths call the network while building a service, which the Decision below forbids: the opt-in directory warmup and `access/sync`'s AWS adapter, whose client factory assumes a role through STS.
 - Routes rarely use `Depends()`; most call provider functions inline.
 
 [svcs](https://svcs.hynek.me/) (26.x) is a small, typed service locator: a registry maps a type to a factory, and a container scoped to one unit of work resolves services from it (`get`, async `aget`) and runs their cleanup when the scope closes. Its FastAPI integration builds the registry in lifespan and gives each request its own container.
@@ -23,7 +23,9 @@ Current code:
 
 **The host registers core services by contract in an svcs registry.** At startup `server/` registers one factory per `contracts` Protocol (`registry.register_factory(StorageService, ...)`). The Protocol is the key; the concrete class name appears only in the host's registration code. Nothing outside `server/` imports a provider module or an `infrastructure` implementation.
 
-**Construction is validated eagerly at boot.** After registration, lifespan resolves every registered service once from a startup container and runs its health check. A missing setting or a failing constructor aborts boot before `yield` ([lifecycle.md](lifecycle.md)); nothing is first built mid-request.
+**Construction is validated eagerly at boot, without network I/O.** After registration, lifespan resolves every registered service once from a startup container. That boot check is construction plus static validation of the service's settings slice. A missing setting or a failing constructor aborts boot before `yield` ([lifecycle.md](lifecycle.md)); nothing is first built mid-request. A factory never calls its backing service while constructing it, so the check cannot fail because a dependency is down.
+
+**Pings are diagnostics, not boot checks.** A factory may register an svcs `ping` ([health checks](https://svcs.hynek.me/en/stable/core-concepts.html)) that calls its backing service. Pings are never run by the container, load-balancer or DNS health checks ([health-checks.md](health-checks.md)). A service that should report broken credentials at boot declares a classified credential check instead, which alerts and never aborts ([lifecycle.md](lifecycle.md)).
 
 **Entry points take services from a container scoped to that call:**
 - HTTP routes use the svcs FastAPI integration: a `svcs.fastapi.DepContainer` parameter, then `await services.aget(StorageService)`. The container closes with the request, running factory cleanup.
@@ -48,18 +50,20 @@ Current code:
 
 - import-linter `forbidden`: nothing outside `server/` imports provider modules or `infrastructure` implementations ([plugin-architecture.md](plugin-architecture.md)).
 - Boot test: a registered factory that raises aborts lifespan before `yield`.
+- Boot test: resolving every registered service opens no outbound connection (`socket.connect` spy).
 - grep: no `@lru_cache` provider function under `features/` or `capabilities/` is imported from another package.
 - Review: services take dependencies in `__init__`; `get`/`aget` calls appear only in entry points and host code.
 
 ## Migration
 
-Tickets: TASK-18 (contracts and import boundaries). A separate ticket, still to create, introduces the registry in `server/`.
+Tickets: TASK-18 (contracts and import boundaries), TASK-109 (the registry in `server/`).
 
 Tolerated until closed:
 - features importing `infrastructure` provider functions (`get_storage_service`, `get_event_dispatcher` and the other `get_*` functions);
 - `@lru_cache` providers in feature `providers.py` files, and the global cache resets tests need for them;
-- lazy first-call construction, with warmup done piecemeal in lifespan and `startup_warmup` hookimpls;
+- lazy first-call construction, with warmup done piecemeal in lifespan and `startup_warmup` hookimpls, two of which call the network while building a service (removed by TASK-98 and TASK-128);
 - routes calling provider functions inline instead of taking a container.
 
 **Changes:**
 - 2026-09-24: replaced cached provider functions with an svcs registry of contract-keyed factories, resolved per call at entry points.
+- 2026-09-25: the boot check is construction and static validation with no network I/O; svcs pings are diagnostics; credential checks alert and never abort.

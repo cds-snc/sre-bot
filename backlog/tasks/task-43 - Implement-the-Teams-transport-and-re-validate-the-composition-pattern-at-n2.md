@@ -4,7 +4,7 @@ title: Implement the Teams transport and re-validate the composition pattern at 
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-24 20:10'
+updated_date: '2026-09-25 17:06'
 labels:
   - teams
   - phase-6
@@ -42,6 +42,12 @@ BLOCKED until task-42 lands.
 - [ ] #1 Smoke tests for the Teams surface
 - [ ] #2 PR references decisions/platform-transports.md
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-25: decisions/workplace-systems.md, people-and-accounts.md and platform-entrypoints.md are Accepted. Earlier mentions of their Draft status in this task are historical.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

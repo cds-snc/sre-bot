@@ -4,7 +4,7 @@ title: One settings home per vendor; introduce the SecuritySettings slice
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-24 20:10'
+updated_date: '2026-09-25 15:54'
 labels:
   - clients
   - phase-3
@@ -28,7 +28,7 @@ Steps:
 1. Per vendor: keep app/integrations/<vendor>/settings.py as the single home (credentials live with the client); migrate any fields only present in the old file; delete infrastructure/configuration/integrations/<vendor>.py; update consumers.
 2. Wire app/infrastructure/security/settings.py as the real SecuritySettings slice (allowed issuers/JWKS, CORS allow-list, rate-limit storage backend, dev-bypass flag) and move those fields off ServerSettings - or delete the file if tasks 2/4 already created the slice elsewhere; one home either way.
 3. Namespaced env names (SLACK__..., AWS__...) via env_nested_delimiter; one env var has exactly one owning class.
-4. Fail fast: settings validate at provider import during lifespan phase 2; missing credential fails boot naming the variable.
+4. Fail fast: settings validate in lifespan's configuration phase (decisions/configuration.md, lifecycle.md phase 1), statically: presence and shape only, never a call to test a credential. A missing credential fails validation naming the variable; decisions/plugins.md decides the effect (a feature's slice skips that feature, a host or capability slice aborts boot).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

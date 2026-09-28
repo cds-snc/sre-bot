@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-04 14:19'
-updated_date: '2026-09-24 20:11'
+updated_date: '2026-09-25 17:06'
 labels:
   - layering
 milestone: m-3
@@ -51,6 +51,12 @@ Do the decision work before the code; this is architecture-mode work first. It i
 - [ ] #4 Each of the three existing hand-maintained domain constants is dispositioned as derived, retained-as-policy, or retired, with the disposition recorded
 - [ ] #5 mypy, ruff and the full non-smoke pytest run are green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-25: decisions/workplace-systems.md, people-and-accounts.md and platform-entrypoints.md are Accepted. Earlier mentions of their Draft status in this task are historical. people-and-accounts.md links a Slack or Backstage account through the sso_email rule only when the email is in an allowed domain of a trusted IdP. That allowed-domain list is organization-owned domain data, so this task's IdP-authoritative domain capability should feed it instead of a separate hand-maintained setting.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

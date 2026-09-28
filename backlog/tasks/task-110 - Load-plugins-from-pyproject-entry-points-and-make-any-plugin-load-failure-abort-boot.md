@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
+updated_date: '2026-09-25 15:54'
 labels:
   - plugin-architecture
   - plugins
@@ -35,7 +36,7 @@ Scope:
 - use dotted names for umbrella subdomains ("access.request");
 - targets are the current flat import paths (packages.*) and are repointed to features.* or capabilities.* by each package move;
 - replace the filesystem walk with load_setuptools_entrypoints;
-- make import errors and raising hookimpls fatal;
+- make import errors and raising hookimpls fatal in every layer (decisions/plugins.md); skipping a feature with invalid settings and the credential checks are TASK-126, which builds on this;
 - add the CI check that every package shipping hookimpls has an entry-point line;
 - running from bare, unsynced source loads zero plugins and fails loudly.
 

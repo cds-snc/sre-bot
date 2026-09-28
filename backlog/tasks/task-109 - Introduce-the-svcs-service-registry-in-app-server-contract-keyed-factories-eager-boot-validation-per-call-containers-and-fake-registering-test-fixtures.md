@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:58'
+updated_date: '2026-09-25 15:00'
 labels:
   - plugin-architecture
   - dependency-injection
@@ -31,14 +32,14 @@ decisions/dependency-injection.md replaces cached module-level provider function
 
 Decision points implemented here:
 - At startup app/server/ registers one factory per contracts Protocol (storage, coordination to start). The Protocol is the key; the concrete class appears only in the host's registration code.
-- Eager validation: lifespan resolves every registered service once from a startup container and runs its health check. A missing setting or a failing constructor aborts boot before yield (decisions/lifecycle.md phase 2).
+- Eager validation: lifespan resolves every registered service once from a startup container. The boot check is construction plus static validation of the settings slice, with no network I/O (decisions/dependency-injection.md, lifecycle.md phase 2). A missing setting or a failing constructor aborts boot before yield. A factory may register an svcs ping for diagnostics; pings never run at boot or behind the platform health checks.
 - HTTP routes use the svcs FastAPI integration (DepContainer, await services.aget(Protocol)).
 - Slack handlers, webhook consumers and jobs open a container per invocation and close it when the invocation ends.
 - Only entry points touch a container. Services receive their dependencies through their constructor.
 - Tests build a registry and register Protocol-conforming fakes. No test clears global caches.
 - Adds the import-linter forbidden contract "nothing outside server/ imports provider modules or infrastructure implementations", seeded with today's violations as ignore entries.
 
-Out of scope: moving each consumer off its infrastructure get_* provider. Each package does that when it moves to app/features/ or app/capabilities/, so no package runs half on providers and half on the registry. Depends on TASK-92 for which health checks run at boot and which vendor checks stay out of readiness.
+Out of scope: moving each consumer off its infrastructure get_* provider. Each package does that when it moves to app/features/ or app/capabilities/, so no package runs half on providers and half on the registry. TASK-92 decided the boot-check rule (2026-09-25): construction and static validation only; no vendor or dependency call at boot or in readiness.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -49,4 +50,5 @@ Out of scope: moving each consumer off its infrastructure get_* provider. Each p
 - [ ] #4 A test fixture registers fakes against contracts Protocols; no fixture clears provider caches for registry-resolved services
 - [ ] #5 The import-linter forbidden contract for provider modules exists, with current violations as ignore entries and unmatched alerting on
 - [ ] #6 decisions/dependency-injection.md Migration names this ticket; ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #7 Boot test: resolving every registered service opens no outbound connection (socket.connect spy)
 <!-- AC:END -->

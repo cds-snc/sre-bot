@@ -4,11 +4,11 @@ title: Resolve Slack callers to people at the entry point in shadow mode
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
-updated_date: '2026-09-24 20:08'
+updated_date: '2026-09-25 17:06'
 labels:
   - identity
 dependencies:
-  - TASK-83.7
+  - TASK-83.6
   - TASK-26.2
 references:
   - decisions/platform-entrypoints.md
@@ -21,9 +21,9 @@ ordinal: 175000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-decisions/platform-entrypoints.md (Draft) moves caller resolution to the platform entry point in app/server/<platform>/.
+decisions/platform-entrypoints.md (Accepted 2026-09-25) moves caller resolution to the platform entry point in app/server/<platform>/.
 
-In shadow mode, handlers receive the resolved person as optional context, but no behavior changes, so resolution coverage can be measured safely. This depends on TASK-26 being re-scoped to, and completed under, the entry point split.
+In shadow mode, handlers receive the resolved person as optional context, but no behavior changes, so resolution coverage can be measured safely. A first-seen full SSO member is linked on the request through the sso_email rule (decisions/people-and-accounts.md). An unlinked caller is never refused at the entry point. This depends on TASK-26 being completed under the entry point split.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
