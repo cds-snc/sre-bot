@@ -6,7 +6,4 @@ from .incident import (
 )
 from .role import role  # noqa: F401
 from .secret import secret  # noqa: F401
-from .sre import (
-    sre,  # noqa: F401
-    webhook_helper,  # noqa: F401
-)
+from .sre import webhook_helper  # noqa: F401

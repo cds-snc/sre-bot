@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-05 16:13'
-updated_date: '2026-09-28 14:55'
+updated_date: '2026-09-28 20:19'
 labels:
   - clients
   - phase-3
@@ -75,7 +75,7 @@ Steps:
 2. app/integrations/slack/client.py — replace SlackClientManager with:
    - get_slack_web_client(*, token_kind: Literal["bot", "user"] = "bot") -> WebClient: builds sync RetryHandlers list (Connection/RateLimit/ServerError, max_retry_count=settings.RETRY_MAX_ATTEMPTS) once, selects BOT_TOKEN or USER_TOKEN, sets timeout=settings.REQUEST_TIMEOUT_SECONDS. Built per call, not cached (matches get_aws_client; callers that want sharing cache at their own call site, as packages/oncall_sync/providers.py already does with @lru_cache).
    - get_async_slack_web_client(*, token_kind: Literal["bot"] = "bot") -> AsyncWebClient: same shape with AsyncRetryHandlers, bot token only (no current async-user-token consumer).
-   - classify_slack_error(exc: Exception) -> tuple[OperationStatus, str | None, int | None]: only classifies SlackApiError; anything else re-raised. Reads exc.response.get("error") as the code. Maps code against settings.UNAUTHORIZED_ERRORS -> UNAUTHORIZED, settings.NOT_FOUND_ERRORS -> NOT_FOUND, settings.TRANSIENT_ERRORS -> TRANSIENT_ERROR with retry_after honouring the Retry-After header (exc.response.headers.get("Retry-After") when present, else settings.TRANSIENT_RETRY_AFTER_SECONDS) — AC#1 requires Retry-After to be honoured specifically for rate limiting. Unmapped codes re-raise exc. Import OperationStatus from infrastructure.operations (same home AWS/MaxMind/Google use today; contracts/ doesn't exist until TASK-106). No OperationResult import in this module (AC#1).
+   - classify_slack_error(exc: Exception) -> tuple[OperationStatus, str | None, int | None]: only classifies SlackApiError; anything else re-raised. Reads exc.response.get("error") as the code. Maps code against settings.UNAUTHORIZED_ERRORS -> UNAUTHORIZED, settings.NOT_FOUND_ERRORS -> NOT_FOUND, settings.TRANSIENT_ERRORS -> TRANSIENT_ERROR with retry_after honouring the Retry-After header (exc.response.headers.get("Retry-After") when present, else settings.TRANSIENT_RETRY_AFTER_SECONDS) — AC#1 requires Retry-After to be honoured specifically for rate limiting. Unmapped codes re-raise exc. Import OperationStatus from contracts.operations.status (same import AWS and Google use today). client.py imports only slack_sdk, structlog, integrations.slack.settings and contracts.operations.status, so it passes import-linter contract (d) without new ignore_imports entries. No OperationResult import in this module (AC#1).
    - Module docstring records the sharing/thread-safety decision (AC#4): slack_sdk clients are built per call and never cached inside the factory; a caller that wants one shared instance wraps the factory call in its own cached provider, exactly as packages/oncall_sync/providers.py already does.
 
 3. app/integrations/slack/bootstrap.py — SlackBootstrap.__init__ calls self.web = get_async_slack_web_client() instead of constructing AsyncWebClient directly (drop the inline retry_handlers list, now built inside the factory). LegacySlackBootstrap.__init__ calls self.web = get_slack_web_client() instead of constructing WebClient directly. create_app() methods on both classes are unchanged — TASK-26 still owns moving the Bolt App construction itself. These two sites already had retry handlers before this change, so behaviour is unchanged here.

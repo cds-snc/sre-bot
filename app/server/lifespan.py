@@ -47,7 +47,6 @@ from modules import (
     incident_helper,
     role,
     secret,
-    sre,
     webhook_helper,
 )
 
@@ -99,7 +98,6 @@ def _register_legacy_handlers(bot: App, logger: BoundLogger) -> None:
     atip.register(bot)
     aws.register(bot)
     secret.register(bot)
-    sre.register(bot)
     webhook_helper.register(bot)
     incident.register(bot)
     incident_helper.register(bot)
