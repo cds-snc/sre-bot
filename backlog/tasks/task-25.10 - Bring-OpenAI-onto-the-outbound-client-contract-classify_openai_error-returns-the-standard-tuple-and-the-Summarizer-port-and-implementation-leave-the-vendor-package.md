@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 16:51'
-updated_date: '2026-09-24 20:10'
+updated_date: '2026-09-28 14:55'
 labels:
   - clients
   - phase-3
@@ -63,5 +63,10 @@ TARGET. integrations/openai/ exports build_openai_client (timeout plus a retry p
 created: 2026-09-24 20:10
 ---
 2026-09-24 (human decision): the Summarizer's home is decided during this task's planning. decisions/plugin-architecture.md narrows the options to two, and app/infrastructure/ is not one of them (hosting-only). (a) Per-subdomain adapters: features/incident/draft and features/incident/summary each own a small adapters/openai.py behind their own port. Subdomains may not import each other, and common/ holds no I/O, so one shared adapter inside the incident umbrella is not an option. (b) A summarization capability at app/capabilities/summarization/ with api.py, justified only if it passes the three capability tests. TASK-124.5 (incident umbrella move) depends on this task, so the Summarizer moves once, to its final home.
+---
+
+created: 2026-09-28 14:55
+---
+2026-09-28: classify_openai_error today returns OperationResult with error_code UNAUTHORIZED/FORBIDDEN literals. When moving it onto the outbound-client tuple contract, emit ErrorCode registry members (TASK-105.2), using UNAUTHENTICATED for 401 and FORBIDDEN for 403, consistent with the AWS/Google follow-up task.
 ---
 <!-- COMMENTS:END -->

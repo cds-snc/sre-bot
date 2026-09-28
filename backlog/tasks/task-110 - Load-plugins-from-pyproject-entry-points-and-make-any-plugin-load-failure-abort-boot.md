@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-09-25 15:54'
+updated_date: '2026-09-28 14:44'
 labels:
   - plugin-architecture
   - plugins
@@ -54,3 +54,12 @@ legacy modules/: they keep their hand-written registration until each surface is
 - [ ] #5 decisions/plugins.md and decisions/lifecycle.md drop the filesystem-walk tolerance in the same PR
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-09-28 14:44
+---
+2026-09-28 (from TASK-35 planning): modules/sre and modules/dev register their /sre subcommands ONLY through register_slack_commands hookimpls (modules/sre/__init__.py, modules/dev/__init__.py -> platforms/slack.py register_commands(provider)); the legacy modules/sre/sre.py root-command wrapper is dead (provider registers /sre first, Bolt dispatch is first-match) and TASK-35 deletes it. Moving sre back onto _register_legacy_handlers() is not an option: the provider would have no sre subcommands. So when this task removes the pkgutil walk, it must keep modules.sre and modules.dev registered via the hand-written legacy registration that decisions/plugins.md reserves for modules/ until each surface is rebuilt (explicit registration of those two modules in startup, not new modules.* entry points), and cover it with a test. Planning must decide how that squares with 'pm.register() for a first-party plugin appears only in test fixtures'.
+---
+<!-- COMMENTS:END -->
