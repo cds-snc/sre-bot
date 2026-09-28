@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from integrations.slack.models import CommandPayload, CommandResponse
 from packages.geolocate.platforms.slack import handle_geolocate_command
 

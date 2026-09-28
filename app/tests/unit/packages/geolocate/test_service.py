@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from packages.geolocate.service import geolocate_ip
 
 

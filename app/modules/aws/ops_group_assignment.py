@@ -2,8 +2,8 @@ import json
 
 import structlog
 
+from contracts.operations import OperationStatus
 from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
-from infrastructure.operations import OperationStatus
 from packages.aws_platform.adapters.identity_center import build_identity_center_adapter
 from packages.aws_platform.adapters.organizations import build_organizations_adapter
 from packages.aws_platform.adapters.sso_admin import build_sso_admin_adapter

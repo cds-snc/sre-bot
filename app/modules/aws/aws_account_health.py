@@ -6,7 +6,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from slack_bolt import Ack
 from slack_sdk import WebClient
 
-from infrastructure.operations import OperationResult
+from contracts.operations import OperationResult
 from packages.aws_platform.adapters.config import ConfigAdapter, build_config_adapter
 from packages.aws_platform.adapters.cost_explorer import CostExplorerAdapter, build_cost_explorer_adapter
 from packages.aws_platform.adapters.guard_duty import GuardDutyAdapter, build_guard_duty_adapter

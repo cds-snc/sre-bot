@@ -6,8 +6,8 @@ returning raw identity_store dicts.
 
 import pytest
 
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.directory.models import DirectoryUser
-from infrastructure.operations import OperationResult, OperationStatus
 from modules.provisioning import users
 
 _ERROR_CODE = "quotaExceeded"

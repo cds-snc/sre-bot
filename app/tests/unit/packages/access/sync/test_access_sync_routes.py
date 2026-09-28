@@ -7,8 +7,8 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.idempotency import IdempotencySettings, InMemoryIdempotencyStore
-from infrastructure.operations import OperationResult, OperationStatus
 from infrastructure.security import get_current_user
 from infrastructure.security.models import AuthPrincipalSource, User
 from packages.access.sync.domain import SyncOutcome

@@ -17,7 +17,7 @@ from googleapiclient.errors import HttpError
 from googleapiclient.http import HttpRequest
 from pydantic import ValidationError
 
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.status import OperationStatus
 
 
 def _http_error(status: int, reason: str = "boom", retry_after: str | None = None) -> HttpError:

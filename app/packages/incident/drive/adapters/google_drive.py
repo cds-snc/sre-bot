@@ -10,11 +10,11 @@ from typing import TYPE_CHECKING, Any, cast
 import structlog
 from googleapiclient.errors import HttpError
 
+from contracts.operations import OperationResult
 from infrastructure.configuration.integrations.google import get_google_resources_config
 from infrastructure.drive import DRIVE_SCOPES
 from infrastructure.drive.factory import get_drive_provider
 from infrastructure.drive.models import DriveFile
-from infrastructure.operations import OperationResult
 from integrations.google_workspace import client as google_workspace_client
 
 if TYPE_CHECKING:

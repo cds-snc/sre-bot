@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 import pytest
 from fastapi import HTTPException
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.security.models import AuthPrincipalSource, User
 from packages.access.request.domain import AccessRequest, ApprovalDecision
 from packages.access.request.interactions.http import (

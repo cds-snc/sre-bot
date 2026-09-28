@@ -23,7 +23,7 @@ Established practice separates these concerns:
 - An interface shared by many consumers belongs in a neutral package that both the consumer and the implementation depend on ([Separated Interface](https://martinfowler.com/eaaCatalog/separatedInterface.html)).
 
 Current state:
-- Features import `infrastructure` Protocols and provider functions directly ([dependency-injection.md](dependency-injection.md)). `infrastructure.operations` is the only declared shared kernel.
+- Features import `infrastructure` Protocols and provider functions directly ([dependency-injection.md](dependency-injection.md)). `contracts.operations` (`OperationResult`, `OperationStatus`, `ErrorCode`) is the only shared kernel so far.
 - No entry points are declared yet; plugin discovery walks `app/packages/`. No module path or class name is stored as data, so moving a package changes imports only.
 - Legacy `modules/`, `jobs/` and `api/` import `packages/`, mostly `packages/aws_platform`.
 - [feature-packages.md](feature-packages.md) defines a package shape, but nothing enforces it, and the legacy modules predate it. `modules/sre/` and `modules/aws/` became grab-bags, and `modules/incident/` is built around Google Workspace resources rather than around the incident itself.
@@ -124,7 +124,6 @@ Tickets to create:
 Tolerated until then:
 - features importing `infrastructure` providers;
 - framework and workplace code in `infrastructure/`;
-- `OperationResult` in `infrastructure/operations/`;
 - the DynamoDB `RetryStore` used as a queue;
 - the blinker-backed event dispatcher, used only by `access/request` and `access/sync`, which are rebuilt anyway;
 - feature switches and settings read from environment variables;
@@ -133,3 +132,4 @@ Tolerated until then:
 
 **Changes:**
 - 2026-09-24: accepted; the layers, capability-packages and events records are deleted and the related records rewritten to match.
+- 2026-09-28: TASK-106 created `app/contracts/` with `contracts/operations/` and import-linter contract (c); `OperationResult` is no longer a tolerated divergence.

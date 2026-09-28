@@ -9,7 +9,7 @@ See: decisions/operation-result.md
 
 from dataclasses import dataclass, field
 
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.status import OperationStatus
 
 
 @dataclass(frozen=True)

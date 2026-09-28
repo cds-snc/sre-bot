@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from packages.incident_draft.domain import (
     AI_AUTHOR,
     DocumentSection,

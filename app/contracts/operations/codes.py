@@ -3,7 +3,7 @@
 Every SCREAMING_SNAKE ``error_code`` produced by production code is a member
 here; adding a code is a reviewed one-line change. Call sites may keep plain
 string literals: ``StrEnum`` members are ``str`` instances and compare equal to
-their value. ``tests/unit/infrastructure/operations/test_error_code_registry.py``
+their value. ``tests/unit/contracts/operations/test_error_code_registry.py``
 fails on any static ``error_code`` literal that is not registered.
 
 Out of scope: the raw botocore codes from ``integrations/aws/client.py`` and the

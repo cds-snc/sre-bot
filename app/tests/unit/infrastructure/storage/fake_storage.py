@@ -5,8 +5,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from infrastructure.operations.result import OperationResult
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.result import OperationResult
+from contracts.operations.status import OperationStatus
 
 
 class FakeStorageService:

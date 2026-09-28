@@ -3,7 +3,7 @@
 import structlog
 from fastapi import APIRouter, HTTPException, Query
 
-from infrastructure.operations import OperationStatus
+from contracts.operations import OperationStatus
 from packages.geolocate.schemas import GeolocateRequest, GeolocateResponse
 from packages.geolocate.service import geolocate_ip
 

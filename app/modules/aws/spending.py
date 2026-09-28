@@ -7,10 +7,10 @@ import pandas as pd
 import structlog
 from pandas.core.frame import DataFrame
 
+from contracts.operations import OperationResult
 from infrastructure.configuration.integrations.google import (
     get_google_resources_config,
 )
-from infrastructure.operations import OperationResult
 from infrastructure.spreadsheets import get_spreadsheet_provider
 from packages.aws_platform.adapters.cost_explorer import CostExplorerAdapter, build_cost_explorer_adapter
 from packages.aws_platform.adapters.organizations import OrganizationsAdapter, build_organizations_adapter

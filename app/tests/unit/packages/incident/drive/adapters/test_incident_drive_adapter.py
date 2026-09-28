@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from googleapiclient.errors import HttpError
 
+from contracts.operations import OperationResult
 from infrastructure.drive.models import DriveFile
-from infrastructure.operations import OperationResult
 
 
 def _http_error(status: int) -> HttpError:

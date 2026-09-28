@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrastructure.operations import OperationStatus
+from contracts.operations import OperationStatus
 from modules.slack import webhooks
 from modules.sre import webhook_helper
 

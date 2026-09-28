@@ -16,8 +16,8 @@ import structlog
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 from botocore.exceptions import BotoCoreError, ClientError
 
-from infrastructure.operations.result import OperationResult
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.result import OperationResult
+from contracts.operations.status import OperationStatus
 from infrastructure.storage.protocol import StorageService
 from integrations.aws.client import classify_aws_error, get_aws_client
 

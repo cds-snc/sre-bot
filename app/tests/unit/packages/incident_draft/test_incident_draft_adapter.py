@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from googleapiclient.errors import HttpError
 
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.status import OperationStatus
 from integrations.google_workspace import client as google_workspace_client
 from packages.incident_draft.adapters.google_docs import GoogleDocsIncidentDocument
 from packages.incident_draft.domain import DocumentField, DocumentSection, SectionDraft

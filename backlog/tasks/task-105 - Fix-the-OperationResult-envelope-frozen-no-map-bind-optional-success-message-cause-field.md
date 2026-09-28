@@ -3,10 +3,10 @@ id: TASK-105
 title: >-
   Fix the OperationResult envelope: frozen, no map/bind, optional success
   message, cause field
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-24 19:57'
-updated_date: '2026-09-28 15:37'
+updated_date: '2026-09-28 17:17'
 labels:
   - plugin-architecture
   - operation-result

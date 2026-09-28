@@ -15,7 +15,7 @@ from typing import Annotated, Protocol
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Response, Security
 
-from infrastructure.operations import OperationResult
+from contracts.operations import OperationResult
 from infrastructure.security import get_current_user
 from infrastructure.security.models import User
 from packages.access.sync.interactions.ingress import (

@@ -27,7 +27,7 @@ Scenarios covered:
 import pytest
 from botocore.exceptions import ClientError
 
-from infrastructure.operations import OperationStatus
+from contracts.operations import OperationStatus
 from packages.access.sync.domain import AdapterAssessment
 
 pytestmark = pytest.mark.integration

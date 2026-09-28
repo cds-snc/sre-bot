@@ -3,8 +3,8 @@
 import json
 from dataclasses import dataclass, field
 
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.directory.models import DirectoryGroup, MembershipCheckResult
-from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.catalog import providers as catalog_providers
 from packages.access.catalog.domain import ParsedEntitlementToken
 from packages.access.catalog.service import CatalogService

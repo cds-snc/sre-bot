@@ -2,7 +2,7 @@
 
 from typing import Any, Protocol, runtime_checkable
 
-from infrastructure.operations import OperationResult
+from contracts.operations import OperationResult
 from infrastructure.spreadsheets.models import SheetCell
 
 

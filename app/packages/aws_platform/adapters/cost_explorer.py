@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 from botocore.exceptions import BotoCoreError, ClientError
 
-from infrastructure.operations import OperationResult
+from contracts.operations import OperationResult
 from integrations.aws.client import classify_aws_error, get_aws_client
 from integrations.aws.settings import get_aws_settings
 

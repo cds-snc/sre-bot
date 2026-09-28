@@ -4,7 +4,7 @@ from unittest.mock import ANY, MagicMock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.spreadsheets import RANGE_NOT_FOUND, SheetCell
 from modules.incident import incident_folder
 from packages.aws_platform.adapters.dynamodb import DynamoDBAdapter

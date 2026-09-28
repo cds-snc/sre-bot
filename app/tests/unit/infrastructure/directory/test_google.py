@@ -10,6 +10,7 @@ import pytest
 from googleapiclient.errors import HttpError
 from structlog.testing import capture_logs
 
+from contracts.operations.status import OperationStatus
 from infrastructure.directory import models as directory_models
 from infrastructure.directory.google import GoogleDirectoryProvider
 from infrastructure.directory.models import (
@@ -19,7 +20,6 @@ from infrastructure.directory.models import (
     MembershipCheckResult,
 )
 from infrastructure.directory.provider import DirectoryProvider
-from infrastructure.operations.status import OperationStatus
 
 # Contract values asserted by the batch tests; the provider owns the constants.
 _MEMBERS_PAGE_SIZE = 200

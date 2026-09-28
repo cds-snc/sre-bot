@@ -6,7 +6,7 @@ infrastructure services. Concrete implementations can vary by backing store.
 
 from typing import Any, Protocol, runtime_checkable
 
-from infrastructure.operations.result import OperationResult
+from contracts.operations.result import OperationResult
 
 
 @runtime_checkable

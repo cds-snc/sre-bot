@@ -113,7 +113,7 @@ def test_main_fails_when_non_vendor_module_references_operation_result(tmp_path,
         {
             **COMPLIANT_VENDOR,
             "utils/__init__.py": "",
-            "utils/api.py": "from infrastructure.operations.result import OperationResult\n",
+            "utils/api.py": "from contracts.operations.result import OperationResult\n",
         },
     )
 
@@ -126,10 +126,10 @@ def test_main_fails_when_non_vendor_module_references_operation_result(tmp_path,
 @pytest.mark.parametrize(
     "source",
     [
-        pytest.param("from infrastructure.operations.result import OperationResult\n", id="from-import"),
-        pytest.param("from infrastructure.operations import OperationResult as R\n", id="aliased-import"),
+        pytest.param("from contracts.operations.result import OperationResult\n", id="from-import"),
+        pytest.param("from contracts.operations import OperationResult as R\n", id="aliased-import"),
         pytest.param(
-            "import infrastructure.operations as ops\n\n\ndef build() -> None:\n    ops.OperationResult\n",
+            "import contracts.operations as ops\n\n\ndef build() -> None:\n    ops.OperationResult\n",
             id="attribute-access",
         ),
         pytest.param("def build() -> OperationResult:\n    raise NotImplementedError\n", id="return-annotation"),
@@ -145,7 +145,7 @@ def test_find_current_violations_reports_operation_result_code_reference(tmp_pat
 @pytest.mark.parametrize(
     "source",
     [
-        pytest.param("from infrastructure.operations.result import OperationStatus\n", id="operation-status-import"),
+        pytest.param("from contracts.operations.result import OperationStatus\n", id="operation-status-import"),
         pytest.param('"""Classifies errors; never builds an OperationResult."""\n', id="module-docstring"),
         pytest.param("# Returns a tuple rather than an OperationResult.\nVALUE = 1\n", id="comment"),
     ],
@@ -189,7 +189,7 @@ def test_main_fails_when_baselined_extra_module_newly_references_operation_resul
     _use_tree(
         tmp_path,
         monkeypatch,
-        {**COMPLIANT_VENDOR, "vendor/extra.py": "from infrastructure.operations.result import OperationResult\n"},
+        {**COMPLIANT_VENDOR, "vendor/extra.py": "from contracts.operations.result import OperationResult\n"},
         baseline="module:integrations/vendor/extra.py\n",
     )
 
@@ -210,7 +210,7 @@ def test_find_current_violations_ignores_non_python_files_and_cache_directories(
         {
             **COMPLIANT_VENDOR,
             "vendor/README.md": "OperationResult\n",
-            "vendor/__pycache__/mirror.py": "from infrastructure.operations.result import OperationResult\n",
+            "vendor/__pycache__/mirror.py": "from contracts.operations.result import OperationResult\n",
         },
     )
 

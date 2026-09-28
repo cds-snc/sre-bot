@@ -9,7 +9,7 @@ Adapters must never raise exceptions across this boundary.
 
 from typing import TYPE_CHECKING, Protocol
 
-from infrastructure.operations import OperationResult
+from contracts.operations import OperationResult
 
 if TYPE_CHECKING:
     from packages.access.sync.domain import DesiredPlatformState, DesiredUserState

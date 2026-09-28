@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from infrastructure.operations import OperationStatus
+from contracts.operations import OperationStatus
 from packages.access.common.config import (
     BundleConfigLoader,
     EnvConfigLoader,

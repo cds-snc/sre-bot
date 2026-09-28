@@ -2,7 +2,7 @@ import json
 import uuid
 from unittest.mock import MagicMock, patch
 
-from infrastructure.operations import OperationStatus
+from contracts.operations import OperationStatus
 from models.incidents import Incident
 from modules.incident import db_operations, information_display
 

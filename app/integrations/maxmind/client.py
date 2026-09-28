@@ -8,8 +8,8 @@ import geoip2.database
 import structlog
 from geoip2.errors import AddressNotFoundError, GeoIP2Error
 
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
-from infrastructure.operations import OperationResult, OperationStatus
 
 if TYPE_CHECKING:
     from infrastructure.configuration.integrations.maxmind import MaxMindSettings

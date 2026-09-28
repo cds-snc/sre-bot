@@ -1,10 +1,10 @@
 ---
 id: TASK-105.2
 title: Create the error-code registry next to OperationResult
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-28 14:35'
-updated_date: '2026-09-28 16:05'
+updated_date: '2026-09-28 17:16'
 labels:
   - plugin-architecture
   - operation-result

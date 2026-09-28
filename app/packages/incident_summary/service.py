@@ -16,7 +16,7 @@ from dataclasses import dataclass
 
 import structlog
 
-from infrastructure.operations import OperationResult
+from contracts.operations import OperationResult
 from integrations.openai import Summarizer, get_summarizer
 
 logger = structlog.get_logger()

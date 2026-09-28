@@ -13,7 +13,7 @@ import httpx
 import pytest
 
 import integrations.openai.summarizer as summarizer_module
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.status import OperationStatus
 from integrations.openai.summarizer import OpenAISummarizer, Summarizer
 
 pytestmark = pytest.mark.unit

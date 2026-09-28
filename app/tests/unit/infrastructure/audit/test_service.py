@@ -10,10 +10,10 @@ from uuid import uuid4
 
 import pytest
 
+from contracts.operations.result import OperationResult
 from infrastructure.audit.models import AuditEvent
 from infrastructure.audit.protocol import AuditTrailService
 from infrastructure.audit.service import DynamoDBAuditTrailService
-from infrastructure.operations.result import OperationResult
 
 
 def _make_event(**kwargs) -> AuditEvent:

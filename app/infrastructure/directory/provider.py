@@ -2,6 +2,7 @@
 
 from typing import Protocol, runtime_checkable
 
+from contracts.operations import OperationResult
 from infrastructure.directory.models import (
     DirectoryGroup,
     DirectoryGroupsWithMembers,
@@ -9,7 +10,6 @@ from infrastructure.directory.models import (
     DirectoryUser,
     MembershipCheckResult,
 )
-from infrastructure.operations import OperationResult
 
 
 @runtime_checkable

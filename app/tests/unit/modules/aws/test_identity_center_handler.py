@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.directory.models import DirectoryUser
-from infrastructure.operations import OperationResult, OperationStatus
 from modules.aws import identity_center
 from modules.provisioning import users
 

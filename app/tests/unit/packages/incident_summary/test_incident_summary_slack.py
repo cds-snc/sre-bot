@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import structlog
 
-from infrastructure.operations import OperationResult
+from contracts.operations import OperationResult
 from integrations.slack.models import CommandPayload
 from packages.incident_summary.platforms.slack import (
     _fetch_transcript,

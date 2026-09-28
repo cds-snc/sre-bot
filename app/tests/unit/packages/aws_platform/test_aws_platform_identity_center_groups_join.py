@@ -15,7 +15,7 @@ import boto3
 import pytest
 from botocore.stub import Stubber
 
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.status import OperationStatus
 from packages.aws_platform.adapters.identity_center import IdentityCenterAdapter
 
 pytestmark = pytest.mark.unit

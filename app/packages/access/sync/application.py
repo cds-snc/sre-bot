@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING, Protocol
 
 import structlog
 
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.events import Event, EventDispatcher
-from infrastructure.operations import OperationResult, OperationStatus
 from packages.access.common.config import AccessRuntimeConfig
 from packages.access.sync import events as sync_events
 from packages.access.sync.adapters import AccessSyncAdapter

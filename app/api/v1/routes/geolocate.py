@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from infrastructure.operations import OperationStatus
+from contracts.operations import OperationStatus
 from infrastructure.security import get_limiter
 from integrations import maxmind
 from packages.geolocate.schemas import build_open_source_map_links

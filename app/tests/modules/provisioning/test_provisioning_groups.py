@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.directory.models import (
     DirectoryGroup,
     DirectoryGroupFailure,
@@ -10,7 +11,6 @@ from infrastructure.directory.models import (
     DirectoryMember,
     DirectoryUser,
 )
-from infrastructure.operations import OperationResult, OperationStatus
 from modules.provisioning import groups, users
 
 

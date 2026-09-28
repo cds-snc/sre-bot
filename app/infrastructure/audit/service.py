@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from contracts.operations.result import OperationResult
 from infrastructure.audit.models import AuditEvent
 from infrastructure.audit.protocol import AuditTrailService
-from infrastructure.operations.result import OperationResult
 from infrastructure.storage import get_storage_service
 
 if TYPE_CHECKING:

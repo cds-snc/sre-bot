@@ -43,12 +43,12 @@ from unittest.mock import MagicMock
 import pytest
 from botocore.exceptions import ClientError
 
+from contracts.operations import OperationResult
 from infrastructure.directory.models import (
     DirectoryGroup,
     DirectoryMember,
     MembershipCheckResult,
 )
-from infrastructure.operations import OperationResult
 from packages.access.common.config import AccessRuntimeConfig as AccessSyncRuntimeConfig
 from packages.access.common.config import PlatformPolicy
 from packages.access.common.group_policy import ManagedGroupPolicy

@@ -7,8 +7,8 @@ import dataclasses
 
 import pytest
 
-from infrastructure.operations.result import OperationResult
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.result import OperationResult
+from contracts.operations.status import OperationStatus
 
 
 @pytest.mark.unit

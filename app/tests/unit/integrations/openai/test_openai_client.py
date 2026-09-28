@@ -9,7 +9,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.status import OperationStatus
 from integrations.openai.client import build_openai_client, classify_openai_error
 
 pytestmark = pytest.mark.unit

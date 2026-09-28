@@ -9,7 +9,7 @@ from pathlib import Path
 
 import structlog
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 
 
 @dataclass(frozen=True)

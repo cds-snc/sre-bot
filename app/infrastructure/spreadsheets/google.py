@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 import structlog
 from googleapiclient.errors import HttpError
 
-from infrastructure.operations import OperationResult
-from infrastructure.operations.status import OperationStatus
+from contracts.operations import OperationResult
+from contracts.operations.status import OperationStatus
 from infrastructure.spreadsheets.models import SheetCell
 from infrastructure.spreadsheets.settings import SpreadsheetSettings
 from integrations.google_workspace.client import classify_google_error

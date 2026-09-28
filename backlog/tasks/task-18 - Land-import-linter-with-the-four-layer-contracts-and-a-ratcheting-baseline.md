@@ -3,11 +3,11 @@ id: TASK-18
 title: >-
   Land import-linter with the six-layer plugin-architecture contracts and a
   ratcheting ignore list
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-28 15:14'
+updated_date: '2026-09-28 17:16'
 labels:
   - toolchain
   - phase-2
@@ -56,8 +56,8 @@ Seed each contract's ignore_imports with every current violation so the suite la
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 CI blocking; baseline snapshot committed
-- [ ] #2 PR references decisions/toolchain.md and decisions/plugin-architecture.md (decisions/layers.md was deleted 2026-09-24 and replaced by plugin-architecture.md)
+- [x] #1 CI blocking; baseline snapshot committed
+- [x] #2 PR references decisions/toolchain.md and decisions/plugin-architecture.md (decisions/layers.md was deleted 2026-09-24 and replaced by plugin-architecture.md)
 <!-- DOD:END -->
 
 ## Implementation Plan

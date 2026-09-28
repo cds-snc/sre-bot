@@ -13,8 +13,8 @@ import contextlib
 
 import httpx
 
-from infrastructure.operations.result import OperationResult
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.result import OperationResult
+from contracts.operations.status import OperationStatus
 from integrations.openai.settings import OpenAISettings, get_openai_settings
 
 

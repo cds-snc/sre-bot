@@ -21,7 +21,7 @@ from typing import Any, Protocol
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from packages.access.common.config.settings import (
     AccessRuntimeConfig,
     CatalogExtensions,

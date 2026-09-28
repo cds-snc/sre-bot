@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from packages.incident_summary.service import (
     EMPTY_HISTORY_CODE,
     TranscriptMessage,

@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, call
 import pytest
 from botocore.exceptions import ClientError
 
-from infrastructure.operations import OperationResult, OperationStatus
+from contracts.operations import OperationResult, OperationStatus
 from packages.access.common.config import EntitlementRule
 from packages.access.sync.adapters.aws_identity_center import (
     AwsIdentityCenterAdapter,

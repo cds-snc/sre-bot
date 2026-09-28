@@ -8,10 +8,10 @@ from typing import Any
 
 import structlog
 
+from contracts.operations import OperationResult, OperationStatus
 from infrastructure.i18n.loader import YAMLTranslationLoader
 from infrastructure.i18n.models import Locale, TranslationKey
 from infrastructure.i18n.translator import Translator
-from infrastructure.operations import OperationResult, OperationStatus
 
 
 class TranslationService:

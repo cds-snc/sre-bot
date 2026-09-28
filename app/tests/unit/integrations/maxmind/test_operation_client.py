@@ -6,7 +6,7 @@ import pytest
 from geoip2.errors import AddressNotFoundError, GeoIP2Error
 
 import integrations.maxmind as maxmind_package
-from infrastructure.operations import OperationStatus
+from contracts.operations import OperationStatus
 from integrations.maxmind.client import GeoLocationData, MaxMindClient, classify_maxmind_error
 
 

@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.status import OperationStatus
 
 __all__ = [
     "DirectoryUser",

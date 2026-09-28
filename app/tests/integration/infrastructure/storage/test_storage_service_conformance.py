@@ -8,7 +8,7 @@ from decimal import Decimal
 
 import pytest
 
-from infrastructure.operations.status import OperationStatus
+from contracts.operations.status import OperationStatus
 from infrastructure.storage.service import DynamoDBStorageService
 
 from .conftest import STORAGE_TEST_TABLE_NAME
