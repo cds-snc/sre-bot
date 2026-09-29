@@ -258,3 +258,55 @@ def test_approved_domain_lookup_failure_keeps_existing_error_event() -> None:
     events = [entry["event"] for entry in logs]
     assert "oncall_sync_user_lookup_failed" in events
     assert "oncall_sync_participant_email_domain_mismatch" not in events
+
+
+# ---------------------------------------------------------------------------
+# Slack error classification
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_usergroup_write_error_carries_the_classified_status_and_code() -> None:
+    client = MagicMock()
+    client.usergroups_list.return_value = {"usergroups": [{"id": "S123", "handle": "oncall-x", "date_delete": 0}]}
+    client.usergroups_users_update.side_effect = _slack_error("missing_scope")
+
+    with pytest.raises(OnCallSyncError) as excinfo:
+        SlackUserGroupTarget(client).sync_user_group_ids("oncall-x", "On-call X", "desc", ["U1"])
+
+    assert str(excinfo.value) == "Slack API call failed: missing_scope (unauthorized)"
+    assert isinstance(excinfo.value.__cause__, SlackApiError)
+
+
+@pytest.mark.unit
+def test_unclassified_slack_error_is_still_wrapped_so_other_schedules_keep_syncing() -> None:
+    client = MagicMock()
+    client.usergroups_list.return_value = {"usergroups": []}
+    client.usergroups_create.side_effect = _slack_error("invalid_handle")
+
+    with pytest.raises(OnCallSyncError) as excinfo:
+        SlackUserGroupTarget(client).sync_user_group_ids("oncall-x", "On-call X", "desc", ["U1"])
+
+    assert str(excinfo.value) == "Slack API call failed: invalid_handle"
+
+
+@pytest.mark.unit
+def test_non_slack_exception_propagates_unchanged() -> None:
+    client = MagicMock()
+    client.usergroups_list.side_effect = KeyError("usergroups")
+
+    with pytest.raises(KeyError):
+        SlackUserGroupTarget(client).sync_user_group_ids("oncall-x", "On-call X", "desc", ["U1"])
+
+
+@pytest.mark.unit
+def test_user_lookup_failure_logs_the_classified_status() -> None:
+    client = MagicMock()
+    client.users_lookupByEmail.side_effect = _slack_error("users_not_found")
+
+    with capture_logs() as logs:
+        _sync(client, ["missing@example.com"])
+
+    failure = next(entry for entry in logs if entry["event"] == "oncall_sync_user_lookup_failed")
+    assert failure["error"] == "users_not_found"
+    assert failure["status"] == "not_found"

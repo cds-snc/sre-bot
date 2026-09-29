@@ -3,10 +3,10 @@ id: TASK-25.4
 title: >-
   Apply outbound-client contract to Slack: classify_slack_error + single client
   factory
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-08-05 16:13'
-updated_date: '2026-09-28 20:19'
+updated_date: '2026-09-29 18:53'
 labels:
   - clients
   - phase-3
@@ -48,12 +48,12 @@ BOUNDARY WITH TASK-26. TASK-26 moves the transport (Bolt runtime, parser, format
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/slack/client.py exports Web client factory functions (bot/user token, sync/async as needed) with SDK-native RetryHandlers set once at construction, and classify_slack_error(exc) -> (OperationStatus, error_code, retry_after) for SlackApiError that honours Retry-After; no OperationResult in integrations/slack/client.py
-- [ ] #2 SlackClientManager is deleted, and no production code outside integrations/slack/client.py calls WebClient(...) or AsyncWebClient(...) directly: bootstrap.py, users.py and packages/oncall_sync build through the factory
-- [ ] #3 classify_slack_error has unit tests: each mapped SlackApiError family -> expected status/error_code/retry_after (Retry-After honoured); one unmapped exception propagates. Factory tests assert token selection and RetryHandler wiring
-- [ ] #4 No hand-rolled retry loop competes with slack_sdk's RetryHandlers (grep), and the client sharing/thread-safety choice is recorded
-- [ ] #5 decisions/sdk-typing.md no longer lists SlackClientManager or multiple Slack construction paths as a tolerated divergence
-- [ ] #6 Every feature adapter that acts on Slack as a target (e.g. oncall_sync usergroup writes) calls the Web client directly inside try/except SlackApiError and calls classify_slack_error; the adapter surfaces the classified status/error_code through its Protocol's existing error contract (OperationResult where the Protocol already returns it; the feature's own domain exception carrying the classified error_code where the Protocol is Path B-shaped by its system, e.g. oncall_sync's OnCallSyncError) per outbound-clients.md's allowance that a Path B adapter's shape follows its system
+- [x] #1 integrations/slack/client.py exports Web client factory functions (bot/user token, sync/async as needed) with SDK-native RetryHandlers set once at construction, and classify_slack_error(exc) -> (OperationStatus, error_code, retry_after) for SlackApiError that honours Retry-After; no OperationResult in integrations/slack/client.py
+- [x] #2 SlackClientManager is deleted, and no production code outside integrations/slack/client.py calls WebClient(...) or AsyncWebClient(...) directly: bootstrap.py, users.py and packages/oncall_sync build through the factory
+- [x] #3 classify_slack_error has unit tests: each mapped SlackApiError family -> expected status/error_code/retry_after (Retry-After honoured); one unmapped exception propagates. Factory tests assert token selection and RetryHandler wiring
+- [x] #4 No hand-rolled retry loop competes with slack_sdk's RetryHandlers (grep), and the client sharing/thread-safety choice is recorded
+- [x] #5 decisions/sdk-typing.md no longer lists SlackClientManager or multiple Slack construction paths as a tolerated divergence
+- [x] #6 Every feature adapter that acts on Slack as a target (e.g. oncall_sync usergroup writes) calls the Web client directly inside try/except SlackApiError and calls classify_slack_error; the adapter surfaces the classified status/error_code through its Protocol's existing error contract (OperationResult where the Protocol already returns it; the feature's own domain exception carrying the classified error_code where the Protocol is Path B-shaped by its system, e.g. oncall_sync's OnCallSyncError) per outbound-clients.md's allowance that a Path B adapter's shape follows its system
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -116,6 +116,24 @@ Assumptions to verify during implementation:
 - WebClient(...)/AsyncWebClient(...) construction performs no network I/O (matches slack_sdk's documented lazy-connection model) — verify empirically before writing a "no outbound connection" factory test in the AWS-Checks style; if slack_sdk does no eager I/O the test may just assert on the returned object's configured attributes instead of a socket spy.
 - The exact set of slack_sdk short error codes to bucket under UNAUTHORIZED/NOT_FOUND/TRANSIENT is not authoritative from any decision record; verify against slack_sdk's documented error strings (https://api.slack.com/methods) during implementation and treat the settings catalogues as the single place to correct them later, same as AWS's settings-driven catalogues. (Accepted by reviewer as an implementation-time detail.)
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+integrations/slack/client.py now holds get_slack_web_client(*, actor="bot"|"user"), get_async_slack_web_client() and classify_slack_error(exc) -> tuple[OperationStatus, str | None, int | None] (same shape as the AWS/Google/MaxMind classifiers; no OperationResult). SlackClientManager is deleted. Factories attach slack_sdk's connection/rate-limit/server-error RetryHandlers once, with the per-call timeout, and build per call; the module docstring records the sharing choice (callers cache at their own provider). settings.py gained UNAUTHORIZED_ERRORS / NOT_FOUND_ERRORS / TRANSIENT_ERRORS catalogues (checked against Slack's documented error codes) and TRANSIENT_RETRY_AFTER_SECONDS (30). classify_slack_error honours Retry-After, matched case-insensitively like slack_sdk; an unparseable header falls back to the default.
+
+Call sites: SlackBootstrap / LegacySlackBootstrap and integrations/slack/users.py build through the factory. Intended behaviour change: users.py (users_lookupByEmail, a read) and the oncall_sync user-token client (idempotent usergroup writes) gain the SDK retry handlers they lacked. Grep: WebClient(/AsyncWebClient( appear only in integrations/slack/client.py; there are no hand-rolled retry loops in integrations/slack or packages/oncall_sync.
+
+Deviations from plan:
+- The factory argument is `actor`, not `token_kind`: ruff S105-S107 flag any "token" name as a hardcoded password, and CLAUDE.md forbids suppressions.
+- Import-linter contract (e) forbids packages.oncall_sync.providers -> integrations, and ignore lists are shrink-only. The USER_TOKEN guard and the factory call moved into packages/oncall_sync/adapters/slack.py::build_user_group_sync_target, and providers.py imports only the adapter. This also removed the existing ignore entry "packages.oncall_sync.providers -> integrations.slack.settings". TASK-124.2's description is updated accordingly.
+- oncall_sync adapter: SlackApiError codes the catalogues don't name are still wrapped in OnCallSyncError, not re-raised. The service catches only OnCallSyncError, so letting them escape would abort sync_all for every remaining schedule. The message now carries the classified status ("missing_scope (unauthorized)"), and the lookup-failure log carries status. Non-Slack exceptions still propagate.
+- Bootstrap tests were left unchanged: they already assert token, timeout and retry handlers on the built client, and now exercise the factory end to end.
+
+Also fixed in touched files: removed deprecated `from __future__ import annotations` (slack settings.py, oncall_sync providers.py and adapters/slack.py, and the providers test), and the two mypy no-any-return errors in integrations/slack/users.py. Deleted the legacy tests/integrations/slack/test_slack_client.py (it tested SlackClientManager); tests/integrations/slack/test_users.py was edited in place to patch get_slack_web_client. decisions/sdk-typing.md and decisions/outbound-clients.md close the Slack divergence (Changes entries 2026-09-29).
+
+Gates: ruff check clean; lint-imports 8 kept, 0 broken (contract (e) ignore list down by one); mypy 67 errors repo-wide (was 69), 0 in touched files; pytest tests --ignore=tests/smoke 3524 passed, 6 failed (known TASK-90 order leaks); make test 2772 + 758 passed.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

@@ -14,8 +14,6 @@ timeout, retry budget, delivery mode, error-code catalogues). Feature-domain
 configuration (channel IDs, user-group IDs) lives with the consuming feature.
 """
 
-from __future__ import annotations
-
 from functools import lru_cache
 
 import structlog
@@ -44,6 +42,40 @@ class SlackSettings(BaseSettings):
 
     REQUEST_TIMEOUT_SECONDS: int = Field(default=10, alias="SLACK_REQUEST_TIMEOUT_SECONDS")
     RETRY_MAX_ATTEMPTS: int = Field(default=2, alias="SLACK_RETRY_MAX_ATTEMPTS")
+    TRANSIENT_RETRY_AFTER_SECONDS: int = Field(
+        default=30,
+        alias="SLACK_TRANSIENT_RETRY_AFTER_SECONDS",
+        description="Retry hint attached to transient classifications when Slack sends no Retry-After header, in seconds.",
+    )
+
+    UNAUTHORIZED_ERRORS: list[str] = Field(
+        default=[
+            "not_authed",
+            "invalid_auth",
+            "account_inactive",
+            "token_revoked",
+            "token_expired",
+            "missing_scope",
+            "no_permission",
+            "not_allowed_token_type",
+            "access_denied",
+            "permission_denied",
+            "ekm_access_denied",
+            "team_access_not_granted",
+        ],
+        alias="SLACK_UNAUTHORIZED_ERRORS",
+        description="Slack Web API error codes classified as UNAUTHORIZED.",
+    )
+    NOT_FOUND_ERRORS: list[str] = Field(
+        default=["channel_not_found", "user_not_found", "users_not_found", "message_not_found", "no_such_subteam"],
+        alias="SLACK_NOT_FOUND_ERRORS",
+        description="Slack Web API error codes classified as NOT_FOUND.",
+    )
+    TRANSIENT_ERRORS: list[str] = Field(
+        default=["ratelimited", "internal_error", "fatal_error", "service_unavailable", "request_timeout"],
+        alias="SLACK_TRANSIENT_ERRORS",
+        description="Slack Web API error codes classified as TRANSIENT_ERROR.",
+    )
 
     @model_validator(mode="after")
     def _validate_transport_credentials(self) -> SlackSettings:
