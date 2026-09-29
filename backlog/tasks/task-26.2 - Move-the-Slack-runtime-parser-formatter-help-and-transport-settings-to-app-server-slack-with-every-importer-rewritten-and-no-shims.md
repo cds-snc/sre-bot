@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:58'
-updated_date: '2026-09-28 14:36'
+updated_date: '2026-09-29 19:20'
 labels:
   - plugin-architecture
   - slack
@@ -32,6 +32,8 @@ Slice 2 of TASK-26. Moves provider.py (Bolt runtime and Socket Mode lifecycle), 
 Mechanical move with no behaviour change. The one behaviour-neutral refactor carried over from the original scope is the parser tokenizer delegating to shlex.split, kept as its own commit.
 
 Constraint (see TASK-26): legacy modules/ may not import app/server/. Each helper they use today gets the disposition recorded in the TASK-26 plan: contracts/slack for pure data, the handler contract for runtime helpers, or a consumer's adapter. No import-linter ignore entry is added, and no shim is left at an old path.
+
+Bootstrap callers in app/modules/ (disposition fixed after TASK-25.4): modules/ops/notifications.py (LegacySlackBootstrap().create_app().client), modules/dev/platforms/slack.py and modules/sre/platforms/slack.py (LegacySlackBootstrap().web) use only a Web client, so each calls integrations.slack.client.get_slack_web_client() instead. After that the provider runtime is the only LegacySlackBootstrap caller, and bootstrap.py moves to app/server/slack/ with it. The integrations/slack/__init__.py re-export of both bootstrap classes is removed.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
