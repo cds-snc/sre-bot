@@ -3,7 +3,7 @@ id: doc-2
 title: Delivery Sequence and Stacked Pull Requests
 type: guide
 created_date: '2026-09-24 20:23'
-updated_date: '2026-09-28 17:11'
+updated_date: '2026-09-29 20:21'
 ---
 # Delivery Sequence and Stacked Pull Requests
 
@@ -25,6 +25,7 @@ GitHub stacked pull requests are available in our organization (feature in publi
 - All branches of a stack live in this repository. Cross-fork stacks are not supported.
 - Auto-merge is not supported for stacked PRs.
 - Every layer must meet `main`'s branch protection on its own: approvals, required checks and a linear stack history. Each layer therefore leaves `main` releasable.
+- Whole-stack merges fail here. `main` requires approval of the most recent reviewable push, so merging a stack in one step merges only the bottom layer: GitHub rebases the remaining layers onto `main` and force-pushes them, which makes their approvals stale. Merge layers manually, bottom-up, one at a time, and get a re-approval for each rebased layer. Don't push to stack branches while waiting on re-approvals. Expect one re-approval round per layer, so keep stacks short.
 
 **Commands** (the `gh stack` extension)
 
@@ -53,7 +54,7 @@ These are git write operations and are run by the developer; agents do not run t
 
 ## Critical path
 
-TASK-18, TASK-105 -> TASK-105.1 -> TASK-105.2 -> TASK-105.3 -> TASK-106 -> TASK-26.1 (also after TASK-25.4, and TASK-35 -> TASK-36) -> TASK-107 -> TASK-110 -> TASK-112 (with TASK-111) -> TASK-114.
+TASK-18, TASK-105 -> TASK-105.1 -> TASK-105.2 -> TASK-105.3 -> TASK-106 -> TASK-26.1 (as TASK-26.1.1 -> TASK-26.1.2 -> TASK-26.1.3; also after TASK-25.4, and TASK-35 -> TASK-36) -> TASK-107 -> TASK-110 -> TASK-112 (with TASK-111) -> TASK-114.
 
 TASK-109 (the service registry) is also required before the capability and feature moves. It follows TASK-108, TASK-58 and the TASK-92 decision. Almost every later task depends on TASK-114 and TASK-109.
 
@@ -74,10 +75,10 @@ TASK-109 (the service registry) is also required before the capability and featu
 
 | Stack | Layers (bottom -> top) | Risk |
 | --- | --- | --- |
-| A: contracts spine | TASK-18 (import-linter) -> TASK-105 (OperationResult envelope) -> TASK-105.1 (drop provider/operation, delete the unused operations classifiers) -> TASK-105.2 (error-code registry) -> TASK-105.3 (clear the call-site mypy errors from TASK-105's optional message) -> TASK-106 (create contracts/, adds the contracts import-linter contract) -> TASK-26.1 (Slack handler contract; requires TASK-25.4 and TASK-36 merged) -> TASK-107 (hookspecs to contracts/) | low: configuration, types, codemod moves. TASK-26.1 changes every Slack hookimpl signature and gets the closest review. |
+| A: contracts spine | TASK-18 (import-linter) -> TASK-105 (OperationResult envelope) -> TASK-105.1 (drop provider/operation, delete the unused operations classifiers) -> TASK-105.2 (error-code registry) -> TASK-105.3 (clear the call-site mypy errors from TASK-105's optional message) -> TASK-106 (create contracts/, adds the contracts import-linter contract) -> TASK-26.1.1 (Slack command models to contracts/) -> TASK-26.1.2 (Slack lookups behind package adapters) -> TASK-26.1.3 (Slack registrar and reply Protocols; every hookimpl) -> TASK-107 (hookspecs to contracts/) | low: configuration, types, codemod moves. TASK-26.1.3 changes every Slack hookimpl signature and gets the closest review. |
 | B: logging | TASK-28.2 -> TASK-28.3 -> TASK-115 (logging setup to server/) | low |
 
-Stack A status (2026-09-28): layers through TASK-106 are submitted (#1504-#1511, stack #1506) and in review. The stack is paused until TASK-25.4 and TASK-36 merge; the resume conditions are in doc-3 (Stack A handoff).
+Stack A status (2026-09-29): part 1 (TASK-18 through TASK-106, #1504-#1511, stack #1506) merged, and so did the prerequisites TASK-35 (#1512), TASK-36 (#1513) and TASK-25.4 (#1515). Part 2 is a new stack from `main`: TASK-26.1.1 -> TASK-26.1.2 -> TASK-26.1.3 -> TASK-107. Current state is in doc-3 (Stack A handoff).
 
 Single PRs: TASK-28.1; TASK-94 (alarm filters, Terraform) after TASK-28.2; TASK-133 (AWS and Google classifiers emit registry codes) after TASK-105.2, standalone because it changes the codes callers see.
 
