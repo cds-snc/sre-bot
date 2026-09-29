@@ -14,6 +14,7 @@ class ServerSettings(InfrastructureSettings):
     Environment Variables:
         BACKEND_URL: Backend API base URL (default: http://127.0.0.1:8000)
         NOTIFY_OPS_CHANNEL_ID: Slack channel ID for ops notifications
+        NOTIFY_ONCALL_GROUP_ID: Slack user-group ID for Notify on-call mentions
         GOOGLE_CLIENT_ID: Google OAuth client ID
         GOOGLE_CLIENT_SECRET: Google OAuth client secret
         SESSION_SECRET_KEY: Secret key for session encryption
@@ -36,6 +37,7 @@ class ServerSettings(InfrastructureSettings):
 
     BACKEND_URL: str = Field(default="http://127.0.0.1:8000", alias="BACKEND_URL")
     NOTIFY_OPS_CHANNEL_ID: str = Field(default="", alias="NOTIFY_OPS_CHANNEL_ID")
+    NOTIFY_ONCALL_GROUP_ID: str = Field(default="", alias="NOTIFY_ONCALL_GROUP_ID")
     SRE_TEST_CHANNEL_ID: str = Field(default="", alias="SRE_TEST_CHANNEL_ID")
     GOOGLE_CLIENT_ID: str | None = Field(default=None, alias="GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET: str | None = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
