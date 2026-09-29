@@ -64,6 +64,9 @@ def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> list[d
         service_id = "Unknown"
         api_key_name = "Unknown Key"
 
+    if not server_settings.NOTIFY_ONCALL_GROUP_ID:
+        raise ValueError("NOTIFY_ONCALL_GROUP_ID is not set in server settings")
+
     # Attempt to revoke the API key
     revocation_result = notify.revoke_api_key(api_key, key_type, github_repo, source)
 
@@ -87,7 +90,11 @@ def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> list[d
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"Notify API Key Name {api_key_name} from service id {service_id} was committed in github file {github_repo}.\n",
+                "text": (
+                    f"Notify API Key Name {api_key_name} from service id {service_id} "
+                    f"was committed in github file {github_repo}.\n"
+                    f"(cc <!subteam^{server_settings.NOTIFY_ONCALL_GROUP_ID}|notify-oncall>)"
+                ),
             },
         },
         {
