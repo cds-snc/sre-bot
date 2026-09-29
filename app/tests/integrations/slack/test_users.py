@@ -276,10 +276,10 @@ def test_get_user_email_from_handle(mock_get_all_users):
     assert users.get_user_email_from_handle(client, "@unknown_name") is None
 
 
-@patch("integrations.slack.users.SlackClientManager")
-def test_replace_users_emails_with_mention_success(mock_slack_client_manager):
+@patch("integrations.slack.users.get_slack_web_client")
+def test_replace_users_emails_with_mention_success(mock_get_slack_web_client):
     mock_client = MagicMock()
-    mock_slack_client_manager.get_client.return_value = mock_client
+    mock_get_slack_web_client.return_value = mock_client
     mock_client.users_lookupByEmail.return_value = {"user": {"id": "U12345"}}
 
     text = "Please contact john.doe@example.com for more information."
@@ -289,10 +289,10 @@ def test_replace_users_emails_with_mention_success(mock_slack_client_manager):
     mock_client.users_lookupByEmail.assert_called_once_with(email="john.doe@example.com")
 
 
-@patch("integrations.slack.users.SlackClientManager")
-def test_replace_users_emails_with_mention_multiple_emails(mock_slack_client_manager):
+@patch("integrations.slack.users.get_slack_web_client")
+def test_replace_users_emails_with_mention_multiple_emails(mock_get_slack_web_client):
     mock_client = MagicMock()
-    mock_slack_client_manager.get_client.return_value = mock_client
+    mock_get_slack_web_client.return_value = mock_client
 
     def mock_lookup_by_email(email):
         if email == "john.doe@example.com":
@@ -310,10 +310,10 @@ def test_replace_users_emails_with_mention_multiple_emails(mock_slack_client_man
     assert mock_client.users_lookupByEmail.call_count == 2
 
 
-@patch("integrations.slack.users.SlackClientManager")
-def test_replace_users_emails_with_mention_no_user_found(mock_slack_client_manager):
+@patch("integrations.slack.users.get_slack_web_client")
+def test_replace_users_emails_with_mention_no_user_found(mock_get_slack_web_client):
     mock_client = MagicMock()
-    mock_slack_client_manager.get_client.return_value = mock_client
+    mock_get_slack_web_client.return_value = mock_client
     mock_client.users_lookupByEmail.return_value = None
 
     text = "Please contact unknown@example.com for more information."
@@ -323,10 +323,10 @@ def test_replace_users_emails_with_mention_no_user_found(mock_slack_client_manag
     mock_client.users_lookupByEmail.assert_called_once_with(email="unknown@example.com")
 
 
-@patch("integrations.slack.users.SlackClientManager")
-def test_replace_users_emails_with_mention_no_user_id(mock_slack_client_manager):
+@patch("integrations.slack.users.get_slack_web_client")
+def test_replace_users_emails_with_mention_no_user_id(mock_get_slack_web_client):
     mock_client = MagicMock()
-    mock_slack_client_manager.get_client.return_value = mock_client
+    mock_get_slack_web_client.return_value = mock_client
     mock_client.users_lookupByEmail.return_value = {"user": {}}
 
     text = "Please contact john.doe@example.com for more information."
@@ -336,9 +336,9 @@ def test_replace_users_emails_with_mention_no_user_id(mock_slack_client_manager)
     mock_client.users_lookupByEmail.assert_called_once_with(email="john.doe@example.com")
 
 
-@patch("integrations.slack.users.SlackClientManager")
-def test_replace_users_emails_with_mention_no_client(mock_slack_client_manager):
-    mock_slack_client_manager.get_client.return_value = None
+@patch("integrations.slack.users.get_slack_web_client")
+def test_replace_users_emails_with_mention_no_client(mock_get_slack_web_client):
+    mock_get_slack_web_client.return_value = None
 
     text = "Please contact john.doe@example.com for more information."
     result = users.replace_users_emails_with_mention(text)
@@ -346,10 +346,10 @@ def test_replace_users_emails_with_mention_no_client(mock_slack_client_manager):
     assert result == "Please contact john.doe@example.com for more information."
 
 
-@patch("integrations.slack.users.SlackClientManager")
-def test_replace_users_emails_with_mention_no_emails(mock_slack_client_manager):
+@patch("integrations.slack.users.get_slack_web_client")
+def test_replace_users_emails_with_mention_no_emails(mock_get_slack_web_client):
     mock_client = MagicMock()
-    mock_slack_client_manager.get_client.return_value = mock_client
+    mock_get_slack_web_client.return_value = mock_client
 
     text = "This text has no email addresses in it."
     result = users.replace_users_emails_with_mention(text)
@@ -358,10 +358,10 @@ def test_replace_users_emails_with_mention_no_emails(mock_slack_client_manager):
     mock_client.users_lookupByEmail.assert_not_called()
 
 
-@patch("integrations.slack.users.SlackClientManager")
-def test_replace_users_emails_with_mention_empty_text(mock_slack_client_manager):
+@patch("integrations.slack.users.get_slack_web_client")
+def test_replace_users_emails_with_mention_empty_text(mock_get_slack_web_client):
     mock_client = MagicMock()
-    mock_slack_client_manager.get_client.return_value = mock_client
+    mock_get_slack_web_client.return_value = mock_client
 
     text = ""
     result = users.replace_users_emails_with_mention(text)

@@ -362,7 +362,6 @@ ignore_imports = [
     "packages.incident_summary.platforms.slack -> integrations.slack.models",
     "packages.incident_summary.platforms.slack -> integrations.slack.provider",
     "packages.incident_summary.service -> integrations.openai",
-    "packages.oncall_sync.providers -> integrations.slack.settings",
     "packages.rant.platforms.slack -> integrations.slack.models",
     "packages.rant.platforms.slack -> integrations.slack.provider",
     "packages.user_rotations.platforms.slack -> integrations.slack.models",

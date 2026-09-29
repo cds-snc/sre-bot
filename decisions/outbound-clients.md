@@ -66,7 +66,7 @@ Tickets: TASK-25 (per-vendor contract), TASK-87 (Google write replay safety) and
 - a per-call `num_retries=0` override at six Google writes (Calendar event insert, Meet space create, incident_draft Drive copy and Docs batchUpdate, incident documents apply_document_edits, Sheets values.append): a call-site exception to "no retry decision repeated at call sites";
 - a replayed Directory `members.insert` that returns 409 is not treated as success;
 - `MaxMindClient` classifies and returns `OperationResult` inside the vendor package;
-- Slack has no `classify_slack_error` and builds its Web client at four sites; its transport modules still live in `integrations/slack/` (TASK-26);
+- Slack's transport modules still live in `integrations/slack/` (TASK-26);
 - Opsgenie: business operations in the vendor package, no classifier, no explicit timeout;
 - Sentinel: the audit sink lives in the vendor package, which has no classifier and imports `infrastructure.audit`;
 - Notify: `revoke_api_key` lives in the vendor package, which has no classifier;
@@ -82,3 +82,4 @@ Tickets: TASK-25 (per-vendor contract), TASK-87 (Google write replay safety) and
 - 2026-09-24: removed the closed AWS wrapper-class tolerance and references to deleted code; Migration lists every open divergence under its epic ticket; integrations import only `contracts/` shared types, and adapters live in a feature's or capability's `adapters/` or in `infrastructure/`.
 - 2026-09-25: factories do no network I/O; assumed-role credentials are deferred and refreshable; boot credential verification is an explicit check.
 - 2026-09-28: closed the `integrations/` → `infrastructure.operations` divergence (TASK-106 moved the shared types to `app/contracts/operations/`); the remaining `infrastructure` imports are import-linter ignore entries (TASK-18).
+- 2026-09-29: Slack has `classify_slack_error` and one Web client factory carrying the SDK retry handlers (TASK-25.4); only its transport-module placement (TASK-26) remains open.

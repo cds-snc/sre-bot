@@ -54,11 +54,11 @@ The discovery client does not need to stay untyped. **[`google-api-python-client
 ## Migration
 
 Ticket: TASK-25. The four divergences this record first tolerated are deleted: the `execute_*_api_call` dispatchers, the `*_next` twins, the docstring-param scraper and the AWS facade. The SDK-typing guard baseline is empty. Tolerated until their tickets close:
-- `MaxMindClient`, a wrapper class over the geoip2 `Reader` that returns `OperationResult`;
-- the `SlackClientManager` singleton, and four separate Slack Web-client construction sites instead of one factory.
+- `MaxMindClient`, a wrapper class over the geoip2 `Reader` that returns `OperationResult`.
 
 **Changes:**
 - 2026-07-31: Google discovery `Resource`s are typed at construction with `google-api-python-client-stubs`.
 - 2026-09-10: corrected the Admin Directory stub import path.
 - 2026-09-18: the four original anti-patterns are deleted and the SDK-typing guard baseline is empty (TASK-25.2.6.2); the MaxMind and Slack client facades are recorded as tolerated divergences.
 - 2026-09-24: Context describes the deleted anti-patterns without dead file paths; Migration names epic tickets only.
+- 2026-09-29: closed the Slack divergence: `SlackClientManager` and the four Slack Web-client construction sites are replaced by one factory in `integrations/slack/client.py` (TASK-25.4).

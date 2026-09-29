@@ -4,7 +4,7 @@ title: Migrate the Slack transport to async Bolt (AsyncApp + AsyncSocketModeHand
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-25 17:06'
+updated_date: '2026-09-29 19:20'
 labels:
   - slack
   - phase-4
@@ -75,5 +75,10 @@ Build AsyncApp and AsyncSocketModeHandler in app/server/slack/ (after TASK-26 un
 created: 2026-09-24 20:04
 ---
 2026-09-24: runtime home is app/server/slack/ (decisions/platform-entrypoints.md, plugin-architecture.md); depends on TASK-26.2, which moves the runtime there.
+---
+
+created: 2026-09-29 19:20
+---
+2026-09-29 (after TASK-25.4, with TASK-26.2's recorded disposition): supersedes the 2026-07-27 'Explicit target' comment. TASK-26.2 repoints the three app/modules/ callers (ops, dev, sre) to integrations.slack.client.get_slack_web_client() and moves bootstrap.py to app/server/slack/. When this task starts, the provider runtime is the only LegacySlackBootstrap caller, so this task deletes LegacySlackBootstrap outright; nothing waits on the strangler (TASK-39/40). There is no build_slack_web_client: the AsyncApp's client comes from get_async_slack_web_client(), which already carries the SDK async retry handlers and timeout.
 ---
 <!-- COMMENTS:END -->

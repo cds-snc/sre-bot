@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-25 17:06'
+updated_date: '2026-09-29 19:20'
 labels:
   - slack
   - phase-3
@@ -34,7 +34,7 @@ COORDINATOR (rescoped 2026-09-24). Implemented by its subtasks; closes when they
 Target homes (decisions/platform-entrypoints.md, platform-transports.md, transport-slack.md, plugin-architecture.md):
 - app/server/slack/: the Bolt runtime and Socket Mode lifecycle, verification, dispatch, parser, formatter, help, and the transport settings (COMMAND_PREFIX).
 - app/contracts/ (the Slack part under app/contracts/slack/): registration hookspecs, typed request and reply models, the registrar Protocol features register through, and the outbound messaging Protocol. It imports no SDK runtime; pure-data slack_sdk model types are allowed.
-- app/integrations/slack/: the authenticated AsyncWebClient factory, classify_slack_error (TASK-25.4) and credentials only.
+- app/integrations/slack/: the Web client factories (get_slack_web_client, get_async_slack_web_client), classify_slack_error (TASK-25.4) and credentials only.
 
 The earlier scope moved the transport to app/infrastructure/slack/ and left re-export shims at the old paths. Both are dropped. infrastructure/ is hosting-only, so no inbound runtime belongs there. Shims are the lingering migration state this backlog avoids: every importer is rewritten in the subtask that moves its target.
 
@@ -106,5 +106,10 @@ created: 2026-09-18 16:51
 created: 2026-09-24 19:58
 ---
 2026-09-24 rescope: target homes follow decisions/platform-entrypoints.md and plugin-architecture.md (server/slack, contracts), not infrastructure/slack; shims dropped. Decomposed into ordered subtasks; the existing plan predates the split and must be re-planned per subtask.
+---
+
+created: 2026-09-29 19:20
+---
+2026-09-29 (after TASK-25.4): supersedes the 2026-07-27 'Bootstrap relocation sequence' comment and the 2026-09-10 note placing the handler contract in app/infrastructure/<platform>/. bootstrap.py moves to app/server/slack/ with the runtime (TASK-26.2), with no shim; the handler contract goes to app/contracts/slack/ (TASK-26.1). bootstrap's Web clients already come from the integrations/slack/client.py factories, and its three app/modules/ callers need only a Web client, so TASK-26.2 repoints them to get_slack_web_client() rather than to app/server/.
 ---
 <!-- COMMENTS:END -->

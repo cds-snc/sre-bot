@@ -8,7 +8,7 @@ import re
 import structlog
 from slack_sdk import WebClient
 
-from integrations.slack.client import SlackClientManager
+from integrations.slack.client import get_slack_web_client
 
 SLACK_USER_ID_REGEX = r"^[A-Z0-9]+$"
 
@@ -112,7 +112,8 @@ def get_user_email_from_handle(client: WebClient, user_handle: str) -> str | Non
             user_info = client.users_info(user=user_id)
 
             if user_info["ok"]:
-                return user_info["user"]["profile"]["email"]
+                email: str = user_info["user"]["profile"]["email"]
+                return email
     return None
 
 
@@ -136,7 +137,7 @@ def get_user_email_from_id(client: WebClient, user_id: str) -> str | None:
         if user_info.get("ok"):
             user: dict = user_info.get("user", {})  # type: ignore
             profile: dict = user.get("profile", {}) if isinstance(user, dict) else {}  # type: ignore
-            email = profile.get("email") if isinstance(profile, dict) else None
+            email: str | None = profile.get("email") if isinstance(profile, dict) else None
             if email:
                 log.debug(
                     "resolved_user_email_from_id",
@@ -200,7 +201,7 @@ def replace_users_emails_with_mention(text: str) -> str:
     """
     log = logger.bind(component="replace_users_emails_with_mention")
 
-    client = SlackClientManager.get_client()
+    client = get_slack_web_client()
     if not client:
         return text
     email_pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
