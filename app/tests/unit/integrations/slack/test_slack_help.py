@@ -2,6 +2,7 @@
 
 import pytest
 
+from contracts.slack.models import Argument, ArgumentType
 from integrations.slack.help import (
     _generate_slack_help_text as generate_slack_help_text,
 )
@@ -11,7 +12,6 @@ from integrations.slack.help import (
 from integrations.slack.help import (
     _get_argument_by_name as get_argument_by_name,
 )
-from integrations.slack.parser import Argument, ArgumentType
 
 pytestmark = pytest.mark.unit
 
@@ -178,6 +178,27 @@ class TestGenerateHelpText:
         lines = help_text.split("\n")
         # First line should have custom indent
         assert lines[0].startswith("    ")
+
+    def test_generate_help_text_translates_description_in_requested_locale(self):
+        """The translator receives the caller's locale, so descriptions render in the user's language.
+
+        A recording translator stands in for the provider's; asserting on its calls and output
+        proves the locale is forwarded rather than silently defaulted.
+        """
+        calls: list[tuple[str | None, str, str]] = []
+
+        def translate(key: str | None, fallback: str, locale: str) -> str:
+            calls.append((key, fallback, locale))
+            return f"[{locale}] {fallback}"
+
+        args = [
+            Argument(name="email", type=ArgumentType.EMAIL, description="Email", description_key="help.email"),
+        ]
+
+        help_text = generate_slack_help_text(args, translate=translate, locale="fr-FR")
+
+        assert calls == [("help.email", "Email", "fr-FR")]
+        assert "[fr-FR] Email" in help_text
 
 
 class TestGenerateUsageLine:

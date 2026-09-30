@@ -25,13 +25,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import structlog
 
+from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
 from infrastructure.i18n import t
-from integrations.slack.models import (
-    Argument,
-    ArgumentType,
-    CommandPayload,
-    CommandResponse,
-)
 from packages.incident_draft.domain import DraftedDocument, TranscriptMessage
 from packages.incident_draft.service import (
     DOCUMENT_UNREADABLE_CODE,

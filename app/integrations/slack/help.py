@@ -7,7 +7,7 @@ Argument definitions, with optional i18n support.
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from integrations.slack.models import Argument
+from contracts.slack.models import Argument
 
 if TYPE_CHECKING:
     from integrations.slack.models import CommandDefinition
@@ -122,7 +122,7 @@ def _generate_slack_help_text(
 
         # Add description
         if arg.description or arg.description_key:
-            description = translate(arg.description_key, arg.description) if translate else arg.description
+            description = translate(arg.description_key, arg.description, locale) if translate else arg.description
             if description:
                 lines.append(f"{indent}{indent}{description}")
 

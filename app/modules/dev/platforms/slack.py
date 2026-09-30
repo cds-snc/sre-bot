@@ -12,9 +12,9 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from contracts.slack.models import CommandPayload, CommandResponse
 from infrastructure.configuration.app import get_app_settings
 from integrations.slack import LegacySlackBootstrap
-from integrations.slack.models import CommandPayload, CommandResponse
 from modules.dev import (
     google,
     incident,

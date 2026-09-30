@@ -13,12 +13,8 @@ Tests argument parsing including:
 
 import pytest
 
-from integrations.slack.parser import (
-    Argument,
-    ArgumentParsingError,
-    ArgumentType,
-    CommandArgumentParser,
-)
+from contracts.slack.models import Argument, ArgumentParsingError, ArgumentType
+from integrations.slack.parser import CommandArgumentParser
 
 pytestmark = pytest.mark.unit
 

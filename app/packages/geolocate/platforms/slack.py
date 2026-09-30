@@ -5,9 +5,8 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 from contracts.operations import OperationStatus
+from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
 from infrastructure.i18n import t
-from integrations.slack.models import CommandPayload, CommandResponse
-from integrations.slack.parser import Argument, ArgumentType
 from packages.geolocate.schemas import GeolocateResponse
 from packages.geolocate.service import geolocate_ip
 
@@ -75,7 +74,7 @@ def handle_geolocate_command(
 
     if result.is_success:
         # Build GeolocateResponse from result data
-        data = GeolocateResponse(ip_address=ip_address, **result.data)
+        data = GeolocateResponse(ip_address=ip_address, **(result.data or {}))
         locale = payload.user_locale or "en-US"
         blocks = _format_success_blocks(data, locale=locale)
         return CommandResponse(message="", ephemeral=False, blocks=blocks)

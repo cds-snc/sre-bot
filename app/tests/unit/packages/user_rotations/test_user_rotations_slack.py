@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from integrations.slack.models import CommandPayload
+from contracts.slack.models import CommandPayload
 from packages.user_rotations.platforms.slack import (
     handle_rotations_help,
     handle_view_command,

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from integrations.slack.models import CommandPayload, CommandResponse
+from contracts.slack.models import CommandPayload, CommandResponse
 from packages.rant.platforms.slack import handle_rant_command, register_commands
 
 

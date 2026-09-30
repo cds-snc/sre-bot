@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-29 20:19'
-updated_date: '2026-09-29 20:20'
+updated_date: '2026-09-29 20:43'
 labels:
   - plugin-architecture
   - slack
@@ -77,3 +77,9 @@ AC map: #1 contracts; #2 specs/manager; #3 hookimpls; #4 import-linter; #5 legac
 Size: 13 production files, about 200 LOC. Cannot split further: every implementer of the hookspec changes with it.
 Rollback: git revert; same Slack calls, different indirection.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From 7a (TASK-26.1.1): packages/access/sync/interactions/slack.py:32 and packages/geolocate/platforms/slack.py:14 still import SlackPlatformProvider under TYPE_CHECKING from the deleted infrastructure.platforms.providers.slack (mypy import-untyped). Re-signing their register_commands onto SlackCommandRegistrar must remove these imports; do not repoint them at integrations.slack.provider (that would need new contract (e) entries).
+<!-- SECTION:NOTES:END -->

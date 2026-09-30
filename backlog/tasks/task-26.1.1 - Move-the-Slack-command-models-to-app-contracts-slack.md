@@ -1,10 +1,10 @@
 ---
 id: TASK-26.1.1
 title: Move the Slack command models to app/contracts/slack/
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-29 20:19'
-updated_date: '2026-09-29 20:20'
+updated_date: '2026-09-29 20:43'
 labels:
   - plugin-architecture
   - slack
@@ -30,10 +30,10 @@ Stack A layer 7a (slice 1 of TASK-26.1). Mechanical move with no behaviour chang
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/contracts/slack/models.py defines the five types as before; app/integrations/slack/models.py no longer defines them (CommandDefinition and the View/Card/Http families stay)
-- [ ] #2 Every production and test importer imports the five types from contracts.slack.models; grep finds none importing them from integrations.slack.models or integrations.slack.parser, and no re-export shim exists
-- [ ] #3 The 6 '-> integrations.slack.models' and 2 '-> integrations.slack.parser' contract (e) ignore entries are deleted and no ignore entry is added
-- [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; the TASK-36 legacy_surface suite is green before and after
+- [x] #1 app/contracts/slack/models.py defines the five types as before; app/integrations/slack/models.py no longer defines them (CommandDefinition and the View/Card/Http families stay)
+- [x] #2 Every production and test importer imports the five types from contracts.slack.models; grep finds none importing them from integrations.slack.models or integrations.slack.parser, and no re-export shim exists
+- [x] #3 The 6 '-> integrations.slack.models' and 2 '-> integrations.slack.parser' contract (e) ignore entries are deleted and no ignore entry is added
+- [x] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; the TASK-36 legacy_surface suite is green before and after
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -54,3 +54,26 @@ AC map: #1 steps 2-3; #2 steps 4-5 and 7; #3 step 6; #4 step 7.
 Size: 14 production files (2 new), about 190 LOC, almost all moved verbatim; every other file is a 1-3 line import change.
 Rollback: git revert; no runtime change.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented as planned. The five types (ArgumentType, Argument, ArgumentParsingError, CommandPayload, CommandResponse) moved to app/contracts/slack/models.py with their docstrings; app/integrations/slack/models.py keeps CommandDefinition and the View/Card/Http families and imports CommandPayload/CommandResponse from contracts. No shim. None of the five was frozen before; all stay mutable (the shape test pins this).
+
+Importers rewritten: 12 production, 13 test files. CommandArgumentParser imports stay on integrations.slack.parser. Contract (e): 6 '-> integrations.slack.models' and 2 '-> integrations.slack.parser' entries deleted, none added.
+
+Fixes in touched files (fix-bugs-in-touched-files rule):
+- CommandPayload.__post_init__: deprecated datetime.utcnow() replaced by datetime.now(UTC). The correlation id is opaque; the epoch value is only correct now (utcnow().timestamp() read naive UTC as local time).
+- integrations/slack/help.py _generate_slack_help_text: the translator was called without the locale it receives, so argument descriptions always rendered in en-US. It now forwards the locale; regression test test_generate_help_text_translates_description_in_requested_locale. This is a user-visible fix (fr-FR users now get French argument help).
+- packages/geolocate/platforms/slack.py: **result.data -> **(result.data or {}) (mypy arg-type; data is T | None).
+
+Handed to TASK-26.1.3: packages/access/sync/interactions/slack.py:32 and packages/geolocate/platforms/slack.py:14 import SlackPlatformProvider under TYPE_CHECKING from infrastructure.platforms.providers.slack, which no longer exists (mypy import-untyped). Pointing them at integrations.slack.provider would need new contract (e) entries, which AC #3 forbids; 7c re-signs both register_commands onto SlackCommandRegistrar, so the import goes away there.
+
+Evidence (from app/):
+- ruff check .: All checks passed!
+- lint-imports: 8 kept, 0 broken; (e) 35 ignored imports (43 before)
+- mypy: 67 errors repo-wide (69 before); 0 in touched files except the 2 stale TYPE_CHECKING imports above (pre-existing, handed to 7c)
+- pytest tests --ignore=tests/smoke: 3534 passed, 6 failed: the known TASK-90 order leaks (test_webhooks_aws_sns x3, directory test_google x3); make test green (2779 + 760 passed)
+- legacy_surface: 17 passed before and after
+- rg: no import of the five names from integrations.slack.models or integrations.slack.parser
+<!-- SECTION:NOTES:END -->

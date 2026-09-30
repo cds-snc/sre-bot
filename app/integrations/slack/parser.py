@@ -12,11 +12,7 @@ Handles:
 
 from typing import Any
 
-from integrations.slack.models import (
-    Argument,
-    ArgumentParsingError,
-    ArgumentType,
-)
+from contracts.slack.models import Argument, ArgumentParsingError, ArgumentType
 
 
 class CommandArgumentParser:
