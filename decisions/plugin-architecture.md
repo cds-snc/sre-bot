@@ -39,7 +39,7 @@ Current state:
 | `capabilities/` | Engines and shared business capabilities (approvals, notifications, audit trail, people and accounts, workplace systems, text generation) | `contracts`, lower capabilities' `api.py`; its `adapters/` may import `integrations` |
 | `infrastructure/` | Hosting implementations of `contracts` Protocols | `contracts`, `integrations` |
 | `integrations/` | Vendor clients ([outbound-clients.md](outbound-clients.md), unchanged) | `contracts` (shared types only) |
-| `contracts/` | The public plugin API | the standard library, `typing` and `pluggy` markers only |
+| `contracts/` | The public plugin API | the standard library, `typing`, `pluggy` markers and the third-party types a hookspec parameter names (FastAPI, structlog) only |
 
 **`contracts/` is the public plugin API.** It holds:
 - hookspecs, including the host's extension points;
@@ -136,3 +136,4 @@ Tolerated until then:
 - 2026-09-24: accepted; the layers, capability-packages and events records are deleted and the related records rewritten to match.
 - 2026-09-28: TASK-106 created `app/contracts/` with `contracts/operations/` and import-linter contract (c); `OperationResult` is no longer a tolerated divergence.
 - 2026-10-01: text generation is a capability; needs shared by one feature's subdomains go to that feature's `core/`, per feature-packages.md.
+- 2026-10-01: `contracts/` may import the third-party types a hookspec parameter names (FastAPI, structlog); pluggy evaluates hookspec annotations at registration, so they cannot be deferred (TASK-107).

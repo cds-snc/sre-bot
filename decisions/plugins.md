@@ -12,12 +12,12 @@ scope: How features and capabilities register with the host, and how extension p
 Features and capabilities attach handlers (Slack, HTTP, jobs, i18n resources) and strategies to the host at startup ([plugin-architecture.md](plugin-architecture.md)). pluggy provides hookspec/hookimpl registration and is already in use. It offers two ways to register a plugin: explicit `pm.register(module)` and `pm.load_setuptools_entrypoints(group)`, which reads entry points from installed distribution metadata. It has no filesystem-scan primitive.
 
 Current code:
-- `infrastructure/plugins/base.py`'s `auto_discover_plugins` walks `packages/` and `modules/` with `pkgutil.walk_packages`, imports every subpackage and registers it. It logs and skips a package that fails to import, so a broken feature silently does not load.
+- `server/plugins/base.py`'s `auto_discover_plugins` walks `packages/` and `modules/` with `pkgutil.walk_packages`, imports every subpackage and registers it. It logs and skips a package that fails to import, so a broken feature silently does not load.
 - A `startup_warmup` hookimpl that raises aborts boot. `access/sync`'s warmup assumes an AWS role through STS, so a business feature's credentials failure stops the whole app.
 - `pyproject.toml` declares no entry points.
-- Hookspecs live in `infrastructure/plugins/specs.py`: `register_slack_commands`, `register_slack_listeners`, `register_routes`, `register_i18n_resources`, `register_event_handlers`, `register_background_jobs`, `startup_warmup`.
+- Hookspecs live in `contracts/plugins/hookspecs.py`: `register_slack_commands`, `register_routes`, `register_i18n_resources`, `register_event_handlers`, `register_background_jobs`, `startup_warmup`. The `hookspec` and `hookimpl` markers and the namespace constant live in `contracts/plugins/namespace.py`; the plugin manager lives in `server/plugins/`.
 - `register_event_handlers` has no implementations. `access/request` and `access/sync` subscribe to the blinker-backed dispatcher by calling `register_handler` inside `startup_warmup`.
-- The marker name is `"sre_bot"` in code; `[project] name` is `sre-bot`. `server/lifespan.py` imports `pluggy.PluginManager` directly.
+- The namespace constant is read from the installed project metadata (`sre-bot`, normalised to `sre_bot`) and names both markers and the `PluginManager`. pluggy is imported only in `contracts/plugins/` and `server/plugins/`.
 
 Which plugins load should be a reviewed statement, not a side effect of what sits in a folder. Every mature pluggy host (pytest, datasette, tox) uses a declared list or entry points, never a scan.
 
@@ -87,12 +87,11 @@ Tickets: TASK-18 (contracts, including hookspecs), TASK-110 (entry-point loading
 Tolerated until closed:
 - the filesystem walk in `auto_discover_plugins`, with import errors logged and skipped;
 - a raising `startup_warmup` hookimpl aborts boot even when the cause is a feature's settings or credentials;
-- hookspecs and the `hookimpl` marker in `infrastructure/plugins/`;
 - the `register_event_handlers` hookspec, and `access/request` and `access/sync` subscribing to the in-process dispatcher in `startup_warmup`;
-- plugins under `packages/` rather than `features/`;
-- the `sre_bot`/`sre-bot` split, and `server/lifespan.py` importing `pluggy.PluginManager`.
+- plugins under `packages/` rather than `features/`.
 
 **Changes:**
 - 2026-09-24: entry points target `features.*` and `capabilities.*`; enablement comes from configuration files; extension points replace the in-process event hook.
 - 2026-09-25: boot failure policy is fixed by layer and kind (code defects abort, a feature with invalid settings is skipped); credential checks are an opt-in `register_credential_checks` hook that alerts without aborting.
 - 2026-10-01: an umbrella's `core/` and `common/` are never entry points, per feature-packages.md.
+- 2026-10-01: TASK-107 moved the hookspecs, the markers and the namespace constant to `contracts/plugins/` and the plugin manager to `server/plugins/`; `infrastructure/plugins/` is deleted and its two tolerated items are closed.

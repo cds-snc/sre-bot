@@ -30,7 +30,7 @@ class TestScheduledTasksInitialization:
         """
         bot = MagicMock()
 
-        scheduled_tasks.init(bot)
+        scheduled_tasks.init(bot, MagicMock())
 
         # Count schedule.do() calls - one per task
         do_calls = [call for call in mock_schedule.mock_calls if ".do(" in str(call)]
@@ -46,7 +46,7 @@ class TestScheduledTasksInitialization:
         """
         bot = MagicMock()
 
-        scheduled_tasks.init(bot)
+        scheduled_tasks.init(bot, MagicMock())
 
         # Verify daily task times were called (at least once each)
         daily_do_calls = [call for call in mock_schedule.mock_calls if ".day.at(" in str(call) and ".do(" in str(call)]
@@ -73,7 +73,7 @@ class TestScheduledTasksInitialization:
         """
         bot = MagicMock()
 
-        scheduled_tasks.init(bot)
+        scheduled_tasks.init(bot, MagicMock())
 
         # Tasks should be registered and scheduled
         do_calls = [call for call in mock_schedule.mock_calls if ".do(" in str(call)]

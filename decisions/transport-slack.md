@@ -63,10 +63,11 @@ Tickets: TASK-26 (Slack home consolidation), TASK-33 (async Bolt), TASK-41 (lega
 Tolerated until then:
 - the runtime, parser, formatter and help in `integrations/slack/`, and `COMMAND_PREFIX` in `infrastructure/slack/settings.py`;
 - sync `SocketModeHandler` in `provider.py` beside the `AsyncApp` in `bootstrap.py`;
-- dual registration: the legacy `register(bot)` list in `server/lifespan.py` beside pluggy hookspecs that hand features runtime objects (`register_slack_commands(provider: SlackPlatformProvider)`, `register_slack_listeners(app: AsyncApp)`);
+- dual registration: the legacy `register(bot)` list in `server/lifespan.py` beside the `register_slack_commands(registrar: SlackCommandRegistrar)` hookspec;
 - `slack_sdk.WebClient` imported outside `adapters/` in `packages/oncall_sync/providers.py` and `packages/rant/platforms/slack.py`;
 - legacy modules building command names from `COMMAND_PREFIX` in their own `bot.command()` calls;
 - the duplicate Slack settings in `infrastructure/configuration/infrastructure/platforms.py`, deleted rather than extended.
 
 **Changes:**
 - 2026-09-24: runtime moves to `server/slack/`, hookspecs and the outbound Protocol to `contracts/`, per plugin-architecture.md; dropped the closed `PREFIX` retirement; Migration names epic tickets only; shared Slack helpers never wrap Bolt or `slack_sdk`, and a standard toolkit is an open Draft.
+- 2026-10-01: the Slack hookspec takes the registrar Protocol and `register_slack_listeners` is deleted (TASK-26.1); the dual-registration item now names only the legacy list.

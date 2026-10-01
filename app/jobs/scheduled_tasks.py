@@ -9,7 +9,6 @@ from structlog import get_logger
 
 from contracts.scheduler.registry import BackgroundJobRegistry
 from infrastructure.idempotency import get_lease_store, run_if_leased
-from infrastructure.plugins.manager import get_plugin_manager
 from integrations import maxmind, opsgenie
 from jobs.settings import get_scheduler_settings
 from modules.aws import identity_center, spending
@@ -90,8 +89,14 @@ def _tier2(name: str, job: Callable[..., None]) -> Callable[..., None]:
     return wrapped
 
 
-def init(bot):
-    """Initialize the scheduled tasks."""
+def init(bot, register_plugin_jobs: Callable[[BackgroundJobRegistry], None]):
+    """Initialize the scheduled tasks.
+
+    Args:
+        bot: Slack Bolt app whose client the legacy jobs use.
+        register_plugin_jobs: Called once with the scheduler registry so feature
+            plugins register their recurring jobs.
+    """
     logger.info("initializing_scheduled_tasks", module="scheduled_tasks", function="init")
 
     schedule.every(5).minutes.do(safe_run(scheduler_heartbeat))
@@ -110,7 +115,7 @@ def init(bot):
     )
 
     registry = _ScheduleBackgroundJobRegistry()
-    get_plugin_manager().hook.register_background_jobs(registry=registry)
+    register_plugin_jobs(registry)
 
 
 def scheduler_heartbeat():

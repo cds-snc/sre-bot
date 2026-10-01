@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import cast
 
 from fastapi import FastAPI
-from pluggy import PluginManager
 from slack_bolt import App
 from structlog.stdlib import BoundLogger
 
@@ -32,11 +31,6 @@ from infrastructure.i18n import (
 )
 from infrastructure.logging.settings import LoggingSettings, get_logging_settings
 from infrastructure.logging.setup import configure_logging
-from infrastructure.plugins import (
-    auto_discover_plugins,
-    get_plugin_manager,
-    register_feature_integrations,
-)
 from infrastructure.security import get_jwks_manager
 from integrations.slack.provider import get_slack_provider
 from jobs import scheduled_tasks
@@ -48,6 +42,13 @@ from modules import (
     role,
     secret,
     webhook_helper,
+)
+from server.plugins.base import auto_discover_plugins
+from server.plugins.manager import (
+    FeaturePluginManager,
+    get_plugin_manager,
+    register_background_jobs,
+    register_feature_integrations,
 )
 
 
@@ -114,7 +115,7 @@ def _start_scheduled_tasks(
         logger.info("scheduled_tasks_skipped", reason="environment_is_not_production")
         return None
 
-    scheduled_tasks.init(bot)
+    scheduled_tasks.init(bot, register_background_jobs)
     stop_event = cast(threading.Event | None, scheduled_tasks.run_continuously())
     logger.info("scheduled_tasks_started")
     return stop_event
@@ -178,7 +179,7 @@ def _initialize_directory_provider(
     log.info("directory_provider_initialization_completed")
 
 
-def _initialize_translation_service(pm: PluginManager, logger: BoundLogger) -> TranslationService:
+def _initialize_translation_service(pm: FeaturePluginManager, logger: BoundLogger) -> TranslationService:
     """"""
     # Phase 1: Discover feature plugins and collect i18n resource registrations.
     log = logger.bind(phase="i18n_resource_collection")

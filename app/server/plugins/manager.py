@@ -12,8 +12,9 @@ import structlog
 
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
+from contracts.scheduler.registry import BackgroundJobRegistry
 from infrastructure.i18n.resources import I18nResourceRegistry
-from infrastructure.plugins.base import auto_discover_plugins
+from server.plugins.base import auto_discover_plugins
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -24,9 +25,11 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger()
 
+type FeaturePluginManager = pluggy.PluginManager
+
 
 @lru_cache(maxsize=1)
-def get_plugin_manager() -> pluggy.PluginManager:
+def get_plugin_manager() -> FeaturePluginManager:
     """Get the application-scoped feature plugin manager singleton.
 
     Returns:
@@ -97,6 +100,15 @@ def register_feature_integrations(
 
     pm.hook.startup_warmup(logger=logger)
     logger.info("feature_startup_warmup_completed")
+
+
+def register_background_jobs(registry: BackgroundJobRegistry) -> None:
+    """Fire the register_background_jobs hook so features register their recurring jobs.
+
+    Args:
+        registry: Scheduler-agnostic registry the scheduler runtime hands to features.
+    """
+    get_plugin_manager().hook.register_background_jobs(registry=registry)
 
 
 def discover_and_init_features(

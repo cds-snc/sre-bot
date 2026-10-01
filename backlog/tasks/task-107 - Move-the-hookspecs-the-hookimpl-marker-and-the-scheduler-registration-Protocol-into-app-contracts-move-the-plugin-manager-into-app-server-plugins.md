@@ -3,10 +3,10 @@ id: TASK-107
 title: >-
   Move the hookspecs, the hookimpl marker and the scheduler registration
   Protocol into app/contracts/; move the plugin manager into app/server/plugins/
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-24 19:58'
-updated_date: '2026-10-01 14:59'
+updated_date: '2026-10-01 16:58'
 labels:
   - plugin-architecture
   - plugins
@@ -41,12 +41,12 @@ Out of scope: discovery through entry points (its own ticket) and the scheduler 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every hookspec, the hookimpl marker, the namespace constant and the BackgroundJobRegistry Protocol live in app/contracts/; app/infrastructure/plugins/ is deleted with no re-export
-- [ ] #2 The plugin manager lives in app/server/plugins/; grep finds import pluggy only in app/contracts/ and app/server/plugins/
-- [ ] #3 The marker name, the PluginManager project name and the entry-point group are one constant sourced from project metadata
-- [ ] #4 Every hookimpl imports hookimpl from contracts; the boot-test hookspec inventory moves with the specs and still passes
-- [ ] #5 decisions/plugins.md, platform-transports.md and platform-entrypoints.md tolerated lists drop the infrastructure/plugins items in the same PR
-- [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 Every hookspec, the hookimpl marker, the namespace constant and the BackgroundJobRegistry Protocol live in app/contracts/; app/infrastructure/plugins/ is deleted with no re-export
+- [x] #2 The plugin manager lives in app/server/plugins/; grep finds import pluggy only in app/contracts/ and app/server/plugins/
+- [x] #3 The marker name, the PluginManager project name and the entry-point group are one constant sourced from project metadata
+- [x] #4 Every hookimpl imports hookimpl from contracts; the boot-test hookspec inventory moves with the specs and still passes
+- [x] #5 decisions/plugins.md, platform-transports.md and platform-entrypoints.md tolerated lists drop the infrastructure/plugins items in the same PR
+- [x] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -67,6 +67,12 @@ AC map for this task: #1 -> 107.1 + 107.2 (spec types) + 107.3 (specs, marker, c
 Out of scope, unchanged: entry-point discovery (TASK-110 replaces server/plugins/base.py in place and reads the same PLUGIN_NAMESPACE as the entry-point group), the scheduler runtime (TASK-52 moves jobs/scheduled_tasks.py into server/scheduler/ and may drop the callable parameter), deleting register_event_handlers, EventDispatcher and the EventHandlerRegistrar Protocol (TASK-30).
 Rollback per layer: git revert of that layer's PR; layers revert top-down.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+All four layers are implemented (2026-10-01): TASK-107.1 (scheduler registry Protocol, #1521), TASK-107.2 (i18n spec and registrar, #1522), TASK-107.3 (hookspecs, markers, namespace constant, #1523) and TASK-107.4 (plugin manager to server/plugins, infrastructure/plugins deleted, decision records). Gates and evidence are in each subtask's notes. AC #3 caveat: no entry-point group is declared yet (TASK-110), so the constant currently names the two markers and the PluginManager only.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

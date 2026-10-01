@@ -25,8 +25,8 @@ def auto_discover_plugins(
         base_paths: List of base paths to search (e.g., ["packages", "modules"]).
 
     Example:
-        >>> pm = pluggy.PluginManager("sre_bot")
-        >>> pm.add_hookspecs(hookspecs.platforms)
+        >>> pm = pluggy.PluginManager(PLUGIN_NAMESPACE)
+        >>> pm.add_hookspecs(FeatureLifecycleSpecs)
         >>> auto_discover_plugins(pm, base_paths=["packages", "modules"])
         # Now pm has all @hookimpl functions from all packages
     """

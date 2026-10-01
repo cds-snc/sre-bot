@@ -292,21 +292,17 @@ class TestInitJobRegistration:
 
     @pytest.mark.unit
     @patch("jobs.scheduled_tasks._tier2")
-    @patch("jobs.scheduled_tasks.get_plugin_manager")
     @patch("jobs.scheduled_tasks.schedule.every")
     @patch("jobs.scheduled_tasks.get_scheduler_settings")
-    def test_init_registers_tier1_jobs_without_lease(
-        self, mock_get_settings, mock_schedule_every, mock_get_pm, mock_tier2
-    ) -> None:
+    def test_init_registers_tier1_jobs_without_lease(self, mock_get_settings, mock_schedule_every, mock_tier2) -> None:
         """init() registers Tier-1 jobs (scheduler_heartbeat, integration_healthchecks) without lease wrapping."""
         # Single shared default Tier-2 lease TTL (no per-job aggregator).
         mock_settings = MagicMock()
         mock_settings.DEFAULT_TIER2_LEASE_TTL_SECONDS = 1800
         mock_get_settings.return_value = mock_settings
 
-        # Mock plugin manager
-        mock_pm = MagicMock()
-        mock_get_pm.return_value = mock_pm
+        # Plugin job registration callable handed in by the host
+        register_plugin_jobs = MagicMock()
 
         # Mock schedule builder
         mock_schedule = MagicMock()
@@ -315,28 +311,28 @@ class TestInitJobRegistration:
         # Mock bot
         mock_bot = MagicMock()
 
-        init(mock_bot)
+        init(mock_bot, register_plugin_jobs)
 
         # Only the 3 Tier-2 jobs go through the lease wrapper; the 2 Tier-1 jobs
         # (scheduler_heartbeat, integration_healthchecks) must be scheduled directly.
         assert mock_tier2.call_count == 3
-        mock_pm.hook.register_background_jobs.assert_called_once()
+        register_plugin_jobs.assert_called_once()
+        (registry,) = register_plugin_jobs.call_args.args
+        assert isinstance(registry, _ScheduleBackgroundJobRegistry)
 
     @pytest.mark.unit
-    @patch("jobs.scheduled_tasks.get_plugin_manager")
     @patch("jobs.scheduled_tasks.schedule.every")
     @patch("jobs.scheduled_tasks.get_scheduler_settings")
     @patch("jobs.scheduled_tasks._tier2")
-    def test_init_registers_tier2_jobs_with_lease(self, mock_tier2, mock_get_settings, mock_schedule_every, mock_get_pm) -> None:
+    def test_init_registers_tier2_jobs_with_lease(self, mock_tier2, mock_get_settings, mock_schedule_every) -> None:
         """init() registers Tier-2 jobs (provision_aws_identity_center, etc.) with lease wrapping via _tier2."""
         # Single shared default Tier-2 lease TTL (no per-job aggregator).
         mock_settings = MagicMock()
         mock_settings.DEFAULT_TIER2_LEASE_TTL_SECONDS = 1800
         mock_get_settings.return_value = mock_settings
 
-        # Mock plugin manager
-        mock_pm = MagicMock()
-        mock_get_pm.return_value = mock_pm
+        # Plugin job registration callable handed in by the host
+        register_plugin_jobs = MagicMock()
 
         # Mock schedule builder
         mock_schedule = MagicMock()
@@ -348,7 +344,7 @@ class TestInitJobRegistration:
         # Mock bot
         mock_bot = MagicMock()
 
-        init(mock_bot)
+        init(mock_bot, register_plugin_jobs)
 
         # Each Tier-2 job goes through _tier2 with its own lease key. The TTL is
         # NOT passed per call: _tier2 reads the single shared default internally,
@@ -366,14 +362,12 @@ class TestInitJobRegistration:
     @patch("jobs.scheduled_tasks.spending")
     @patch("jobs.scheduled_tasks.notify_stale_incident_channels")
     @patch("jobs.scheduled_tasks.get_lease_store")
-    @patch("jobs.scheduled_tasks.get_plugin_manager")
     @patch("jobs.scheduled_tasks.schedule.every")
     @patch("jobs.scheduled_tasks.get_scheduler_settings")
     def test_init_daily_spending_job_runs_update_job_without_arguments(
         self,
         mock_get_settings,
         mock_schedule_every,
-        mock_get_pm,
         mock_get_lease_store,
         mock_notify_stale_incident_channels,
         mock_spending,
@@ -402,7 +396,7 @@ class TestInitJobRegistration:
         mock_spending.generate_spending_data = create_autospec(spending.generate_spending_data)
         mock_spending.execute_spending_data_update_job = create_autospec(spending.execute_spending_data_update_job)
 
-        init(MagicMock())
+        init(MagicMock(), MagicMock())
 
         # Act
         daily_registrations = mock_schedule_every.return_value.day.at.return_value.do.call_args_list

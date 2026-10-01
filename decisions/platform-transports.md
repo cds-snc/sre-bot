@@ -69,9 +69,8 @@ Roles 2 and 3 share the Web API client built in `integrations/<platform>/`, but 
 Tickets: TASK-26 (Slack home consolidation), TASK-33 (async Bolt), TASK-42 and TASK-43 (Teams).
 
 Tolerated until then:
-- the Slack runtime, parser, formatter and help in `integrations/slack/`;
-- the `register_slack_listeners(app: AsyncApp)` hookspec in `infrastructure/plugins/specs.py`, which hands features the Bolt app;
-- handler hookspecs in `infrastructure/plugins/` instead of `contracts/`.
+- the Slack runtime, parser, formatter and help in `integrations/slack/`.
 
 **Changes:**
 - 2026-09-24: runtime moves to `server/<platform>/` and the handler contract to `contracts/`, per plugin-architecture.md; no helper wraps the platform SDK, and interaction toolkits are an open Draft.
+- 2026-10-01: `register_slack_listeners` is deleted (TASK-26.1) and the handler hookspecs are in `contracts/plugins/` (TASK-107); both tolerated items are closed.
