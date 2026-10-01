@@ -3,10 +3,10 @@ id: TASK-107.2
 title: >-
   Move I18nResourceSpec to app/contracts/i18n/ and add the I18nResourceRegistrar
   Protocol
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-01 14:47'
-updated_date: '2026-10-01 14:59'
+updated_date: '2026-10-01 16:39'
 labels:
   - plugin-architecture
   - plugins
@@ -30,10 +30,10 @@ Stack A layer 8b (slice 2 of TASK-107). register_i18n_resources is typed on the 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/contracts/i18n/resources.py defines I18nResourceSpec (fields and validation unchanged) and I18nResourceRegistrar (Protocol: register(spec) -> None) and imports nothing from the app
-- [ ] #2 infrastructure/i18n/resources.py keeps I18nResourceRegistry, imports the spec from contracts, and structurally satisfies I18nResourceRegistrar; infrastructure.i18n no longer exports I18nResourceSpec
-- [ ] #3 The 4 contract (b) ignore entries 'packages.{access.sync,geolocate,incident_draft,incident_summary} -> infrastructure.i18n.resources' are deleted and no ignore entry is added
-- [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 app/contracts/i18n/resources.py defines I18nResourceSpec (fields and validation unchanged) and I18nResourceRegistrar (Protocol: register(spec) -> None) and imports nothing from the app
+- [x] #2 infrastructure/i18n/resources.py keeps I18nResourceRegistry, imports the spec from contracts, and structurally satisfies I18nResourceRegistrar; infrastructure.i18n no longer exports I18nResourceSpec
+- [x] #3 The 4 contract (b) ignore entries 'packages.{access.sync,geolocate,incident_draft,incident_summary} -> infrastructure.i18n.resources' are deleted and no ignore entry is added
+- [x] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -69,6 +69,30 @@ Size: 12 production files (2 new, 10 edited: resources.py, i18n/__init__.py, ser
 Blast radius: type-level; the dataclass is unchanged. Rollback: git revert.
 Assumption: nothing else constructs I18nResourceSpec outside app/ and tests; verify with rg at the repo root.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented on stack-a/task-107.2-i18n-spec-to-contracts (Stack A layer 8b), tests first.
+
+What changed:
+- New app/contracts/i18n/ (__init__.py docstring only; resources.py): I18nResourceSpec moved verbatim (fields and validation unchanged) plus I18nResourceRegistrar(Protocol) with register(spec) -> None. Standard-library imports only.
+- infrastructure/i18n/resources.py keeps I18nResourceRegistry and imports the spec from contracts; infrastructure/i18n/__init__.py no longer exports I18nResourceSpec; service.py docstring example updated.
+- The 4 hookimpls (access.sync, geolocate, incident_draft, incident_summary) and server/lifespan.py import the spec from contracts.i18n.resources. No re-export at the old path.
+- infrastructure/plugins/specs.py: register_i18n_resources(self, registry: I18nResourceRegistrar).
+- pyproject.toml: the 4 contract (b) entries 'packages.{access.sync,geolocate,incident_draft,incident_summary} -> infrastructure.i18n.resources' deleted, none added (57 -> 53 ignored).
+- 3 existing test files: import lines only.
+
+Beyond the plan (small, in touched files): the 4 hookimpls' registry parameter, untyped before, is now annotated I18nResourceRegistrar -> None, so mypy checks each hookimpl against the contract; their stale 'I18nResourceRegistry' docstring lines were reworded.
+
+New tests: tests/unit/contracts/i18n/test_i18n_contracts_resource_spec_validation.py (defaults, explicit values, frozen, 3 rejection cases, stdlib-only AST scan) and test_i18n_contracts_registrar_protocol.py (register signature, the geolocate hookimpl registering through a fake registrar, the infrastructure registry assigned to and driven through the Protocol). 10 tests.
+
+Gates (from app/, full ci_code.yml sequence): ruff check clean; make fmt-ci 772 files already formatted; check-sdk-typing OK; check-vendor-package-contract OK (16 baselined); check-aws-platform-seam OK (11 baselined); check-runtime-imports OK; lint-imports 8 kept, 0 broken, contract (b) 53 ignored; make test 2842 passed then 760 passed; mypy 65 errors in 22 files repo-wide, unchanged from layer 8a, no new errors in touched files.
+
+Pre-existing, not fixed: infrastructure/i18n/service.py carries 11 'Translator | None' mypy errors. This layer edits only its docstring example. Fixing them changes how TranslationService is constructed (12 test call sites build it with no translator), so it is left for a decision rather than folded into a mechanical move.
+
+Size: 12 production files (2 new, 10 edited), 19 insertions and 50 deletions in edited files plus 45 new lines. Verified with rg that contracts.i18n.resources is the only import source of I18nResourceSpec and that nothing outside app/ constructs it.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

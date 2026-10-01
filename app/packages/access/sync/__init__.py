@@ -9,9 +9,9 @@ Exports the FastAPI router for registration in the main application.
 
 from pathlib import Path
 
+from contracts.i18n.resources import I18nResourceRegistrar, I18nResourceSpec
 from contracts.slack.registrar import SlackCommandRegistrar
 from infrastructure.events import get_event_dispatcher
-from infrastructure.i18n.resources import I18nResourceSpec
 from infrastructure.plugins import hookimpl
 from packages.access.common.events import REQUEST_APPROVED
 from packages.access.common.providers import get_access_runtime_config
@@ -106,7 +106,7 @@ def register_background_jobs(registry) -> None:
 
 
 @hookimpl
-def register_i18n_resources(registry) -> None:
+def register_i18n_resources(registry: I18nResourceRegistrar) -> None:
     """Register access sync translation resource locations."""
     package_root = Path(__file__).parent
     locales_path = package_root / "locales"

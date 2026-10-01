@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
+from contracts.i18n.resources import I18nResourceRegistrar, I18nResourceSpec
 from contracts.slack.registrar import SlackCommandRegistrar
-from infrastructure.i18n.resources import I18nResourceSpec
 from infrastructure.plugins import hookimpl
 from packages.geolocate.platforms import slack
 from packages.geolocate.routes import router as geolocate_router
@@ -32,11 +32,11 @@ def register_routes(app):
 
 
 @hookimpl
-def register_i18n_resources(registry):
+def register_i18n_resources(registry: I18nResourceRegistrar) -> None:
     """Register geolocate translation resource locations.
 
     Args:
-        registry: I18nResourceRegistry for registering resource specifications.
+        registry: Registrar for translation resource specifications.
     """
     package_root = Path(__file__).parent
     locales_path = package_root / "locales"

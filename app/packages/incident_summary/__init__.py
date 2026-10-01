@@ -7,8 +7,8 @@ effect free at import time (only decorated hookimpls are defined here).
 
 from pathlib import Path
 
+from contracts.i18n.resources import I18nResourceRegistrar, I18nResourceSpec
 from contracts.slack.registrar import SlackCommandRegistrar
-from infrastructure.i18n.resources import I18nResourceSpec
 from infrastructure.plugins import hookimpl
 from packages.incident_summary.platforms import slack
 from packages.incident_summary.service import TranscriptMessage, summarize_transcript
@@ -25,11 +25,11 @@ def register_slack_commands(registrar: SlackCommandRegistrar) -> None:
 
 
 @hookimpl
-def register_i18n_resources(registry):
+def register_i18n_resources(registry: I18nResourceRegistrar) -> None:
     """Register incident_summary translation resource locations.
 
     Args:
-        registry: I18nResourceRegistry for registering resource specifications.
+        registry: Registrar for translation resource specifications.
     """
     locales_path = Path(__file__).parent / "locales"
     registry.register(

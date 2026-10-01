@@ -10,10 +10,10 @@ import pluggy
 from fastapi import FastAPI
 from structlog.stdlib import BoundLogger
 
+from contracts.i18n.resources import I18nResourceRegistrar
 from contracts.scheduler.registry import BackgroundJobRegistry
 from contracts.slack.registrar import SlackCommandRegistrar
 from infrastructure.events import EventDispatcher
-from infrastructure.i18n import I18nResourceRegistry
 
 hookspec = pluggy.HookspecMarker("sre_bot")
 
@@ -51,11 +51,11 @@ class FeatureLifecycleSpecs:
         """
 
     @hookspec
-    def register_i18n_resources(self, registry: I18nResourceRegistry) -> None:
+    def register_i18n_resources(self, registry: I18nResourceRegistrar) -> None:
         """Register feature translation resource locations.
 
         Args:
-            registry: I18nResourceRegistry for registering resource specifications.
+            registry: Registrar for translation resource specifications.
         """
 
     @hookspec

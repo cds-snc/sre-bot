@@ -2,7 +2,8 @@
 
 from pathlib import Path
 
-from infrastructure.i18n.resources import I18nResourceRegistry, I18nResourceSpec
+from contracts.i18n.resources import I18nResourceSpec
+from infrastructure.i18n.resources import I18nResourceRegistry
 
 
 def test_geolocate_package_can_register_i18n_resources() -> None:
