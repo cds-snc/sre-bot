@@ -3,7 +3,7 @@ id: doc-3
 title: Stack A handoff
 type: guide
 created_date: '2026-09-28 15:02'
-updated_date: '2026-10-01 14:59'
+updated_date: '2026-10-01 16:32'
 ---
 # Stack A handoff
 
@@ -11,7 +11,7 @@ updated_date: '2026-10-01 14:59'
 
 Stack A, the contracts spine (doc-2, Wave 1). Trunk: `main`.
 
-**Status: part 2 in progress (2026-10-01, fourth session).** Part 1 (layers 0-6, GitHub stack #1506) merged to `main`. The three standalone prerequisites merged too: TASK-35 (#1512), TASK-36 (#1513) and TASK-25.4 (#1515). TASK-26.1 was decomposed into three layers; all three are now implemented and committed. TASK-107 was decomposed into four layers (8a-8d); their plans were approved on 2026-10-01. Part 2 is a new stack (`gh stack init` done) whose bottom layer targets `main`. Nothing in part 2 is pushed yet.
+**Status: part 2 in progress (2026-10-01, fifth session).** Part 1 (layers 0-6, GitHub stack #1506) merged to `main`. The three standalone prerequisites merged too: TASK-35 (#1512), TASK-36 (#1513) and TASK-25.4 (#1515). Part 2 is GitHub stack #1520, whose bottom layer targets `main`. Layers 7a-7c (TASK-26.1) are pushed and in review as #1517, #1518 and #1519, all with green CI. Layer 8a (TASK-107.1) is implemented with gates green but not committed. Layers 8b-8d have approved plans and no branch yet.
 
 The 2026-10-01 decision amendment (decisions/feature-packages.md: umbrellas gain a `core/` layer; text generation becomes a capability) is off this stack: it is commit f0c0e6da on branch `docs/umbrella-core-layer`, cut from `main`, open as PR #1516. It changes later work only: TASK-25.10, TASK-124.x, TASK-38, TASK-97 and the new TASK-134 and TASK-135.
 
@@ -20,10 +20,10 @@ The 2026-10-01 decision amendment (decisions/feature-packages.md: umbrellas gain
 | # | Task | Branch | PR | State | Notes |
 | --- | --- | --- | --- | --- | --- |
 | 0-6 | planning, TASK-18, 105, 105.1, 105.2, 105.3, 106 | `stack-a/*` | #1504-#1511 (stack #1506) | merged | Part 1: import-linter contracts (a)-(h), OperationResult envelope, ErrorCode registry, app/contracts/operations/. |
-| 7a | TASK-26.1.1 | `stack-a/task-26.1.1-slack-models-to-contracts` | - | ready | Committed: 90d9d72a (planning) and 1a87d62a (implementation). Also fixes the help.py locale bug (user-visible) and deprecated utcnow. |
-| 7b | TASK-26.1.2 | `stack-a/task-26.1.2-slack-lookup-adapters` | - | ready | Committed: 19843a16. Slack lookups in rant, incident_draft and incident_summary run through package Protocols (service.py) implemented in adapters/slack.py and wired by providers.py. The draft and summary adapters are a stepping stone that TASK-135 replaces; the rant one stays. |
-| 7c | TASK-26.1.3 | `stack-a/task-26.1.3-slack-registrar-reply` | - | ready | Committed: 0741db20. All 6 ACs checked. contracts/slack/registrar.py and reply.py; integrations/slack/reply.py (SlackWebReply, exposed as provider.reply); hookspec re-signed to `registrar`, register_slack_listeners deleted; all 8 hookimpls migrated; 4 contract (e) entries deleted (38 -> 34). Closest review. |
-| 8a | TASK-107.1 | `stack-a/task-107.1-scheduler-registry-to-contracts` (not created) | - | plan approved | `BackgroundJobRegistry` moves from jobs/ to contracts/scheduler/; jobs/models.py deleted. 6 production files, about 50 LOC. Contract (a) ignores 12 -> 11. |
+| 7a | TASK-26.1.1 | `stack-a/task-26.1.1-slack-models-to-contracts` | #1517 | in review | Commits 90d9d72a (planning) and 1a87d62a. CI green. Also fixes the help.py locale bug (user-visible) and deprecated utcnow. The PR title is still the branch-derived "stack a/task 26.1.1 slack models to contracts". |
+| 7b | TASK-26.1.2 | `stack-a/task-26.1.2-slack-lookup-adapters` | #1518 | in review | Commit 19843a16. CI green. Slack lookups in rant, incident_draft and incident_summary run through package Protocols (service.py) implemented in adapters/slack.py and wired by providers.py. The draft and summary adapters are a stepping stone that TASK-135 replaces; the rant one stays. |
+| 7c | TASK-26.1.3 | `stack-a/task-26.1.3-slack-registrar-reply` | #1519 | in review | Commits 0741db20 and 4dfef224 (CI fix). CI green. contracts/slack/registrar.py and reply.py; `SlackWebReply` lives in integrations/slack/provider.py (exposed as provider.reply) because the vendor-package contract check rejects a new module in integrations/slack/; hookspec re-signed to `registrar`, register_slack_listeners deleted; all 8 hookimpls migrated; 4 contract (e) entries deleted (38 -> 34). Closest review. |
+| 8a | TASK-107.1 | `stack-a/task-107.1-scheduler-registry-to-contracts` | - | in progress | Implemented, uncommitted, all 4 ACs checked, gates green. Plan commit 972a0106 sits at the bottom of the branch. `BackgroundJobRegistry` moved to contracts/scheduler/registry.py; jobs/models.py deleted; contract (a) ignores 12 -> 11. |
 | 8b | TASK-107.2 | `stack-a/task-107.2-i18n-spec-to-contracts` (not created) | - | plan approved | `I18nResourceSpec` to contracts/i18n/, new `I18nResourceRegistrar` Protocol implemented by the infrastructure registry. 12 production files, about 80 LOC. Contract (b) ignores 57 -> 53. |
 | 8c | TASK-107.3 | `stack-a/task-107.3-hookspecs-to-contracts` (not created) | - | plan approved | `FeatureLifecycleSpecs`, both markers and the metadata-derived `PLUGIN_NAMESPACE` to contracts/plugins/; 11 hookimpl imports rewritten; inventory test moves; manager stays put. 19 production files (11 are one-line swaps), about 190 LOC. Contract (b) ignores 53 -> 44. |
 | 8d | TASK-107.4 | `stack-a/task-107.4-plugin-manager-to-server` (not created) | - | plan approved | Manager and discovery to server/plugins/; infrastructure/plugins/ deleted; `scheduled_tasks.init` takes the registration callable; the stale decision-record text is fixed here. 7 production files plus 8 lines across 7 decision records. |
@@ -32,27 +32,31 @@ TASK-26.1 is the parent of 7a-7c and TASK-107 the parent of 8a-8d; each parent i
 
 ## Position
 
-Branch `stack-a/task-26.1.3-slack-registrar-reply` at 0741db20 (7c), on top of 19843a16 (7b), 1a87d62a (7a) and `main` at 72db5677 (level with `origin/main`). `gh stack view` shows the three layers in order; none is pushed. No background agents.
+Branch `stack-a/task-107.1-scheduler-registry-to-contracts` at 972a0106 (the 8a plan commit), on top of 4dfef224 and 0741db20 (7c), 19843a16 (7b), 1a87d62a (7a) and `main`. `gh stack view` shows the four branches in order; the lower three have PRs. No background agents.
 
-Uncommitted, all of it planning for layer 8 and none of it code: the TASK-107 task file (plan and approval comment), the four new task files TASK-107.1 to TASK-107.4, the TASK-30 task file (one comment), doc-2 and this doc. It belongs in a `plan:` commit at the bottom of layer 8a's branch, the way 90d9d72a sits under 7a.
+Uncommitted, all of it layer 8a (TASK-107.1): new `app/contracts/scheduler/` and `app/tests/unit/contracts/scheduler/`; edited `app/infrastructure/plugins/specs.py`, `app/jobs/__init__.py`, `app/jobs/scheduled_tasks.py` and `app/pyproject.toml`; deleted `app/jobs/models.py`; the TASK-107.1 task file (notes and ACs). This doc is also uncommitted and goes in its own `plan:` commit.
 
-Gates recorded for the 7c commit (run from `app/` before committing; not re-run since, the code is unchanged): ruff check clean; lint-imports 8 kept, 0 broken; mypy 0 errors in touched files (65 repo-wide, none new); pytest `tests --ignore=tests/smoke` 3582 passed, 6 failed, the 6 being the known single-process order failures (TASK-90) that pass on their own; legacy_surface 17 passed before and after, with only its registration call changed.
+Gates recorded for 8a (run from `app/` on the uncommitted tree): ruff check clean; ruff format --check 767 files already formatted; check-sdk-typing, check-vendor-package-contract (16 baselined), check-aws-platform-seam and check-runtime-imports OK; lint-imports 8 kept, 0 broken; mypy 65 errors in 22 files repo-wide, 0 in touched files; `make test` 2832 passed, then 760 passed.
+
+Gate rule for every remaining layer: run the whole CI sequence from `.github/workflows/ci_code.yml` before calling a layer ready (`make fmt-ci check-sdk-typing check-vendor-package-contract check-aws-platform-seam check-runtime-imports check-import-contracts test`, plus ruff check and mypy). #1519 first failed CI because only ruff, mypy, lint-imports and pytest had been run and the vendor-package guardrail was missed.
 
 ## Next actions
 
-1. **human**: submit 7a-7c. The uncommitted planning files are not pushed:
+1. **human**: commit layer 8a, commit this doc, and push:
    ```shell
+   git add app "backlog/tasks/task-107.1 - Move-the-BackgroundJobRegistry-scheduler-Protocol-from-app-jobs-to-app-contracts-scheduler.md"
+   git commit -m "refactor(contracts): move the BackgroundJobRegistry scheduler Protocol to app/contracts/scheduler (TASK-107.1)"
+   git add backlog/docs
+   git commit -m "plan: update the Stack A handoff after layer 8a"
    gh stack submit
    ```
-   The PR descriptions carry the flags listed under Open decisions (7a locale fix, 7b client factory, 7c rotation-view message and catch-all reply port). Merge bottom-up one layer at a time, with a re-approval per rebased layer (doc-2 rules).
-2. **human**: create layer 8a's branch and commit the planning files on it:
+2. **human**: create layer 8b's branch:
    ```shell
-   gh stack add stack-a/task-107.1-scheduler-registry-to-contracts
-   git add backlog/docs backlog/tasks
-   git commit -m "plan: decompose TASK-107 into Stack A layers 8a-8d"
+   gh stack add stack-a/task-107.2-i18n-spec-to-contracts
    ```
-3. **agent**: implement 8a (TASK-107.1) on that branch: tests first, then code, gates, ACs through the CLI.
-4. **human**: merge the docs-only PR #1516 (`docs/umbrella-core-layer`) when approved; it is independent of this stack. As of 2026-10-01 it is open and waiting on review.
+3. **agent**: implement 8b (TASK-107.2) on that branch: tests first, then code, the full CI sequence, ACs through the CLI. Then 8c and 8d the same way, one branch each.
+4. **human**: review and merge #1517, #1518 and #1519 bottom-up, one layer at a time, with a re-approval per rebased layer (doc-2 rules). The PR descriptions should carry the flags listed under Open decisions (7a locale fix, 7b client factory, 7c rotation-view message and catch-all reply port).
+5. **human**: merge the docs-only PR #1516 (`docs/umbrella-core-layer`) when approved; it is independent of this stack.
 
 ## Open decisions
 
