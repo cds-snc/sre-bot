@@ -1,19 +1,18 @@
 """Hook specifications for feature plugin lifecycle.
 
 Covers the full lifecycle of a feature package:
-  - Slack event listener registration (commands, views, actions, etc.)
+  - Slack command registration
   - HTTP route registration
   - Startup settings validation / cache warmup
 """
 
 import pluggy
 from fastapi import FastAPI
-from slack_bolt.async_app import AsyncApp
 from structlog.stdlib import BoundLogger
 
+from contracts.slack.registrar import SlackCommandRegistrar
 from infrastructure.events import EventDispatcher
 from infrastructure.i18n import I18nResourceRegistry
-from integrations.slack.provider import SlackPlatformProvider
 from jobs import BackgroundJobRegistry
 
 hookspec = pluggy.HookspecMarker("sre_bot")
@@ -24,7 +23,7 @@ class FeatureLifecycleSpecs:
 
     This includes:
         - Startup validation and warmup
-        - Slack listeners registration (passes the Bolt app for direct registration)
+        - Slack command registration (through the registrar Protocol)
         - HTTP route registration
         - Background job registration
         - i18n resource registration
@@ -35,19 +34,12 @@ class FeatureLifecycleSpecs:
     """
 
     @hookspec
-    def register_slack_commands(self, provider: SlackPlatformProvider) -> None:
-        """Register Slack commands with the provider.
-        (DEPRECATED: will be removed in favor of register_slack_listeners for direct Bolt app registration)
+    def register_slack_commands(self, registrar: SlackCommandRegistrar) -> None:
+        """Register Slack commands through the registrar.
 
         Args:
-            provider: SlackPlatformProvider instance to register commands with.
-        """
-
-    @hookspec
-    def register_slack_listeners(self, app: AsyncApp) -> None:
-        """Register Slack listeners directly on the Bolt app instance.
-        Args:
-            app: The Bolt AsyncApp instance to register listeners on.
+            registrar: Registrar to attach command handlers to; handlers reply
+                through ``registrar.reply``.
         """
 
     @hookspec

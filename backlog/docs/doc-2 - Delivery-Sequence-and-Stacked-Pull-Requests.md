@@ -3,7 +3,7 @@ id: doc-2
 title: Delivery Sequence and Stacked Pull Requests
 type: guide
 created_date: '2026-09-24 20:23'
-updated_date: '2026-09-29 20:21'
+updated_date: '2026-10-01 14:07'
 ---
 # Delivery Sequence and Stacked Pull Requests
 
@@ -90,7 +90,6 @@ Single PRs: TASK-28.1; TASK-94 (alarm filters, Terraform) after TASK-28.2; TASK-
 | TASK-100 | lease re-read fail-open | single PR, after TASK-99 and TASK-58 |
 | TASK-110 | entry-point plugin loading; plugin load failures become fatal | single PR, deployed and observed on its own |
 | TASK-111 | TOML configuration files | single PR, coordinated with the Terraform and SSM changes |
-| TASK-25.10 | OpenAI onto the outbound-client contract | single PR, after TASK-106 |
 | D: host tooling | TASK-112 (per-environment enablement) -> TASK-113 (extension-point phase) -> TASK-114 (generator and shape check) | stack; no runtime change while every plugin is enabled by default |
 
 ### Wave 3: framework services into server/
@@ -107,8 +106,9 @@ Single PRs: TASK-28.1; TASK-94 (alarm filters, Terraform) after TASK-28.2; TASK-
 
 These are mechanical moves with no dependencies between them. Ship them as parallel single PRs. For a single review sitting, short stacks of two or three are acceptable.
 
-- Capabilities: TASK-119 (directory), TASK-120 (drive), TASK-121 (spreadsheets), TASK-122 (audit), TASK-123 (rotations), TASK-32 (notifications placeholder). TASK-25.7 (Sentinel) follows TASK-122.
-- Features: TASK-124.3 (rant), TASK-124.6 (geolocate), TASK-124.4 (talent), TASK-124.2 (oncall_sync, after TASK-123), TASK-124.5 (incident umbrella, after TASK-120 and TASK-25.10).
+- Capabilities: TASK-119 (directory), TASK-120 (drive), TASK-121 (spreadsheets), TASK-122 (audit), TASK-123 (rotations), TASK-32 (notifications placeholder). TASK-25.7 (Sentinel) follows TASK-122. TASK-25.10 (OpenAI onto the outbound-client contract, creating the text-generation capability) moved here from Wave 2 on 2026-10-01: it now creates a capability, so it waits for TASK-110 and TASK-114 like the others. TASK-134 (structured template fill in that capability) follows it.
+- Features: TASK-124.3 (rant), TASK-124.6 (geolocate), TASK-124.4 (talent), TASK-124.2 (oncall_sync, after TASK-123), TASK-124.5 (incident umbrella, after TASK-120, TASK-134 and TASK-135).
+- Incident reshape, a behaviour-preserving refactor and not a move: TASK-135 (incident_draft and incident_summary become one subdomain over incident/core), after TASK-26.1, TASK-25.10 and the TASK-97 decision. Single PRs, decomposed at planning.
 
 ### Wave 5: behaviour-changing tracks
 

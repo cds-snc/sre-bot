@@ -18,8 +18,8 @@ if TYPE_CHECKING:
     from fastapi import FastAPI
     from structlog.stdlib import BoundLogger
 
+    from contracts.slack.registrar import SlackCommandRegistrar
     from infrastructure.events.service import EventDispatcher
-    from integrations.slack.provider import SlackPlatformProvider
 
 logger = structlog.get_logger()
 
@@ -67,7 +67,7 @@ def collect_feature_i18n_resources(
 def register_feature_integrations(
     app: FastAPI,
     logger: BoundLogger,
-    slack_provider: SlackPlatformProvider | None = None,
+    slack_provider: SlackCommandRegistrar | None = None,
     event_dispatcher: EventDispatcher | None = None,
 ) -> None:
     """Phase 2 — Register commands, routes, and run startup warmup.
@@ -79,12 +79,12 @@ def register_feature_integrations(
     Args:
         app: FastAPI application instance passed to register_routes hookimpls.
         logger: Structured logger passed to startup_warmup hookimpls.
-        slack_provider: Slack provider, if initialized.
+        slack_provider: Slack command registrar (the platform provider), if initialized.
     """
     pm = get_plugin_manager()
 
     if slack_provider:
-        pm.hook.register_slack_commands(provider=slack_provider)
+        pm.hook.register_slack_commands(registrar=slack_provider)
         logger.info("slack_commands_registered")
 
     if event_dispatcher:
@@ -101,7 +101,7 @@ def register_feature_integrations(
 def discover_and_init_features(
     app: FastAPI,
     logger: BoundLogger,
-    slack_provider: SlackPlatformProvider | None = None,
+    slack_provider: SlackCommandRegistrar | None = None,
     event_dispatcher: EventDispatcher | None = None,
 ) -> I18nResourceRegistry:
     """Discover all feature packages and run their full startup lifecycle.

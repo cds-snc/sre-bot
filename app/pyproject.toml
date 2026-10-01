@@ -352,12 +352,8 @@ ignore_imports = [
     "packages.**.adapters.** -> integrations.**",
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/outbound-clients.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one.
-    "packages.incident_draft.platforms.slack -> integrations.slack.provider",
     "packages.incident_draft.service -> integrations.openai",
-    "packages.incident_summary.platforms.slack -> integrations.slack.provider",
     "packages.incident_summary.service -> integrations.openai",
-    "packages.rant.platforms.slack -> integrations.slack.provider",
-    "packages.user_rotations.platforms.slack -> integrations.slack.provider",
 ]
 
 [[tool.importlinter.contracts]]

@@ -1,28 +1,26 @@
 """Slack platform implementation for geolocate package."""
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import structlog
 
 from contracts.operations import OperationStatus
 from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
+from contracts.slack.registrar import SlackCommandRegistrar
 from infrastructure.i18n import t
 from packages.geolocate.schemas import GeolocateResponse
 from packages.geolocate.service import geolocate_ip
 
-if TYPE_CHECKING:
-    from infrastructure.platforms.providers.slack import SlackPlatformProvider
-
 logger = structlog.get_logger()
 
 
-def register_commands(provider: SlackPlatformProvider) -> None:
-    """Register geolocate Slack commands with the provider.
+def register_commands(registrar: SlackCommandRegistrar) -> None:
+    """Register geolocate Slack commands with the registrar.
 
     Args:
-        provider: Slack platform provider instance.
+        registrar: Slack command registrar.
     """
-    provider.register_command(
+    registrar.register_command(
         command="geolocate",
         handler=handle_geolocate_command,
         parent="sre",

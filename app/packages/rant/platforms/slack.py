@@ -1,41 +1,35 @@
 """Slack platform implementation for the rant package."""
 
-from typing import TYPE_CHECKING
-
 import structlog
-from slack_sdk import WebClient
 
 from contracts.slack.models import CommandPayload, CommandResponse
+from contracts.slack.registrar import SlackCommandRegistrar
+from contracts.slack.reply import SlackReplyPort
 from packages.rant.providers import get_user_identity_lookup
 from packages.rant.service import UserIdentity, UserIdentityLookup, format_rant
-
-if TYPE_CHECKING:
-    from integrations.slack.provider import SlackPlatformProvider
 
 logger = structlog.get_logger()
 
 
-def register_commands(provider: SlackPlatformProvider) -> None:
-    """Register the top-level ``/rant`` Slack command with the provider.
+def register_commands(registrar: SlackCommandRegistrar) -> None:
+    """Register the top-level ``/rant`` Slack command with the registrar.
 
     Registered without a parent so it is exposed as a root slash command
     (``/rant``) rather than a subcommand of ``/sre``.
 
-    The registered handler is wrapped so it receives the provider's Slack Web
-    API client at dispatch time, which is needed to post the message with the
-    invoking user's name and avatar (``chat:write.customize``). The user's
-    identity is resolved through the package's ``UserIdentityLookup``.
+    The registered handler is wrapped so it receives the registrar's reply
+    port, which is needed to post the message with the invoking user's name
+    and avatar (``chat:write.customize``). The user's identity is resolved
+    through the package's ``UserIdentityLookup``.
 
     Args:
-        provider: Slack platform provider instance.
+        registrar: Slack command registrar.
     """
 
     def _dispatch(payload: CommandPayload) -> CommandResponse:
-        # Read the client lazily: it is only populated after the provider has
-        # started, which happens after command registration.
-        return handle_rant_command(payload, provider.client, get_user_identity_lookup())
+        return handle_rant_command(payload, registrar.reply, get_user_identity_lookup())
 
-    provider.register_command(
+    registrar.register_command(
         command="rant",
         handler=_dispatch,
         description="Shout a message to the channel in bold uppercase",
@@ -46,7 +40,7 @@ def register_commands(provider: SlackPlatformProvider) -> None:
 
 def handle_rant_command(
     payload: CommandPayload,
-    client: WebClient | None,
+    reply: SlackReplyPort,
     identities: UserIdentityLookup,
 ) -> CommandResponse:
     """Handle ``/rant <text>`` by posting a bold, uppercase message.
@@ -64,8 +58,7 @@ def handle_rant_command(
     Args:
         payload: Command payload from the Slack platform provider. ``text``
             holds the full message to shout.
-        client: Slack Web API client used to post the customized message.
-            May be ``None`` before startup.
+        reply: Port used to post the customized message.
         identities: Lookup resolving the invoking user's name and avatar.
 
     Returns:
@@ -85,20 +78,19 @@ def handle_rant_command(
         )
 
     formatted = format_rant(text)
-    identity = _resolve_user_identity(identities, payload.user_id, log) if client else None
+    identity = _resolve_user_identity(identities, payload.user_id, log) if payload.channel_id else None
 
-    if client is not None and payload.channel_id and identity is not None:
-        try:
-            client.chat_postMessage(
-                channel=payload.channel_id,
-                text=formatted,
-                username=identity.display_name,
-                icon_url=identity.icon_url,
-            )
+    if payload.channel_id and identity is not None:
+        posted = reply.post_message(
+            channel_id=payload.channel_id,
+            text=formatted,
+            username=identity.display_name,
+            icon_url=identity.icon_url,
+        )
+        if posted.is_success:
             log.info("rant_command_posted_as_user")
             return CommandResponse(message="✅ Ranted.", ephemeral=True)
-        except Exception as e:
-            log.warning("rant_post_as_user_failed", error=str(e))
+        log.warning("rant_post_as_user_failed", error=posted.message, error_code=posted.error_code)
 
     # Fallback: post as the bot, attributed to the user via a mention prefix.
     log.info("rant_command_posted_as_bot")

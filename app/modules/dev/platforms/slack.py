@@ -8,11 +8,12 @@ Only available in development environment (ENVIRONMENT=dev).
 """
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import structlog
 
 from contracts.slack.models import CommandPayload, CommandResponse
+from contracts.slack.registrar import SlackCommandRegistrar
 from infrastructure.configuration.app import get_app_settings
 from integrations.slack import LegacySlackBootstrap
 from modules.dev import (
@@ -22,10 +23,6 @@ from modules.dev import (
 from modules.dev import (
     slack as slack_dev,
 )
-
-if TYPE_CHECKING:
-    from integrations.slack.provider import SlackPlatformProvider
-
 
 logger = structlog.get_logger()
 client = LegacySlackBootstrap().web
@@ -288,14 +285,14 @@ def handle_add_incident_command(payload: CommandPayload) -> CommandResponse:
     )
 
 
-def register_commands(provider: SlackPlatformProvider) -> None:
-    """Register dev module commands with Slack provider.
+def register_commands(registrar: SlackCommandRegistrar) -> None:
+    """Register dev module commands with the Slack registrar.
 
     Args:
-        provider: Slack platform provider instance
+        registrar: Slack command registrar
     """
     # Register parent dev command (handler=None means auto-generate help).
-    provider.register_command(
+    registrar.register_command(
         command="dev",
         handler=None,
         parent="sre",
@@ -303,7 +300,7 @@ def register_commands(provider: SlackPlatformProvider) -> None:
         description_key="sre.subcommands.dev.description",
     )
 
-    provider.register_command(
+    registrar.register_command(
         command="google",
         handler=handle_google_dev_command,
         parent="sre.dev",
@@ -311,7 +308,7 @@ def register_commands(provider: SlackPlatformProvider) -> None:
         description_key="dev.subcommands.google.description",
     )
 
-    provider.register_command(
+    registrar.register_command(
         command="slack",
         handler=handle_slack_dev_command,
         parent="sre.dev",
@@ -319,7 +316,7 @@ def register_commands(provider: SlackPlatformProvider) -> None:
         description_key="dev.subcommands.slack.description",
     )
 
-    provider.register_command(
+    registrar.register_command(
         command="stale",
         handler=handle_stale_dev_command,
         parent="sre.dev",
@@ -327,7 +324,7 @@ def register_commands(provider: SlackPlatformProvider) -> None:
         description_key="dev.subcommands.stale.description",
     )
 
-    provider.register_command(
+    registrar.register_command(
         command="incident",
         handler=handle_incident_dev_command,
         parent="sre.dev",
@@ -335,7 +332,7 @@ def register_commands(provider: SlackPlatformProvider) -> None:
         description_key="dev.subcommands.incident.description",
     )
 
-    provider.register_command(
+    registrar.register_command(
         command="load-incidents",
         handler=handle_load_incidents_command,
         parent="sre.dev",
@@ -343,7 +340,7 @@ def register_commands(provider: SlackPlatformProvider) -> None:
         description_key="dev.subcommands.load_incidents.description",
     )
 
-    provider.register_command(
+    registrar.register_command(
         command="add-incident",
         handler=handle_add_incident_command,
         parent="sre.dev",

@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from contracts.operations import OperationResult, OperationStatus
 from contracts.slack.models import CommandPayload
 from packages.user_rotations.platforms.slack import (
     handle_rotations_help,
@@ -12,6 +13,7 @@ from packages.user_rotations.platforms.slack import (
     register_commands,
 )
 from packages.user_rotations.service import UserRotationShift
+from tests.factories.slack import FakeSlackReply
 
 pytestmark = pytest.mark.unit
 
@@ -38,7 +40,7 @@ def test_rotations_help_lists_the_view_command_and_readme() -> None:
 
 
 def test_view_command_opens_modal_with_one_line_per_shift() -> None:
-    client = MagicMock()
+    reply = FakeSlackReply()
     payload = CommandPayload(text="", user_id="U1", platform_metadata={"trigger_id": "trigger"})
     shifts = [
         UserRotationShift("U1", datetime(2026, 9, 14, 9, tzinfo=UTC), datetime(2026, 9, 21, 9, tzinfo=UTC)),
@@ -47,15 +49,42 @@ def test_view_command_opens_modal_with_one_line_per_shift() -> None:
     service = MagicMock()
     service.get_rotation_shifts.return_value = shifts
 
-    response = handle_view_command(payload, {"usergroup_handle": "fielding-questions"}, client, service)
+    response = handle_view_command(payload, {"usergroup_handle": "fielding-questions"}, reply, service)
 
     assert response.message == ""
     assert response.ephemeral is True
-    client.views_open.assert_called_once()
-    kwargs = client.views_open.call_args.kwargs
+    (kwargs,) = reply.calls_to("open_view")
     assert kwargs["trigger_id"] == "trigger"
     text = kwargs["view"]["blocks"][0]["text"]["text"]
     assert text.splitlines() == [
         "<@U1> | <!date^1789376400^{date_short} {time}|2026-09-14 09:00 UTC> - <!date^1789981200^{date_short} {time}|2026-09-21 09:00 UTC>",
         "<@U2> | <!date^1789981200^{date_short} {time}|2026-09-21 09:00 UTC> - <!date^1790586000^{date_short} {time}|2026-09-28 09:00 UTC>",
     ]
+
+
+def test_view_command_reports_failure_when_the_modal_cannot_be_opened() -> None:
+    reply = FakeSlackReply(OperationResult.error(OperationStatus.PERMANENT_ERROR, "expired", error_code="expired_trigger_id"))
+    payload = CommandPayload(text="", user_id="U1", platform_metadata={"trigger_id": "trigger"})
+    service = MagicMock()
+    service.get_rotation_shifts.return_value = [
+        UserRotationShift("U1", datetime(2026, 9, 14, 9, tzinfo=UTC), datetime(2026, 9, 21, 9, tzinfo=UTC)),
+    ]
+
+    response = handle_view_command(payload, {"usergroup_handle": "fielding-questions"}, reply, service)
+
+    assert response.message == "Unable to open the user rotation view."
+    assert response.ephemeral is True
+
+
+def test_view_command_without_trigger_id_opens_nothing() -> None:
+    reply = FakeSlackReply()
+    payload = CommandPayload(text="", user_id="U1")
+    service = MagicMock()
+    service.get_rotation_shifts.return_value = [
+        UserRotationShift("U1", datetime(2026, 9, 14, 9, tzinfo=UTC), datetime(2026, 9, 21, 9, tzinfo=UTC)),
+    ]
+
+    response = handle_view_command(payload, {"usergroup_handle": "fielding-questions"}, reply, service)
+
+    assert response.message == "Unable to open the user rotation view."
+    assert reply.calls == []

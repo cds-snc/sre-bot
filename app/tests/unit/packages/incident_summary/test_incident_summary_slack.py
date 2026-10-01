@@ -112,15 +112,6 @@ class TestHandleSummarizeCommand:
         assert response.message.startswith("❌")
         assert "nothing to summarize" not in response.message.lower()
 
-    def test_missing_client_returns_error_without_calling_service(self):
-        payload = CommandPayload(text="", user_id="U9", channel_id="C123")
-
-        with patch(_SUMMARIZE, new=AsyncMock()) as mock_service:
-            response = handle_summarize_command(payload, {}, None)
-
-        assert response.ephemeral is True
-        mock_service.assert_not_awaited()
-
     def test_missing_channel_id_returns_error_without_calling_service(self):
         channel = _channel_with_history([{"user": "U1", "text": "hi", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="")

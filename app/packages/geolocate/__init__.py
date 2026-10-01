@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from contracts.slack.registrar import SlackCommandRegistrar
 from infrastructure.i18n.resources import I18nResourceSpec
 from infrastructure.plugins import hookimpl
 from packages.geolocate.platforms import slack
@@ -11,13 +12,13 @@ from packages.geolocate.service import geolocate_ip
 
 
 @hookimpl
-def register_slack_commands(provider):
+def register_slack_commands(registrar: SlackCommandRegistrar) -> None:
     """Register geolocate Slack commands.
 
     Args:
-        provider: Slack platform provider instance.
+        registrar: Slack command registrar.
     """
-    slack.register_commands(provider)
+    slack.register_commands(registrar)
 
 
 @hookimpl
