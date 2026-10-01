@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-09-29 20:19'
-updated_date: '2026-10-01 14:27'
+updated_date: '2026-10-01 16:26'
 labels:
   - plugin-architecture
   - slack
@@ -106,4 +106,6 @@ Gates (from app/): ruff check: All checks passed. lint-imports: 8 kept, 0 broken
 Size: 22 production files against the plan's 13, because each hookimpl is an __init__.py plus a platforms module; 20 modified files net -8 lines, plus 3 new files (192 lines). One subsystem, not split because every implementer changes with the hookspec.
 
 Follow-ups, not done here: decisions/plugins.md:18, platform-entrypoints.md, platform-transports.md, transport-slack.md and hookspec-deprecation.md still describe register_slack_listeners and the provider-typed hookspec as current; packages/access/request/__init__.py docstring still says register_slack_commands(provider).
+
+CI fix 2026-10-01 (PR #1519): the tests job failed at make check-vendor-package-contract with two net-new violations, module:integrations/slack/reply.py and operation-result:integrations/slack/reply.py (a vendor package holds only __init__.py, client.py and settings.py, and the baseline only ratchets down). Fix: SlackWebReply and its classifier helper moved into integrations/slack/provider.py, which is already baselined under both rules and moves to server/slack/ as a whole in TASK-26.2; integrations/slack/reply.py deleted. No baseline entry and no import-linter entry added; no behaviour or test change (the tests reach the class through provider.reply). This local gate list missed the guardrail scripts; the full CI sequence was run this time, from app/: make fmt-ci (764 files already formatted), check-sdk-typing OK, check-vendor-package-contract OK (16 baselined entries remain), check-aws-platform-seam OK, check-runtime-imports OK, check-import-contracts 8 kept 0 broken, ruff check clean, mypy 65 errors in 22 files repo-wide and 0 in integrations/slack/provider.py, make test 2828 passed and 760 passed.
 <!-- SECTION:NOTES:END -->
