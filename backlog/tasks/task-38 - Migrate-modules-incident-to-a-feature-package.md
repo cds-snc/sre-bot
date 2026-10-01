@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-28 14:36'
+updated_date: '2026-10-01 14:06'
 labels:
   - migration
   - phase-5
@@ -39,10 +39,10 @@ Rescoped 2026-09-24 to decisions/plugin-architecture.md and migration.md: legacy
 Human direction (2026-09-16, recorded on TASK-97): incident is redesigned from the ground up.
 
 What changed from the earlier scope:
-- The relocation of packages/incident_draft, packages/incident_summary and packages/incident/scheduling into the umbrella is now TASK-124.5, so this ticket builds on features/incident/ and never on packages/.
+- The relocation of the incident umbrella is TASK-124.5, after TASK-135 reshapes incident_draft and incident_summary into one subdomain over incident/core, so this ticket builds on features/incident/ and never on packages/.
 - This ticket now follows TASK-97 instead of preceding it. TASK-97 decides what the bot owns and where the record of truth lives, and its implementation packet names the right-sized rebuild tickets. Rebuilding before that decision would carry the Google-shaped design into the new layer and rebuild it again.
 
-Current surface (modules/incident, about 4636 LOC across 17 modules): the declare flow, channel lifecycle and status updates, the information display and update modals, roles, documents and folders, retro scheduling, alerts and stale-channel nudges (a Tier-2 scheduled job, see TASK-65 and TASK-99). The candidate subdomain split (declare/, channel/, documents/, retro/, alerts/, beside the relocated draft/, summary/ and scheduling/) is confirmed by the TASK-97 packet, not here.
+Current surface (modules/incident, about 4636 LOC across 17 modules): the declare flow, channel lifecycle and status updates, the information display and update modals, roles, documents and folders, retro scheduling, alerts and stale-channel nudges (a Tier-2 scheduled job, see TASK-65 and TASK-99). The subdomain split is confirmed by the TASK-97 packet, not here. Amended 2026-10-01 (decisions/feature-packages.md umbrella rules 2 to 5): a subdomain is a unit enabled, owned or deleted on its own, not one command, so the earlier candidate list (declare/, channel/, documents/, retro/, alerts/, draft/, summary/, scheduling/) is no longer the starting point. What every subdomain works on (the incident record and its store, the conversation and report ports with one adapter per system, and the check that a command refers to a known incident that may still be changed) lives in features/incident/core/, imported only through core/api.py. The channel and the documents are resources of the incident, held in core/, not subdomains.
 
 Rules carried forward:
 - Handlers register through the Slack handler contract (TASK-26.1).
@@ -57,7 +57,7 @@ Rules carried forward:
 - [ ] #2 Smoke tests pass before and after each surface cutover; command names and responses unchanged
 - [ ] #3 app/modules/incident/ is deleted, its legacy list entry is removed, and no baseline grew
 - [ ] #4 EN/FR catalogues complete (parity check green)
-- [ ] #5 Shared incident vocabulary lives in features/incident/common/ with no I/O and at least two subdomain consumers per item; no subdomain imports another subdomain
+- [ ] #5 Shared incident vocabulary lives in features/incident/common/ with no I/O and at least two subdomain consumers per item; what every subdomain works on (the incident record, its store, its resource ports and adapters, the shared command checks) lives in features/incident/core/ and is imported only through core/api.py; no subdomain imports another subdomain
 - [ ] #6 The TASK-18 umbrella contract for features.incident stays green with exhaustive = true as subdomains are added
 - [ ] #7 Google adapters used by incident subdomains return frozen domain dataclasses instead of dicts (decisions/sdk-typing.md item 3)
 - [ ] #8 No module under features/incident/ imports a vendor SDK or an app/integrations client outside its own adapters/; workplace systems are reached through capability api.py contracts or a feature-owned adapter
@@ -66,6 +66,7 @@ Rules carried forward:
 - [ ] #11 Core incident concepts (the incident, its status lifecycle, participants and artifact references) are vendor-agnostic frozen dataclasses; no raw vendor payload, SDK type or DynamoDB AttributeValue shape crosses out of an adapter
 - [ ] #12 Records of truth live where the TASK-97 decision puts them; no workplace document or spreadsheet is read back as a source of truth (decisions/workplace-systems.md rule 5)
 - [ ] #13 No incident list, folder list or picker in the rebuilt surfaces silently truncates results: long lists paginate or filter within Slack's block and option limits (supersedes TASK-81)
+- [ ] #14 Every incident command resolves its incident through one core/ function that returns the incident or a classified refusal; no subdomain re-implements the lookup, and the conversation is a resource of the incident record, never its key
 <!-- AC:END -->
 
 ## Definition of Done

@@ -36,7 +36,7 @@ Current state:
 | --- | --- | --- |
 | `server/` | The host: composition root, lifespan, plugin manager, transport runtimes (Bolt), and the framework services' implementations (i18n, auth, logging setup) | everything |
 | `features/` | Business feature plugins | `contracts`, capabilities' `api.py`; its `adapters/` may import `integrations` |
-| `capabilities/` | Engines and shared business capabilities (approvals, notifications, audit trail, people and accounts, workplace systems) | `contracts`, lower capabilities' `api.py`; its `adapters/` may import `integrations` |
+| `capabilities/` | Engines and shared business capabilities (approvals, notifications, audit trail, people and accounts, workplace systems, text generation) | `contracts`, lower capabilities' `api.py`; its `adapters/` may import `integrations` |
 | `infrastructure/` | Hosting implementations of `contracts` Protocols | `contracts`, `integrations` |
 | `integrations/` | Vendor clients ([outbound-clients.md](outbound-clients.md), unchanged) | `contracts` (shared types only) |
 | `contracts/` | The public plugin API | the standard library, `typing` and `pluggy` markers only |
@@ -50,7 +50,9 @@ It contains no implementation and imports nothing else from the app, so it could
 
 **Features and capabilities never import `infrastructure/` or `server/`.** The host constructs the core services and hands them to plugins.
 
-**Features never import each other.** A need two features share becomes a capability.
+**Features never import each other.** A need two features share becomes a capability. A need two subdomains of one feature share stays in that feature, in its `core/` ([feature-packages.md](feature-packages.md)).
+
+**Text generation is a capability.** Producing text from source material and instructions (a summary, or a template filled section by section) is a domain-agnostic engine with a feature-free vocabulary. Features supply the source text, the instructions or template, and any feature-specific post-processing; the model vendor sits behind the capability's adapter.
 
 **Plugins get core services from a registry, keyed by contract.** At startup the host registers a factory for each `contracts` Protocol in a type-keyed registry ([svcs](https://svcs.hynek.me/)). Entry points (HTTP routes, Slack and Teams handlers, jobs) take what they need from a container scoped to that call; FastAPI routes do this through the registry's FastAPI integration. Services receive their dependencies through their constructor and never look them up mid-method. Tests register fakes against the same Protocols.
 
@@ -133,3 +135,4 @@ Tolerated until then:
 **Changes:**
 - 2026-09-24: accepted; the layers, capability-packages and events records are deleted and the related records rewritten to match.
 - 2026-09-28: TASK-106 created `app/contracts/` with `contracts/operations/` and import-linter contract (c); `OperationResult` is no longer a tolerated divergence.
+- 2026-10-01: text generation is a capability; needs shared by one feature's subdomains go to that feature's `core/`, per feature-packages.md.

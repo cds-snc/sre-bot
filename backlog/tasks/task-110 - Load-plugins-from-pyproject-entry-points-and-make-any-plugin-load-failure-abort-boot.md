@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-09-28 14:44'
+updated_date: '2026-10-01 14:06'
 labels:
   - plugin-architecture
   - plugins
@@ -54,6 +54,12 @@ legacy modules/: they keep their hand-written registration until each surface is
 - [ ] #5 decisions/plugins.md and decisions/lifecycle.md drop the filesystem-walk tolerance in the same PR
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-01 (amended decisions/feature-packages.md and plugins.md): an umbrella's core/ and common/ are never entry points and have no enablement key. Subdomain names for incident come from TASK-135 and the TASK-97 packet; incident.draft and incident.summary will not exist as separate entry points.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
