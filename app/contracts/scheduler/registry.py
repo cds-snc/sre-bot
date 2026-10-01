@@ -1,3 +1,5 @@
+"""Scheduler-agnostic registry Protocol feature packages register background jobs through."""
+
 from collections.abc import Callable
 from datetime import timedelta
 from typing import Protocol

@@ -3,10 +3,10 @@ id: TASK-107.1
 title: >-
   Move the BackgroundJobRegistry scheduler Protocol from app/jobs/ to
   app/contracts/scheduler/
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-01 14:47'
-updated_date: '2026-10-01 14:59'
+updated_date: '2026-10-01 16:32'
 labels:
   - plugin-architecture
   - plugins
@@ -30,10 +30,10 @@ Stack A layer 8a (slice 1 of TASK-107). Mechanical move of the BackgroundJobRegi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/contracts/scheduler/ defines BackgroundJobRegistry (register_daily, register_interval) unchanged in signature; app/jobs/models.py is deleted and jobs/__init__.py re-exports nothing
-- [ ] #2 infrastructure/plugins/specs.py and jobs/scheduled_tasks.py import it from contracts.scheduler; rg finds no 'from jobs import BackgroundJobRegistry' or 'jobs.models'
-- [ ] #3 The contract (a) ignore entry 'infrastructure.plugins.specs -> jobs' is deleted and no ignore entry is added
-- [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 app/contracts/scheduler/ defines BackgroundJobRegistry (register_daily, register_interval) unchanged in signature; app/jobs/models.py is deleted and jobs/__init__.py re-exports nothing
+- [x] #2 infrastructure/plugins/specs.py and jobs/scheduled_tasks.py import it from contracts.scheduler; rg finds no 'from jobs import BackgroundJobRegistry' or 'jobs.models'
+- [x] #3 The contract (a) ignore entry 'infrastructure.plugins.specs -> jobs' is deleted and no ignore entry is added
+- [x] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -63,6 +63,27 @@ Size: 6 production files (2 new, 1 deleted, 3 edited), about 50 LOC of which abo
 Blast radius: type-only; the runtime registry in jobs is untouched. Rollback: git revert restores the old module.
 Assumption: nothing outside app/ (scripts, terraform) imports jobs.models; verify with rg over the repo root.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented 2026-10-01 (Stack A layer 8a), left In Progress for human review.
+
+What changed:
+- New app/contracts/scheduler/__init__.py (docstring only) and app/contracts/scheduler/registry.py: BackgroundJobRegistry copied verbatim from jobs/models.py (register_daily, register_interval; stdlib imports only).
+- app/jobs/models.py deleted; app/jobs/__init__.py keeps its docstring and re-exports nothing.
+- app/jobs/scheduled_tasks.py and app/infrastructure/plugins/specs.py import the Protocol from contracts.scheduler.registry.
+- app/pyproject.toml: contract (a) ignore entry 'infrastructure.plugins.specs -> jobs' deleted, none added (12 -> 11 ignored imports).
+No behaviour change: the runtime registry in jobs/scheduled_tasks.py is untouched.
+
+Tests: new tests/unit/contracts/scheduler/test_scheduler_contracts_registry_protocol.py (a fake registry assigned to the Protocol type and called through it; both methods keyword-only; AST scan shows contracts/scheduler imports only the standard library). It failed at collection before the move (No module named contracts.scheduler). tests/unit/jobs unchanged and green.
+
+Verify: rg over the repo root finds no 'jobs.models' and no 'from jobs import BackgroundJobRegistry' outside backlog task text; nothing in decisions/, .github/, .claude/ or app/bin names the old path.
+
+Gates (from app/, the full CI sequence): ruff check: All checks passed. ruff format --check: 767 files already formatted. check-sdk-typing, check-vendor-package-contract (16 baselined), check-aws-platform-seam, check-runtime-imports: OK. lint-imports: 8 kept, 0 broken, contract (a) at 11 ignored imports. mypy: 65 errors in 22 files repo-wide (unchanged), 0 in touched files. make test: 2832 passed, then 760 passed (4 more than before, the new tests).
+
+Size: 6 production files (2 new, 1 deleted, 3 edited) plus 2 test files, as planned.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

@@ -7,10 +7,10 @@ from typing import Any
 import schedule
 from structlog import get_logger
 
+from contracts.scheduler.registry import BackgroundJobRegistry
 from infrastructure.idempotency import get_lease_store, run_if_leased
 from infrastructure.plugins.manager import get_plugin_manager
 from integrations import maxmind, opsgenie
-from jobs.models import BackgroundJobRegistry
 from jobs.settings import get_scheduler_settings
 from modules.aws import identity_center, spending
 from modules.incident.notify_stale_incident_channels import (
