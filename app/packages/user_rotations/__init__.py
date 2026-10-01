@@ -1,7 +1,7 @@
 """Self-managed rotation configuration and current-assignment calculation."""
 
+from contracts.plugins.namespace import hookimpl
 from contracts.slack.registrar import SlackCommandRegistrar
-from infrastructure.plugins import hookimpl
 
 
 @hookimpl

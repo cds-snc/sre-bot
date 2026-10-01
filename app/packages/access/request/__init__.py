@@ -5,12 +5,12 @@ approved requests are advanced to ``completed`` or ``failed`` once the sync
 provider reports back.
 
 Slack command and interaction registration are deferred to a later iteration
-pending implementation of a ``register_slack_commands(provider)`` hookimpl
+pending implementation of a ``register_slack_commands(registrar)`` hookimpl
 per ADR-0059 Standard 3.
 """
 
+from contracts.plugins.namespace import hookimpl
 from infrastructure.events import get_event_dispatcher
-from infrastructure.plugins import hookimpl
 from packages.access.common.events import SYNC_COMPLETED, SYNC_FAILED
 from packages.access.common.providers import get_access_runtime_config
 from packages.access.request.interactions.http import router as access_requests_router

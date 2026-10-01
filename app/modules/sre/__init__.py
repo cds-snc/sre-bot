@@ -1,7 +1,7 @@
 """SRE module - Platform command registration."""
 
+from contracts.plugins.namespace import hookimpl
 from contracts.slack.registrar import SlackCommandRegistrar
-from infrastructure.plugins import hookimpl
 from modules.sre.platforms import slack
 
 

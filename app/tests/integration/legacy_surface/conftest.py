@@ -31,7 +31,8 @@ import packages.incident_draft as incident_draft_module
 import packages.incident_summary as incident_summary_module
 import packages.rant as rant_module
 import packages.user_rotations as user_rotations_module
-from infrastructure.plugins.specs import FeatureLifecycleSpecs
+from contracts.plugins.hookspecs import FeatureLifecycleSpecs
+from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
@@ -185,7 +186,7 @@ def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> Slack
     monkeypatch.setattr(incident_draft_slack, "get_incident_channel_port", lambda: IncidentDraftSlackChannel(client))
     monkeypatch.setattr(incident_summary_slack, "get_incident_channel_port", lambda: IncidentSummarySlackChannel(client))
 
-    plugin_manager = pluggy.PluginManager("sre_bot")
+    plugin_manager = pluggy.PluginManager(PLUGIN_NAMESPACE)
     plugin_manager.add_hookspecs(FeatureLifecycleSpecs)
     for hookimpl_module in SLACK_COMMAND_HOOKIMPLS:
         plugin_manager.register(hookimpl_module)

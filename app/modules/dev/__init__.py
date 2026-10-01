@@ -4,8 +4,8 @@ Only available in development environment (PREFIX=dev-).
 Provides testing and development commands for Google Workspace, Slack and incidents.
 """
 
+from contracts.plugins.namespace import hookimpl
 from contracts.slack.registrar import SlackCommandRegistrar
-from infrastructure.plugins import hookimpl
 from modules.dev.platforms import slack
 
 

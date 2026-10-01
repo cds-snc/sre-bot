@@ -6,16 +6,27 @@ Covers the full lifecycle of a feature package:
   - Startup settings validation / cache warmup
 """
 
-import pluggy
+from collections.abc import Callable
+from typing import Any, Protocol
+
 from fastapi import FastAPI
 from structlog.stdlib import BoundLogger
 
 from contracts.i18n.resources import I18nResourceRegistrar
+from contracts.plugins.namespace import hookspec
 from contracts.scheduler.registry import BackgroundJobRegistry
 from contracts.slack.registrar import SlackCommandRegistrar
-from infrastructure.events import EventDispatcher
 
-hookspec = pluggy.HookspecMarker("sre_bot")
+
+class EventHandlerRegistrar(Protocol):
+    """Registration boundary for feature event handlers.
+
+    This protocol defines the exact contract feature packages must interact with.
+    """
+
+    def register_handler(self, event_type: str, handler: Callable[[Any], object]) -> None:
+        """Register a handler for an event type."""
+        ...
 
 
 class FeatureLifecycleSpecs:
@@ -59,11 +70,11 @@ class FeatureLifecycleSpecs:
         """
 
     @hookspec
-    def register_event_handlers(self, dispatcher: EventDispatcher) -> None:
+    def register_event_handlers(self, dispatcher: EventHandlerRegistrar) -> None:
         """Register feature event handlers with the application dispatcher.
 
         Args:
-            dispatcher: The application-scoped event dispatcher.
+            dispatcher: Registrar for event handlers (the application-scoped event dispatcher).
         """
 
     @hookspec

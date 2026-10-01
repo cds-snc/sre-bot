@@ -8,8 +8,8 @@ import time (only decorated hookimpls are defined here).
 from pathlib import Path
 
 from contracts.i18n.resources import I18nResourceRegistrar, I18nResourceSpec
+from contracts.plugins.namespace import hookimpl
 from contracts.slack.registrar import SlackCommandRegistrar
-from infrastructure.plugins import hookimpl
 from packages.incident_draft.domain import (
     DocumentSection,
     DraftedDocument,
