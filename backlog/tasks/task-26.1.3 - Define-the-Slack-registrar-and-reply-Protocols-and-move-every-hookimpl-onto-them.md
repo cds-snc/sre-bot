@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-29 20:19'
-updated_date: '2026-09-29 20:43'
+updated_date: '2026-10-01 12:48'
 labels:
   - plugin-architecture
   - slack
@@ -82,4 +82,6 @@ Rollback: git revert; same Slack calls, different indirection.
 
 <!-- SECTION:NOTES:BEGIN -->
 From 7a (TASK-26.1.1): packages/access/sync/interactions/slack.py:32 and packages/geolocate/platforms/slack.py:14 still import SlackPlatformProvider under TYPE_CHECKING from the deleted infrastructure.platforms.providers.slack (mypy import-untyped). Re-signing their register_commands onto SlackCommandRegistrar must remove these imports; do not repoint them at integrations.slack.provider (that would need new contract (e) entries).
+
+From TASK-26.1.2 (2026-10-01): rant, incident_draft and incident_summary now take their Slack lookups from providers.py (get_user_identity_lookup, get_incident_channel_port). The only provider.client uses left in those three packages are replies: rant chat_postMessage and incident_draft chat_postEphemeral. handle_summarize_command still carries an optional port parameter (`IncidentChannelPort | None`) kept for its missing-client test; drop it when re-signing the handlers. The legacy_surface harness patches those provider functions at the handler modules (tests/integration/legacy_surface/conftest.py build_harness).
 <!-- SECTION:NOTES:END -->

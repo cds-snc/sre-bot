@@ -14,8 +14,6 @@ consumes domain values and Protocols and returns an ``OperationResult`` so any
 platform adapter can reuse it.
 """
 
-from __future__ import annotations
-
 import json
 import re
 from collections.abc import Mapping, Sequence
@@ -217,6 +215,31 @@ class IncidentDocumentPort(Protocol):
         links: Mapping[str, str],
     ) -> DraftWriteResult | None:
         """Write the draft document (creating or rewriting it); ``None`` on failure."""
+        ...
+
+
+@runtime_checkable
+class IncidentChannelPort(Protocol):
+    """Behavior contract for reading the incident channel a draft is built from."""
+
+    def list_bookmarks(self, channel_id: str) -> Sequence[Mapping[str, Any]]:
+        """Return the channel's bookmarks, each with its ``title`` and ``link``."""
+        ...
+
+    def fetch_history(self, channel_id: str, *, limit: int, oldest: str) -> Sequence[Mapping[str, Any]]:
+        """Return up to ``limit`` raw channel messages posted since ``oldest``, newest first."""
+        ...
+
+    def get_channel(self, channel_id: str) -> Mapping[str, Any]:
+        """Return the channel's metadata, including its ``created`` time."""
+        ...
+
+    def get_user(self, user_id: str) -> Mapping[str, Any]:
+        """Return the user's record, including their ``profile``."""
+        ...
+
+    def get_self_identity(self) -> Mapping[str, Any]:
+        """Return this bot's own ``user_id``, ``bot_id`` and ``user`` name."""
         ...
 
 

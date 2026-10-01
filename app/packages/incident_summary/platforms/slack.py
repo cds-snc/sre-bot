@@ -6,24 +6,24 @@ owns the Slack-specific work (fetching history, resolving display names) and
 delegates the actual summarization to the platform-agnostic
 ``packages.incident_summary.service``.
 
-The Slack Web API client is captured lazily from the provider at dispatch
-time (it only exists after startup); ``slack_sdk`` is imported for typing
-only, keeping the package free of a runtime Slack SDK dependency.
+Channel history, channel metadata and user records are read through the
+package's ``IncidentChannelPort``, resolved from ``providers`` at dispatch time.
 """
-
-from __future__ import annotations
 
 import asyncio
 import re
 import time
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
 from infrastructure.i18n import t
+from packages.incident_summary.providers import get_incident_channel_port
 from packages.incident_summary.service import (
     EMPTY_HISTORY_CODE,
+    IncidentChannelPort,
     TranscriptMessage,
     summarize_transcript,
 )
@@ -33,8 +33,6 @@ from packages.incident_summary.settings import (
 )
 
 if TYPE_CHECKING:
-    from slack_sdk import WebClient
-
     from integrations.slack.provider import SlackPlatformProvider
 
 logger = structlog.get_logger()
@@ -66,10 +64,10 @@ def register_commands(provider: SlackPlatformProvider) -> None:
     """
 
     def _dispatch(payload: CommandPayload, parsed_args: dict[str, Any]) -> CommandResponse:
-        return handle_summarize_command(payload, parsed_args, provider.client)
+        return handle_summarize_command(payload, parsed_args, get_incident_channel_port())
 
     def _dispatch_default(payload: CommandPayload) -> CommandResponse:
-        return handle_summarize_command(payload, {}, provider.client)
+        return handle_summarize_command(payload, {}, get_incident_channel_port())
 
     provider.register_command(
         command="summarize",
@@ -101,7 +99,7 @@ def register_commands(provider: SlackPlatformProvider) -> None:
 def handle_summarize_command(
     payload: CommandPayload,
     parsed_args: dict[str, Any],
-    client: WebClient | None,
+    channel: IncidentChannelPort | None,
 ) -> CommandResponse:
     """Handle ``/sre incident summarize`` and return an ephemeral summary.
 
@@ -115,7 +113,7 @@ def handle_summarize_command(
         parsed_args: Parsed ``--since``/``--limit`` arguments (empty for the
             no-argument invocation). When ``--since`` is omitted the summary
             covers the whole incident, starting from channel creation.
-        client: Slack Web API client, or ``None`` before startup.
+        channel: Port reading the incident channel, or ``None`` when unavailable.
 
     Returns:
         An ephemeral ``CommandResponse`` carrying the summary, an
@@ -128,7 +126,7 @@ def handle_summarize_command(
         channel_id=payload.channel_id,
     )
 
-    if client is None or not payload.channel_id:
+    if channel is None or not payload.channel_id:
         log.warning("incident_summary_no_client_or_channel")
         return _error_response(locale)
 
@@ -139,9 +137,9 @@ def handle_summarize_command(
     if oldest is None:
         # No explicit window: summarize the whole incident from when the
         # channel (incident) was created.
-        oldest = _resolve_channel_start(client, payload.channel_id, settings, log)
+        oldest = _resolve_channel_start(channel, payload.channel_id, settings, log)
 
-    messages = _fetch_transcript(client, payload.channel_id, limit=limit, oldest=oldest, log=log)
+    messages = _fetch_transcript(channel, payload.channel_id, limit=limit, oldest=oldest, log=log)
 
     result = asyncio.run(summarize_transcript(messages, instructions=_SLACK_FORMAT_INSTRUCTIONS))
 
@@ -167,7 +165,7 @@ def handle_summarize_command(
 
 
 def _fetch_transcript(
-    client: WebClient,
+    channel: IncidentChannelPort,
     channel_id: str,
     *,
     limit: int,
@@ -180,12 +178,11 @@ def _fetch_transcript(
     list is returned so the caller renders the empty-history path.
     """
     try:
-        response = client.conversations_history(channel=channel_id, limit=limit, oldest=f"{oldest:.6f}")
+        raw_messages = channel.fetch_history(channel_id, limit=limit, oldest=f"{oldest:.6f}")
     except Exception as exc:  # noqa: BLE001 - degrade to empty history on any API error
         log.warning("incident_summary_history_fetch_failed", error=str(exc))
         return []
 
-    raw_messages = response.get("messages") or []
     name_cache: dict[str, str] = {}
     messages: list[TranscriptMessage] = []
 
@@ -195,7 +192,7 @@ def _fetch_transcript(
         user_id = raw.get("user")
         if not text or not user_id:
             continue
-        author = _resolve_display_name(client, user_id, name_cache, log)
+        author = _resolve_display_name(channel, user_id, name_cache, log)
         messages.append(TranscriptMessage(author=author, text=text))
 
     log.info(
@@ -207,7 +204,7 @@ def _fetch_transcript(
 
 
 def _resolve_display_name(
-    client: WebClient,
+    channel: IncidentChannelPort,
     user_id: str,
     cache: dict[str, str],
     log: structlog.stdlib.BoundLogger,
@@ -218,9 +215,8 @@ def _resolve_display_name(
 
     name = user_id
     try:
-        info = client.users_info(user=user_id)
-        user: dict[str, Any] = info.get("user") or {}
-        profile: dict[str, Any] = user.get("profile") or {}
+        user = channel.get_user(user_id)
+        profile: Mapping[str, Any] = user.get("profile") or {}
         name = profile.get("display_name") or profile.get("real_name") or user.get("real_name") or user_id
     except Exception as exc:  # noqa: BLE001 - a missing name must not fail the summary
         log.warning("incident_summary_user_lookup_failed", user_id=user_id, error=str(exc))
@@ -255,7 +251,7 @@ def _resolve_oldest(raw: Any) -> float | None:
 
 
 def _resolve_channel_start(
-    client: WebClient,
+    channel: IncidentChannelPort,
     channel_id: str,
     settings: IncidentSummarySettings,
     log: structlog.stdlib.BoundLogger,
@@ -267,8 +263,7 @@ def _resolve_channel_start(
     gracefully instead of failing the summary.
     """
     try:
-        info = client.conversations_info(channel=channel_id)
-        created = (info.get("channel") or {}).get("created")
+        created = channel.get_channel(channel_id).get("created")
         if created is not None:
             return float(created)
     except Exception as exc:  # noqa: BLE001 - degrade to default window on any API error
