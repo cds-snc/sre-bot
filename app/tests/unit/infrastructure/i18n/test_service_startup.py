@@ -3,8 +3,8 @@
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from contracts.i18n.resources import I18nResourceSpec
 from infrastructure.i18n.models import Locale, TranslationKey
-from infrastructure.i18n.resources import I18nResourceSpec
 from infrastructure.i18n.service import TranslationService
 
 

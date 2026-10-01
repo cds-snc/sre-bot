@@ -41,7 +41,8 @@ class TranslationService:
             return {"message": msg}
 
         # Initialization (lifespan)
-        from infrastructure.i18n import get_translation_service, I18nResourceSpec
+        from contracts.i18n.resources import I18nResourceSpec
+        from infrastructure.i18n import get_translation_service
 
         translation = get_translation_service()
         resources = [

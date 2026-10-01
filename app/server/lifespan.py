@@ -10,6 +10,7 @@ from pluggy import PluginManager
 from slack_bolt import App
 from structlog.stdlib import BoundLogger
 
+from contracts.i18n.resources import I18nResourceSpec
 from infrastructure.configuration.app import AppSettings, get_app_settings
 from infrastructure.configuration.features.sre_ops import (
     SreOpsSettings,
@@ -26,7 +27,6 @@ from infrastructure.directory import (
 )
 from infrastructure.i18n import (
     I18nResourceRegistry,
-    I18nResourceSpec,
     TranslationService,
     get_translation_service,
 )
