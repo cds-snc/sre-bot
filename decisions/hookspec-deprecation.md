@@ -9,7 +9,7 @@ scope: How a hookspec is deprecated and later removed.
 
 ## Context
 
-[plugins.md](plugins.md) makes hookspecs host-owned and reviewed but has no rule for retiring one. The gap is not hypothetical: `app/infrastructure/plugins/specs.py`'s `register_slack_commands` already carries an ad hoc docstring — "(DEPRECATED: will be removed in favor of register_slack_listeners for direct Bolt app registration)" — with no minimum lifetime, no announcement mechanism, and no removal checklist. Four hookimpls still implement it today (`app/modules/dev`, `app/modules/sre`, `app/packages/access/sync`, `app/packages/geolocate`), plus one pending in `app/packages/access/request`. Without a rule, nothing stops a removal PR from deleting the spec the same day it's marked deprecated, breaking any implementer a quick grep misses.
+[plugins.md](plugins.md) makes hookspecs host-owned and reviewed but has no rule for retiring one. The gap is not hypothetical: when this record was written, `register_slack_commands` carried an ad hoc docstring — "(DEPRECATED: will be removed in favor of register_slack_listeners for direct Bolt app registration)" — with no minimum lifetime, no announcement mechanism, and no removal checklist, while four hookimpls still implemented it (`app/modules/dev`, `app/modules/sre`, `app/packages/access/sync`, `app/packages/geolocate`). The hookspecs now live in `app/contracts/plugins/hookspecs.py`; `register_slack_commands` has since been re-signed on the registrar Protocol and `register_slack_listeners` deleted. Without a rule, nothing stops a removal PR from deleting the spec the same day it's marked deprecated, breaking any implementer a quick grep misses.
 
 ## Decision
 
@@ -20,9 +20,9 @@ scope: How a hookspec is deprecated and later removed.
 **Removal checklist**, all required in the removal PR (this is [governance.md](governance.md)'s cascade rule applied to code, not just decision records):
 1. Repo-wide grep for `@hookimpl` implementers of the deprecated spec name — zero remaining callers required.
 2. Every implementer found is migrated or deleted before the spec is removed (a removal PR with live implementers is rejected, not merged with a TODO).
-3. The hookspec is deleted from `specs.py`.
+3. The hookspec is deleted from `app/contracts/plugins/hookspecs.py`.
 4. Any decision record naming the removed spec (starting with [plugins.md](plugins.md)) is updated in the same PR.
-5. `app/tests/unit/infrastructure/plugins/test_plugins_hookspecs.py` (the boot-test spec inventory) drops the removed spec, proving nothing still expects it.
+5. `app/tests/unit/contracts/plugins/test_contracts_hookspecs_inventory.py` (the boot-test spec inventory) drops the removed spec, proving nothing still expects it.
 
 ## Consequences
 
@@ -42,3 +42,4 @@ Ticket: TASK-67. Tolerated until closed: the current ad hoc docstring wording; f
 
 **Changes:**
 - 2026-09-24: Migration names epic tickets only; the backlog owns the breakdown.
+- 2026-10-01: paths follow the hookspecs' move to `contracts/plugins/` (TASK-107); the `register_slack_commands` example is recast as history.

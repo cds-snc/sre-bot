@@ -1,8 +1,8 @@
 """Test plugin discovery and i18n hook invocation."""
 
 from infrastructure.i18n.resources import I18nResourceRegistry
-from infrastructure.plugins.base import auto_discover_plugins
-from infrastructure.plugins.manager import get_plugin_manager
+from server.plugins.base import auto_discover_plugins
+from server.plugins.manager import get_plugin_manager
 
 
 def test_plugin_discovery_finds_geolocate() -> None:

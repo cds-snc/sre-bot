@@ -19,7 +19,7 @@ Current state:
 
 - The Slack runtime lives in `integrations/slack/` (`provider.py::SlackPlatformProvider`, `bootstrap.py`), started from `server/lifespan.py`. `infrastructure/slack/` holds only `settings.py`.
 - Feature handlers import Slack models and the argument parser from `integrations.slack`.
-- The `register_slack_listeners(app: AsyncApp)` hookspec hands features the Bolt app itself.
+- Features register Slack commands through the `SlackCommandRegistrar` Protocol (`contracts/slack/registrar.py`); no hookspec hands out the Bolt app.
 - Teams is not built (TASK-42, TASK-43).
 
 ## Decision
@@ -63,10 +63,10 @@ Tickets: TASK-26 (Slack runtime to `app/server/slack/`, handler contract to `app
 
 Tolerated until then:
 - the Slack runtime in `integrations/slack/`;
-- `register_slack_listeners(app: AsyncApp)` in `infrastructure/plugins/specs.py`;
 - handlers importing `integrations.slack` models and parser;
 - `server/bot_middleware.py` attaching the bot to request state.
 
 **Changes:**
 - 2026-09-24: the handler contract moves to `app/contracts/`, per plugin-architecture.md.
 - 2026-09-25: Accepted; an unlinked caller reaches the feature's access policy instead of being refused at the entry point.
+- 2026-10-01: `register_slack_listeners` is deleted (TASK-26.1); its tolerated item is closed.

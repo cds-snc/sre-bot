@@ -6,8 +6,9 @@ import pluggy
 import pytest
 
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
+from contracts.plugins.namespace import PLUGIN_NAMESPACE, hookimpl
 from infrastructure.events.service import EventDispatcher
-from infrastructure.plugins.manager import register_feature_integrations
+from server.plugins.manager import register_feature_integrations
 
 pytestmark = pytest.mark.unit
 
@@ -17,10 +18,9 @@ def test_register_event_handlers_hookspec_exists() -> None:
 
 
 def test_hookimpl_receives_dispatcher() -> None:
-    pm = pluggy.PluginManager("sre_bot")
+    pm = pluggy.PluginManager(PLUGIN_NAMESPACE)
     pm.add_hookspecs(FeatureLifecycleSpecs)
     observed: dict[str, object] = {}
-    hookimpl = pluggy.HookimplMarker("sre_bot")
 
     class Plugin:
         @hookimpl
@@ -42,7 +42,7 @@ def test_hookspec_called_during_feature_integration(monkeypatch) -> None:
     fake_pm.hook.register_event_handlers = mocked_hook
 
     monkeypatch.setattr(
-        "infrastructure.plugins.manager.get_plugin_manager",
+        "server.plugins.manager.get_plugin_manager",
         lambda: fake_pm,
     )
 

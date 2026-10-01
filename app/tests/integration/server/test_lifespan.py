@@ -182,7 +182,7 @@ def test_lifespan_start_scheduled_tasks_runs_when_environment_is_prod(mock_setti
 
     # Assert
     assert result is stop_event
-    init_mock.assert_called_once_with(mock_bot)
+    init_mock.assert_called_once_with(mock_bot, lifespan_module.register_background_jobs)
     run_mock.assert_called_once()
     mock_logger.info.assert_called_with("scheduled_tasks_started")
 
