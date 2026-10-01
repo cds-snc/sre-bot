@@ -1,7 +1,5 @@
 """Tests for the incident_draft Slack platform adapter."""
 
-from __future__ import annotations
-
 import re
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -22,30 +20,29 @@ from packages.incident_draft.service import (
     DOCUMENT_UNREADABLE_CODE,
     EMPTY_HISTORY_CODE,
     NO_ANSWERS_CODE,
+    IncidentChannelPort,
 )
 from packages.incident_draft.settings import IncidentDraftSettings
 
 pytestmark = pytest.mark.unit
 
 _DRAFT = "packages.incident_draft.platforms.slack.draft_incident_document"
+_CHANNEL_PORT = "packages.incident_draft.platforms.slack.get_incident_channel_port"
 _DOC_URL = "https://docs.google.com/document/d/DOC123/edit"
 
 
-def _client(messages: list[dict] | None = None, bookmark_link: str = _DOC_URL) -> MagicMock:
-    """Build a Slack client mock with a bookmarked incident doc and history."""
-    client = MagicMock()
-    client.bookmarks_list.return_value = {
-        "ok": True,
-        "bookmarks": [
-            {"title": "Some runbook", "link": "https://example.com"},
-            {"title": "Incident report", "link": bookmark_link},
-        ],
-    }
-    client.conversations_history.return_value = {"messages": messages or []}
-    client.conversations_info.return_value = {"channel": {"created": 1_700_000_000}}
-    client.users_info.return_value = {"ok": True, "user": {"profile": {"display_name": "Ada"}}}
-    client.auth_test.return_value = {"ok": True, "user_id": "UBOT"}
-    return client
+def _channel(messages: list[dict] | None = None, bookmark_link: str = _DOC_URL) -> MagicMock:
+    """Build a fake incident channel port with a bookmarked incident doc and history."""
+    channel = MagicMock(spec=IncidentChannelPort)
+    channel.list_bookmarks.return_value = [
+        {"title": "Some runbook", "link": "https://example.com"},
+        {"title": "Incident report", "link": bookmark_link},
+    ]
+    channel.fetch_history.return_value = messages or []
+    channel.get_channel.return_value = {"created": 1_700_000_000}
+    channel.get_user.return_value = {"profile": {"display_name": "Ada"}}
+    channel.get_self_identity.return_value = {"user_id": "UBOT"}
+    return channel
 
 
 def _outcome(document_id: str = "NEW1", drafted=("Trigger",), unanswered=(), created: bool = True) -> DraftedDocument:
@@ -75,20 +72,23 @@ class TestRegisterCommands:
         fallback = provider.register_command.call_args.kwargs["fallback_handler"]
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
-        with patch("packages.incident_draft.platforms.slack.handle_draft_command") as mock_handle:
+        with (
+            patch(_CHANNEL_PORT) as mock_port,
+            patch("packages.incident_draft.platforms.slack.handle_draft_command") as mock_handle,
+        ):
             fallback(payload)
 
-        mock_handle.assert_called_once_with(payload, {}, provider.client)
+        mock_handle.assert_called_once_with(payload, {}, provider.client, mock_port.return_value)
 
 
 class TestHandleDraftCommand:
     def test_success_is_a_single_line_linking_the_draft(self):
-        client = _client([{"user": "U1", "text": "prod is down", "ts": "1"}])
+        channel = _channel([{"user": "U1", "text": "prod is down", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
         outcome = _outcome(drafted=("Trigger", "Impact"), unanswered=("Lessons Learned",))
 
         with patch(_DRAFT, new=AsyncMock(return_value=OperationResult.success(data=outcome))) as mock_service:
-            response = handle_draft_command(payload, {}, client)
+            response = handle_draft_command(payload, {}, MagicMock(), channel)
 
         assert response.ephemeral is True
         assert response.message == (
@@ -103,7 +103,7 @@ class TestHandleDraftCommand:
         assert mock_service.await_args.args[0] == "DOC123"
 
     def test_transcript_is_passed_to_the_service_chronologically(self):
-        client = _client(
+        channel = _channel(
             [
                 {"user": "U1", "text": "newest", "ts": "2"},
                 {"user": "U1", "text": "oldest", "ts": "1"},
@@ -112,18 +112,18 @@ class TestHandleDraftCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_DRAFT, new=AsyncMock(return_value=OperationResult.success(data=_outcome()))) as mock_service:
-            handle_draft_command(payload, {}, client)
+            handle_draft_command(payload, {}, MagicMock(), channel)
 
         messages = mock_service.await_args.args[1]
         assert [m.text for m in messages] == ["oldest", "newest"]
 
     def test_missing_bookmark_renders_notice_without_calling_service(self):
-        client = _client()
-        client.bookmarks_list.return_value = {"ok": True, "bookmarks": []}
+        channel = _channel()
+        channel.list_bookmarks.return_value = []
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_DRAFT, new=AsyncMock()) as mock_service:
-            response = handle_draft_command(payload, {}, client)
+            response = handle_draft_command(payload, {}, MagicMock(), channel)
 
         assert "couldn't find an incident document" in response.message.lower()
         mock_service.assert_not_awaited()
@@ -137,27 +137,27 @@ class TestHandleDraftCommand:
         ],
     )
     def test_known_error_codes_render_specific_notices(self, error_code, fragment):
-        client = _client([{"user": "U1", "text": "hi", "ts": "1"}])
+        channel = _channel([{"user": "U1", "text": "hi", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(
             _DRAFT,
             new=AsyncMock(return_value=OperationResult.permanent_error(message="x", error_code=error_code)),
         ):
-            response = handle_draft_command(payload, {}, client)
+            response = handle_draft_command(payload, {}, MagicMock(), channel)
 
         assert response.ephemeral is True
         assert fragment in response.message.lower()
 
     def test_unknown_error_renders_generic_error(self):
-        client = _client([{"user": "U1", "text": "hi", "ts": "1"}])
+        channel = _channel([{"user": "U1", "text": "hi", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(
             _DRAFT,
             new=AsyncMock(return_value=OperationResult.transient_error(message="boom", error_code="SERVER_ERROR")),
         ):
-            response = handle_draft_command(payload, {}, client)
+            response = handle_draft_command(payload, {}, MagicMock(), channel)
 
         assert response.message.startswith("❌")
 
@@ -165,51 +165,51 @@ class TestHandleDraftCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_DRAFT, new=AsyncMock()) as mock_service:
-            response = handle_draft_command(payload, {}, None)
+            response = handle_draft_command(payload, {}, None, _channel())
 
         assert response.ephemeral is True
         mock_service.assert_not_awaited()
 
     def test_limit_argument_is_passed_to_history_fetch(self):
-        client = _client([{"user": "U1", "text": "hi", "ts": "1"}])
+        channel = _channel([{"user": "U1", "text": "hi", "ts": "1"}])
         payload = CommandPayload(text="--limit 25", user_id="U9", channel_id="C123")
 
         with patch(_DRAFT, new=AsyncMock(return_value=OperationResult.success(data=_outcome()))):
-            handle_draft_command(payload, {"--limit": 25}, client)
+            handle_draft_command(payload, {"--limit": 25}, MagicMock(), channel)
 
-        assert client.conversations_history.call_args.kwargs["limit"] == 25
+        assert channel.fetch_history.call_args.kwargs["limit"] == 25
 
 
 class TestFindIncidentDocumentId:
     def test_extracts_id_from_incident_report_bookmark(self):
-        assert _find_incident_document_id(_client(), "C123", structlog.get_logger()) == "DOC123"
+        assert _find_incident_document_id(_channel(), "C123", structlog.get_logger()) == "DOC123"
 
     def test_invalid_link_returns_none(self):
-        client = _client(bookmark_link="https://example.com/not-a-doc")
+        channel = _channel(bookmark_link="https://example.com/not-a-doc")
 
-        assert _find_incident_document_id(client, "C123", structlog.get_logger()) is None
+        assert _find_incident_document_id(channel, "C123", structlog.get_logger()) is None
 
     def test_api_error_returns_none(self):
-        client = MagicMock()
-        client.bookmarks_list.side_effect = RuntimeError("nope")
+        channel = MagicMock(spec=IncidentChannelPort)
+        channel.list_bookmarks.side_effect = RuntimeError("nope")
 
-        assert _find_incident_document_id(client, "C123", structlog.get_logger()) is None
+        assert _find_incident_document_id(channel, "C123", structlog.get_logger()) is None
 
 
 class TestHelpers:
     def test_fetch_transcript_resolves_display_names(self):
-        client = _client([{"user": "U1", "text": "prod is down", "ts": "1"}])
+        channel = _channel([{"user": "U1", "text": "prod is down", "ts": "1"}])
 
-        messages = _fetch_transcript(client, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
+        messages = _fetch_transcript(channel, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
 
         assert messages[0].author == "Ada"
         assert messages[0].text == "prod is down"
 
     def test_fetch_transcript_degrades_to_empty_on_api_error(self):
-        client = _client()
-        client.conversations_history.side_effect = RuntimeError("nope")
+        channel = _channel()
+        channel.fetch_history.side_effect = RuntimeError("nope")
 
-        assert _fetch_transcript(client, "C123", limit=10, oldest=0.0, log=structlog.get_logger()) == []
+        assert _fetch_transcript(channel, "C123", limit=10, oldest=0.0, log=structlog.get_logger()) == []
 
     def test_resolve_limit_caps_and_defaults(self):
         settings = IncidentDraftSettings(
@@ -229,7 +229,7 @@ class TestBotMessageFiltering:
     """The bot's own scaffolding messages must not reach the transcript."""
 
     def test_own_messages_are_excluded(self):
-        client = _client(
+        channel = _channel(
             [
                 {"user": "UBOT", "text": "A hangout has been created at: https://meet…", "ts": "3"},
                 {"user": "UBOT", "text": "An incident report has been created at: …", "ts": "2"},
@@ -237,29 +237,29 @@ class TestBotMessageFiltering:
             ]
         )
 
-        messages = _fetch_transcript(client, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
+        messages = _fetch_transcript(channel, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
 
         assert [m.text for m in messages] == ["prod is down"]
 
     def test_other_bots_are_kept(self):
         """An alerting bot's message is often the first real timeline event."""
-        client = _client(
+        channel = _channel(
             [
                 {"user": "UPAGERDUTY", "text": "[ALERT] checkout 500 rate above threshold", "ts": "1"},
                 {"user": "UBOT", "text": "An incident report has been created at: …", "ts": "2"},
             ]
         )
 
-        messages = _fetch_transcript(client, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
+        messages = _fetch_transcript(channel, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
 
         assert [m.text for m in messages] == ["[ALERT] checkout 500 rate above threshold"]
 
     def test_auth_test_failure_keeps_every_message(self):
         """A failed self-lookup must degrade to no filtering, not an empty draft."""
-        client = _client([{"user": "U1", "text": "prod is down", "ts": "1"}])
-        client.auth_test.side_effect = RuntimeError("nope")
+        channel = _channel([{"user": "U1", "text": "prod is down", "ts": "1"}])
+        channel.get_self_identity.side_effect = RuntimeError("nope")
 
-        messages = _fetch_transcript(client, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
+        messages = _fetch_transcript(channel, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
 
         assert [m.text for m in messages] == ["prod is down"]
 
@@ -268,30 +268,30 @@ class TestBotDetectionSignals:
     """Own-message detection must not rely on the user id alone."""
 
     def test_matches_on_bot_id_when_user_id_differs(self):
-        client = _client(
+        channel = _channel(
             [
                 {"user": "UOTHER", "bot_id": "BSELF", "text": "created a hangout", "ts": "2"},
                 {"user": "U1", "text": "prod is down", "ts": "1"},
             ]
         )
-        client.auth_test.return_value = {"ok": True, "user_id": "UBOT", "bot_id": "BSELF", "user": "sre_dev"}
+        channel.get_self_identity.return_value = {"user_id": "UBOT", "bot_id": "BSELF", "user": "sre_dev"}
 
-        messages = _fetch_transcript(client, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
+        messages = _fetch_transcript(channel, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
 
         assert [m.text for m in messages] == ["prod is down"]
 
     def test_matches_on_display_name_when_ids_differ(self):
         """The case that slipped through: posted under an id auth_test doesn't report."""
-        client = _client([{"user": "UUNKNOWN", "text": "posted a SEV-2 severity warning", "ts": "1"}])
-        client.auth_test.return_value = {"ok": True, "user_id": "UBOT", "bot_id": "BSELF", "user": "sre_dev"}
-        client.users_info.return_value = {"ok": True, "user": {"profile": {"display_name": "SRE Dev"}}}
+        channel = _channel([{"user": "UUNKNOWN", "text": "posted a SEV-2 severity warning", "ts": "1"}])
+        channel.get_self_identity.return_value = {"user_id": "UBOT", "bot_id": "BSELF", "user": "sre_dev"}
+        channel.get_user.return_value = {"profile": {"display_name": "SRE Dev"}}
 
-        messages = _fetch_transcript(client, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
+        messages = _fetch_transcript(channel, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
 
         assert messages == []
 
     def test_channel_events_are_dropped_whoever_made_them(self):
-        client = _client(
+        channel = _channel(
             [
                 {"user": "U1", "subtype": "channel_topic", "text": "set the channel topic to: SEV-2", "ts": "3"},
                 {"user": "U1", "subtype": "channel_join", "text": "has joined the channel", "ts": "2"},
@@ -299,16 +299,16 @@ class TestBotDetectionSignals:
             ]
         )
 
-        messages = _fetch_transcript(client, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
+        messages = _fetch_transcript(channel, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
 
         assert [m.text for m in messages] == ["prod is down"]
 
     def test_a_human_named_similarly_is_not_dropped(self):
-        client = _client([{"user": "U1", "text": "prod is down", "ts": "1"}])
-        client.auth_test.return_value = {"ok": True, "user_id": "UBOT", "bot_id": "BSELF", "user": "sre_dev"}
-        client.users_info.return_value = {"ok": True, "user": {"profile": {"display_name": "Sam Devlin"}}}
+        channel = _channel([{"user": "U1", "text": "prod is down", "ts": "1"}])
+        channel.get_self_identity.return_value = {"user_id": "UBOT", "bot_id": "BSELF", "user": "sre_dev"}
+        channel.get_user.return_value = {"profile": {"display_name": "Sam Devlin"}}
 
-        messages = _fetch_transcript(client, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
+        messages = _fetch_transcript(channel, "C123", limit=10, oldest=0.0, log=structlog.get_logger())
 
         assert [m.text for m in messages] == ["prod is down"]
 
@@ -316,15 +316,15 @@ class TestBotDetectionSignals:
 class TestProgressNotice:
     """The invoker is told work is underway, before the slow part starts."""
 
-    def _run(self, client):
+    def _run(self, client, channel):
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
         with patch(_DRAFT, new=AsyncMock(return_value=OperationResult.success(data=_outcome()))):
-            return handle_draft_command(payload, {}, client)
+            return handle_draft_command(payload, {}, client, channel)
 
     def test_an_ephemeral_notice_is_posted_to_the_invoker(self):
-        client = _client([{"user": "U1", "text": "prod is down", "ts": "1"}])
+        client = MagicMock()
 
-        self._run(client)
+        self._run(client, _channel([{"user": "U1", "text": "prod is down", "ts": "1"}]))
 
         client.chat_postEphemeral.assert_called_once()
         kwargs = client.chat_postEphemeral.call_args.kwargs
@@ -334,29 +334,31 @@ class TestProgressNotice:
 
     def test_the_notice_precedes_the_transcript_fetch(self):
         """Posting it after the slow work would defeat the point."""
-        client = _client([{"user": "U1", "text": "prod is down", "ts": "1"}])
+        client = MagicMock()
+        channel = _channel([{"user": "U1", "text": "prod is down", "ts": "1"}])
         order: list[str] = []
         client.chat_postEphemeral.side_effect = lambda **_: order.append("notice")
-        client.conversations_history.side_effect = lambda **_: (order.append("history"), {"messages": []})[1]
+        channel.fetch_history.side_effect = lambda *_, **__: (order.append("history"), [])[1]
 
-        self._run(client)
+        self._run(client, channel)
 
         assert order[0] == "notice"
 
     def test_no_notice_when_the_channel_has_no_incident_document(self):
         """Nothing slow follows, so a progress note would only be noise."""
-        client = _client()
-        client.bookmarks_list.return_value = {"ok": True, "bookmarks": []}
+        client = MagicMock()
+        channel = _channel()
+        channel.list_bookmarks.return_value = []
 
-        self._run(client)
+        self._run(client, channel)
 
         client.chat_postEphemeral.assert_not_called()
 
     def test_a_failed_notice_does_not_fail_the_command(self):
-        client = _client([{"user": "U1", "text": "prod is down", "ts": "1"}])
+        client = MagicMock()
         client.chat_postEphemeral.side_effect = RuntimeError("missing scope")
 
-        response = self._run(client)
+        response = self._run(client, _channel([{"user": "U1", "text": "prod is down", "ts": "1"}]))
 
         assert "draft incident report" in response.message
 
@@ -365,7 +367,7 @@ class TestPartialDraftMessage:
     """A truncated run still produces a draft, and says what is missing."""
 
     def _run(self, partial: bool):
-        client = _client([{"user": "U1", "text": "prod is down", "ts": "1"}])
+        channel = _channel([{"user": "U1", "text": "prod is down", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
         outcome = DraftedDocument(
             document_id="NEW1",
@@ -375,7 +377,7 @@ class TestPartialDraftMessage:
             partial=partial,
         )
         with patch(_DRAFT, new=AsyncMock(return_value=OperationResult.success(data=outcome))):
-            return handle_draft_command(payload, {}, client)
+            return handle_draft_command(payload, {}, MagicMock(), channel)
 
     def test_a_partial_run_links_the_draft_and_explains_the_gap(self):
         response = self._run(partial=True)
@@ -397,8 +399,8 @@ class TestTimestampFormatting:
 
     @staticmethod
     def _stamp(tzname: str, ts: str = "1755450120") -> str:
-        client = _client([{"user": "U1", "text": "prod is down", "ts": ts}])
-        return _fetch_transcript(client, "C123", limit=10, oldest=0.0, log=structlog.get_logger(), tzname=tzname)[0].timestamp
+        channel = _channel([{"user": "U1", "text": "prod is down", "ts": ts}])
+        return _fetch_transcript(channel, "C123", limit=10, oldest=0.0, log=structlog.get_logger(), tzname=tzname)[0].timestamp
 
     def test_slack_timestamps_carry_date_time_and_zone(self):
         stamp = self._stamp("America/Toronto")

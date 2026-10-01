@@ -9,16 +9,17 @@ instructions, answers them from the transcript, and writes the result into a
 draft document. The one write into the incident report itself is its timeline
 section, which the service replaces via the document port.
 
-The Slack Web API client is captured lazily from the provider at dispatch
-time (it only exists after startup); ``slack_sdk`` is imported for typing
-only, keeping the package free of a runtime Slack SDK dependency.
+Channel bookmarks, history, metadata and user records are read through the
+package's ``IncidentChannelPort``, resolved from ``providers`` at dispatch
+time. The Slack Web API client is captured lazily from the provider (it only
+exists after startup) and is used only for the in-request progress notice;
+``slack_sdk`` is imported for typing only.
 """
-
-from __future__ import annotations
 
 import asyncio
 import re
 import time
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -28,10 +29,12 @@ import structlog
 from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
 from infrastructure.i18n import t
 from packages.incident_draft.domain import DraftedDocument, TranscriptMessage
+from packages.incident_draft.providers import get_incident_channel_port
 from packages.incident_draft.service import (
     DOCUMENT_UNREADABLE_CODE,
     EMPTY_HISTORY_CODE,
     NO_ANSWERS_CODE,
+    IncidentChannelPort,
     draft_incident_document,
 )
 from packages.incident_draft.settings import (
@@ -81,10 +84,10 @@ def register_commands(provider: SlackPlatformProvider) -> None:
     """
 
     def _dispatch(payload: CommandPayload, parsed_args: dict[str, Any]) -> CommandResponse:
-        return handle_draft_command(payload, parsed_args, provider.client)
+        return handle_draft_command(payload, parsed_args, provider.client, get_incident_channel_port())
 
     def _dispatch_default(payload: CommandPayload) -> CommandResponse:
-        return handle_draft_command(payload, {}, provider.client)
+        return handle_draft_command(payload, {}, provider.client, get_incident_channel_port())
 
     provider.register_command(
         command="draft",
@@ -111,6 +114,7 @@ def handle_draft_command(
     payload: CommandPayload,
     parsed_args: dict[str, Any],
     client: WebClient | None,
+    channel: IncidentChannelPort,
 ) -> CommandResponse:
     """Handle ``/sre incident draft`` and report the outcome ephemerally.
 
@@ -124,7 +128,9 @@ def handle_draft_command(
         parsed_args: Parsed ``--limit`` argument (empty for the no-argument
             invocation). History always starts at the channel's creation so the
             draft covers the whole incident.
-        client: Slack Web API client, or ``None`` before startup.
+        client: Slack Web API client used for the progress notice, or ``None``
+            before startup.
+        channel: Port reading the incident channel.
 
     Returns:
         An ephemeral ``CommandResponse`` linking the new draft document, or a
@@ -141,7 +147,7 @@ def handle_draft_command(
         log.warning("incident_draft_no_client_or_channel")
         return _error_response(locale)
 
-    document_id = _find_incident_document_id(client, payload.channel_id, log)
+    document_id = _find_incident_document_id(channel, payload.channel_id, log)
     if not document_id:
         msg = t(
             f"{_DOMAIN}.result.no_document",
@@ -157,8 +163,8 @@ def handle_draft_command(
 
     settings = get_incident_draft_settings()
     limit = _resolve_limit(parsed_args.get("--limit"), settings)
-    oldest = _resolve_channel_start(client, payload.channel_id, settings, log)
-    messages = _fetch_transcript(client, payload.channel_id, limit=limit, oldest=oldest, log=log, tzname=settings.TIMEZONE)
+    oldest = _resolve_channel_start(channel, payload.channel_id, settings, log)
+    messages = _fetch_transcript(channel, payload.channel_id, limit=limit, oldest=oldest, log=log, tzname=settings.TIMEZONE)
 
     result = asyncio.run(draft_incident_document(document_id, messages))
 
@@ -262,7 +268,7 @@ def _render_error(
 
 
 def _find_incident_document_id(
-    client: WebClient,
+    channel: IncidentChannelPort,
     channel_id: str,
     log: structlog.stdlib.BoundLogger,
 ) -> str | None:
@@ -273,12 +279,12 @@ def _find_incident_document_id(
     cannot be found (including on any Slack API failure).
     """
     try:
-        response = client.bookmarks_list(channel_id=channel_id)
+        bookmarks = channel.list_bookmarks(channel_id)
     except Exception as exc:  # noqa: BLE001 - degrade to "no document" on any API error
         log.warning("incident_draft_bookmarks_fetch_failed", error=str(exc))
         return None
 
-    for bookmark in response.get("bookmarks") or []:
+    for bookmark in bookmarks:
         if bookmark.get("title") != _INCIDENT_REPORT_BOOKMARK:
             continue
         match = _DOC_ID_PATTERN.search(bookmark.get("link") or "")
@@ -289,7 +295,7 @@ def _find_incident_document_id(
 
 
 def _fetch_transcript(
-    client: WebClient,
+    channel: IncidentChannelPort,
     channel_id: str,
     *,
     limit: int,
@@ -303,15 +309,14 @@ def _fetch_transcript(
     list is returned so the caller renders the empty-history path.
     """
     try:
-        response = client.conversations_history(channel=channel_id, limit=limit, oldest=f"{oldest:.6f}")
+        raw_messages = channel.fetch_history(channel_id, limit=limit, oldest=f"{oldest:.6f}")
     except Exception as exc:  # noqa: BLE001 - degrade to empty history on any API error
         log.warning("incident_draft_history_fetch_failed", error=str(exc))
         return []
 
-    raw_messages = response.get("messages") or []
     name_cache: dict[str, str] = {}
     messages: list[TranscriptMessage] = []
-    identity = _resolve_self_identity(client, log)
+    identity = _resolve_self_identity(channel, log)
     skipped_own = 0
 
     # conversations_history returns newest-first; draft chronologically.
@@ -325,7 +330,7 @@ def _fetch_transcript(
             # are channel plumbing, never incident facts.
             skipped_own += 1
             continue
-        author = _resolve_display_name(client, user_id, name_cache, log)
+        author = _resolve_display_name(channel, user_id, name_cache, log)
         if _is_own_message(raw, author, identity):
             # This bot's own posts (topic changes, hangout links, "an incident
             # report has been created at...") are scaffolding. Other bots are
@@ -343,7 +348,7 @@ def _fetch_transcript(
     return messages
 
 
-def _resolve_self_identity(client: WebClient, log: structlog.stdlib.BoundLogger) -> dict[str, str]:
+def _resolve_self_identity(channel: IncidentChannelPort, log: structlog.stdlib.BoundLogger) -> dict[str, str]:
     """Return this bot's own ``user_id``, ``bot_id`` and name from ``auth_test``.
 
     Matching on the user id alone proved unreliable -- depending on how a
@@ -353,7 +358,7 @@ def _resolve_self_identity(client: WebClient, log: structlog.stdlib.BoundLogger)
     the lookup fails, which disables the filter rather than failing the draft.
     """
     try:
-        response = client.auth_test()
+        response = channel.get_self_identity()
     except Exception as exc:  # noqa: BLE001 - a failed lookup must not fail the draft
         log.warning("incident_draft_auth_test_failed", error=str(exc))
         return {}
@@ -367,7 +372,7 @@ def _resolve_self_identity(client: WebClient, log: structlog.stdlib.BoundLogger)
     return identity
 
 
-def _is_own_message(raw: dict[str, Any], author: str, identity: dict[str, str]) -> bool:
+def _is_own_message(raw: Mapping[str, Any], author: str, identity: dict[str, str]) -> bool:
     """Whether a message was posted by this bot, matched on any known signal."""
     if not identity:
         return False
@@ -381,7 +386,7 @@ def _is_own_message(raw: dict[str, Any], author: str, identity: dict[str, str]) 
     return bool(own_name) and _normalize_name(author) == own_name
 
 
-def _is_channel_event(raw: dict[str, Any]) -> bool:
+def _is_channel_event(raw: Mapping[str, Any]) -> bool:
     """Whether a message is a Slack system event rather than someone talking."""
     subtype = str(raw.get("subtype") or "")
     return subtype.startswith("channel_") or subtype in _SYSTEM_SUBTYPES
@@ -413,7 +418,7 @@ def _format_time(raw_ts: Any, tzname: str) -> str:
 
 
 def _resolve_display_name(
-    client: WebClient,
+    channel: IncidentChannelPort,
     user_id: str,
     cache: dict[str, str],
     log: structlog.stdlib.BoundLogger,
@@ -424,9 +429,8 @@ def _resolve_display_name(
 
     name = user_id
     try:
-        info = client.users_info(user=user_id)
-        user: dict[str, Any] = info.get("user") or {}
-        profile: dict[str, Any] = user.get("profile") or {}
+        user = channel.get_user(user_id)
+        profile: Mapping[str, Any] = user.get("profile") or {}
         name = profile.get("display_name") or profile.get("real_name") or user.get("real_name") or user_id
     except Exception as exc:  # noqa: BLE001 - a missing name must not fail the draft
         log.warning("incident_draft_user_lookup_failed", user_id=user_id, error=str(exc))
@@ -449,7 +453,7 @@ def _resolve_limit(raw: Any, settings: IncidentDraftSettings) -> int:
 
 
 def _resolve_channel_start(
-    client: WebClient,
+    channel: IncidentChannelPort,
     channel_id: str,
     settings: IncidentDraftSettings,
     log: structlog.stdlib.BoundLogger,
@@ -461,8 +465,7 @@ def _resolve_channel_start(
     gracefully instead of failing the draft.
     """
     try:
-        info = client.conversations_info(channel=channel_id)
-        created = (info.get("channel") or {}).get("created")
+        created = channel.get_channel(channel_id).get("created")
         if created is not None:
             return float(created)
     except Exception as exc:  # noqa: BLE001 - degrade to default window on any API error

@@ -3,9 +3,10 @@
 The harness registers the production ``register_slack_commands`` hookimpls
 through a pluggy PluginManager onto a real ``SlackPlatformProvider`` bound to
 a real ``slack_bolt.App``, then feeds form-encoded slash-command requests to
-``App.dispatch``. Only the edges are faked: the Slack Web API client, the
-``response_url`` webhook that Bolt's ``respond`` posts to, and each package's
-backing service (patched per test).
+``App.dispatch``. Only the edges are faked: the Slack Web API client (which
+also backs each package's Slack lookup adapter), the ``response_url`` webhook
+that Bolt's ``respond`` posts to, and each package's backing service (patched
+per test).
 """
 
 import importlib.util
@@ -34,6 +35,12 @@ from infrastructure.plugins.specs import FeatureLifecycleSpecs
 from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
+from packages.incident_draft.adapters.slack import SlackIncidentChannel as IncidentDraftSlackChannel
+from packages.incident_draft.platforms import slack as incident_draft_slack
+from packages.incident_summary.adapters.slack import SlackIncidentChannel as IncidentSummarySlackChannel
+from packages.incident_summary.platforms import slack as incident_summary_slack
+from packages.rant.adapters.slack import SlackUserIdentityLookup
+from packages.rant.platforms import slack as rant_slack
 
 SLACK_COMMAND_HOOKIMPLS: tuple[ModuleType, ...] = (
     sre_module,
@@ -172,6 +179,11 @@ def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> Slack
     provider = SlackPlatformProvider(settings=settings, formatter=SlackBlockKitFormatter(), command_prefix=command_prefix)
     provider._app = app
     provider._client = client
+
+    # Each package's Slack lookups run through its real adapter over the same fake client.
+    monkeypatch.setattr(rant_slack, "get_user_identity_lookup", lambda: SlackUserIdentityLookup(client))
+    monkeypatch.setattr(incident_draft_slack, "get_incident_channel_port", lambda: IncidentDraftSlackChannel(client))
+    monkeypatch.setattr(incident_summary_slack, "get_incident_channel_port", lambda: IncidentSummarySlackChannel(client))
 
     plugin_manager = pluggy.PluginManager("sre_bot")
     plugin_manager.add_hookspecs(FeatureLifecycleSpecs)

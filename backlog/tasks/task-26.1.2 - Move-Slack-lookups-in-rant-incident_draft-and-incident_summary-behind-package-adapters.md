@@ -3,10 +3,10 @@ id: TASK-26.1.2
 title: >-
   Move Slack lookups in rant, incident_draft and incident_summary behind package
   adapters
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-09-29 20:19'
-updated_date: '2026-09-29 20:20'
+updated_date: '2026-10-01 12:48'
 labels:
   - plugin-architecture
   - slack
@@ -31,10 +31,10 @@ Stack A layer 7b (slice 2 of TASK-26.1). Behaviour-neutral: every Slack Web API 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 rant, incident_draft and incident_summary handlers make no Slack lookup through provider.client; each lookup goes through a Protocol defined in the package's service.py and implemented in its adapters/slack.py
-- [ ] #2 Only adapters/ modules import integrations; no contract (e) ignore entry is added and no ports.py or other name outside the decisions/feature-packages.md layout table is created
-- [ ] #3 Adapter tests cover each lookup method's call shape; existing handler tests keep their assertions and swap only their client stub for a fake of the new Protocol
-- [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; the TASK-36 legacy_surface suite is green before and after
+- [x] #1 rant, incident_draft and incident_summary handlers make no Slack lookup through provider.client; each lookup goes through a Protocol defined in the package's service.py and implemented in its adapters/slack.py
+- [x] #2 Only adapters/ modules import integrations; no contract (e) ignore entry is added and no ports.py or other name outside the decisions/feature-packages.md layout table is created
+- [x] #3 Adapter tests cover each lookup method's call shape; existing handler tests keep their assertions and swap only their client stub for a fake of the new Protocol
+- [x] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; the TASK-36 legacy_surface suite is green before and after
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -62,3 +62,35 @@ AC map: #1 per-package steps; #2 pattern + lint-imports; #3 tests; #4 gates.
 Size: about 12 production files, about 140 LOC.
 Rollback: git revert; same Slack calls either way.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented 2026-10-01 on stack-a/task-26.1.2-slack-lookup-adapters (Stack A layer 7b). Left In Progress for human review.
+
+What changed
+- rant: service.py gains UserIdentity (frozen dataclass) and the UserIdentityLookup Protocol (lookup_user_identity). New adapters/slack.py (SlackUserIdentityLookup, build_user_identity_lookup) and providers.py (get_user_identity_lookup, lru_cached). The users_info call and profile parsing moved into the adapter; the handler keeps the try/except that falls back to posting as the bot.
+- incident_draft: service.py gains IncidentChannelPort (list_bookmarks, fetch_history, get_channel, get_user, get_self_identity). New adapters/slack.py (SlackIncidentChannel) beside google_docs.py; providers.py gains get_incident_channel_port.
+- incident_summary: service.py gains IncidentChannelPort (fetch_history, get_channel, get_user). New adapters/slack.py and providers.py.
+- The draft and summary adapters are thin: one Web API call per method with the same arguments as before, returning the part of the payload the handler reads. They let Web API errors propagate, so every existing `except Exception` degradation and log event stays in the handler. Nothing classifies, so classify_slack_error is not used.
+- Handlers get the port from providers.py inside the dispatch closure. provider.client is now used only for replies: rant chat_postMessage and incident_draft chat_postEphemeral. incident_summary no longer reads provider.client at all.
+- Removed `from __future__ import annotations` from every touched file that had it.
+
+Things a reviewer should know
+- Lookups now run on integrations.slack.client.get_slack_web_client() (same SLACK_BOT_TOKEN) instead of the Bolt app's client, so they pick up that factory's timeout and rate-limit/server-error retry handlers. This follows from the approved plan; the calls and arguments are unchanged.
+- handle_summarize_command keeps an optional third parameter (now `IncidentChannelPort | None`) so the existing missing-client test keeps its assertion. Production never passes None. TASK-26.1.3 re-signs the handlers and can drop it.
+- platforms/slack.py in incident_draft now imports providers at module level, so the Google Docs adapter is imported when the package loads rather than on first draft. Import only; no side effects.
+- Size: 7 modified and 7 new production files, about 320 added lines (the plan estimated 12 files and 140 LOC; docstrings and Protocol bodies account for the difference).
+
+Tests
+- New: test_rant_slack_adapter_lookup.py, test_incident_draft_slack_adapter_lookup.py, test_incident_summary_slack_adapter_lookup.py (call shape per method, returned shape, SlackApiError propagates, builder uses the client factory).
+- Existing handler tests keep their assertions; the client stub became a MagicMock(spec=<Protocol>), and assertions that named a Web API method now name the Protocol method (for example conversations_history -> fetch_history). One test was renamed (test_handler_dispatches_with_channel_port_and_parsed_args) and one rant handler test was added for a lookup that raises.
+- legacy_surface conftest: build_harness patches each package's provider function to the real adapter over the harness FakeSlackClient. No assertion changed.
+
+Gates (run from app/)
+- uv run ruff check . -> All checks passed
+- uv run lint-imports -> 8 kept, 0 broken; app/pyproject.toml untouched, no ignore entry added
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> 67 errors in 24 files repo-wide, 0 in files touched by this task
+- uv run pytest tests/integration/legacy_surface -> 17 passed before and after
+- uv run pytest tests --ignore=tests/smoke -> 3563 passed, 6 failed. The 6 are the known order-dependent failures in tests/modules/webhooks/test_webhooks_aws_sns.py (3) and tests/unit/infrastructure/directory/test_google.py (3); both files pass when run on their own (111 passed).
+<!-- SECTION:NOTES:END -->

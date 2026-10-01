@@ -9,10 +9,9 @@ This module is deliberately free of Slack and HTTP imports: it consumes
 platform adapter can reuse it.
 """
 
-from __future__ import annotations
-
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Any, Protocol, runtime_checkable
 
 import structlog
 
@@ -43,6 +42,23 @@ class TranscriptMessage:
 
     author: str
     text: str
+
+
+@runtime_checkable
+class IncidentChannelPort(Protocol):
+    """Behavior contract for reading the incident channel a summary is built from."""
+
+    def fetch_history(self, channel_id: str, *, limit: int, oldest: str) -> Sequence[Mapping[str, Any]]:
+        """Return up to ``limit`` raw channel messages posted since ``oldest``, newest first."""
+        ...
+
+    def get_channel(self, channel_id: str) -> Mapping[str, Any]:
+        """Return the channel's metadata, including its ``created`` time."""
+        ...
+
+    def get_user(self, user_id: str) -> Mapping[str, Any]:
+        """Return the user's record, including their ``profile``."""
+        ...
 
 
 async def summarize_transcript(
