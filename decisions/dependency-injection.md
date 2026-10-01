@@ -32,7 +32,7 @@ Current code:
 - Slack and Teams handlers, webhook consumers and jobs open a container per invocation and close it when the invocation ends.
 - Only entry points touch a container. Services receive their dependencies through their constructor, typed by Protocol, and never look anything up mid-method.
 
-**Feature-local wiring stays in the feature.** A feature builds its own service objects (repositories, application services, policies) from contracts it resolved from the registry, in its own wiring module. It does not register them as core services, and no other package imports that wiring.
+**Feature-local wiring stays in the feature.** A feature builds its own service objects (repositories, application services, policies) from contracts it resolved from the registry, in its own wiring module. It does not register them as core services, and no other package imports that wiring. In an umbrella, the services every subdomain shares are built by the provider functions in the feature's `core/api.py`, which each subdomain's wiring calls ([feature-packages.md](feature-packages.md)).
 
 **No `lru_cache` provider functions across layers.** A cached module-level function that returns a shared instance is the pattern being replaced; features and capabilities do not import one from another layer. Singleton lifetime, where a service needs it, is the host's registration choice (`register_value` or a factory closing over one instance), not a cache on a function.
 
@@ -67,3 +67,4 @@ Tolerated until closed:
 **Changes:**
 - 2026-09-24: replaced cached provider functions with an svcs registry of contract-keyed factories, resolved per call at entry points.
 - 2026-09-25: the boot check is construction and static validation with no network I/O; svcs pings are diagnostics; credential checks alert and never abort.
+- 2026-10-01: an umbrella's shared services are wired through its `core/api.py`.

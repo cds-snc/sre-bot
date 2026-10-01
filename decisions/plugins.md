@@ -32,11 +32,11 @@ Which plugins load should be a reviewed statement, not a side effect of what sit
 ```toml
 [project.entry-points."sre_bot"]
 "access.request" = "features.access.request"
-"incident.draft" = "features.incident.draft"
+"access.sync"    = "features.access.sync"
 approvals        = "capabilities.approvals"
 ```
 
-Entry-point names are dotted `<package>.<subdomain>` for subdomains, so the flat per-group name registry cannot collide. An umbrella feature's own package holds no hookimpls and is never an entry point ([feature-packages.md](feature-packages.md)).
+Entry-point names are dotted `<package>.<subdomain>` for subdomains, so the flat per-group name registry cannot collide. An umbrella feature's own package, its `core/` and its `common/` hold no hookimpls and are never entry points ([feature-packages.md](feature-packages.md)).
 
 **Enablement comes from configuration.** Each entry point has an enablement key in the base configuration file; the environment's file may override it ([configuration.md](configuration.md)). The host reads the entry points, skips every plugin disabled in the environment's configuration before registering it (`pm.set_blocked(name)` or filtering the entry-point list), and registers the rest. A disabled plugin registers nothing: no routes, no OpenAPI entries, no strategies, no settings reads.
 
@@ -95,3 +95,4 @@ Tolerated until closed:
 **Changes:**
 - 2026-09-24: entry points target `features.*` and `capabilities.*`; enablement comes from configuration files; extension points replace the in-process event hook.
 - 2026-09-25: boot failure policy is fixed by layer and kind (code defects abort, a feature with invalid settings is skipped); credential checks are an opt-in `register_credential_checks` hook that alerts without aborting.
+- 2026-10-01: an umbrella's `core/` and `common/` are never entry points, per feature-packages.md.

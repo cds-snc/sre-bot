@@ -71,7 +71,7 @@ Tickets: TASK-25 (per-vendor contract), TASK-87 (Google write replay safety) and
 - Sentinel: the audit sink lives in the vendor package, which has no classifier and imports `infrastructure.audit`;
 - Notify: `revoke_api_key` lives in the vendor package, which has no classifier;
 - Trello: ATIP operations in the vendor package, no classifier, no explicit timeout or retry;
-- OpenAI: the `Summarizer` port and implementation live in the vendor package, and `classify_openai_error` returns `OperationResult`;
+- OpenAI: the `Summarizer` port and implementation live in the vendor package instead of the text-generation capability ([plugin-architecture.md](plugin-architecture.md)), and `classify_openai_error` returns `OperationResult`;
 - every vendor's settings except AWS's still live in `infrastructure/configuration/integrations/` (TASK-24).
 
 **Changes:**
@@ -83,3 +83,4 @@ Tickets: TASK-25 (per-vendor contract), TASK-87 (Google write replay safety) and
 - 2026-09-25: factories do no network I/O; assumed-role credentials are deferred and refreshable; boot credential verification is an explicit check.
 - 2026-09-28: closed the `integrations/` → `infrastructure.operations` divergence (TASK-106 moved the shared types to `app/contracts/operations/`); the remaining `infrastructure` imports are import-linter ignore entries (TASK-18).
 - 2026-09-29: Slack has `classify_slack_error` and one Web client factory carrying the SDK retry handlers (TASK-25.4); only its transport-module placement (TASK-26) remains open.
+- 2026-10-01: the OpenAI `Summarizer` port and implementation are destined for the text-generation capability.

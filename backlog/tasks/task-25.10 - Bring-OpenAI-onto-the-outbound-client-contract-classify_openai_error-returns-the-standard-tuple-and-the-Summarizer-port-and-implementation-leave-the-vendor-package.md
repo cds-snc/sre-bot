@@ -2,18 +2,20 @@
 id: TASK-25.10
 title: >-
   Bring OpenAI onto the outbound-client contract: classify_openai_error returns
-  the standard tuple, and the Summarizer port and implementation leave the
-  vendor package
+  the standard tuple, and the Summarizer port and implementation move to the
+  text-generation capability
 status: To Do
 assignee: []
 created_date: '2026-09-18 16:51'
-updated_date: '2026-09-28 14:55'
+updated_date: '2026-10-01 14:06'
 labels:
   - clients
   - phase-3
 milestone: m-3
 dependencies:
   - TASK-106
+  - TASK-110
+  - TASK-114
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
@@ -22,6 +24,7 @@ references:
   - app/packages/incident_draft/service.py
   - app/packages/incident_summary/service.py
   - decisions/plugin-architecture.md
+  - decisions/feature-packages.md
 parent_task_id: TASK-25
 priority: medium
 ordinal: 243000
@@ -39,22 +42,25 @@ TODAY (verified 2026-09-18):
 
 CONSUMERS (re-grep): packages/incident_draft/service.py and packages/incident_summary/service.py. Both import Summarizer and get_summarizer from integrations.openai. packages/incident_summary/settings.py refers to integrations.openai.settings in prose.
 
-DESIGN QUESTION FOR THE PLANNER (raise it in chat, do not decide it in the plan). Summarizer is a port with two feature consumers. Options:
-- a business-agnostic infrastructure service (Path A, decisions/layers.md: promote on the second consumer);
-- a capability package (decisions/capability-packages.md, still Draft);
-- a per-feature adapter in each consumer.
-The choice decides where OpenAISummarizer and its parsing helpers live. The vendor package keeps only the client factory, classification and settings.
+OWNER DECIDED (human, 2026-10-01; decisions/plugin-architecture.md, "Text generation is a capability"). The Summarizer port and its OpenAI implementation move to a new capability, app/capabilities/text_generation/. The earlier options (an infrastructure service, or a per-feature adapter in each consumer) are rejected.
+- api.py holds the port, its domain types and the provider function. It keeps the one operation both consumers use today: source text plus instructions gives text, as OperationResult. Its names are feature-free: no incident or Slack vocabulary.
+- adapters/openai.py holds the OpenAI implementation and the response-parsing helpers. It is the only file importing integrations.openai, does try/except plus classify, and builds OperationResult.
+- An in-memory fake of the port lives in the package (cloud-portability.md fake contract).
+- Features keep their own prompt text and post-processing and pass them in.
+The structured template-fill operation is TASK-134, not this task. The vendor package keeps only the client factory, classification and settings.
 
-TARGET. integrations/openai/ exports build_openai_client (timeout plus a retry policy set once at construction, stated explicitly), classify_openai_error returning the standard tuple, and settings. The Summarizer port and implementation live in their decided owner, doing try/except + classify and building OperationResult. Both features are repointed with behaviour unchanged.
+SEQUENCING. This is the first package under app/capabilities/ unless a workplace capability (TASK-119 to TASK-121) lands first, so it waits for entry-point loading (TASK-110) and the generator and shape check (TASK-114), as those do. Whichever capability lands first adds capabilities to the import-linter root packages.
+
+TARGET. integrations/openai/ exports build_openai_client (timeout plus a retry policy set once at construction, stated explicitly), classify_openai_error returning the standard tuple, and settings. The port and implementation live in app/capabilities/text_generation/ as described above. Both features are repointed to its api.py with behaviour unchanged.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 integrations/openai/ contains only __init__.py, client.py and settings.py; classify_openai_error returns (OperationStatus, error_code, retry_after); every openai entry in bin/baselines/vendor_package_contract.txt is removed
-- [ ] #2 The Summarizer port and OpenAI implementation live in the owner the human decided; incident_draft and incident_summary are repointed with unchanged behaviour covered by their existing tests
+- [ ] #2 The port and its OpenAI implementation live in app/capabilities/text_generation/ (api.py, adapters/openai.py, an in-memory fake, README with classification and feature consumers); the package passes the TASK-114 shape check and its vocabulary is feature-free; incident_draft and incident_summary import only its api.py, with unchanged behaviour covered by their existing tests
 - [ ] #3 The OpenAI client's retry policy is explicit at construction (or explicitly none, with the reason recorded), alongside its timeout
 - [ ] #4 Classification tests cover each mapped HTTP status family and Retry-After, plus one unmapped exception propagating; no 'from __future__ import annotations' remains in touched files
-- [ ] #5 decisions/outbound-clients.md no longer lists OpenAI as a tolerated divergence; ruff, mypy, pytest tests --ignore=tests/smoke and make check-vendor-package-contract pass, with output recorded in notes
+- [ ] #5 decisions/outbound-clients.md no longer lists OpenAI as a tolerated divergence; ruff, mypy, lint-imports, pytest tests --ignore=tests/smoke and make check-vendor-package-contract pass, with output recorded in notes
 <!-- AC:END -->
 
 ## Comments

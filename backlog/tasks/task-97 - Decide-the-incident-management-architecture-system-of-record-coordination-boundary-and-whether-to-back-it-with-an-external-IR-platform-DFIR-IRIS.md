@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-16 14:24'
-updated_date: '2026-09-24 20:05'
+updated_date: '2026-10-01 14:07'
 labels:
   - architecture
   - incident
@@ -26,7 +26,7 @@ ordinal: 222000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-ARCHITECTURE DECISION, no implementation. Produces a decisions/ record and an implementation-ready packet; TASK-38 (relocation) proceeds independently and must not prejudge this.
+ARCHITECTURE DECISION, no implementation. Produces a decisions/ record and an implementation-ready packet; TASK-38 (the rebuild) and TASK-135 (the draft and summary reshape) follow this task.
 
 CONTEXT. modules/incident is the largest legacy surface (4636 LOC, 17 modules). It was designed around Google Workspace and DynamoDB: the incident list lives in a Google Sheet, the report lives in a Google Doc, the retro is a Google Calendar event with a Meet link, and the record in DynamoDB is reached through hand-built AttributeValue dicts. Human direction 2026-09-16: incident is to be redesigned from the ground up, with no assumption that any existing logic survives. A report document may or may not exist. A list of incidents and their statuses almost certainly exists, tracked as app-level database records and definitely not a spreadsheet. A video call probably exists, and which tool provides it is unknown and not yet interesting.
 
@@ -51,6 +51,13 @@ CONSTRAINTS ON WHATEVER IS CHOSEN (these are design inputs, not build steps; the
 - No persisted state is written with a read-modify-write or a vendor list-append.
 - An external IR platform, if chosen, is an outbound integration governed by decisions/outbound-clients.md and sdk-typing.md, behind a feature-owned adapter returning OperationResult - never a new infrastructure capability.
 
+HUMAN DIRECTION 2026-10-01 (design inputs; they narrow the question above but do not choose between Options A, B and C)
+- The incident is the anchor, not the channel. Today the Slack channel is the source of truth that every incident is recorded against, and an archived channel cannot be edited, so features break once a channel is archived. A bot-owned record keyed by the incident exists under every option, at least as the thin coordination record of Option C. The conversation, the status and the report are resources that record references.
+- Resources are flexible by kind and by system: a conversation on a configured platform, the current status, a report that is a Google Doc today and may be a Word document or something else later. Each is a purpose-shaped port with one adapter per system, selected by the stored reference (decisions/workplace-systems.md rules 3 and 4).
+- These live in features/incident/core/ (decisions/feature-packages.md umbrella rule 4, amended 2026-10-01), with the shared command check: which incident does this command refer to, and may it still be changed. Split the check in two: every command must map to a known incident; only an operation that writes to the conversation needs the conversation to be writable. A status or report update on an incident whose channel is archived should keep working.
+- Subdomains are enablement units, not commands (umbrella rule 2). The packet names the incident subdomains on that basis, including the one TASK-135 makes of draft and summarize, and says what core/ owns.
+- Drafting and summarizing are uses of the text-generation capability (decisions/plugin-architecture.md; TASK-25.10, TASK-134); the incident feature supplies the transcript, the prompt or template and incident-specific post-processing.
+
 DEPENDENCIES AND COUPLINGS
 - The storage operations incident would need are TASK-27.1 and TASK-27.2.
 - Person and linked-account resolution is TASK-83.
@@ -65,6 +72,7 @@ DEPENDENCIES AND COUPLINGS
 - [ ] #3 The constraints listed in the description are carried into the chosen design and each one is either satisfied or recorded as a named, time-boxed divergence
 - [ ] #4 The user-visible capabilities of today's feature are inventoried separately from their current implementation, so the redesign can drop implementations without silently dropping capabilities
 - [ ] #5 An implementation-ready packet exists with right-sized backlog tasks under the single-PR size gate, sequenced against TASK-27.1, TASK-27.2, TASK-83 and TASK-38, and stating when incident leaves the provisional packages/aws_platform DynamoDB adapter so TASK-88 can dissolve that package
+- [ ] #6 The packet names the incident subdomains as enablement units and states what features/incident/core/ owns (record, store, resource ports, the shared command check), following the 2026-10-01 human direction; TASK-135 and TASK-38 are sequenced against it
 <!-- AC:END -->
 
 ## Comments
