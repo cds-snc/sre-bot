@@ -4,20 +4,17 @@ Uses decorator-based command registration via auto-discovery.
 Registers the SRE subcommands (version, incident, webhooks, groups).
 """
 
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 import structlog
 from slack_bolt import Ack, Respond
 
 from contracts.slack.models import CommandPayload, CommandResponse
+from contracts.slack.registrar import SlackCommandRegistrar
 from infrastructure.configuration.app import get_app_settings
 from integrations.slack.bootstrap import LegacySlackBootstrap
 from modules.incident import incident_helper
 from modules.sre import webhook_helper
-
-if TYPE_CHECKING:
-    from integrations.slack.provider import SlackPlatformProvider
-
 
 client = LegacySlackBootstrap().web
 
@@ -180,8 +177,8 @@ def handle_webhooks_command(payload: CommandPayload) -> CommandResponse:
         )
 
 
-def register_commands(provider: SlackPlatformProvider) -> None:
-    """Register SRE module commands with Slack provider.
+def register_commands(registrar: SlackCommandRegistrar) -> None:
+    """Register SRE module commands with the Slack registrar.
 
     Note: No need to register explicit "help" handlers - the platform provider
     automatically generates help when:
@@ -190,9 +187,9 @@ def register_commands(provider: SlackPlatformProvider) -> None:
     - User types `/sre <subcommand> help` (subcommand help)
 
     Args:
-        provider: Slack platform provider instance
+        registrar: Slack command registrar
     """
-    provider.register_command(
+    registrar.register_command(
         command="version",
         handler=handle_version_command,
         parent="sre",
@@ -200,7 +197,7 @@ def register_commands(provider: SlackPlatformProvider) -> None:
         description_key="sre.subcommands.version.description",
     )
 
-    provider.register_command(
+    registrar.register_command(
         command="incident",
         handler=handle_incident_command,
         parent="sre",
@@ -209,7 +206,7 @@ def register_commands(provider: SlackPlatformProvider) -> None:
         legacy_mode=True,
     )
 
-    provider.register_command(
+    registrar.register_command(
         command="webhooks",
         handler=handle_webhooks_command,
         parent="sre",

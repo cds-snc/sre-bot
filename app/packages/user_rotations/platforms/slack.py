@@ -1,33 +1,34 @@
 """Slack command interface for viewing user rotations."""
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
+
+import structlog
 
 from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
+from contracts.slack.registrar import SlackCommandRegistrar
+from contracts.slack.reply import SlackReplyPort
 from packages.user_rotations.providers import get_user_rotations_service
 from packages.user_rotations.service import UserRotationShift, UserRotationsService
 
-if TYPE_CHECKING:
-    from slack_sdk import WebClient
-
-    from integrations.slack.provider import SlackPlatformProvider
+logger = structlog.get_logger()
 
 README_URL = "https://github.com/cds-snc/sre-bot/blob/main/app/packages/user_rotations/README.md"
 
 
-def register_commands(provider: SlackPlatformProvider) -> None:
+def register_commands(registrar: SlackCommandRegistrar) -> None:
     """Register ``/sre rotations`` commands."""
 
     def dispatch(payload: CommandPayload, parsed_args: dict[str, Any]) -> CommandResponse:
-        return handle_view_command(payload, parsed_args, provider.client, get_user_rotations_service())
+        return handle_view_command(payload, parsed_args, registrar.reply, get_user_rotations_service())
 
-    provider.register_command(
+    registrar.register_command(
         command="rotations",
         handler=handle_rotations_help,
         parent="sre",
         description="View self-managed user rotations",
     )
-    provider.register_command(
+    registrar.register_command(
         command="view",
         handler=dispatch,
         parent="sre.rotations",
@@ -61,7 +62,7 @@ def handle_rotations_help(_: CommandPayload) -> CommandResponse:
 def handle_view_command(
     payload: CommandPayload,
     parsed_args: dict[str, Any],
-    client: WebClient | None,
+    reply: SlackReplyPort,
     service: UserRotationsService,
 ) -> CommandResponse:
     """Open a modal showing the selected rotation's next 12 weeks of shifts."""
@@ -71,10 +72,18 @@ def handle_view_command(
         return CommandResponse(message=f"No user rotation configured for `{handle}`.", ephemeral=True)
 
     trigger_id = str(payload.platform_metadata.get("trigger_id", ""))
-    if client is None or not trigger_id:
+    if not trigger_id:
         return CommandResponse(message="Unable to open the user rotation view.", ephemeral=True)
 
-    client.views_open(trigger_id=trigger_id, view=_modal(shifts))
+    opened = reply.open_view(trigger_id=trigger_id, view=_modal(shifts))
+    if not opened.is_success:
+        logger.warning(
+            "user_rotations_view_open_failed",
+            usergroup_handle=handle,
+            error=opened.message,
+            error_code=opened.error_code,
+        )
+        return CommandResponse(message="Unable to open the user rotation view.", ephemeral=True)
     return CommandResponse(message="", ephemeral=True)
 
 

@@ -37,8 +37,8 @@ def test_register_legacy_handlers_and_hookimpl_path_register_sre_command_once(mo
     provider._app = mock_bot
 
     # Act
-    register_sre_commands(provider=provider)
-    register_dev_commands(provider=provider)
+    register_sre_commands(registrar=provider)
+    register_dev_commands(registrar=provider)
     provider._auto_register_root_commands()
     with (
         patch("server.lifespan.role"),

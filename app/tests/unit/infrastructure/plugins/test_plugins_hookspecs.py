@@ -9,12 +9,12 @@ import inspect
 import pluggy
 import pytest
 
+from contracts.slack.registrar import SlackCommandRegistrar
 from infrastructure.plugins import specs
 from infrastructure.plugins.specs import FeatureLifecycleSpecs, hookspec
 
 EXPECTED_HOOKS = [
     "register_slack_commands",
-    "register_slack_listeners",
     "register_routes",
     "register_i18n_resources",
     "register_event_handlers",
@@ -24,8 +24,7 @@ EXPECTED_HOOKS = [
 
 
 EXPECTED_PARAMS = {
-    "register_slack_commands": ["self", "provider"],
-    "register_slack_listeners": ["self", "app"],
+    "register_slack_commands": ["self", "registrar"],
     "register_routes": ["self", "app"],
     "register_i18n_resources": ["self", "registry"],
     "register_event_handlers": ["self", "dispatcher"],
@@ -69,6 +68,14 @@ def test_feature_lifecycle_specs_method_signatures() -> None:
         sig = inspect.signature(func)
         params = list(sig.parameters.keys())
         assert params == expected_params, f"{name} params: {params} != {expected_params}"
+
+
+def test_slack_hookspecs_expose_no_sdk_runtime_object() -> None:
+    # Features register through the registrar Protocol; no hookspec hands out the Bolt app.
+    assert not hasattr(FeatureLifecycleSpecs, "register_slack_listeners")
+    annotation = inspect.signature(FeatureLifecycleSpecs.register_slack_commands).parameters["registrar"].annotation
+    assert annotation is SlackCommandRegistrar
+    assert not any(name in vars(specs) for name in ("AsyncApp", "App", "SlackPlatformProvider"))
 
 
 def test_plugin_manager_exposes_hooks_after_adding_specs() -> None:

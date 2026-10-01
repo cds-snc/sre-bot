@@ -14,11 +14,12 @@ import asyncio
 import re
 import time
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import structlog
 
 from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
+from contracts.slack.registrar import SlackCommandRegistrar
 from infrastructure.i18n import t
 from packages.incident_summary.providers import get_incident_channel_port
 from packages.incident_summary.service import (
@@ -31,9 +32,6 @@ from packages.incident_summary.settings import (
     IncidentSummarySettings,
     get_incident_summary_settings,
 )
-
-if TYPE_CHECKING:
-    from integrations.slack.provider import SlackPlatformProvider
 
 logger = structlog.get_logger()
 
@@ -52,15 +50,15 @@ _SLACK_FORMAT_INSTRUCTIONS = (
 )
 
 
-def register_commands(provider: SlackPlatformProvider) -> None:
-    """Register the ``/sre incident summarize`` subcommand with the provider.
+def register_commands(registrar: SlackCommandRegistrar) -> None:
+    """Register the ``/sre incident summarize`` subcommand with the registrar.
 
     The command works with no arguments (using safe defaults) as well as with
     ``--since``/``--limit``; a ``fallback_handler`` handles the no-argument
-    invocation so the provider does not show help instead of running.
+    invocation so the runtime does not show help instead of running.
 
     Args:
-        provider: Slack platform provider instance.
+        registrar: Slack command registrar.
     """
 
     def _dispatch(payload: CommandPayload, parsed_args: dict[str, Any]) -> CommandResponse:
@@ -69,7 +67,7 @@ def register_commands(provider: SlackPlatformProvider) -> None:
     def _dispatch_default(payload: CommandPayload) -> CommandResponse:
         return handle_summarize_command(payload, {}, get_incident_channel_port())
 
-    provider.register_command(
+    registrar.register_command(
         command="summarize",
         handler=_dispatch,
         parent="sre.incident",
@@ -99,7 +97,7 @@ def register_commands(provider: SlackPlatformProvider) -> None:
 def handle_summarize_command(
     payload: CommandPayload,
     parsed_args: dict[str, Any],
-    channel: IncidentChannelPort | None,
+    channel: IncidentChannelPort,
 ) -> CommandResponse:
     """Handle ``/sre incident summarize`` and return an ephemeral summary.
 
@@ -113,7 +111,7 @@ def handle_summarize_command(
         parsed_args: Parsed ``--since``/``--limit`` arguments (empty for the
             no-argument invocation). When ``--since`` is omitted the summary
             covers the whole incident, starting from channel creation.
-        channel: Port reading the incident channel, or ``None`` when unavailable.
+        channel: Port reading the incident channel.
 
     Returns:
         An ephemeral ``CommandResponse`` carrying the summary, an
@@ -126,8 +124,8 @@ def handle_summarize_command(
         channel_id=payload.channel_id,
     )
 
-    if channel is None or not payload.channel_id:
-        log.warning("incident_summary_no_client_or_channel")
+    if not payload.channel_id:
+        log.warning("incident_summary_no_channel")
         return _error_response(locale)
 
     settings = get_incident_summary_settings()

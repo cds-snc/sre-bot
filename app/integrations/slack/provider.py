@@ -26,6 +26,7 @@ from integrations.slack.help import (
 )
 from integrations.slack.models import CommandDefinition
 from integrations.slack.parser import CommandArgumentParser
+from integrations.slack.reply import SlackWebReply
 from integrations.slack.settings import get_slack_settings
 
 logger = structlog.get_logger()
@@ -103,6 +104,8 @@ class SlackPlatformProvider:
         # Will be initialized when app is started
         self._app: App | None = None
         self._client: Any | None = None
+        # Reads the client on every call: it only exists once the app is initialized.
+        self._reply = SlackWebReply(lambda: self._client)
 
         # Help generator for unified help text generation
         self._help_generator = SlackHelpGenerator(
@@ -568,6 +571,16 @@ class SlackPlatformProvider:
             The Slack Bolt ``WebClient`` instance, or ``None`` if not started.
         """
         return self._client
+
+    @property
+    def reply(self) -> SlackWebReply:
+        """Get the reply port handlers use to post messages and open views.
+
+        Satisfies ``contracts.slack.registrar.SlackCommandRegistrar.reply``.
+        Usable only after the provider has been started; before that every
+        call returns an error result.
+        """
+        return self._reply
 
     @property
     def settings(self):

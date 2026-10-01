@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import structlog
 
-from contracts.operations import OperationResult
+from contracts.operations import OperationResult, OperationStatus
 from contracts.slack.models import CommandPayload
 from packages.incident_draft.domain import DraftedDocument
 from packages.incident_draft.platforms.slack import (
@@ -23,6 +23,7 @@ from packages.incident_draft.service import (
     IncidentChannelPort,
 )
 from packages.incident_draft.settings import IncidentDraftSettings
+from tests.factories.slack import FakeSlackReply
 
 pytestmark = pytest.mark.unit
 
@@ -78,7 +79,7 @@ class TestRegisterCommands:
         ):
             fallback(payload)
 
-        mock_handle.assert_called_once_with(payload, {}, provider.client, mock_port.return_value)
+        mock_handle.assert_called_once_with(payload, {}, provider.reply, mock_port.return_value)
 
 
 class TestHandleDraftCommand:
@@ -88,7 +89,7 @@ class TestHandleDraftCommand:
         outcome = _outcome(drafted=("Trigger", "Impact"), unanswered=("Lessons Learned",))
 
         with patch(_DRAFT, new=AsyncMock(return_value=OperationResult.success(data=outcome))) as mock_service:
-            response = handle_draft_command(payload, {}, MagicMock(), channel)
+            response = handle_draft_command(payload, {}, FakeSlackReply(), channel)
 
         assert response.ephemeral is True
         assert response.message == (
@@ -112,7 +113,7 @@ class TestHandleDraftCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_DRAFT, new=AsyncMock(return_value=OperationResult.success(data=_outcome()))) as mock_service:
-            handle_draft_command(payload, {}, MagicMock(), channel)
+            handle_draft_command(payload, {}, FakeSlackReply(), channel)
 
         messages = mock_service.await_args.args[1]
         assert [m.text for m in messages] == ["oldest", "newest"]
@@ -123,7 +124,7 @@ class TestHandleDraftCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_DRAFT, new=AsyncMock()) as mock_service:
-            response = handle_draft_command(payload, {}, MagicMock(), channel)
+            response = handle_draft_command(payload, {}, FakeSlackReply(), channel)
 
         assert "couldn't find an incident document" in response.message.lower()
         mock_service.assert_not_awaited()
@@ -144,7 +145,7 @@ class TestHandleDraftCommand:
             _DRAFT,
             new=AsyncMock(return_value=OperationResult.permanent_error(message="x", error_code=error_code)),
         ):
-            response = handle_draft_command(payload, {}, MagicMock(), channel)
+            response = handle_draft_command(payload, {}, FakeSlackReply(), channel)
 
         assert response.ephemeral is True
         assert fragment in response.message.lower()
@@ -157,25 +158,28 @@ class TestHandleDraftCommand:
             _DRAFT,
             new=AsyncMock(return_value=OperationResult.transient_error(message="boom", error_code="SERVER_ERROR")),
         ):
-            response = handle_draft_command(payload, {}, MagicMock(), channel)
+            response = handle_draft_command(payload, {}, FakeSlackReply(), channel)
 
         assert response.message.startswith("❌")
 
-    def test_missing_client_returns_error_without_calling_service(self):
-        payload = CommandPayload(text="", user_id="U9", channel_id="C123")
+    def test_missing_channel_id_returns_error_without_calling_service(self):
+        payload = CommandPayload(text="", user_id="U9", channel_id="")
+        reply = FakeSlackReply()
 
         with patch(_DRAFT, new=AsyncMock()) as mock_service:
-            response = handle_draft_command(payload, {}, None, _channel())
+            response = handle_draft_command(payload, {}, reply, _channel())
 
         assert response.ephemeral is True
+        assert response.message.startswith("\u274c")
         mock_service.assert_not_awaited()
+        assert reply.calls == []
 
     def test_limit_argument_is_passed_to_history_fetch(self):
         channel = _channel([{"user": "U1", "text": "hi", "ts": "1"}])
         payload = CommandPayload(text="--limit 25", user_id="U9", channel_id="C123")
 
         with patch(_DRAFT, new=AsyncMock(return_value=OperationResult.success(data=_outcome()))):
-            handle_draft_command(payload, {"--limit": 25}, MagicMock(), channel)
+            handle_draft_command(payload, {"--limit": 25}, FakeSlackReply(), channel)
 
         assert channel.fetch_history.call_args.kwargs["limit"] == 25
 
@@ -316,49 +320,46 @@ class TestBotDetectionSignals:
 class TestProgressNotice:
     """The invoker is told work is underway, before the slow part starts."""
 
-    def _run(self, client, channel):
+    def _run(self, reply, channel):
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
         with patch(_DRAFT, new=AsyncMock(return_value=OperationResult.success(data=_outcome()))):
-            return handle_draft_command(payload, {}, client, channel)
+            return handle_draft_command(payload, {}, reply, channel)
 
     def test_an_ephemeral_notice_is_posted_to_the_invoker(self):
-        client = MagicMock()
+        reply = FakeSlackReply()
 
-        self._run(client, _channel([{"user": "U1", "text": "prod is down", "ts": "1"}]))
+        self._run(reply, _channel([{"user": "U1", "text": "prod is down", "ts": "1"}]))
 
-        client.chat_postEphemeral.assert_called_once()
-        kwargs = client.chat_postEphemeral.call_args.kwargs
-        assert kwargs["channel"] == "C123"
-        assert kwargs["user"] == "U9"
+        (kwargs,) = reply.calls_to("post_ephemeral")
+        assert kwargs["channel_id"] == "C123"
+        assert kwargs["user_id"] == "U9"
         assert "drafting the incident report" in kwargs["text"]
 
     def test_the_notice_precedes_the_transcript_fetch(self):
         """Posting it after the slow work would defeat the point."""
-        client = MagicMock()
+        reply = FakeSlackReply()
         channel = _channel([{"user": "U1", "text": "prod is down", "ts": "1"}])
-        order: list[str] = []
-        client.chat_postEphemeral.side_effect = lambda **_: order.append("notice")
-        channel.fetch_history.side_effect = lambda *_, **__: (order.append("history"), [])[1]
+        notices_before_history: list[int] = []
+        channel.fetch_history.side_effect = lambda *_, **__: (notices_before_history.append(len(reply.calls)), [])[1]
 
-        self._run(client, channel)
+        self._run(reply, channel)
 
-        assert order[0] == "notice"
+        assert notices_before_history == [1]
 
     def test_no_notice_when_the_channel_has_no_incident_document(self):
         """Nothing slow follows, so a progress note would only be noise."""
-        client = MagicMock()
+        reply = FakeSlackReply()
         channel = _channel()
         channel.list_bookmarks.return_value = []
 
-        self._run(client, channel)
+        self._run(reply, channel)
 
-        client.chat_postEphemeral.assert_not_called()
+        assert reply.calls == []
 
     def test_a_failed_notice_does_not_fail_the_command(self):
-        client = MagicMock()
-        client.chat_postEphemeral.side_effect = RuntimeError("missing scope")
+        reply = FakeSlackReply(OperationResult.error(OperationStatus.UNAUTHORIZED, "missing scope", error_code="missing_scope"))
 
-        response = self._run(client, _channel([{"user": "U1", "text": "prod is down", "ts": "1"}]))
+        response = self._run(reply, _channel([{"user": "U1", "text": "prod is down", "ts": "1"}]))
 
         assert "draft incident report" in response.message
 
@@ -377,7 +378,7 @@ class TestPartialDraftMessage:
             partial=partial,
         )
         with patch(_DRAFT, new=AsyncMock(return_value=OperationResult.success(data=outcome))):
-            return handle_draft_command(payload, {}, MagicMock(), channel)
+            return handle_draft_command(payload, {}, FakeSlackReply(), channel)
 
     def test_a_partial_run_links_the_draft_and_explains_the_gap(self):
         response = self._run(partial=True)

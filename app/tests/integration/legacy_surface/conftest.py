@@ -189,7 +189,7 @@ def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> Slack
     plugin_manager.add_hookspecs(FeatureLifecycleSpecs)
     for hookimpl_module in SLACK_COMMAND_HOOKIMPLS:
         plugin_manager.register(hookimpl_module)
-    plugin_manager.hook.register_slack_commands(provider=provider)
+    plugin_manager.hook.register_slack_commands(registrar=provider)
     provider._auto_register_root_commands()
 
     harness = SlackCommandHarness(app=app, provider=provider, client=client, command_prefix=command_prefix)

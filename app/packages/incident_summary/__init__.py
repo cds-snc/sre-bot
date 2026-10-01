@@ -7,6 +7,7 @@ effect free at import time (only decorated hookimpls are defined here).
 
 from pathlib import Path
 
+from contracts.slack.registrar import SlackCommandRegistrar
 from infrastructure.i18n.resources import I18nResourceSpec
 from infrastructure.plugins import hookimpl
 from packages.incident_summary.platforms import slack
@@ -14,13 +15,13 @@ from packages.incident_summary.service import TranscriptMessage, summarize_trans
 
 
 @hookimpl
-def register_slack_commands(provider):
+def register_slack_commands(registrar: SlackCommandRegistrar) -> None:
     """Register the incident_summary Slack commands.
 
     Args:
-        provider: Slack platform provider instance.
+        registrar: Slack command registrar.
     """
-    slack.register_commands(provider)
+    slack.register_commands(registrar)
 
 
 @hookimpl

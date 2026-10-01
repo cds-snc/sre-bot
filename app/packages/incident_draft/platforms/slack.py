@@ -11,9 +11,8 @@ section, which the service replaces via the document port.
 
 Channel bookmarks, history, metadata and user records are read through the
 package's ``IncidentChannelPort``, resolved from ``providers`` at dispatch
-time. The Slack Web API client is captured lazily from the provider (it only
-exists after startup) and is used only for the in-request progress notice;
-``slack_sdk`` is imported for typing only.
+time. The in-request progress notice goes through the registrar's reply port;
+no Slack SDK is imported here.
 """
 
 import asyncio
@@ -21,12 +20,14 @@ import re
 import time
 from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import structlog
 
 from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
+from contracts.slack.registrar import SlackCommandRegistrar
+from contracts.slack.reply import SlackReplyPort
 from infrastructure.i18n import t
 from packages.incident_draft.domain import DraftedDocument, TranscriptMessage
 from packages.incident_draft.providers import get_incident_channel_port
@@ -41,11 +42,6 @@ from packages.incident_draft.settings import (
     IncidentDraftSettings,
     get_incident_draft_settings,
 )
-
-if TYPE_CHECKING:
-    from slack_sdk import WebClient
-
-    from integrations.slack.provider import SlackPlatformProvider
 
 logger = structlog.get_logger()
 
@@ -71,25 +67,25 @@ _SYSTEM_SUBTYPES = frozenset(
 )
 
 
-def register_commands(provider: SlackPlatformProvider) -> None:
-    """Register the ``/sre incident draft`` subcommand with the provider.
+def register_commands(registrar: SlackCommandRegistrar) -> None:
+    """Register the ``/sre incident draft`` subcommand with the registrar.
 
     The command works with no arguments (drafting from the whole incident
     history) as well as with ``--limit``; a ``fallback_handler`` handles the
-    no-argument invocation so the provider does not show help instead of
+    no-argument invocation so the runtime does not show help instead of
     running.
 
     Args:
-        provider: Slack platform provider instance.
+        registrar: Slack command registrar.
     """
 
     def _dispatch(payload: CommandPayload, parsed_args: dict[str, Any]) -> CommandResponse:
-        return handle_draft_command(payload, parsed_args, provider.client, get_incident_channel_port())
+        return handle_draft_command(payload, parsed_args, registrar.reply, get_incident_channel_port())
 
     def _dispatch_default(payload: CommandPayload) -> CommandResponse:
-        return handle_draft_command(payload, {}, provider.client, get_incident_channel_port())
+        return handle_draft_command(payload, {}, registrar.reply, get_incident_channel_port())
 
-    provider.register_command(
+    registrar.register_command(
         command="draft",
         handler=_dispatch,
         parent="sre.incident",
@@ -113,7 +109,7 @@ def register_commands(provider: SlackPlatformProvider) -> None:
 def handle_draft_command(
     payload: CommandPayload,
     parsed_args: dict[str, Any],
-    client: WebClient | None,
+    reply: SlackReplyPort,
     channel: IncidentChannelPort,
 ) -> CommandResponse:
     """Handle ``/sre incident draft`` and report the outcome ephemerally.
@@ -128,8 +124,7 @@ def handle_draft_command(
         parsed_args: Parsed ``--limit`` argument (empty for the no-argument
             invocation). History always starts at the channel's creation so the
             draft covers the whole incident.
-        client: Slack Web API client used for the progress notice, or ``None``
-            before startup.
+        reply: Port used to post the progress notice.
         channel: Port reading the incident channel.
 
     Returns:
@@ -143,8 +138,8 @@ def handle_draft_command(
         channel_id=payload.channel_id,
     )
 
-    if client is None or not payload.channel_id:
-        log.warning("incident_draft_no_client_or_channel")
+    if not payload.channel_id:
+        log.warning("incident_draft_no_channel")
         return _error_response(locale)
 
     document_id = _find_incident_document_id(channel, payload.channel_id, log)
@@ -159,7 +154,7 @@ def handle_draft_command(
     # Everything past this point is slow -- fetching the channel, one AI call,
     # then several Google Docs round trips. Bolt has already acked, so without
     # this the invoker watches nothing happen for a minute.
-    _notify_working(client, payload.channel_id, payload, locale, log)
+    _notify_working(reply, payload.channel_id, payload, locale, log)
 
     settings = get_incident_draft_settings()
     limit = _resolve_limit(parsed_args.get("--limit"), settings)
@@ -174,7 +169,7 @@ def handle_draft_command(
 
 
 def _notify_working(
-    client: WebClient,
+    reply: SlackReplyPort,
     channel_id: str,
     payload: CommandPayload,
     locale: str,
@@ -191,10 +186,9 @@ def _notify_working(
         "🤖 Reading this channel and drafting the incident report — this usually takes up to a minute. "
         "I'll post a link here when it's ready.",
     )
-    try:
-        client.chat_postEphemeral(channel=channel_id, user=payload.user_id, text=text)
-    except Exception as exc:  # noqa: BLE001 - a missing notice must not fail the draft
-        log.warning("incident_draft_progress_notice_failed", error=str(exc))
+    posted = reply.post_ephemeral(channel_id=channel_id, user_id=payload.user_id, text=text)
+    if not posted.is_success:
+        log.warning("incident_draft_progress_notice_failed", error=posted.message, error_code=posted.error_code)
 
 
 def _success_response(outcome: DraftedDocument | None, locale: str) -> CommandResponse:
