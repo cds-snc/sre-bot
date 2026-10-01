@@ -223,7 +223,6 @@ unmatched_ignore_imports_alerting = "error"
 ignore_imports = [
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/plugin-architecture.md Migration and decisions/outbound-clients.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one.
-    "infrastructure.plugins.specs -> jobs",
     "integrations.google_workspace.client -> infrastructure.configuration.integrations.google",
     "integrations.maxmind.client -> infrastructure.configuration.integrations.maxmind",
     "integrations.notify.client -> infrastructure.configuration.app",

@@ -10,10 +10,10 @@ import pluggy
 from fastapi import FastAPI
 from structlog.stdlib import BoundLogger
 
+from contracts.scheduler.registry import BackgroundJobRegistry
 from contracts.slack.registrar import SlackCommandRegistrar
 from infrastructure.events import EventDispatcher
 from infrastructure.i18n import I18nResourceRegistry
-from jobs import BackgroundJobRegistry
 
 hookspec = pluggy.HookspecMarker("sre_bot")
 

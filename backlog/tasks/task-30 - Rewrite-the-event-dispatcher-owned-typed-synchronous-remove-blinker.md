@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-24 20:04'
+updated_date: '2026-10-01 14:59'
 labels:
   - infrastructure
   - phase-4
@@ -59,3 +59,13 @@ Sequencing: this is a cleanup that closes after its consumers are rehomed.
 - [ ] #3 No dead event-bus code remains; dependent moves (queue step, notifications) are tracked by their own tasks
 - [ ] #4 PR references decisions/events.md
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Guillaume Charest
+created: 2026-10-01 14:59
+---
+2026-10-01, from the TASK-107 plan: TASK-107.3 keeps register_event_handlers and types it on a new EventHandlerRegistrar Protocol in app/contracts/plugins/. This task deletes that Protocol and its test along with the hookspec and the dispatcher.
+---
+<!-- COMMENTS:END -->
