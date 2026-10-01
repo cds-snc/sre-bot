@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING, cast
 import structlog
 from slack_bolt import Ack, Respond
 
+from contracts.slack.models import CommandPayload, CommandResponse
 from infrastructure.configuration.app import get_app_settings
 from integrations.slack.bootstrap import LegacySlackBootstrap
-from integrations.slack.models import CommandPayload, CommandResponse
 from modules.incident import incident_helper
 from modules.sre import webhook_helper
 

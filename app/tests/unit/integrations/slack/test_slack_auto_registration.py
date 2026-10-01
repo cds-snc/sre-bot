@@ -10,11 +10,11 @@ from unittest.mock import Mock
 
 import pytest
 
+from contracts.slack.models import CommandPayload, CommandResponse
 from infrastructure.configuration.infrastructure.platforms import (
     SlackPlatformSettings,
 )
 from integrations.slack.formatter import SlackBlockKitFormatter
-from integrations.slack.models import CommandPayload, CommandResponse
 from integrations.slack.provider import SlackPlatformProvider
 
 

@@ -12,11 +12,8 @@ Tests all quote preservation scenarios including:
 
 import pytest
 
-from integrations.slack.parser import (
-    Argument,
-    ArgumentType,
-    CommandArgumentParser,
-)
+from contracts.slack.models import Argument, ArgumentType
+from integrations.slack.parser import CommandArgumentParser
 
 pytestmark = pytest.mark.unit
 

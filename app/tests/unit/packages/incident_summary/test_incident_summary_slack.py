@@ -8,7 +8,7 @@ import pytest
 import structlog
 
 from contracts.operations import OperationResult
-from integrations.slack.models import CommandPayload
+from contracts.slack.models import CommandPayload
 from packages.incident_summary.platforms.slack import (
     _fetch_transcript,
     _parse_since_seconds,

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 import structlog
 from slack_sdk import WebClient
 
-from integrations.slack.models import CommandPayload, CommandResponse
+from contracts.slack.models import CommandPayload, CommandResponse
 from packages.rant.service import format_rant
 
 if TYPE_CHECKING:

@@ -10,14 +10,9 @@ import structlog
 from structlog.stdlib import BoundLogger
 
 from contracts.operations import OperationResult
+from contracts.slack.models import Argument, ArgumentParsingError, ArgumentType, CommandPayload
 from infrastructure.directory import get_directory_provider
-from integrations.slack.models import CommandPayload
-from integrations.slack.parser import (
-    Argument,
-    ArgumentParsingError,
-    ArgumentType,
-    CommandArgumentParser,
-)
+from integrations.slack.parser import CommandArgumentParser
 
 logger: BoundLogger = structlog.get_logger()
 

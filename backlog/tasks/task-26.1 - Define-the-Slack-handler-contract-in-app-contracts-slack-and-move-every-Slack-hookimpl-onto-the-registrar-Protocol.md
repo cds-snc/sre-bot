@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:58'
-updated_date: '2026-09-28 14:16'
+updated_date: '2026-09-29 20:20'
 labels:
   - plugin-architecture
   - slack
@@ -47,3 +47,16 @@ This is also the replacement that TASK-67 names when it retires register_slack_c
 - [ ] #4 TASK-36 smoke suite green before and after; command names and behaviour unchanged
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Decomposed for the single-PR size gate (about 17 production files and 500-650 LOC as one change, mixing a mechanical move with the hookspec re-sign) into three stacked layers of Stack A part 2, each its own subtask, branch and PR:
+- TASK-26.1.1 (layer 7a): move the five command models to app/contracts/slack/models.py; mechanical.
+- TASK-26.1.2 (layer 7b): Slack lookups in rant, incident_draft and incident_summary move behind package-owned Protocols implemented in adapters/; behaviour-neutral.
+- TASK-26.1.3 (layer 7c): SlackCommandRegistrar and SlackReplyPort in app/contracts/slack/; register_slack_commands re-signed, register_slack_listeners deleted, all 8 hookimpls migrated.
+
+Decisions: in-request replies (post to the invoking channel, ephemeral, open a view) go through SlackReplyPort, exposed as the registrar's reply property and implemented by the runtime; lookups go through each feature's own Protocol and adapters/ (decisions/platform-entrypoints.md). Reply methods return OperationResult.
+
+AC map: #1 -> 26.1.1 (models) and 26.1.3 (Protocols); #2 and #3 -> 26.1.3; #4 and #5 -> every layer. This task is done when its three subtasks are done.
+<!-- SECTION:PLAN:END -->

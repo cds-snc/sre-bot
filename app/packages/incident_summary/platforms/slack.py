@@ -20,13 +20,8 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
 from infrastructure.i18n import t
-from integrations.slack.models import (
-    Argument,
-    ArgumentType,
-    CommandPayload,
-    CommandResponse,
-)
 from packages.incident_summary.service import (
     EMPTY_HISTORY_CODE,
     TranscriptMessage,

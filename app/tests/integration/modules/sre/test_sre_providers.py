@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from integrations.slack.models import CommandPayload, CommandResponse
+from contracts.slack.models import CommandPayload, CommandResponse
 from modules.sre.platforms import slack as sre_slack
 
 

@@ -9,7 +9,7 @@ import pytest
 import structlog
 
 from contracts.operations import OperationResult
-from integrations.slack.models import CommandPayload
+from contracts.slack.models import CommandPayload
 from packages.incident_draft.domain import DraftedDocument
 from packages.incident_draft.platforms.slack import (
     _fetch_transcript,

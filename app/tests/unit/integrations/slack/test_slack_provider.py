@@ -6,8 +6,8 @@ import pytest
 
 import integrations.slack.provider as provider_module
 from contracts.operations import OperationStatus
+from contracts.slack.models import CommandPayload, CommandResponse
 from integrations.slack.formatter import SlackBlockKitFormatter
-from integrations.slack.models import CommandPayload, CommandResponse
 from integrations.slack.provider import SlackPlatformProvider
 
 

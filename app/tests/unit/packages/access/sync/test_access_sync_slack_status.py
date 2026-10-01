@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from integrations.slack.models import CommandPayload, CommandResponse
+from contracts.slack.models import CommandPayload, CommandResponse
 from packages.access.sync.interactions.slack import handle_sync_status_command
 
 

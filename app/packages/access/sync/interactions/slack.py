@@ -13,9 +13,8 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
 from infrastructure.i18n import t
-from integrations.slack.models import CommandPayload, CommandResponse
-from integrations.slack.parser import Argument, ArgumentType
 from packages.access.sync.interactions.ingress import (
     enqueue_platform_sync,
     enqueue_user_sync,

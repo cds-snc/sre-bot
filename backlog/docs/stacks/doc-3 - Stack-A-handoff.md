@@ -3,46 +3,49 @@ id: doc-3
 title: Stack A handoff
 type: guide
 created_date: '2026-09-28 15:02'
-updated_date: '2026-09-28 17:11'
+updated_date: '2026-09-29 20:44'
 ---
 # Stack A handoff
 
 ## Stack
 
-Stack A, the contracts spine (doc-2, Wave 1). Trunk: `main`. GitHub stack #1506.
+Stack A, the contracts spine (doc-2, Wave 1). Trunk: `main`.
 
-**Status: paused after layer 6 (2026-09-28).** Layers 0-6 are submitted and in review. Layer 7 (TASK-26.1) is blocked on two standalone PRs, so the stack stops here until they merge. The dependencies were re-checked against doc-2 and kept.
+**Status: part 2 in progress (2026-09-29).** Part 1 (layers 0-6, GitHub stack #1506) merged to `main`. The three standalone prerequisites merged too: TASK-35 (#1512), TASK-36 (#1513) and TASK-25.4 (#1515). TASK-26.1 was decomposed into three layers with approved plans. Part 2 is a new stack (`gh stack init` done) whose bottom layer targets `main`.
 
 ## Layers
 
 | # | Task | Branch | PR | State | Notes |
 | --- | --- | --- | --- | --- | --- |
-| 0 | planning (docs only) | `stack-a/plan` | #1504 | in review | Realigned Stack A and Wave 0 to current decisions; created TASK-105.1, 105.2, 36.1-36.3 and 133; added this doc and the `stacked-pr-session` skill. |
-| 1 | TASK-18 | `stack-a/task-18-import-linter` | #1505 | in review | import-linter with 7 contracts and a shrink-only ignore list; contract (c) deferred to TASK-106. |
-| 2 | TASK-105 | `stack-a/task-105-operation-result-envelope` | #1507 | in review | OperationResult frozen, monad helpers removed, `cause` added; `message` optional and `retry_after` a float, which left mypy errors at call sites (cleared by TASK-105.3). |
-| 3 | TASK-105.1 | `stack-a/task-105.1-drop-provider-operation` | #1508 | in review | Dropped `provider`/`operation`; deleted the unused operations classifiers. |
-| 4 | TASK-105.2 | `stack-a/task-105.2-error-code-registry` | #1509 | in review | `ErrorCode` StrEnum (76 members) plus an AST scan that fails on an unregistered static `error_code`. |
-| 5 | TASK-105.3 | `stack-a/task-105.3-result-message-call-sites` | #1510 | in review | Cleared the widening mypy errors at call sites; fixed a `None < str` crash in `incident_folder.get_incidents_from_sheet`. Reviewer to check the 12 fallback messages in packages/access. |
-| 6 | TASK-106 | `stack-a/task-106-contracts` | #1511 | in review | Created app/contracts/operations/, deleted app/infrastructure/operations/ (137 importers rewritten), added import-linter contract (c), removed 45 ignore entries. |
-| 7 | TASK-26.1 | `stack-a/task-26.1-slack-handler-contract` | - | planned, blocked | Needs TASK-25.4 and TASK-36 merged. No plan yet. |
-| 8 | TASK-107 | `stack-a/task-107-hookspecs-to-contracts` | - | planned, blocked | Needs TASK-26.1. No plan yet. |
+| 0-6 | planning, TASK-18, 105, 105.1, 105.2, 105.3, 106 | `stack-a/*` | #1504-#1511 (stack #1506) | merged | Part 1: import-linter contracts (a)-(h), OperationResult envelope, ErrorCode registry, app/contracts/operations/. |
+| 7a | TASK-26.1.1 | `stack-a/task-26.1.1-slack-models-to-contracts` | - | in progress | First commit = planning (90d9d72). Implementation done, gates green, ACs checked; uncommitted. Also fixes the help.py locale bug (user-visible) and deprecated utcnow. |
+| 7b | TASK-26.1.2 | `stack-a/task-26.1.2-slack-lookup-adapters` | - | plan approved | Slack lookups in rant, incident_draft and incident_summary behind package Protocols in adapters/; behaviour-neutral. |
+| 7c | TASK-26.1.3 | `stack-a/task-26.1.3-slack-registrar-reply` | - | plan approved | SlackCommandRegistrar and SlackReplyPort; register_slack_commands re-signed, register_slack_listeners deleted, all 8 hookimpls; deletes 4 contract (e) entries. Must also remove the stale TYPE_CHECKING imports of infrastructure.platforms.providers.slack in access/sync and geolocate (task note). Closest review. |
+| 8 | TASK-107 | `stack-a/task-107-hookspecs-to-contracts` | - | planned | Needs TASK-26.1.3. No plan yet. |
 
-TASK-105.2, 105.3 and 106 each carry implementation notes with their gate output.
+TASK-26.1 is the parent of 7a-7c; it is done when they are.
 
-## Resume conditions
+## Position
 
-Resume Stack A when all of these hold:
-1. TASK-25.4 (Slack client factory and classifier) has merged. It is a standalone PR off `main` with an approved plan.
-2. TASK-35 -> TASK-36 (Slack command inventory and pinning tests) have merged. Both are standalone PRs off `main` with approved plans.
-3. TASK-26.1 has an approved plan. Plan it after TASK-25.4 merges: its outbound messaging Protocol wraps 25.4's client factory.
+Branch `stack-a/task-26.1.1-slack-models-to-contracts`. Uncommitted: the whole 7a implementation (app/contracts/slack/, app/tests/unit/contracts/slack/, 25 importer files, app/pyproject.toml, help.py locale fix, geolocate typing fix) plus task edits on TASK-26.1.1 (ACs, notes) and TASK-26.1.3 (hand-off note) and this doc. All belong to the 7a commit. No background agents.
 
-Then add layer 7 on top of whatever remains of the stack: `gh stack add stack-a/task-26.1-slack-handler-contract` (on top of #1511 if it is still open, otherwise the new bottom layer targets `main`).
+## Next actions
 
-## Carried into later layers
+1. **human**: review and commit 7a, then open the 7b layer:
+   ```shell
+   git add app/ backlog/
+   git commit -m "refactor(contracts): move Slack command models to app/contracts/slack (TASK-26.1.1)"
+   gh stack add stack-a/task-26.1.2-slack-lookup-adapters
+   ```
+2. **agent**: implement TASK-26.1.2 from its plan (TDD, gates, ACs, notes, left In Progress), then hand over commit commands.
+3. **human**: commit 7b; `gh stack add stack-a/task-26.1.3-slack-registrar-reply`.
+4. **agent**: implement TASK-26.1.3.
+5. **human**: `gh stack submit` when the layers are ready; merge bottom-up one layer at a time, with a re-approval per rebased layer (doc-2 rules).
 
-- TASK-26.1: `packages/geolocate/platforms/slack.py:15` and `packages/access/sync/interactions/slack.py:33` import `SlackPlatformProvider` under `TYPE_CHECKING` from `infrastructure.platforms.providers.slack`, which does not exist. mypy's incremental cache usually hides the error. The fix needs a contract type (or a new contract (e) ignore entry, which the list forbids), so it belongs with TASK-26.1's Slack contract.
+## Open decisions
+
+- 7a carries a one-line user-visible bug fix (Slack argument help now honours the user's locale; before, it always rendered en-US). It is kept per the fix-bugs-in-touched-files rule. If the reviewer wants 7a to be purely mechanical, split it into its own task/PR.
 
 ## Planning queue
 
-- TASK-26.1: after TASK-25.4 merges.
-- TASK-107: after TASK-26.1's plan is approved.
+- TASK-107: plan once TASK-26.1.3's shape is final (after 7c is implemented), since it moves the re-signed hookspecs to app/contracts/.

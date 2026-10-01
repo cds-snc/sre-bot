@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from integrations.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
+from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
 from packages.user_rotations.providers import get_user_rotations_service
 from packages.user_rotations.service import UserRotationShift, UserRotationsService
 
