@@ -5,7 +5,7 @@ No Slack commands are registered in this initial iteration — Slack
 interaction support is deferred to the next iteration.
 """
 
-from infrastructure.plugins import hookimpl
+from contracts.plugins.namespace import hookimpl
 from packages.access.catalog.interactions.http import router as access_catalog_router
 from packages.access.catalog.providers import (
     get_catalog_service,

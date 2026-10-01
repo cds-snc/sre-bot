@@ -248,14 +248,12 @@ unmatched_ignore_imports_alerting = "error"
 ignore_imports = [
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/plugin-architecture.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one.
-    "packages.access.catalog -> infrastructure.plugins",
     "packages.access.catalog.interactions.http -> infrastructure.security",
     "packages.access.catalog.interactions.http -> infrastructure.security.models",
     "packages.access.catalog.providers -> infrastructure.directory",
     "packages.access.catalog.service -> infrastructure.directory.provider",
     "packages.access.common.group_policy -> infrastructure.directory.models",
     "packages.access.request -> infrastructure.events",
-    "packages.access.request -> infrastructure.plugins",
     "packages.access.request.interactions.http -> infrastructure.security",
     "packages.access.request.interactions.http -> infrastructure.security.models",
     "packages.access.request.policies -> infrastructure.directory.models",
@@ -268,7 +266,6 @@ ignore_imports = [
     "packages.access.request.service -> infrastructure.events",
     "packages.access.request.store -> infrastructure.storage.protocol",
     "packages.access.sync -> infrastructure.events",
-    "packages.access.sync -> infrastructure.plugins",
     "packages.access.sync.application -> infrastructure.events",
     "packages.access.sync.desired_state -> infrastructure.directory.provider",
     "packages.access.sync.interactions.http -> infrastructure.security",
@@ -284,23 +281,17 @@ ignore_imports = [
     "packages.access.sync.providers -> infrastructure.idempotency",
     "packages.access.sync.providers -> infrastructure.storage",
     "packages.access.sync.store -> infrastructure.storage.protocol",
-    "packages.geolocate -> infrastructure.plugins",
     "packages.geolocate.platforms.slack -> infrastructure.i18n",
     "packages.incident.drive.adapters.google_drive -> infrastructure.configuration.integrations.google",
     "packages.incident.drive.adapters.google_drive -> infrastructure.drive",
     "packages.incident.drive.adapters.google_drive -> infrastructure.drive.factory",
     "packages.incident.drive.adapters.google_drive -> infrastructure.drive.models",
-    "packages.incident_draft -> infrastructure.plugins",
     "packages.incident_draft.adapters.google_docs -> infrastructure.configuration.integrations.google",
     "packages.incident_draft.adapters.google_docs -> infrastructure.drive",
     "packages.incident_draft.platforms.slack -> infrastructure.i18n",
-    "packages.incident_summary -> infrastructure.plugins",
     "packages.incident_summary.platforms.slack -> infrastructure.i18n",
-    "packages.oncall_sync -> infrastructure.plugins",
-    "packages.rant -> infrastructure.plugins",
     "packages.talent.adapters.google_drive -> infrastructure.configuration.integrations.google",
     "packages.talent.adapters.google_drive -> infrastructure.drive.factory",
-    "packages.user_rotations -> infrastructure.plugins",
 ]
 
 [[tool.importlinter.contracts]]

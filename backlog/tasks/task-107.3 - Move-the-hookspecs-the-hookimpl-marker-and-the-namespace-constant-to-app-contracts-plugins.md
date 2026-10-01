@@ -3,10 +3,10 @@ id: TASK-107.3
 title: >-
   Move the hookspecs, the hookimpl marker and the namespace constant to
   app/contracts/plugins/
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-01 14:47'
-updated_date: '2026-10-01 14:59'
+updated_date: '2026-10-01 16:47'
 labels:
   - plugin-architecture
   - plugins
@@ -30,11 +30,11 @@ Stack A layer 8c (slice 3 of TASK-107). FeatureLifecycleSpecs, the hookspec and 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 contracts/plugins/ defines FeatureLifecycleSpecs (all six hookspecs, signatures unchanged except the dispatcher and registry types), hookspec, hookimpl and one PLUGIN_NAMESPACE constant read from the installed sre-bot distribution metadata (value stays sre_bot)
-- [ ] #2 infrastructure/plugins/specs.py is deleted; every hookimpl imports hookimpl from contracts.plugins; infrastructure.plugins exports no hookimpl; rg finds no 'from infrastructure.plugins import hookimpl'
-- [ ] #3 The 9 contract (b) ignore entries 'packages.* -> infrastructure.plugins' are deleted and no ignore entry is added
-- [ ] #4 The boot-test hookspec inventory moves to tests/unit/contracts/plugins/ and passes; the TASK-36 legacy_surface suite changes only its marker and namespace imports; no assertion changes
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 contracts/plugins/ defines FeatureLifecycleSpecs (all six hookspecs, signatures unchanged except the dispatcher and registry types), hookspec, hookimpl and one PLUGIN_NAMESPACE constant read from the installed sre-bot distribution metadata (value stays sre_bot)
+- [x] #2 infrastructure/plugins/specs.py is deleted; every hookimpl imports hookimpl from contracts.plugins; infrastructure.plugins exports no hookimpl; rg finds no 'from infrastructure.plugins import hookimpl'
+- [x] #3 The 9 contract (b) ignore entries 'packages.* -> infrastructure.plugins' are deleted and no ignore entry is added
+- [x] #4 The boot-test hookspec inventory moves to tests/unit/contracts/plugins/ and passes; the TASK-36 legacy_surface suite changes only its marker and namespace imports; no assertion changes
+- [x] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -76,6 +76,30 @@ Blast radius: a missed hookimpl import fails at package import and is logged-and
 
 <!-- SECTION:NOTES:BEGIN -->
 From planning (2026-10-01): packages/access/request/__init__.py is touched here for its hookimpl import; fix its stale docstring in the same edit (it still says register_slack_commands(provider); the parameter is registrar since TASK-26.1.3).
+
+Implemented on stack-a/task-107.3-hookspecs-to-contracts (Stack A layer 8c), tests first.
+
+What changed:
+- New app/contracts/plugins/: __init__.py (docstring only); namespace.py (PLUGIN_NAMESPACE read from the installed sre-bot distribution metadata and normalised to sre_bot, plus hookspec and hookimpl markers built from it); hookspecs.py (FeatureLifecycleSpecs with all six hookspecs, moved verbatim except register_event_handlers, now typed on the new EventHandlerRegistrar Protocol defined beside it). FastAPI and structlog stay runtime imports, as decided in the plan.
+- infrastructure/plugins/specs.py deleted. infrastructure/plugins/__init__.py no longer defines or exports hookimpl. manager.py imports FeatureLifecycleSpecs and PLUGIN_NAMESPACE from contracts.plugins and builds PluginManager(PLUGIN_NAMESPACE).
+- The 11 hookimpl importers (9 packages, modules/dev, modules/sre) import hookimpl from contracts.plugins.namespace. No re-export at the old path.
+- packages/access/request/__init__.py: stale docstring fixed (register_slack_commands(registrar)), per the planning note.
+- pyproject.toml: the 9 contract (b) entries 'packages.* -> infrastructure.plugins' deleted, none added (53 -> 44 ignored).
+
+Tests:
+- Inventory test moved to tests/unit/contracts/plugins/test_contracts_hookspecs_inventory.py: imports and the namespace constant only; EXPECTED_HOOKS, EXPECTED_PARAMS and every assertion unchanged. The emptied tests/unit/infrastructure/plugins/ directory is gone.
+- New test_contracts_plugin_namespace_constant.py (constant equals the normalised metadata name, both markers carry it, a PluginManager built from it binds a hookimpl, AST scan for app imports outside contracts) and test_contracts_event_registrar_protocol.py (fake registrar, and the real EventDispatcher assigned to the Protocol and delivering an event). 6 new tests.
+- tests/unit/infrastructure/events/test_hookspec_registration.py and tests/integration/legacy_surface/conftest.py: import lines, and the conftest builds its PluginManager from PLUGIN_NAMESPACE. No assertion changes. The plan also listed test_i18n_hook_discovery.py and test_access_plugin_discovery_registration.py; they import only infrastructure.plugins.base and .manager, which do not move until 8d, so they are untouched.
+
+Gates (from app/, full ci_code.yml sequence): ruff check clean; make fmt-ci 777 files already formatted; check-sdk-typing OK; check-vendor-package-contract OK (16 baselined); check-aws-platform-seam OK (11 baselined); check-runtime-imports OK; lint-imports 8 kept, 0 broken, contract (b) 44 ignored; make test 2848 passed then 760 passed (legacy_surface included); mypy 65 errors in 22 files repo-wide, error set identical to layer 8b, 0 in touched files.
+
+Verified: rg finds no 'from infrastructure.plugins import hookimpl' and no 'infrastructure.plugins.specs' under app/. Non-editable install check: a scratch venv built with 'uv sync --locked --no-dev --no-editable' (the Dockerfile's command) imports contracts.plugins.namespace and reports sre_bot for the constant, the marker and the manager. No docker image build was run.
+
+Left for 8d as planned: decision records that still name infrastructure/plugins/specs.py (plugins.md, i18n.md, platform-transports.md, platform-entrypoints.md, hookspec-deprecation.md).
+
+Size: 19 production files (3 new, 1 deleted, 15 edited).
+
+Correction to the size line above: 18 production files (3 new, 1 deleted, 14 edited: infrastructure/plugins/__init__.py, manager.py, 11 hookimpls, pyproject.toml); the plan's count of 15 edited was off by one. 15 insertions and 112 deletions in tracked files, plus 111 new lines in contracts/plugins/.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

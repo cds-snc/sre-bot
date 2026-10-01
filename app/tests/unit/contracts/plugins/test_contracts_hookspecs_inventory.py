@@ -1,4 +1,4 @@
-"""Unit tests for infrastructure.plugins.specs.FeatureLifecycleSpecs.
+"""Unit tests for contracts.plugins.hookspecs.FeatureLifecycleSpecs.
 
 Aim: exercise the module surface to ensure the public contract is stable
 and the hookspecs are exposed to pluggy's PluginManager.
@@ -9,9 +9,10 @@ import inspect
 import pluggy
 import pytest
 
+from contracts.plugins import hookspecs as specs
+from contracts.plugins.hookspecs import FeatureLifecycleSpecs
+from contracts.plugins.namespace import PLUGIN_NAMESPACE, hookspec
 from contracts.slack.registrar import SlackCommandRegistrar
-from infrastructure.plugins import specs
-from infrastructure.plugins.specs import FeatureLifecycleSpecs, hookspec
 
 EXPECTED_HOOKS = [
     "register_slack_commands",
@@ -79,7 +80,7 @@ def test_slack_hookspecs_expose_no_sdk_runtime_object() -> None:
 
 
 def test_plugin_manager_exposes_hooks_after_adding_specs() -> None:
-    pm = pluggy.PluginManager("sre_bot")
+    pm = pluggy.PluginManager(PLUGIN_NAMESPACE)
     pm.add_hookspecs(FeatureLifecycleSpecs)
 
     for name in EXPECTED_HOOKS:

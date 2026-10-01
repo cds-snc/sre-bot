@@ -10,9 +10,10 @@ from typing import TYPE_CHECKING
 import pluggy
 import structlog
 
+from contracts.plugins.hookspecs import FeatureLifecycleSpecs
+from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from infrastructure.i18n.resources import I18nResourceRegistry
 from infrastructure.plugins.base import auto_discover_plugins
-from infrastructure.plugins.specs import FeatureLifecycleSpecs
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -31,7 +32,7 @@ def get_plugin_manager() -> pluggy.PluginManager:
     Returns:
         PluginManager configured with all feature lifecycle hookspecs.
     """
-    pm = pluggy.PluginManager("sre_bot")
+    pm = pluggy.PluginManager(PLUGIN_NAMESPACE)
     pm.add_hookspecs(FeatureLifecycleSpecs)
 
     logger.info("plugin_manager_created")

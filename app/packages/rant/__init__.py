@@ -1,7 +1,7 @@
 """Rant package - shout a message to the channel in bold uppercase."""
 
+from contracts.plugins.namespace import hookimpl
 from contracts.slack.registrar import SlackCommandRegistrar
-from infrastructure.plugins import hookimpl
 from packages.rant.platforms import slack
 from packages.rant.service import format_rant
 

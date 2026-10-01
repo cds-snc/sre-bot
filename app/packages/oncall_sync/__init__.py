@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from infrastructure.plugins import hookimpl
+from contracts.plugins.namespace import hookimpl
 from packages.oncall_sync.settings import get_oncall_schedules
 from packages.user_rotations.settings import get_rotations
 

@@ -10,9 +10,9 @@ Exports the FastAPI router for registration in the main application.
 from pathlib import Path
 
 from contracts.i18n.resources import I18nResourceRegistrar, I18nResourceSpec
+from contracts.plugins.namespace import hookimpl
 from contracts.slack.registrar import SlackCommandRegistrar
 from infrastructure.events import get_event_dispatcher
-from infrastructure.plugins import hookimpl
 from packages.access.common.events import REQUEST_APPROVED
 from packages.access.common.providers import get_access_runtime_config
 from packages.access.sync.interactions import slack
