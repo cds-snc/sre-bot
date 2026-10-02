@@ -41,10 +41,20 @@ The following pattern handlers have been implemented:
 | DynamoDB Access        | 55       | `dynamodb_access.py`        | Handles unexpected DynamoDB access alerts     |
 | CloudWatch Alarm       | 50       | `cloudwatch_alarm.py`       | Handles CloudWatch alarm notifications        |
 | Abuse Notification     | 45       | `abuse_notification.py`     | Handles AWS abuse reports                     |
+| Blazer Check           | 45       | `blazer_check.py`           | Handles Blazer check state notifications      |
 | Budget Notification    | 40       | `budget_notification.py`    | Handles budget threshold alerts               |
 | Auto Mitigation        | 35       | `auto_mitigation.py`        | Handles security group auto-mitigation        |
 | IAM User               | 30       | `iam_user.py`               | Handles new IAM user creation alerts          |
 | Budget Auto Adjustment | 25       | `budget_auto_adjustment.py` | Handles budget auto-adjustments (logged only) |
+
+### Blazer Check Messages
+
+`blazer_check.py` matches when the SNS subject is `Blazer check` or the JSON message has `"source": "blazer"`. It accepts two message formats:
+
+- **Plain text** (Blazer's default Slack text): a title such as `Check Failing: my query`, optional detail lines, then the query URL on the last line.
+- **JSON**: `{"source": "blazer", "query_name": ..., "state": ..., "query_url": ..., "description": ..., "message": ...}`. Use this form to include the query description. All fields except `source` are optional.
+
+The state drives the emoji (`passing`, `failing`, `error`, `timed out`, `disabled`); unknown states fall back to a generic one.
 
 ## Pattern Matching Types
 
@@ -163,6 +173,7 @@ Existing tests will need to be updated to:
 - `modules/webhooks/patterns/aws_sns_notification/api_key_detected.py`
 - `modules/webhooks/patterns/aws_sns_notification/budget_auto_adjustment.py`
 - `modules/webhooks/patterns/aws_sns_notification/step_functions.py`
+- `modules/webhooks/patterns/aws_sns_notification/blazer_check.py`
 
 ### Modified Files
 
