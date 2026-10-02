@@ -7,7 +7,7 @@ import structlog
 
 from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
 from contracts.slack.registrar import SlackCommandRegistrar
-from contracts.slack.reply import SlackReplyPort
+from contracts.slack.reply import SlackReplySender
 from packages.user_rotations.providers import get_user_rotations_service
 from packages.user_rotations.service import UserRotationShift, UserRotationsService
 
@@ -62,7 +62,7 @@ def handle_rotations_help(_: CommandPayload) -> CommandResponse:
 def handle_view_command(
     payload: CommandPayload,
     parsed_args: dict[str, Any],
-    reply: SlackReplyPort,
+    reply: SlackReplySender,
     service: UserRotationsService,
 ) -> CommandResponse:
     """Open a modal showing the selected rotation's next 12 weeks of shifts."""

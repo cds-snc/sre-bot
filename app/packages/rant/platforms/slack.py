@@ -4,7 +4,7 @@ import structlog
 
 from contracts.slack.models import CommandPayload, CommandResponse
 from contracts.slack.registrar import SlackCommandRegistrar
-from contracts.slack.reply import SlackReplyPort
+from contracts.slack.reply import SlackReplySender
 from packages.rant.providers import get_user_identity_lookup
 from packages.rant.service import UserIdentity, UserIdentityLookup, format_rant
 
@@ -18,7 +18,7 @@ def register_commands(registrar: SlackCommandRegistrar) -> None:
     (``/rant``) rather than a subcommand of ``/sre``.
 
     The registered handler is wrapped so it receives the registrar's reply
-    port, which is needed to post the message with the invoking user's name
+    interface, which is needed to post the message with the invoking user's name
     and avatar (``chat:write.customize``). The user's identity is resolved
     through the package's ``UserIdentityLookup``.
 
@@ -40,7 +40,7 @@ def register_commands(registrar: SlackCommandRegistrar) -> None:
 
 def handle_rant_command(
     payload: CommandPayload,
-    reply: SlackReplyPort,
+    reply: SlackReplySender,
     identities: UserIdentityLookup,
 ) -> CommandResponse:
     """Handle ``/rant <text>`` by posting a bold, uppercase message.
@@ -58,7 +58,7 @@ def handle_rant_command(
     Args:
         payload: Command payload from the Slack platform provider. ``text``
             holds the full message to shout.
-        reply: Port used to post the customized message.
+        reply: Interface used to post the customized message.
         identities: Lookup resolving the invoking user's name and avatar.
 
     Returns:

@@ -21,6 +21,8 @@ Use this skill when introducing or refactoring interfaces, domain types, and tra
 - Use explicit conversion between transport and internal models when crossing boundaries.
 - Keep protocols small and focused on needed behavior.
 - When both shared service protocols and route-local protocols exist, keep their method signatures aligned for overlapping methods.
+- Name a `Protocol` for the role it plays (`Reader`, `Lookup`, `Store`, `Provider`, `Registrar`, `Sender`), never for the pattern: `SlackReplySender`, `DirectoryProvider`, `IdempotencyStore`. Keep `Port` out of class, function and variable names.
+- In docstrings and decision-record prose, say "interface". Keep "port" only where a record discusses ports-and-adapters itself; elsewhere it reads as a network port.
 
 ## Protocol Alignment Pattern
 
@@ -35,6 +37,7 @@ Use this skill when introducing or refactoring interfaces, domain types, and tra
 - Dict-first internal contracts when stable structured types are available.
 - Broad protocols exposing more methods than a consumer uses.
 - Parallel protocols that describe the same method with different return shapes.
+- Pattern-named protocols and providers (`SomethingPort`, `get_something_port`): the name says which pattern is in use, not what the interface does.
 
 ## Review Checklist
 

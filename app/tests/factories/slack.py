@@ -5,7 +5,7 @@ from typing import Any
 
 from contracts.operations import OperationResult
 from contracts.slack.models import Argument, CommandPayload, CommandResponse
-from contracts.slack.reply import SlackReplyPort
+from contracts.slack.reply import SlackReplySender
 
 
 class FakeSlackReply:
@@ -39,14 +39,14 @@ class FakeSlackReply:
 
 
 class FakeSlackRegistrar:
-    """Records each registered command's keyword arguments and exposes a fake reply port."""
+    """Records each registered command's keyword arguments and exposes a fake reply interface."""
 
     def __init__(self, reply: FakeSlackReply | None = None) -> None:
         self._reply = reply or FakeSlackReply()
         self.commands: list[dict[str, Any]] = []
 
     @property
-    def reply(self) -> SlackReplyPort:
+    def reply(self) -> SlackReplySender:
         return self._reply
 
     def register_command(

@@ -10,15 +10,15 @@ from collections.abc import Callable
 from typing import Any, Protocol
 
 from contracts.slack.models import Argument, CommandPayload, CommandResponse
-from contracts.slack.reply import SlackReplyPort
+from contracts.slack.reply import SlackReplySender
 
 
 class SlackCommandRegistrar(Protocol):
-    """Registers hierarchical Slack commands and exposes the reply port."""
+    """Registers hierarchical Slack commands and exposes the reply interface."""
 
     @property
-    def reply(self) -> SlackReplyPort:
-        """Port handlers use to post messages and open views."""
+    def reply(self) -> SlackReplySender:
+        """Interface handlers use to post messages and open views."""
         ...
 
     def register_command(

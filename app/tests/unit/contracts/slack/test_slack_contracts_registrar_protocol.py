@@ -17,7 +17,7 @@ import pytest
 import contracts.slack
 import packages.user_rotations as user_rotations_module
 from contracts.slack.registrar import SlackCommandRegistrar
-from contracts.slack.reply import SlackReplyPort
+from contracts.slack.reply import SlackReplySender
 from integrations.slack.provider import SlackPlatformProvider
 from tests.factories.slack import FakeSlackRegistrar, FakeSlackReply
 
@@ -28,7 +28,7 @@ _FORBIDDEN_SDK_ROOTS = frozenset({"slack_bolt", "slack_sdk"})
 
 def test_fake_registrar_satisfies_the_registrar_and_reply_protocols() -> None:
     registrar: SlackCommandRegistrar = FakeSlackRegistrar()
-    reply: SlackReplyPort = registrar.reply
+    reply: SlackReplySender = registrar.reply
 
     assert isinstance(reply, FakeSlackReply)
     assert reply.post_ephemeral(channel_id="C1", user_id="U1", text="hi").is_success
@@ -66,8 +66,8 @@ def test_registrar_register_command_mirrors_the_runtime_provider_signature() -> 
         ("open_view", ["self", "trigger_id", "view"]),
     ],
 )
-def test_reply_port_methods_take_keyword_only_arguments(method: str, expected: list[str]) -> None:
-    params = inspect.signature(getattr(SlackReplyPort, method)).parameters
+def test_reply_sender_methods_take_keyword_only_arguments(method: str, expected: list[str]) -> None:
+    params = inspect.signature(getattr(SlackReplySender, method)).parameters
 
     assert list(params) == expected
     assert all(param.kind is inspect.Parameter.KEYWORD_ONLY for name, param in params.items() if name != "self")
