@@ -365,6 +365,8 @@ ignore_imports = [
     "packages.oncall_sync -> packages.user_rotations.settings",
     "packages.oncall_sync.ports -> packages.user_rotations.service",
     "packages.oncall_sync.providers -> packages.user_rotations.providers",
+    # Temporary (TASK-135.2): removed by TASK-135.4 when the package moves into the incident umbrella.
+    "packages.incident_summary.service -> packages.incident.core.api",
 ]
 
 [[tool.importlinter.contracts]]

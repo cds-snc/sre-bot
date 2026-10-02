@@ -3,10 +3,10 @@ id: TASK-135.2
 title: >-
   Move incident_summary onto packages/incident/core: the service gathers the
   transcript and the handler makes one service call
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-02 15:39'
-updated_date: '2026-10-02 17:11'
+updated_date: '2026-10-02 17:28'
 labels:
   - plugin-architecture
   - features
@@ -46,11 +46,11 @@ Independent of TASK-135.3: the two can be done in either order or in parallel.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 /sre incident summarize is handled with one service call; the service reads the transcript through packages.incident.core.api, and platforms/slack.py holds no history fetch, name resolution or window resolution
-- [ ] #2 packages/incident_summary defines no channel interface, TranscriptMessage, Slack adapter or provider function of its own; adapters/ and providers.py are deleted
-- [ ] #3 rg -n 'Port\b|_port\b|_PORT\b|\bport\b' over packages/incident_summary and tests/unit/packages/incident_summary finds nothing, and the legacy_surface conftest no longer patches get_incident_channel_port for incident_summary
-- [ ] #4 Command name, arguments and replies are unchanged: the legacy_surface suite is green with no assertion change, and summarize still sends unfiltered messages without times to the model
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; exactly one import-linter ignore entry is added (packages.incident_summary.service -> packages.incident.core.api), marked as removed by TASK-135.4
+- [x] #1 /sre incident summarize is handled with one service call; the service reads the transcript through packages.incident.core.api, and platforms/slack.py holds no history fetch, name resolution or window resolution
+- [x] #2 packages/incident_summary defines no channel interface, TranscriptMessage, Slack adapter or provider function of its own; adapters/ and providers.py are deleted
+- [x] #3 rg -n 'Port\b|_port\b|_PORT\b|\bport\b' over packages/incident_summary and tests/unit/packages/incident_summary finds nothing, and the legacy_surface conftest no longer patches get_incident_channel_port for incident_summary
+- [x] #4 Command name, arguments and replies are unchanged: the legacy_surface suite is green with no assertion change, and summarize still sends unfiltered messages without times to the model
+- [x] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; exactly one import-linter ignore entry is added (packages.incident_summary.service -> packages.incident.core.api), marked as removed by TASK-135.4
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -112,6 +112,35 @@ BLAST RADIUS AND ROLLBACK
 - Only /sre incident summarize. Replies, arguments and the model input are unchanged. Log events for transcript gathering change name (incident_summary_history_fetched, _history_fetch_failed, _user_lookup_failed and _channel_info_failed become the core adapter's incident_transcript_* events); nothing outside app/ references the old names (rg over the repo, 2026-10-02).
 - No configuration, manifest or schema change. A single git revert restores the previous code.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented 2026-10-02 as layer 2 of Stack G (handoff: doc-4), on branch stack-g/task-135.2-incident-summary-onto-core over layer 1 (0724af46). Stops at In Progress for human review.
+
+Production changes (app/packages/incident_summary): service.py gains summarize_incident_conversation with _resolve_limit, _resolve_window_start and the _now clock, and loses TranscriptMessage and IncidentChannelPort (158 lines); platforms/slack.py makes the one service call and keeps _parse_since_seconds, the new input translators _parse_since and _parse_limit, rendering and registration (349 -> 246 lines); providers.py, adapters/slack.py and adapters/__init__.py deleted; __init__.py drops the TranscriptMessage re-export; README.md updated. app/pyproject.toml: one feature-independence ignore entry, 'packages.incident_summary.service -> packages.incident.core.api', under the comment 'Temporary (TASK-135.2): removed by TASK-135.4 ...'.
+
+Tests: new test_incident_summary_conversation_summarize.py (16 tests over a Protocol fake of IncidentTranscriptReader); test_incident_summary_slack.py edited in place as planned (handler tests stub summarize_incident_conversation; _CHANNEL_PORT, mock_port and the fake-channel helper removed; test_handler_dispatches_with_parsed_args); test_incident_summary_service.py imports TranscriptMessage from packages.incident.core.api and drops its deprecated 'from __future__ import annotations' line; test_incident_summary_slack_adapter_lookup.py deleted with the adapter. TDD: red at collection (ImportError: summarize_incident_conversation), green after the implementation.
+
+legacy_surface: conftest.py patches get_incident_transcript_reader on packages.incident_summary.service with SlackIncidentTranscriptReader over the fake client; test_slack_command_registration_surface.py changes 3 lines, the import and the two setattr targets (handler module -> service module), no assert line; INVENTORY.md:116 now cites platforms/slack.py:60 (the registration call; the old :62 was already stale).
+
+Gates, from app/:
+- uv run ruff check . -> All checks passed!
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 65 errors in 22 files (checked 375 source files); 0 in incident_summary, packages/incident/core or legacy_surface files. Same 65 as before the layer.
+- uv run lint-imports -> Contracts: 9 kept, 0 broken. (f) reports 4 ignored imports (3 + the one temporary entry). (e) is back to 34 matched imports, the package's own adapter being gone.
+- uv run pytest tests --ignore=tests/smoke -> 6 failed, 3669 passed. The same 6 known single-process order leaks as on main and layer 1 (TASK-90: test_webhooks_aws_sns.py x3, directory/test_google.py x3), which pass in isolation and under make test.
+- uv run pytest tests/integration/legacy_surface -> 17 passed before the layer (on layer 1) and 17 passed after, no assertion changed.
+
+Slice checks:
+- rg -n 'Port\b|_port\b|_PORT\b|\bport\b' app/packages/incident_summary app/tests/unit/packages/incident_summary -> no match (exit 1).
+- rg -n 'incident_summary' app/tests/integration/legacy_surface/conftest.py -> :31 import packages.incident_summary, :42 the service import, :53 the hookimpl tuple, :187 the get_incident_transcript_reader patch. No get_incident_channel_port for this package.
+- rg -n 'get_incident_channel_port' app -> incident_draft only (its providers.py, platforms/slack.py, its unit test and conftest.py:186), which TASK-135.3 removes.
+- Before deleting: rg 'incident_summary' outside the package found only tests, the legacy_surface harness and pyproject.
+
+AC evidence: #1 handle_summarize_command makes one asyncio.run(summarize_incident_conversation(...)) call; TestHandleSummarizeCommand and the new service tests. #2 the deleted files and service.py's import from packages.incident.core.api; lint-imports. #3 the two rg outputs above. #4 legacy_surface runs; test_transcript_is_read_once_for_the_conversation_with_filtering_off and test_model_receives_author_and_text_lines_without_times. #5 the gates above.
+
+Behaviour notes: the window start and the limit resolve as before (explicit --since from now; else the conversation's start; else now minus DEFAULT_SINCE_HOURS; limit None, unreadable or not positive -> default, capped at the maximum). Transcript-gathering log events are now the core adapter's incident_transcript_* events, as the plan's blast radius says.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

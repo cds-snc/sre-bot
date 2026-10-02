@@ -5,8 +5,9 @@ channel, for someone jumping into an incident.
 
 ## What it does
 
-Fetches recent channel history, resolves author display names, builds a plain
-transcript, and asks the `Summarizer` port (OpenAI, see
+Reads the incident conversation's transcript (recent channel history with
+author display names resolved), builds a plain transcript, and asks the
+`Summarizer` interface (OpenAI, see
 `app/integrations/openai/`) to produce a concise, factual summary: what is
 happening, current status, actions taken, and next steps. The summary is
 returned **ephemerally** — only the person who ran
@@ -58,13 +59,16 @@ bot so the Web API client picks up the new token.
 ## Architecture
 
 - `platforms/slack.py` — Slack adapter: registers the command under
-  `sre.incident`, parses `--since`/`--limit`, fetches history + names, calls the
-  service, renders an ephemeral response. Follows the five-step handler
-  discipline (parse → typed values → one service call → `OperationResult` →
-  render). No runtime `slack_sdk` import (typing only).
-- `service.py` — platform-agnostic: turns `TranscriptMessage` values into a
-  transcript and delegates to the `Summarizer` port, returning
-  `OperationResult`. No Slack/HTTP imports. Empty history →
+  `sre.incident`, translates `--since`/`--limit`, makes one service call and
+  renders an ephemeral response. Follows the five-step handler discipline
+  (parse → typed values → one service call → `OperationResult` → render). No
+  `slack_sdk` import.
+- `service.py` — platform-agnostic: `summarize_incident_conversation` resolves
+  the limit and the start of the window, reads the transcript through
+  `packages/incident/core` (`IncidentTranscriptReader`, imported from
+  `core/api.py`), and `summarize_transcript` turns the `TranscriptMessage`
+  values into a transcript and delegates to the `Summarizer` interface,
+  returning `OperationResult`. No Slack/HTTP imports. Empty history →
   `OperationResult` with `error_code="EMPTY_HISTORY"`.
 - `settings.py` — partitioned feature settings.
 - `locales/` — EN/FR message catalogues (`register_i18n_resources`).

@@ -1,15 +1,10 @@
 """Tests for the platform-agnostic incident_summary service."""
 
-from __future__ import annotations
-
 import pytest
 
 from contracts.operations import OperationResult, OperationStatus
-from packages.incident_summary.service import (
-    EMPTY_HISTORY_CODE,
-    TranscriptMessage,
-    summarize_transcript,
-)
+from packages.incident.core.api import TranscriptMessage
+from packages.incident_summary.service import EMPTY_HISTORY_CODE, summarize_transcript
 
 pytestmark = pytest.mark.unit
 

@@ -3,7 +3,7 @@ id: doc-2
 title: Delivery Sequence and Stacked Pull Requests
 type: guide
 created_date: '2026-09-24 20:23'
-updated_date: '2026-10-02 16:59'
+updated_date: '2026-10-02 17:23'
 ---
 # Delivery Sequence and Stacked Pull Requests
 
@@ -110,7 +110,7 @@ These are mechanical moves with no dependencies between them. Ship them as paral
 
 - Capabilities: TASK-119 (directory), TASK-120 (drive), TASK-121 (spreadsheets), TASK-122 (audit), TASK-123 (rotations), TASK-32 (notifications placeholder). TASK-25.7 (Sentinel) follows TASK-122. TASK-25.10 (OpenAI onto the outbound-client contract, creating the text-generation capability) moved here from Wave 2 on 2026-10-01: it now creates a capability, so it waits for TASK-110 and TASK-114 like the others. TASK-134 (structured template fill in that capability) follows it. TASK-138 (calendar capability, from packages/incident/scheduling; TASK-38.6 consumes it) was added on 2026-10-02 by the TASK-97 decision.
 - Features: TASK-124.3 (rant), TASK-124.6 (geolocate), TASK-124.4 (talent), TASK-124.2 (oncall_sync, after TASK-123), TASK-124.5 (incident umbrella with core/ and the scribe subdomain, after TASK-120, TASK-134 and TASK-135; the adapter-only packages documents, drive, meet and scheduling move as they are and are folded in by TASK-38).
-- Incident reshape, a behaviour-preserving refactor and not a move: TASK-135 (incident_draft and incident_summary become the scribe subdomain over incident/core), as TASK-135.1 -> TASK-135.2 and TASK-135.3 (parallel) -> TASK-135.4, after TASK-26.1; TASK-25.10 blocks no slice and the TASK-97 decision (2026-10-02) unblocked TASK-135.4. Standalone single PRs from main, no stack. It also finishes TASK-136: the replacement for `IncidentChannelPort` takes a role name, and the `_CHANNEL_PORT` / `mock_port` test names are renamed with it (listed in the TASK-135 notes).
+- Incident reshape, a behaviour-preserving refactor and not a move: TASK-135 (incident_draft and incident_summary become the scribe subdomain over incident/core), as TASK-135.1 -> TASK-135.2 and TASK-135.3 (parallel) -> TASK-135.4, after TASK-26.1; TASK-25.10 blocks no slice and the TASK-97 decision (2026-10-02) unblocked TASK-135.4. Delivered as Stack G (human, 2026-10-02): TASK-135.1 -> TASK-135.2 -> TASK-135.3 -> TASK-135.4, bottom-up, one task per layer; with TASK-135.4 unblocked no layer waits on work outside the chain, and 135.2 and 135.3, independent in content, are ordered summary first. Handoff: doc-4 (backlog/docs/stacks/). It also finishes TASK-136: the replacement for `IncidentChannelPort` takes a role name, and the `_CHANNEL_PORT` / `mock_port` test names are renamed with it (listed in the TASK-135 notes).
 
 ### Wave 5: behaviour-changing tracks
 
