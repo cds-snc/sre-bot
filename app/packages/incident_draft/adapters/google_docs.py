@@ -1,4 +1,4 @@
-"""Google-backed adapter for the ``IncidentDocumentPort``.
+"""Google-backed adapter for the ``IncidentDocumentStore``.
 
 Owns every Google structural detail: walking the source document body to turn
 heading-styled paragraphs into ``DocumentSection`` values (the heading plus the
@@ -11,8 +11,6 @@ incident report is only ever read; the sole content-removing operation here is g
 Per ``decisions/feature-packages.md`` this is the only place in the package
 allowed to import ``integrations``.
 """
-
-from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
@@ -141,7 +139,7 @@ _KNOWN_LABEL_KEYS = _REGULAR_TEXT_LABEL_KEYS | frozenset(re.sub(r"[^a-z0-9]+", "
 
 
 class GoogleDocsIncidentDocument:
-    """``IncidentDocumentPort`` implementation backed by Google Docs and Drive."""
+    """``IncidentDocumentStore`` implementation backed by Google Docs and Drive."""
 
     def read_sections(self, document_id: str) -> list[DocumentSection]:
         """Return the document's heading-delimited sections in document order.

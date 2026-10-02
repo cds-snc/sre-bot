@@ -294,12 +294,12 @@ Per `decisions/feature-packages.md` and `decisions/transport-slack.md`:
   (heading + instructions), `SectionDraft`, `DocumentField`,
   `DraftWriteResult`, `DraftedDocument`.
 - `service.py` — platform-agnostic orchestrator; depends on the
-  `IncidentDocumentPort` Protocol and the `Summarizer` port; no Slack, HTTP,
+  `IncidentDocumentStore` Protocol and the `Summarizer` interface; no Slack, HTTP,
   or Google SDK imports.
 - `adapters/google_docs.py` — the only file touching **Google**
   (Docs read + Drive copy + Docs populate). `service.py` imports the
-  `Summarizer` port and `platforms/slack.py` the transport models, both by
+  `Summarizer` interface and `platforms/slack.py` the transport models, both by
   design.
-- `providers.py` — feature-local DI wiring for the document port.
+- `providers.py` — feature-local DI wiring for the document interface.
 - `platforms/slack.py` — five-step handler; ephemeral responses; EN/FR
   locales in `locales/`.

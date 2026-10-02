@@ -7,7 +7,7 @@ names. It delegates the drafting to the platform-agnostic
 ``packages.incident_draft.service``, which reads each heading's template
 instructions, answers them from the transcript, and writes the result into a
 draft document. The one write into the incident report itself is its timeline
-section, which the service replaces via the document port.
+section, which the service replaces via the document interface.
 
 Channel bookmarks, history, metadata and user records are read through the
 package's ``IncidentChannelPort``, resolved from ``providers`` at dispatch
@@ -125,7 +125,7 @@ def handle_draft_command(
             invocation). History always starts at the channel's creation so the
             draft covers the whole incident.
         reply: Interface used to post the progress notice.
-        channel: Port reading the incident channel.
+        channel: Interface reading the incident channel.
 
     Returns:
         An ephemeral ``CommandResponse`` linking the new draft document, or a

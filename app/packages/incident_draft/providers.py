@@ -13,8 +13,8 @@ from packages.incident_draft.service import IncidentChannelPort
 
 
 @lru_cache(maxsize=1)
-def get_incident_document_port() -> GoogleDocsIncidentDocument:
-    """Return the process-wide Google-Docs-backed ``IncidentDocumentPort``."""
+def get_incident_document_store() -> GoogleDocsIncidentDocument:
+    """Return the process-wide Google-Docs-backed ``IncidentDocumentStore``."""
     return GoogleDocsIncidentDocument()
 
 

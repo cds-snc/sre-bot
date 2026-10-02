@@ -1,6 +1,4 @@
-"""Tests for the Google-backed IncidentDocumentPort adapter."""
-
-from __future__ import annotations
+"""Tests for the Google-backed IncidentDocumentStore adapter."""
 
 import re
 from unittest.mock import MagicMock, patch

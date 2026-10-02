@@ -1,7 +1,5 @@
 """Tests for the platform-agnostic incident_draft service."""
 
-from __future__ import annotations
-
 import json
 
 import pytest
@@ -58,8 +56,8 @@ class _StubSummarizer:
         return self._result
 
 
-class _StubDocumentPort:
-    """Minimal ``IncidentDocumentPort`` stub capturing the drafted sections."""
+class _StubIncidentDocumentStore:
+    """Minimal ``IncidentDocumentStore`` stub capturing the drafted sections."""
 
     def __init__(
         self,
@@ -99,7 +97,7 @@ def _sections() -> list[DocumentSection]:
 class TestDraftIncidentDocument:
     @pytest.mark.asyncio
     async def test_unreadable_document_short_circuits(self):
-        documents = _StubDocumentPort(sections=[])
+        documents = _StubIncidentDocumentStore(sections=[])
         summarizer = _StubSummarizer(OperationResult.success(data="unused"))
 
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -110,7 +108,7 @@ class TestDraftIncidentDocument:
 
     @pytest.mark.asyncio
     async def test_empty_history_returns_permanent_error_without_calling_summarizer(self):
-        documents = _StubDocumentPort(sections=_sections())
+        documents = _StubIncidentDocumentStore(sections=_sections())
         summarizer = _StubSummarizer(OperationResult.success(data="unused"))
 
         result = await draft_incident_document("D1", [], documents=documents, summarizer=summarizer)
@@ -121,7 +119,7 @@ class TestDraftIncidentDocument:
 
     @pytest.mark.asyncio
     async def test_prompt_carries_each_headings_instructions_and_the_transcript(self):
-        documents = _StubDocumentPort(sections=_sections())
+        documents = _StubIncidentDocumentStore(sections=_sections())
         summarizer = _StubSummarizer(OperationResult.success(data='{"Trigger": "A bad deploy."}'))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -139,7 +137,7 @@ class TestDraftIncidentDocument:
             "Impact": "Checkout was unavailable to users.",
             "Detection": "",
         }
-        documents = _StubDocumentPort(sections=_sections())
+        documents = _StubIncidentDocumentStore(sections=_sections())
         summarizer = _StubSummarizer(OperationResult.success(data=json.dumps(answers)))
 
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -152,7 +150,7 @@ class TestDraftIncidentDocument:
 
     @pytest.mark.asyncio
     async def test_unanswered_section_keeps_the_templates_instructions(self):
-        documents = _StubDocumentPort(sections=_sections())
+        documents = _StubIncidentDocumentStore(sections=_sections())
         summarizer = _StubSummarizer(OperationResult.success(data='{"Trigger": "A bad deploy."}'))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -170,7 +168,7 @@ class TestDraftIncidentDocument:
     @pytest.mark.asyncio
     async def test_requests_a_larger_completion_budget_than_the_vendor_default(self):
         """Drafting emits JSON for every section; the 800-token default truncates it."""
-        documents = _StubDocumentPort(sections=_sections())
+        documents = _StubIncidentDocumentStore(sections=_sections())
         summarizer = _StubSummarizer(OperationResult.success(data='{"Trigger": "A bad deploy."}'))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -180,7 +178,7 @@ class TestDraftIncidentDocument:
     @pytest.mark.asyncio
     async def test_json_wrapped_in_prose_is_parsed(self):
         wrapped = 'Sure! Here is the draft:\n{"Trigger": "A bad deploy."}\nLet me know if you need changes.'
-        documents = _StubDocumentPort(sections=_sections())
+        documents = _StubIncidentDocumentStore(sections=_sections())
         summarizer = _StubSummarizer(OperationResult.success(data=wrapped))
 
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -192,7 +190,7 @@ class TestDraftIncidentDocument:
     async def test_truncated_response_still_produces_a_partial_draft(self):
         """Every run writes a fresh document, so a fragment costs nothing."""
         truncated = '{"Trigger": "A bad deploy caused 500s.", "Impact": "Checkout was down.", "Lessons Learned": "The team lea'
-        documents = _StubDocumentPort(sections=_sections())
+        documents = _StubIncidentDocumentStore(sections=_sections())
         summarizer = _StubSummarizer(OperationResult.success(data=truncated))
 
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -204,7 +202,7 @@ class TestDraftIncidentDocument:
 
     @pytest.mark.asyncio
     async def test_empty_model_response_returns_unparseable(self):
-        documents = _StubDocumentPort(sections=_sections())
+        documents = _StubIncidentDocumentStore(sections=_sections())
         summarizer = _StubSummarizer(OperationResult.success(data=""))
 
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -224,7 +222,7 @@ class TestDraftIncidentDocument:
     @pytest.mark.asyncio
     async def test_code_fenced_json_is_parsed(self):
         fenced = '```json\n{"Trigger": "A bad deploy."}\n```'
-        documents = _StubDocumentPort(sections=_sections())
+        documents = _StubIncidentDocumentStore(sections=_sections())
         summarizer = _StubSummarizer(OperationResult.success(data=fenced))
 
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -234,7 +232,7 @@ class TestDraftIncidentDocument:
 
     @pytest.mark.asyncio
     async def test_unparseable_model_output_returns_error_without_creating(self):
-        documents = _StubDocumentPort(sections=_sections())
+        documents = _StubIncidentDocumentStore(sections=_sections())
         summarizer = _StubSummarizer(OperationResult.success(data="not json at all"))
 
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -245,7 +243,7 @@ class TestDraftIncidentDocument:
 
     @pytest.mark.asyncio
     async def test_all_blank_answers_return_no_answers_without_creating(self):
-        documents = _StubDocumentPort(sections=_sections())
+        documents = _StubIncidentDocumentStore(sections=_sections())
         summarizer = _StubSummarizer(OperationResult.success(data='{"Trigger": "", "Impact": "  "}'))
 
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -256,7 +254,7 @@ class TestDraftIncidentDocument:
 
     @pytest.mark.asyncio
     async def test_summarizer_error_propagates_status_and_code(self):
-        documents = _StubDocumentPort(sections=_sections())
+        documents = _StubIncidentDocumentStore(sections=_sections())
         summarizer = _StubSummarizer(OperationResult.transient_error(message="boom", error_code="SERVER_ERROR"))
 
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -267,7 +265,7 @@ class TestDraftIncidentDocument:
 
     @pytest.mark.asyncio
     async def test_create_failure_returns_transient_error(self):
-        documents = _StubDocumentPort(sections=_sections(), new_document_id=None)
+        documents = _StubIncidentDocumentStore(sections=_sections(), new_document_id=None)
         summarizer = _StubSummarizer(OperationResult.success(data='{"Trigger": "A bad deploy."}'))
 
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -283,7 +281,7 @@ class TestListHeadingDetection:
         ["Action Items", "action items", "Follow-up Tasks", "Next Steps", "Detailed Timeline"],
     )
     async def test_list_headings_are_marked_for_bulleting(self, heading):
-        documents = _StubDocumentPort(sections=[DocumentSection(heading=heading, instructions="x\n")])
+        documents = _StubIncidentDocumentStore(sections=[DocumentSection(heading=heading, instructions="x\n")])
         summarizer = _StubSummarizer(OperationResult.success(data=json.dumps({heading: "- do the thing"})))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -292,7 +290,7 @@ class TestListHeadingDetection:
 
     @pytest.mark.asyncio
     async def test_prose_headings_are_not_marked(self):
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Trigger", instructions="x\n")])
+        documents = _StubIncidentDocumentStore(sections=[DocumentSection(heading="Trigger", instructions="x\n")])
         summarizer = _StubSummarizer(OperationResult.success(data='{"Trigger": "A bad deploy."}'))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -309,7 +307,7 @@ class TestHeadingMatching:
         ["Summary", "summary", "Summary:", "1. Summary", "SUMMARY", " Summary "],
     )
     async def test_key_drift_still_matches_the_heading(self, model_key):
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        documents = _StubIncidentDocumentStore(sections=[DocumentSection(heading="Summary", instructions="")])
         summarizer = _StubSummarizer(OperationResult.success(data=json.dumps({model_key: "Checkout was down."})))
 
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -320,7 +318,7 @@ class TestHeadingMatching:
 
     @pytest.mark.asyncio
     async def test_numbered_document_heading_matches_plain_model_key(self):
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="5. Detection", instructions="")])
+        documents = _StubIncidentDocumentStore(sections=[DocumentSection(heading="5. Detection", instructions="")])
         summarizer = _StubSummarizer(OperationResult.success(data='{"Detection": "A bad deploy."}'))
 
         result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -329,7 +327,7 @@ class TestHeadingMatching:
 
     @pytest.mark.asyncio
     async def test_genuinely_absent_section_stays_unanswered(self):
-        documents = _StubDocumentPort(
+        documents = _StubIncidentDocumentStore(
             sections=[
                 DocumentSection(heading="Summary", instructions=""),
                 DocumentSection(heading="Detection", instructions=""),
@@ -348,7 +346,7 @@ class TestTruncationNeverDestroysContent:
 
     @pytest.mark.asyncio
     async def test_complete_response_still_writes_normally(self):
-        documents = _StubDocumentPort(sections=_sections())
+        documents = _StubIncidentDocumentStore(sections=_sections())
         answers = {"Trigger": "A bad deploy.", "Impact": "Checkout was down.", "Lessons Learned": "Add a canary."}
         summarizer = _StubSummarizer(OperationResult.success(data=json.dumps(answers)))
 
@@ -386,7 +384,7 @@ class TestMetadataFieldInference:
             "Start-of-impact time": "2026-08-17 10:30",
             "End-of-impact time": "",
         }
-        documents = _StubDocumentPort(sections=self._sections())
+        documents = _StubIncidentDocumentStore(sections=self._sections())
         summarizer = _StubSummarizer(OperationResult.success(data=json.dumps(answers)))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -400,7 +398,7 @@ class TestMetadataFieldInference:
     @pytest.mark.asyncio
     async def test_the_author_is_the_bot_not_the_responders(self):
         """Responders spoke in the channel; they did not author this draft."""
-        documents = _StubDocumentPort(sections=self._sections())
+        documents = _StubIncidentDocumentStore(sections=self._sections())
         summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "Checkout was down."}'))
         messages = [
             TranscriptMessage(author="Sylvia", text="report failing"),
@@ -416,7 +414,7 @@ class TestMetadataFieldInference:
     @pytest.mark.asyncio
     async def test_on_call_and_facilitators_are_filled_when_evidenced(self):
         answers = {"Summary": "x", "On-call": "Sylvia", "Facilitators": "Pat"}
-        documents = _StubDocumentPort(sections=self._sections())
+        documents = _StubIncidentDocumentStore(sections=self._sections())
         summarizer = _StubSummarizer(OperationResult.success(data=json.dumps(answers)))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -428,7 +426,7 @@ class TestMetadataFieldInference:
     @pytest.mark.asyncio
     async def test_unevidenced_fields_are_left_blank_rather_than_guessed(self):
         answers = {"Summary": "x", "On-call": "", "Facilitators": "   ", "Detection time": ""}
-        documents = _StubDocumentPort(sections=self._sections())
+        documents = _StubIncidentDocumentStore(sections=self._sections())
         summarizer = _StubSummarizer(OperationResult.success(data=json.dumps(answers)))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -440,7 +438,7 @@ class TestMetadataFieldInference:
 
     @pytest.mark.asyncio
     async def test_metadata_labels_are_offered_to_the_model(self):
-        documents = _StubDocumentPort(sections=self._sections())
+        documents = _StubIncidentDocumentStore(sections=self._sections())
         summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -458,7 +456,7 @@ class TestPullRequestLinks:
         return [DocumentSection(heading="Summary", instructions="")]
 
     async def _run(self, messages):
-        documents = _StubDocumentPort(sections=self._sections())
+        documents = _StubIncidentDocumentStore(sections=self._sections())
         summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "PR 1899 fixed it."}'))
         await draft_incident_document("D1", messages, documents=documents, summarizer=summarizer)
         return documents
@@ -498,7 +496,7 @@ class TestAuthorIsAlwaysTheBot:
     @pytest.mark.asyncio
     async def test_written_even_when_the_model_offers_its_own_author(self):
         answers = {"Summary": "x", "Author(s)": "Sylvia and Pat"}
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        documents = _StubIncidentDocumentStore(sections=[DocumentSection(heading="Summary", instructions="")])
         summarizer = _StubSummarizer(OperationResult.success(data=json.dumps(answers)))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -509,7 +507,7 @@ class TestAuthorIsAlwaysTheBot:
 
     @pytest.mark.asyncio
     async def test_written_even_when_nothing_else_is_established(self):
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        documents = _StubIncidentDocumentStore(sections=[DocumentSection(heading="Summary", instructions="")])
         summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -531,7 +529,7 @@ class TestHumanOnlySections:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("heading", _SKIPPED)
     async def test_the_section_is_never_sent_to_the_model(self, heading):
-        documents = _StubDocumentPort(
+        documents = _StubIncidentDocumentStore(
             sections=[
                 DocumentSection(heading="Summary", instructions="Summarize.\n"),
                 DocumentSection(heading=heading, instructions="Ask why 5 times.\n"),
@@ -546,7 +544,7 @@ class TestHumanOnlySections:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("heading", _SKIPPED)
     async def test_nothing_is_written_into_the_section(self, heading):
-        documents = _StubDocumentPort(
+        documents = _StubIncidentDocumentStore(
             sections=[
                 DocumentSection(heading="Summary", instructions="Summarize.\n"),
                 DocumentSection(heading=heading, instructions="Ask why 5 times.\n"),
@@ -565,7 +563,7 @@ class TestHumanOnlySections:
 
     @pytest.mark.asyncio
     async def test_other_sections_are_unaffected(self):
-        documents = _StubDocumentPort(
+        documents = _StubIncidentDocumentStore(
             sections=[
                 DocumentSection(heading="Summary", instructions="Summarize.\n"),
                 DocumentSection(heading="Lessons Learned", instructions="What did we learn?\n"),
@@ -579,7 +577,7 @@ class TestHumanOnlySections:
 
     @pytest.mark.asyncio
     async def test_the_prompt_no_longer_describes_them(self):
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        documents = _StubIncidentDocumentStore(sections=[DocumentSection(heading="Summary", instructions="")])
         summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -606,7 +604,9 @@ class TestTimelineNeverCollapsesToOneEntry:
 
     @staticmethod
     async def _timeline_written(value):
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Detailed Timeline", instructions="List events.\n")])
+        documents = _StubIncidentDocumentStore(
+            sections=[DocumentSection(heading="Detailed Timeline", instructions="List events.\n")]
+        )
         summarizer = _StubSummarizer(OperationResult.success(data=json.dumps({"Detailed Timeline": value})))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -648,7 +648,7 @@ class TestTimelineNeverCollapsesToOneEntry:
     @pytest.mark.asyncio
     async def test_a_list_answer_is_not_silently_discarded(self):
         """A non-string value used to be dropped, leaving the section empty."""
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Action Items", instructions="List tasks.\n")])
+        documents = _StubIncidentDocumentStore(sections=[DocumentSection(heading="Action Items", instructions="List tasks.\n")])
         answers = {"Action Items": ["Ada to add an alert", "Sylvia to document the rollback"]}
         summarizer = _StubSummarizer(OperationResult.success(data=json.dumps(answers)))
 
@@ -663,7 +663,7 @@ class TestTimelineNeverCollapsesToOneEntry:
 
     @pytest.mark.asyncio
     async def test_the_prompt_forbids_both_collapsing_shapes(self):
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        documents = _StubIncidentDocumentStore(sections=[DocumentSection(heading="Summary", instructions="")])
         summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -680,7 +680,7 @@ class TestTimelineNeverCollapsesToOneEntry:
         soft one, so coverage now comes first and the worked example shows
         several entries rather than one.
         """
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        documents = _StubIncidentDocumentStore(sections=[DocumentSection(heading="Summary", instructions="")])
         summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -697,7 +697,7 @@ class TestTimelineNeverCollapsesToOneEntry:
 
     @pytest.mark.asyncio
     async def test_the_prompt_requires_a_full_date_stamp_on_every_entry(self):
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        documents = _StubIncidentDocumentStore(sections=[DocumentSection(heading="Summary", instructions="")])
         summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -711,7 +711,7 @@ class TestTimelineNeverCollapsesToOneEntry:
     @pytest.mark.asyncio
     async def test_the_sentence_limit_does_not_apply_to_list_sections(self):
         """The global "1-4 sentences" rule silently capped the timeline."""
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        documents = _StubIncidentDocumentStore(sections=[DocumentSection(heading="Summary", instructions="")])
         summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
@@ -837,7 +837,7 @@ class TestAPullRequestIsNamedOnce:
     @pytest.mark.asyncio
     async def test_the_url_still_resolves_to_a_link_after_being_collapsed(self):
         """Links are resolved before collapsing, so the short form stays clickable."""
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        documents = _StubIncidentDocumentStore(sections=[DocumentSection(heading="Summary", instructions="")])
         answer = "Reverted by PR 1898, https://github.com/cds-snc/sre-bot/pull/1898."
         summarizer = _StubSummarizer(OperationResult.success(data=json.dumps({"Summary": answer})))
 
@@ -848,7 +848,7 @@ class TestAPullRequestIsNamedOnce:
 
     @pytest.mark.asyncio
     async def test_the_prompt_asks_for_the_short_form_only(self):
-        documents = _StubDocumentPort(sections=[DocumentSection(heading="Summary", instructions="")])
+        documents = _StubIncidentDocumentStore(sections=[DocumentSection(heading="Summary", instructions="")])
         summarizer = _StubSummarizer(OperationResult.success(data='{"Summary": "x"}'))
 
         await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
