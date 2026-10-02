@@ -32,9 +32,12 @@ guidance is left exactly as it is, ready for a human.
 
 ## How it works
 
-1. **Locate and read the channel.** The incident document is found via the
-   channel's "Incident report" bookmark. The transcript is fetched from channel
-   creation, display names resolved, timestamps attached, and noise removed:
+1. **Locate and read the channel.** The handler makes one service call. The
+   service finds the incident document via the channel's "Incident report"
+   bookmark (the package's `IncidentReportLinkLookup` interface), then reads
+   the transcript through the `IncidentTranscriptReader` interface of
+   `packages/incident/core`: fetched from channel creation, display names
+   resolved, each message carrying its time, and noise removed:
 
    - **This bot's own messages** — topic changes, hangout links, "an incident
      report has been created at…". Matched on *any* of `user_id`, `bot_id` or
@@ -290,16 +293,22 @@ timeout) and the Google Workspace service account, with the `documents` and
 
 Per `decisions/feature-packages.md` and `decisions/transport-slack.md`:
 
-- `domain.py` — frozen values: `TranscriptMessage`, `DocumentSection`
-  (heading + instructions), `SectionDraft`, `DocumentField`,
-  `DraftWriteResult`, `DraftedDocument`.
+- `domain.py` — frozen values: `DocumentSection` (heading + instructions),
+  `SectionDraft`, `DocumentField`, `DraftWriteResult`, `DraftedDocument`.
+  `TranscriptMessage` comes from `packages/incident/core`.
 - `service.py` — platform-agnostic orchestrator; depends on the
-  `IncidentDocumentStore` Protocol and the `Summarizer` interface; no Slack, HTTP,
-  or Google SDK imports.
+  `IncidentDocumentStore` and `IncidentReportLinkLookup` interfaces defined
+  here, the incident core's `IncidentTranscriptReader` and the `Summarizer`
+  interface; no Slack, HTTP, or Google SDK imports. It is the only module of
+  the package that imports `packages/incident/core`.
+- `adapters/slack.py` — the report-link lookup on Slack bookmarks; returns
+  plain strings and no links on an API error.
 - `adapters/google_docs.py` — the only file touching **Google**
   (Docs read + Drive copy + Docs populate). `service.py` imports the
   `Summarizer` interface and `platforms/slack.py` the transport models, both by
   design.
-- `providers.py` — feature-local DI wiring for the document interface.
-- `platforms/slack.py` — five-step handler; ephemeral responses; EN/FR
+- `providers.py` — feature-local DI wiring for the document store and the
+  report-link lookup.
+- `platforms/slack.py` — five-step handler making one service call; posts the
+  progress notice when the service signals the start; ephemeral responses; EN/FR
   locales in `locales/`.

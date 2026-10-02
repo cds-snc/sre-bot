@@ -1,49 +1,43 @@
-"""Slack adapter — implements ``IncidentChannelPort`` on the Slack Web API.
+"""Slack adapter — implements ``IncidentReportLinkLookup`` on the Slack Web API.
 
-Each method issues one Web API call and returns the part of the payload the
-handler reads. Web API errors propagate; the handler owns each degradation.
+Incident channels carry an "Incident report" bookmark pointing at the report
+document. The adapter owns the degradation: a Web API failure is logged here
+and never raised.
 """
 
-from collections.abc import Mapping, Sequence
-from typing import Any
-
+import structlog
 from slack_sdk import WebClient
 
 from integrations.slack.client import get_slack_web_client
 
+logger = structlog.get_logger()
 
-class SlackIncidentChannel:
-    """Read an incident channel's bookmarks, history, metadata and members from Slack."""
+_INCIDENT_REPORT_BOOKMARK = "Incident report"
+
+
+class SlackIncidentReportLinkLookup:
+    """Find an incident channel's report links among its Slack bookmarks."""
 
     def __init__(self, client: WebClient) -> None:
         self._client = client
 
-    def list_bookmarks(self, channel_id: str) -> Sequence[Mapping[str, Any]]:
-        """Return the channel's bookmarks from ``bookmarks.list``."""
-        response = self._client.bookmarks_list(channel_id=channel_id)
-        return response.get("bookmarks") or []
+    def find_report_links(self, conversation_id: str) -> list[str]:
+        """Return the links of the channel's "Incident report" bookmarks, in listed order.
 
-    def fetch_history(self, channel_id: str, *, limit: int, oldest: str) -> Sequence[Mapping[str, Any]]:
-        """Return up to ``limit`` messages posted since ``oldest``, newest first."""
-        response = self._client.conversations_history(channel=channel_id, limit=limit, oldest=oldest)
-        return response.get("messages") or []
+        A bookmark without a link is an empty string. On any Slack API failure
+        of ``bookmarks.list`` no links are returned, so the caller renders its
+        no-document path.
+        """
+        try:
+            response = self._client.bookmarks_list(channel_id=conversation_id)
+        except Exception as exc:  # noqa: BLE001 - degrade to "no document" on any API error
+            logger.warning("incident_draft_bookmarks_fetch_failed", conversation_id=conversation_id, error=str(exc))
+            return []
 
-    def get_channel(self, channel_id: str) -> Mapping[str, Any]:
-        """Return the channel object from ``conversations.info``."""
-        response = self._client.conversations_info(channel=channel_id)
-        return response.get("channel") or {}
-
-    def get_user(self, user_id: str) -> Mapping[str, Any]:
-        """Return the user object from ``users.info``."""
-        response = self._client.users_info(user=user_id)
-        return response.get("user") or {}
-
-    def get_self_identity(self) -> Mapping[str, Any]:
-        """Return this bot's ``user_id``, ``bot_id`` and ``user`` name from ``auth.test``."""
-        response = self._client.auth_test()
-        return {key: response.get(key) for key in ("user_id", "bot_id", "user")}
+        bookmarks = response.get("bookmarks") or []
+        return [str(bookmark.get("link") or "") for bookmark in bookmarks if bookmark.get("title") == _INCIDENT_REPORT_BOOKMARK]
 
 
-def build_incident_channel() -> SlackIncidentChannel:
+def build_incident_report_link_lookup() -> SlackIncidentReportLinkLookup:
     """Build the adapter on the bot's Web client."""
-    return SlackIncidentChannel(get_slack_web_client())
+    return SlackIncidentReportLinkLookup(get_slack_web_client())

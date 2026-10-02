@@ -9,6 +9,11 @@ incident channel transcript via the ``Summarizer`` interface
 each run (a fresh copy of the incident report template). The incident report
 created at channel creation is only ever read, never modified.
 
+``draft_incident_document_from_conversation`` is the use case a platform
+handler calls: it finds the incident report through the
+``IncidentReportLinkLookup``, reads the conversation's transcript through the
+incident core ``IncidentTranscriptReader`` and drafts from it.
+
 This module is deliberately free of Slack, HTTP, and Google SDK imports: it
 consumes domain values and Protocols and returns an ``OperationResult`` so any
 platform adapter can reuse it.
@@ -16,15 +21,18 @@ platform adapter can reuse it.
 
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from itertools import pairwise
 from typing import Any, Protocol, runtime_checkable
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import structlog
 
 from contracts.operations import OperationResult
 from integrations.openai import Summarizer, get_summarizer
+from packages.incident.core.api import IncidentTranscriptReader, TranscriptMessage, get_incident_transcript_reader
 from packages.incident_draft.domain import (
     AI_AUTHOR,
     DocumentField,
@@ -32,12 +40,12 @@ from packages.incident_draft.domain import (
     DraftedDocument,
     DraftWriteResult,
     SectionDraft,
-    TranscriptMessage,
 )
-from packages.incident_draft.settings import get_incident_draft_settings
+from packages.incident_draft.settings import IncidentDraftSettings, get_incident_draft_settings
 
 logger = structlog.get_logger()
 
+NO_DOCUMENT_CODE = "NO_DOCUMENT"
 DOCUMENT_UNREADABLE_CODE = "DOCUMENT_UNREADABLE"
 EMPTY_HISTORY_CODE = "EMPTY_HISTORY"
 DRAFT_UNPARSEABLE_CODE = "DRAFT_UNPARSEABLE"
@@ -150,6 +158,9 @@ _MODEL_FIELD_LABELS = (
 )
 _AUTHORS_FIELD_LABEL = "Author(s)"
 
+# The incident report is a Google Doc; its id is what the document store reads.
+_DOC_ID_PATTERN = re.compile(r"https://docs\.google\.com/document/d/([a-zA-Z0-9_-]+)")
+
 # Pull-request links as they appear in Slack messages. The model writes "PR
 # 1898" in prose, so the number is mapped back to the URL somebody actually
 # posted. Group 1 is the repository, kept so a PR the channel discussed without
@@ -219,28 +230,81 @@ class IncidentDocumentStore(Protocol):
 
 
 @runtime_checkable
-class IncidentChannelPort(Protocol):
-    """Behavior contract for reading the incident channel a draft is built from."""
+class IncidentReportLinkLookup(Protocol):
+    """Interface finding where an incident conversation's report lives.
 
-    def list_bookmarks(self, channel_id: str) -> Sequence[Mapping[str, Any]]:
-        """Return the channel's bookmarks, each with its ``title`` and ``link``."""
+    Implementations never raise for a platform failure: they log it and return
+    no links.
+    """
+
+    def find_report_links(self, conversation_id: str) -> Sequence[str]:
+        """Return the links the conversation holds to its incident report.
+
+        The links are plain strings in the order the platform lists them; a
+        report entry with no link is an empty string. Empty when the
+        conversation has no report entry or the platform lookup failed.
+        """
         ...
 
-    def fetch_history(self, channel_id: str, *, limit: int, oldest: str) -> Sequence[Mapping[str, Any]]:
-        """Return up to ``limit`` raw channel messages posted since ``oldest``, newest first."""
-        ...
 
-    def get_channel(self, channel_id: str) -> Mapping[str, Any]:
-        """Return the channel's metadata, including its ``created`` time."""
-        ...
+async def draft_incident_document_from_conversation(
+    conversation_id: str,
+    *,
+    limit: int | None = None,
+    on_started: Callable[[], None] | None = None,
+    reader: IncidentTranscriptReader | None = None,
+    report_links: IncidentReportLinkLookup | None = None,
+) -> OperationResult[DraftedDocument]:
+    """Draft a filled-in copy of an incident conversation's report.
 
-    def get_user(self, user_id: str) -> Mapping[str, Any]:
-        """Return the user's record, including their ``profile``."""
-        ...
+    Finds the report document, then reads the conversation from its start --
+    without this bot's own posts and the platform's system events -- and drafts
+    from that transcript.
 
-    def get_self_identity(self) -> Mapping[str, Any]:
-        """Return this bot's own ``user_id``, ``bot_id`` and ``user`` name."""
-        ...
+    Args:
+        conversation_id: The incident conversation to draft from.
+        limit: Maximum number of messages to read. Missing or not positive
+            means the configured default; larger values are capped.
+        on_started: Called once when the report document has been found, before
+            the slow work (reading the transcript, the model call, the document
+            writes) begins. Not called when there is no report document.
+        reader: Optional ``IncidentTranscriptReader``; defaults to the incident
+            core's process singleton. Injected in tests.
+        report_links: Optional ``IncidentReportLinkLookup``; defaults to the
+            Slack-backed adapter from ``providers``. Injected in tests.
+
+    Returns:
+        The ``OperationResult`` of ``draft_incident_document`` for the report
+        and the messages read, or a permanent error with ``NO_DOCUMENT`` when
+        the conversation links to no report document.
+    """
+    log = logger.bind(operation="draft_incident_document_from_conversation", conversation_id=conversation_id)
+
+    if report_links is None:
+        from packages.incident_draft.providers import get_incident_report_link_lookup
+
+        report_links = get_incident_report_link_lookup()
+
+    document_id = _find_report_document_id(report_links.find_report_links(conversation_id), log)
+    if document_id is None:
+        return OperationResult.permanent_error(
+            message="No incident report document is linked from the conversation",
+            error_code=NO_DOCUMENT_CODE,
+        )
+
+    if on_started is not None:
+        on_started()
+
+    settings = get_incident_draft_settings()
+    reader = reader or get_incident_transcript_reader()
+    messages = reader.read_transcript(
+        conversation_id,
+        since=_resolve_window_start(reader, conversation_id, settings),
+        limit=_resolve_limit(limit, settings),
+        exclude_own_and_system_messages=True,
+    )
+
+    return await draft_incident_document(document_id, messages)
 
 
 async def draft_incident_document(
@@ -457,15 +521,78 @@ def _build_payload(
         blocks.append(f"### {section.heading}\nInstructions: {instructions}")
     fields_text = "\n".join(f"- {label}" for label in _MODEL_FIELD_LABELS)
     sections_text = "\n\n".join(blocks)
-    transcript = "\n".join(_transcript_line(message) for message in messages)
+    tzname = get_incident_draft_settings().TIMEZONE
+    transcript = "\n".join(_transcript_line(message, tzname) for message in messages)
     return f"Report sections:\n\n{sections_text}\n\nMetadata fields:\n{fields_text}\n\nIncident channel transcript:\n{transcript}"
 
 
-def _transcript_line(message: TranscriptMessage) -> str:
+def _transcript_line(message: TranscriptMessage, tzname: str) -> str:
     """Render one transcript line, prefixed with its time when known."""
-    if message.timestamp:
-        return f"[{message.timestamp}] {message.author}: {message.text}"
+    timestamp = _format_time(message.posted_at, tzname)
+    if timestamp:
+        return f"[{timestamp}] {message.author}: {message.text}"
     return f"{message.author}: {message.text}"
+
+
+def _format_time(posted_at: datetime | None, tzname: str) -> str:
+    """Format a message time as ``YYYY-MM-DD HH:MM ZZZ`` in the configured zone.
+
+    Responders read the report in local time, and an incident spanning days --
+    or a daylight-saving boundary -- is ambiguous without the date and zone.
+    Falls back to UTC when the zone name is unknown, and returns an empty string
+    for a message without a time; the transcript line then simply carries no time.
+    """
+    if posted_at is None:
+        return ""
+
+    moment = posted_at.astimezone(UTC)
+    try:
+        moment = moment.astimezone(ZoneInfo(tzname))
+    except ZoneInfoNotFoundError, ValueError:
+        logger.warning("incident_draft_unknown_timezone", timezone=tzname)
+    return moment.strftime("%Y-%m-%d %H:%M %Z")
+
+
+def _find_report_document_id(links: Sequence[str], log: structlog.stdlib.BoundLogger) -> str | None:
+    """Return the document id of the first report link that carries one.
+
+    ``None`` when there is no link or none points at a Google Doc.
+    """
+    for link in links:
+        match = _DOC_ID_PATTERN.search(link)
+        if match:
+            return match.group(1)
+        log.warning("incident_draft_bookmark_link_invalid", link=link)
+    return None
+
+
+def _resolve_limit(limit: int | None, settings: IncidentDraftSettings) -> int:
+    """Turn the requested limit into a safe, capped message count."""
+    if limit is None or limit <= 0:
+        return settings.DEFAULT_HISTORY_LIMIT
+    return min(limit, settings.MAX_HISTORY_LIMIT)
+
+
+def _resolve_window_start(
+    reader: IncidentTranscriptReader,
+    conversation_id: str,
+    settings: IncidentDraftSettings,
+) -> datetime:
+    """Return the start of the window to draft from.
+
+    The window starts when the conversation did, so the draft covers the whole
+    incident, and falls back to the configured default window when the reader
+    cannot say.
+    """
+    started_at = reader.conversation_started_at(conversation_id)
+    if started_at is not None:
+        return started_at
+    return _now() - timedelta(hours=settings.DEFAULT_SINCE_HOURS)
+
+
+def _now() -> datetime:
+    """Return the current time, timezone-aware UTC."""
+    return datetime.now(UTC)
 
 
 def _parse_answers(raw: str) -> tuple[dict[str, str] | None, bool]:

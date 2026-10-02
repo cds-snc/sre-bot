@@ -37,8 +37,9 @@ from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
 from packages.incident.core.adapters.slack import SlackIncidentTranscriptReader
-from packages.incident_draft.adapters.slack import SlackIncidentChannel as IncidentDraftSlackChannel
-from packages.incident_draft.platforms import slack as incident_draft_slack
+from packages.incident_draft import providers as incident_draft_providers
+from packages.incident_draft import service as incident_draft_service
+from packages.incident_draft.adapters.slack import SlackIncidentReportLinkLookup
 from packages.incident_summary import service as incident_summary_service
 from packages.rant.adapters.slack import SlackUserIdentityLookup
 from packages.rant.platforms import slack as rant_slack
@@ -183,7 +184,10 @@ def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> Slack
 
     # Each package's Slack lookups run through its real adapter over the same fake client.
     monkeypatch.setattr(rant_slack, "get_user_identity_lookup", lambda: SlackUserIdentityLookup(client))
-    monkeypatch.setattr(incident_draft_slack, "get_incident_channel_port", lambda: IncidentDraftSlackChannel(client))
+    monkeypatch.setattr(incident_draft_service, "get_incident_transcript_reader", lambda: SlackIncidentTranscriptReader(client))
+    monkeypatch.setattr(
+        incident_draft_providers, "get_incident_report_link_lookup", lambda: SlackIncidentReportLinkLookup(client)
+    )
     monkeypatch.setattr(incident_summary_service, "get_incident_transcript_reader", lambda: SlackIncidentTranscriptReader(client))
 
     plugin_manager = pluggy.PluginManager(PLUGIN_NAMESPACE)

@@ -1,16 +1,19 @@
 """Tests for the platform-agnostic incident_draft service."""
 
 import json
+import re
+from datetime import UTC, datetime
 
 import pytest
 
 from contracts.operations import OperationResult, OperationStatus
+from packages.incident.core.api import TranscriptMessage
+from packages.incident_draft import service
 from packages.incident_draft.domain import (
     AI_AUTHOR,
     DocumentSection,
     DraftWriteResult,
     SectionDraft,
-    TranscriptMessage,
 )
 from packages.incident_draft.service import (
     CREATE_FAILED_CODE,
@@ -19,10 +22,12 @@ from packages.incident_draft.service import (
     EMPTY_HISTORY_CODE,
     NO_ANSWERS_CODE,
     _collapse_pr_references,
+    _format_time,
     _parse_answers,
     _resolve_pr_links,
     draft_incident_document,
 )
+from packages.incident_draft.settings import IncidentDraftSettings
 
 pytestmark = pytest.mark.unit
 
@@ -856,3 +861,47 @@ class TestAPullRequestIsNamedOnce:
         instructions = summarizer.received_instructions or ""
         assert "never paste its URL beside it" in instructions
         assert "include its\nfull URL" not in instructions
+
+
+class TestTimestampFormatting:
+    """Entries carry the date as well as the time — a clock alone is ambiguous."""
+
+    _SUMMER = datetime.fromtimestamp(1755450120, tz=UTC)
+    _WINTER = datetime.fromtimestamp(1739450120, tz=UTC)
+
+    def test_stamps_carry_date_time_and_zone(self):
+        stamp = _format_time(self._SUMMER, "America/Toronto")
+
+        assert re.fullmatch(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2} E[DS]T", stamp), stamp
+        assert stamp == "2025-08-17 13:02 EDT"
+
+    def test_the_zone_follows_daylight_saving(self):
+        summer = _format_time(self._SUMMER, "America/Toronto")
+        winter = _format_time(self._WINTER, "America/Toronto")
+
+        assert {summer.split()[-1], winter.split()[-1]} == {"EDT", "EST"}
+
+    def test_an_unknown_zone_falls_back_to_utc(self):
+        """A bad config value must not cost the timeline its timestamps."""
+        assert _format_time(self._SUMMER, "Not/AZone") == _format_time(self._SUMMER, "UTC") == "2025-08-17 17:02 UTC"
+
+    def test_a_message_without_a_time_yields_no_stamp(self):
+        assert _format_time(None, "America/Toronto") == ""
+
+    @pytest.mark.asyncio
+    async def test_transcript_lines_reach_the_model_stamped_in_the_configured_zone(self, monkeypatch: pytest.MonkeyPatch):
+        """Each line is ``[YYYY-MM-DD HH:MM ZZZ] Name: text``; a message with no time is ``Name: text``."""
+        settings = IncidentDraftSettings.model_validate({"INCIDENT_DRAFT__TIMEZONE": "America/Toronto"})
+        monkeypatch.setattr(service, "get_incident_draft_settings", lambda: settings)
+        documents = _StubIncidentDocumentStore(sections=_sections())
+        summarizer = _StubSummarizer(OperationResult.success(data='{"Trigger": "A bad deploy."}'))
+        messages = [
+            TranscriptMessage(author="Ada", text="prod is down", posted_at=self._SUMMER),
+            TranscriptMessage(author="Bob", text="on it"),
+        ]
+
+        await draft_incident_document("D1", messages, documents=documents, summarizer=summarizer)
+
+        assert (summarizer.received_payload or "").endswith(
+            "Incident channel transcript:\n[2025-08-17 13:02 EDT] Ada: prod is down\nBob: on it"
+        )
