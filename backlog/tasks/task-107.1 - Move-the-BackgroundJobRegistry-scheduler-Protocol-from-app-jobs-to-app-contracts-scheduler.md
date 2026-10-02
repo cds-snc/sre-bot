@@ -3,10 +3,10 @@ id: TASK-107.1
 title: >-
   Move the BackgroundJobRegistry scheduler Protocol from app/jobs/ to
   app/contracts/scheduler/
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-01 14:47'
-updated_date: '2026-10-01 16:32'
+updated_date: '2026-10-02 14:59'
 labels:
   - plugin-architecture
   - plugins

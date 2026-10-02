@@ -3,10 +3,10 @@ id: TASK-136.2
 title: >-
   Rename IncidentDocumentPort to IncidentDocumentStore and
   get_incident_document_port to get_incident_document_store
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-02 00:37'
-updated_date: '2026-10-02 13:20'
+updated_date: '2026-10-02 15:09'
 labels:
   - plugin-architecture
   - naming

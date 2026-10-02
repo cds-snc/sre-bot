@@ -3,10 +3,10 @@ id: TASK-107.3
 title: >-
   Move the hookspecs, the hookimpl marker and the namespace constant to
   app/contracts/plugins/
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-01 14:47'
-updated_date: '2026-10-01 16:47'
+updated_date: '2026-10-02 14:59'
 labels:
   - plugin-architecture
   - plugins

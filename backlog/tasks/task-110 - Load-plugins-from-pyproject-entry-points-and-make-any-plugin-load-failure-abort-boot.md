@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-10-01 14:06'
+updated_date: '2026-10-02 13:49'
 labels:
   - plugin-architecture
   - plugins
@@ -67,5 +67,13 @@ legacy modules/: they keep their hand-written registration until each surface is
 created: 2026-09-28 14:44
 ---
 2026-09-28 (from TASK-35 planning): modules/sre and modules/dev register their /sre subcommands ONLY through register_slack_commands hookimpls (modules/sre/__init__.py, modules/dev/__init__.py -> platforms/slack.py register_commands(provider)); the legacy modules/sre/sre.py root-command wrapper is dead (provider registers /sre first, Bolt dispatch is first-match) and TASK-35 deletes it. Moving sre back onto _register_legacy_handlers() is not an option: the provider would have no sre subcommands. So when this task removes the pkgutil walk, it must keep modules.sre and modules.dev registered via the hand-written legacy registration that decisions/plugins.md reserves for modules/ until each surface is rebuilt (explicit registration of those two modules in startup, not new modules.* entry points), and cover it with a test. Planning must decide how that squares with 'pm.register() for a first-party plugin appears only in test fixtures'.
+---
+
+created: 2026-10-02 13:49
+---
+From the Stack A handoff, moved here when that doc was retired (2026-10-02; verified on main at f182ecd2). Three leftovers from TASK-107.3 and TASK-107.4 that this task is the natural place to settle:
+1. server/plugins/manager.py still defines discover_and_init_features (:114) and collect_feature_i18n_resources (:45), and nothing outside that module calls them: lifespan inlines the same steps. Delete them here when the filesystem walk is replaced, or keep one as the single discovery entry point and have lifespan call it; do not leave both paths.
+2. pyproject.toml declares no entry points, so the entry-point-group use of PLUGIN_NAMESPACE (contracts/plugins/namespace.py) has no consumer until this task adds them. Today the constant is used only for the pluggy markers and the plugin manager.
+3. PLUGIN_NAMESPACE is read from the installed distribution metadata (metadata('sre-bot')), so importing contracts.plugins.namespace raises PackageNotFoundError wherever the project is not installed. That matches this task's 'bare, unsynced source fails loudly' scope, but it was only checked in a scratch venv built the way the Dockerfile builds it; no docker image build was run. Verify it in a real image build here (the packaging dependency is TASK-14).
 ---
 <!-- COMMENTS:END -->

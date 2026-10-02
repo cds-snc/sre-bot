@@ -3,10 +3,10 @@ id: TASK-107.2
 title: >-
   Move I18nResourceSpec to app/contracts/i18n/ and add the I18nResourceRegistrar
   Protocol
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-01 14:47'
-updated_date: '2026-10-01 16:39'
+updated_date: '2026-10-02 14:59'
 labels:
   - plugin-architecture
   - plugins

@@ -3,10 +3,10 @@ id: TASK-25.4
 title: >-
   Apply outbound-client contract to Slack: classify_slack_error + single client
   factory
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-08-05 16:13'
-updated_date: '2026-09-29 19:20'
+updated_date: '2026-10-02 14:56'
 labels:
   - clients
   - phase-3

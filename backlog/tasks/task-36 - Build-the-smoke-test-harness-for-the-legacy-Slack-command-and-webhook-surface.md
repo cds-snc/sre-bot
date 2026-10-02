@@ -1,10 +1,10 @@
 ---
 id: TASK-36
 title: Build the smoke-test harness for the legacy Slack command and webhook surface
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-28 20:59'
+updated_date: '2026-10-02 14:59'
 labels:
   - migration
   - phase-5
