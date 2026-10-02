@@ -11,7 +11,7 @@ from contracts.i18n.resources import I18nResourceRegistrar, I18nResourceSpec
 from contracts.plugins.namespace import hookimpl
 from contracts.slack.registrar import SlackCommandRegistrar
 from packages.incident_summary.platforms import slack
-from packages.incident_summary.service import TranscriptMessage, summarize_transcript
+from packages.incident_summary.service import summarize_transcript
 
 
 @hookimpl
@@ -44,6 +44,5 @@ def register_i18n_resources(registry: I18nResourceRegistrar) -> None:
 
 
 __all__ = [
-    "TranscriptMessage",
     "summarize_transcript",
 ]

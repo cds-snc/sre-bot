@@ -1,39 +1,24 @@
 """Tests for the incident_summary Slack platform adapter."""
 
+from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-import structlog
 
 from contracts.operations import OperationResult
 from contracts.slack.models import CommandPayload
 from packages.incident_summary.platforms.slack import (
-    _fetch_transcript,
     _parse_since_seconds,
-    _resolve_channel_start,
-    _resolve_display_name,
-    _resolve_limit,
-    _resolve_oldest,
     _to_slack_mrkdwn,
     handle_summarize_command,
     register_commands,
 )
-from packages.incident_summary.service import EMPTY_HISTORY_CODE, IncidentChannelPort
-from packages.incident_summary.settings import IncidentSummarySettings
+from packages.incident_summary.service import EMPTY_HISTORY_CODE
 
 pytestmark = pytest.mark.unit
 
-_SUMMARIZE = "packages.incident_summary.platforms.slack.summarize_transcript"
-_CHANNEL_PORT = "packages.incident_summary.platforms.slack.get_incident_channel_port"
-
-
-def _channel_with_history(messages: list[dict], display_name: str = "Ada") -> MagicMock:
-    """Build a fake incident channel port with history and a resolvable author."""
-    channel = MagicMock(spec=IncidentChannelPort)
-    channel.fetch_history.return_value = messages
-    channel.get_channel.return_value = {"created": 1_700_000_000}
-    channel.get_user.return_value = {"profile": {"display_name": display_name}}
-    return channel
+_SUMMARIZE = "packages.incident_summary.platforms.slack.summarize_incident_conversation"
+_HANDLE = "packages.incident_summary.platforms.slack.handle_summarize_command"
 
 
 class TestRegisterCommands:
@@ -49,17 +34,16 @@ class TestRegisterCommands:
         assert kwargs["fallback_handler"] is not None
         assert kwargs["handler"] is not None
 
-    def test_handler_dispatches_with_channel_port_and_parsed_args(self):
+    def test_handler_dispatches_with_parsed_args(self):
         provider = MagicMock()
         register_commands(provider)
         handler = provider.register_command.call_args.kwargs["handler"]
         payload = CommandPayload(text="--limit 5", user_id="U9", channel_id="C123")
 
-        target = "packages.incident_summary.platforms.slack.handle_summarize_command"
-        with patch(_CHANNEL_PORT) as mock_port, patch(target) as mock_handle:
+        with patch(_HANDLE) as mock_handle:
             handler(payload, {"--limit": 5})
 
-        mock_handle.assert_called_once_with(payload, {"--limit": 5}, mock_port.return_value)
+        mock_handle.assert_called_once_with(payload, {"--limit": 5})
 
     def test_fallback_dispatches_with_empty_args(self):
         provider = MagicMock()
@@ -67,69 +51,63 @@ class TestRegisterCommands:
         fallback = provider.register_command.call_args.kwargs["fallback_handler"]
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
-        target = "packages.incident_summary.platforms.slack.handle_summarize_command"
-        with patch(_CHANNEL_PORT) as mock_port, patch(target) as mock_handle:
+        with patch(_HANDLE) as mock_handle:
             fallback(payload)
 
-        mock_handle.assert_called_once_with(payload, {}, mock_port.return_value)
+        mock_handle.assert_called_once_with(payload, {})
 
 
 class TestHandleSummarizeCommand:
     def test_success_renders_ephemeral_summary(self):
-        channel = _channel_with_history([{"user": "U1", "text": "prod is down", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="Everything is on fire"))) as mock_service:
-            response = handle_summarize_command(payload, {}, channel)
+            response = handle_summarize_command(payload, {})
 
         assert response.ephemeral is True
         assert "Everything is on fire" in response.message
         mock_service.assert_awaited_once()
+        assert mock_service.await_args.args == ("C123",)
 
     def test_empty_history_renders_localized_notice(self):
-        channel = _channel_with_history([])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(
             _SUMMARIZE,
             new=AsyncMock(return_value=OperationResult.permanent_error(message="nothing", error_code=EMPTY_HISTORY_CODE)),
         ):
-            response = handle_summarize_command(payload, {}, channel)
+            response = handle_summarize_command(payload, {})
 
         assert response.ephemeral is True
         assert "nothing to summarize" in response.message.lower()
 
     def test_summarizer_error_renders_generic_error(self):
-        channel = _channel_with_history([{"user": "U1", "text": "prod is down", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(
             _SUMMARIZE, new=AsyncMock(return_value=OperationResult.transient_error(message="boom", error_code="SERVER_ERROR"))
         ):
-            response = handle_summarize_command(payload, {}, channel)
+            response = handle_summarize_command(payload, {})
 
         assert response.ephemeral is True
         assert response.message.startswith("❌")
         assert "nothing to summarize" not in response.message.lower()
 
     def test_missing_channel_id_returns_error_without_calling_service(self):
-        channel = _channel_with_history([{"user": "U1", "text": "hi", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="")
 
         with patch(_SUMMARIZE, new=AsyncMock()) as mock_service:
-            response = handle_summarize_command(payload, {}, channel)
+            response = handle_summarize_command(payload, {})
 
         assert response.ephemeral is True
         assert response.message.startswith("\u274c")
         mock_service.assert_not_awaited()
-        channel.fetch_history.assert_not_called()
 
     def test_success_message_includes_header(self):
-        channel = _channel_with_history([{"user": "U1", "text": "prod is down", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="the summary body"))):
-            response = handle_summarize_command(payload, {}, channel)
+            response = handle_summarize_command(payload, {})
 
         # Header precedes the summary body, separated by a blank line.
         assert response.message.endswith("the summary body")
@@ -137,121 +115,62 @@ class TestHandleSummarizeCommand:
         assert response.message != "the summary body"
 
     def test_summary_body_is_normalized_to_slack_mrkdwn(self):
-        channel = _channel_with_history([{"user": "U1", "text": "prod is down", "ts": "1"}])
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
         raw = "## **Key events**\n- • first\n- second"
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data=raw))):
-            response = handle_summarize_command(payload, {}, channel)
+            response = handle_summarize_command(payload, {})
 
         assert "**" not in response.message
         assert "##" not in response.message
         assert "\u2022 \u2022" not in response.message
         assert "*Key events*" in response.message
 
-    def test_limit_argument_is_passed_to_history_fetch(self):
-        channel = _channel_with_history([{"user": "U1", "text": "hi", "ts": "1"}])
+    def test_limit_argument_is_passed_to_the_service(self):
         payload = CommandPayload(text="--limit 25", user_id="U9", channel_id="C123")
 
-        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))):
-            handle_summarize_command(payload, {"--limit": 25}, channel)
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
+            handle_summarize_command(payload, {"--limit": 25})
 
-        assert channel.fetch_history.call_args.kwargs["limit"] == 25
-        # oldest must be a Slack "seconds.6digits" timestamp, not a raw float
-        # repr (a 7+ decimal value silently matches nothing and returns zero
-        # messages).
-        oldest = channel.fetch_history.call_args.kwargs["oldest"]
-        assert isinstance(oldest, str)
-        assert len(oldest.rsplit(".", 1)[1]) == 6
+        assert mock_service.await_args.kwargs["limit"] == 25
 
-    def test_since_argument_sets_oldest_window(self):
-        import time
+    @pytest.mark.parametrize("raw", [None, "bad"])
+    def test_missing_or_unreadable_limit_is_passed_as_none(self, raw):
+        # The service owns the default; the handler only says "no usable limit".
+        payload = CommandPayload(text="", user_id="U9", channel_id="C123")
+        parsed_args = {} if raw is None else {"--limit": raw}
 
-        channel = _channel_with_history([{"user": "U1", "text": "hi", "ts": "1"}])
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
+            handle_summarize_command(payload, parsed_args)
+
+        assert mock_service.await_args.kwargs["limit"] is None
+
+    def test_since_argument_is_passed_as_a_duration(self):
         payload = CommandPayload(text="--since 2h", user_id="U9", channel_id="C123")
 
-        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))):
-            handle_summarize_command(payload, {"--since": "2h"}, channel)
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
+            handle_summarize_command(payload, {"--since": "2h"})
 
-        oldest = float(channel.fetch_history.call_args.kwargs["oldest"])
-        # 2 hours ago, within a small tolerance for execution time.
-        assert abs((time.time() - 2 * 3600) - oldest) < 5
+        assert mock_service.await_args.kwargs["since"] == timedelta(hours=2)
 
-    def test_default_window_starts_at_channel_creation(self):
-        channel = _channel_with_history([{"user": "U1", "text": "hi", "ts": "1"}])
-        channel.get_channel.return_value = {"created": 1_700_000_000}
-        payload = CommandPayload(text="", user_id="U9", channel_id="C123")
-
-        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))):
-            handle_summarize_command(payload, {}, channel)
-
-        channel.get_channel.assert_called_once_with("C123")
-        oldest = float(channel.fetch_history.call_args.kwargs["oldest"])
-        assert oldest == 1_700_000_000.0
-
-    def test_slack_mrkdwn_instructions_passed_to_service(self):
-        channel = _channel_with_history([{"user": "U1", "text": "hi", "ts": "1"}])
+    @pytest.mark.parametrize("parsed_args", [{}, {"--since": "abc"}, {"--since": "0h"}])
+    def test_missing_or_invalid_since_is_passed_as_none(self, parsed_args):
+        # No usable look-back: the service starts the window at the conversation's start.
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
-            handle_summarize_command(payload, {}, channel)
+            handle_summarize_command(payload, parsed_args)
+
+        assert mock_service.await_args.kwargs["since"] is None
+
+    def test_slack_mrkdwn_instructions_passed_to_service(self):
+        payload = CommandPayload(text="", user_id="U9", channel_id="C123")
+
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
+            handle_summarize_command(payload, {})
 
         instructions = mock_service.await_args.kwargs["instructions"]
         assert "mrkdwn" in instructions.lower()
-
-    def test_bot_and_empty_messages_are_filtered_out(self):
-        # Only human messages with both text and a user survive; bot messages
-        # (no ``user``) and empty-text messages are dropped.
-        channel = _channel_with_history(
-            [
-                {"user": "U1", "text": "real message", "ts": "3"},
-                {"bot_id": "B1", "text": "posted by an app", "ts": "2"},
-                {"user": "U1", "text": "   ", "ts": "1"},
-            ]
-        )
-        payload = CommandPayload(text="", user_id="U9", channel_id="C123")
-
-        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
-            handle_summarize_command(payload, {}, channel)
-
-        messages = mock_service.await_args.args[0]
-        assert [m.text for m in messages] == ["real message"]
-
-    def test_history_fetch_error_renders_empty_history(self):
-        channel = MagicMock(spec=IncidentChannelPort)
-        channel.fetch_history.side_effect = RuntimeError("slack exploded")
-        payload = CommandPayload(text="", user_id="U9", channel_id="C123")
-
-        with patch(
-            _SUMMARIZE,
-            new=AsyncMock(return_value=OperationResult.permanent_error(message="nothing", error_code=EMPTY_HISTORY_CODE)),
-        ) as mock_service:
-            response = handle_summarize_command(payload, {}, channel)
-
-        # A Slack API failure degrades to an empty transcript, so the service
-        # is called with no messages and the empty-history notice is shown.
-        assert mock_service.await_args.args[0] == []
-        assert response.ephemeral is True
-        assert "nothing to summarize" in response.message.lower()
-
-    def test_history_is_built_chronologically_with_resolved_names(self):
-        # Channel history arrives newest-first; the service must receive
-        # chronological "author: text" lines with display names resolved.
-        channel = _channel_with_history(
-            [
-                {"user": "U1", "text": "second", "ts": "2"},
-                {"user": "U1", "text": "first", "ts": "1"},
-            ],
-            display_name="Ada",
-        )
-        payload = CommandPayload(text="", user_id="U9", channel_id="C123")
-
-        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
-            handle_summarize_command(payload, {}, channel)
-
-        messages = mock_service.await_args.args[0]
-        assert [m.text for m in messages] == ["first", "second"]
-        assert all(m.author == "Ada" for m in messages)
 
 
 class TestArgumentParsingHelpers:
@@ -266,75 +185,6 @@ class TestArgumentParsingHelpers:
     @pytest.mark.parametrize("value", [None, "", "abc", "0h", "-5"])
     def test_parse_since_seconds_returns_none_for_invalid(self, value):
         assert _parse_since_seconds(value) is None
-
-    def test_resolve_oldest_uses_default_when_since_absent(self):
-        # Absent --since yields None so the caller defaults to channel start.
-        assert _resolve_oldest(None) is None
-
-    def test_resolve_oldest_computes_window_from_since(self):
-        import time
-
-        before = _resolve_oldest("2h")
-        assert before is not None
-        assert abs((time.time() - 2 * 3600) - before) < 5
-
-    def test_resolve_limit_defaults_and_caps(self):
-        # Fields use env-var aliases, so populate via alias to exercise the
-        # logic independently of the production defaults.
-        settings = IncidentSummarySettings.model_validate(
-            {
-                "INCIDENT_SUMMARY__DEFAULT_HISTORY_LIMIT": 200,
-                "INCIDENT_SUMMARY__MAX_HISTORY_LIMIT": 500,
-            }
-        )
-        assert _resolve_limit(None, settings) == 200
-        assert _resolve_limit(50, settings) == 50
-        assert _resolve_limit(9999, settings) == 500
-        assert _resolve_limit(0, settings) == 200
-        assert _resolve_limit("bad", settings) == 200
-
-
-class TestResolveDisplayName:
-    def test_prefers_display_name(self):
-        channel = MagicMock(spec=IncidentChannelPort)
-        channel.get_user.return_value = {
-            "profile": {"display_name": "Ada", "real_name": "Ada Lovelace"},
-            "real_name": "Ada Lovelace",
-        }
-
-        name = _resolve_display_name(channel, "U1", {}, structlog.get_logger())
-
-        assert name == "Ada"
-
-    def test_falls_back_to_real_name_when_display_name_blank(self):
-        channel = MagicMock(spec=IncidentChannelPort)
-        channel.get_user.return_value = {
-            "profile": {"display_name": "", "real_name": "Ada Lovelace"},
-        }
-
-        name = _resolve_display_name(channel, "U1", {}, structlog.get_logger())
-
-        assert name == "Ada Lovelace"
-
-    def test_falls_back_to_user_id_on_api_error(self):
-        channel = MagicMock(spec=IncidentChannelPort)
-        channel.get_user.side_effect = RuntimeError("boom")
-
-        name = _resolve_display_name(channel, "U1", {}, structlog.get_logger())
-
-        assert name == "U1"
-
-    def test_caches_lookups_to_avoid_repeat_api_calls(self):
-        channel = MagicMock(spec=IncidentChannelPort)
-        channel.get_user.return_value = {"profile": {"display_name": "Ada"}}
-        cache: dict[str, str] = {}
-        log = structlog.get_logger()
-
-        first = _resolve_display_name(channel, "U1", cache, log)
-        second = _resolve_display_name(channel, "U1", cache, log)
-
-        assert first == second == "Ada"
-        channel.get_user.assert_called_once()
 
 
 class TestToSlackMrkdwn:
@@ -370,58 +220,3 @@ class TestToSlackMrkdwn:
         raw = "## **Key events**\n- \u2022 first thing\n- second thing"
         expected = "*Key events*\n\u2022 first thing\n\u2022 second thing"
         assert _to_slack_mrkdwn(raw) == expected
-
-
-class TestResolveChannelStart:
-    def test_returns_channel_created_timestamp(self):
-        channel = MagicMock(spec=IncidentChannelPort)
-        channel.get_channel.return_value = {"created": 1_700_000_000}
-        settings = IncidentSummarySettings(DEFAULT_SINCE_HOURS=24)
-
-        oldest = _resolve_channel_start(channel, "C123", settings, structlog.get_logger())
-
-        assert oldest == 1_700_000_000.0
-
-    def test_falls_back_to_default_window_on_api_error(self):
-        import time
-
-        channel = MagicMock(spec=IncidentChannelPort)
-        channel.get_channel.side_effect = RuntimeError("no scope")
-        settings = IncidentSummarySettings(DEFAULT_SINCE_HOURS=24)
-
-        oldest = _resolve_channel_start(channel, "C123", settings, structlog.get_logger())
-
-        assert abs((time.time() - 24 * 3600) - oldest) < 5
-
-    def test_falls_back_when_created_missing(self):
-        import time
-
-        channel = MagicMock(spec=IncidentChannelPort)
-        channel.get_channel.return_value = {}
-        settings = IncidentSummarySettings(DEFAULT_SINCE_HOURS=24)
-
-        oldest = _resolve_channel_start(channel, "C123", settings, structlog.get_logger())
-
-        assert abs((time.time() - 24 * 3600) - oldest) < 5
-
-
-class TestFetchTranscript:
-    def test_returns_empty_list_on_history_api_error(self):
-        channel = MagicMock(spec=IncidentChannelPort)
-        channel.fetch_history.side_effect = RuntimeError("boom")
-
-        messages = _fetch_transcript(channel, "C123", limit=200, oldest=0.0, log=structlog.get_logger())
-
-        assert messages == []
-
-    def test_orders_messages_chronologically(self):
-        channel = MagicMock(spec=IncidentChannelPort)
-        channel.fetch_history.return_value = [
-            {"user": "U1", "text": "newest", "ts": "3"},
-            {"user": "U1", "text": "oldest", "ts": "1"},
-        ]
-        channel.get_user.return_value = {"profile": {"display_name": "Ada"}}
-
-        messages = _fetch_transcript(channel, "C123", limit=200, oldest=0.0, log=structlog.get_logger())
-
-        assert [m.text for m in messages] == ["oldest", "newest"]

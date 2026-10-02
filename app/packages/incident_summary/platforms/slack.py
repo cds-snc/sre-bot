@@ -2,18 +2,18 @@
 
 Registers ``/sre incident summarize`` as a child of ``sre.incident`` and
 turns recent channel history into an ephemeral catch-up summary. The adapter
-owns the Slack-specific work (fetching history, resolving display names) and
-delegates the actual summarization to the platform-agnostic
-``packages.incident_summary.service``.
+owns the Slack-specific input and output: it translates ``--since`` and
+``--limit``, makes one call to the platform-agnostic
+``packages.incident_summary.service`` and renders the result as Slack mrkdwn.
 
-Channel history, channel metadata and user records are read through the
-package's ``IncidentChannelPort``, resolved from ``providers`` at dispatch time.
+The service reads the conversation's transcript through the incident core's
+``IncidentTranscriptReader`` interface; no history fetch, name resolution or
+window resolution happens here.
 """
 
 import asyncio
 import re
-import time
-from collections.abc import Mapping
+from datetime import timedelta
 from typing import Any
 
 import structlog
@@ -21,17 +21,7 @@ import structlog
 from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
 from contracts.slack.registrar import SlackCommandRegistrar
 from infrastructure.i18n import t
-from packages.incident_summary.providers import get_incident_channel_port
-from packages.incident_summary.service import (
-    EMPTY_HISTORY_CODE,
-    IncidentChannelPort,
-    TranscriptMessage,
-    summarize_transcript,
-)
-from packages.incident_summary.settings import (
-    IncidentSummarySettings,
-    get_incident_summary_settings,
-)
+from packages.incident_summary.service import EMPTY_HISTORY_CODE, summarize_incident_conversation
 
 logger = structlog.get_logger()
 
@@ -62,10 +52,10 @@ def register_commands(registrar: SlackCommandRegistrar) -> None:
     """
 
     def _dispatch(payload: CommandPayload, parsed_args: dict[str, Any]) -> CommandResponse:
-        return handle_summarize_command(payload, parsed_args, get_incident_channel_port())
+        return handle_summarize_command(payload, parsed_args)
 
     def _dispatch_default(payload: CommandPayload) -> CommandResponse:
-        return handle_summarize_command(payload, {}, get_incident_channel_port())
+        return handle_summarize_command(payload, {})
 
     registrar.register_command(
         command="summarize",
@@ -97,13 +87,11 @@ def register_commands(registrar: SlackCommandRegistrar) -> None:
 def handle_summarize_command(
     payload: CommandPayload,
     parsed_args: dict[str, Any],
-    channel: IncidentChannelPort,
 ) -> CommandResponse:
     """Handle ``/sre incident summarize`` and return an ephemeral summary.
 
     Follows the five-step handler discipline: parse (framework) -> typed
-    values -> gather inputs + one service call -> ``OperationResult`` ->
-    render. All responses are ephemeral so the summary is only shown to the
+    values -> one service call -> ``OperationResult`` -> render. All responses are ephemeral so the summary is only shown to the
     invoking responder.
 
     Args:
@@ -111,7 +99,6 @@ def handle_summarize_command(
         parsed_args: Parsed ``--since``/``--limit`` arguments (empty for the
             no-argument invocation). When ``--since`` is omitted the summary
             covers the whole incident, starting from channel creation.
-        channel: Port reading the incident channel.
 
     Returns:
         An ephemeral ``CommandResponse`` carrying the summary, an
@@ -128,18 +115,14 @@ def handle_summarize_command(
         log.warning("incident_summary_no_channel")
         return _error_response(locale)
 
-    settings = get_incident_summary_settings()
-
-    limit = _resolve_limit(parsed_args.get("--limit"), settings)
-    oldest = _resolve_oldest(parsed_args.get("--since"))
-    if oldest is None:
-        # No explicit window: summarize the whole incident from when the
-        # channel (incident) was created.
-        oldest = _resolve_channel_start(channel, payload.channel_id, settings, log)
-
-    messages = _fetch_transcript(channel, payload.channel_id, limit=limit, oldest=oldest, log=log)
-
-    result = asyncio.run(summarize_transcript(messages, instructions=_SLACK_FORMAT_INSTRUCTIONS))
+    result = asyncio.run(
+        summarize_incident_conversation(
+            payload.channel_id,
+            since=_parse_since(parsed_args.get("--since")),
+            limit=_parse_limit(parsed_args.get("--limit")),
+            instructions=_SLACK_FORMAT_INSTRUCTIONS,
+        )
+    )
 
     if result.is_success:
         header = t(f"{_DOMAIN}.result.header", locale, "🧾 Incident summary")
@@ -162,119 +145,33 @@ def handle_summarize_command(
     return _error_response(locale)
 
 
-def _fetch_transcript(
-    channel: IncidentChannelPort,
-    channel_id: str,
-    *,
-    limit: int,
-    oldest: float,
-    log: structlog.stdlib.BoundLogger,
-) -> list[TranscriptMessage]:
-    """Fetch channel history and resolve authors into transcript messages.
-
-    Returns messages in chronological order. On any Slack API failure an empty
-    list is returned so the caller renders the empty-history path.
-    """
-    try:
-        raw_messages = channel.fetch_history(channel_id, limit=limit, oldest=f"{oldest:.6f}")
-    except Exception as exc:  # noqa: BLE001 - degrade to empty history on any API error
-        log.warning("incident_summary_history_fetch_failed", error=str(exc))
-        return []
-
-    name_cache: dict[str, str] = {}
-    messages: list[TranscriptMessage] = []
-
-    # conversations_history returns newest-first; summarize chronologically.
-    for raw in reversed(raw_messages):
-        text = (raw.get("text") or "").strip()
-        user_id = raw.get("user")
-        if not text or not user_id:
-            continue
-        author = _resolve_display_name(channel, user_id, name_cache, log)
-        messages.append(TranscriptMessage(author=author, text=text))
-
-    log.info(
-        "incident_summary_history_fetched",
-        raw_count=len(raw_messages),
-        kept_count=len(messages),
-    )
-    return messages
-
-
-def _resolve_display_name(
-    channel: IncidentChannelPort,
-    user_id: str,
-    cache: dict[str, str],
-    log: structlog.stdlib.BoundLogger,
-) -> str:
-    """Resolve a Slack user's display name, caching lookups; fall back to the id."""
-    if user_id in cache:
-        return cache[user_id]
-
-    name = user_id
-    try:
-        user = channel.get_user(user_id)
-        profile: Mapping[str, Any] = user.get("profile") or {}
-        name = profile.get("display_name") or profile.get("real_name") or user.get("real_name") or user_id
-    except Exception as exc:  # noqa: BLE001 - a missing name must not fail the summary
-        log.warning("incident_summary_user_lookup_failed", user_id=user_id, error=str(exc))
-
-    cache[user_id] = name
-    return name
-
-
-def _resolve_limit(raw: Any, settings: IncidentSummarySettings) -> int:
-    """Coerce the ``--limit`` value into a safe, capped message count."""
+def _parse_limit(raw: Any) -> int | None:
+    """Coerce the ``--limit`` value into an integer; ``None`` when absent or unreadable."""
     if raw is None:
-        return settings.DEFAULT_HISTORY_LIMIT
+        return None
     try:
-        limit = int(raw)
+        return int(raw)
     except TypeError, ValueError:
-        return settings.DEFAULT_HISTORY_LIMIT
-    if limit <= 0:
-        return settings.DEFAULT_HISTORY_LIMIT
-    return min(limit, settings.MAX_HISTORY_LIMIT)
+        return None
 
 
-def _resolve_oldest(raw: Any) -> float | None:
-    """Convert ``--since`` into a Unix ``oldest`` timestamp.
+def _parse_since(raw: Any) -> timedelta | None:
+    """Convert ``--since`` into a duration.
 
-    Returns ``None`` when ``--since`` is absent or invalid so the caller can
-    default to the incident's start (channel creation time).
+    Returns ``None`` when ``--since`` is absent or invalid so the service
+    defaults to the incident's start (channel creation time).
     """
     seconds = _parse_since_seconds(raw)
     if seconds is None:
         return None
-    return time.time() - seconds
-
-
-def _resolve_channel_start(
-    channel: IncidentChannelPort,
-    channel_id: str,
-    settings: IncidentSummarySettings,
-    log: structlog.stdlib.BoundLogger,
-) -> float:
-    """Return the channel's creation time as a Unix ``oldest`` timestamp.
-
-    Falls back to the configured default window if the channel info lookup
-    fails, so a missing ``channels:read``/``groups:read`` scope degrades
-    gracefully instead of failing the summary.
-    """
-    try:
-        created = channel.get_channel(channel_id).get("created")
-        if created is not None:
-            return float(created)
-    except Exception as exc:  # noqa: BLE001 - degrade to default window on any API error
-        log.warning("incident_summary_channel_info_failed", error=str(exc))
-
-    return time.time() - settings.DEFAULT_SINCE_HOURS * _SINCE_UNITS["h"]
+    return timedelta(seconds=seconds)
 
 
 def _parse_since_seconds(raw: Any) -> int | None:
     """Parse a ``--since`` duration (e.g. ``30m``, ``2h``, ``1d``) into seconds.
 
     A bare number is treated as hours. Returns ``None`` for missing or invalid
-    input so the caller applies the configured default.
+    input so the service applies its default window.
     """
     if not raw:
         return None

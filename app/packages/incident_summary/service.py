@@ -1,22 +1,24 @@
 """Platform-agnostic incident-summary business logic.
 
-Builds a chat transcript from platform-neutral messages and delegates to the
-``Summarizer`` port (``integrations.openai``) to produce a catch-up summary
-for a responder joining an incident channel.
+Reads an incident conversation's transcript through the incident core
+``IncidentTranscriptReader`` interface and delegates to the ``Summarizer``
+interface (``integrations.openai``) to produce a catch-up summary for a
+responder joining an incident channel.
 
 This module is deliberately free of Slack and HTTP imports: it consumes
 ``TranscriptMessage`` values and returns an ``OperationResult`` so any
 platform adapter can reuse it.
 """
 
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from typing import Any, Protocol, runtime_checkable
+from collections.abc import Sequence
+from datetime import UTC, datetime, timedelta
 
 import structlog
 
 from contracts.operations import OperationResult
 from integrations.openai import Summarizer, get_summarizer
+from packages.incident.core.api import IncidentTranscriptReader, TranscriptMessage, get_incident_transcript_reader
+from packages.incident_summary.settings import IncidentSummarySettings, get_incident_summary_settings
 
 logger = structlog.get_logger()
 
@@ -36,29 +38,39 @@ _CONTENT_INSTRUCTIONS = (
 )
 
 
-@dataclass(frozen=True)
-class TranscriptMessage:
-    """A single platform-neutral chat message to be summarized."""
+async def summarize_incident_conversation(
+    conversation_id: str,
+    *,
+    since: timedelta | None = None,
+    limit: int | None = None,
+    instructions: str | None = None,
+    reader: IncidentTranscriptReader | None = None,
+) -> OperationResult[str]:
+    """Summarize what has been said in an incident conversation.
 
-    author: str
-    text: str
+    Args:
+        conversation_id: The incident conversation to summarize.
+        since: How far back to read. When omitted the summary covers the whole
+            incident, from the conversation's start, falling back to the
+            configured default window when the start is unknown.
+        limit: Maximum number of messages to read. Missing or not positive
+            means the configured default; larger values are capped.
+        instructions: Optional additional instructions passed on to
+            ``summarize_transcript``.
+        reader: Optional ``IncidentTranscriptReader``; defaults to the incident
+            core's process singleton. Injected in tests.
 
+    Returns:
+        The ``OperationResult`` of ``summarize_transcript`` for the messages
+        read, including its ``EMPTY_HISTORY`` error when nothing was read.
+    """
+    settings = get_incident_summary_settings()
+    reader = reader or get_incident_transcript_reader()
 
-@runtime_checkable
-class IncidentChannelPort(Protocol):
-    """Behavior contract for reading the incident channel a summary is built from."""
+    start = _resolve_window_start(reader, conversation_id, since, settings)
+    messages = reader.read_transcript(conversation_id, since=start, limit=_resolve_limit(limit, settings))
 
-    def fetch_history(self, channel_id: str, *, limit: int, oldest: str) -> Sequence[Mapping[str, Any]]:
-        """Return up to ``limit`` raw channel messages posted since ``oldest``, newest first."""
-        ...
-
-    def get_channel(self, channel_id: str) -> Mapping[str, Any]:
-        """Return the channel's metadata, including its ``created`` time."""
-        ...
-
-    def get_user(self, user_id: str) -> Mapping[str, Any]:
-        """Return the user's record, including their ``profile``."""
-        ...
+    return await summarize_transcript(messages, instructions=instructions)
 
 
 async def summarize_transcript(
@@ -73,8 +85,8 @@ async def summarize_transcript(
         messages: Chronologically ordered messages to summarize.
         instructions: Optional additional instructions (e.g. platform-specific
             formatting rules) appended to this feature's incident-content
-            prompt before being sent to the ``Summarizer`` port.
-        summarizer: Optional ``Summarizer`` port; defaults to the process
+            prompt before being sent to the ``Summarizer`` interface.
+        summarizer: Optional ``Summarizer`` interface; defaults to the process
             singleton. Injected in tests.
 
     Returns:
@@ -112,3 +124,35 @@ async def summarize_transcript(
 def _build_transcript(messages: Sequence[TranscriptMessage]) -> str:
     """Render messages as ``author: text`` lines in the given order."""
     return "\n".join(f"{message.author}: {message.text}" for message in messages)
+
+
+def _resolve_limit(limit: int | None, settings: IncidentSummarySettings) -> int:
+    """Turn the requested limit into a safe, capped message count."""
+    if limit is None or limit <= 0:
+        return settings.DEFAULT_HISTORY_LIMIT
+    return min(limit, settings.MAX_HISTORY_LIMIT)
+
+
+def _resolve_window_start(
+    reader: IncidentTranscriptReader,
+    conversation_id: str,
+    since: timedelta | None,
+    settings: IncidentSummarySettings,
+) -> datetime:
+    """Return the start of the window to summarize.
+
+    An explicit ``since`` is measured from now. Without one the window starts
+    when the conversation did, and falls back to the configured default window
+    when the reader cannot say.
+    """
+    if since is not None:
+        return _now() - since
+    started_at = reader.conversation_started_at(conversation_id)
+    if started_at is not None:
+        return started_at
+    return _now() - timedelta(hours=settings.DEFAULT_SINCE_HOURS)
+
+
+def _now() -> datetime:
+    """Return the current time, timezone-aware UTC."""
+    return datetime.now(UTC)

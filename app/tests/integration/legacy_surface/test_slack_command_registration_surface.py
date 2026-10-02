@@ -20,7 +20,7 @@ from packages.access.sync.interactions.ingress import EnqueuedJob
 from packages.geolocate.platforms import slack as geolocate_slack
 from packages.incident_draft.domain import DraftedDocument
 from packages.incident_draft.platforms import slack as incident_draft_slack
-from packages.incident_summary.platforms import slack as incident_summary_slack
+from packages.incident_summary import service as incident_summary_service
 from packages.incident_summary.service import EMPTY_HISTORY_CODE
 from packages.rant.service import format_rant
 from packages.user_rotations.platforms import slack as user_rotations_slack
@@ -350,7 +350,7 @@ def test_incident_summarize_returns_the_summary_ephemerally(
 ) -> None:
     """/sre incident summarize summarises the channel transcript once."""
     summarizer = AsyncRecorder(OperationResult.success(data="The deploy was rolled back."))
-    monkeypatch.setattr(incident_summary_slack, "summarize_transcript", summarizer)
+    monkeypatch.setattr(incident_summary_service, "summarize_transcript", summarizer)
 
     response = incident_channel.dispatch("sre", "incident summarize")
 
@@ -371,7 +371,7 @@ def test_incident_summarize_with_empty_history_says_there_is_nothing_yet(
     summarizer = AsyncRecorder(
         OperationResult.error(OperationStatus.PERMANENT_ERROR, "no messages", error_code=EMPTY_HISTORY_CODE)
     )
-    monkeypatch.setattr(incident_summary_slack, "summarize_transcript", summarizer)
+    monkeypatch.setattr(incident_summary_service, "summarize_transcript", summarizer)
 
     incident_channel.dispatch("sre", "incident summarize")
 
