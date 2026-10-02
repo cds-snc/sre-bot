@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 15:39'
-updated_date: '2026-10-02 15:43'
+updated_date: '2026-10-02 17:11'
 labels:
   - plugin-architecture
   - features
@@ -112,3 +112,12 @@ BLAST RADIUS AND ROLLBACK
 - Only /sre incident summarize. Replies, arguments and the model input are unchanged. Log events for transcript gathering change name (incident_summary_history_fetched, _history_fetch_failed, _user_lookup_failed and _channel_info_failed become the core adapter's incident_transcript_* events); nothing outside app/ references the old names (rg over the repo, 2026-10-02).
 - No configuration, manifest or schema change. A single git revert restores the previous code.
 <!-- SECTION:PLAN:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-02 17:11
+---
+Re-verified TODAY against main at 8bcbf373 (2026-10-02). Since c8de7643 main gained only #1528 (blazer formatter, aws_sns_notification) and #1529 (planning records); git diff c8de7643..8bcbf373 is empty for packages/incident, packages/incident_draft, packages/incident_summary, their unit tests, tests/integration/legacy_surface, app/pyproject.toml and server/. TASK-25.10, TASK-134 and TASK-110 are still To Do and unmerged: the services still import integrations.openai and pyproject declares no entry points. No difference in code. One citation note: the class line of TranscriptMessage is service.py:40 (the plan's :39 is its decorator). platforms/slack.py is 349 lines with the helpers at :165, :204, :226, :239, :251 and the service call at :142, as planned. Delivery changed: this slice is layer 2 of the TASK-135 stack and sits on TASK-135.1's branch.
+---
+<!-- COMMENTS:END -->

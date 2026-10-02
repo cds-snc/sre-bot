@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-01 14:05'
-updated_date: '2026-10-02 16:46'
+updated_date: '2026-10-02 17:11'
 labels:
   - plugin-architecture
   - features
@@ -91,6 +91,8 @@ Decisions (human, 2026-10-02):
 AC map: #1 -> 135.1; #2 -> 135.1 (contract with core and the existing siblings) and 135.4 (the subdomain added); #3 -> 135.2 and 135.3 (one service call, gathering in the service) and 135.4 (one subdomain); #4 -> 135.2 and 135.3 (duplicates removed, one TranscriptMessage) and 135.4 (packages deleted); #5 and #6 -> every slice. The test-name renames from the TASK-136 notes land in 135.2 (incident_summary) and 135.3 (incident_draft). This task is done when its four subtasks are done.
 
 Subdomain name (TASK-97, 2026-10-02): scribe. TASK-135.4 is unblocked.
+
+Delivery (doc-2), superseding the line above (human, 2026-10-02): one stack of four layers, TASK-135.1 -> TASK-135.2 -> TASK-135.3 -> TASK-135.4, bottom-up, one task per layer and PR. The reason for standalone PRs is gone: TASK-135.4 waited on TASK-97, which was decided on 2026-10-02, so no layer waits on work outside the chain. 135.2 and 135.3 stay independent in content; the stack orders them summary first, then draft. Handoff doc under backlog/docs/stacks/.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes

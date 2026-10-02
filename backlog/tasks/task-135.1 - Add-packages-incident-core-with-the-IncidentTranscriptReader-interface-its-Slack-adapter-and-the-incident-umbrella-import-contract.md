@@ -3,10 +3,10 @@ id: TASK-135.1
 title: >-
   Add packages/incident/core with the IncidentTranscriptReader interface, its
   Slack adapter and the incident umbrella import contract
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-02 15:38'
-updated_date: '2026-10-02 15:43'
+updated_date: '2026-10-02 17:18'
 labels:
   - plugin-architecture
   - features
@@ -45,11 +45,11 @@ MUST NOT PREJUDGE TASK-97: core/ receives the transcript interface only. No inci
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 packages/incident/core/api.py exposes TranscriptMessage, IncidentTranscriptReader and get_incident_transcript_reader; the interface's signatures carry only str, int, bool, datetime and TranscriptMessage, with no Slack payload, SDK type or Slack timestamp string
-- [ ] #2 One Slack adapter implements the interface: chronological order, display-name resolution, timestamp conversion and the caller-selected filtering of the bot's own and system messages are covered by unit tests against a fake Web client
-- [ ] #3 core/ has no entrypoints/, no hookimpl and no entry point; an import-linter layers contract for packages.incident lists documents, drive, meet and scheduling as independent siblings above core, with exhaustive = true
-- [ ] #4 No existing production module changes other than app/pyproject.toml; the legacy_surface suite is green with no change to its files
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; no import-linter ignore entry is added
+- [x] #1 packages/incident/core/api.py exposes TranscriptMessage, IncidentTranscriptReader and get_incident_transcript_reader; the interface's signatures carry only str, int, bool, datetime and TranscriptMessage, with no Slack payload, SDK type or Slack timestamp string
+- [x] #2 One Slack adapter implements the interface: chronological order, display-name resolution, timestamp conversion and the caller-selected filtering of the bot's own and system messages are covered by unit tests against a fake Web client
+- [x] #3 core/ has no entrypoints/, no hookimpl and no entry point; an import-linter layers contract for packages.incident lists documents, drive, meet and scheduling as independent siblings above core, with exhaustive = true
+- [x] #4 No existing production module changes other than app/pyproject.toml; the legacy_surface suite is green with no change to its files
+- [x] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; no import-linter ignore entry is added
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -103,3 +103,37 @@ ASSUMPTIONS AND HOW TO VERIFY
 BLAST RADIUS AND ROLLBACK
 - No runtime path reaches the new code. The only way this PR breaks main is the new import-linter contract, which fails CI rather than production. A single git revert restores the previous state.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented 2026-10-02 as layer 1 of Stack G (handoff: doc-4), on main at 8bcbf373. Stops at In Progress for human review.
+
+Files (new): app/packages/incident/core/__init__.py (empty), domain.py, api.py, adapters/__init__.py (empty), adapters/slack.py: 285 lines in total. app/pyproject.toml: the incident-umbrella layers contract, 11 lines added, nothing else. Tests (new): app/tests/unit/packages/incident/core/ with test_incident_core_transcript_read.py, test_incident_core_conversation_started_at.py, test_incident_core_api_surface.py and __init__.py. No existing production module and no legacy_surface file changed (git status: only pyproject.toml modified under app/).
+
+TDD: the three test files were written first and failed at collection (ModuleNotFoundError: packages.incident.core); 48 passed after the implementation.
+
+Gates, from app/:
+- uv run ruff check . -> All checks passed!
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 65 errors in 22 files (checked 378 source files); 0 in packages/incident/core and tests/unit/packages/incident/core (rg count over the mypy output). The 65 are outside the touched files.
+- uv run lint-imports -> Contracts: 9 kept, 0 broken, including '(i) Incident subdomains are independent siblings over core KEPT'. No ignore entry added (pyproject diff is the new contract only). Contract (e) reports 35 matched ignored imports instead of 34: its existing adapters wildcard now also matches packages.incident.core.adapters.slack -> integrations.slack.client; the ignore list itself is unchanged.
+- uv run pytest tests --ignore=tests/smoke -> 6 failed, 3672 passed. The 6 are the known single-process order leaks (TASK-90), not from this change: tests/modules/webhooks/test_webhooks_aws_sns.py (3) and tests/unit/infrastructure/directory/test_google.py (3). Those two files alone: 111 passed. make test (the CI split): 2906 passed and 772 passed, 0 failed.
+- uv run pytest tests/integration/legacy_surface -> 17 passed before the change and 17 passed after, with no file of the suite touched.
+
+Slice checks:
+- rg '^\s*from packages|^\s*import packages' app/packages/incident outside core/ -> no match (documents, drive, meet and scheduling do not import each other); lint-imports confirms with exhaustive = true.
+- Plugin discovery imports packages.incident.core as a no-op: the app boot tests pass in the full run, and test_core_is_not_a_plugin pins no entrypoints/ or platforms/ directory and no hookimpl in core/__init__.py.
+
+AC evidence: #1 test_incident_core_api_surface.py (__all__ is the three names; signatures carry str, int, bool, datetime and TranscriptMessage). #2 test_incident_core_transcript_read.py and test_incident_core_conversation_started_at.py over MagicMock(spec=WebClient). #3 lint-imports output above and test_core_is_not_a_plugin. #4 git status and the legacy_surface runs. #5 the gates above.
+
+Carried over unchanged from the two handlers, as planned: the history call and its six-decimal oldest string, the name fallback and per-read cache, the system subtypes, the three own-message signals, auth_test once per filtered read after the history call. Log events are incident_transcript_* and carry conversation_id. One naming choice not in the plan: the fetched-history log field is skipped_own_and_system_messages (draft's was skipped_own_messages).
+<!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-02 17:11
+---
+Re-verified TODAY against main at 8bcbf373 (2026-10-02). Since c8de7643 main gained only #1528 (blazer formatter, aws_sns_notification) and #1529 (planning records); git diff c8de7643..8bcbf373 is empty for packages/incident, packages/incident_draft, packages/incident_summary, their unit tests, tests/integration/legacy_surface, app/pyproject.toml and server/. TASK-25.10, TASK-134 and TASK-110 are still To Do and unmerged: the services still import integrations.openai and pyproject declares no entry points. No difference: packages/incident holds documents, drive, meet and scheduling with no core/ and no umbrella contract; IncidentChannelPort is at incident_draft/service.py:222 and incident_summary/service.py:48; the access-umbrella contract is at pyproject.toml:378.
+---
+<!-- COMMENTS:END -->
