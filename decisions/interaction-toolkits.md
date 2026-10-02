@@ -42,7 +42,7 @@ The `pluggy` allowance and a platform's model types are then the same kind of de
 ## Open before acceptance
 
 - **Toolkit, shared helpers or conventions only.** Is a host-owned toolkit worth its cost, or do a few documented conventions plus lint checks (no manual `ack()` after work, no raw `response_url` posts) give most of the benefit?
-- **Proof on real features.** Build the Slack conventions for one or two rebuilt features first (for example `incident_draft` and `user_rotations`, the feature packages that call Bolt's client directly today), and decide from what they actually needed.
+- **Proof on real features.** Build the Slack conventions for one or two rebuilt features first (for example `incident/scribe` and `user_rotations`, the feature packages that call Bolt's client directly today), and decide from what they actually needed.
 - **Staying thin over time.** How the no-wrapper rule is enforced in review once the toolkit has several consumers.
 - **Teams.** Whether a Teams toolkit is needed at all, decided when the first Teams feature exists.
 

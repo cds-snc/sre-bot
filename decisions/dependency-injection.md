@@ -13,7 +13,7 @@ Features need core services (storage, queue, coordination, secrets, scheduler, t
 
 Current code:
 - Each infrastructure service exposes a module-level provider function (`get_storage_service()`, `get_event_dispatcher()`, `get_directory_provider()`), and features import these directly from `infrastructure.*`. `packages/access/request/providers.py`, for example, calls `get_storage_service()` and `get_event_dispatcher()`.
-- Feature `providers.py` files (`access/*`, `incident_draft`, `oncall_sync`, `user_rotations`) build service objects in `@lru_cache` functions, so each is process-global state that tests must reset.
+- Feature `providers.py` files (`access/*`, `incident/scribe`, `oncall_sync`, `user_rotations`) build service objects in `@lru_cache` functions, so each is process-global state that tests must reset.
 - Construction is lazy, on first call. Lifespan builds a few services explicitly (JWKS clients, directory, translator) and each feature's `startup_warmup` hookimpl builds its own; nothing guarantees every service is built before traffic. Two of these paths call the network while building a service, which the Decision below forbids: the opt-in directory warmup and `access/sync`'s AWS adapter, whose client factory assumes a role through STS.
 - Routes rarely use `Depends()`; most call provider functions inline.
 

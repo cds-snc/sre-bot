@@ -1,12 +1,12 @@
 ---
 id: TASK-135.4
 title: >-
-  Merge incident_draft and incident_summary into one subdomain under
-  packages/incident and delete both packages
-status: To Do
+  Add packages/incident/scribe holding the draft and summarize use cases, not
+  yet registered
+status: In Progress
 assignee: []
 created_date: '2026-10-02 15:39'
-updated_date: '2026-10-02 17:11'
+updated_date: '2026-10-02 18:01'
 labels:
   - plugin-architecture
   - features
@@ -29,89 +29,70 @@ ordinal: 305000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Slice 4 of TASK-135 (contract). A mechanical move: after TASK-135.2 and TASK-135.3 both packages already read the transcript through packages/incident/core/api.py and each handler makes one service call. This slice moves them into one subdomain of the incident umbrella and deletes the two top-level packages.
-
-UNBLOCKED 2026-10-02: the TASK-97 packet (decisions/incident-management.md) names the subdomain scribe, the enablement unit for draft and summarize over the text-generation capability. Entry point incident.scribe after TASK-124.5.
+Slice 4 of TASK-135 (expand). Rescoped on 2026-10-02 (human): the merge of the two packages was split in two PRs for review size. This slice adds the merged subdomain as new code that nothing registers; TASK-135.5 switches both commands to it and deletes packages/incident_draft and packages/incident_summary.
 
 THIS SLICE
-- packages/incident/scribe/ holds both use cases: two handlers, one service module, one settings module, one providers module, the Google Docs and Slack bookmark adapters, and both locale catalogues. One package registers both Slack commands and both i18n domains.
-- packages/incident_draft and packages/incident_summary are deleted. Every importer, mock patch string and import-linter entry is rewritten in the same PR; no re-export shim.
-- The incident umbrella layers contract gains the subdomain; the two temporary feature-independence ignore entries added by TASK-135.2 and TASK-135.3 are removed, and both packages leave that contract's modules list.
-- No behaviour change: command names, arguments, replies, i18n domains and keys, settings environment variable names and log event names are unchanged.
+- packages/incident/scribe/ holds both use cases as a copy of the two packages after TASK-135.2 and TASK-135.3: two handlers and one register_commands in platforms/slack.py, one service module, one settings module, one providers module, the Google Docs and Slack bookmark adapters, both locale catalogues and one README.
+- Its __init__.py defines no hookimpl, so plugin discovery finds the package and registers nothing from it: packages.incident_draft and packages.incident_summary still own both commands and their i18n resources.
+- The unit tests of both packages are copied to tests/unit/packages/incident/scribe/ with imports and patch strings rewritten, so the new code is tested before it is switched on. The originals stay until TASK-135.5.
+- The incident umbrella layers contract gains scribe; the copy needs four import-linter ignore entries beside the six that name the two packages, until TASK-135.5 deletes the originals.
+- No behaviour change and no change to any existing production module other than app/pyproject.toml.
 
-Human decision 2026-10-02: the merged subdomain has one service.py (decisions/feature-packages.md layout table), about 900 lines until TASK-134 moves draft's answer parsing to the text-generation capability.
+Human decision 2026-10-02: the merged subdomain has one service.py (decisions/feature-packages.md layout table), about 1,030 lines until TASK-134 moves draft's answer parsing to the text-generation capability.
 
-Whether the report document interface (IncidentDocumentStore) and IncidentReportLinkLookup belong in core/ is decided by the TASK-97 packet and is not changed here.
+Whether IncidentDocumentStore and IncidentReportLinkLookup belong in core/ is decided by the TASK-97 packet and is not changed here.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 /sre incident draft and /sre incident summarize are two handlers in one subdomain package under packages/incident, registered by one pair of hookimpls; the subdomain imports packages.incident.core only through core/api.py
-- [ ] #2 packages/incident_draft and packages/incident_summary no longer exist; rg -n 'incident_draft|incident_summary' over app/ finds only i18n domain names, settings environment variable aliases, log event names and locale file names
-- [ ] #3 The incident umbrella layers contract lists the subdomain as an independent sibling above core with exhaustive = true; the two temporary feature-independence ignore entries are removed and no import-linter ignore entry is added
-- [ ] #4 The move is mechanical: no function body changes beyond import paths, and the tests move with their modules under tests/unit/packages/incident/scribe/
-- [ ] #5 Command names, arguments and replies are unchanged: the legacy_surface suite is green with no assertion change
-- [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; import-linter ignore entries only shrank against main at the start of TASK-135
+- [x] #1 packages/incident/scribe/ holds both use cases (two handlers, one service, one settings and one providers module, the adapters and both locale catalogues) and imports packages.incident.core only through core/api.py; its __init__.py defines no hookimpl, so it registers no command and no i18n resource
+- [x] #2 No existing production module changes other than app/pyproject.toml: packages/incident_draft, packages/incident_summary and their tests are untouched, and the legacy_surface suite is green with no change to its files
+- [x] #3 The scribe code is the two packages' code with import paths rewritten and the name-collision renames listed in the plan, and nothing else; its unit tests live under tests/unit/packages/incident/scribe/
+- [x] #4 The incident umbrella layers contract lists scribe as an independent sibling above core with exhaustive = true; exactly four import-linter ignore entries are added, the scribe copies of the six entries naming the two packages, whose originals TASK-135.5 deletes
+- [x] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-Subdomain name: scribe (TASK-97, decisions/incident-management.md, 2026-10-02). Unblocked.
+Split (human, 2026-10-02): this task was planned and approved as the whole merge. After implementation it was split in two for review size. The full approved plan now sits on TASK-135.5 with a note of which steps each task took; this task keeps the part below.
 
-Size: a mechanical move of two packages (16 production modules, 4 locale files, 2 READMEs) into one, plus app/pyproject.toml. Outside pure moves and import-path rewrites the hand-written change is about 150 production LOC (one merged __init__.py, name-collision renames, pyproject). Over the file count, but doc-2 requires a move to rewrite every importer in the same PR with no re-export shim, so it cannot be cut further. No behaviour change.
-
-STEPS
-0. Re-verify before starting, because TASK-25.10, TASK-134 and TASK-110 may have merged since this plan was written (2026-10-02 at c8de7643): re-run rg -n 'incident_draft|incident_summary' over the repo outside backlog/, re-read both service modules' imports, and check pyproject for entry points. Record the differences as a comment on this task before editing.
-1. Create app/packages/incident/scribe/ and move, keeping git history as renames where a file moves whole:
-   - incident_draft/domain.py -> domain.py
-   - incident_draft/adapters/google_docs.py and adapters/slack.py (SlackIncidentReportLinkLookup) -> adapters/
-   - incident_draft/providers.py -> providers.py
-   - incident_draft/locales/* and incident_summary/locales/* -> locales/ (file names incident_draft.<locale>.yml and incident_summary.<locale>.yml unchanged)
-   - both settings.py -> one settings.py holding IncidentDraftSettings and IncidentSummarySettings with their INCIDENT_DRAFT__* and INCIDENT_SUMMARY__* aliases unchanged; drop the deprecated 'from __future__ import annotations' line from both (:9)
-   - both service.py -> one service.py (human decision 2026-10-02): draft's module with summary's functions appended
-   - both platforms/slack.py -> one platforms/slack.py with both handlers and both registrations
-   - both README.md -> one README.md
-2. Resolve the name collisions the merge creates, and nothing else:
-   - platforms/slack.py: _DOMAIN (two values) -> _DRAFT_DOMAIN and _SUMMARY_DOMAIN; register_commands (two) -> one function making both registrar.register_command calls; _error_response (two, different messages) -> _draft_error_response and _summary_error_response; the --limit coercion helper is kept once.
-   - service.py: EMPTY_HISTORY_CODE (same value in both) kept once; logger kept once; the two limit-resolution helpers stay separate functions over their own settings, renamed by use case, so no logic is unified in a move PR.
-3. app/packages/incident/scribe/__init__.py: one register_slack_commands hookimpl calling the merged register_commands, and one register_i18n_resources hookimpl registering two I18nResourceSpec values (domains incident_draft and incident_summary unchanged, owner 'packages.incident.scribe', the shared locales path). No re-exports beyond what tests import.
-4. Delete app/packages/incident_draft/ and app/packages/incident_summary/.
-5. app/pyproject.toml:
-   - no-host-imports ignore_imports (:289-292): four entries become three under the new paths (google_docs -> infrastructure.configuration.integrations.google, google_docs -> infrastructure.drive, platforms.slack -> infrastructure.i18n);
-   - integrations-via-adapters ignore_imports (:341-342): two entries become one for the merged service, or none if TASK-25.10 has already moved the summarizer behind the capability;
-   - feature-independence: remove packages.incident_draft and packages.incident_summary from modules (:354-355) and remove the two temporary ignore entries added by TASK-135.2 and TASK-135.3;
-   - incident-umbrella layers: first layer becomes "documents | drive | meet | scheduling | scribe".
-6. Tests move with their modules to app/tests/unit/packages/incident/scribe/, files renamed to the test_incident_scribe_<entity>_<action>.py pattern, with every import and patch string rewritten. Known patch strings on 2026-10-02 (re-grep at step 0): packages.incident_draft.adapters.google_docs.get_google_resources_config, ...google_docs.google_workspace_client, packages.incident_draft.platforms.slack.handle_draft_command, packages.incident_summary.platforms.slack.handle_summarize_command (2), plus those TASK-135.2 and TASK-135.3 introduce on the service and providers modules. Test bodies and assertions are not edited.
-7. app/tests/integration/legacy_surface/: conftest.py imports the one subdomain module in place of the two packages (:30-31, :52-53) and patches get_incident_transcript_reader once, on the merged service module, and get_incident_report_link_lookup on the merged providers module; test_slack_command_registration_surface.py imports (:21-24) and the four setattr targets point at the merged modules, with no assert line changed; INVENTORY.md:115-116 paths updated.
-8. Records and sibling tasks:
-   - decisions/feature-packages.md: Context (:13, :14, :17) and 'Tolerated until then' (:117, :119) no longer list the two packages; add a dated Changes line.
-   - decisions/dependency-injection.md:16, configuration.md:16, interaction-toolkits.md:45 and i18n.md:17 name the packages by path: update the names.
-   - Through the backlog CLI, bring the paths in TASK-124.5, TASK-25.10 and TASK-134 up to date if they are still open.
-9. Gates from app/: uv run ruff check . ; uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' (0 errors in touched files) ; uv run lint-imports ; uv run pytest tests --ignore=tests/smoke. Then rg -n 'incident_draft|incident_summary' app/ and classify every hit (expect only i18n domains and keys, settings aliases and class names, log event names, locale file names), and rg -n 'Port\b|_port\b|_PORT\b|\bport\b' app/packages/incident app/tests/unit/packages/incident app/tests/integration/legacy_surface (expect nothing).
+STEPS (numbers are those of the approved plan)
+0. Re-verification on top of layers 1 to 3: done, recorded as a comment on this task.
+1. Create app/packages/incident/scribe/ from the two packages: domain.py, adapters/google_docs.py, adapters/slack.py and providers.py as they are with import paths rewritten; both locale catalogues under locales/ with their file names unchanged; one settings.py holding IncidentDraftSettings and IncidentSummarySettings with their aliases unchanged; one service.py (draft's module with summary's functions appended); one platforms/slack.py with both handlers; one README.md. The originals are copied, not moved: they are deleted by TASK-135.5.
+2. Resolve the name collisions the merge creates, and nothing else: platforms/slack.py _DOMAIN -> _DRAFT_DOMAIN and _SUMMARY_DOMAIN, one register_commands making both registrar.register_command calls, _error_response -> _draft_error_response and _summary_error_response, the --limit coercion helper kept once; service.py EMPTY_HISTORY_CODE, logger and _now kept once, the two limit and window helpers renamed by use case.
+3 (part). app/packages/incident/scribe/__init__.py is a docstring only. The hookimpls are TASK-135.5.
+5 (part). app/pyproject.toml: the incident-umbrella first layer becomes "documents | drive | meet | scheduling | scribe"; four ignore entries are added for the copy (no-host-imports: google_docs -> infrastructure.configuration.integrations.google, google_docs -> infrastructure.drive, platforms.slack -> infrastructure.i18n; integrations-via-adapters: service -> integrations.openai). The six originals and the two temporary feature-independence entries stay until TASK-135.5.
+6 (part). Copy the 13 unit test files to app/tests/unit/packages/incident/scribe/ as test_incident_scribe_<entity>_<action>.py with every import and patch string rewritten.
+9. Gates from app/: ruff, mypy (0 errors in touched files), lint-imports, pytest tests --ignore=tests/smoke.
 
 AC MAP
-- #1 -> steps 1, 2, 3; the moved handler and registration tests; lint-imports (umbrella contract).
-- #2 -> steps 4, 9 (first rg, hits classified in notes).
-- #3 -> step 5; lint-imports output and the pyproject diff.
-- #4 -> steps 1, 2, 6; review of the diff with moved-line detection; collision renames listed in step 2 are the only edits to function bodies.
-- #5 -> step 7; pytest tests/integration/legacy_surface recorded before and after.
-- #6 -> steps 5, 9; ignore-entry count before and after against the count at c8de7643 (6 entries naming the two packages).
-
-TEST MATRIX
-- No new behaviour, so no new behaviour tests. The moved unit suites (about 250 tests on 2026-10-02) and the four legacy_surface incident tests must pass unchanged in body.
-- One addition: the registration test asserts the single package registers both commands under sre.incident and both i18n domains.
-
-ASSUMPTIONS AND HOW TO VERIFY
-- The i18n loader reads <domain>.<locale>.yml files (infrastructure/i18n/loader.py:53), so two domains can share one locales directory. Verify with the two locale parity tests and by rendering one translated reply per command in the legacy_surface suite.
-- Plugin discovery walks packages/ recursively (server/plugins/base.py:46), as it does for packages/access/*, so the nested subdomain registers without a host change. If TASK-110 has landed, the two entry points become one named incident.scribe (umbrella rule 6).
-- Nothing outside app/ and decisions/ names the two packages (rg over the repo on 2026-10-02: no hit in app/bin, terraform, workflows or the Makefile).
-- The subdomain name, and whether IncidentDocumentStore or IncidentReportLinkLookup move to core/, come from the TASK-97 packet; if the packet moves either, that is its own task, not this move.
-
-BLAST RADIUS AND ROLLBACK
-- Both commands. The risk is a missed importer or patch string, which fails at import time in CI, not in production. Settings variable names, i18n keys and replies are unchanged, so there is no deployment step.
-- A single git revert restores both packages.
+- #1 -> steps 1, 2, 3. #2 -> the commit's file list and the legacy_surface run. #3 -> steps 1, 2, 6. #4 -> step 5. #5 -> step 9.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented as layer 4 of Stack G on stack-g/task-135.4-incident-scribe-subdomain, committed as 6178aa7e on top of d902d38c (TASK-135.3). Status stays In Progress; a human moves it to Done.
+
+WHAT CHANGED (30 files, +7528 / -1; every file but app/pyproject.toml is new)
+- app/packages/incident/scribe/: __init__.py (docstring only, no hookimpl), service.py (1034 lines), settings.py, providers.py, domain.py, adapters/google_docs.py, adapters/slack.py, platforms/slack.py, locales/ (four catalogue files), README.md.
+- app/tests/unit/packages/incident/scribe/: the 13 unit test files of the two packages, renamed test_incident_scribe_*.py, imports and patch strings rewritten.
+- app/pyproject.toml: scribe added to the incident-umbrella layer; four ignore entries added for the copy.
+- Collision renames, the only edits to function bodies against the originals: platforms/slack.py _DOMAIN -> _DRAFT_DOMAIN and _SUMMARY_DOMAIN, _error_response -> _draft_error_response and _summary_error_response, the four dispatch closures named per command, _parse_limit kept once; service.py _resolve_limit -> _resolve_draft_limit and _resolve_summary_limit, _resolve_window_start -> _resolve_draft_window_start and _resolve_summary_window_start, EMPTY_HISTORY_CODE, logger and _now kept once. 'from __future__ import annotations' is dropped from the merged settings module and from four of the copied test files.
+
+FOR REVIEW
+1. Three copied unit tests differ in body from their originals: the draft and summarize registration tests asserted a single register_command call, which the merged register_commands no longer makes. They pick their command's registration from the recorded calls; the assertions on command, parent, handler and fallback are the same.
+2. Labels in this commit name the wrong task: the scribe __init__.py docstring and the two pyproject comments beside the added ignore entries say TASK-135.4 switches registration and deletes the originals. That is TASK-135.5. All three lines are replaced or removed by TASK-135.5's commit, so nothing wrong reaches main once both layers merge; the text is only visible in this PR's diff.
+3. GitHub shows this PR as about 7,500 added lines because a copy cannot be displayed as a rename. Against the originals the content differs only by import paths and the renames above.
+
+GATES (run on an export of 6178aa7e, 2026-10-02)
+- ruff check . -> All checks passed!
+- mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 65 errors in 22 files (baseline count; 385 source files checked); 0 in packages/incident/scribe.
+- lint-imports -> Contracts: 9 kept, 0 broken.
+- pytest tests/integration/legacy_surface -> 17 passed, with no change to its files.
+- pytest tests --ignore=tests/smoke -> 6 failed, 3973 passed (3675 before, plus the copied scribe tests). The 6 are the known TASK-90 order leaks.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
@@ -124,5 +105,15 @@ created: 2026-10-02 16:46
 created: 2026-10-02 17:11
 ---
 Re-verified TODAY against main at 8bcbf373 (2026-10-02). Since c8de7643 main gained only #1528 (blazer formatter, aws_sns_notification) and #1529 (planning records); git diff c8de7643..8bcbf373 is empty for packages/incident, packages/incident_draft, packages/incident_summary, their unit tests, tests/integration/legacy_surface, app/pyproject.toml and server/. TASK-25.10, TASK-134 and TASK-110 are still To Do and unmerged: the services still import integrations.openai and pyproject declares no entry points. No difference, so step 5's 'or none if TASK-25.10 has already moved the summarizer' does not apply (one merged integrations.openai entry) and step 8's entry-point merge does not apply (TASK-110 unmerged). pyproject lines are as planned: no-host-imports :289-292, integrations-via-adapters :341-342, feature-independence modules :354-355. Step 0 is re-run when this layer starts, on top of layers 1 to 3. Delivery changed: this slice is layer 4 of the TASK-135 stack.
+---
+
+created: 2026-10-02 17:45
+---
+Step 0 re-run 2026-10-02 on top of layers 1 to 3 (d902d38c; main still at 8bcbf373, the stack's base). TASK-25.10, TASK-134 and TASK-110 are still To Do: both services import integrations.openai and pyproject declares no entry points, so the integrations-via-adapters entries become one and there is no entry point to merge. Differences from the plan's lists: (1) rg finds two files the plan did not name: decisions/outbound-clients.md:66 names incident_draft in prose (updated with the other records), and tests/modules/incident/test_incident_helper.py has two legacy test functions named test_legacy_handle_incident_summary_command*, which belong to modules/incident and are left alone. (2) infrastructure/i18n/resources.py deduplicates registrations on path alone and logs i18n_resource_duplicate_skipped for the second; the loader reads every <domain>.<locale>.yml under a path and spec.domain is only logged. Two specs on the shared locales directory (plan step 3) would therefore drop the second with a warning at every boot, so the package registers the directory once. (3) Merging the two register_commands functions means the three unit tests that asserted a single register_command call cannot keep their bodies (plan step 6 expected no body edits).
+---
+
+created: 2026-10-02 18:01
+---
+2026-10-02 (human, in session): rescoped. The merge was implemented as one change and then split by the human into two commits for review size: this task is the unregistered package (6178aa7e) and the new TASK-135.5 is the switch and the deletion (5c5bcd37). Title, description, ACs, plan and notes are rewritten for the smaller scope; the approved full plan moved to TASK-135.5. Comment #3 (step 0) stands for both tasks.
 ---
 <!-- COMMENTS:END -->

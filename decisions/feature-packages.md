@@ -10,11 +10,10 @@ scope: The one package shape for features, capabilities and their subdomains, pl
 ## Context
 
 Features live in `app/packages/` today; `features/` and `capabilities/` do not exist yet ([plugin-architecture.md](plugin-architecture.md)). An earlier layout record was a closed filename list that banned names the code needed (no slot for persistence, no `locales/`), so this record was reconciled with the shipped shape. Nothing enforces it, and the shipped packages have drifted:
-- Five packages (`geolocate`, `incident_draft`, `incident_summary`, `rant`, `user_rotations`) put Slack handlers in `platforms/`, and `access` puts them in `interactions/`, instead of `entrypoints/`; `geolocate` also has `routes.py`, `oncall_sync` has `ports.py`, and `access/sync` has many extra top-level modules (`application.py`, `job_runner.py`, `presenters.py` and others).
-- Handler files in six packages import `integrations.slack` directly, `oncall_sync/providers.py` imports `integrations.slack.settings`, and the `incident_draft` and `incident_summary` services import `integrations.openai`.
+- Four packages (`geolocate`, `incident/scribe`, `rant`, `user_rotations`) put Slack handlers in `platforms/`, and `access` puts them in `interactions/`, instead of `entrypoints/`; `geolocate` also has `routes.py`, `oncall_sync` has `ports.py`, and `access/sync` has many extra top-level modules (`application.py`, `job_runner.py`, `presenters.py` and others).
+- Handler files in six packages import `integrations.slack` directly, `oncall_sync/providers.py` imports `integrations.slack.settings`, and the `incident/scribe` service imports `integrations.openai`.
 - `access/sync` handlers are synchronous `def` functions.
 - `access/request` and `access/sync` publish and handle domain events through the blinker-backed `infrastructure.events` dispatcher.
-- `incident_draft` and `incident_summary` sit outside the `packages/incident/` umbrella. Each is one slash command shipped as a whole package, and each carries its own interface, Slack adapter and provider for the same channel lookups; their handlers build the transcript themselves.
 - `access/common` reads runtime-config files and holds a cached provider, although `common/` is meant to do no I/O.
 
 `packages/access/` and `packages/incident/` are umbrellas with empty `__init__.py` files. No entry points are declared yet.
@@ -114,9 +113,8 @@ Tickets: TASK-18 (import-linter contracts), TASK-38 (incident), TASK-124 (packag
 Tolerated until then:
 - packages in `app/packages/`, with no generator and no shape check;
 - `platforms/` directories and the extra top-level modules listed in Context;
-- `integrations` imports outside `adapters/`: `integrations.slack` in handler files and `oncall_sync/providers.py`, and `integrations.openai` in the `incident_draft` and `incident_summary` services;
+- `integrations` imports outside `adapters/`: `integrations.slack` in handler files and `oncall_sync/providers.py`, and `integrations.openai` in the `incident/scribe` service;
 - `providers.py` files that import `infrastructure` providers instead of resolving contracts from the registry;
-- `incident_draft` and `incident_summary` as two packages, each with its own channel interface, Slack adapter and provider, and handlers that gather the transcript before calling the service;
 - the runtime-config loaders and cached provider in `access/common`;
 - synchronous handlers in `access/sync/interactions/`;
 - the `infrastructure.events` dispatcher in `access/request` and `access/sync`;
@@ -128,3 +126,4 @@ Tolerated until then:
 - 2026-09-24: one generator-enforced shape for features and capabilities under the plugin-architecture layers, with reactions through extension points instead of domain events; inbound handlers live in `entrypoints/`.
 - 2026-10-01: umbrellas gain an optional `core/` layer that may do I/O, imported through `api.py`; a subdomain is an enablement unit, not a command; sibling independence is kept.
 - 2026-10-02: Protocols are named for their role, never with a `Port` suffix, and prose says "interface" (TASK-136).
+- 2026-10-02: `incident_draft` and `incident_summary` are now the `scribe` subdomain of `packages/incident/`, reading the transcript through `core/` (TASK-135); Context and the tolerated list no longer name them as separate packages.

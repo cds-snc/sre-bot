@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 16:51'
-updated_date: '2026-10-01 14:06'
+updated_date: '2026-10-02 17:44'
 labels:
   - clients
   - phase-3
@@ -21,10 +21,9 @@ references:
   - decisions/sdk-typing.md
   - app/integrations/openai/client.py
   - app/integrations/openai/summarizer.py
-  - app/packages/incident_draft/service.py
-  - app/packages/incident_summary/service.py
   - decisions/plugin-architecture.md
   - decisions/feature-packages.md
+  - app/packages/incident/scribe/service.py
 parent_task_id: TASK-25
 priority: medium
 ordinal: 243000
@@ -40,7 +39,7 @@ TODAY (verified 2026-09-18):
 - app/integrations/openai/summarizer.py: the Summarizer Protocol (a port), the OpenAISummarizer implementation that returns OperationResult, response-parsing helpers and get_summarizer. It is baselined as both module: and operation-result:.
 - client.py, summarizer.py and settings.py still use 'from __future__ import annotations', which CLAUDE.md marks as deprecated on 3.14. That counts as a bug to fix in touched files.
 
-CONSUMERS (re-grep): packages/incident_draft/service.py and packages/incident_summary/service.py. Both import Summarizer and get_summarizer from integrations.openai. packages/incident_summary/settings.py refers to integrations.openai.settings in prose.
+CONSUMERS (re-grep): packages/incident/scribe/service.py, the one service module of the scribe subdomain since TASK-135.4 (it holds both the draft and the summarize use case). It imports Summarizer and get_summarizer from integrations.openai. packages/incident/scribe/settings.py refers to integration settings in prose.
 
 OWNER DECIDED (human, 2026-10-01; decisions/plugin-architecture.md, "Text generation is a capability"). The Summarizer port and its OpenAI implementation move to a new capability, app/capabilities/text_generation/. The earlier options (an infrastructure service, or a per-feature adapter in each consumer) are rejected.
 - api.py holds the port, its domain types and the provider function. It keeps the one operation both consumers use today: source text plus instructions gives text, as OperationResult. Its names are feature-free: no incident or Slack vocabulary.
@@ -57,7 +56,7 @@ TARGET. integrations/openai/ exports build_openai_client (timeout plus a retry p
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 integrations/openai/ contains only __init__.py, client.py and settings.py; classify_openai_error returns (OperationStatus, error_code, retry_after); every openai entry in bin/baselines/vendor_package_contract.txt is removed
-- [ ] #2 The port and its OpenAI implementation live in app/capabilities/text_generation/ (api.py, adapters/openai.py, an in-memory fake, README with classification and feature consumers); the package passes the TASK-114 shape check and its vocabulary is feature-free; incident_draft and incident_summary import only its api.py, with unchanged behaviour covered by their existing tests
+- [ ] #2 The port and its OpenAI implementation live in app/capabilities/text_generation/ (api.py, adapters/openai.py, an in-memory fake, README with classification and feature consumers); the package passes the TASK-114 shape check and its vocabulary is feature-free; the incident scribe subdomain (packages/incident/scribe, the former incident_draft and incident_summary) imports only its api.py, with unchanged behaviour covered by its existing tests
 - [ ] #3 The OpenAI client's retry policy is explicit at construction (or explicitly none, with the reason recorded), alongside its timeout
 - [ ] #4 Classification tests cover each mapped HTTP status family and Retry-After, plus one unmapped exception propagating; no 'from __future__ import annotations' remains in touched files
 - [ ] #5 decisions/outbound-clients.md no longer lists OpenAI as a tolerated divergence; ruff, mypy, lint-imports, pytest tests --ignore=tests/smoke and make check-vendor-package-contract pass, with output recorded in notes

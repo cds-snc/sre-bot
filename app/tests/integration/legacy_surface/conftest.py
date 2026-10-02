@@ -27,8 +27,7 @@ import modules.dev as dev_module
 import modules.sre as sre_module
 import packages.access.sync as access_sync_module
 import packages.geolocate as geolocate_module
-import packages.incident_draft as incident_draft_module
-import packages.incident_summary as incident_summary_module
+import packages.incident.scribe as incident_scribe_module
 import packages.rant as rant_module
 import packages.user_rotations as user_rotations_module
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
@@ -37,10 +36,9 @@ from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
 from packages.incident.core.adapters.slack import SlackIncidentTranscriptReader
-from packages.incident_draft import providers as incident_draft_providers
-from packages.incident_draft import service as incident_draft_service
-from packages.incident_draft.adapters.slack import SlackIncidentReportLinkLookup
-from packages.incident_summary import service as incident_summary_service
+from packages.incident.scribe import providers as incident_scribe_providers
+from packages.incident.scribe import service as incident_scribe_service
+from packages.incident.scribe.adapters.slack import SlackIncidentReportLinkLookup
 from packages.rant.adapters.slack import SlackUserIdentityLookup
 from packages.rant.platforms import slack as rant_slack
 
@@ -50,8 +48,7 @@ SLACK_COMMAND_HOOKIMPLS: tuple[ModuleType, ...] = (
     rant_module,
     user_rotations_module,
     access_sync_module,
-    incident_draft_module,
-    incident_summary_module,
+    incident_scribe_module,
     geolocate_module,
 )
 
@@ -169,7 +166,7 @@ def _authorize_single_workspace(**_: Any) -> AuthorizeResult:
 
 
 def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> SlackCommandHarness:
-    """Wire the eight hookimpls onto a fresh provider and Bolt app."""
+    """Wire the seven hookimpls onto a fresh provider and Bolt app."""
     monkeypatch.setattr(App, "__init__", _unpatched_app_init())
     client = FakeSlackClient()
     app = RecordingApp(
@@ -184,11 +181,10 @@ def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> Slack
 
     # Each package's Slack lookups run through its real adapter over the same fake client.
     monkeypatch.setattr(rant_slack, "get_user_identity_lookup", lambda: SlackUserIdentityLookup(client))
-    monkeypatch.setattr(incident_draft_service, "get_incident_transcript_reader", lambda: SlackIncidentTranscriptReader(client))
+    monkeypatch.setattr(incident_scribe_service, "get_incident_transcript_reader", lambda: SlackIncidentTranscriptReader(client))
     monkeypatch.setattr(
-        incident_draft_providers, "get_incident_report_link_lookup", lambda: SlackIncidentReportLinkLookup(client)
+        incident_scribe_providers, "get_incident_report_link_lookup", lambda: SlackIncidentReportLinkLookup(client)
     )
-    monkeypatch.setattr(incident_summary_service, "get_incident_transcript_reader", lambda: SlackIncidentTranscriptReader(client))
 
     plugin_manager = pluggy.PluginManager(PLUGIN_NAMESPACE)
     plugin_manager.add_hookspecs(FeatureLifecycleSpecs)

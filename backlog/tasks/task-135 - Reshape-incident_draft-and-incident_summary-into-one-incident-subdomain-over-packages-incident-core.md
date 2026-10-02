@@ -3,10 +3,10 @@ id: TASK-135
 title: >-
   Reshape incident_draft and incident_summary into one incident subdomain over
   packages/incident/core
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-01 14:05'
-updated_date: '2026-10-02 17:11'
+updated_date: '2026-10-02 18:01'
 labels:
   - plugin-architecture
   - features
@@ -56,12 +56,12 @@ Waits for TASK-26.1 (the handlers are re-signed onto the Slack registrar and rep
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 packages/incident/core/ exposes, through core/api.py only, a conversation port that returns an ordered sequence of TranscriptMessage; no Slack payload, SDK type or Slack timestamp string crosses the port, and one Slack adapter implements it
-- [ ] #2 core/ has no entrypoints/, no hookimpls and no entry point; an import-linter layers contract for packages.incident lists the subdomains as independent siblings above core, with exhaustive = true
-- [ ] #3 /sre incident draft and /sre incident summarize are two handlers in one subdomain; each handler makes one service call, and the transcript is gathered by the service through core/api.py
-- [ ] #4 packages/incident_draft and packages/incident_summary no longer exist; one TranscriptMessage type remains; no channel port, Slack adapter or provider function is duplicated
-- [ ] #5 Command names, arguments and replies are unchanged: the TASK-36 legacy_surface suite is green before and after with no assertion change
-- [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; import-linter ignore entries only shrank
+- [x] #1 packages/incident/core/ exposes, through core/api.py only, a conversation port that returns an ordered sequence of TranscriptMessage; no Slack payload, SDK type or Slack timestamp string crosses the port, and one Slack adapter implements it
+- [x] #2 core/ has no entrypoints/, no hookimpls and no entry point; an import-linter layers contract for packages.incident lists the subdomains as independent siblings above core, with exhaustive = true
+- [x] #3 /sre incident draft and /sre incident summarize are two handlers in one subdomain; each handler makes one service call, and the transcript is gathered by the service through core/api.py
+- [x] #4 packages/incident_draft and packages/incident_summary no longer exist; one TranscriptMessage type remains; no channel port, Slack adapter or provider function is duplicated
+- [x] #5 Command names, arguments and replies are unchanged: the TASK-36 legacy_surface suite is green before and after with no assertion change
+- [x] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; import-linter ignore entries only shrank
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -107,6 +107,20 @@ From TASK-136 (2026-10-02, human decision): the test-side names for the channel 
 - tests/unit/packages/incident_summary/test_incident_summary_slack.py: _CHANNEL_PORT (:27, used :59 and :71), mock_port (:59, :62, :71, :74), the test name test_handler_dispatches_with_channel_port_and_parsed_args (:52), and the helper docstring 'fake incident channel port' (:31).
 - tests/integration/legacy_surface/conftest.py patches get_incident_channel_port (2 occurrences); it follows the provider-function rename.
 Name them after the role name chosen for the replacement interface (for example _CHANNEL_READER / mock_reader if it is a Reader). When this task is done, rg -i 'port' over the incident tests and packages must find nothing; if any of these tests survive the reshape under a new path, the rename goes with them. This is what closes TASK-136 AC #5, whose only remaining exceptions are then genuine network ports (app/bin/dev-token.py, the aws_sns_notification auto_mitigation module and its test), which stay as they are.
+
+2026-10-02: all five slices are implemented and committed on Stack G (handoff: doc-4), each In Progress with every AC checked, waiting for review and merge. Status here stays In Progress; a human moves it to Done once the stack has merged.
+
+Delivery as built: five layers, not four. TASK-135.4 was split after implementation for review size (human, 2026-10-02): TASK-135.4 adds packages/incident/scribe/ unregistered (6178aa7e) and TASK-135.5 registers it and deletes packages/incident_draft and packages/incident_summary (5c5bcd37). Layers 1 to 3: 0724af46 (TASK-135.1), 9f57c514 (TASK-135.2), d902d38c (TASK-135.3).
+
+ACs verified at 5c5bcd37, the top of the stack:
+- #1: packages/incident/core/api.py exposes IncidentTranscriptReader, TranscriptMessage and get_incident_transcript_reader; signatures carry str, int, bool, datetime and TranscriptMessage only; one Slack adapter implements it (TASK-135.1). The interface took a role name, IncidentTranscriptReader, per TASK-136; the AC's word 'port' predates that rule.
+- #2: core/ has no entrypoints/ and no hookimpl (rg hookimpl over packages/incident/core: no match) and pyproject declares no entry point; the incident-umbrella layers contract lists documents, drive, meet, scheduling and scribe above core with exhaustive = true, and lint-imports keeps it.
+- #3: both handlers live in packages/incident/scribe/platforms/slack.py, each makes one service call, and the service gathers the transcript through core/api.py.
+- #4: packages/incident_draft and packages/incident_summary are gone; the only TranscriptMessage class is packages/incident/core/domain.py; the one remaining Slack lookup outside core is the draft-only IncidentReportLinkLookup (human decision, 2026-10-02).
+- #5: legacy_surface 17 passed before and after every layer; the only edits to its files are import paths, patch targets and the harness wiring, with no assert line changed.
+- #6: ruff clean; mypy 65 errors, the baseline count, none in touched files; lint-imports 9 contracts kept; pytest tests --ignore=tests/smoke 6 failed, 3678 passed, the 6 being the known TASK-90 order leaks. Import-linter ignore entries naming the two packages went from 6 on main to 4 naming the subdomain; both temporary entries are gone.
+
+Open for the reviewer (details on TASK-135.4 and TASK-135.5): one i18n resource registration instead of two; three registration unit tests changed body; the classes of rg hit kept in app/ (settings getter names, the Google Docs named-range prefix, test names).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
