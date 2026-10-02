@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 15:43'
+updated_date: '2026-10-02 20:51'
 labels:
   - clients
   - reliability
@@ -53,3 +54,12 @@ NOT IN SCOPE: Drive files.create/files.copy in infrastructure/drive and Director
 - [ ] #5 decisions/outbound-clients.md's Migration section no longer tolerates the per-call num_retries=0 override, with a dated Changes line
 - [ ] #6 ruff, mypy, pytest tests --ignore=tests/smoke, make check-sdk-typing and make check-vendor-package-contract pass, with output recorded in notes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-02 20:51
+---
+2026-10-02: the incident documents site in the list above changed in a production bug fix (duplicate timeline entries, see the TASK-87 comment of the same date). app/packages/incident/documents/adapters/google_docs.py::apply_document_edits now takes a required revision id, sends writeControl.requiredRevisionId, returns a bool, and still passes .execute(num_retries=0); the line number in the description has moved. The count of six sites is unchanged. Because the write is now revision-guarded, the planner should decide whether this site moves to the retries-disabled handle like the other five or back to the retrying default; AC#2 and AC#4 hold either way only if the per-call override is gone.
+---
+<!-- COMMENTS:END -->

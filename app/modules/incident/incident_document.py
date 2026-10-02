@@ -2,13 +2,15 @@
 
 import datetime
 import re
+from collections.abc import Callable
+from typing import Any
 
 from structlog import get_logger
 
 from infrastructure.configuration.integrations.google import get_google_resources_config
 from packages.incident.documents.adapters.google_docs import (
     apply_document_edits,
-    fetch_document_content,
+    fetch_document_snapshot,
     replace_placeholders,
 )
 from packages.incident.drive.adapters import google_drive as incident_drive
@@ -17,6 +19,7 @@ google_resources = get_google_resources_config()
 INCIDENT_TEMPLATE = google_resources.incident_template_id
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
+TIMELINE_UPDATE_ATTEMPTS = 3
 
 logger = get_logger()
 
@@ -78,12 +81,58 @@ def update_incident_document_status(document_id, new_status="Closed"):
     return replace_placeholders(document_id, replacements, match_case=False)
 
 
-def get_timeline_section(document_id):
-    # Retrieve the document content
-    content = fetch_document_content(document_id)
-    if content is None:
-        return None
+def update_timeline_section(document_id: str, rewrite: Callable[[str], str | None]) -> bool:
+    """Rewrite the timeline section from a single document snapshot.
 
+    rewrite receives the current timeline text and returns the new text, or None when
+    nothing needs to change. The edit only applies while the document is still at the
+    revision it was read at, so an edit built from a stale read is rejected instead of
+    written over newer content. After a rejected or unconfirmed write the document is read
+    again and rewrite is re-evaluated, which lets it see an edit that already landed.
+
+    Returns True when the timeline is in the requested state, False otherwise.
+    """
+    for attempt in range(1, TIMELINE_UPDATE_ATTEMPTS + 1):
+        snapshot = fetch_document_snapshot(document_id)
+        if snapshot is None:
+            return False
+
+        timeline_content = extract_timeline_section(snapshot.content)
+        if timeline_content is None:
+            logger.warning(
+                "incident_timeline_update_failed",
+                document_id=document_id,
+                error="Headings not found",
+            )
+            return False
+
+        new_content = rewrite(timeline_content)
+        if new_content is None:
+            return True
+
+        requests = build_timeline_replacement(snapshot.content, new_content, START_HEADING, END_HEADING)
+        if requests is None:
+            return False
+
+        if apply_document_edits(document_id, requests, snapshot.revision_id):
+            return True
+        logger.warning(
+            "incident_timeline_update_not_applied",
+            document_id=document_id,
+            attempt=attempt,
+        )
+
+    logger.error(
+        "incident_timeline_update_failed",
+        document_id=document_id,
+        error="Edit not confirmed",
+        attempts=TIMELINE_UPDATE_ATTEMPTS,
+    )
+    return False
+
+
+def extract_timeline_section(content):
+    """Return the text between the timeline headings of a document body, or None if a heading is missing."""
     timeline_content = ""
     record = False
     found_start = False
@@ -135,24 +184,17 @@ def find_heading_indices(content, start_heading, end_heading):
     return start_index, end_index
 
 
-# Replace the text between the headings
-def replace_text_between_headings(doc_id, new_content, start_heading, end_heading):
+def build_timeline_replacement(content, new_content, start_heading, end_heading):
+    """Build the batchUpdate requests replacing the text between two headings, or None if a heading is missing.
 
-    content = fetch_document_content(doc_id)
-    if content is None:
-        logger.warning(
-            "replace_text_between_headings_failed",
-            document_id=doc_id,
-            error="Headings not found",
-        )
-        return
-
+    The request indices are only valid against the document body they were computed from.
+    """
     # Find the start and end indices
     start_index, end_index = find_heading_indices(content, start_heading, end_heading)
 
     if start_index is not None and end_index is not None:
         # Delete the existing content from the document
-        requests = [{"deleteContentRange": {"range": {"startIndex": start_index, "endIndex": end_index}}}]
+        requests: list[dict[str, Any]] = [{"deleteContentRange": {"range": {"startIndex": start_index, "endIndex": end_index}}}]
 
         # split the formatted content by the emoji
         line = new_content.split(" ➡ ")
@@ -253,10 +295,10 @@ def replace_text_between_headings(doc_id, new_content, start_heading, end_headin
                         }
                     }
                 )
-        apply_document_edits(doc_id, requests)
-    else:
-        logger.warning(
-            "replace_text_between_headings_failed",
-            document_id=doc_id,
-            error="Headings not found",
-        )
+        return requests
+
+    logger.warning(
+        "build_timeline_replacement_failed",
+        error="Headings not found",
+    )
+    return None

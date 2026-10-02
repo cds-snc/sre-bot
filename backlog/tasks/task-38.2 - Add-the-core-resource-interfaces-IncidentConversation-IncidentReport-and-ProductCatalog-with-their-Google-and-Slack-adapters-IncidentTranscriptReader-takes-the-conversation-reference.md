@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
+updated_date: '2026-10-02 20:51'
 labels:
   - migration
   - phase-5
@@ -49,3 +50,12 @@ Behaviour-preserving: no command, reply or log event visible to users changes. T
 - [ ] #5 No vendor resource configuration or template is read at import time (import the package with no settings and no network)
 - [ ] #6 The legacy_surface suite is green with no assertion change; ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; import-linter ignore entries only shrank
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-02 20:51
+---
+2026-10-02: input for the IncidentReport Google adapter. A production bug fix made the legacy report timeline write revision-guarded (see the TASK-38.5 and TASK-87 comments of this date). When the report interface is defined, an index-based section write should take the snapshot it was computed from and be rejected on a newer revision, as packages/incident/documents/adapters/google_docs.py::apply_document_edits now does with writeControl.requiredRevisionId; a section rendered from the record does not need the read-parse-rewrite round trip at all.
+---
+<!-- COMMENTS:END -->
