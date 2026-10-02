@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-01 14:05'
-updated_date: '2026-10-01 20:28'
+updated_date: '2026-10-02 00:42'
 labels:
   - plugin-architecture
   - features
@@ -68,4 +68,6 @@ Waits for TASK-26.1 (the handlers are re-signed onto the Slack registrar and rep
 
 <!-- SECTION:NOTES:BEGIN -->
 From review (2026-10-01, #1518 and #1519): the reviewer read 'port' as a network port and asked for IncidentChannelReader. The replacement interface this task puts in packages/incident/core/ takes a role name, not a Port suffix (for example IncidentTranscriptReader, since it reads a conversation's transcript; confirm the name at planning), and its provider function follows (no get_..._port). Where this task's description and ACs say 'port', read 'interface'; the ACs are not reworded. Docstrings written here say 'interface'. The same rule for every other Port-suffixed Protocol is TASK-136; IncidentChannelPort is left to this task and excluded there.
+
+From TASK-136 (2026-10-02): TASK-136.2 renames IncidentDocumentPort to IncidentDocumentStore and get_incident_document_port to get_incident_document_store, so where this task's text says IncidentDocumentPort, read IncidentDocumentStore once that slice merges. TASK-136 leaves the 'Summarizer port' / 'Port reading ...' prose in incident_summary (service.py, README.md, platforms/slack.py) alone because this task rewrites that package: write 'interface' there.
 <!-- SECTION:NOTES:END -->

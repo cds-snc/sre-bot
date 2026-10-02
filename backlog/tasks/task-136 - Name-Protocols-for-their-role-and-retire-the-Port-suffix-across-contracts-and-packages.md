@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-01 20:28'
+updated_date: '2026-10-02 00:42'
 labels:
   - plugin-architecture
   - naming
@@ -53,7 +54,21 @@ SIZE. About 20 production files across three areas (contracts/slack, incident, a
 - [ ] #2 SlackReplyPort is renamed to the role name agreed at planning, with every importer rewritten and no alias or re-export left at the old name
 - [ ] #3 IncidentDocumentPort and get_incident_document_port are renamed to role names, unless TASK-135 or TASK-38 already replaced them
 - [ ] #4 The three public and six private Port-suffixed Protocols under packages/access are renamed to role names that do not collide with the concrete classes
-- [ ] #5 rg finds no Protocol class ending in Port and no identifier ending in _port in app/ production code or tests, and docstrings in the touched files say interface instead of port
+- [ ] #5 rg finds no Protocol class ending in Port and no class, function, variable or parameter name ending in _port in app/ production code or tests, except IncidentChannelPort / get_incident_channel_port and the test names that refer to them (TASK-135) and the network-port identifiers in app/bin/dev-token.py, app/modules/webhooks/patterns/aws_sns_notification/auto_mitigation.py and its test; docstrings in the touched files say interface instead of port
 - [ ] #6 No behaviour change: the TASK-36 legacy_surface suite is green before and after with no assertion change
 - [ ] #7 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-02 00:38
+---
+Decomposed 2026-10-02 into TASK-136.1 (naming rule recorded in the type-model-boundaries skill and decisions/feature-packages.md, plus SlackReplyPort rename), TASK-136.2 (incident_draft document interface; depends on 136.1 because both edit incident_draft/platforms/slack.py) and TASK-136.3 (packages/access; new names pending the human, plan intentionally empty). Decisions made by the human in chat 2026-10-02: SlackReplyPort becomes SlackReplySender with no alias or re-export; IncidentDocumentPort becomes IncidentDocumentStore and get_incident_document_port becomes get_incident_document_store in this task, not deferred to TASK-135 or TASK-38; IncidentChannelPort and get_incident_channel_port stay untouched (TASK-135 owns them); the rule is recorded in .claude/skills/type-model-boundaries/SKILL.md and decisions/feature-packages.md because no decision record owns Protocol naming. The access role names and whether the six route-local twins are kept or collapsed are still open. Parent ACs are unchanged and this task stays the coordinator.
+---
+
+created: 2026-10-02 00:42
+---
+Decisions 2026-10-02 (Guillaume Charest, in session): access names are AccessRequestWorkflow, EntitlementCatalog and AccessSynchronizer, with underscore twins and _AccessRequestRouteSettings / _CatalogRouteSettings / _AccessSyncRouteSettings; the route-local twins are kept here and their collapse is noted on TASK-124.1. AC #5 reworded to name its exceptions (TASK-135 names, genuine network ports). Left out of every slice: 'port' prose in incident_summary (TASK-135 rewrites the package; noted there), in decisions/transport-slack.md and decisions/outbound-clients.md, and the module name packages/oncall_sync/ports.py.
+---
+<!-- COMMENTS:END -->
