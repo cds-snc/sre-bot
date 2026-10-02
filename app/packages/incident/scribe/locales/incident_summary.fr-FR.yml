@@ -1,0 +1,7 @@
+incident_summary:
+  description: "Résumer ce qui s'est passé dans ce canal jusqu'à présent, pour quelqu'un qui rejoint l'incident."
+  examples.default: "`/sre incident summarize` - Résumer l'activité récente du canal."
+  examples.since: "`/sre incident summarize --since 2h --limit 100` - Résumer les 2 dernières heures (jusqu'à 100 messages)."
+  result.header: "\U0001F9FE Résumé de l'incident"
+  result.empty_history: "Il n'y a rien à résumer pour le moment dans ce canal."
+  result.error: "\u274C Impossible de générer un résumé pour le moment. Veuillez réessayer sous peu."

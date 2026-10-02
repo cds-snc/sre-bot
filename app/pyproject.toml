@@ -290,6 +290,10 @@ ignore_imports = [
     "packages.incident_draft.adapters.google_docs -> infrastructure.drive",
     "packages.incident_draft.platforms.slack -> infrastructure.i18n",
     "packages.incident_summary.platforms.slack -> infrastructure.i18n",
+    # Temporary: the scribe copies of the four incident_draft and incident_summary entries above; TASK-135.4 deletes the originals.
+    "packages.incident.scribe.adapters.google_docs -> infrastructure.configuration.integrations.google",
+    "packages.incident.scribe.adapters.google_docs -> infrastructure.drive",
+    "packages.incident.scribe.platforms.slack -> infrastructure.i18n",
     "packages.talent.adapters.google_drive -> infrastructure.configuration.integrations.google",
     "packages.talent.adapters.google_drive -> infrastructure.drive.factory",
 ]
@@ -340,6 +344,8 @@ ignore_imports = [
     # Shrink-only: remove an entry when its import is fixed; never add one.
     "packages.incident_draft.service -> integrations.openai",
     "packages.incident_summary.service -> integrations.openai",
+    # Temporary: the scribe copy of the two entries above; TASK-135.4 deletes the originals.
+    "packages.incident.scribe.service -> integrations.openai",
 ]
 
 [[tool.importlinter.contracts]]
@@ -395,7 +401,7 @@ name = "(i) Incident subdomains are independent siblings over core"
 type = "layers"
 containers = ["packages.incident"]
 layers = [
-    "documents | drive | meet | scheduling",
+    "documents | drive | meet | scheduling | scribe",
     "core",
 ]
 exhaustive = true
