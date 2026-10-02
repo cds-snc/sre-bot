@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 15:39'
-updated_date: '2026-10-02 16:47'
+updated_date: '2026-10-02 17:11'
 labels:
   - plugin-architecture
   - features
@@ -119,5 +119,10 @@ BLAST RADIUS AND ROLLBACK
 created: 2026-10-02 16:46
 ---
 2026-10-02: unblocked by TASK-97. The subdomain is packages/incident/scribe (entry point incident.scribe after TASK-124.5). IncidentDocumentStore and IncidentReportLinkLookup stay here; TASK-38.2 moves the document store into core/ behind IncidentReport and retires the link lookup. The only AC text change is the <subdomain> placeholder in AC #4, now scribe; order and wording are otherwise unchanged.
+---
+
+created: 2026-10-02 17:11
+---
+Re-verified TODAY against main at 8bcbf373 (2026-10-02). Since c8de7643 main gained only #1528 (blazer formatter, aws_sns_notification) and #1529 (planning records); git diff c8de7643..8bcbf373 is empty for packages/incident, packages/incident_draft, packages/incident_summary, their unit tests, tests/integration/legacy_surface, app/pyproject.toml and server/. TASK-25.10, TASK-134 and TASK-110 are still To Do and unmerged: the services still import integrations.openai and pyproject declares no entry points. No difference, so step 5's 'or none if TASK-25.10 has already moved the summarizer' does not apply (one merged integrations.openai entry) and step 8's entry-point merge does not apply (TASK-110 unmerged). pyproject lines are as planned: no-host-imports :289-292, integrations-via-adapters :341-342, feature-independence modules :354-355. Step 0 is re-run when this layer starts, on top of layers 1 to 3. Delivery changed: this slice is layer 4 of the TASK-135 stack.
 ---
 <!-- COMMENTS:END -->
