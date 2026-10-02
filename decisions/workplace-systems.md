@@ -61,7 +61,7 @@ Current state:
 
 ## Migration
 
-Tickets: TASK-38 (incident records into storage) and TASK-39 (talent-role records, with the role surface rebuild); TASK-119, TASK-120 and TASK-121 (`directory`, `drive` and `spreadsheets` to `app/capabilities/`).
+Tickets: TASK-38 (incident records into storage, decomposed in [incident-management.md](incident-management.md)) and TASK-39 (talent-role records, with the role surface rebuild); TASK-119, TASK-120 and TASK-121 (`directory`, `drive` and `spreadsheets` to `app/capabilities/`).
 
 Tolerated until then:
 - the three workplace providers in `infrastructure/directory/`, `infrastructure/drive/` and `infrastructure/spreadsheets/`;
@@ -72,3 +72,4 @@ Tolerated until then:
 **Changes:**
 - 2026-09-24: workplace systems are capabilities and infrastructure is hosting only, per plugin-architecture.md.
 - 2026-09-25: Accepted; Migration names its tickets.
+- 2026-10-02: the incident record, its references and its projection are specified in [incident-management.md](incident-management.md) (TASK-97).

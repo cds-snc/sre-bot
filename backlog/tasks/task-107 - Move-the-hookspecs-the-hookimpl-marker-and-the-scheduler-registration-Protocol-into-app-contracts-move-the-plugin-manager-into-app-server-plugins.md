@@ -3,10 +3,10 @@ id: TASK-107
 title: >-
   Move the hookspecs, the hookimpl marker and the scheduler registration
   Protocol into app/contracts/; move the plugin manager into app/server/plugins/
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-24 19:58'
-updated_date: '2026-10-01 16:58'
+updated_date: '2026-10-02 14:59'
 labels:
   - plugin-architecture
   - plugins

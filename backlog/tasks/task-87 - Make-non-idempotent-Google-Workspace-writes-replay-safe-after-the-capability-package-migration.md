@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 13:59'
-updated_date: '2026-09-24 20:11'
+updated_date: '2026-10-02 16:59'
 labels:
   - clients
 dependencies: []
@@ -91,5 +91,15 @@ AC#7 and AC#9 are satisfied by each slice for its own sites.
 created: 2026-09-24 20:11
 ---
 2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). The Drive, Sheets and Directory write paths it names move from app/infrastructure/ to app/capabilities/ (TASK-119, TASK-120, TASK-121). Children that land before a move edit the current home, and the move carries the change mechanically.
+---
+
+created: 2026-10-02 16:46
+---
+2026-10-02 (TASK-97 decided, decisions/incident-management.md): after TASK-38 the incident Google write sites consolidate into features/incident/core/adapters/google_docs.py (report create, placeholder replace, status text, timeline append; absorbs documents and drive), the list projection writer in core/adapters/ (Sheets append and status cell), lifecycle/adapters/ (Meet create) and retrospective/adapters/google_calendar.py (events.insert). Re-scope this task against those four files once TASK-38.2 lands.
+---
+
+created: 2026-10-02 16:59
+---
+2026-10-02 correction: the Calendar events.insert write site lands in app/capabilities/calendar/adapters/google.py (TASK-138), which is the capability-package adapter TASK-87.3 waits for; the incident retrospective subdomain has no calendar adapter.
 ---
 <!-- COMMENTS:END -->

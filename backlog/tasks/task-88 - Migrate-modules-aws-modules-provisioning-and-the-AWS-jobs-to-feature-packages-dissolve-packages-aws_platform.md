@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:36'
-updated_date: '2026-09-28 14:36'
+updated_date: '2026-10-02 16:46'
 labels:
   - phase-5
 dependencies:
@@ -75,5 +75,10 @@ EVENTUAL HOMES (recorded 2026-09-11 so the Google-series pattern of vendor-neutr
 created: 2026-09-14 14:05
 ---
 2026-09-14 (human decision): the AWS access-request flow (aws_access_requests.py, jobs/revoke_aws_sso_access.py) was removed from the feature inventory. It is dead and deleted under TASK-25.2.3.2.4, and packages/access re-provides the capability. ops_group_assignment.py stays in the inventory as its own concern.
+---
+
+created: 2026-10-02 16:46
+---
+2026-10-02 (TASK-97 decided): incident leaves the provisional packages/aws_platform DynamoDB adapter in TASK-38.5, when modules/incident/db_operations.py is deleted and the seam baseline loses its incident entries. That slice is the condition for dissolving packages/aws_platform here.
 ---
 <!-- COMMENTS:END -->

@@ -3,7 +3,7 @@ id: doc-2
 title: Delivery Sequence and Stacked Pull Requests
 type: guide
 created_date: '2026-09-24 20:23'
-updated_date: '2026-10-02 13:31'
+updated_date: '2026-10-02 16:59'
 ---
 # Delivery Sequence and Stacked Pull Requests
 
@@ -64,7 +64,7 @@ TASK-109 (the service registry) is also required before the capability and featu
 
 | Lane | Tasks | Form |
 | --- | --- | --- |
-| Decisions (docs only) | TASK-92 (health model, gates TASK-109), TASK-117 (i18n library, gates TASK-118), TASK-97 (incident architecture, gates TASK-38), TASK-83.1 (identity Draft records), TASK-104 (CLAUDE.md and skills) | single PRs |
+| Decisions (docs only) | TASK-92 (health model, gates TASK-109), TASK-117 (i18n library, gates TASK-118), TASK-97 (incident architecture, gates TASK-38; decided 2026-10-02, decisions/incident-management.md, with the TASK-38.1 to TASK-38.8 packet and the expansion drafts DRAFT-1 to DRAFT-7 that start after this sequence), TASK-83.1 (identity Draft records), TASK-104 (CLAUDE.md and skills) | single PRs |
 | Critical-path prerequisites | TASK-25.4 (Slack client factory and classifier), TASK-24 (vendor settings, SecuritySettings), TASK-35 (sre single registration) -> TASK-36 (legacy-surface inventory and pinning tests for the 8 Slack command hookimpls) | single PRs; TASK-35 (#1512), TASK-36 (#1513) and TASK-25.4 (#1515) have merged |
 | Legacy-surface pinning | TASK-36.1 (hard-coded slash commands and interactions), TASK-36.2 (webhook route), TASK-36.3 (scheduled jobs), each after TASK-36 | parallel single PRs; each gates the rebuilds that change its surface |
 | Storage | TASK-27.1 (vendor-neutral read) | single PR, behaviour change |
@@ -78,9 +78,9 @@ TASK-109 (the service registry) is also required before the capability and featu
 | A: contracts spine | TASK-18 (import-linter) -> TASK-105 (OperationResult envelope) -> TASK-105.1 (drop provider/operation, delete the unused operations classifiers) -> TASK-105.2 (error-code registry) -> TASK-105.3 (clear the call-site mypy errors from TASK-105's optional message) -> TASK-106 (create contracts/, adds the contracts import-linter contract) -> TASK-26.1.1 (Slack command models to contracts/) -> TASK-26.1.2 (Slack lookups behind package adapters) -> TASK-26.1.3 (Slack registrar and reply Protocols; every hookimpl) -> TASK-107.1 (scheduler registration Protocol to contracts/) -> TASK-107.2 (i18n resource spec to contracts/) -> TASK-107.3 (hookspecs and markers to contracts/) -> TASK-107.4 (plugin manager to server/plugins/) | low: configuration, types, codemod moves. TASK-26.1.3 changes every Slack hookimpl signature and gets the closest review. |
 | B: logging | TASK-28.2 -> TASK-28.3 -> TASK-115 (logging setup to server/) | low |
 
-Stack A status (2026-10-02): complete and merged. Part 1 (TASK-18 through TASK-106, #1504-#1511, stack #1506) and part 2 (TASK-26.1.1 through TASK-107.4, #1517-#1519 and #1521-#1524, stack #1520) are on `main`, as are the prerequisites TASK-35 (#1512), TASK-36 (#1513) and TASK-25.4 (#1515). The next critical-path task is TASK-110. Details and the open follow-ups are in doc-3 (Stack A handoff).
+Stack A status (2026-10-02): complete and merged. Part 1 (TASK-18 through TASK-106, #1504-#1511, stack #1506) and part 2 (TASK-26.1.1 through TASK-107.4, #1517-#1519 and #1521-#1524, stack #1520) are on `main`, as are the prerequisites TASK-35 (#1512), TASK-36 (#1513) and TASK-25.4 (#1515). The next critical-path task is TASK-110. The stack's handoff doc was retired on 2026-10-02; its open follow-ups moved to the tasks that own them: TASK-137 (mypy errors in infrastructure/i18n), TASK-110 (the uncalled discovery functions in server/plugins/manager.py, the entry points, and the `PLUGIN_NAMESPACE` check in a real image build) and TASK-67 (stale since TASK-26.1.3).
 
-Stack A review follow-up: TASK-136 (Protocols are named for their role; the `Port` suffix is retired) came out of the review of #1518 and #1519. It ships as three single PRs from `main` with no dependency between the code they touch: TASK-136.1 (the recorded rule, `SlackReplySender`; #1525, merged), TASK-136.2 (`IncidentDocumentStore`; #1526, merged) and TASK-136.3 (packages/access; implemented 2026-10-02, PR not yet opened). `IncidentChannelPort`, its provider function and the test names that go with them are left to TASK-135. Current state is in doc-3.
+Stack A review follow-up: TASK-136 (Protocols are named for their role; the `Port` suffix is retired) came out of the review of #1518 and #1519. It shipped as three single PRs from `main`, all merged: TASK-136.1 (the recorded rule, `SlackReplySender`; #1525), TASK-136.2 (`IncidentDocumentStore`; #1526) and TASK-136.3 (packages/access; #1527). `IncidentChannelPort`, its provider function and the test names that go with them are left to TASK-135.
 
 Single PRs: TASK-28.1; TASK-94 (alarm filters, Terraform) after TASK-28.2; TASK-133 (AWS and Google classifiers emit registry codes) after TASK-105.2, standalone because it changes the codes callers see.
 
@@ -108,9 +108,9 @@ Single PRs: TASK-28.1; TASK-94 (alarm filters, Terraform) after TASK-28.2; TASK-
 
 These are mechanical moves with no dependencies between them. Ship them as parallel single PRs. For a single review sitting, short stacks of two or three are acceptable.
 
-- Capabilities: TASK-119 (directory), TASK-120 (drive), TASK-121 (spreadsheets), TASK-122 (audit), TASK-123 (rotations), TASK-32 (notifications placeholder). TASK-25.7 (Sentinel) follows TASK-122. TASK-25.10 (OpenAI onto the outbound-client contract, creating the text-generation capability) moved here from Wave 2 on 2026-10-01: it now creates a capability, so it waits for TASK-110 and TASK-114 like the others. TASK-134 (structured template fill in that capability) follows it.
-- Features: TASK-124.3 (rant), TASK-124.6 (geolocate), TASK-124.4 (talent), TASK-124.2 (oncall_sync, after TASK-123), TASK-124.5 (incident umbrella, after TASK-120, TASK-134 and TASK-135).
-- Incident reshape, a behaviour-preserving refactor and not a move: TASK-135 (incident_draft and incident_summary become one subdomain over incident/core), after TASK-26.1, TASK-25.10 and the TASK-97 decision. Single PRs, decomposed at planning. It also finishes TASK-136: the replacement for `IncidentChannelPort` takes a role name, and the `_CHANNEL_PORT` / `mock_port` test names are renamed with it (listed in the TASK-135 notes).
+- Capabilities: TASK-119 (directory), TASK-120 (drive), TASK-121 (spreadsheets), TASK-122 (audit), TASK-123 (rotations), TASK-32 (notifications placeholder). TASK-25.7 (Sentinel) follows TASK-122. TASK-25.10 (OpenAI onto the outbound-client contract, creating the text-generation capability) moved here from Wave 2 on 2026-10-01: it now creates a capability, so it waits for TASK-110 and TASK-114 like the others. TASK-134 (structured template fill in that capability) follows it. TASK-138 (calendar capability, from packages/incident/scheduling; TASK-38.6 consumes it) was added on 2026-10-02 by the TASK-97 decision.
+- Features: TASK-124.3 (rant), TASK-124.6 (geolocate), TASK-124.4 (talent), TASK-124.2 (oncall_sync, after TASK-123), TASK-124.5 (incident umbrella with core/ and the scribe subdomain, after TASK-120, TASK-134 and TASK-135; the adapter-only packages documents, drive, meet and scheduling move as they are and are folded in by TASK-38).
+- Incident reshape, a behaviour-preserving refactor and not a move: TASK-135 (incident_draft and incident_summary become the scribe subdomain over incident/core), as TASK-135.1 -> TASK-135.2 and TASK-135.3 (parallel) -> TASK-135.4, after TASK-26.1; TASK-25.10 blocks no slice and the TASK-97 decision (2026-10-02) unblocked TASK-135.4. Standalone single PRs from main, no stack. It also finishes TASK-136: the replacement for `IncidentChannelPort` takes a role name, and the `_CHANNEL_PORT` / `mock_port` test names are renamed with it (listed in the TASK-135 notes).
 
 ### Wave 5: behaviour-changing tracks
 
@@ -119,7 +119,7 @@ These are mechanical moves with no dependencies between them. Ship them as paral
 | Webhooks | Stack F: TASK-37.1 -> TASK-37.2 -> TASK-37.3 (behaviour-preserving, held by the TASK-36.2 pinning tests); then TASK-37.4 (cutover), TASK-47 (HMAC), TASK-48 and TASK-49 in parallel, TASK-37.5 | stack F, then single PRs |
 | Approvals | TASK-60 -> TASK-125 -> TASK-61 -> TASK-30; then TASK-62 and TASK-63; TASK-124.1 (access) after TASK-61 and TASK-30; it also decides whether the route-local Protocol twins kept by TASK-136.3 are collapsed | single PRs |
 | Identity | TASK-83.3 and TASK-83.12 early; TASK-83.2 -> TASK-83.4 -> TASK-83.5 and TASK-83.6 -> TASK-83.7 -> TASK-83.8; TASK-83.9 -> TASK-83.10 after TASK-38 | single PRs |
-| Legacy rebuild by surface | TASK-38 (per the TASK-97 packet), TASK-39, TASK-88, TASK-40, then TASK-41, each held by the TASK-36.1 and TASK-36.3 pinning tests for its surface; TASK-53, TASK-55, TASK-56 and TASK-65 ride with the surfaces that own them | single PRs per surface |
+| Legacy rebuild by surface | TASK-38 as TASK-38.1 (core record and store, after TASK-124.5, TASK-27.2, TASK-108 and TASK-109) -> TASK-38.2 (core resource interfaces) -> TASK-38.3 -> TASK-38.4 -> TASK-38.5 (lifecycle; TASK-38.5 frees packages/aws_platform for TASK-88) with TASK-38.6 (retrospective, after TASK-138) in parallel after TASK-38.2 -> TASK-38.7 (record cutover) -> TASK-38.8 (delete modules/incident); then TASK-39, TASK-88, TASK-40, TASK-41, each held by the TASK-36.1 and TASK-36.3 pinning tests for its surface; TASK-53, TASK-55, TASK-56 and TASK-65 ride with the surfaces that own them. The incident expansion drafts under TASK-97 (metrics replacement, products as records, the external case recorder and DFIR-IRIS adapter, inbound case events, second-suite adapters, the updates command, retro meeting management and retro action items as records) start only after this sequence is finished | single PRs per surface; each cutover is a standalone merge |
 
 ## Standalone merges
 

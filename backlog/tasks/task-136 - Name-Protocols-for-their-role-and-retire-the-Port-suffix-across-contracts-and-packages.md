@@ -3,10 +3,10 @@ id: TASK-136
 title: >-
   Name Protocols for their role and retire the Port suffix across contracts and
   packages
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-01 20:28'
-updated_date: '2026-10-02 13:42'
+updated_date: '2026-10-02 15:10'
 labels:
   - plugin-architecture
   - naming
@@ -85,5 +85,10 @@ Decision 2026-10-02 (Guillaume Charest, in session) on the AC #5 leftovers: the 
 created: 2026-10-02 13:40
 ---
 Parent ACs checked 2026-10-02 against the working tree (f182ecd2 plus the uncommitted TASK-136.3 change). #1: rule present in .claude/skills/type-model-boundaries/SKILL.md (:24-25) and decisions/feature-packages.md (:85, change log :130), merged with #1525. #2: SlackReplyPort has no definition, importer or alias in app/ (one string in the test that asserts its absence), #1525. #3: #1526. #4: TASK-136.3, not yet merged. #5: the only matches left are the exceptions the AC names: IncidentChannelPort (2 classes), get_incident_channel_port (12), the test names that refer to them (_CHANNEL_PORT 5, mock_port 6; assigned to TASK-135), and network ports (DEV_JWKS_PORT in app/bin/dev-token.py, test_auto_mitigation_handler_extracts_port). #6 and #7: legacy_surface 17 passed with no assertion change; ruff clean, import contracts 8 kept, 2858 and 760 tests passed, mypy unchanged in touched files (evidence in the TASK-136.3 notes). #4, #6 and #7 hold on main only once TASK-136.3 merges. Status left for the human.
+---
+
+created: 2026-10-02 15:07
+---
+When to close (2026-10-02, after #1527 merged): all three slices are on main (TASK-136.1 #1525, TASK-136.2 #1526, TASK-136.3 #1527) and all seven ACs are checked, so this task can be set to Done now. AC #5 is met as worded: what is left in app/ is exactly the exceptions it names. The remaining jargon names (IncidentChannelPort, get_incident_channel_port, and the _CHANNEL_PORT / mock_port test names with one test name and two docstrings) are owned by TASK-135, whose implementation notes list them with line references, so keeping this task open until TASK-135 would track the same work twice. The network-port identifiers (app/bin/dev-token.py, the auto_mitigation module and its test) are legitimate and stay. The Stack A handoff doc that carried this question was retired the same day.
 ---
 <!-- COMMENTS:END -->

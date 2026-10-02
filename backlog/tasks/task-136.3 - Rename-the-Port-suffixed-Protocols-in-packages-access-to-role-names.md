@@ -1,10 +1,10 @@
 ---
 id: TASK-136.3
 title: Rename the Port-suffixed Protocols in packages/access to role names
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-02 00:38'
-updated_date: '2026-10-02 13:23'
+updated_date: '2026-10-02 15:09'
 labels:
   - plugin-architecture
   - naming

@@ -1,10 +1,10 @@
 ---
 id: TASK-136.1
 title: Record the Protocol naming rule and rename SlackReplyPort to SlackReplySender
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-02 00:37'
-updated_date: '2026-10-02 00:47'
+updated_date: '2026-10-02 14:59'
 labels:
   - plugin-architecture
   - naming

@@ -3,10 +3,10 @@ id: TASK-26.1.2
 title: >-
   Move Slack lookups in rant, incident_draft and incident_summary behind package
   adapters
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-29 20:19'
-updated_date: '2026-10-01 12:48'
+updated_date: '2026-10-02 14:58'
 labels:
   - plugin-architecture
   - slack

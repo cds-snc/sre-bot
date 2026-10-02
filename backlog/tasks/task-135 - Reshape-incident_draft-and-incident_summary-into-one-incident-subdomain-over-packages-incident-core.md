@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-01 14:05'
-updated_date: '2026-10-02 13:28'
+updated_date: '2026-10-02 16:46'
 labels:
   - plugin-architecture
   - features
@@ -64,6 +64,35 @@ Waits for TASK-26.1 (the handlers are re-signed onto the Slack registrar and rep
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; import-linter ignore entries only shrank
 <!-- AC:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Decomposed for the single-PR size gate (as one change: about 30 production files across two packages, a new core/ and the import contracts, mixing a refactor with a package move). Four subtasks, each its own branch and PR:
+- TASK-135.1: add packages/incident/core/ (TranscriptMessage, IncidentTranscriptReader, its provider and Slack adapter) and the incident umbrella layers contract. Nothing consumes it yet.
+- TASK-135.2: incident_summary onto core. The service gathers through core/api.py, the handler makes one service call, and the package's channel interface, adapter and provider are deleted.
+- TASK-135.3: incident_draft onto core, the same way, keeping a draft-only IncidentReportLinkLookup for the report bookmark.
+- TASK-135.4: merge both packages into one subdomain under packages/incident/ and delete them. Mechanical move.
+
+Why not the three slices the description suggests: 'core/ plus both packages repointed' alone is about 17 production files, and repointing the handlers first and moving the gathering second would rewrite the same handler code and tests twice. Cutting per package keeps each PR inside the gate and touches each handler once.
+
+Order and blockers: 135.1 first; 135.2 and 135.3 are independent of each other and both follow 135.1; 135.4 follows both and is blocked on the TASK-97 decision for the subdomain's name. TASK-26.1 is done. TASK-25.10 blocks no slice: the summarizer call is not touched by the reshape, and whichever of the two lands second updates its import path and one import-linter entry.
+
+Delivery (doc-2): standalone single PRs from main, no stack. 135.2 and 135.3 do not build on each other, and 135.4 waits on work outside the chain.
+
+Decisions (human, 2026-10-02):
+- The replacement for IncidentChannelPort is IncidentTranscriptReader, provider get_incident_transcript_reader.
+- Filtering of the bot's own and system messages is a caller choice on the reader: draft filters and summarize does not, as today.
+- The report-bookmark lookup stays out of core/ as the draft-only IncidentReportLinkLookup; report resolution belongs to the TASK-97 packet.
+- packages/incident/documents, drive and meet do not fold into core/ here (TASK-38).
+- 135.2 and 135.3 each add one temporary feature-independence ignore entry, both removed by 135.4.
+- The merged subdomain has one service.py.
+- draft_incident_document and summarize_transcript keep their signatures; the legacy_surface suite stubs them and asserts their positional arguments, so a gathering function is added above each.
+
+AC map: #1 -> 135.1; #2 -> 135.1 (contract with core and the existing siblings) and 135.4 (the subdomain added); #3 -> 135.2 and 135.3 (one service call, gathering in the service) and 135.4 (one subdomain); #4 -> 135.2 and 135.3 (duplicates removed, one TranscriptMessage) and 135.4 (packages deleted); #5 and #6 -> every slice. The test-name renames from the TASK-136 notes land in 135.2 (incident_summary) and 135.3 (incident_draft). This task is done when its four subtasks are done.
+
+Subdomain name (TASK-97, 2026-10-02): scribe. TASK-135.4 is unblocked.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -77,3 +106,12 @@ From TASK-136 (2026-10-02, human decision): the test-side names for the channel 
 - tests/integration/legacy_surface/conftest.py patches get_incident_channel_port (2 occurrences); it follows the provider-function rename.
 Name them after the role name chosen for the replacement interface (for example _CHANNEL_READER / mock_reader if it is a Reader). When this task is done, rg -i 'port' over the incident tests and packages must find nothing; if any of these tests survive the reshape under a new path, the rename goes with them. This is what closes TASK-136 AC #5, whose only remaining exceptions are then genuine network ports (app/bin/dev-token.py, the aws_sns_notification auto_mitigation module and its test), which stay as they are.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-02 16:46
+---
+2026-10-02 (TASK-97 decided, decisions/incident-management.md): the merged subdomain is scribe; TASK-135.4 is unblocked. Answers to the questions this task left to the packet: IncidentDocumentStore moves into core/ as the Google adapter behind the IncidentReport interface in TASK-38.2, and IncidentReportLinkLookup is retired there (scribe reads the report reference from the record after find_incident_for_conversation); IncidentTranscriptReader keeps the conversation id string through 135.1 to 135.4 and takes a ConversationReference in TASK-38.2; packages/incident/documents, drive, meet and scheduling fold into core/, lifecycle/ and retrospective/ in TASK-38.2, 38.3 and 38.6, never here.
+---
+<!-- COMMENTS:END -->

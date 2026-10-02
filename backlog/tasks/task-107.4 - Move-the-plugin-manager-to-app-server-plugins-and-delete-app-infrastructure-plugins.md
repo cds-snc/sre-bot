@@ -3,10 +3,10 @@ id: TASK-107.4
 title: >-
   Move the plugin manager to app/server/plugins/ and delete
   app/infrastructure/plugins/
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-01 14:47'
-updated_date: '2026-10-01 16:58'
+updated_date: '2026-10-02 14:59'
 labels:
   - plugin-architecture
   - plugins
