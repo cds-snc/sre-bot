@@ -420,7 +420,7 @@ def _fill_section_requests(
                 {
                     "createNamedRange": {
                         "name": name,
-                        "range": {"startIndex": insert_at, "endIndex": insert_at + len(inline_text)},
+                        "range": {"startIndex": insert_at, "endIndex": insert_at + _utf16_len(inline_text)},
                     }
                 }
             )
@@ -595,7 +595,7 @@ def _inline_label_spans(document: dict, span: tuple[int, int]) -> dict[str, tupl
         if not separator or not key or len(key.split()) > 6 or len(key) > 40:
             continue
         if key not in labels:
-            value_start = element_start + len(label) + 1
+            value_start = element_start + _utf16_len(label) + 1
             labels[key] = (value_start, max(value_start, element_end - 1), bool(value.strip()))
     return labels
 
@@ -983,7 +983,7 @@ def _doubled_value_repairs(document: dict) -> list[tuple[int, list[dict[str, Any
         if single is None:
             continue
 
-        value_start = element_start + len(label) + 1
+        value_start = element_start + _utf16_len(label) + 1
         value_end = max(value_start, element_end - 1)
         if value_end <= value_start:
             continue
@@ -1066,7 +1066,7 @@ def _field_spans(document: dict) -> dict[str, tuple[int, int]]:
 
         label = label.strip()
         if label and label not in spans:
-            value_start = start_index + len(text.split(":", 1)[0]) + 1
+            value_start = start_index + _utf16_len(text.split(":", 1)[0]) + 1
             spans[label] = (value_start, max(value_start, end_index - 1))
     return spans
 
@@ -1151,7 +1151,7 @@ class _RequestBuilder:
         """Insert ``text`` at the running index and style the range it occupies."""
         if not text:
             return
-        start, end = self._index, self._index + len(text)
+        start, end = self._index, self._index + _utf16_len(text)
         self._requests.append({"insertText": {"location": {"index": start}, "text": text}})
         self._requests.append(_paragraph_style_request(start, end, named_style, indent_pt=indent_pt))
         if italic or muted or bold:
@@ -1230,6 +1230,16 @@ def _strip_markdown(text: str) -> str:
     return text.strip()
 
 
+def _utf16_len(text: str) -> int:
+    """Return the length of ``text`` in UTF-16 code units.
+
+    Google Docs indexes count UTF-16 code units, while ``len`` counts code
+    points: a character outside the Basic Multilingual Plane (most emoji)
+    takes two units, so index arithmetic done with ``len`` drifts after it.
+    """
+    return len(text.encode("utf-16-le")) // 2
+
+
 def _pr_link_requests(text: str, start: int, links: Mapping[str, str]) -> list[dict[str, Any]]:
     """Hyperlink every pull request the drafted text names.
 
@@ -1246,7 +1256,10 @@ def _pr_link_requests(text: str, start: int, links: Mapping[str, str]) -> list[d
         requests.append(
             {
                 "updateTextStyle": {
-                    "range": {"startIndex": start + match.start(), "endIndex": start + match.end()},
+                    "range": {
+                        "startIndex": start + _utf16_len(text[: match.start()]),
+                        "endIndex": start + _utf16_len(text[: match.end()]),
+                    },
                     "textStyle": {"link": {"url": url}},
                     "fields": "link",
                 }

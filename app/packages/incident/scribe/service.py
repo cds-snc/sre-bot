@@ -388,6 +388,7 @@ async def draft_incident_document(
             status=result.status,
             message=result.message or "Incident draft summarizer failed",
             error_code=result.error_code,
+            retry_after=result.retry_after,
         )
 
     raw = result.data or ""

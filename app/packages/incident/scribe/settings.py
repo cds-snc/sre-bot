@@ -34,8 +34,9 @@ class IncidentDraftSettings(BaseSettings):
     # Drafting emits one JSON object covering every section of the report --
     # timelines, Q&A chains, bulleted retrospectives -- so it needs far more
     # completion budget than a single catch-up summary (the vendor default of
-    # 800 truncates the JSON mid-object). A truncated run is discarded rather
-    # than written, so this being generous costs little.
+    # 800 truncates the JSON mid-object). A truncated run still writes a draft
+    # from the sections that arrived whole, marked partial, but the later
+    # sections are missing from it, so the budget is kept generous.
     MAX_OUTPUT_TOKENS: int = Field(default=4000, alias="INCIDENT_DRAFT__MAX_OUTPUT_TOKENS")
 
 

@@ -214,6 +214,13 @@ class TestToSlackMrkdwn:
     def test_mixed_dash_and_bullet_markers_collapse(self):
         assert _to_slack_mrkdwn("- \u2022 item") == "\u2022 item"
 
+    def test_asterisk_bullet_becomes_slack_bullet(self):
+        # A Markdown "* item" line is a bullet; the asterisk is followed by whitespace.
+        assert _to_slack_mrkdwn("* item") == "\u2022 item"
+
+    def test_asterisk_bullet_keeps_bold_text_inside_the_item(self):
+        assert _to_slack_mrkdwn("* **Next step**: roll back") == "\u2022 *Next step*: roll back"
+
     def test_bold_title_line_is_preserved_not_treated_as_bullet(self):
         # A standalone *bold* title must not be mistaken for a bullet marker.
         assert _to_slack_mrkdwn("*Key events*") == "*Key events*"

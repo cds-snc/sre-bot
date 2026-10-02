@@ -17,6 +17,11 @@ _CLIENT = "packages.incident.scribe.adapters.google_docs.google_workspace_client
 _RESOURCES = "packages.incident.scribe.adapters.google_docs.get_google_resources_config"
 
 
+def _utf16_units(text: str) -> int:
+    """Length of ``text`` in UTF-16 code units, the unit Google Docs indexes count in."""
+    return len(text.encode("utf-16-le")) // 2
+
+
 def _http_error(status: int) -> HttpError:
     """An ``HttpError`` carrying the status the Drive API would have returned."""
 
@@ -811,6 +816,32 @@ class TestPullRequestHyperlinks:
         text, base = insert["text"], insert["location"]["index"]
         span = linked[0]["range"]
         assert text[span["startIndex"] - base : span["endIndex"] - base] == "PR 1898"
+
+    def test_link_range_counts_utf16_code_units_after_an_emoji(self, docs_service):
+        """Docs indexes are UTF-16 code units, so an emoji before the reference moves the link by two."""
+        requests = self._run(docs_service, "\U0001f525 Guillaume opened PR 1898.")
+
+        (linked,) = self._links_in(requests)
+        insert = self._insert_of(requests, "PR 1898")
+        text, base = insert["text"], insert["location"]["index"]
+        offset = _utf16_units(text[: text.index("PR 1898")])
+        assert linked["range"] == {"startIndex": base + offset, "endIndex": base + offset + len("PR 1898")}
+
+    def test_text_after_an_emoji_line_is_inserted_past_its_utf16_length(self, docs_service):
+        """The running insert index advances by UTF-16 code units, so later inserts and styles do not drift."""
+        requests = self._run(docs_service, "\U0001f525 Checkout was down.\nRolled back the deploy.", links={})
+
+        first = self._insert_of(requests, "Checkout was down")
+        second = self._insert_of(requests, "Rolled back")
+        start = first["location"]["index"]
+        end = start + _utf16_units(first["text"])
+        assert second["location"]["index"] == end
+        styled = [
+            r["updateParagraphStyle"]["range"]
+            for r in requests
+            if r.get("updateParagraphStyle", {}).get("range", {}).get("startIndex") == start
+        ]
+        assert styled == [{"startIndex": start, "endIndex": end}]
 
     def test_hash_and_case_variants_are_recognised(self, docs_service):
         requests = self._run(docs_service, "See pr #1898 for the fix.")

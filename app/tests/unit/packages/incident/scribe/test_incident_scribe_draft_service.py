@@ -123,6 +123,20 @@ class TestDraftIncidentDocument:
         assert summarizer.calls == 0
 
     @pytest.mark.asyncio
+    async def test_summarizer_error_keeps_its_status_code_and_retry_hint(self):
+        """A rate-limited summarizer result reaches the caller with the upstream retry hint intact."""
+        documents = _StubIncidentDocumentStore(sections=_sections())
+        summarizer = _StubSummarizer(
+            OperationResult.transient_error(message="rate limited", error_code="RATE_LIMITED", retry_after=30.0)
+        )
+
+        result = await draft_incident_document("D1", _MESSAGES, documents=documents, summarizer=summarizer)
+
+        assert result.status == OperationStatus.TRANSIENT_ERROR
+        assert result.error_code == "RATE_LIMITED"
+        assert result.retry_after == 30.0
+
+    @pytest.mark.asyncio
     async def test_prompt_carries_each_headings_instructions_and_the_transcript(self):
         documents = _StubIncidentDocumentStore(sections=_sections())
         summarizer = _StubSummarizer(OperationResult.success(data='{"Trigger": "A bad deploy."}'))

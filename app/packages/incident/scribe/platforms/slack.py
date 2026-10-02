@@ -437,7 +437,8 @@ def _to_slack_mrkdwn(text: str) -> str:
             continue
 
         # Collapse any run of bullet markers (-, *, +, •) into a single "• ".
-        bullet = re.match(r"^(?:[-+\u2022]\s*)+(.*)$", stripped)
+        # "*" counts only when whitespace follows, so a "*bold title*" line is kept.
+        bullet = re.match(r"^(?:[-+\u2022]\s*|\*\s+)+(.*)$", stripped)
         if bullet:
             content = bullet.group(1).strip()
             stripped = f"\u2022 {content}" if content else "\u2022"
