@@ -47,14 +47,14 @@ router = APIRouter(prefix="/access", tags=["Access Sync"])
 # ---------------------------------------------------------------------------
 
 
-class _AccessSyncSettingsPort(Protocol):
+class _AccessSyncRouteSettings(Protocol):
     """Structural contract for the settings object consumed by route handlers."""
 
     enabled: bool
     job_ttl_seconds: int
 
 
-class _AccessSyncApplicationServicePort(Protocol):
+class _AccessSynchronizer(Protocol):
     """Structural contract for application service methods consumed by routes."""
 
     def sync_user(
@@ -86,13 +86,13 @@ def _http_error_from_enqueue(error_code: str, message: str) -> HTTPException:
 
 
 def _resolve_coordinator(
-    coordinator: _AccessSyncApplicationServicePort | None,
-) -> _AccessSyncApplicationServicePort:
+    coordinator: _AccessSynchronizer | None,
+) -> _AccessSynchronizer:
     """Resolve coordinator lazily after feature-gate checks."""
     return coordinator if coordinator is not None else get_access_sync_coordinator()
 
 
-def _noop_coordinator() -> _AccessSyncApplicationServicePort | None:
+def _noop_coordinator() -> _AccessSynchronizer | None:
     """No-op dependency used to defer coordinator assembly until after gating."""
     return None
 
@@ -122,9 +122,9 @@ def _noop_coordinator() -> _AccessSyncApplicationServicePort | None:
 def sync_endpoint(
     request: AccessSyncRequest,
     response: Response,
-    settings: Annotated[_AccessSyncSettingsPort, Depends(get_access_sync_settings)],
+    settings: Annotated[_AccessSyncRouteSettings, Depends(get_access_sync_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-sync"])],
-    coordinator: Annotated[_AccessSyncApplicationServicePort | None, Depends(_noop_coordinator)] = None,
+    coordinator: Annotated[_AccessSynchronizer | None, Depends(_noop_coordinator)] = None,
 ) -> UserSyncJobAcceptedResponse | PlatformSyncJobAcceptedResponse:
     """Enqueue an on-demand user sync or a full platform sync job."""
     log = logger.bind(

@@ -31,13 +31,13 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/access/catalog", tags=["Access Catalog"])
 
 
-class _CatalogSettingsPort(Protocol):
+class _CatalogRouteSettings(Protocol):
     """Structural contract for settings consumed by route handlers."""
 
     enabled: bool
 
 
-class _CatalogServicePort(Protocol):
+class _EntitlementCatalog(Protocol):
     """Structural contract for catalog service consumed by route handlers."""
 
     def list_platforms(self) -> OperationResult[list[PlatformSummary]]: ...
@@ -63,13 +63,13 @@ def _map_status(status: OperationStatus) -> int:
 
 
 def _resolve_catalog_service(
-    service: _CatalogServicePort | None,
-) -> _CatalogServicePort:
+    service: _EntitlementCatalog | None,
+) -> _EntitlementCatalog:
     """Resolve catalog service lazily after feature-gate checks."""
     return service if service is not None else get_catalog_service()
 
 
-def _noop_catalog_service() -> _CatalogServicePort | None:
+def _noop_catalog_service() -> _EntitlementCatalog | None:
     """No-op dependency used to defer heavy service assembly until after gating."""
     return None
 
@@ -85,9 +85,9 @@ def _noop_catalog_service() -> _CatalogServicePort | None:
     },
 )
 def list_platforms(
-    settings: Annotated[_CatalogSettingsPort, Depends(get_catalog_settings)],
+    settings: Annotated[_CatalogRouteSettings, Depends(get_catalog_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-catalog"])],
-    service: Annotated[_CatalogServicePort | None, Depends(_noop_catalog_service)] = None,
+    service: Annotated[_EntitlementCatalog | None, Depends(_noop_catalog_service)] = None,
 ) -> PlatformListResponse:
     """List all configured platforms."""
     log = logger.bind(
@@ -127,9 +127,9 @@ def list_platforms(
 )
 def list_entitlements(
     platform: str,
-    settings: Annotated[_CatalogSettingsPort, Depends(get_catalog_settings)],
+    settings: Annotated[_CatalogRouteSettings, Depends(get_catalog_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-catalog"])],
-    service: Annotated[_CatalogServicePort | None, Depends(_noop_catalog_service)] = None,
+    service: Annotated[_EntitlementCatalog | None, Depends(_noop_catalog_service)] = None,
 ) -> EntitlementListResponse:
     """List entitlements for a platform with membership annotation."""
     log = logger.bind(

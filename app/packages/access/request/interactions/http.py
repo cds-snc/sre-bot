@@ -8,7 +8,7 @@ Five endpoints:
     GET    /api/v1/access/requests/{request_id}             — status + history.
 
 Handlers validate the incoming body, delegate to the service via
-``AccessRequestServicePort``, and map ``OperationResult`` to HTTP.
+``AccessRequestWorkflow``, and map ``OperationResult`` to HTTP.
 No business logic lives here.
 """
 
@@ -40,13 +40,13 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/access/requests", tags=["Access Requests"])
 
 
-class _AccessRequestSettingsPort(Protocol):
+class _AccessRequestRouteSettings(Protocol):
     """Structural contract for settings consumed by route handlers."""
 
     enabled: bool
 
 
-class _AccessRequestServicePort(Protocol):
+class _AccessRequestWorkflow(Protocol):
     """Structural contract for service methods consumed by route handlers."""
 
     def submit_request(
@@ -151,13 +151,13 @@ def _build_request_response(
 
 
 def _resolve_service(
-    service: _AccessRequestServicePort | None,
-) -> _AccessRequestServicePort:
+    service: _AccessRequestWorkflow | None,
+) -> _AccessRequestWorkflow:
     """Resolve the request service lazily after feature-gate checks."""
     return service if service is not None else get_access_request_service()
 
 
-def _noop_request_service() -> _AccessRequestServicePort | None:
+def _noop_request_service() -> _AccessRequestWorkflow | None:
     """No-op dependency used to defer heavy service assembly until after gating."""
     return None
 
@@ -181,9 +181,9 @@ def _noop_request_service() -> _AccessRequestServicePort | None:
 )
 def submit_request(
     body: SubmitAccessRequestBody,
-    settings: Annotated[_AccessRequestSettingsPort, Depends(get_access_request_settings)],
+    settings: Annotated[_AccessRequestRouteSettings, Depends(get_access_request_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
-    service: Annotated[_AccessRequestServicePort | None, Depends(_noop_request_service)] = None,
+    service: Annotated[_AccessRequestWorkflow | None, Depends(_noop_request_service)] = None,
 ) -> SubmitAccessRequestResponse:
     """Submit a new access request."""
     if not settings.enabled:
@@ -246,9 +246,9 @@ def submit_request(
 def approve_request(
     request_id: str,
     body: ApproveRequestBody,
-    settings: Annotated[_AccessRequestSettingsPort, Depends(get_access_request_settings)],
+    settings: Annotated[_AccessRequestRouteSettings, Depends(get_access_request_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
-    service: Annotated[_AccessRequestServicePort | None, Depends(_noop_request_service)] = None,
+    service: Annotated[_AccessRequestWorkflow | None, Depends(_noop_request_service)] = None,
 ) -> AccessRequestStatusResponse:
     """Submit an approval decision for a pending access request."""
     if not settings.enabled:
@@ -296,9 +296,9 @@ def approve_request(
 def reject_request(
     request_id: str,
     body: RejectRequestBody,
-    settings: Annotated[_AccessRequestSettingsPort, Depends(get_access_request_settings)],
+    settings: Annotated[_AccessRequestRouteSettings, Depends(get_access_request_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
-    service: Annotated[_AccessRequestServicePort | None, Depends(_noop_request_service)] = None,
+    service: Annotated[_AccessRequestWorkflow | None, Depends(_noop_request_service)] = None,
 ) -> AccessRequestStatusResponse:
     """Submit a rejection decision for a pending access request."""
     if not settings.enabled:
@@ -346,9 +346,9 @@ def reject_request(
 def cancel_request(
     request_id: str,
     body: CancelRequestBody,
-    settings: Annotated[_AccessRequestSettingsPort, Depends(get_access_request_settings)],
+    settings: Annotated[_AccessRequestRouteSettings, Depends(get_access_request_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
-    service: Annotated[_AccessRequestServicePort | None, Depends(_noop_request_service)] = None,
+    service: Annotated[_AccessRequestWorkflow | None, Depends(_noop_request_service)] = None,
 ) -> AccessRequestStatusResponse:
     """Cancel a pending access request (requester only)."""
     if not settings.enabled:
@@ -401,9 +401,9 @@ def cancel_request(
 def retry_request(
     request_id: str,
     body: RetryRequestBody,
-    settings: Annotated[_AccessRequestSettingsPort, Depends(get_access_request_settings)],
+    settings: Annotated[_AccessRequestRouteSettings, Depends(get_access_request_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
-    service: Annotated[_AccessRequestServicePort | None, Depends(_noop_request_service)] = None,
+    service: Annotated[_AccessRequestWorkflow | None, Depends(_noop_request_service)] = None,
 ) -> AccessRequestStatusResponse:
     """Retry IDP provisioning for a failed access request."""
     if not settings.enabled:
@@ -448,9 +448,9 @@ def retry_request(
 )
 def get_request_status(
     request_id: str,
-    settings: Annotated[_AccessRequestSettingsPort, Depends(get_access_request_settings)],
+    settings: Annotated[_AccessRequestRouteSettings, Depends(get_access_request_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
-    service: Annotated[_AccessRequestServicePort | None, Depends(_noop_request_service)] = None,
+    service: Annotated[_AccessRequestWorkflow | None, Depends(_noop_request_service)] = None,
 ) -> AccessRequestStatusResponse:
     """Fetch request status, resolved approvers, and decision history."""
     if not settings.enabled:

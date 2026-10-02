@@ -3,10 +3,10 @@ id: TASK-136
 title: >-
   Name Protocols for their role and retire the Port suffix across contracts and
   packages
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-01 20:28'
-updated_date: '2026-10-02 00:42'
+updated_date: '2026-10-02 13:42'
 labels:
   - plugin-architecture
   - naming
@@ -50,13 +50,13 @@ SIZE. About 20 production files across three areas (contracts/slack, incident, a
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The naming rule (Protocols named for their role, no Port suffix, 'interface' in prose) is recorded in the type-model-boundaries skill and in the decision record that owns package structure
-- [ ] #2 SlackReplyPort is renamed to the role name agreed at planning, with every importer rewritten and no alias or re-export left at the old name
-- [ ] #3 IncidentDocumentPort and get_incident_document_port are renamed to role names, unless TASK-135 or TASK-38 already replaced them
-- [ ] #4 The three public and six private Port-suffixed Protocols under packages/access are renamed to role names that do not collide with the concrete classes
-- [ ] #5 rg finds no Protocol class ending in Port and no class, function, variable or parameter name ending in _port in app/ production code or tests, except IncidentChannelPort / get_incident_channel_port and the test names that refer to them (TASK-135) and the network-port identifiers in app/bin/dev-token.py, app/modules/webhooks/patterns/aws_sns_notification/auto_mitigation.py and its test; docstrings in the touched files say interface instead of port
-- [ ] #6 No behaviour change: the TASK-36 legacy_surface suite is green before and after with no assertion change
-- [ ] #7 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 The naming rule (Protocols named for their role, no Port suffix, 'interface' in prose) is recorded in the type-model-boundaries skill and in the decision record that owns package structure
+- [x] #2 SlackReplyPort is renamed to the role name agreed at planning, with every importer rewritten and no alias or re-export left at the old name
+- [x] #3 IncidentDocumentPort and get_incident_document_port are renamed to role names, unless TASK-135 or TASK-38 already replaced them
+- [x] #4 The three public and six private Port-suffixed Protocols under packages/access are renamed to role names that do not collide with the concrete classes
+- [x] #5 rg finds no Protocol class ending in Port and no class, function, variable or parameter name ending in _port in app/ production code or tests, except IncidentChannelPort / get_incident_channel_port and the test names that refer to them (TASK-135) and the network-port identifiers in app/bin/dev-token.py, app/modules/webhooks/patterns/aws_sns_notification/auto_mitigation.py and its test; docstrings in the touched files say interface instead of port
+- [x] #6 No behaviour change: the TASK-36 legacy_surface suite is green before and after with no assertion change
+- [x] #7 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Comments
@@ -70,5 +70,20 @@ Decomposed 2026-10-02 into TASK-136.1 (naming rule recorded in the type-model-bo
 created: 2026-10-02 00:42
 ---
 Decisions 2026-10-02 (Guillaume Charest, in session): access names are AccessRequestWorkflow, EntitlementCatalog and AccessSynchronizer, with underscore twins and _AccessRequestRouteSettings / _CatalogRouteSettings / _AccessSyncRouteSettings; the route-local twins are kept here and their collapse is noted on TASK-124.1. AC #5 reworded to name its exceptions (TASK-135 names, genuine network ports). Left out of every slice: 'port' prose in incident_summary (TASK-135 rewrites the package; noted there), in decisions/transport-slack.md and decisions/outbound-clients.md, and the module name packages/oncall_sync/ports.py.
+---
+
+created: 2026-10-02 13:23
+---
+TASK-136.3 implemented 2026-10-02 (uncommitted, awaiting PR). Repo-wide check for parent AC #5 on that tree: 'class \w+Port' matches only IncidentChannelPort (incident_draft/service.py, incident_summary/service.py); identifiers ending in _port are get_incident_channel_port, mock_port in test_incident_draft_slack.py and test_incident_summary_slack.py (mocks of the channel interface, TASK-135's files), and the network-port test name in test_auto_mitigation.py. Parent ACs are left unchecked for the human.
+---
+
+created: 2026-10-02 13:28
+---
+Decision 2026-10-02 (Guillaume Charest, in session) on the AC #5 leftovers: the network-port identifiers (app/bin/dev-token.py, auto_mitigation and its test) are legitimate and stay. The _CHANNEL_PORT constants, mock_port variables, the test name ..._with_channel_port_... and the 'fake incident channel port' docstrings in test_incident_draft_slack.py and test_incident_summary_slack.py are jargon and must be renamed; they are assigned to TASK-135 along with IncidentChannelPort / get_incident_channel_port, and recorded in its implementation notes with line references.
+---
+
+created: 2026-10-02 13:40
+---
+Parent ACs checked 2026-10-02 against the working tree (f182ecd2 plus the uncommitted TASK-136.3 change). #1: rule present in .claude/skills/type-model-boundaries/SKILL.md (:24-25) and decisions/feature-packages.md (:85, change log :130), merged with #1525. #2: SlackReplyPort has no definition, importer or alias in app/ (one string in the test that asserts its absence), #1525. #3: #1526. #4: TASK-136.3, not yet merged. #5: the only matches left are the exceptions the AC names: IncidentChannelPort (2 classes), get_incident_channel_port (12), the test names that refer to them (_CHANNEL_PORT 5, mock_port 6; assigned to TASK-135), and network ports (DEV_JWKS_PORT in app/bin/dev-token.py, test_auto_mitigation_handler_extracts_port). #6 and #7: legacy_surface 17 passed with no assertion change; ruff clean, import contracts 8 kept, 2858 and 760 tests passed, mypy unchanged in touched files (evidence in the TASK-136.3 notes). #4, #6 and #7 hold on main only once TASK-136.3 merges. Status left for the human.
 ---
 <!-- COMMENTS:END -->

@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 
-class CatalogServicePort(Protocol):
+class EntitlementCatalog(Protocol):
     """Structural contract for the catalog service consumed by route handlers."""
 
     def list_platforms(self) -> OperationResult[list[PlatformSummary]]: ...

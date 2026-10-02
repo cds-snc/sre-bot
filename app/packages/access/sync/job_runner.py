@@ -25,7 +25,7 @@ from datetime import UTC, datetime
 import structlog
 
 from infrastructure.idempotency import IdempotencyStore
-from packages.access.sync.application import AccessSyncApplicationServicePort
+from packages.access.sync.application import AccessSynchronizer
 from packages.access.sync.domain import ReconciliationOutcome, SyncOutcome
 from packages.access.sync.job_models import (
     CompletedPlatformRecord,
@@ -53,7 +53,7 @@ logger = structlog.get_logger()
 
 
 def run_user_sync_job(
-    coordinator: AccessSyncApplicationServicePort,
+    coordinator: AccessSynchronizer,
     job_status_store: JobStatusStore,
     lock_store: IdempotencyStore,
     job_id: str,
@@ -135,7 +135,7 @@ def run_user_sync_job(
 
 
 def run_platform_sync_job(
-    coordinator: AccessSyncApplicationServicePort,
+    coordinator: AccessSynchronizer,
     job_status_store: JobStatusStore,
     lock_store: IdempotencyStore,
     job_id: str,
@@ -245,7 +245,7 @@ def run_platform_sync_job(
 
 
 def spawn_user_sync_thread(
-    coordinator: AccessSyncApplicationServicePort,
+    coordinator: AccessSynchronizer,
     job_status_store: JobStatusStore,
     lock_store: IdempotencyStore,
     job_id: str,
@@ -291,7 +291,7 @@ def spawn_user_sync_thread(
 
 
 def spawn_platform_sync_thread(
-    coordinator: AccessSyncApplicationServicePort,
+    coordinator: AccessSynchronizer,
     job_status_store: JobStatusStore,
     lock_store: IdempotencyStore,
     job_id: str,

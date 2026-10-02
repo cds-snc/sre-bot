@@ -39,7 +39,7 @@ logger = structlog.get_logger()
 # ---------------------------------------------------------------------------
 
 
-class AccessSyncApplicationServicePort(Protocol):
+class AccessSynchronizer(Protocol):
     """Structural contract for the access sync application service."""
 
     def sync_user(

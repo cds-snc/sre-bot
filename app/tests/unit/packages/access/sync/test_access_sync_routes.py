@@ -30,7 +30,7 @@ def _get_route(path: str, method: str) -> APIRoute:
 
 
 class _FakeCoordinator:
-    """Minimal stub that satisfies the access sync application service port."""
+    """Minimal stub that satisfies the ``_AccessSynchronizer`` interface."""
 
     def __init__(self, result: OperationResult) -> None:
         self._result = result
@@ -54,7 +54,7 @@ class _FakeCoordinator:
 
 
 class _Settings:
-    """Minimal settings stub satisfying the _AccessSyncSettingsPort protocol."""
+    """Minimal settings stub satisfying the _AccessSyncRouteSettings protocol."""
 
     def __init__(self, enabled: bool) -> None:
         self.enabled = enabled

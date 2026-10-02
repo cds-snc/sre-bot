@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-01 14:05'
-updated_date: '2026-10-02 00:42'
+updated_date: '2026-10-02 13:28'
 labels:
   - plugin-architecture
   - features
@@ -70,4 +70,10 @@ Waits for TASK-26.1 (the handlers are re-signed onto the Slack registrar and rep
 From review (2026-10-01, #1518 and #1519): the reviewer read 'port' as a network port and asked for IncidentChannelReader. The replacement interface this task puts in packages/incident/core/ takes a role name, not a Port suffix (for example IncidentTranscriptReader, since it reads a conversation's transcript; confirm the name at planning), and its provider function follows (no get_..._port). Where this task's description and ACs say 'port', read 'interface'; the ACs are not reworded. Docstrings written here say 'interface'. The same rule for every other Port-suffixed Protocol is TASK-136; IncidentChannelPort is left to this task and excluded there.
 
 From TASK-136 (2026-10-02): TASK-136.2 renames IncidentDocumentPort to IncidentDocumentStore and get_incident_document_port to get_incident_document_store, so where this task's text says IncidentDocumentPort, read IncidentDocumentStore once that slice merges. TASK-136 leaves the 'Summarizer port' / 'Port reading ...' prose in incident_summary (service.py, README.md, platforms/slack.py) alone because this task rewrites that package: write 'interface' there.
+
+From TASK-136 (2026-10-02, human decision): the test-side names for the channel interface must be renamed by this task, together with IncidentChannelPort and get_incident_channel_port. They are the ports-and-adapters jargon TASK-136 retires, not network ports, and TASK-136 left them alone only because this task owns the channel interface and its tests. As of f182ecd2:
+- tests/unit/packages/incident_draft/test_incident_draft_slack.py: the patch-target constant _CHANNEL_PORT (:31, used :77), the mock variable mock_port (:77, :82), and the helper docstring 'fake incident channel port' (:36).
+- tests/unit/packages/incident_summary/test_incident_summary_slack.py: _CHANNEL_PORT (:27, used :59 and :71), mock_port (:59, :62, :71, :74), the test name test_handler_dispatches_with_channel_port_and_parsed_args (:52), and the helper docstring 'fake incident channel port' (:31).
+- tests/integration/legacy_surface/conftest.py patches get_incident_channel_port (2 occurrences); it follows the provider-function rename.
+Name them after the role name chosen for the replacement interface (for example _CHANNEL_READER / mock_reader if it is a Reader). When this task is done, rg -i 'port' over the incident tests and packages must find nothing; if any of these tests survive the reshape under a new path, the rename goes with them. This is what closes TASK-136 AC #5, whose only remaining exceptions are then genuine network ports (app/bin/dev-token.py, the aws_sns_notification auto_mitigation module and its test), which stay as they are.
 <!-- SECTION:NOTES:END -->
