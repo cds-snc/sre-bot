@@ -3,7 +3,7 @@ id: doc-2
 title: Delivery Sequence and Stacked Pull Requests
 type: guide
 created_date: '2026-09-24 20:23'
-updated_date: '2026-10-02 13:31'
+updated_date: '2026-10-02 15:07'
 ---
 # Delivery Sequence and Stacked Pull Requests
 
@@ -78,9 +78,9 @@ TASK-109 (the service registry) is also required before the capability and featu
 | A: contracts spine | TASK-18 (import-linter) -> TASK-105 (OperationResult envelope) -> TASK-105.1 (drop provider/operation, delete the unused operations classifiers) -> TASK-105.2 (error-code registry) -> TASK-105.3 (clear the call-site mypy errors from TASK-105's optional message) -> TASK-106 (create contracts/, adds the contracts import-linter contract) -> TASK-26.1.1 (Slack command models to contracts/) -> TASK-26.1.2 (Slack lookups behind package adapters) -> TASK-26.1.3 (Slack registrar and reply Protocols; every hookimpl) -> TASK-107.1 (scheduler registration Protocol to contracts/) -> TASK-107.2 (i18n resource spec to contracts/) -> TASK-107.3 (hookspecs and markers to contracts/) -> TASK-107.4 (plugin manager to server/plugins/) | low: configuration, types, codemod moves. TASK-26.1.3 changes every Slack hookimpl signature and gets the closest review. |
 | B: logging | TASK-28.2 -> TASK-28.3 -> TASK-115 (logging setup to server/) | low |
 
-Stack A status (2026-10-02): complete and merged. Part 1 (TASK-18 through TASK-106, #1504-#1511, stack #1506) and part 2 (TASK-26.1.1 through TASK-107.4, #1517-#1519 and #1521-#1524, stack #1520) are on `main`, as are the prerequisites TASK-35 (#1512), TASK-36 (#1513) and TASK-25.4 (#1515). The next critical-path task is TASK-110. Details and the open follow-ups are in doc-3 (Stack A handoff).
+Stack A status (2026-10-02): complete and merged. Part 1 (TASK-18 through TASK-106, #1504-#1511, stack #1506) and part 2 (TASK-26.1.1 through TASK-107.4, #1517-#1519 and #1521-#1524, stack #1520) are on `main`, as are the prerequisites TASK-35 (#1512), TASK-36 (#1513) and TASK-25.4 (#1515). The next critical-path task is TASK-110. The stack's handoff doc was retired on 2026-10-02; its open follow-ups moved to the tasks that own them: TASK-137 (mypy errors in infrastructure/i18n), TASK-110 (the uncalled discovery functions in server/plugins/manager.py, the entry points, and the `PLUGIN_NAMESPACE` check in a real image build) and TASK-67 (stale since TASK-26.1.3).
 
-Stack A review follow-up: TASK-136 (Protocols are named for their role; the `Port` suffix is retired) came out of the review of #1518 and #1519. It ships as three single PRs from `main` with no dependency between the code they touch: TASK-136.1 (the recorded rule, `SlackReplySender`; #1525, merged), TASK-136.2 (`IncidentDocumentStore`; #1526, merged) and TASK-136.3 (packages/access; implemented 2026-10-02, PR not yet opened). `IncidentChannelPort`, its provider function and the test names that go with them are left to TASK-135. Current state is in doc-3.
+Stack A review follow-up: TASK-136 (Protocols are named for their role; the `Port` suffix is retired) came out of the review of #1518 and #1519. It shipped as three single PRs from `main`, all merged: TASK-136.1 (the recorded rule, `SlackReplySender`; #1525), TASK-136.2 (`IncidentDocumentStore`; #1526) and TASK-136.3 (packages/access; #1527). `IncidentChannelPort`, its provider function and the test names that go with them are left to TASK-135.
 
 Single PRs: TASK-28.1; TASK-94 (alarm filters, Terraform) after TASK-28.2; TASK-133 (AWS and Google classifiers emit registry codes) after TASK-105.2, standalone because it changes the codes callers see.
 
