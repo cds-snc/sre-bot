@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-28 16:30'
-updated_date: '2026-09-24 20:07'
+updated_date: '2026-10-02 16:46'
 labels:
   - architecture
   - reliability
@@ -74,5 +74,10 @@ created: 2026-09-14 15:27
 created: 2026-09-24 20:07
 ---
 2026-09-24 alignment with decisions/plugin-architecture.md and migration.md: each job's owning code is rebuilt by surface into app/features/ or app/capabilities/ (not moved to app/packages/). Its register_background_jobs hookimpl lives there, with schedule, Tier and lease TTL in that package's settings slice (values in the TOML files, TASK-111). The owning tickets per job: notify_stale_incident_channels -> TASK-38 (incident alerts subdomain); spending.generate_spending_data and provision_aws_identity_center -> TASK-88. The pull-hub lives in app/server/scheduler/ after TASK-52; its final cleanup removes the hand-imports there. The placeholder 'TASK-A' in the description is TASK-64.
+---
+
+created: 2026-10-02 16:46
+---
+2026-10-02: the notify_stale_incident_channels job is strangled in TASK-38.5 (features/incident/lifecycle registers it through register_background_jobs with Tier-2 lease and TTL from the lifecycle settings slice; the hand-import in jobs/scheduled_tasks.py is deleted there). TASK-38.5 depends on TASK-64.
 ---
 <!-- COMMENTS:END -->

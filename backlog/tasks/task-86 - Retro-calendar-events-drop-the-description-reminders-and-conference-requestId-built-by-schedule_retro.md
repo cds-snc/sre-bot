@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-10 17:48'
-updated_date: '2026-09-11 14:13'
+updated_date: '2026-10-02 16:59'
 labels:
   - incident
   - bug
@@ -51,3 +51,17 @@ COORDINATION (updated 2026-09-11):
 - [ ] #3 insert_event takes the event fields it supports as explicit parameters; unsupported keyword arguments are rejected rather than silently ignored
 - [ ] #4 The new tests fail against the pre-fix code (recorded in the notes), and ruff, mypy and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-02 16:46
+---
+2026-10-02 (TASK-97 decided): the calendar adapter moves to features/incident/retrospective/adapters/ in TASK-38.6, whose description and AC #2 carry this fix (typed parameters; description, reminders and the conference request id are sent). If TASK-38.6 lands first, close this task against it; if this task is fixed first in packages/incident/scheduling, TASK-38.6 moves the fix.
+---
+
+created: 2026-10-02 16:59
+---
+2026-10-02 correction: the calendar adapter's home is app/capabilities/calendar/adapters/google.py (TASK-138), not features/incident/retrospective/adapters/. TASK-138 carries this fix (typed parameters; description, reminders and the conference request are sent). TASK-38.6 then consumes the capability and has no calendar adapter.
+---
+<!-- COMMENTS:END -->

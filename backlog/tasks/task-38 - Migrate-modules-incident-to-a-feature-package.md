@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-10-01 14:06'
+updated_date: '2026-10-02 17:00'
 labels:
   - migration
   - phase-5
@@ -25,6 +25,7 @@ references:
   - decisions/workplace-systems.md
   - decisions/people-and-accounts.md
   - decisions/plugin-architecture.md
+  - decisions/incident-management.md
 priority: medium
 ordinal: 38000
 ---
@@ -32,22 +33,29 @@ ordinal: 38000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Rescoped 2026-09-24 to decisions/plugin-architecture.md and migration.md: legacy modules are rebuilt by surface, not moved.
-- Each user-facing surface of modules/incident is assigned to its target in the TASK-36 inventory, pinned by smoke tests, rebuilt in the standard shape, and cut over.
-- The module is deleted when its last surface has moved.
-- Vendor concepts leave the feature on the way: an incident works with documents and a chat channel through capability contracts (capabilities/drive, capabilities/spreadsheets and future documents, calendar and chat capabilities), not with Google Drive folders.
-Human direction (2026-09-16, recorded on TASK-97): incident is redesigned from the ground up.
+COORDINATOR since 2026-10-02: contains no implementation. Decided by TASK-97 (decisions/incident-management.md, Accepted 2026-10-02): the bot owns incident management, the system of record is the incident record in app storage, the conversation is a resource of the incident and never its key, and an external case platform is optional behind a feature-owned ExternalCaseRecorder (no adapter in this series). The rebuild is behaviour-preserving: the current behaviour is preserved while doc-2's sequence runs, and the feature expands afterwards (drafts under TASK-97).
 
-What changed from the earlier scope:
-- The relocation of the incident umbrella is TASK-124.5, after TASK-135 reshapes incident_draft and incident_summary into one subdomain over incident/core, so this ticket builds on features/incident/ and never on packages/.
-- This ticket now follows TASK-97 instead of preceding it. TASK-97 decides what the bot owns and where the record of truth lives, and its implementation packet names the right-sized rebuild tickets. Rebuilding before that decision would carry the Google-shaped design into the new layer and rebuild it again.
+Rescoped 2026-09-24 to decisions/plugin-architecture.md and migration.md: legacy modules are rebuilt by surface, not moved. Each user-facing surface of modules/incident is assigned to its target in the TASK-36 inventory, pinned by smoke tests, rebuilt in the standard shape, and cut over; the module is deleted when its last surface has moved. The relocation of the incident umbrella is TASK-124.5, after TASK-135 reshapes incident_draft and incident_summary into the scribe subdomain over incident/core, so this ticket builds on features/incident/ and never on packages/.
 
-Current surface (modules/incident, about 4636 LOC across 17 modules): the declare flow, channel lifecycle and status updates, the information display and update modals, roles, documents and folders, retro scheduling, alerts and stale-channel nudges (a Tier-2 scheduled job, see TASK-65 and TASK-99). The subdomain split is confirmed by the TASK-97 packet, not here. Amended 2026-10-01 (decisions/feature-packages.md umbrella rules 2 to 5): a subdomain is a unit enabled, owned or deleted on its own, not one command, so the earlier candidate list (declare/, channel/, documents/, retro/, alerts/, draft/, summary/, scheduling/) is no longer the starting point. What every subdomain works on (the incident record and its store, the conversation and report ports with one adapter per system, and the check that a command refers to a known incident that may still be changed) lives in features/incident/core/, imported only through core/api.py. The channel and the documents are resources of the incident, held in core/, not subdomains.
+THE UMBRELLA (decisions/incident-management.md)
+- features/incident/core/: the record and its store (IncidentStore over the storage contract, in-memory fake), the two-part command check (find_incident_for_conversation for every command; conversation_is_writable only before a channel write), the resource interfaces with one adapter per system selected by the stored reference (IncidentConversation, IncidentReport, IncidentTranscriptReader, ProductCatalog, ExternalCaseRecorder), imported only through core/api.py.
+- features/incident/common/: the settings tree and shared vocabulary, no I/O.
+- Subdomains as enablement units: lifecycle (declare, status, show and update, roles, archive, timeline capture, canvas, recreate resources, alert buttons, stale nudges; own adapter: video call), retrospective (attendees, availability, the retro meeting through the calendar capability TASK-138; no adapter of its own), scribe (draft and summarize; TASK-135). Entry points incident.lifecycle, incident.retrospective, incident.scribe.
+
+THE SLICES (children, each under the single-PR size gate, standalone PRs from main)
+- TASK-38.1 core record and store (after TASK-124.5, TASK-27.2, TASK-108, TASK-109)
+- TASK-38.2 core resource interfaces; documents and drive fold into core/; IncidentTranscriptReader takes the conversation reference
+- TASK-38.3 lifecycle: declare and the alert buttons (after TASK-36.1, TASK-37); meet folds into lifecycle/adapters/
+- TASK-38.4 lifecycle: status, show, update, roles, archive
+- TASK-38.5 lifecycle: timeline capture and the nudge job (after TASK-36.3, TASK-64); db_operations deleted, incident leaves packages/aws_platform, which unblocks TASK-88
+- TASK-38.6 retrospective (after TASK-36.1 and TASK-138, which turns packages/incident/scheduling into app/capabilities/calendar/ and carries the TASK-86 fix)
+- TASK-38.7 record cutover: the list sheet becomes a write-only projection, reads removed, references backfilled
+- TASK-38.8 contract: modules/incident deleted, legacy list entry and catalogues removed, inventory and records updated
+TASK-38.6 is independent of TASK-38.3 to TASK-38.5. Person references switch to people with TASK-83 (TASK-83.9 and TASK-83.10 follow this task).
 
 Rules carried forward:
-- Handlers register through the Slack handler contract (TASK-26.1).
-- Strings go through the translator contract with EN and FR catalogues (TASK-118, and the TASK-21 parity gate).
-- Settings consolidate onto features/incident/common/settings.py, with values in the TOML files. The env-var rename of INCIDENT_SUMMARY__* and incident_draft's aliases is deployment-coordinated and belongs to this series.
+- Handlers register through the Slack handler contract (TASK-26.1); strings go through the translator contract with EN and FR catalogues (TASK-118, TASK-21 parity gate).
+- Settings consolidate onto features/incident/common/settings.py with values in the TOML files; the env-var rename of INCIDENT_SUMMARY__* and incident_draft's aliases is deployment-coordinated and rides with the lifecycle slices after TASK-111.
 - Each rebuild PR ships smoke tests pinned before cutover and removes that surface's legacy registration in the same series.
 <!-- SECTION:DESCRIPTION:END -->
 
@@ -202,5 +210,15 @@ created: 2026-09-16 14:38
 What still holds from that note: no NEW persistence design starts here. AC#14 already says so. De-vendorizing the concepts that already exist is in scope; inventing a storage schema, migrating off the incident sheet, or growing an app-owned domain beyond what today's behaviour needs is not, and waits for TASK-97.
 
 TASK-80 was archived on 2026-09-16 as superseded by decisions/workplace-systems.md rule 1. Its replacement expectation - a capability package with one adapter per system if document I/O is ever needed by more than one feature, never an infrastructure Protocol - is recorded on the archived task and is consistent with AC#10 and AC#11 here.
+---
+
+created: 2026-10-02 16:46
+---
+2026-10-02: TASK-97 decided (decisions/incident-management.md). This task is now a coordinator over TASK-38.1 to TASK-38.8; the description lists the subdomains (lifecycle, retrospective, scribe), what core/ owns and the slice order. AC #1 to #14 are satisfied through the children; check each here when its slice is Done.
+---
+
+created: 2026-10-02 16:59
+---
+2026-10-02 amendment: the retrospective subdomain consumes the calendar capability (TASK-138) instead of owning a calendar adapter; TASK-38.6 now depends on TASK-138. The retro portion expands after doc-2: DRAFT-8 (reschedule, modify, cancel, attendees, reminders) and DRAFT-9 (action items as records).
 ---
 <!-- COMMENTS:END -->

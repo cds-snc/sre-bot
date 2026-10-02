@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 19:28'
-updated_date: '2026-09-01 19:28'
+updated_date: '2026-10-02 16:46'
 labels:
   - bug
   - incident
@@ -88,5 +88,10 @@ This is deliberately not being fixed inside the TASK-25.1.3 PR, to keep that mig
 created: 2026-09-01 19:28
 ---
 Discovered while validating TASK-25.1.3 (Sheets migration off execute_google_api_call). Explicitly NOT a regression from that PR: get_values old-vs-new returned identical live payloads (467 rows, old == new) and batch_update_values old-vs-new build an identical request URI and JSON body; googleapiclient strips None kwargs exactly as the old filtered_params logic did. Left out of that PR to keep the migration behaviour-neutral.
+---
+
+created: 2026-10-02 16:46
+---
+2026-10-02 (TASK-97 decided, decisions/incident-management.md): the sheet stops being a record. TASK-38.4 rewrites the status fan-out from the record, so the modal path and the command path write the same projection row, and TASK-38.7 makes the sheet a write-only projection rebuilt from storage. If this bug is fixed earlier as a bug fix in the frozen module, keep it to the normalization in the proposed fix.
 ---
 <!-- COMMENTS:END -->
