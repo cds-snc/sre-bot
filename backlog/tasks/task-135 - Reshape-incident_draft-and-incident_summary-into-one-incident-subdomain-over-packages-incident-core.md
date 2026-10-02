@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-01 14:05'
+updated_date: '2026-10-01 20:28'
 labels:
   - plugin-architecture
   - features
@@ -62,3 +63,9 @@ Waits for TASK-26.1 (the handlers are re-signed onto the Slack registrar and rep
 - [ ] #5 Command names, arguments and replies are unchanged: the TASK-36 legacy_surface suite is green before and after with no assertion change
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; import-linter ignore entries only shrank
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From review (2026-10-01, #1518 and #1519): the reviewer read 'port' as a network port and asked for IncidentChannelReader. The replacement interface this task puts in packages/incident/core/ takes a role name, not a Port suffix (for example IncidentTranscriptReader, since it reads a conversation's transcript; confirm the name at planning), and its provider function follows (no get_..._port). Where this task's description and ACs say 'port', read 'interface'; the ACs are not reworded. Docstrings written here say 'interface'. The same rule for every other Port-suffixed Protocol is TASK-136; IncidentChannelPort is left to this task and excluded there.
+<!-- SECTION:NOTES:END -->
