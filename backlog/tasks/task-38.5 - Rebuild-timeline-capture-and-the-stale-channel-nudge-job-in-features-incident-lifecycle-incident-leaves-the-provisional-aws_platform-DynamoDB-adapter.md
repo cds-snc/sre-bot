@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
+updated_date: '2026-10-02 20:51'
 labels:
   - migration
   - phase-5
@@ -46,3 +47,29 @@ Legacy registrations and the job hand-import are removed in the same PR; pinned 
 - [ ] #4 The TASK-36.1 and TASK-36.3 pinning tests for these surfaces are green before and after the cutover with no assertion change
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; no baseline grew; the seam baseline only shrank
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-02 20:51
+---
+2026-10-02 production bug fix on the legacy floppy-disk handlers. It is a stopgap; this slice replaces it. Carry these findings into the plan.
+
+BUG: one saved message appeared 4 times in the incident report timeline. The handler rewrites the whole timeline section by index from a document read. Several runs for the same message each read the document before the previous write was visible, and each applied its full rewrite. What fired 4 runs was not established (Slack redelivery or repeated clicks while nothing appeared).
+
+STOPGAP NOW IN modules/incident (to delete with the legacy handlers):
+- incident_document.update_timeline_section(document_id, rewrite): one snapshot per attempt for text, indexes and revision; the write is guarded by writeControl.requiredRevisionId; a rejected or timed-out write re-reads and re-evaluates; at most TIMELINE_UPDATE_ATTEMPTS = 3, a module constant, not a setting.
+- incident_conversation.rearrange_by_datetime_ascending keeps one entry per (timestamp, permalink), so the next save in a channel collapses whole-line duplicates left by the bug.
+- get_timeline_section and replace_text_between_headings are gone; extract_timeline_section and build_timeline_replacement are their pure replacements.
+- Tests: app/tests/unit/modules/incident/test_incident_timeline_update.py runs both handlers against an in-memory document that enforces the revision guard.
+
+WHAT THE REBUILD SHOULD SETTLE (not fixed by the stopgap):
+- Source of truth. AC#1 already puts timeline entries on the record. Render the report section from the record's entries (keyed by channel and message ts) instead of parsing the document back into entries; that makes a save idempotent by key and removes the text round trip.
+- Event dedupe. The handlers act on every reaction_added delivery and on every user who adds the reaction. Decide whether a (channel, message ts) claim through the idempotency primitive is needed once the record is the source of truth.
+- Concurrent human edits. requiredRevisionId also rejects the write when a person types in the report between the read and the write. Three attempts cover it today; a busy document can exhaust them and the save is dropped with only an error log.
+- Timeout. The rewrite sends about three requests per entry and can exceed GOOGLE_API_TIMEOUT_SECONDS (10 s) on a long timeline. The timeout is out of scope for TASK-87; decide here whether to write only the changed entry or to give this write a longer timeout.
+- Index units. build_timeline_replacement counts Python characters, the Docs API counts UTF-16 code units, so a message with an emoji outside the BMP shifts every later index. packages/incident/scribe already handles this.
+- Unmatched entries. The fallback branch inserts the whole remaining text for each entry that fails the pattern.
+- User feedback. A failed save is only logged; the user sees nothing and tends to click again.
+---
+<!-- COMMENTS:END -->

@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from typing import Any
 
 import pytz  # type: ignore
 from slack_sdk import WebClient  # type: ignore
@@ -12,15 +13,12 @@ from integrations.sentinel import log_to_sentinel
 from integrations.slack import users as slack_users
 from modules.incident import incident_helper, schedule_retro
 from modules.incident.incident_document import (
-    get_timeline_section,
-    replace_text_between_headings,
+    update_timeline_section,
 )
 from packages.incident.documents import utils
 
 settings = get_app_settings()
 
-START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
-END_HEADING = "Trigger"
 
 logger = get_logger()
 
@@ -77,7 +75,7 @@ def create_incident_conversation(client: WebClient, incident_name: str):
 
 # Make sure that we are listening only on floppy disk reaction
 def is_floppy_disk(event: dict) -> bool:
-    return event["reaction"] == "floppy_disk"
+    return bool(event["reaction"] == "floppy_disk")
 
 
 # We need to ack all other reactions so that they don't get processed
@@ -127,7 +125,7 @@ def rearrange_by_datetime_ascending(text):
         r"\s*➡️\s*\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) ET\]\((https?://[\w./-]+(?:\?\w+=\d+\.\d+&\w+=\w+)?)\)\s([\w\s]+):\s"
     )
 
-    current_message = []
+    current_message: list[Any] = []
     for line in lines:
         match = re.match(pattern, line)
         if match:
@@ -144,8 +142,11 @@ def rearrange_by_datetime_ascending(text):
     if current_message:  # Don't forget to append the last message
         entries.append(current_message)
 
+    # A Slack message is identified by its time and permalink: keep one entry per message
+    unique_entries = {(entry[0], entry[1]): entry for entry in entries}
+
     # Sort the entries by datetime in ascending order
-    sorted_entries = sorted(entries, key=lambda x: x[0])
+    sorted_entries = sorted(unique_entries.values(), key=lambda x: x[0])
 
     # Reformat the entries back into strings, including 'ET' and the full message
     sorted_text = "\n\n".join(
@@ -295,25 +296,23 @@ def handle_reaction_added(client, ack, body):
                 # get the full name of the user so that we include it into the timeline
                 user_full_name = user["profile"]["real_name"]
 
-                # get the current timeline section content
-                content = get_timeline_section(document_id)
-
                 # handle any images in the messages
                 message = handle_images_in_message(message)
 
                 # if the message contains mentions to other slack users, replace those mentions with their name
                 message = slack_users.replace_user_id_with_handle(client, message["text"])
 
-                # if the message already exists in the timeline, then don't put it there again
-                if content and message_date_time not in content:
-                    # append the new message to the content
-                    content += f" ➡️ [{message_date_time}]({link}) {user_full_name}: {message}"
+                new_entry = f" ➡️ [{message_date_time}]({link}) {user_full_name}: {message}"
 
-                    # sort all the message to be in ascending chronological order
-                    sorted_content = rearrange_by_datetime_ascending(content)
+                def add_entry(content, message_date_time=message_date_time, new_entry=new_entry):
+                    # if the message already exists in the timeline, then don't put it there again
+                    if not content or message_date_time in content:
+                        return None
+                    # append the new message and sort all the messages in ascending chronological order
+                    return rearrange_by_datetime_ascending(content + new_entry)
 
-                    # replace the content in the file with the new headings
-                    replace_text_between_headings(document_id, sorted_content, START_HEADING, END_HEADING)
+                # rewrite the timeline section from the current state of the document
+                update_timeline_section(document_id, add_entry)
         except Exception as e:
             logger.error(
                 "incident_document_update_failed",
@@ -363,9 +362,6 @@ def handle_reaction_removed(client, ack, body):
             # get the incident report document id from the incident channel
             document_id = get_incident_document_id(client, channel_id)
 
-            # get the current content from the document
-            content = get_timeline_section(document_id)
-
             # handle any images in the message
             message = handle_images_in_message(message)
 
@@ -378,18 +374,18 @@ def handle_reaction_removed(client, ack, body):
             # Construct the message to remove
             message_to_remove = f" ➡️ [{message_date_time}]({link}) {user_full_name}: {message}\n"
 
-            # Remove the message
-            if message_to_remove in content:
-                content = content.replace(message_to_remove, "\n")
+            message_found = False
 
-                # Update the timeline content
-                replace_text_between_headings(
-                    document_id,
-                    content,
-                    START_HEADING,
-                    END_HEADING,
-                )
-            else:
+            def remove_entry(content):
+                nonlocal message_found
+                if message_to_remove not in content:
+                    return None
+                message_found = True
+                return content.replace(message_to_remove, "\n")
+
+            # Remove the message and update the timeline content
+            updated = update_timeline_section(document_id, remove_entry)
+            if updated and not message_found:
                 logger.warning(
                     "handle_reaction_removed_message_not_found",
                     channel=channel_name,

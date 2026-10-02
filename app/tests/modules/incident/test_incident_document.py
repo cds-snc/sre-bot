@@ -97,41 +97,37 @@ def test_update_incident_document_status_invalid_status():
 
 @patch("modules.incident.incident_document.END_HEADING", END_HEADING)
 @patch("modules.incident.incident_document.START_HEADING", START_HEADING)
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_extract_timeline_content(mock_fetch_document_content):
+def test_extract_timeline_content():
     content = [START_HEADING, "Timeline content", END_HEADING]
-    mock_fetch_document_content.return_value = create_mock_document(content)
+    document_content = create_mock_document(content)
 
-    result = incident_document.get_timeline_section("document_id")
+    result = incident_document.extract_timeline_section(document_content)
     assert result == "Timeline content"
 
 
 @patch("modules.incident.incident_document.END_HEADING", END_HEADING)
 @patch("modules.incident.incident_document.START_HEADING", START_HEADING)
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_extract_timeline_content_with_text_before_heading(mock_fetch_document_content):
+def test_extract_timeline_content_with_text_before_heading():
     content = ["Some text", START_HEADING, "Timeline content", END_HEADING]
-    mock_fetch_document_content.return_value = create_mock_document(content)
+    document_content = create_mock_document(content)
 
-    result = incident_document.get_timeline_section("document_id")
+    result = incident_document.extract_timeline_section(document_content)
     assert result == "Timeline content"
 
 
 @patch("modules.incident.incident_document.END_HEADING", END_HEADING)
 @patch("modules.incident.incident_document.START_HEADING", START_HEADING)
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_extract_timeline_content_with_text_after_heading(mock_fetch_document_content):
+def test_extract_timeline_content_with_text_after_heading():
     content = [START_HEADING, "Timeline content", END_HEADING, "Some text"]
-    mock_fetch_document_content.return_value = create_mock_document(content)
+    document_content = create_mock_document(content)
 
-    result = incident_document.get_timeline_section("document_id")
+    result = incident_document.extract_timeline_section(document_content)
     assert result == "Timeline content"
 
 
 @patch("modules.incident.incident_document.END_HEADING", END_HEADING)
 @patch("modules.incident.incident_document.START_HEADING", START_HEADING)
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_extract_timeline_content_with_text_between_heading(mock_fetch_document_content):
+def test_extract_timeline_content_with_text_between_heading():
     content = [
         "Start of some text",
         START_HEADING,
@@ -139,68 +135,54 @@ def test_extract_timeline_content_with_text_between_heading(mock_fetch_document_
         END_HEADING,
         "End of some text",
     ]
-    mock_fetch_document_content.return_value = create_mock_document(content)
+    document_content = create_mock_document(content)
 
-    result = incident_document.get_timeline_section("document_id")
+    result = incident_document.extract_timeline_section(document_content)
     assert result == "Timeline content"
 
 
 @patch("modules.incident.incident_document.END_HEADING", END_HEADING)
 @patch("modules.incident.incident_document.START_HEADING", START_HEADING)
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_get_timeline_section_no_headings(mock_fetch_document_content):
+def test_get_timeline_section_no_headings():
     content = ["Some text", "Other text"]
-    mock_fetch_document_content.return_value = create_mock_document(content)
+    document_content = create_mock_document(content)
 
-    result = incident_document.get_timeline_section("document_id")
+    result = incident_document.extract_timeline_section(document_content)
     assert result is None
 
 
 @patch("modules.incident.incident_document.END_HEADING", END_HEADING)
 @patch("modules.incident.incident_document.START_HEADING", START_HEADING)
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_get_timeline_section_missing_start_heading(mock_fetch_document_content):
+def test_get_timeline_section_missing_start_heading():
     content = ["Some text", "Timeline content", END_HEADING, "Other text"]
-    mock_fetch_document_content.return_value = create_mock_document(content)
+    document_content = create_mock_document(content)
 
-    result = incident_document.get_timeline_section("document_id")
+    result = incident_document.extract_timeline_section(document_content)
     assert result is None
 
 
 @patch("modules.incident.incident_document.END_HEADING", END_HEADING)
 @patch("modules.incident.incident_document.START_HEADING", START_HEADING)
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_get_timeline_section_missing_end_heading(mock_fetch_document_content):
+def test_get_timeline_section_missing_end_heading():
     content = ["Some text", START_HEADING, "Timeline content", "Other text"]
-    mock_fetch_document_content.return_value = create_mock_document(content)
+    document_content = create_mock_document(content)
 
-    result = incident_document.get_timeline_section("document_id")
+    result = incident_document.extract_timeline_section(document_content)
     assert result is None
 
 
 @patch("modules.incident.incident_document.END_HEADING", END_HEADING)
 @patch("modules.incident.incident_document.START_HEADING", START_HEADING)
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_get_timeline_section_empty_document(mock_fetch_document_content):
-    mock_fetch_document_content.return_value = create_mock_document([])
+def test_get_timeline_section_empty_document():
+    document_content = create_mock_document([])
 
-    result = incident_document.get_timeline_section("document_id")
-    assert result is None
-
-
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_get_timeline_section_returns_none_on_classified_fetch_failure(mock_fetch_document_content):
-    """AC#6: a classified Docs failure degrades to None instead of crashing."""
-    mock_fetch_document_content.return_value = None
-
-    result = incident_document.get_timeline_section("document_id")
+    result = incident_document.extract_timeline_section(document_content)
     assert result is None
 
 
 @patch("modules.incident.incident_document.END_HEADING", END_HEADING)
 @patch("modules.incident.incident_document.START_HEADING", START_HEADING)
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_extract_timeline_content_with_link(mock_fetch_document_content):
+def test_extract_timeline_content_with_link():
     content = [
         START_HEADING,
         "Timeline content with a ",
@@ -218,9 +200,9 @@ def test_extract_timeline_content_with_link(mock_fetch_document_content):
         },
         END_HEADING,
     ]
-    mock_fetch_document_content.return_value = create_mock_document(content)
+    document_content = create_mock_document(content)
 
-    result = incident_document.get_timeline_section("document_id")
+    result = incident_document.extract_timeline_section(document_content)
     assert result == "Timeline content with a [link](http://example.com)"
 
 
@@ -310,10 +292,7 @@ def test_both_headings_present_find_heading_indices():
     )
 
 
-@patch("modules.incident.incident_document.apply_document_edits")
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_replace_text_between_headings(mock_fetch_document_content, mock_apply_document_edits):
-    doc_id = "mock_doc_id"
+def test_build_timeline_replacement():
     content = [
         {"paragraph": {"elements": [{"endIndex": 20, "textRun": {"content": START_HEADING}}]}},
         {
@@ -331,21 +310,14 @@ def test_replace_text_between_headings(mock_fetch_document_content, mock_apply_d
         },
         {"paragraph": {"elements": [{"startIndex": 40, "textRun": {"content": END_HEADING}}]}},
     ]
-    mock_fetch_document_content.return_value = content
-    mock_apply_document_edits.return_value = {}
 
-    incident_document.replace_text_between_headings(doc_id, "new content", START_HEADING, END_HEADING)
+    requests = incident_document.build_timeline_replacement(content, "new content", START_HEADING, END_HEADING)
 
-    assert mock_apply_document_edits.called
+    assert requests
 
 
-@patch("modules.incident.incident_document.apply_document_edits")
 @patch("modules.incident.incident_document.find_heading_indices")
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_replace_text_between_headings_more_text(
-    mock_fetch_document_content, mock_find_heading_indices, mock_apply_document_edits
-):
-    doc_id = "mock_doc_id"
+def test_build_timeline_replacement_more_text(mock_find_heading_indices):
     new_content = "[2023-10-01 12:00 ET](http://example.com) John Doe: New content ➡️ [2023-10-01 13:00 ET](http://example.com) Jane Doe: More new content"
 
     content = [
@@ -391,19 +363,14 @@ def test_replace_text_between_headings_more_text(
             }
         },
     ]
-    mock_fetch_document_content.return_value = content
     mock_find_heading_indices.return_value = (45, 70)
-    mock_apply_document_edits.return_value = {}
 
-    incident_document.replace_text_between_headings(doc_id, new_content, START_HEADING, END_HEADING)
+    requests = incident_document.build_timeline_replacement(content, new_content, START_HEADING, END_HEADING)
 
-    assert mock_apply_document_edits.called
+    assert requests
 
 
-@patch("modules.incident.incident_document.apply_document_edits")
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_replace_text_between_headings_start_heading_not_found(mock_fetch_document_content, mock_apply_document_edits):
-    doc_id = "mock_doc_id"
+def test_build_timeline_replacement_start_heading_not_found():
 
     content = [
         {
@@ -421,17 +388,13 @@ def test_replace_text_between_headings_start_heading_not_found(mock_fetch_docume
         },
         {"paragraph": {"elements": [{"textRun": {"content": END_HEADING, "startIndex": 40}}]}},
     ]
-    mock_fetch_document_content.return_value = content
 
-    incident_document.replace_text_between_headings(doc_id, "new content", START_HEADING, END_HEADING)
+    requests = incident_document.build_timeline_replacement(content, "new content", START_HEADING, END_HEADING)
 
-    assert not mock_apply_document_edits.called
+    assert requests is None
 
 
-@patch("modules.incident.incident_document.apply_document_edits")
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_replace_text_between_headings_end_heading_not_found(mock_fetch_document_content, mock_apply_document_edits):
-    doc_id = "mock_doc_id"
+def test_build_timeline_replacement_end_heading_not_found():
 
     content = [
         {"paragraph": {"elements": [{"textRun": {"content": START_HEADING, "endIndex": 20}}]}},
@@ -449,17 +412,13 @@ def test_replace_text_between_headings_end_heading_not_found(mock_fetch_document
             }
         },
     ]
-    mock_fetch_document_content.return_value = content
 
-    incident_document.replace_text_between_headings(doc_id, "new content", START_HEADING, END_HEADING)
+    requests = incident_document.build_timeline_replacement(content, "new content", START_HEADING, END_HEADING)
 
-    assert not mock_apply_document_edits.called
+    assert requests is None
 
 
-@patch("modules.incident.incident_document.apply_document_edits")
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_replace_text_between_headings_neither_heading_not_found(mock_fetch_document_content, mock_apply_document_edits):
-    doc_id = "mock_doc_id"
+def test_build_timeline_replacement_neither_heading_not_found():
 
     content = [
         {
@@ -476,32 +435,14 @@ def test_replace_text_between_headings_neither_heading_not_found(mock_fetch_docu
             }
         },
     ]
-    mock_fetch_document_content.return_value = content
 
-    incident_document.replace_text_between_headings(doc_id, "new content", START_HEADING, END_HEADING)
+    requests = incident_document.build_timeline_replacement(content, "new content", START_HEADING, END_HEADING)
 
-    assert not mock_apply_document_edits.called
-
-
-@patch("modules.incident.incident_document.apply_document_edits")
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_replace_text_between_headings_content_not_found(mock_fetch_document_content, mock_apply_document_edits):
-    """AC#6: a classified Docs failure degrades to a no-op instead of crashing."""
-    doc_id = "mock_doc_id"
-    mock_fetch_document_content.return_value = None
-
-    incident_document.replace_text_between_headings(doc_id, "new content", START_HEADING, END_HEADING)
-
-    assert not mock_apply_document_edits.called
+    assert requests is None
 
 
-@patch("modules.incident.incident_document.apply_document_edits")
 @patch("modules.incident.incident_document.find_heading_indices")
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_replace_text_between_headings_with_indices(
-    mock_fetch_document_content, mock_find_heading_indices, mock_apply_document_edits
-):
-    doc_id = "mock_doc_id"
+def test_build_timeline_replacement_with_indices(mock_find_heading_indices):
     new_content = "[2023-10-01 12:00 ET](http://example.com) John Doe: New content ➡️ [2023-10-01 13:00 ET](http://example.com) Jane Doe: More new content"
 
     content = [
@@ -521,22 +462,15 @@ def test_replace_text_between_headings_with_indices(
         },
         {"paragraph": {"elements": [{"textRun": {"content": END_HEADING, "startIndex": 40}}]}},
     ]
-    mock_fetch_document_content.return_value = content
     mock_find_heading_indices.return_value = (20, 40)
-    mock_apply_document_edits.return_value = {}
 
-    incident_document.replace_text_between_headings(doc_id, new_content, START_HEADING, END_HEADING)
+    requests = incident_document.build_timeline_replacement(content, new_content, START_HEADING, END_HEADING)
 
-    assert mock_apply_document_edits.called
+    assert requests
 
 
-@patch("modules.incident.incident_document.apply_document_edits")
 @patch("modules.incident.incident_document.find_heading_indices")
-@patch("modules.incident.incident_document.fetch_document_content")
-def test_replace_text_between_headings_with_unmatched_entry(
-    mock_fetch_document_content, mock_find_heading_indices, mock_apply_document_edits
-):
-    doc_id = "mock_doc_id"
+def test_build_timeline_replacement_with_unmatched_entry(mock_find_heading_indices):
     new_content = "Unmatched entry content ➡️ Another unmatched entry"
 
     content = [
@@ -556,14 +490,11 @@ def test_replace_text_between_headings_with_unmatched_entry(
         },
         {"paragraph": {"elements": [{"textRun": {"content": END_HEADING, "startIndex": 40}}]}},
     ]
-    mock_fetch_document_content.return_value = content
     mock_find_heading_indices.return_value = (20, 40)
-    mock_apply_document_edits.return_value = {}
 
-    incident_document.replace_text_between_headings(doc_id, new_content, START_HEADING, END_HEADING)
+    requests = incident_document.build_timeline_replacement(content, new_content, START_HEADING, END_HEADING)
 
-    assert mock_apply_document_edits.called
+    assert requests
     # Verify that the unmatched entry was inserted as is
-    requests = mock_apply_document_edits.call_args[0][1]
     assert any("Unmatched entry content" in req["insertText"]["text"] for req in requests if "insertText" in req)
     assert any("Another unmatched entry" in req["insertText"]["text"] for req in requests if "insertText" in req)

@@ -708,11 +708,10 @@ def test_handle_reaction_added_incident_report_document_not_found(
 
 
 @patch("modules.incident.incident_conversation.logger")
-@patch("modules.incident.incident_conversation.replace_text_between_headings")
 @patch("modules.incident.incident_conversation.rearrange_by_datetime_ascending")
 @patch("modules.incident.incident_conversation.slack_users")
 @patch("modules.incident.incident_conversation.handle_images_in_message")
-@patch("modules.incident.incident_conversation.get_timeline_section")
+@patch("modules.incident.incident_conversation.update_timeline_section")
 @patch("modules.incident.incident_conversation.convert_epoch_to_datetime_est")
 @patch("modules.incident.incident_conversation.handle_forwarded_messages")
 @patch("modules.incident.incident_conversation.get_incident_document_id")
@@ -722,15 +721,16 @@ def test_handle_reaction_added_processes_messages(
     mock_get_incident_document_id,
     mock_handle_forwarded_messages,
     mock_convert_epoch_to_datetime_est,
-    mock_get_timeline_section,
+    mock_update_timeline_section,
     mock_handle_images_in_message,
     mock_slack_users,
     mock_rearrange_by_datetime_ascending,
-    mock_replace_text_between_headings,
     mock_logger,
 ):
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_convert_epoch_to_datetime_est.return_value = "2017-11-30 18:52:30 ET"
+    mock_update_timeline_section.side_effect = lambda _document_id, rewrite: rewrite("Existing timeline") is not None
     mock_return_messages.return_value = {
         "messages": [
             {
@@ -753,11 +753,10 @@ def test_handle_reaction_added_processes_messages(
     mock_get_incident_document_id.assert_called_once()
     mock_handle_forwarded_messages.assert_called_once()
     mock_convert_epoch_to_datetime_est.assert_called_once()
-    mock_get_timeline_section.assert_called_once()
+    mock_update_timeline_section.assert_called_once()
     mock_handle_images_in_message.assert_called_once()
     mock_slack_users.replace_user_id_with_handle.assert_called_once()
     mock_rearrange_by_datetime_ascending.assert_called_once()
-    mock_replace_text_between_headings.assert_called_once()
 
 
 @patch("modules.incident.incident_conversation.logger")
@@ -1017,11 +1016,10 @@ def test_handle_reaction_removed_message_not_in_timeline(
 
 
 @patch("modules.incident.incident_conversation.logger")
-@patch("modules.incident.incident_conversation.replace_text_between_headings")
 @patch("modules.incident.incident_conversation.rearrange_by_datetime_ascending")
 @patch("modules.incident.incident_conversation.slack_users")
 @patch("modules.incident.incident_conversation.handle_images_in_message")
-@patch("modules.incident.incident_conversation.get_timeline_section")
+@patch("modules.incident.incident_conversation.update_timeline_section")
 @patch("modules.incident.incident_conversation.convert_epoch_to_datetime_est")
 @patch("modules.incident.incident_conversation.handle_forwarded_messages")
 @patch("modules.incident.incident_conversation.get_incident_document_id")
@@ -1031,11 +1029,10 @@ def test_handle_reaction_removed_processes_messages(
     mock_get_incident_document_id,
     mock_handle_forwarded_messages,
     mock_convert_epoch_to_datetime_est,
-    mock_get_timeline_section,
+    mock_update_timeline_section,
     mock_handle_images_in_message,
     mock_slack_users,
     mock_rearrange_by_datetime_ascending,
-    mock_replace_text_between_headings,
     mock_logger,
 ):
     mock_client = MagicMock()
@@ -1057,10 +1054,15 @@ def test_handle_reaction_removed_processes_messages(
         }
     }
 
-    # Mock the return value of get_timeline_section
-    mock_get_timeline_section.return_value = (
-        " ➡️ [2021-04-04 12:34:50](https://example.com/permalink) John Doe: Original message text\n"
-    )
+    # Run the handler's rewrite against a timeline holding the message
+    timeline = " ➡️ [2021-04-04 12:34:50](https://example.com/permalink) John Doe: Original message text\n"
+    rewritten = []
+
+    def apply_rewrite(_document_id, rewrite):
+        rewritten.append(rewrite(timeline))
+        return True
+
+    mock_update_timeline_section.side_effect = apply_rewrite
 
     # Mock the return value of convert_epoch_to_datetime_est
     mock_convert_epoch_to_datetime_est.return_value = "2021-04-04 12:34:50"
@@ -1079,11 +1081,12 @@ def test_handle_reaction_removed_processes_messages(
     mock_get_incident_document_id.assert_called_once()
     mock_handle_forwarded_messages.assert_called_once()
     mock_convert_epoch_to_datetime_est.assert_called_once()
-    mock_get_timeline_section.assert_called_once()
+    mock_update_timeline_section.assert_called_once()
     mock_handle_images_in_message.assert_called_once()
     mock_slack_users.replace_user_id_with_handle.assert_called_once()
     mock_rearrange_by_datetime_ascending.assert_not_called()
-    mock_replace_text_between_headings.assert_called_once()
+    assert rewritten == ["\n"]
+    mock_logger.warning.assert_not_called()
 
 
 @patch("modules.incident.incident_conversation.logger")
@@ -1113,7 +1116,7 @@ def test_handle_reaction_removed_no_messages(mock_return_messages, mock_logger):
 
 @patch("modules.incident.incident_conversation.logger")
 @patch("modules.incident.incident_conversation.return_messages")
-@patch("modules.incident.incident_conversation.get_timeline_section")
+@patch("modules.incident.incident_conversation.update_timeline_section")
 @patch("modules.incident.incident_conversation.get_incident_document_id")
 @patch("modules.incident.incident_conversation.convert_epoch_to_datetime_est")
 @patch("modules.incident.incident_conversation.handle_forwarded_messages")
@@ -1125,7 +1128,7 @@ def test_handle_reaction_removed_message_not_found(
     mock_handle_forwarded_messages,
     mock_convert_epoch_to_datetime_est,
     mock_get_incident_document_id,
-    mock_get_timeline_section,
+    mock_update_timeline_section,
     mock_return_messages,
     mock_logger,
 ):
@@ -1143,7 +1146,7 @@ def test_handle_reaction_removed_message_not_found(
     }
     mock_convert_epoch_to_datetime_est.return_value = "2023-10-01 12:00:00"
     mock_get_incident_document_id.return_value = "doc123"
-    mock_get_timeline_section.return_value = "Some content without the message"
+    mock_update_timeline_section.side_effect = lambda _document_id, rewrite: rewrite("Some content without the message") is None
 
     body = {
         "event": {

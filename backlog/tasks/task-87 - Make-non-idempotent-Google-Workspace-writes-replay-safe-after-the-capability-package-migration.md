@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 13:59'
-updated_date: '2026-10-02 16:59'
+updated_date: '2026-10-02 20:51'
 labels:
   - clients
 dependencies: []
@@ -101,5 +101,23 @@ created: 2026-10-02 16:46
 created: 2026-10-02 16:59
 ---
 2026-10-02 correction: the Calendar events.insert write site lands in app/capabilities/calendar/adapters/google.py (TASK-138), which is the capability-package adapter TASK-87.3 waits for; the incident retrospective subdomain has no calendar adapter.
+---
+
+created: 2026-10-02 20:51
+---
+2026-10-02 production bug fix changed one write in this task's site list. Re-read this before scoping.
+
+WHAT HAPPENED: timeline entries saved with the floppy-disk reaction were written 4 times in an incident report. The SDK did not replay the write (num_retries=0 held: one POST per handler run, verified against a slow local server). The legacy handler ran several times for the same message, and each run read the document before the previous run's batchUpdate was visible. The 10 s timeout makes that window routine on long timelines: the client gives up, Google still applies the edit. What fired the handler 4 times was not established (Slack redelivery or repeated clicks).
+
+WHAT CHANGED in app/packages/incident/documents/adapters/google_docs.py:
+- fetch_document_content is replaced by fetch_document_snapshot, which returns the body with its revisionId.
+- apply_document_edits(document_id, requests, required_revision_id) now sends writeControl.requiredRevisionId and returns a bool. Google rejects the edit with 400 when the document moved past that revision. A 400 and a TimeoutError both return False ("not confirmed"); the caller must re-read before sending again.
+- It still passes .execute(num_retries=0), so it stays in TASK-87.1's list of six.
+The description's entry for this site ("Generic passthrough ... Retries disabled") is stale: it is now protected by a vendor mechanism (AC#1 category two), not only by disabled retries.
+
+FOR SCOPING:
+- With the revision guard an SDK replay of a landed edit is rejected, not applied twice, so this write could move back to the retrying handle. Not done in the fix: a replay would turn a successful write into a 400 and one extra read. Decide here or in TASK-87.1.
+- The same guard fits the other index-based documents.batchUpdate in packages/incident/scribe/adapters/google_docs.py; it was not touched.
+- SDK replay is one source of duplicate writes; a second handler run built from a stale read is another, and disabling retries does not cover it. The legacy caller (modules/incident/incident_document.py::update_timeline_section) handles it with a bounded re-read loop; TASK-38.5 owns the proper rebuild.
 ---
 <!-- COMMENTS:END -->
