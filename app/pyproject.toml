@@ -286,11 +286,6 @@ ignore_imports = [
     "packages.incident.drive.adapters.google_drive -> infrastructure.drive",
     "packages.incident.drive.adapters.google_drive -> infrastructure.drive.factory",
     "packages.incident.drive.adapters.google_drive -> infrastructure.drive.models",
-    "packages.incident_draft.adapters.google_docs -> infrastructure.configuration.integrations.google",
-    "packages.incident_draft.adapters.google_docs -> infrastructure.drive",
-    "packages.incident_draft.platforms.slack -> infrastructure.i18n",
-    "packages.incident_summary.platforms.slack -> infrastructure.i18n",
-    # Temporary: the scribe copies of the four incident_draft and incident_summary entries above; TASK-135.4 deletes the originals.
     "packages.incident.scribe.adapters.google_docs -> infrastructure.configuration.integrations.google",
     "packages.incident.scribe.adapters.google_docs -> infrastructure.drive",
     "packages.incident.scribe.platforms.slack -> infrastructure.i18n",
@@ -342,9 +337,6 @@ ignore_imports = [
     "packages.**.adapters.** -> integrations.**",
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/outbound-clients.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one.
-    "packages.incident_draft.service -> integrations.openai",
-    "packages.incident_summary.service -> integrations.openai",
-    # Temporary: the scribe copy of the two entries above; TASK-135.4 deletes the originals.
     "packages.incident.scribe.service -> integrations.openai",
 ]
 
@@ -357,8 +349,6 @@ modules = [
     "packages.aws_platform",
     "packages.geolocate",
     "packages.incident",
-    "packages.incident_draft",
-    "packages.incident_summary",
     "packages.oncall_sync",
     "packages.rant",
     "packages.talent",
@@ -371,10 +361,6 @@ ignore_imports = [
     "packages.oncall_sync -> packages.user_rotations.settings",
     "packages.oncall_sync.ports -> packages.user_rotations.service",
     "packages.oncall_sync.providers -> packages.user_rotations.providers",
-    # Temporary (TASK-135.2): removed by TASK-135.4 when the package moves into the incident umbrella.
-    "packages.incident_summary.service -> packages.incident.core.api",
-    # Temporary (TASK-135.3): removed by TASK-135.4 when the package moves into the incident umbrella.
-    "packages.incident_draft.service -> packages.incident.core.api",
 ]
 
 [[tool.importlinter.contracts]]

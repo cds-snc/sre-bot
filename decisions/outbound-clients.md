@@ -63,7 +63,7 @@ Tickets: TASK-25 (per-vendor contract), TASK-87 (Google write replay safety) and
 - `integrations/aws/client.py` assumes a role through STS while building a client and never reuses the credentials, so a role-bearing client costs one STS call per build and fails at construction when STS or credentials fail (TASK-98);
 - `integrations/` making 11 `infrastructure` imports (settings under `infrastructure.configuration`, `infrastructure.audit.models`, `infrastructure.i18n`, `infrastructure.slack.settings`), held as ignore entries on import-linter contract (d);
 - non-idempotent Google writes (Drive create and copy) issued on the retrying handle;
-- a per-call `num_retries=0` override at six Google writes (Calendar event insert, Meet space create, incident_draft Drive copy and Docs batchUpdate, incident documents apply_document_edits, Sheets values.append): a call-site exception to "no retry decision repeated at call sites";
+- a per-call `num_retries=0` override at six Google writes (Calendar event insert, Meet space create, incident scribe Drive copy and Docs batchUpdate, incident documents apply_document_edits, Sheets values.append): a call-site exception to "no retry decision repeated at call sites";
 - a replayed Directory `members.insert` that returns 409 is not treated as success;
 - `MaxMindClient` classifies and returns `OperationResult` inside the vendor package;
 - Slack's transport modules still live in `integrations/slack/` (TASK-26);

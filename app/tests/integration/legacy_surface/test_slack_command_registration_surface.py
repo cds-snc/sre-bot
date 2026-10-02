@@ -18,10 +18,9 @@ from contracts.operations import OperationResult, OperationStatus
 from packages.access.sync.interactions import slack as access_sync_slack
 from packages.access.sync.interactions.ingress import EnqueuedJob
 from packages.geolocate.platforms import slack as geolocate_slack
-from packages.incident_draft import service as incident_draft_service
-from packages.incident_draft.domain import DraftedDocument
-from packages.incident_summary import service as incident_summary_service
-from packages.incident_summary.service import EMPTY_HISTORY_CODE
+from packages.incident.scribe import service as incident_scribe_service
+from packages.incident.scribe.domain import DraftedDocument
+from packages.incident.scribe.service import EMPTY_HISTORY_CODE
 from packages.rant.service import format_rant
 from packages.user_rotations.platforms import slack as user_rotations_slack
 from packages.user_rotations.service import UserRotationShift
@@ -283,7 +282,7 @@ def test_access_sync_user_enqueue_failure_is_reported(
     assert "lock store unavailable" in reply["text"]
 
 
-# --- packages/incident_draft and packages/incident_summary ------------------
+# --- packages/incident/scribe ------------------------------------------------
 
 CHANNEL_HISTORY = {
     "ok": True,
@@ -317,7 +316,7 @@ def test_incident_draft_drafts_from_the_bookmarked_document(
             data=DraftedDocument(document_id="doc-draft", created=True, drafted_headings=("Summary",), unanswered_headings=())
         )
     )
-    monkeypatch.setattr(incident_draft_service, "draft_incident_document", drafter)
+    monkeypatch.setattr(incident_scribe_service, "draft_incident_document", drafter)
 
     response = incident_channel.dispatch("sre", "incident draft")
 
@@ -337,7 +336,7 @@ def test_incident_draft_without_bookmarked_document_does_not_draft(
     """Without an "Incident report" bookmark the command explains and never calls the drafter."""
     incident_channel.client.replies["bookmarks_list"] = {"ok": True, "bookmarks": []}
     drafter = AsyncRecorder()
-    monkeypatch.setattr(incident_draft_service, "draft_incident_document", drafter)
+    monkeypatch.setattr(incident_scribe_service, "draft_incident_document", drafter)
 
     incident_channel.dispatch("sre", "incident draft")
 
@@ -350,7 +349,7 @@ def test_incident_summarize_returns_the_summary_ephemerally(
 ) -> None:
     """/sre incident summarize summarises the channel transcript once."""
     summarizer = AsyncRecorder(OperationResult.success(data="The deploy was rolled back."))
-    monkeypatch.setattr(incident_summary_service, "summarize_transcript", summarizer)
+    monkeypatch.setattr(incident_scribe_service, "summarize_transcript", summarizer)
 
     response = incident_channel.dispatch("sre", "incident summarize")
 
@@ -371,7 +370,7 @@ def test_incident_summarize_with_empty_history_says_there_is_nothing_yet(
     summarizer = AsyncRecorder(
         OperationResult.error(OperationStatus.PERMANENT_ERROR, "no messages", error_code=EMPTY_HISTORY_CODE)
     )
-    monkeypatch.setattr(incident_summary_service, "summarize_transcript", summarizer)
+    monkeypatch.setattr(incident_scribe_service, "summarize_transcript", summarizer)
 
     incident_channel.dispatch("sre", "incident summarize")
 
