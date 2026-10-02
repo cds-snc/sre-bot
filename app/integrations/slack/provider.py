@@ -37,7 +37,7 @@ logger = structlog.get_logger()
 class SlackWebReply:
     """Send handler replies through a Slack Web client.
 
-    Implements ``contracts.slack.reply.SlackReplyPort``. Maps ``SlackApiError``
+    Implements ``contracts.slack.reply.SlackReplySender``. Maps ``SlackApiError``
     to ``OperationResult`` through ``classify_slack_error`` so handlers branch
     on a result instead of catching SDK exceptions
     (decisions/transport-slack.md, Errors).
@@ -656,7 +656,7 @@ class SlackPlatformProvider:
 
     @property
     def reply(self) -> SlackWebReply:
-        """Get the reply port handlers use to post messages and open views.
+        """Get the reply interface handlers use to post messages and open views.
 
         Satisfies ``contracts.slack.registrar.SlackCommandRegistrar.reply``.
         Usable only after the provider has been started; before that every

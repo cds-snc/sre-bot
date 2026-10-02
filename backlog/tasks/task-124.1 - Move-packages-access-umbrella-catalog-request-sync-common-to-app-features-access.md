@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:01'
-updated_date: '2026-10-01 14:06'
+updated_date: '2026-10-02 00:47'
 labels:
   - plugin-architecture
   - features
@@ -50,3 +50,11 @@ Added 2026-10-01 (amended decisions/feature-packages.md, umbrella rules 4 and 5)
 - [ ] #7 access/sync handlers are async def, and access/sync uses only layout-table names
 - [ ] #8 access/common does no I/O: the runtime-config loaders and their provider live in access/core/ and are imported only through core/api.py; core/ has no entrypoints/, no hookimpls and no entry point; the umbrella layers contract lists core between the subdomains and common
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+From TASK-136 (2026-10-02): each access subdomain declares its service Protocol twice, once in the service module (AccessRequestWorkflow, EntitlementCatalog, AccessSynchronizer after TASK-136.3) and once as a private route-local twin in interactions/http.py (_AccessRequestWorkflow, _EntitlementCatalog, _AccessSynchronizer). The catalog and sync twins are method-for-method identical; the request twin omits advance_from_sync_result. When this task rewrites interactions/ into entrypoints/, collapse each twin onto its subdomain's public Protocol (or decide to keep the narrower request one). This stays inside each subdomain and is not an access/core item: core/ admits only what two or more subdomains consume.
+
+Caveat on the twin collapse: the type-model-boundaries skill's Protocol Alignment Pattern explicitly allows a narrower route-local Protocol beside the shared one, so the twins follow a documented pattern. Collapsing them means deciding that pattern no longer applies to access (and updating the skill), not just deleting duplicates.
+<!-- SECTION:NOTES:END -->

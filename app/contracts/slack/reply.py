@@ -1,6 +1,6 @@
 """Outbound messaging Protocol Slack handlers use to reply.
 
-Handlers reach the Slack Web API only through this port, obtained from
+Handlers reach the Slack Web API only through this interface, obtained from
 ``SlackCommandRegistrar.reply``. Implementations classify Web API failures
 into an ``OperationResult`` and never raise.
 
@@ -12,7 +12,7 @@ from typing import Any, Protocol
 from contracts.operations import OperationResult
 
 
-class SlackReplyPort(Protocol):
+class SlackReplySender(Protocol):
     """Replies a Slack handler can send as the bot."""
 
     def post_message(

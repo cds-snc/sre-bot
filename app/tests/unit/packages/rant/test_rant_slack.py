@@ -125,7 +125,7 @@ def test_register_commands_registers_top_level_rant():
 
 @pytest.mark.unit
 def test_registered_handler_replies_through_the_registrar(monkeypatch):
-    """The registered handler posts through the registrar's reply port, with the identity from the package lookup."""
+    """The registered handler posts through the registrar's reply interface, with the identity from the package lookup."""
     reply = FakeSlackReply()
     registrar = FakeSlackRegistrar(reply)
     monkeypatch.setattr(rant_slack, "get_user_identity_lookup", _identities_with_profile)

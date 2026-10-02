@@ -1,10 +1,10 @@
-"""Behavior tests for the reply port exposed by ``SlackPlatformProvider.reply``.
+"""Behavior tests for the reply interface exposed by ``SlackPlatformProvider.reply``.
 
 The provider's Web client is replaced by a recording stub, so each test
 observes the exact Web API call a reply method issues and the
 ``OperationResult`` it returns. Failures are real ``SlackApiError`` objects
 carrying real ``SlackResponse`` payloads and headers, as slack_sdk raises
-them: the port must classify them into a result and never raise, because
+them: the interface must classify them into a result and never raise, because
 handlers branch on the result instead of catching SDK exceptions.
 """
 
@@ -18,7 +18,7 @@ from slack_sdk.web.slack_response import SlackResponse
 
 from contracts.operations import OperationStatus
 from contracts.slack.registrar import SlackCommandRegistrar
-from contracts.slack.reply import SlackReplyPort
+from contracts.slack.reply import SlackReplySender
 from integrations.slack.provider import SlackPlatformProvider
 
 pytestmark = pytest.mark.unit
@@ -44,9 +44,9 @@ def _provider(client: Any | None) -> SlackPlatformProvider:
     return provider
 
 
-def test_provider_is_a_registrar_whose_reply_is_a_reply_port() -> None:
+def test_provider_is_a_registrar_whose_reply_is_a_reply_sender() -> None:
     registrar: SlackCommandRegistrar = _provider(MagicMock())
-    reply: SlackReplyPort = registrar.reply
+    reply: SlackReplySender = registrar.reply
 
     assert reply is registrar.reply
 

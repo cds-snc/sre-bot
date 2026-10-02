@@ -11,7 +11,7 @@ section, which the service replaces via the document port.
 
 Channel bookmarks, history, metadata and user records are read through the
 package's ``IncidentChannelPort``, resolved from ``providers`` at dispatch
-time. The in-request progress notice goes through the registrar's reply port;
+time. The in-request progress notice goes through the registrar's reply interface;
 no Slack SDK is imported here.
 """
 
@@ -27,7 +27,7 @@ import structlog
 
 from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
 from contracts.slack.registrar import SlackCommandRegistrar
-from contracts.slack.reply import SlackReplyPort
+from contracts.slack.reply import SlackReplySender
 from infrastructure.i18n import t
 from packages.incident_draft.domain import DraftedDocument, TranscriptMessage
 from packages.incident_draft.providers import get_incident_channel_port
@@ -109,7 +109,7 @@ def register_commands(registrar: SlackCommandRegistrar) -> None:
 def handle_draft_command(
     payload: CommandPayload,
     parsed_args: dict[str, Any],
-    reply: SlackReplyPort,
+    reply: SlackReplySender,
     channel: IncidentChannelPort,
 ) -> CommandResponse:
     """Handle ``/sre incident draft`` and report the outcome ephemerally.
@@ -124,7 +124,7 @@ def handle_draft_command(
         parsed_args: Parsed ``--limit`` argument (empty for the no-argument
             invocation). History always starts at the channel's creation so the
             draft covers the whole incident.
-        reply: Port used to post the progress notice.
+        reply: Interface used to post the progress notice.
         channel: Port reading the incident channel.
 
     Returns:
@@ -169,7 +169,7 @@ def handle_draft_command(
 
 
 def _notify_working(
-    reply: SlackReplyPort,
+    reply: SlackReplySender,
     channel_id: str,
     payload: CommandPayload,
     locale: str,
