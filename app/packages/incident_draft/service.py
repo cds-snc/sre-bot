@@ -2,9 +2,9 @@
 
 The incident document created at channel creation is a template: each heading
 is followed by guidance describing what belongs in that section. This service
-reads those heading/guidance pairs through the ``IncidentDocumentPort``, treats
+reads those heading/guidance pairs through the ``IncidentDocumentStore``, treats
 the guidance as per-section drafting instructions, answers each one from the
-incident channel transcript via the ``Summarizer`` port
+incident channel transcript via the ``Summarizer`` interface
 (``integrations.openai``), and writes the answers into a new draft document on
 each run (a fresh copy of the incident report template). The incident report
 created at channel creation is only ever read, never modified.
@@ -200,7 +200,7 @@ _LIST_HEADING_MARKERS = (
 
 
 @runtime_checkable
-class IncidentDocumentPort(Protocol):
+class IncidentDocumentStore(Protocol):
     """Behavior contract for reading the incident document and creating the draft."""
 
     def read_sections(self, document_id: str) -> list[DocumentSection]:
@@ -247,7 +247,7 @@ async def draft_incident_document(
     document_id: str,
     messages: Sequence[TranscriptMessage],
     *,
-    documents: IncidentDocumentPort | None = None,
+    documents: IncidentDocumentStore | None = None,
     summarizer: Summarizer | None = None,
 ) -> OperationResult[DraftedDocument]:
     """Draft a filled-in copy of the incident document from channel history.
@@ -257,9 +257,9 @@ async def draft_incident_document(
             only ever read, never modified.
         messages: Chronologically ordered incident-channel messages -- the only
             source of facts for the drafted content.
-        documents: Optional ``IncidentDocumentPort``; defaults to the
+        documents: Optional ``IncidentDocumentStore``; defaults to the
             Google-Docs-backed adapter from ``providers``. Injected in tests.
-        summarizer: Optional ``Summarizer`` port; defaults to the process
+        summarizer: Optional ``Summarizer`` interface; defaults to the process
             singleton. Injected in tests.
 
     Returns:
@@ -278,9 +278,9 @@ async def draft_incident_document(
     )
 
     if documents is None:
-        from packages.incident_draft.providers import get_incident_document_port
+        from packages.incident_draft.providers import get_incident_document_store
 
-        documents = get_incident_document_port()
+        documents = get_incident_document_store()
 
     sections = [s for s in documents.read_sections(document_id) if not _is_human_only(s.heading)]
     if not sections:
