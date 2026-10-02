@@ -1,10 +1,10 @@
 ---
 id: TASK-136.3
 title: Rename the Port-suffixed Protocols in packages/access to role names
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-02 00:38'
-updated_date: '2026-10-02 00:42'
+updated_date: '2026-10-02 13:23'
 labels:
   - plugin-architecture
   - naming
@@ -27,11 +27,11 @@ Slice 3 of TASK-136. Applies the Protocol naming rule to packages/access: the th
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every Port-suffixed Protocol under packages/access has a role name that does not collide with the concrete service classes (AccessRequestService, CatalogService, AccessSyncApplicationService), or, where the plan records that a route-local twin is removed, no longer exists; rg finds no Protocol class ending in Port under app/packages/access and no importer of an old name
-- [ ] #2 The test that asserts the sync ingress dependency type by class-name string (tests/unit/packages/access/sync/test_access_sync_application_service_naming.py) and the other access tests that name these Protocols are updated in place to the new names, with the same assertions on behaviour and signatures
-- [ ] #3 Docstrings and comments in the touched access files say 'interface' instead of 'port'
-- [ ] #4 No behaviour change: the TASK-36 legacy_surface suite is green with no assertion change
-- [ ] #5 Full CI sequence from app/ passes: ruff check, make fmt-ci check-sdk-typing check-vendor-package-contract check-aws-platform-seam check-runtime-imports check-import-contracts test, and mypy shows no new errors in touched files
+- [x] #1 Every Port-suffixed Protocol under packages/access has a role name that does not collide with the concrete service classes (AccessRequestService, CatalogService, AccessSyncApplicationService), or, where the plan records that a route-local twin is removed, no longer exists; rg finds no Protocol class ending in Port under app/packages/access and no importer of an old name
+- [x] #2 The test that asserts the sync ingress dependency type by class-name string (tests/unit/packages/access/sync/test_access_sync_application_service_naming.py) and the other access tests that name these Protocols are updated in place to the new names, with the same assertions on behaviour and signatures
+- [x] #3 Docstrings and comments in the touched access files say 'interface' instead of 'port'
+- [x] #4 No behaviour change: the TASK-36 legacy_surface suite is green with no assertion change
+- [x] #5 Full CI sequence from app/ passes: ruff check, make fmt-ci check-sdk-typing check-vendor-package-contract check-aws-platform-seam check-runtime-imports check-import-contracts test, and mypy shows no new errors in touched files
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -69,4 +69,42 @@ Blast radius: packages/access only; a missed importer fails at import and is cau
 Ordering: independent of TASK-136.2 (no shared file). Depends on TASK-136.1 only for the recorded rule.
 
 Doubts to verify: (1) FastAPI treats Annotated[_Protocol, Depends(fn)] by the Depends callable only, so renaming the annotation changes no OpenAPI component name (check the generated schema). (2) No test stub or patch string names a private Protocol beyond the two docstrings found (re-run rg over app/tests).
+
+Amendments after re-checking the tree at f182ecd2 (2026-10-02, after TASK-136.2):
+- Call sites unchanged: 8 production files, 47 lines; catalog/interactions/http.py classes are at :34 and :40. None of the nine new names exists in app/.
+- request/service.py carries 'from __future__ import annotations' (deprecated under the CPython 3.14 baseline). It is removed in this task because the file is touched. Its TYPE_CHECKING-only imports (DirectoryMember, DirectoryProvider) stay valid under lazy annotations; test_access_request_package_init.py calls get_type_hints on six Protocol methods and guards this.
+- test_access_sync_application_service_naming.py: the module docstring ('Fail-first naming tests for Sprint 1 ...') and the 'renamed' wording in two test docstrings carry a sprint label and transitory state; they are reworded to describe the observable behaviour while the file is edited.
+- Step 1 as written asserts the old name is absent, and step 5 expects rg for 'Port' names under the access tests to be empty. Both cannot hold if the old name is a string literal in the test. Which one gives way is the human's call at plan approval.
+- Baselines taken before any edit: OpenAPI schema of the three access routers (35011 bytes, contains none of the Protocol names); pytest tests/unit/packages/access + tests/integration/legacy_surface 355 passed; mypy on packages/access plus the three test files 15 errors in 2 files, none in packages/access; IncidentChannelPort / get_incident_channel_port 53 occurrences in 13 files.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+What changed (mechanical rename inside packages/access, no behaviour change, no alias at any old name):
+- Public Protocols: AccessRequestServicePort -> AccessRequestWorkflow (request/service.py), CatalogServicePort -> EntitlementCatalog (catalog/service.py), AccessSyncApplicationServicePort -> AccessSynchronizer (sync/application.py), with the importers sync/job_runner.py and sync/interactions/ingress.py.
+- Route-local Protocols in the three interactions/http.py modules: _AccessRequestServicePort -> _AccessRequestWorkflow, _CatalogServicePort -> _EntitlementCatalog, _AccessSyncApplicationServicePort -> _AccessSynchronizer, _AccessRequestSettingsPort -> _AccessRequestRouteSettings, _CatalogSettingsPort -> _CatalogRouteSettings, _AccessSyncSettingsPort -> _AccessSyncRouteSettings. The twins are kept (collapse is TASK-124.1).
+- request/service.py: module docstring says 'Protocol interface'; the deprecated 'from __future__ import annotations' is removed.
+- Tests edited in place, same assertions: test_access_sync_application_service_naming.py (new name in the hasattr and __name__ checks, test renamed ..._uses_access_synchronizer, sprint label and 'renamed' wording dropped from docstrings); test_access_request_package_init.py (import, getattr, test renamed test_access_request_workflow_...); test_access_sync_routes.py (two stub docstrings). Both edited tests failed before the production rename (ImportError on AccessRequestWorkflow at collection). No absence assertion, per the approval decision.
+- 8 production files, 3 test files; 47 production lines plus the future-import removal.
+
+Evidence (2026-10-02, from app/, on f182ecd2 plus this change):
+- AC1: rg -n '\w+Port\b' packages/access tests/unit/packages/access -> no match; rg for the nine old names over app/ -> no match.
+- AC2: the three test files above; pytest tests/unit/packages/access green inside the full run.
+- AC3: rg -n -i '\bport\b|_port\b' packages/access tests/unit/packages/access -> no match.
+- AC4: pytest tests/integration/legacy_surface -> 17 passed; no file under tests/integration changed.
+- AC5: ruff check . -> All checks passed. make fmt-ci check-sdk-typing check-vendor-package-contract check-aws-platform-seam check-runtime-imports check-import-contracts test -> rc 0; 783 files already formatted; import contracts 8 kept, 0 broken; 2858 passed and 760 passed. mypy on packages/access plus the three test files: 15 errors in 2 files before and after, identical once line numbers are stripped, none in packages/access or the edited tests (infrastructure/i18n and integrations/openai settings, pre-existing).
+- Plan doubt 1: app.openapi() for the three access routers is byte-identical before and after (35011 bytes). Doubt 2: no test names a private Protocol beyond the two docstrings.
+- IncidentChannelPort / get_incident_channel_port: 53 occurrences in 13 files, unchanged.
+
+For the human: the change is uncommitted on feat/rename_port_suffix_protocols (HEAD f182ecd2, same commit as main); commit, PR, review, then move to Done.
+<!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-02 13:19
+---
+Plan approved 2026-10-02 (Guillaume Charest, in session), as written plus the appended amendments. Decision: the naming test asserts the new name only; absence of the old names is proven by rg, not by a test assertion (same as TASK-136.2).
+---
+<!-- COMMENTS:END -->

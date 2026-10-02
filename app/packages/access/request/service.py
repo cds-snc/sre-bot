@@ -14,11 +14,9 @@ The service owns no persistence directly — it delegates to
 ``AccessRequestRepository``.  It enforces all policy rules by calling pure
 functions from ``policies.py``.
 
-Protocol port ``AccessRequestServicePort`` decouples route handlers from the
+Protocol interface ``AccessRequestWorkflow`` decouples route handlers from the
 concrete class and makes the service trivially substitutable in tests.
 """
-
-from __future__ import annotations
 
 import uuid
 from dataclasses import replace
@@ -54,11 +52,11 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 
-class AccessRequestServicePort(Protocol):
+class AccessRequestWorkflow(Protocol):
     """Structural contract for the access request service.
 
     Route handlers and test stubs depend on this Protocol rather than the
-    concrete class, mirroring the ``AccessSyncApplicationServicePort`` pattern.
+    concrete class, mirroring the ``AccessSynchronizer`` pattern.
     """
 
     def submit_request(

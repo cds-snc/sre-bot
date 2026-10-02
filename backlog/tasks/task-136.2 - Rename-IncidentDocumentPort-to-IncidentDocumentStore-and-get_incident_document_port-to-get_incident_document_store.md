@@ -4,10 +4,9 @@ title: >-
   Rename IncidentDocumentPort to IncidentDocumentStore and
   get_incident_document_port to get_incident_document_store
 status: In Progress
-assignee:
-  - '@claude'
+assignee: []
 created_date: '2026-10-02 00:37'
-updated_date: '2026-10-02 12:41'
+updated_date: '2026-10-02 13:20'
 labels:
   - plugin-architecture
   - naming
