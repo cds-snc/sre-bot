@@ -1,4 +1,4 @@
-"""Unit tests for the incident_draft Slack channel lookup adapter."""
+"""Unit tests for the incident_draft Slack report-link lookup adapter."""
 
 from unittest.mock import MagicMock
 
@@ -6,105 +6,80 @@ import pytest
 from slack_sdk.errors import SlackApiError
 
 from packages.incident_draft.adapters import slack as slack_adapter
-from packages.incident_draft.adapters.slack import SlackIncidentChannel, build_incident_channel
-from packages.incident_draft.service import IncidentChannelPort
+from packages.incident_draft.adapters.slack import SlackIncidentReportLinkLookup, build_incident_report_link_lookup
+from packages.incident_draft.service import IncidentReportLinkLookup
 
 pytestmark = pytest.mark.unit
 
+_REPORT_LINK = "https://docs.google.com/document/d/DOC123/edit"
 
-def test_list_bookmarks_calls_bookmarks_list_and_returns_the_bookmarks() -> None:
-    """The channel's bookmarks come back as Slack listed them."""
-    bookmarks = [{"title": "Incident report", "link": "https://docs.google.com/document/d/DOC123/edit"}]
+
+def test_find_report_links_calls_bookmarks_list_and_returns_the_incident_report_links() -> None:
+    """Only bookmarks titled "Incident report" count; their links come back as plain strings."""
     client = MagicMock()
-    client.bookmarks_list.return_value = {"ok": True, "bookmarks": bookmarks}
+    client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {"title": "Some runbook", "link": "https://example.com"},
+            {"title": "Incident report", "link": _REPORT_LINK},
+        ],
+    }
 
-    assert SlackIncidentChannel(client).list_bookmarks("C123") == bookmarks
+    assert SlackIncidentReportLinkLookup(client).find_report_links("C123") == [_REPORT_LINK]
     client.bookmarks_list.assert_called_once_with(channel_id="C123")
 
 
-def test_fetch_history_calls_conversations_history_and_returns_messages_newest_first() -> None:
-    """History is requested with the caller's window and returned in Slack's order."""
-    raw = [{"user": "U1", "text": "newest", "ts": "2"}, {"user": "U1", "text": "oldest", "ts": "1"}]
+def test_report_links_keep_the_order_slack_listed_them_in() -> None:
+    """Several "Incident report" bookmarks are returned in listed order, so the caller's first match is Slack's first."""
     client = MagicMock()
-    client.conversations_history.return_value = {"ok": True, "messages": raw}
+    client.bookmarks_list.return_value = {
+        "ok": True,
+        "bookmarks": [
+            {"title": "Incident report", "link": "https://example.com/first"},
+            {"title": "Other", "link": "https://example.com/other"},
+            {"title": "Incident report", "link": "https://example.com/second"},
+        ],
+    }
 
-    messages = SlackIncidentChannel(client).fetch_history("C123", limit=25, oldest="1700000000.000000")
+    assert SlackIncidentReportLinkLookup(client).find_report_links("C123") == [
+        "https://example.com/first",
+        "https://example.com/second",
+    ]
 
-    assert messages == raw
-    client.conversations_history.assert_called_once_with(channel="C123", limit=25, oldest="1700000000.000000")
 
-
-def test_get_channel_calls_conversations_info_and_returns_the_channel() -> None:
-    """The channel object carries the creation time the handler reads."""
+@pytest.mark.parametrize("bookmark", [{"title": "Incident report"}, {"title": "Incident report", "link": None}])
+def test_a_report_bookmark_without_a_link_yields_an_empty_string_entry(bookmark: dict[str, str | None]) -> None:
+    """A bookmark with no link still counts as an entry, so the caller can report it as unusable."""
     client = MagicMock()
-    client.conversations_info.return_value = {"ok": True, "channel": {"created": 1_700_000_000}}
+    client.bookmarks_list.return_value = {"ok": True, "bookmarks": [bookmark]}
 
-    assert SlackIncidentChannel(client).get_channel("C123") == {"created": 1_700_000_000}
-    client.conversations_info.assert_called_once_with(channel="C123")
-
-
-def test_get_user_calls_users_info_and_returns_the_user() -> None:
-    """The user object carries the profile the handler resolves a display name from."""
-    user = {"real_name": "Ada Lovelace", "profile": {"display_name": "Ada"}}
-    client = MagicMock()
-    client.users_info.return_value = {"ok": True, "user": user}
-
-    assert SlackIncidentChannel(client).get_user("U1") == user
-    client.users_info.assert_called_once_with(user="U1")
+    assert SlackIncidentReportLinkLookup(client).find_report_links("C123") == [""]
 
 
-def test_get_self_identity_calls_auth_test_and_returns_the_bot_identifiers() -> None:
-    """The bot's user id, bot id and name are the three signals own-message filtering needs."""
-    client = MagicMock()
-    client.auth_test.return_value = {"ok": True, "user_id": "UBOT", "bot_id": "BBOT", "user": "sre-bot", "team": "T"}
-
-    identity = SlackIncidentChannel(client).get_self_identity()
-
-    assert identity == {"user_id": "UBOT", "bot_id": "BBOT", "user": "sre-bot"}
-    client.auth_test.assert_called_once_with()
-
-
-def test_missing_payload_keys_yield_empty_values() -> None:
+def test_missing_bookmarks_key_yields_no_links() -> None:
     """A response without the expected key reads as empty rather than raising."""
     client = MagicMock()
-    for method in ("bookmarks_list", "conversations_history", "conversations_info", "users_info", "auth_test"):
-        getattr(client, method).return_value = {"ok": True}
-    channel = SlackIncidentChannel(client)
+    client.bookmarks_list.return_value = {"ok": True}
 
-    assert channel.list_bookmarks("C123") == []
-    assert channel.fetch_history("C123", limit=10, oldest="0.000000") == []
-    assert channel.get_channel("C123") == {}
-    assert channel.get_user("U1") == {}
-    assert channel.get_self_identity() == {"user_id": None, "bot_id": None, "user": None}
+    assert SlackIncidentReportLinkLookup(client).find_report_links("C123") == []
 
 
-@pytest.mark.parametrize(
-    ("web_api_method", "lookup"),
-    [
-        ("bookmarks_list", lambda channel: channel.list_bookmarks("C123")),
-        ("conversations_history", lambda channel: channel.fetch_history("C123", limit=10, oldest="0.000000")),
-        ("conversations_info", lambda channel: channel.get_channel("C123")),
-        ("users_info", lambda channel: channel.get_user("U1")),
-        ("auth_test", lambda channel: channel.get_self_identity()),
-    ],
-)
-def test_lookups_propagate_slack_api_errors(web_api_method: str, lookup) -> None:
-    """The adapter does not swallow Web API errors; the handler owns each degradation."""
+def test_a_slack_api_error_yields_no_links() -> None:
+    """The adapter owns the degradation: a Web API error is not raised and reads as no report links."""
     client = MagicMock()
-    getattr(client, web_api_method).side_effect = SlackApiError("err", {"ok": False, "error": "missing_scope"})
+    client.bookmarks_list.side_effect = SlackApiError("err", {"ok": False, "error": "missing_scope"})
 
-    with pytest.raises(SlackApiError):
-        lookup(SlackIncidentChannel(client))
+    assert SlackIncidentReportLinkLookup(client).find_report_links("C123") == []
 
 
-def test_build_incident_channel_uses_the_bot_web_client(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_incident_report_link_lookup_uses_the_bot_web_client(monkeypatch: pytest.MonkeyPatch) -> None:
     """The built adapter satisfies the package Protocol and calls through the shared client factory's client."""
     client = MagicMock()
-    client.conversations_info.return_value = {"ok": True, "channel": {"created": 1}}
+    client.bookmarks_list.return_value = {"ok": True, "bookmarks": [{"title": "Incident report", "link": _REPORT_LINK}]}
     monkeypatch.setattr(slack_adapter, "get_slack_web_client", lambda: client)
 
-    channel = build_incident_channel()
+    lookup = build_incident_report_link_lookup()
 
-    assert isinstance(channel, IncidentChannelPort)
-    channel.get_channel("C123")
-    client.conversations_info.assert_called_once_with(channel="C123")
+    assert isinstance(lookup, IncidentReportLinkLookup)
+    assert lookup.find_report_links("C123") == [_REPORT_LINK]
+    client.bookmarks_list.assert_called_once_with(channel_id="C123")

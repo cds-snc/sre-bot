@@ -3,10 +3,10 @@ id: TASK-135.3
 title: >-
   Move incident_draft onto packages/incident/core: the service gathers the
   transcript and the handler makes one service call
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-02 15:39'
-updated_date: '2026-10-02 17:11'
+updated_date: '2026-10-02 17:37'
 labels:
   - plugin-architecture
   - features
@@ -46,12 +46,12 @@ Independent of TASK-135.2: the two can be done in either order or in parallel.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 /sre incident draft is handled with one service call; the service finds the report document and reads the transcript through packages.incident.core.api, and platforms/slack.py holds no bookmark lookup, history fetch, name resolution, message filtering or time formatting
-- [ ] #2 packages/incident_draft defines no channel interface and no TranscriptMessage of its own; its only Slack lookup is IncidentReportLinkLookup, which returns plain strings and is resolved by get_incident_report_link_lookup
-- [ ] #3 The progress notice is still posted only after the report document is found and before the transcript is read; a channel with no bookmarked report gets the unchanged no-document reply and no notice
-- [ ] #4 rg -n 'Port\b|_port\b|_PORT\b|\bport\b' over packages/incident_draft and tests/unit/packages/incident_draft finds nothing, and the legacy_surface conftest no longer patches get_incident_channel_port
-- [ ] #5 Command name, arguments and replies are unchanged: the legacy_surface suite is green with no assertion change, and the transcript sent to the model keeps the same lines, filtering and time stamps
-- [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; exactly one import-linter ignore entry is added (packages.incident_draft.service -> packages.incident.core.api), marked as removed by TASK-135.4
+- [x] #1 /sre incident draft is handled with one service call; the service finds the report document and reads the transcript through packages.incident.core.api, and platforms/slack.py holds no bookmark lookup, history fetch, name resolution, message filtering or time formatting
+- [x] #2 packages/incident_draft defines no channel interface and no TranscriptMessage of its own; its only Slack lookup is IncidentReportLinkLookup, which returns plain strings and is resolved by get_incident_report_link_lookup
+- [x] #3 The progress notice is still posted only after the report document is found and before the transcript is read; a channel with no bookmarked report gets the unchanged no-document reply and no notice
+- [x] #4 rg -n 'Port\b|_port\b|_PORT\b|\bport\b' over packages/incident_draft and tests/unit/packages/incident_draft finds nothing, and the legacy_surface conftest no longer patches get_incident_channel_port
+- [x] #5 Command name, arguments and replies are unchanged: the legacy_surface suite is green with no assertion change, and the transcript sent to the model keeps the same lines, filtering and time stamps
+- [x] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; exactly one import-linter ignore entry is added (packages.incident_draft.service -> packages.incident.core.api), marked as removed by TASK-135.4
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -121,6 +121,37 @@ BLAST RADIUS AND ROLLBACK
 - Only /sre incident draft. Replies, arguments, the progress notice's timing and the model input are unchanged. Log events for transcript gathering change name (incident_draft_history_fetched, _history_fetch_failed, _self_identity, _auth_test_failed, _user_lookup_failed and _channel_info_failed become the core adapter's incident_transcript_* events); nothing outside app/ references the old names (rg over the repo, 2026-10-02).
 - No configuration, manifest or schema change; INCIDENT_DRAFT__* variables are untouched. A single git revert restores the previous code.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented as layer 3 of Stack G on stack-g/task-135.3-incident-draft-onto-core (on top of 9f57c514). Status stays In Progress; a human moves it to Done.
+
+WHAT CHANGED
+- service.py: draft_incident_document_from_conversation(conversation_id, *, limit, on_started, reader, report_links) is the handler's one call. It finds the report document through IncidentReportLinkLookup, returns NO_DOCUMENT when no link carries a Google Docs id, calls on_started, resolves the limit and window start, reads through packages.incident.core.api with exclude_own_and_system_messages=True and awaits draft_incident_document(document_id, messages), whose signature is unchanged. IncidentChannelPort is deleted. _format_time now takes the message's posted_at datetime; _transcript_line formats it in settings.TIMEZONE.
+- platforms/slack.py: 478 -> 249 lines. Keeps --limit parsing (_parse_limit, same shape as incident_summary's), the progress notice (posted from the on_started callback), one service call and rendering; NO_DOCUMENT maps to the existing no_document message.
+- adapters/slack.py: SlackIncidentReportLinkLookup.find_report_links (bookmarks_list, 'Incident report' title filter, plain strings, warning incident_draft_bookmarks_fetch_failed and no links on an API error); providers.py: get_incident_report_link_lookup.
+- domain.py: TranscriptMessage and the 'from __future__ import annotations' line deleted; __init__.py drops the re-export; README flow and architecture sections updated.
+- pyproject.toml: one feature-independence ignore entry, packages.incident_draft.service -> packages.incident.core.api, marked Temporary (TASK-135.3), removed by TASK-135.4.
+- legacy_surface: conftest patches get_incident_transcript_reader on the draft service module and get_incident_report_link_lookup on the draft providers module, both over the same fake client; the registration test stubs draft_incident_document on the service module (import and two setattr targets, no assert line changed); INVENTORY.md line 115 now points at platforms/slack.py:55.
+
+TWO ADDITIONS THE PLAN DID NOT LIST
+- contracts/operations/codes.py: NO_DOCUMENT added to the ErrorCode registry. test_error_code_registry requires every static error_code in production code to be registered, so the new code could not land without it.
+- tests/unit/packages/incident_draft/test_incident_draft_providers_document_store.py: its TranscriptMessage import moved to packages.incident.core.api (the plan's assumption list missed this importer).
+
+TESTS
+- New test_incident_draft_conversation_draft.py (22 tests): report lookup, NO_DOCUMENT boundaries, invalid-then-valid link, on_started ordering, window, limit, filtering on, provider defaults, EMPTY_HISTORY, error returned unchanged. The invalid-link warning is asserted on a mocked service logger, not structlog capture_logs, because capture_logs is order-dependent in the single-process run (TASK-90).
+- test_incident_draft_slack.py rewritten around the one service call; test_incident_draft_service.py gains the time-formatting cases and the '[YYYY-MM-DD HH:MM ZZZ] Name: text' model-input assertion; test_incident_draft_slack_adapter_lookup.py covers title filter, order, missing link, missing key, API error and the builder.
+
+GATES (from app/, 2026-10-02)
+- uv run ruff check . -> All checks passed!
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 65 errors in 22 files (same count as the baseline); 0 in the files this layer touched.
+- uv run lint-imports -> Contracts: 9 kept, 0 broken; contract (f) now reports 5 ignored imports (was 4).
+- uv run pytest tests/integration/legacy_surface -> 17 passed before and 17 passed after, no assertion changed.
+- uv run pytest tests --ignore=tests/smoke -> 6 failed, 3675 passed. The 6 are the known TASK-90 order leaks (test_webhooks_aws_sns.py x3, directory/test_google.py x3), unchanged from the baseline.
+- rg -n 'Port\b|_port\b|_PORT\b|\bport\b' app/packages/incident_draft app/tests/unit/packages/incident_draft -> no match.
+- rg -n 'get_incident_channel_port' app -> no match.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

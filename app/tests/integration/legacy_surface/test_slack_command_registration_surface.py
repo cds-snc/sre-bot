@@ -18,8 +18,8 @@ from contracts.operations import OperationResult, OperationStatus
 from packages.access.sync.interactions import slack as access_sync_slack
 from packages.access.sync.interactions.ingress import EnqueuedJob
 from packages.geolocate.platforms import slack as geolocate_slack
+from packages.incident_draft import service as incident_draft_service
 from packages.incident_draft.domain import DraftedDocument
-from packages.incident_draft.platforms import slack as incident_draft_slack
 from packages.incident_summary import service as incident_summary_service
 from packages.incident_summary.service import EMPTY_HISTORY_CODE
 from packages.rant.service import format_rant
@@ -317,7 +317,7 @@ def test_incident_draft_drafts_from_the_bookmarked_document(
             data=DraftedDocument(document_id="doc-draft", created=True, drafted_headings=("Summary",), unanswered_headings=())
         )
     )
-    monkeypatch.setattr(incident_draft_slack, "draft_incident_document", drafter)
+    monkeypatch.setattr(incident_draft_service, "draft_incident_document", drafter)
 
     response = incident_channel.dispatch("sre", "incident draft")
 
@@ -337,7 +337,7 @@ def test_incident_draft_without_bookmarked_document_does_not_draft(
     """Without an "Incident report" bookmark the command explains and never calls the drafter."""
     incident_channel.client.replies["bookmarks_list"] = {"ok": True, "bookmarks": []}
     drafter = AsyncRecorder()
-    monkeypatch.setattr(incident_draft_slack, "draft_incident_document", drafter)
+    monkeypatch.setattr(incident_draft_service, "draft_incident_document", drafter)
 
     incident_channel.dispatch("sre", "incident draft")
 

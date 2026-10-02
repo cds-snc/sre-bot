@@ -14,7 +14,6 @@ from packages.incident_draft.domain import (
     DocumentSection,
     DraftedDocument,
     SectionDraft,
-    TranscriptMessage,
 )
 from packages.incident_draft.platforms import slack
 from packages.incident_draft.service import draft_incident_document
@@ -53,6 +52,5 @@ __all__ = [
     "DocumentSection",
     "DraftedDocument",
     "SectionDraft",
-    "TranscriptMessage",
     "draft_incident_document",
 ]

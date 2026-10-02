@@ -4,27 +4,11 @@ Frozen, platform-neutral dataclasses shared by the service, the document
 adapter, and the platform adapters. This module depends only on the stdlib.
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 # Written into Author(s). The responders who spoke in the channel did not author
 # this document, and a reader needs to know it was machine-written.
 AI_AUTHOR = "SRE Bot (AI generated)"
-
-
-@dataclass(frozen=True)
-class TranscriptMessage:
-    """A single platform-neutral chat message used as drafting evidence.
-
-    ``timestamp`` is a short pre-formatted clock time (e.g. ``"14:09"``) shown
-    to the model so it can build a timeline; it is empty when the platform
-    adapter could not resolve one.
-    """
-
-    author: str
-    text: str
-    timestamp: str = ""
 
 
 @dataclass(frozen=True)
