@@ -384,3 +384,14 @@ layers = [
     "common",
 ]
 exhaustive = true
+
+[[tool.importlinter.contracts]]
+id = "incident-umbrella"
+name = "(i) Incident subdomains are independent siblings over core"
+type = "layers"
+containers = ["packages.incident"]
+layers = [
+    "documents | drive | meet | scheduling",
+    "core",
+]
+exhaustive = true
