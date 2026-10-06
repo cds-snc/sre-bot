@@ -175,6 +175,10 @@ class SlackPlatformProvider:
         self._logger = logger.bind(provider=name, version=version)
         # Commands stored by full_path (e.g., "sre.dev.aws") as key
         self._commands: dict[str, CommandDefinition] = {}
+        # Native Bolt listeners by exact id, attached when the app is initialized.
+        self._block_actions: dict[str, Callable[..., object]] = {}
+        self._view_submissions: dict[str, Callable[..., object]] = {}
+        self._listeners_attached = False
         self._translator: Translator | None = None
         if translation_service:
             self.set_translator(translation_service)
@@ -266,6 +270,7 @@ class SlackPlatformProvider:
             # Extract unique root commands from registered command tree
             # (e.g., "sre" from "sre.incident", "sre.webhooks", etc.)
             self._auto_register_root_commands()
+            self._attach_interaction_listeners()
 
             # Prepare Socket Mode handler if enabled (start happens separately)
             if self._settings.SOCKET_MODE:
@@ -540,6 +545,56 @@ class SlackPlatformProvider:
                 slash_command=slash_command,
                 root=root_command,
             )
+
+    def register_block_action(self, action_id: str, listener: Callable[..., object]) -> None:
+        """Register a native Bolt listener for one block action, by exact ``action_id``.
+
+        Raises:
+            ValueError: The id is blank or already registered.
+            RuntimeError: Listeners were already attached to the Bolt app.
+        """
+        self._register_listener("block action", self._block_actions, action_id, listener)
+
+    def register_view_submission(self, callback_id: str, listener: Callable[..., object]) -> None:
+        """Register a native Bolt listener for one view submission, by exact ``callback_id``.
+
+        Raises:
+            ValueError: The id is blank or already registered.
+            RuntimeError: Listeners were already attached to the Bolt app.
+        """
+        self._register_listener("view submission", self._view_submissions, callback_id, listener)
+
+    def _register_listener(
+        self,
+        kind: str,
+        listeners: dict[str, Callable[..., object]],
+        listener_id: str,
+        listener: Callable[..., object],
+    ) -> None:
+        """Store a listener until the app exists; registration is startup-only and each id is unique."""
+        if self._listeners_attached:
+            raise RuntimeError(f"Slack {kind} {listener_id!r} registered after startup")
+        if not listener_id.strip():
+            raise ValueError(f"Slack {kind} id must not be blank")
+        if listener_id in listeners:
+            raise ValueError(f"Slack {kind} {listener_id!r} is already registered")
+        listeners[listener_id] = listener
+        self._logger.debug("slack_listener_registered", kind=kind, listener_id=listener_id)
+
+    def _attach_interaction_listeners(self) -> None:
+        """Attach the registered block-action and view-submission listeners to the Bolt app, unwrapped."""
+        if not self._app:
+            return
+        for action_id, listener in self._block_actions.items():
+            self._app.block_action(action_id)(listener)
+        for callback_id, listener in self._view_submissions.items():
+            self._app.view_submission(callback_id)(listener)
+        self._listeners_attached = True
+        self._logger.info(
+            "slack_interaction_listeners_attached",
+            block_actions=sorted(self._block_actions),
+            view_submissions=sorted(self._view_submissions),
+        )
 
     def _tokenize_command_text(self, text: str) -> list[str]:
         """Tokenize Slack command text using quote-aware parsing."""

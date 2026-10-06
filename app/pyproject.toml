@@ -217,6 +217,8 @@ packages = ["api", "contracts", "infrastructure", "integrations", "jobs", "model
 # optional layers; add each to root_packages in the PR that creates it
 # (import-linter rejects a root package that does not exist).
 root_packages = ["server", "packages", "infrastructure", "integrations", "modules", "api", "jobs", "models", "utils", "contracts"]
+# Third-party packages join the graph so contract (j) can name slack_bolt.
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 id = "layers"
@@ -403,3 +405,14 @@ layers = [
     "core",
 ]
 exhaustive = true
+
+[[tool.importlinter.contracts]]
+id = "slack-bolt-in-entrypoints"
+name = "(j) slack_bolt is imported only by the Slack runtime, legacy modules and entrypoints/slack.py"
+type = "protected"
+protected_modules = ["slack_bolt"]
+# The Slack runtime (server, integrations until it moves) and legacy modules hold
+# the Bolt app; a feature's Slack entry point handles interactions with Bolt's own
+# listener arguments (decisions/platform-entrypoints.md rule 3, transport-slack.md
+# Checks). Direct imports only: chains through integrations are tracked by (e).
+allowed_importers = ["server", "integrations", "modules", "packages.**.entrypoints.slack"]

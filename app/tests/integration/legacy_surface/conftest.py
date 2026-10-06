@@ -10,9 +10,7 @@ that Bolt's ``respond`` posts to, and each package's backing service (patched
 per test).
 """
 
-import importlib.util
-from collections.abc import Callable, Iterator
-from concurrent.futures import Executor, Future
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from types import ModuleType, SimpleNamespace
 from typing import Any
@@ -22,7 +20,6 @@ import pluggy
 import pytest
 import structlog
 from slack_bolt import App, BoltRequest, BoltResponse
-from slack_bolt.authorization import AuthorizeResult
 from slack_sdk.webhook import WebhookClient
 
 import packages.access.sync as access_sync_module
@@ -42,6 +39,7 @@ from packages.incident.scribe.adapters.slack import SlackIncidentReportLinkLooku
 from packages.rant.adapters.slack import SlackUserIdentityLookup
 from packages.rant.platforms import slack as rant_slack
 from server.lifespan import _register_legacy_slack_commands
+from tests.factories.slack_bolt import FakeSlackClient, InlineExecutor, authorize_single_workspace, unpatched_app_init
 
 SLACK_COMMAND_HOOKIMPLS: tuple[ModuleType, ...] = (
     rant_module,
@@ -55,53 +53,6 @@ USER_ID = "U0INVOKER"
 CHANNEL_ID = "C0INCIDENT"
 TRIGGER_ID = "trigger-123"
 RESPONSE_URL = "https://hooks.slack.test/commands/response"
-
-
-class InlineExecutor(Executor):
-    """Runs Bolt listeners on the dispatching thread.
-
-    Bolt acks first and then hands the listener to its executor; running it
-    inline keeps that production ordering while letting assertions observe
-    every side effect as soon as ``dispatch`` returns.
-    """
-
-    def submit(self, fn: Callable[..., Any], /, *args: Any, **kwargs: Any) -> Future[Any]:
-        future: Future[Any] = Future()
-        try:
-            future.set_result(fn(*args, **kwargs))
-        except BaseException as exc:
-            future.set_exception(exc)
-        return future
-
-
-class FakeSlackClient:
-    """Records every Web API call and answers with canned payloads.
-
-    Any method name is accepted; its reply comes from ``replies`` (a dict, or
-    an exception to raise) and defaults to an empty ``ok`` payload.
-    """
-
-    def __init__(self) -> None:
-        self.calls: list[tuple[str, dict[str, Any]]] = []
-        self.replies: dict[str, dict[str, Any] | Exception] = {
-            "auth_test": {"ok": True, "user_id": "UBOT", "bot_id": "BBOT", "user": "sre-bot"}
-        }
-
-    def __getattr__(self, name: str) -> Callable[..., dict[str, Any]]:
-        if name.startswith("_"):
-            raise AttributeError(name)
-
-        def method(**kwargs: Any) -> dict[str, Any]:
-            self.calls.append((name, kwargs))
-            reply = self.replies.get(name, {"ok": True})
-            if isinstance(reply, Exception):
-                raise reply
-            return reply
-
-        return method
-
-    def calls_to(self, name: str) -> list[dict[str, Any]]:
-        return [kwargs for called, kwargs in self.calls if called == name]
 
 
 class RecordingApp(App):
@@ -143,33 +94,12 @@ class SlackCommandHarness:
         return self.app.dispatch(request)
 
 
-def _unpatched_app_init() -> Callable[..., None]:
-    """Return slack_bolt's own ``App.__init__``.
-
-    The session-wide ``pytest_configure`` hook in ``tests/conftest.py``
-    replaces ``App.__init__`` with a stub that registers nothing. Executing a
-    private copy of ``slack_bolt.app.app`` recovers the library's constructor
-    so this harness can build a real, fully initialised App.
-    """
-    spec = importlib.util.find_spec("slack_bolt.app.app")
-    assert spec is not None and spec.loader is not None
-    pristine = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(pristine)
-    init: Callable[..., None] = pristine.App.__init__
-    return init
-
-
-def _authorize_single_workspace(**_: Any) -> AuthorizeResult:
-    """Static workspace authorization, so Bolt never calls ``auth.test``."""
-    return AuthorizeResult(enterprise_id=None, team_id="T0TEAM", bot_token="xoxb-test", bot_id="BBOT", bot_user_id="UBOT")
-
-
 def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> SlackCommandHarness:
     """Wire the five hookimpls and the legacy sre and dev commands onto a fresh provider and Bolt app."""
-    monkeypatch.setattr(App, "__init__", _unpatched_app_init())
+    monkeypatch.setattr(App, "__init__", unpatched_app_init())
     client = FakeSlackClient()
     app = RecordingApp(
-        authorize=_authorize_single_workspace,
+        authorize=authorize_single_workspace,
         request_verification_enabled=False,
         listener_executor=InlineExecutor(),
     )

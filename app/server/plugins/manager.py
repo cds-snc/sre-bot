@@ -14,6 +14,7 @@ import structlog
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from contracts.scheduler.registry import BackgroundJobRegistry
+from server.plugins.slack_registrar import PluginSlackRegistrar
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -84,7 +85,7 @@ def register_feature_integrations(
     pm = get_plugin_manager()
 
     if slack_provider:
-        pm.hook.register_slack_commands(registrar=slack_provider)
+        _register_slack_per_plugin(pm, slack_provider)
         logger.info("slack_commands_registered")
 
     if event_dispatcher:
@@ -96,6 +97,18 @@ def register_feature_integrations(
 
     pm.hook.startup_warmup(logger=logger)
     logger.info("feature_startup_warmup_completed")
+
+
+def _register_slack_per_plugin(pm: FeaturePluginManager, registrar: SlackCommandRegistrar) -> None:
+    """Call each plugin's ``register_slack_commands`` with a registrar scoped to its entry-point name.
+
+    A blocked (disabled) plugin is listed without a plugin object and is skipped.
+    """
+    plugins = [(name, plugin) for name, plugin in pm.list_name_plugin() if plugin is not None]
+    for name, plugin in plugins:
+        others = [other for _, other in plugins if other is not plugin]
+        hook = pm.subset_hook_caller("register_slack_commands", remove_plugins=others)
+        hook(registrar=PluginSlackRegistrar(registrar, name))
 
 
 def register_background_jobs(registry: BackgroundJobRegistry) -> None:

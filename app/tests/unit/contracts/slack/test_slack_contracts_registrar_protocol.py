@@ -19,6 +19,7 @@ import packages.user_rotations as user_rotations_module
 from contracts.slack.registrar import SlackCommandRegistrar
 from contracts.slack.reply import SlackReplySender
 from integrations.slack.provider import SlackPlatformProvider
+from server.plugins.slack_registrar import PluginSlackRegistrar
 from tests.factories.slack import FakeSlackRegistrar, FakeSlackReply
 
 pytestmark = pytest.mark.unit
@@ -32,6 +33,12 @@ def test_fake_registrar_satisfies_the_registrar_and_reply_protocols() -> None:
 
     assert isinstance(reply, FakeSlackReply)
     assert reply.post_ephemeral(channel_id="C1", user_id="U1", text="hi").is_success
+
+
+def test_plugin_scoped_registrar_satisfies_the_registrar_protocol() -> None:
+    registrar: SlackCommandRegistrar = PluginSlackRegistrar(FakeSlackRegistrar(), "demo.feature")
+
+    assert isinstance(registrar.reply, FakeSlackReply)
 
 
 def test_hookimpl_registers_its_commands_through_the_registrar() -> None:
@@ -56,6 +63,14 @@ def test_registrar_register_command_mirrors_the_runtime_provider_signature() -> 
     assert {name: param.kind for name, param in protocol_params.items()} == {
         name: param.kind for name, param in provider_params.items()
     }
+
+
+@pytest.mark.parametrize("method", ["register_block_action", "register_view_submission"])
+def test_registrar_listener_methods_mirror_the_runtime_provider_signature(method: str) -> None:
+    protocol_params = inspect.signature(getattr(SlackCommandRegistrar, method)).parameters
+    provider_params = inspect.signature(getattr(SlackPlatformProvider, method)).parameters
+
+    assert list(protocol_params) == list(provider_params)
 
 
 @pytest.mark.parametrize(
