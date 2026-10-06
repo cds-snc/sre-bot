@@ -3,7 +3,7 @@ id: doc-2
 title: Delivery Sequence and Stacked Pull Requests
 type: guide
 created_date: '2026-09-24 20:23'
-updated_date: '2026-10-02 18:01'
+updated_date: '2026-10-06 14:15'
 ---
 # Delivery Sequence and Stacked Pull Requests
 
@@ -90,7 +90,7 @@ Single PRs: TASK-28.1; TASK-94 (alarm filters, Terraform) after TASK-28.2; TASK-
 | --- | --- | --- |
 | C: registry | TASK-108 (storage Protocol to contracts/) -> TASK-102 (ownership-checked release) -> TASK-58 (coordination rename) -> TASK-109 (svcs registry) | stack; starts once Stack A's TASK-106 and TASK-27.1 have merged (TASK-106 has; TASK-27.1 is open as of 2026-10-02); TASK-109 also needs the TASK-92 decision |
 | TASK-100 | lease re-read fail-open | single PR, after TASK-99 and TASK-58 |
-| TASK-110 | entry-point plugin loading; plugin load failures become fatal | single PR, deployed and observed on its own |
+| TASK-110 | as TASK-110.1 (modules.sre and modules.dev onto explicit legacy registration, behaviour-preserving) -> TASK-110.2 (entry-point plugin loading; plugin load failures become fatal); split on 2026-10-06 for the single-PR gate | two single PRs in order, not a stack; TASK-110.2 is deployed and observed on its own |
 | TASK-111 | TOML configuration files | single PR, coordinated with the Terraform and SSM changes |
 | D: host tooling | TASK-112 (per-environment enablement) -> TASK-113 (extension-point phase) -> TASK-114 (generator and shape check) | stack; no runtime change while every plugin is enabled by default |
 
@@ -110,7 +110,7 @@ These are mechanical moves with no dependencies between them. Ship them as paral
 
 - Capabilities: TASK-119 (directory), TASK-120 (drive), TASK-121 (spreadsheets), TASK-122 (audit), TASK-123 (rotations), TASK-32 (notifications placeholder). TASK-25.7 (Sentinel) follows TASK-122. TASK-25.10 (OpenAI onto the outbound-client contract, creating the text-generation capability) moved here from Wave 2 on 2026-10-01: it now creates a capability, so it waits for TASK-110 and TASK-114 like the others. TASK-134 (structured template fill in that capability) follows it. TASK-138 (calendar capability, from packages/incident/scheduling; TASK-38.6 consumes it) was added on 2026-10-02 by the TASK-97 decision.
 - Features: TASK-124.3 (rant), TASK-124.6 (geolocate), TASK-124.4 (talent), TASK-124.2 (oncall_sync, after TASK-123), TASK-124.5 (incident umbrella with core/ and the scribe subdomain, after TASK-120, TASK-134 and TASK-135; the adapter-only packages documents, drive, meet and scheduling move as they are and are folded in by TASK-38).
-- Incident reshape, a behaviour-preserving refactor and not a move: TASK-135 (incident_draft and incident_summary become the scribe subdomain over incident/core), as TASK-135.1 -> TASK-135.2 and TASK-135.3 (parallel) -> TASK-135.4, after TASK-26.1; TASK-25.10 blocks no slice and the TASK-97 decision (2026-10-02) unblocked TASK-135.4. Delivered as Stack G (human, 2026-10-02): TASK-135.1 -> TASK-135.2 -> TASK-135.3 -> TASK-135.4 -> TASK-135.5, bottom-up, one task per layer; TASK-135.4 was split after implementation for review size, into TASK-135.4 (add packages/incident/scribe, unregistered) and TASK-135.5 (register it and delete the two packages), and all five layers are implemented and awaiting review as of 2026-10-02; with TASK-135.4 unblocked no layer waits on work outside the chain, and 135.2 and 135.3, independent in content, are ordered summary first. Handoff: doc-4 (backlog/docs/stacks/). It also finishes TASK-136: the replacement for `IncidentChannelPort` takes a role name, and the `_CHANNEL_PORT` / `mock_port` test names are renamed with it (listed in the TASK-135 notes).
+- Incident reshape, a behaviour-preserving refactor and not a move: TASK-135 (incident_draft and incident_summary become the scribe subdomain over incident/core), as TASK-135.1 -> TASK-135.2 and TASK-135.3 (parallel) -> TASK-135.4, after TASK-26.1; TASK-25.10 blocks no slice and the TASK-97 decision (2026-10-02) unblocked TASK-135.4. Delivered as Stack G (human, 2026-10-02): TASK-135.1 -> TASK-135.2 -> TASK-135.3 -> TASK-135.4 -> TASK-135.5, bottom-up, one task per layer; TASK-135.4 was split after implementation for review size, into TASK-135.4 (add packages/incident/scribe, unregistered) and TASK-135.5 (register it and delete the two packages), and 135.2 and 135.3, independent in content, were ordered summary first. Stack G status (2026-10-06): complete and merged, #1530-#1534, bottom-up; its handoff doc (doc-4) was retired on 2026-10-06 and its one forward item, the `incident.scribe` entry-point name, is recorded on TASK-110. It also finishes TASK-136: the replacement for `IncidentChannelPort` takes a role name, and the `_CHANNEL_PORT` / `mock_port` test names are renamed with it (listed in the TASK-135 notes).
 
 ### Wave 5: behaviour-changing tracks
 
@@ -124,7 +124,7 @@ These are mechanical moves with no dependencies between them. Ship them as paral
 ## Standalone merges
 
 These change runtime or deployment behaviour. Merge and deploy each one separately:
-- TASK-110: plugin load failures abort boot.
+- TASK-110.2: plugin load failures abort boot (TASK-110.1 before it is behaviour-preserving).
 - TASK-111: configuration moves to files.
 - TASK-33: async Bolt.
 - TASK-100: lease read-failure policy.
