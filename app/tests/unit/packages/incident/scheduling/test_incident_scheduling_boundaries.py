@@ -57,8 +57,9 @@ def test_incident_umbrella_is_namespace_only():
 
 
 def test_incident_scheduling_has_no_entry_point():
-    """AC#6: no pyproject.toml entry-point line for the new package."""
+    """No pyproject.toml entry point targets the scheduling package or the incident umbrella."""
     pyproject = tomllib.loads((APP_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     entry_points = pyproject.get("project", {}).get("entry-points", {})
     declared = {target for group in entry_points.values() for target in group.values()}
-    assert not any(target == "packages.incident" or target.startswith("packages.incident.") for target in declared)
+    scheduling = "packages.incident.scheduling"
+    assert not any(target in {"packages.incident", scheduling} or target.startswith(f"{scheduling}.") for target in declared)

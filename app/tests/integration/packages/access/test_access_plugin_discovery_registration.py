@@ -1,11 +1,11 @@
 """Regression tests for access plugin discovery and registration chain."""
 
 import importlib
+from unittest.mock import MagicMock
 
 import pytest
 
-from server.plugins.base import auto_discover_plugins
-from server.plugins.manager import get_plugin_manager
+from server.plugins.manager import get_plugin_manager, load_plugins
 
 _ACCESS_ENV_KEYS = (
     "ACCESS_SYNC_ENABLED",
@@ -47,7 +47,7 @@ def test_access_plugins_register_routes_and_slack_commands_from_interactions() -
     """Access plugins should remain discoverable and register interactions endpoints."""
     get_plugin_manager.cache_clear()
     pm = get_plugin_manager()
-    auto_discover_plugins(pm, base_paths=["packages"])
+    load_plugins(pm, MagicMock())
 
     app = _FakeApp()
     slack_provider = _FakeSlackProvider()

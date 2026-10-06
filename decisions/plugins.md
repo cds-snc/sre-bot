@@ -12,9 +12,9 @@ scope: How features and capabilities register with the host, and how extension p
 Features and capabilities attach handlers (Slack, HTTP, jobs, i18n resources) and strategies to the host at startup ([plugin-architecture.md](plugin-architecture.md)). pluggy provides hookspec/hookimpl registration and is already in use. It offers two ways to register a plugin: explicit `pm.register(module)` and `pm.load_setuptools_entrypoints(group)`, which reads entry points from installed distribution metadata. It has no filesystem-scan primitive.
 
 Current code:
-- `server/plugins/base.py`'s `auto_discover_plugins` walks `packages/` and `modules/` with `pkgutil.walk_packages`, imports every subpackage and registers it. It logs and skips a package that fails to import, so a broken feature silently does not load.
+- `server/plugins/manager.py`'s `load_plugins` registers plugins with `pm.load_setuptools_entrypoints(PLUGIN_NAMESPACE)` before i18n collection. A plugin that fails to import aborts boot, and boot also aborts when the group yields no plugin (missing or stale project metadata).
 - A `startup_warmup` hookimpl that raises aborts boot. `access/sync`'s warmup assumes an AWS role through STS, so a business feature's credentials failure stops the whole app.
-- `pyproject.toml` declares no entry points.
+- `pyproject.toml` declares one entry point per `packages/` plugin under `[project.entry-points.sre_bot]`, named `<feature>` or `<feature>.<subdomain>`. A unit test checks the declarations against the packages that ship hookimpls, in both directions.
 - Hookspecs live in `contracts/plugins/hookspecs.py`: `register_slack_commands`, `register_routes`, `register_i18n_resources`, `register_event_handlers`, `register_background_jobs`, `startup_warmup`. The `hookspec` and `hookimpl` markers and the namespace constant live in `contracts/plugins/namespace.py`; the plugin manager lives in `server/plugins/`.
 - `register_event_handlers` has no implementations. `access/request` and `access/sync` subscribe to the blinker-backed dispatcher by calling `register_handler` inside `startup_warmup`.
 - The namespace constant is read from the installed project metadata (`sre-bot`, normalised to `sre_bot`) and names both markers and the `PluginManager`. pluggy is imported only in `contracts/plugins/` and `server/plugins/`.
@@ -85,7 +85,6 @@ Code defects abort in every layer: they ship with the image, the old tasks keep 
 Tickets: TASK-18 (contracts, including hookspecs), TASK-110 (entry-point loading), TASK-112 (enablement from configuration), TASK-126 (feature isolation and credential checks). The package moves are listed in [plugin-architecture.md](plugin-architecture.md). `modules/` keeps its hand-written registration until each surface is rebuilt ([migration.md](migration.md)).
 
 Tolerated until closed:
-- the filesystem walk in `auto_discover_plugins`, with import errors logged and skipped;
 - a raising `startup_warmup` hookimpl aborts boot even when the cause is a feature's settings or credentials;
 - the `register_event_handlers` hookspec, and `access/request` and `access/sync` subscribing to the in-process dispatcher in `startup_warmup`;
 - plugins under `packages/` rather than `features/`.
@@ -95,3 +94,4 @@ Tolerated until closed:
 - 2026-09-25: boot failure policy is fixed by layer and kind (code defects abort, a feature with invalid settings is skipped); credential checks are an opt-in `register_credential_checks` hook that alerts without aborting.
 - 2026-10-01: an umbrella's `core/` and `common/` are never entry points, per feature-packages.md.
 - 2026-10-01: TASK-107 moved the hookspecs, the markers and the namespace constant to `contracts/plugins/` and the plugin manager to `server/plugins/`; `infrastructure/plugins/` is deleted and its two tolerated items are closed.
+- 2026-10-06: TASK-110 replaced the filesystem walk with entry-point loading; an import failure now aborts boot, and that tolerated item is closed.
