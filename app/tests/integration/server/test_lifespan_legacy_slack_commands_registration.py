@@ -41,6 +41,7 @@ async def test_lifespan_registers_legacy_slack_commands_before_the_slack_app_is_
         patch("server.lifespan._initialize_directory_provider"),
         patch("server.lifespan._initialize_translation_service"),
         patch("server.lifespan.get_plugin_manager"),
+        patch("server.lifespan.load_plugins"),
         patch("server.lifespan.get_slack_provider", return_value=provider),
         patch("server.lifespan.register_feature_integrations", calls.register_feature_integrations),
         patch("server.lifespan._register_legacy_slack_commands", calls.register_legacy_slack_commands),

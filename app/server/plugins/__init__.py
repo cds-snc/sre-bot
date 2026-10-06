@@ -1,1 +1,1 @@
-"""Host plugin manager and feature discovery."""
+"""Host plugin manager and entry-point plugin loading."""

@@ -14,7 +14,7 @@ Composition order matters: configuration before services, services before plugin
 Current code (`app/server/lifespan.py`):
 - Loads settings slices and logs their keys, and builds the JWKS clients without fetching keys (a missing `ISSUER_CONFIG` logs a warning and continues).
 - Makes network calls before traffic in two places: the directory warmup, when `DIRECTORY_REQUIRE_STARTUP_WARMUP` opts in, and `access/sync`'s `startup_warmup`, whose adapter assumes an AWS role through STS while `get_aws_client` builds it. The second one makes STS a hard boot dependency of the whole app on behalf of one business feature.
-- Discovers plugins by walking `packages/` and `modules/` (`auto_discover_plugins`), which logs and skips a package that fails to import.
+- Loads plugins from the `pyproject.toml` entry points (`load_plugins`); a plugin that fails to import aborts boot.
 - Collects i18n resources through `register_i18n_resources`, then initializes the translator strictly; failure aborts boot.
 - Calls `register_slack_commands`, `register_routes` and `startup_warmup`; features construct their services lazily or inside `startup_warmup`. `access/request` and `access/sync` subscribe to in-process events there.
 - Registers legacy `modules/` handlers by hand, starts scheduled tasks only when `ENVIRONMENT == "production"` (Tier-2 jobs take a lease from the idempotency store), then starts Socket Mode.
@@ -73,7 +73,6 @@ Nothing else calls out before traffic: no connectivity probes, no warmups. Clien
 Tickets: TASK-58 (coordination contract and leases), TASK-109 (service registry), TASK-110 (plugin loading), TASK-98 (lazy AssumeRole), TASK-126 (credential checks and feature isolation), TASK-128 (directory check).
 
 Tolerated until closed:
-- plugin discovery by filesystem walk, with import errors logged and skipped;
 - services built lazily or in `startup_warmup` hookimpls instead of an eager registry phase;
 - network I/O before `yield` that aborts boot on failure: the opt-in directory warmup, and `access/sync`'s AssumeRole during client construction;
 - a feature whose settings fail validation aborts boot instead of being skipped;
@@ -84,3 +83,4 @@ Tolerated until closed:
 **Changes:**
 - 2026-09-24: phases aligned with plugin-architecture (config-file enablement, registry validation, extension-point collection, multi-replica); `applies` corrected to `target`.
 - 2026-09-25: only deploy-coupled defects abort boot; a feature with invalid settings is skipped; boot credential checks alert but never abort; readiness is lifespan completion.
+- 2026-10-06: TASK-110 loads plugins from entry points; the filesystem-walk tolerance is closed.

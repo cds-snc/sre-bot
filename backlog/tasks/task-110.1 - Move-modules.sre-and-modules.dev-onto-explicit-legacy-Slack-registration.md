@@ -1,10 +1,10 @@
 ---
 id: TASK-110.1
 title: Move modules.sre and modules.dev onto explicit legacy Slack registration
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-06 14:15'
-updated_date: '2026-10-06 14:22'
+updated_date: '2026-10-06 17:09'
 labels:
   - plugin-architecture
   - plugins

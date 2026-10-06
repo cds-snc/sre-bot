@@ -35,6 +35,18 @@ dependencies = [
     "email-validator>=2.3.0",
 ]
 
+# One line per feature plugin (decisions/plugins.md); the group is PLUGIN_NAMESPACE.
+# Umbrella packages and their core/common kernels are never entry points.
+[project.entry-points.sre_bot]
+"access.catalog" = "packages.access.catalog"
+"access.request" = "packages.access.request"
+"access.sync" = "packages.access.sync"
+geolocate = "packages.geolocate"
+"incident.scribe" = "packages.incident.scribe"
+oncall_sync = "packages.oncall_sync"
+rant = "packages.rant"
+user_rotations = "packages.user_rotations"
+
 [tool.ruff]
 target-version = "py314"
 line-length = 130

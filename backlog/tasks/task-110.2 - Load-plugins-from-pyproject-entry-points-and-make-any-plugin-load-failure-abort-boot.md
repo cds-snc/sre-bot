@@ -3,10 +3,10 @@ id: TASK-110.2
 title: >-
   Load plugins from pyproject entry points and make any plugin load failure
   abort boot
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-06 14:15'
-updated_date: '2026-10-06 14:15'
+updated_date: '2026-10-06 17:09'
 labels:
   - plugin-architecture
   - plugins
@@ -31,14 +31,14 @@ The behaviour change of TASK-110, after TASK-110.1 leaves no modules/ hookimpl. 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 pyproject.toml declares an entry point for every current plugin, with dotted <feature>.<subdomain> names for umbrella subdomains; umbrella packages have none
-- [ ] #2 Lifespan registers plugins only through pm.load_setuptools_entrypoints; no pkgutil/walk_packages discovery remains, and pm.register() for a first-party plugin appears only in test fixtures
-- [ ] #3 Boot tests: a poisoned entry point aborts boot; a raising hookimpl aborts boot; every expected plugin is registered
-- [ ] #4 CI check: every package shipping hookimpls has a matching entry-point line
-- [ ] #5 decisions/plugins.md and decisions/lifecycle.md drop the filesystem-walk tolerance in the same PR
-- [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #7 The slack_provider_start_skipped log fires only in the test environment
-- [ ] #8 A one-off docker build --target builder check of the installed entry-point metadata and load_plugins is recorded in the task notes
+- [x] #1 pyproject.toml declares an entry point for every current plugin, with dotted <feature>.<subdomain> names for umbrella subdomains; umbrella packages have none
+- [x] #2 Lifespan registers plugins only through pm.load_setuptools_entrypoints; no pkgutil/walk_packages discovery remains, and pm.register() for a first-party plugin appears only in test fixtures
+- [x] #3 Boot tests: a poisoned entry point aborts boot; a raising hookimpl aborts boot; every expected plugin is registered
+- [x] #4 CI check: every package shipping hookimpls has a matching entry-point line
+- [x] #5 decisions/plugins.md and decisions/lifecycle.md drop the filesystem-walk tolerance in the same PR
+- [x] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #7 The slack_provider_start_skipped log fires only in the test environment
+- [x] #8 A one-off docker build --target builder check of the installed entry-point metadata and load_plugins is recorded in the task notes
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -89,6 +89,24 @@ cd app && uv sync && uv run ruff check . && uv run mypy . --exclude '(?:^|/)\.ve
 - A stale venv now aborts boot/tests loudly (intended; message says uv sync).
 - Rollback: single revert (dev venvs need `uv sync`); no manifest ordering constraints. Out of scope: TASK-112 enablement, TASK-126 settings-skip/credential checks, features/ moves.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-06 implementation (verified against main 0c0add62).
+
+Plan findings re-verified: same eight hookimpl packages, no modules/ hookimpl, dead manager functions present; the walk call had moved to lifespan.py:196. `uv sync` writes entry_points.txt for the editable install (hatch); uv.lock unchanged.
+
+Deviation from the plan: tests/unit/packages/incident/scheduling/test_incident_scheduling_boundaries.py::test_incident_scheduling_has_no_entry_point forbade any packages.incident.* target and failed once incident.scribe was declared. Narrowed it to the umbrella and the scheduling package (its intent); its task-id docstring was rewritten. bin/check_aws_platform_seam.py's blind-spot note now says the walk is gone (seam check still OK, 11 baselined).
+
+Gates (from app/):
+- ruff check . -> All checks passed!
+- mypy . --exclude venv -> Found 57 errors in 20 files (checked 369 source files); 0 in touched files.
+- lint-imports -> Contracts: 9 kept, 0 broken.
+- pytest tests --ignore=tests/smoke -> 6 failed, 3715 passed. The 6 are the known TASK-90 order leaks (3 in tests/modules/webhooks/test_webhooks_aws_sns.py, 3 in tests/unit/infrastructure/directory/test_google.py); both files pass alone (111 passed).
+
+Image check (AC#8), from repo root: `docker build --target builder -t sre-bot:task110 -f Dockerfile .` built. In the image with /app/.venv/bin/python: PLUGIN_NAMESPACE = sre_bot; dist /app/.venv/lib/python3.14/site-packages/sre_bot-0.1.0.dist-info lists the eight [sre_bot] entry points; load_plugins on a bare pm logged feature_plugins_loaded with the eight names and registered exactly those. Bare-source check: `uv run --no-project` inside /app still resolves /app/.venv (sys.prefix /app/.venv, import succeeds), so it does not demonstrate the failure there; with the sre_bot dist-info moved out of site-packages, `import contracts.plugins.namespace` raises `PackageNotFoundError: No package metadata was found for sre-bot`, as intended.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

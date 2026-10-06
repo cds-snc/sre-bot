@@ -1,7 +1,8 @@
 """Feature plugin manager.
 
-One PluginManager for the entire application. Handles discovery of all feature
-packages and orchestrates their full startup lifecycle via hookspecs.
+One PluginManager for the entire application. Loads the feature plugins
+declared as ``pyproject.toml`` entry points and orchestrates their startup
+lifecycle via hookspecs.
 """
 
 from functools import lru_cache
@@ -13,8 +14,6 @@ import structlog
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from contracts.scheduler.registry import BackgroundJobRegistry
-from infrastructure.i18n.resources import I18nResourceRegistry
-from server.plugins.base import auto_discover_plugins
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
@@ -42,30 +41,27 @@ def get_plugin_manager() -> FeaturePluginManager:
     return pm
 
 
-def collect_feature_i18n_resources(
-    logger: BoundLogger,
-) -> I18nResourceRegistry:
-    """Phase 1 — Discover plugins and collect i18n resource registrations.
+def load_plugins(pm: FeaturePluginManager, logger: BoundLogger) -> None:
+    """Register every feature plugin declared under the ``PLUGIN_NAMESPACE`` entry-point group.
 
-    Must be called BEFORE translation service initialization so that all
-    feature-package locale paths are known and included in the loaded catalogs.
+    Errors are not caught: a plugin that fails to import stops startup. Loading
+    is idempotent, since pluggy skips entry points already registered.
 
     Args:
+        pm: Plugin manager to register the plugins with.
         logger: Structured logger for startup events.
 
-    Returns:
-        I18nResourceRegistry with every registered translation resource.
+    Raises:
+        RuntimeError: No plugin is registered from the group, which means the
+            project metadata is missing or stale.
     """
-    pm = get_plugin_manager()
-
-    auto_discover_plugins(pm, base_paths=["packages", "modules"])
-    logger.info("feature_plugins_discovered", plugin_count=len(pm.get_plugins()))
-
-    i18n_registry = I18nResourceRegistry()
-    pm.hook.register_i18n_resources(registry=i18n_registry)
-    logger.info("i18n_resources_collected", resource_count=i18n_registry.get_resource_count())
-
-    return i18n_registry
+    pm.load_setuptools_entrypoints(PLUGIN_NAMESPACE)
+    plugins = sorted(name for plugin, _ in pm.list_plugin_distinfo() if (name := pm.get_name(plugin)) is not None)
+    if not plugins:
+        raise RuntimeError(
+            f"no_plugins_loaded: no entry points in group {PLUGIN_NAMESPACE!r}; run `uv sync` to install the project"
+        )
+    logger.info("feature_plugins_loaded", plugins=plugins)
 
 
 def register_feature_integrations(
@@ -109,28 +105,3 @@ def register_background_jobs(registry: BackgroundJobRegistry) -> None:
         registry: Scheduler-agnostic registry the scheduler runtime hands to features.
     """
     get_plugin_manager().hook.register_background_jobs(registry=registry)
-
-
-def discover_and_init_features(
-    app: FastAPI,
-    logger: BoundLogger,
-    slack_provider: SlackCommandRegistrar | None = None,
-    event_dispatcher: EventDispatcher | None = None,
-) -> I18nResourceRegistry:
-    """Discover all feature packages and run their full startup lifecycle.
-
-    Kept for backward compatibility with tests. For production startup use
-    collect_feature_i18n_resources() + register_feature_integrations() with
-    translation service initialization between the two phases.
-
-    Returns:
-        I18nResourceRegistry containing all registered translation resources.
-    """
-    i18n_registry = collect_feature_i18n_resources(logger=logger)
-    register_feature_integrations(
-        app=app,
-        logger=logger,
-        slack_provider=slack_provider,
-        event_dispatcher=event_dispatcher,
-    )
-    return i18n_registry

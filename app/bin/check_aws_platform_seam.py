@@ -29,13 +29,11 @@ baseline is net-new and fails the check. Baseline entries that no longer
 reference the seam are reported as stale (safe to remove) and never fail: the
 baseline only ratchets down (decisions/migration.md coexistence rule 3).
 
-Known blind spot, recorded so a green check is not mistaken for proof that
-nothing loads the seam: server/lifespan.py calls auto_discover_plugins with
-base_paths ["packages", "modules"], which walks the whole packages/ tree and
-imports every sub-package. packages.aws_platform is therefore imported at
-startup with no literal reference anywhere, and no AST or string scan can see
-it. This guard bounds net-new NAMED dependents, which is what TASK-88 has to
-migrate.
+Startup no longer walks packages/: plugins load only from pyproject.toml entry
+points and packages.aws_platform has none, so the seam is imported only where
+a module names it. A dynamic import built from a computed string would still
+be invisible to this scan. This guard bounds net-new NAMED dependents, which
+is what TASK-88 has to migrate.
 
 Usage:
     python3 -m bin.check_aws_platform_seam

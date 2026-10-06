@@ -46,10 +46,10 @@ from modules import (
     sre,
     webhook_helper,
 )
-from server.plugins.base import auto_discover_plugins
 from server.plugins.manager import (
     FeaturePluginManager,
     get_plugin_manager,
+    load_plugins,
     register_background_jobs,
     register_feature_integrations,
 )
@@ -189,18 +189,16 @@ def _initialize_directory_provider(
 
 
 def _initialize_translation_service(pm: FeaturePluginManager, logger: BoundLogger) -> TranslationService:
-    """"""
-    # Phase 1: Discover feature plugins and collect i18n resource registrations.
-    log = logger.bind(phase="i18n_resource_collection")
+    """Collect the plugins' i18n resources, then initialize and health-check the translation service.
 
-    auto_discover_plugins(pm, base_paths=["packages", "modules"])
-    logger.info("feature_plugins_discovered", plugin_count=len(pm.get_plugins()))
-
+    Plugins must already be loaded so every feature's locale path is included.
+    """
     i18n_registry = I18nResourceRegistry()
     pm.hook.register_i18n_resources(registry=i18n_registry)
-    logger.info("i18n_resources_collected", resource_count=i18n_registry.get_resource_count())
+    logger.bind(phase="i18n_resource_collection").info(
+        "i18n_resources_collected", resource_count=i18n_registry.get_resource_count()
+    )
 
-    # Phase 2: Initialize translation service with all registered resources.
     log = logger.bind(phase="i18n_initialization")
     translation_service = get_translation_service()
     i18n_resources = i18n_registry.list_specs()
@@ -261,6 +259,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.slack_provider = get_slack_provider()
 
     pm = get_plugin_manager()
+    # Any plugin that fails to load stops startup here, before the app serves.
+    load_plugins(pm, logger.bind(phase="plugin_loading"))
 
     translation_service = _initialize_translation_service(pm, logger)
     # Inject translation service into all platform providers and their formatters
@@ -320,8 +320,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 "slack_provider_start_failed",
                 error=start_slack_result.message,
             )
-        else:
-            logger.info("slack_provider_start_skipped", reason="test_environment")
+    else:
+        logger.info("slack_provider_start_skipped", reason="test_environment")
 
     app.state.scheduled_stop_event = scheduled_stop_event
 
