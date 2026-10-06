@@ -3,10 +3,10 @@ id: TASK-110
 title: >-
   Load plugins from pyproject entry points and make any plugin load failure
   abort boot
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-10-06 14:15'
+updated_date: '2026-10-06 17:09'
 labels:
   - plugin-architecture
   - plugins
@@ -47,8 +47,8 @@ legacy modules/: they keep their hand-written registration until each surface is
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 TASK-110.1 is done: modules.sre and modules.dev are on explicit legacy Slack registration with no hookimpls
-- [ ] #2 TASK-110.2 is done: plugins load only from pyproject entry points and any plugin load failure aborts boot
+- [x] #1 TASK-110.1 is done: modules.sre and modules.dev are on explicit legacy Slack registration with no hookimpls
+- [x] #2 TASK-110.2 is done: plugins load only from pyproject entry points and any plugin load failure aborts boot
 <!-- AC:END -->
 
 ## Implementation Notes

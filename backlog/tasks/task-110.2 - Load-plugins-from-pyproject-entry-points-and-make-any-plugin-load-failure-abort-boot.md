@@ -3,10 +3,10 @@ id: TASK-110.2
 title: >-
   Load plugins from pyproject entry points and make any plugin load failure
   abort boot
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-06 14:15'
-updated_date: '2026-10-06 16:37'
+updated_date: '2026-10-06 17:09'
 labels:
   - plugin-architecture
   - plugins
