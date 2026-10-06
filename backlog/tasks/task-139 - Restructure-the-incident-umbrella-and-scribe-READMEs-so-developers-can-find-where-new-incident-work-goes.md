@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-06 15:56'
-updated_date: '2026-10-06 17:43'
+updated_date: '2026-10-06 19:22'
 labels:
   - incident
   - docs
@@ -63,4 +63,6 @@ Blast radius: docs only; one git revert restores everything.
 
 <!-- SECTION:NOTES:BEGIN -->
 Docs-only change: app/packages/incident/README.md (new) and app/packages/incident/scribe/README.md (restructured; former draft/summarize sections moved verbatim under ## Reference, verified by diff modulo heading level). Registration documented as the incident.scribe entry point (TASK-110.2 merged, 5d6aa0f5). Folders the ADR names but that don't exist yet (lifecycle/, retrospective/, common/, features/incident/) are labelled target and not linked. TASK-140.1 not merged: the umbrella's 'where does new work go' table has no status-update row; follow-up recorded on TASK-140.1. Gates: ruff clean; mypy 57 pre-existing errors, 0 in touched files (Markdown only); pytest 3715 passed / 6 failed (known TASK-90 order leaks: aws_sns x3, google directory x3); tests/unit/packages/incident 433 passed.
+
+2026-10-06 (TASK-140.1): decisions/incident-management.md now places external status updates in scribe/ (use case, StatusPagePublisher and its copy-ready adapter), StatusUpdate records and StatusUpdateStore in core/, and the interim find_incident_for_conversation adapter in core/. The status-update row in app/packages/incident/README.md's 'where does new work go' table is tracked on TASK-140.1.
 <!-- SECTION:NOTES:END -->

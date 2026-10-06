@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-06 19:07'
+updated_date: '2026-10-06 19:22'
 labels:
   - incident
 dependencies:
@@ -74,4 +74,6 @@ Blast radius: records only; one git revert restores. Sibling tasks 140.2-140.6 r
 - Sources fetched this session: support.atlassian.com/statuspage/docs/incident-communication-tips, support.atlassian.com/statuspage/docs/create-an-incident, articles.alpha.canada.ca/notification-gc-notify/system-status/ (EN and FR JSON, modified 2026-09-24), connect.canada.ca/en/discover/service.html, docs.rootly.com/ai/ai-summaries, docs.rootly.com/configuration/publishing-incidents, docs.slack.dev/tools/bolt-python/concepts/acknowledge, docs.slack.dev/surfaces/modals, chat-sdk.dev/docs/modals, github.com/Netflix/dispatch (incident/interactive.py), alistair.cockburn.us/hexagonal-architecture. FireHydrant docs fetched but not cited: they do not state human approval. incident-management.md cites four sources, one over the governance cap (human-accepted).
 - Verification: line counts 150/79/77/77/67 (cap ~150); four frontmatter fields each; every relative .md link resolves; cited URLs return 200. No Python changed, so ruff, mypy and pytest were not run.
 - Backlog: AC #2 and #3 reworded (human-approved); created TASK-141 (command model vs rule 3) and DRAFT-10 (per-product profiles, status-page adapters); DRAFT-7 description corrected.
+
+Follow-up from TASK-139: when this ADR amendment lands, add a status-update row to the 'Where does new work go' table in app/packages/incident/README.md (and, once TASK-140.5 lands, a column in the scribe README's 'At a glance' table).
 <!-- SECTION:NOTES:END -->
