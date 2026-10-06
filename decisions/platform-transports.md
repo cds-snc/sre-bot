@@ -27,7 +27,7 @@ A platform is split across layers by what each part is ([plugin-architecture.md]
 | **Web API client** and its error classification | `app/integrations/<platform>/` |
 
 Rules:
-1. **The runtime is host code.** It is built during lifespan composition, started at the transport phase and closed at shutdown. Features never touch connections or SDK runtime objects.
+1. **The runtime is host code.** It is built during lifespan composition, started at the transport phase and closed at shutdown. Features never touch connections or the SDK app; a feature's entry point receives only the listener arguments the SDK passes it ([platform-entrypoints.md](platform-entrypoints.md) rule 3).
 2. **Verification attaches once, in the runtime,** never per handler.
 3. **Hookspecs fire once, at startup, to register handlers.** Per-event routing is the SDK's job.
 4. **Handlers render, never build.** A handler calls one service method, gets `OperationResult`, and renders it through the shared renderer.
@@ -74,3 +74,4 @@ Tolerated until then:
 **Changes:**
 - 2026-09-24: runtime moves to `server/<platform>/` and the handler contract to `contracts/`, per plugin-architecture.md; no helper wraps the platform SDK, and interaction toolkits are an open Draft.
 - 2026-10-01: `register_slack_listeners` is deleted (TASK-26.1) and the handler hookspecs are in `contracts/plugins/` (TASK-107); both tolerated items are closed.
+- 2026-10-06: feature entry points receive the SDK's listener arguments; connections and the app stay host-only (TASK-140.1).
