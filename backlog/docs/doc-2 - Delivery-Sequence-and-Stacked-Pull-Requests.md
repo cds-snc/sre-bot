@@ -3,7 +3,7 @@ id: doc-2
 title: Delivery Sequence and Stacked Pull Requests
 type: guide
 created_date: '2026-09-24 20:23'
-updated_date: '2026-10-06 14:15'
+updated_date: '2026-10-06 16:23'
 ---
 # Delivery Sequence and Stacked Pull Requests
 
@@ -119,6 +119,7 @@ These are mechanical moves with no dependencies between them. Ship them as paral
 | Webhooks | Stack F: TASK-37.1 -> TASK-37.2 -> TASK-37.3 (behaviour-preserving, held by the TASK-36.2 pinning tests); then TASK-37.4 (cutover), TASK-47 (HMAC), TASK-48 and TASK-49 in parallel, TASK-37.5 | stack F, then single PRs |
 | Approvals | TASK-60 -> TASK-125 -> TASK-61 -> TASK-30; then TASK-62 and TASK-63; TASK-124.1 (access) after TASK-61 and TASK-30; it also decides whether the route-local Protocol twins kept by TASK-136.3 are collapsed | single PRs |
 | Identity | TASK-83.3 and TASK-83.12 early; TASK-83.2 -> TASK-83.4 -> TASK-83.5 and TASK-83.6 -> TASK-83.7 -> TASK-83.8; TASK-83.9 -> TASK-83.10 after TASK-38 | single PRs |
+| Incident status updates (prioritised 2026-10-06) | After TASK-110.2: TASK-140.1 (decision records) -> TASK-140.2 (Slack action and view registrar), TASK-140.3 (conversation to incident id in core) and TASK-140.4 (status-update records and table) in parallel -> TASK-140.5 (draft command, after 140.3 and 140.4, with the 140.4 table applied in Terraform first) -> TASK-140.6 (approval modal and copy-ready publish, after 140.2) -> TASK-140.7 (retire legacy /sre incident updates). TASK-139 (incident and scribe READMEs) is a docs PR after TASK-110.2, parallel with TASK-140.1. TASK-140.5 uses today's Summarizer, so it is sequenced with TASK-25.10 and TASK-134 rather than run beside them | single PRs, not a stack: a new feature changes behaviour, and 140.2 to 140.4 do not build on each other |
 | Legacy rebuild by surface | TASK-38 as TASK-38.1 (core record and store, after TASK-124.5, TASK-27.2, TASK-108 and TASK-109) -> TASK-38.2 (core resource interfaces) -> TASK-38.3 -> TASK-38.4 -> TASK-38.5 (lifecycle; TASK-38.5 frees packages/aws_platform for TASK-88) with TASK-38.6 (retrospective, after TASK-138) in parallel after TASK-38.2 -> TASK-38.7 (record cutover) -> TASK-38.8 (delete modules/incident); then TASK-39, TASK-88, TASK-40, TASK-41, each held by the TASK-36.1 and TASK-36.3 pinning tests for its surface; TASK-53, TASK-55, TASK-56 and TASK-65 ride with the surfaces that own them. The incident expansion drafts under TASK-97 (metrics replacement, products as records, the external case recorder and DFIR-IRIS adapter, inbound case events, second-suite adapters, the updates command, retro meeting management and retro action items as records) start only after this sequence is finished | single PRs per surface; each cutover is a standalone merge |
 
 ## Standalone merges
@@ -132,4 +133,6 @@ These change runtime or deployment behaviour. Merge and deploy each one separate
 - TASK-47: HMAC enforcement.
 - TASK-61: approvals refactor.
 - TASK-30: event bus deletion.
+- TASK-140.6: the first public status updates (approval and publish).
+- TASK-140.7: legacy /sre incident updates cutover.
 - Each legacy surface cutover.

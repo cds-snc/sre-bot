@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
+updated_date: '2026-10-06 15:57'
 labels:
   - migration
   - phase-5
@@ -44,3 +45,9 @@ RULES
 - [ ] #5 The TASK-36.1 pinning tests for these interactions are green before and after the cutover with no assertion change; legacy registrations are removed in the same PR
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; no baseline grew
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-06: external public status updates are TASK-140 (scribe, /sre incident status-update). Legacy /sre incident updates is retired by TASK-140.7; legacy /sre incident status (internal lifecycle state) stays with this task. Public stage (Investigating to Resolved) and lifecycle status are distinct vocabularies.
+<!-- SECTION:NOTES:END -->
