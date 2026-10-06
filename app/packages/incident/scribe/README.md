@@ -1,14 +1,138 @@
 # Incident scribe
 
-The scribe subdomain of the incident umbrella (`decisions/incident-management.md`):
-two AI-assisted commands that work from an incident channel's transcript, read
+The scribe subdomain of the incident umbrella
+([`../README.md`](../README.md), `decisions/incident-management.md`):
+AI-assisted commands that work from an incident channel's transcript, read
 through `packages/incident/core`.
 
 - `/sre incident draft` writes a filled-in copy of the incident report.
 - `/sre incident summarize` gives a responder joining the incident a catch-up
   summary.
 
-## `/sre incident draft`
+## At a glance
+
+Paths are relative to `app/packages/incident/scribe/` unless they start with
+`core/` (`app/packages/incident/core/`) or `tests/` (`app/tests/`).
+
+| | `/sre incident draft` | `/sre incident summarize` |
+| --- | --- | --- |
+| Slack handler | `handle_draft_command` in `platforms/slack.py` | `handle_summarize_command` in `platforms/slack.py` |
+| Service function | `draft_incident_document_from_conversation` → `draft_incident_document` in `service.py` | `summarize_incident_conversation` → `summarize_transcript` in `service.py` |
+| Interfaces | `IncidentReportLinkLookup`, `IncidentDocumentStore` (`service.py`); `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) | `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) |
+| Adapters | `adapters/slack.py` (report link from bookmarks), `adapters/google_docs.py` (read report, copy, fill copy), `core/adapters/slack.py` (transcript), `app/integrations/openai/` | `core/adapters/slack.py` (transcript), `app/integrations/openai/` |
+| Wiring | `providers.py`: `get_incident_report_link_lookup`, `get_incident_document_store`; `core/api.py`: `get_incident_transcript_reader` | `core/api.py`: `get_incident_transcript_reader` |
+| Settings | `IncidentDraftSettings`, prefix `INCIDENT_DRAFT__` | `IncidentSummarySettings`, prefix `INCIDENT_SUMMARY__` |
+| Locale files | `locales/incident_draft.en-US.yml`, `locales/incident_draft.fr-FR.yml` | `locales/incident_summary.en-US.yml`, `locales/incident_summary.fr-FR.yml` |
+| Tests (`tests/unit/packages/incident/scribe/`) | `test_incident_scribe_draft_{service,adapter,slack,settings,locales}.py`, `test_incident_scribe_conversation_draft.py`, `test_incident_scribe_providers_document_store.py`, `test_incident_scribe_slack_adapter_lookup.py` | `test_incident_scribe_summary_{service,slack,settings,locales}.py`, `test_incident_scribe_conversation_summarize.py` |
+| Details | [Reference: draft](#sre-incident-draft) | [Reference: summarize](#sre-incident-summarize) |
+
+Both use cases share `test_incident_scribe_plugin_registration.py`.
+
+## Architecture
+
+Per `decisions/feature-packages.md`, `decisions/transport-slack.md` and
+`decisions/incident-management.md`.
+
+### Call path
+
+```
+Slack  /sre incident draft | summarize
+  │
+  ▼
+platforms/slack.py        parse args → typed values → one service call → OperationResult → render (i18n)
+  │
+  ▼
+service.py                platform-agnostic; no Slack, HTTP or Google SDK imports
+  │
+  ├─► IncidentTranscriptReader ── core/api.py ──► core/adapters/slack.py        (Slack history)
+  ├─► Summarizer ─────────────── integrations.openai                            (text generation)
+  │
+  │   draft only:
+  ├─► IncidentReportLinkLookup ── providers.py ──► adapters/slack.py            (bookmarks)
+  └─► IncidentDocumentStore ───── providers.py ──► adapters/google_docs.py      (Docs read, Drive copy, Docs fill)
+```
+
+### Files
+
+- `__init__.py` — pluggy hookimpls only: `register_slack_commands` and
+  `register_i18n_resources`. The plugin is loaded from the `incident.scribe`
+  entry point under `[project.entry-points.sre_bot]` in `app/pyproject.toml`
+  (`decisions/plugins.md`); no import-time side effects.
+- `platforms/slack.py` — both five-step handlers, registered under
+  `sre.incident` by one `register_commands`; the draft handler posts the
+  progress notice when the service signals the start; ephemeral responses; no
+  `slack_sdk` import.
+- `service.py` — both use cases and the two scribe-owned interfaces
+  (`IncidentDocumentStore`, `IncidentReportLinkLookup`). The only module of the
+  subdomain that imports `packages/incident/core`, through `core/api.py`.
+  Empty history returns an `OperationResult` with `error_code="EMPTY_HISTORY"`.
+- `domain.py` — frozen values of the drafting use case: `DocumentSection`
+  (heading + instructions), `SectionDraft`, `DocumentField`,
+  `DraftWriteResult`, `DraftedDocument`. `TranscriptMessage` comes from
+  `packages/incident/core`.
+- `adapters/slack.py` — the report-link lookup on Slack bookmarks; returns
+  plain strings and no links on an API error.
+- `adapters/google_docs.py` — the only file touching **Google**
+  (Docs read + Drive copy + Docs populate). `service.py` imports the
+  `Summarizer` interface and `platforms/slack.py` the transport models, both by
+  design.
+- `providers.py` — feature-local DI wiring for the document store and the
+  report-link lookup.
+- `settings.py` — partitioned feature settings, one class and one cached getter
+  per use case.
+- `locales/` — EN/FR message catalogues, one pair per use case. One
+  `register_i18n_resources` registration (resource domain `incident_scribe`)
+  loads every `<catalogue>.<locale>.yml` file in the directory.
+
+## Adding a use case
+
+1. **Service.** Add the use case's function to `service.py`, taking typed
+   values and returning `OperationResult`. Declare any new interface as a
+   `Protocol` beside it. Read the channel through `IncidentTranscriptReader`
+   from `core/api.py` and generate text through `Summarizer`; import nothing
+   else from `core`.
+2. **Domain values.** Add frozen dataclasses to `domain.py` only if the use
+   case needs its own values.
+3. **Adapters.** A new external call goes in `adapters/<system>.py`, wired
+   through a cached getter in `providers.py`. If a second incident subdomain
+   will need the same interface, it belongs in `core/` instead (see
+   [Where does new work go](../README.md#where-does-new-work-go)).
+4. **Settings.** Add a `BaseSettings` class and an `lru_cache` getter to
+   `settings.py`, with its own `INCIDENT_<USE_CASE>__` prefix. Do not reuse
+   another use case's class.
+5. **Slack.** Add the handler to `platforms/slack.py` and one
+   `registrar.register_command(..., parent="sre.incident")` call inside
+   `register_commands`. No new hookimpl is needed.
+6. **Locales.** Add `locales/<catalogue>.en-US.yml` and
+   `locales/<catalogue>.fr-FR.yml`. The existing `register_i18n_resources`
+   picks them up.
+7. **Tests.** Add `app/tests/unit/packages/incident/scribe/test_incident_scribe_<use_case>_<action>.py`
+   for service, Slack handler (success and error mapping), settings and locales.
+8. **This README.** Add a column to [At a glance](#at-a-glance) and a section
+   under [Reference](#reference).
+
+## Naming note
+
+The subdomain is `scribe`, but the two original use cases kept the names they
+shipped with, so nothing deployed has to change:
+
+- Settings prefixes `INCIDENT_DRAFT__` and `INCIDENT_SUMMARY__` (and the
+  classes `IncidentDraftSettings`, `IncidentSummarySettings`) are environment
+  variable names already set in deployed configuration.
+- The `incident_draft` and `incident_summary` catalogues are the i18n key
+  prefixes the handlers look up (`_DRAFT_DOMAIN`, `_SUMMARY_DOMAIN` in
+  `platforms/slack.py`).
+- The `incident_draft::` named-range prefix (`adapters/google_docs.py`) is
+  already written into existing draft documents.
+
+Renaming any of them would be a migration, not a docs change. New use cases are
+named after themselves, not after `scribe`.
+
+## Reference
+
+The behaviour detail for each use case.
+
+### `/sre incident draft`
 
 Adds `/sre incident draft`: from inside an incident channel, reads the
 incident Google Doc created at channel creation, treats the guidance written
@@ -16,7 +140,7 @@ under each heading as that section's drafting instructions, answers each one
 from the incident channel's messages, and writes the filled-in result into a
 **new** document. The original report is read, not rewritten.
 
-### Usage
+#### Usage
 
 ```
 /sre incident draft                # draft from the whole incident history
@@ -31,7 +155,7 @@ The invoker gets an ephemeral notice while the work runs — the AI call alone
 takes most of a minute — then a one-line confirmation linking the draft and
 asking them to carry changes back into the original incident document.
 
-### Sections left for humans
+#### Sections left for humans
 
 **Five whys / root causes** and **Lessons Learned** (*What went well*, *What
 went wrong*, *Where we got lucky*) are never drafted. They are judgement calls
@@ -40,7 +164,7 @@ transcript, so those sections are filtered out before the request is built —
 the model never sees them, and nothing is written into them. Their template
 guidance is left exactly as it is, ready for a human.
 
-### How it works
+#### How it works
 
 1. **Locate and read the channel.** The handler makes one service call. The
    service finds the incident document via the channel's "Incident report"
@@ -66,7 +190,7 @@ guidance is left exactly as it is, ready for a human.
 4. **Nothing is written to the report.** See
    [The incident report is never written to](#the-incident-report-is-never-written-to).
 
-#### A fresh copy every run
+##### A fresh copy every run
 
 Each invocation copies the report to its own document, named with the run time
 (`<title> - AI draft 2026-08-26 09:12`). Nothing is reused.
@@ -84,7 +208,7 @@ The trade is that drafts accumulate in the Drive folder instead of inside one
 document, and each run has its own URL. The sweeps described below still run,
 because a copy inherits whatever damage the *report itself* carries.
 
-#### Editing the copy safely
+##### Editing the copy safely
 
 Every edit is computed against one snapshot of the document and applied in a
 single `batchUpdate`, under three rules:
@@ -104,7 +228,7 @@ Generated content is wrapped in named ranges (`incident_draft::<heading>`,
 not needed for replacement; they remain as an invisible record of what the
 machine wrote.
 
-#### Pull-request links
+##### Pull-request links
 
 Every pull request the report names must be openable from the report. The model
 writes "PR 1898" in prose, having summarised away the link somebody posted, so
@@ -130,7 +254,7 @@ and a URL standing alone becomes `PR <number>`. Collapsing runs *after* link
 resolution, so a URL only the model supplied is harvested into the link map
 before it is removed from the text.
 
-#### Pre-filled metadata is never overwritten
+##### Pre-filled metadata is never overwritten
 
 A label that already carries a value is left alone: `Name`, `Team`, `Date`,
 `Slack channel` and `Status` are filled by `modules/incident` when the incident
@@ -139,7 +263,7 @@ produced `Status: In Progress In Progress`. Only labels the template left blank
 are filled — or ones this package wrote itself on an earlier run, which are
 replaced through their named range rather than appended to.
 
-#### Empty Impact labels
+##### Empty Impact labels
 
 `End-users`, `CDS Staff`, `Other government department(s)` and `Other` are
 dropped when nothing fills them, rather than left as bare stubs. Two guards
@@ -148,7 +272,7 @@ this run or left by an earlier one — is kept, and a section the transcript
 could not answer is left entirely alone, template structure included, so a
 human can fill it in by hand.
 
-### Metadata fields
+#### Metadata fields
 
 Every field is attempted, and any the transcript does not establish is left
 blank rather than guessed — a blank line in a retro is expected, a wrong name
@@ -199,7 +323,7 @@ The restyle leads the same `batchUpdate` as the content: it changes no text
 lengths, so it is valid against the snapshot every other edit was computed
 from.
 
-### The incident report is never written to
+#### The incident report is never written to
 
 Every section — the timeline included — is drafted into the **copy**. The
 report created when the incident opened is only ever read.
@@ -213,7 +337,7 @@ this command owns the draft's.
 The `DO NOT REMOVE…` line is stripped from the **copy**, where nothing appends
 to it and it is only noise. The report's own copy is untouched.
 
-### Formatting applied when filling a section
+#### Formatting applied when filling a section
 
 The copied template supplies the layout; these rules shape the content written
 into each answered section.
@@ -226,7 +350,7 @@ tasks naming an owner where the transcript identifies one. Unanswered list
 sections keep their template guidance as plain prose, so instructions are
 never dressed up as completed items.
 
-### Template scaffolding
+#### Template scaffolding
 
 The copy keeps the template's structure, with four exceptions applied only to
 sections that were actually drafted — an undrafted section keeps everything, so
@@ -245,7 +369,7 @@ if missing. The timeline's was replaced by the bot's banner in the report long
 ago, so a copy inherits a section with none — it has to be written in rather
 than merely preserved.
 
-### Action items table
+#### Action items table
 
 Action items are written into the **Action Item** column of the template's
 table, leaving Type, Owner, Issue #, Priority and Done for whoever triages the
@@ -254,7 +378,7 @@ re-run adds rather than overwrites. Items beyond the available empty rows stay
 as bullets above the table — filling only what fits would silently drop the
 rest.
 
-### Settings (all optional)
+#### Settings (all optional)
 
 | Env var | Default | Meaning |
 | --- | --- | --- |
@@ -269,7 +393,7 @@ row above) and `OPENAI_TEMPERATURE`, which is **omitted by default** — the
 gateway's current model rejects the parameter with a 400. Set `0.0` to opt in
 where the model supports it, for more reproducible drafts.
 
-### Truncated responses
+#### Truncated responses
 
 If the model's JSON is cut off mid-object, the sections that arrived are kept
 and written; the invoker is told the draft is partial and can re-run. Since
@@ -289,22 +413,22 @@ number to look at before raising `INCIDENT_DRAFT__MAX_OUTPUT_TOKENS`, since a
 length well short of the budget means the model has its own ceiling and raising
 ours will not help.
 
-### Credentials
+#### Credentials
 
 `OPENAI_API_KEY` (`integrations.openai`, which also supplies the model and
 timeout) and the Google Workspace service account, with the `documents` and
 `drive` scopes.
 
-### Required Slack scopes
+#### Required Slack scopes
 
 `bookmarks:read`, `channels:history`/`groups:history`, `channels:read`/`groups:read`, `users:read`.
 
-## `/sre incident summarize`
+### `/sre incident summarize`
 
 An AI-generated catch-up summary of the current
 channel, for someone jumping into an incident.
 
-### What it does
+#### What it does
 
 Reads the incident conversation's transcript (recent channel history with
 author display names resolved), builds a plain transcript, and asks the
@@ -314,7 +438,7 @@ happening, current status, actions taken, and next steps. The summary is
 returned **ephemerally** — only the person who ran
 the command sees it, so it never adds noise to the incident channel.
 
-### Usage
+#### Usage
 
 ```
 /sre incident summarize                      # since channel creation, up to 500 messages (defaults)
@@ -331,7 +455,7 @@ the command sees it, so it never adds noise to the incident channel.
 - `--limit` — maximum messages to include. Omitted/invalid → default (500);
   capped at `INCIDENT_SUMMARY__MAX_HISTORY_LIMIT` (1000).
 
-### Settings
+#### Settings
 
 Feature-domain settings live in `settings.py` (`IncidentSummarySettings`); all
 have safe defaults:
@@ -346,7 +470,7 @@ OpenAI credentials/model are **not** configured here — they belong to the
 vendor client (`OPENAI_API_KEY`, `OPENAI_MODEL`, …) in
 `app/integrations/openai/settings.py`.
 
-### Required Slack scopes
+#### Required Slack scopes
 
 The bot must be able to read channel history and look up users:
 
@@ -356,44 +480,3 @@ The bot must be able to read channel history and look up users:
 The bot must be a member of the channel (or have `channels:history` via an
 appropriate install). After changing scopes, reinstall the app and restart the
 bot so the Web API client picks up the new token.
-
-## Architecture
-
-Per `decisions/feature-packages.md` and `decisions/transport-slack.md`:
-
-- `domain.py` — frozen values of the drafting use case: `DocumentSection`
-  (heading + instructions), `SectionDraft`, `DocumentField`,
-  `DraftWriteResult`, `DraftedDocument`. `TranscriptMessage` comes from
-  `packages/incident/core`.
-- `service.py` — platform-agnostic, both use cases; no Slack, HTTP, or Google
-  SDK imports, and the only module of the subdomain that imports
-  `packages/incident/core` (through `core/api.py`).
-  - Draft: `draft_incident_document_from_conversation` finds the report through
-    `IncidentReportLinkLookup`, reads the transcript through the core's
-    `IncidentTranscriptReader` and calls `draft_incident_document`, which
-    depends on the `IncidentDocumentStore` and `Summarizer` interfaces.
-  - Summarize: `summarize_incident_conversation` resolves the limit and the
-    start of the window, reads the transcript through the same reader, and
-    `summarize_transcript` turns the `TranscriptMessage` values into a
-    transcript and delegates to the `Summarizer` interface. Empty history →
-    `OperationResult` with `error_code="EMPTY_HISTORY"`.
-- `adapters/slack.py` — the report-link lookup on Slack bookmarks; returns
-  plain strings and no links on an API error.
-- `adapters/google_docs.py` — the only file touching **Google**
-  (Docs read + Drive copy + Docs populate). `service.py` imports the
-  `Summarizer` interface and `platforms/slack.py` the transport models, both by
-  design.
-- `providers.py` — feature-local DI wiring for the document store and the
-  report-link lookup.
-- `settings.py` — partitioned feature settings: `IncidentDraftSettings`
-  (`INCIDENT_DRAFT__*`) and `IncidentSummarySettings` (`INCIDENT_SUMMARY__*`).
-- `platforms/slack.py` — both five-step handlers (parse → typed values → one
-  service call → `OperationResult` → render), registered under `sre.incident`
-  by one `register_commands`; the draft handler posts the progress notice when
-  the service signals the start; ephemeral responses; no `slack_sdk` import.
-- `locales/` — EN/FR message catalogues for the `incident_draft` and
-  `incident_summary` i18n domains.
-
-Registration is startup-driven via pluggy hookimpls in `__init__.py`
-(`register_slack_commands`, `register_i18n_resources`); no import-time side
-effects.

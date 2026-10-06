@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-06 16:23'
+updated_date: '2026-10-06 17:43'
 labels:
   - incident
 dependencies:
@@ -29,3 +29,9 @@ Architecture only, no code. Amend decisions/incident-management.md: external sta
 - [ ] #2 decisions/interaction-toolkits.md (or a superseding record) accepts a minimal Slack action and view-submission registrar for packages, with its limits and tickets
 - [ ] #3 Both records cite the 2026-10-06 research sources on status-update conventions and AI drafting with human approval
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Follow-up from TASK-139: when this ADR amendment lands, add a status-update row to the 'Where does new work go' table in app/packages/incident/README.md (and, once TASK-140.5 lands, a column in the scribe README's 'At a glance' table).
+<!-- SECTION:NOTES:END -->
