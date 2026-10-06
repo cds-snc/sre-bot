@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-10-02 13:49'
+updated_date: '2026-10-06 14:15'
 labels:
   - plugin-architecture
   - plugins
@@ -47,18 +47,18 @@ legacy modules/: they keep their hand-written registration until each surface is
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 pyproject.toml declares an entry point for every current plugin, with dotted <feature>.<subdomain> names for umbrella subdomains; umbrella packages have none
-- [ ] #2 Lifespan registers plugins only through pm.load_setuptools_entrypoints; no pkgutil/walk_packages discovery remains, and pm.register() for a first-party plugin appears only in test fixtures
-- [ ] #3 Boot tests: a poisoned entry point aborts boot; a raising hookimpl aborts boot; every expected plugin is registered
-- [ ] #4 CI check: every package shipping hookimpls has a matching entry-point line
-- [ ] #5 decisions/plugins.md and decisions/lifecycle.md drop the filesystem-walk tolerance in the same PR
-- [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #1 TASK-110.1 is done: modules.sre and modules.dev are on explicit legacy Slack registration with no hookimpls
+- [ ] #2 TASK-110.2 is done: plugins load only from pyproject entry points and any plugin load failure aborts boot
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-01 (amended decisions/feature-packages.md and plugins.md): an umbrella's core/ and common/ are never entry points and have no enablement key. Subdomain names for incident come from TASK-135 and the TASK-97 packet; incident.draft and incident.summary will not exist as separate entry points.
+
+2026-10-06: Stack G merged (#1530-#1534). The incident scribe subdomain is packages/incident/scribe, entry point name incident.scribe; packages/incident/core is never an entry point. packages/incident_draft and packages/incident_summary no longer exist.
+
+2026-10-06 (human decision): split for the single-PR gate, because moving sre/dev off pluggy is a behaviour-preserving refactor pinned by legacy_surface while entry-point loading changes boot semantics. TASK-110.1 moves modules.sre and modules.dev onto explicit legacy registration (walk still in place); TASK-110.2 (depends on 110.1, standalone deploy per doc-2) does the entry points, fatal loading and the rest. The original AC#1-#6 moved verbatim to TASK-110.2; AC#2 is kept literally because 110.1 removes the only first-party registration that would have needed a carve-out. The comments below (TASK-35 planning, Stack A leftovers) are addressed in TASK-110.2's plan.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

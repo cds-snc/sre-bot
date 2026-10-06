@@ -10,6 +10,7 @@ from slack_bolt import App
 from structlog.stdlib import BoundLogger
 
 from contracts.i18n.resources import I18nResourceSpec
+from contracts.slack.registrar import SlackCommandRegistrar
 from infrastructure.configuration.app import AppSettings, get_app_settings
 from infrastructure.configuration.features.sre_ops import (
     SreOpsSettings,
@@ -37,10 +38,12 @@ from jobs import scheduled_tasks
 from modules import (
     atip,
     aws,
+    dev,
     incident,
     incident_helper,
     role,
     secret,
+    sre,
     webhook_helper,
 )
 from server.plugins.base import auto_discover_plugins
@@ -102,6 +105,12 @@ def _register_legacy_handlers(bot: App, logger: BoundLogger) -> None:
     webhook_helper.register(bot)
     incident.register(bot)
     incident_helper.register(bot)
+
+
+def _register_legacy_slack_commands(registrar: SlackCommandRegistrar, logger: BoundLogger) -> None:
+    sre.register_commands(registrar)
+    dev.register_commands(registrar)
+    logger.info("legacy_slack_commands_registered", modules=["sre", "dev"])
 
 
 def _start_scheduled_tasks(
@@ -267,6 +276,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         slack_provider=app.state.slack_provider,
     )
     log.info("feature_integrations_registered")
+    # Legacy sre and dev subcommands must be in the provider's registry before
+    # initialize_app binds the root slash commands.
+    _register_legacy_slack_commands(app.state.slack_provider, logger)
 
     app.state.slack_provider.initialize_app()
     if app.state.slack_provider and getattr(app.state.slack_provider, "app", None):

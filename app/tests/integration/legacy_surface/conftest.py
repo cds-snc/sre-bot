@@ -1,8 +1,9 @@
 """Fixtures that drive Slack commands through a real slack_bolt App.
 
 The harness registers the production ``register_slack_commands`` hookimpls
-through a pluggy PluginManager onto a real ``SlackPlatformProvider`` bound to
-a real ``slack_bolt.App``, then feeds form-encoded slash-command requests to
+through a pluggy PluginManager, then the legacy sre and dev commands through
+the lifespan's own ``_register_legacy_slack_commands``, onto a real
+``SlackPlatformProvider`` bound to a real ``slack_bolt.App``, then feeds form-encoded slash-command requests to
 ``App.dispatch``. Only the edges are faked: the Slack Web API client (which
 also backs each package's Slack lookup adapter), the ``response_url`` webhook
 that Bolt's ``respond`` posts to, and each package's backing service (patched
@@ -19,12 +20,11 @@ from urllib.parse import urlencode
 
 import pluggy
 import pytest
+import structlog
 from slack_bolt import App, BoltRequest, BoltResponse
 from slack_bolt.authorization import AuthorizeResult
 from slack_sdk.webhook import WebhookClient
 
-import modules.dev as dev_module
-import modules.sre as sre_module
 import packages.access.sync as access_sync_module
 import packages.geolocate as geolocate_module
 import packages.incident.scribe as incident_scribe_module
@@ -41,10 +41,9 @@ from packages.incident.scribe import service as incident_scribe_service
 from packages.incident.scribe.adapters.slack import SlackIncidentReportLinkLookup
 from packages.rant.adapters.slack import SlackUserIdentityLookup
 from packages.rant.platforms import slack as rant_slack
+from server.lifespan import _register_legacy_slack_commands
 
 SLACK_COMMAND_HOOKIMPLS: tuple[ModuleType, ...] = (
-    sre_module,
-    dev_module,
     rant_module,
     user_rotations_module,
     access_sync_module,
@@ -166,7 +165,7 @@ def _authorize_single_workspace(**_: Any) -> AuthorizeResult:
 
 
 def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> SlackCommandHarness:
-    """Wire the seven hookimpls onto a fresh provider and Bolt app."""
+    """Wire the five hookimpls and the legacy sre and dev commands onto a fresh provider and Bolt app."""
     monkeypatch.setattr(App, "__init__", _unpatched_app_init())
     client = FakeSlackClient()
     app = RecordingApp(
@@ -191,6 +190,7 @@ def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> Slack
     for hookimpl_module in SLACK_COMMAND_HOOKIMPLS:
         plugin_manager.register(hookimpl_module)
     plugin_manager.hook.register_slack_commands(registrar=provider)
+    _register_legacy_slack_commands(provider, structlog.get_logger())
     provider._auto_register_root_commands()
 
     harness = SlackCommandHarness(app=app, provider=provider, client=client, command_prefix=command_prefix)

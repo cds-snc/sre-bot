@@ -1,8 +1,10 @@
 # Legacy surface inventory
 
 This inventory is the external compatibility contract of the legacy bot: every
-user-facing surface of `app/modules/`, plus the Slack commands registered by
-`register_slack_commands` hookimpls under `app/modules/` and `app/packages/`.
+user-facing surface of `app/modules/`, plus the Slack commands registered on
+the Slack provider, by `register_slack_commands` hookimpls under `app/packages/`
+and by the hand-written `_register_legacy_slack_commands` step in
+`server/lifespan.py` for `modules/sre` and `modules/dev`.
 It is step 1 (Inventory) of the per-surface recipe in `decisions/migration.md`,
 and it is recorded before any module is rebuilt. Other teams depend on these
 command names, interaction ids and URLs. Every rebuild must keep them working.
@@ -99,16 +101,18 @@ The runtime in `jobs/scheduled_tasks.py` also schedules the host-owned Tier-1
 jobs `scheduler_heartbeat` and `integration_healthchecks`. Neither is a module
 surface, and TASK-52 moves both to `app/server/scheduler/`.
 
-## `register_slack_commands` hookimpls
+## Provider-registered Slack commands
 
-Each hookimpl delegates to a package-local `register_commands(provider)`. When
+Each `register_slack_commands` hookimpl, and each module that
+`_register_legacy_slack_commands` calls, delegates to a package-local
+`register_commands(provider)`. When
 the `/sre` root is called with no subcommand, or with `help`, the provider
 generates the help text.
 
 | Surface | Defined at | Registration | Target | Rebuild ticket | Pinned by |
 | --- | --- | --- | --- | --- | --- |
-| `/sre` root; `/sre version`, `/sre incident` (legacy mode), `/sre webhooks` (legacy mode) | `modules/sre/__init__.py:8` → `modules/sre/platforms/slack.py:183` | hookimpl | split: `version` → `app/server/` (system info, like `GET /version`); `incident` → `app/features/incident/`; `webhooks` → `app/capabilities/webhooks/` (admin surface) | `version` TASK-40; `incident` TASK-38; `webhooks` TASK-37.4 | `test_slack_command_registration_surface.py` `-k "sre_ or registered_once or prefix"` |
-| `/sre dev` with `google`, `slack`, `stale`, `incident`, `load-incidents`, `add-incident` (dev environment only) | `modules/dev/__init__.py:12` → `modules/dev/platforms/slack.py:291` | hookimpl | delete: dev-environment test commands with no production users (TASK-40 records the drop) | TASK-40 | `test_slack_command_registration_surface.py` `-k dev_group` |
+| `/sre` root; `/sre version`, `/sre incident` (legacy mode), `/sre webhooks` (legacy mode) | `modules/sre/__init__.py:7` → `modules/sre/platforms/slack.py:183` | hard-coded `_register_legacy_slack_commands` | split: `version` → `app/server/` (system info, like `GET /version`); `incident` → `app/features/incident/`; `webhooks` → `app/capabilities/webhooks/` (admin surface) | `version` TASK-40; `incident` TASK-38; `webhooks` TASK-37.4 | `test_slack_command_registration_surface.py` `-k "sre_ or registered_once or prefix or tree"` |
+| `/sre dev` with `google`, `slack`, `stale`, `incident`, `load-incidents`, `add-incident` (dev environment only) | `modules/dev/__init__.py:11` → `modules/dev/platforms/slack.py:291` | hard-coded `_register_legacy_slack_commands` | delete: dev-environment test commands with no production users (TASK-40 records the drop) | TASK-40 | `test_slack_command_registration_surface.py` `-k dev_` |
 | `/rant` (root command, no parent) | `packages/rant/__init__.py:9` → `packages/rant/platforms/slack.py:19` | hookimpl | `app/features/rant/` | TASK-124.3 | `test_slack_command_registration_surface.py` `-k rant` |
 | `/sre rotations`; `/sre rotations view <usergroup_handle>` | `packages/user_rotations/__init__.py:7` → `packages/user_rotations/platforms/slack.py:18` | hookimpl | `app/capabilities/rotations/` | TASK-123 | `test_slack_command_registration_surface.py` `-k rotations` |
 | `/sre access` (parent, shared by the access subpackages); `/sre access sync`; `sync user <user_email> <platform> [--dry-run]`; `sync platform <platform> [--dry-run]`; `sync status <job_id>` | `packages/access/sync/__init__.py:26` → `packages/access/sync/interactions/slack.py:38` | hookimpl | `app/features/access/` (sync) | TASK-124.1 | `test_slack_command_registration_surface.py` `-k access_sync` |
