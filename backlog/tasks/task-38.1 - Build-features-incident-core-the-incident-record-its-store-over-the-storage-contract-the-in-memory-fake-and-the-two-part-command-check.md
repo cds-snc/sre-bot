@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
+updated_date: '2026-10-06 15:57'
 labels:
   - migration
   - phase-5
@@ -50,3 +51,9 @@ No read-modify-write and no vendor list-append: timeline entries are records und
 - [ ] #5 features/incident/common/ has no I/O and holds the settings tree and shared vocabulary only; the umbrella layers contract lists core above common with exhaustive = true
 - [ ] #6 No existing production module changes other than app/pyproject.toml; the legacy_surface suite is green with no file change; ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-06: TASK-140.3 adds core's find_incident_for_conversation with an interim adapter over the legacy incidents table, and TASK-140.4 adds StatusUpdate records under the incident id (table sre_bot_incident_status_updates). This task's store replaces the interim lookup adapter behind the same interface; the status-update records keep their keys.
+<!-- SECTION:NOTES:END -->

@@ -1,0 +1,35 @@
+---
+id: TASK-140
+title: >-
+  External incident status updates: AI-drafted, human-approved public updates
+  kept as a history under the incident
+status: To Do
+assignee: []
+created_date: '2026-10-06 15:57'
+labels:
+  - incident
+  - features
+  - slack
+dependencies: []
+references:
+  - decisions/incident-management.md
+  - decisions/interaction-toolkits.md
+priority: high
+type: feature
+ordinal: 319000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Teams want a current public status update instead of the unused legacy /sre incident status and updates commands (DynamoDB shows two incidents ever used updates). The scribe subdomain drafts a structured EN/FR update from the incident channel; a responder edits and approves it in a modal; every update is stored as its own record under the incident's id (the legacy incidents table UUID), never as the incident_updates list attribute. Running it again with nothing new reuses the prior update as a 'no new information, next update by' message, decided by code and not by the model. The first slice publishes copy-ready bilingual text; status-page adapters come later behind a StatusPagePublisher interface.
+
+Conventions (research 2026-10-06): stages Investigating / Identified / Monitoring / Resolved (FR: Enquête en cours / Problème identifié / Sous surveillance / Résolu); fields: stage, affected service by public name, user-visible impact, what we are doing (no root-cause speculation), workaround or 'no action needed', next update time in ET with date; plain language per Canada.ca style and GC Notify's published wording; update about every 30 minutes, never silent. AI drafting with human approval matches FireHydrant/Rootly practice; security incidents need a second confirmation.
+
+Decisions (human, 2026-10-06): modal approval over a minimal Slack interaction contract; copy-ready text as the first publish target; records keyed by the existing incident UUID, resolved from the channel through core, never by channel; command /sre incident status-update; legacy updates retired after this ships, legacy status (internal lifecycle state) stays with TASK-38.4. Public stage and internal lifecycle status are distinct vocabularies.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 Every subtask is done
+<!-- AC:END -->

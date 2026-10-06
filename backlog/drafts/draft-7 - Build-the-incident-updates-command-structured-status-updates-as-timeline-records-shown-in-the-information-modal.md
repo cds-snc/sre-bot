@@ -6,6 +6,7 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-10-02 16:44'
+updated_date: '2026-10-06 15:57'
 labels:
   - incident
   - later-wave
@@ -29,3 +30,9 @@ EXPANSION (after doc-2). /sre incident updates is registered today (modules/inci
 - [ ] #2 Updates render in the information modal and in the report in EN and FR
 - [ ] #3 The command works on an incident whose channel is archived, skipping the channel post
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-06: overlaps TASK-140. External public status updates are stored as StatusUpdate records under the incident id (TASK-140.4) and the legacy updates command is retired by TASK-140.7. If this draft is promoted, it should cover internal timeline updates only and read TASK-140's records for the information-modal history rather than adding a second update store.
+<!-- SECTION:NOTES:END -->
