@@ -9,7 +9,7 @@ scope: The strangler-fig plan for legacy app/modules/, the coexistence rules tha
 
 ## Context
 
-`app/modules/` (13 module groups, 73 files, about 12k lines) is the original Slack bot. It has no layering and calls vendor SDKs directly. `server/lifespan.py` registers most of it through the hard-coded `_register_legacy_handlers()` list; `dev` and `sre` also ship hookimpls, and `sre` is registered both ways. `jobs/scheduled_tasks.py` imports `modules.aws` and `modules.incident`, and `api/v1/routes/webhooks.py` imports `modules.webhooks` and `modules.slack`. Nothing in `packages/` or `infrastructure/` imports `modules/`.
+`app/modules/` (13 module groups, 73 files, about 12k lines) is the original Slack bot. It has no layering and calls vendor SDKs directly. `server/lifespan.py` registers it by hand: the Bolt handlers through the hard-coded `_register_legacy_handlers()` list, and the `sre` and `dev` provider subcommands through `_register_legacy_slack_commands()`; no module under `modules/` ships a hookimpl. `jobs/scheduled_tasks.py` imports `modules.aws` and `modules.incident`, and `api/v1/routes/webhooks.py` imports `modules.webhooks` and `modules.slack`. Nothing in `packages/` or `infrastructure/` imports `modules/`.
 
 The modules are not organised around features. `modules/sre/` and `modules/aws/` are grab-bags of unrelated commands, and `modules/incident/` is built around Google Workspace resources (folders, documents, Meet) rather than around the incident itself. Moving them as they are would carry that shape into the new layers.
 
@@ -78,3 +78,4 @@ No migration is left half-done: a surface is either legacy or rebuilt, never bot
 - 2026-09-17: rule 3 and the baseline check cover every freeze baseline under `app/bin/baselines/`.
 - 2026-09-24: webhooks sequencing defers to [webhooks.md](webhooks.md); modules are rebuilt by surface into the plugin-architecture layers, the retired `PREFIX` carve-out is removed, and the non-layer directory table moved here.
 - 2026-10-01: rule 5 destinations include an umbrella's `core/` and `common/`, per [feature-packages.md](feature-packages.md).
+- 2026-10-06: the `sre` and `dev` provider subcommands moved from hookimpls to the hand-written `_register_legacy_slack_commands()` step (TASK-110.1); no `modules/` hookimpl remains.

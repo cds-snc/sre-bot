@@ -1,4 +1,4 @@
-"""Pinning tests for the Slack commands registered by register_slack_commands hookimpls.
+"""Pinning tests for the Slack commands registered on the Slack provider at startup.
 
 Each test sends a form-encoded slash command through ``slack_bolt.App.dispatch``
 on the harness app and asserts only what Slack and the backing services
@@ -10,6 +10,7 @@ different contract as long as the user-facing behaviour is unchanged.
 
 from collections import Counter
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -73,6 +74,47 @@ def test_each_root_slash_command_is_registered_once(slack_command_harness: Slack
     assert counts == Counter({f"/{prefix}sre": 1, f"/{prefix}rant": 1})
 
 
+REGISTERED_COMMAND_TREE: dict[str, bool] = {
+    "rant": False,
+    "sre": True,
+    "sre.access": False,
+    "sre.access.sync": False,
+    "sre.access.sync.platform": False,
+    "sre.access.sync.status": False,
+    "sre.access.sync.user": False,
+    "sre.dev": False,
+    "sre.dev.add-incident": False,
+    "sre.dev.google": False,
+    "sre.dev.incident": False,
+    "sre.dev.load-incidents": False,
+    "sre.dev.slack": False,
+    "sre.dev.stale": False,
+    "sre.geolocate": False,
+    "sre.incident": False,
+    "sre.incident.draft": False,
+    "sre.incident.summarize": False,
+    "sre.rotations": False,
+    "sre.rotations.view": False,
+    "sre.version": False,
+    "sre.webhooks": False,
+}
+
+
+def test_registered_command_tree_is_unchanged(slack_command_harness: SlackCommandHarness) -> None:
+    """The provider holds exactly the pinned command paths, each with its auto-generated flag.
+
+    The literal is the whole tree, so an added, lost or replaced node fails
+    the test, including the legacy /sre incident handler being shadowed by
+    the auto-generated parent of its draft and summarize children.
+    """
+    commands = slack_command_harness.provider._commands
+
+    tree = {full_path: command.is_auto_generated for full_path, command in commands.items()}
+
+    assert tree == REGISTERED_COMMAND_TREE
+    assert commands["sre.incident"].legacy_mode is True
+
+
 def test_command_prefix_is_applied_to_root_slash_commands(monkeypatch: pytest.MonkeyPatch) -> None:
     """A configured prefix renames the slash commands Slack routes to the app."""
     harness = build_harness(monkeypatch, command_prefix="dev-")
@@ -117,6 +159,36 @@ def test_sre_webhooks_subcommand_forwards_to_webhook_helper(
     assert helper_calls[0]["body"]["channel_id"] == CHANNEL_ID
 
 
+def test_sre_incident_subcommand_forwards_to_incident_helper(
+    slack_command_harness: SlackCommandHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """/sre incident passes its arguments and invoker to the legacy incident helper once.
+
+    The helper is faked because it reads Google Drive and DynamoDB; whatever
+    it responds with is relayed ephemerally.
+    """
+    helper_calls: list[dict[str, Any]] = []
+
+    def fake_handle_incident_command(args: list[str], client: Any, body: dict[str, Any], respond: Any, ack: Any) -> None:
+        helper_calls.append({"args": args, "body": body})
+        respond(text="incident help")
+
+    monkeypatch.setattr("modules.sre.platforms.slack.incident_helper.handle_incident_command", fake_handle_incident_command)
+
+    response = slack_command_harness.dispatch("sre", "incident list")
+
+    assert response.status == 200
+    assert only_response(slack_command_harness) == {
+        "url": RESPONSE_URL,
+        "text": "incident help",
+        "response_type": "ephemeral",
+    }
+    assert len(helper_calls) == 1
+    assert helper_calls[0]["args"] == ["list"]
+    assert helper_calls[0]["body"]["user_id"] == USER_ID
+    assert helper_calls[0]["body"]["channel_id"] == CHANNEL_ID
+
+
 # --- modules/dev ------------------------------------------------------------
 
 
@@ -129,6 +201,24 @@ def test_dev_group_acks_and_lists_its_subcommands(slack_command_harness: SlackCo
     assert reply["response_type"] == "ephemeral"
     for subcommand in ("add-incident", "google", "incident", "load-incidents", "slack", "stale"):
         assert f"/sre dev {subcommand}" in reply["text"]
+
+
+def test_dev_leaf_outside_the_development_environment_is_refused(
+    slack_command_harness: SlackCommandHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """/sre dev google outside dev or local answers with a refusal and calls nothing.
+
+    The environment is the only stubbed input; the refusal proves the dev leaf
+    is registered and dispatched, without reaching its Google handler.
+    """
+    monkeypatch.setattr("modules.dev.platforms.slack.get_app_settings", lambda: SimpleNamespace(ENVIRONMENT="production"))
+
+    response = slack_command_harness.dispatch("sre", "dev google")
+
+    assert response.status == 200
+    reply = only_response(slack_command_harness)
+    assert reply["response_type"] == "ephemeral"
+    assert reply["text"] == "This command is only available in the development environment."
 
 
 # --- packages/rant ----------------------------------------------------------

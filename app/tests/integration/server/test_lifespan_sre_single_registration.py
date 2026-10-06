@@ -8,17 +8,15 @@ import pytest
 from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
-from modules.dev import register_slack_commands as register_dev_commands
-from modules.sre import register_slack_commands as register_sre_commands
-from server.lifespan import _register_legacy_handlers
+from server.lifespan import _register_legacy_handlers, _register_legacy_slack_commands
 
 
 @pytest.mark.integration
-def test_register_legacy_handlers_and_hookimpl_path_register_sre_command_once(mock_bot):
+def test_legacy_slack_commands_and_legacy_handlers_register_sre_command_once(mock_bot):
     """The /sre slash command is registered on the Bolt app exactly once.
 
     Runs both startup registration phases against one recording bot: the
-    real sre and dev register_slack_commands hookimpls followed by the
+    real legacy sre and dev Slack command registration followed by the
     provider's root-command auto-registration, then the hard-coded legacy
     handler list. Only the modules that could register /sre run for real; the
     other legacy modules are patched out because they register unrelated
@@ -37,8 +35,7 @@ def test_register_legacy_handlers_and_hookimpl_path_register_sre_command_once(mo
     provider._app = mock_bot
 
     # Act
-    register_sre_commands(registrar=provider)
-    register_dev_commands(registrar=provider)
+    _register_legacy_slack_commands(provider, MagicMock())
     provider._auto_register_root_commands()
     with (
         patch("server.lifespan.role"),
