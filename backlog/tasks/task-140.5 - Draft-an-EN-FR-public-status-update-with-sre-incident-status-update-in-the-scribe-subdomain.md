@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:57'
+updated_date: '2026-10-06 19:08'
 labels:
   - incident
 dependencies:
@@ -32,3 +33,9 @@ Scribe use case: resolve the incident through core, read the transcript since th
 - [ ] #5 Outside an incident channel the command refuses with a localized message; all bot strings are in EN and FR catalogues
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-06 (TASK-140.1): the model fills structured fields only; text shown to the responder is rendered by the default comms profile (decisions/incident-management.md, External status updates), never by the prompt. The scribe Slack entry point uses native Bolt objects; the service imports no Slack SDK (platform-entrypoints.md rule 3).
+<!-- SECTION:NOTES:END -->

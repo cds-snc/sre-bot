@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:57'
+updated_date: '2026-10-06 19:08'
 labels:
   - incident
   - features
@@ -14,6 +15,8 @@ dependencies: []
 references:
   - decisions/incident-management.md
   - decisions/interaction-toolkits.md
+  - decisions/platform-entrypoints.md
+  - decisions/transport-slack.md
 priority: high
 type: feature
 ordinal: 319000
@@ -33,3 +36,9 @@ Decisions (human, 2026-10-06): modal approval over a minimal Slack interaction c
 <!-- AC:BEGIN -->
 - [ ] #1 Every subtask is done
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-06 (TASK-140.1): the records now hold the design. Slack interactions follow platform-entrypoints.md rule 3 (business code platform-neutral; a feature's entrypoints/slack.py uses native Bolt listeners; the host owns registration only). StatusPagePublisher and its copy-ready adapter live in scribe/; a comms profile renders the stored fields, with one default modelled on GC Notify's published incident history; per-product profiles and status-page adapters are DRAFT-10. The command model is reassessed in TASK-141.
+<!-- SECTION:NOTES:END -->

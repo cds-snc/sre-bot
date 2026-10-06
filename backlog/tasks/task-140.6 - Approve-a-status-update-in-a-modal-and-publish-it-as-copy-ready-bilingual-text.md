@@ -4,6 +4,7 @@ title: Approve a status update in a modal and publish it as copy-ready bilingual
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:57'
+updated_date: '2026-10-06 19:08'
 labels:
   - incident
 dependencies:
@@ -18,7 +19,7 @@ ordinal: 325000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-The draft opens in a modal with editable EN and FR fields and the stage; submit approves it (approver recorded) and publishes through a StatusPagePublisher interface whose first adapter returns copy-ready bilingual text to the approver and posts a short confirmation in the channel. Security incidents need an explicit second confirmation in the modal. Real status-page adapters come later.
+The draft opens in a modal with editable EN and FR fields and the stage; submit approves it (approver recorded) and publishes through a StatusPagePublisher interface in scribe/ (one consumer, decisions/incident-management.md) whose first adapter returns copy-ready bilingual text, rendered by the default comms profile modelled on GC Notify's published incident history, to the approver and posts a short confirmation in the channel. The modal's view submission is a native Bolt listener in scribe's entrypoints/slack.py registered through the TASK-140.2 registrar; it acks with field errors, then calls the service. Security incidents need an explicit second confirmation in the modal. Per-product profiles and real status-page adapters come later (DRAFT-10).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

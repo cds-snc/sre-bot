@@ -15,6 +15,8 @@ Per-platform handlers then re-implement the same hard parts by hand, each slight
 
 No off-the-shelf library covers these conventions. Bolt and `slack_sdk.models` provide the runtime and Block Kit types; third-party builders (blockkit) add validation; bot frameworks (Slack Machine) compete with the plugin architecture instead of fitting inside it. Microsoft's Teams SDK for Python reached general availability in May 2026, with Pydantic Adaptive Card models (`microsoft-teams-cards`) and dialogs.
 
+Registration is decided elsewhere and is not part of a toolkit: packages attach block actions and view submissions as native Bolt listeners through the host registrar ([transport-slack.md](transport-slack.md)), and business code stays platform-neutral while a feature's entry point uses its platform's SDK ([platform-entrypoints.md](platform-entrypoints.md) rule 3). The first consumer is the incident status-update approval modal (TASK-140).
+
 The app already paid for wrapping SDKs: the Google API client and boto3 wrappers had to replicate every SDK feature and were deleted ([outbound-clients.md](outbound-clients.md), [sdk-typing.md](sdk-typing.md)).
 
 ## Decision (proposed)
@@ -42,7 +44,7 @@ The `pluggy` allowance and a platform's model types are then the same kind of de
 ## Open before acceptance
 
 - **Toolkit, shared helpers or conventions only.** Is a host-owned toolkit worth its cost, or do a few documented conventions plus lint checks (no manual `ack()` after work, no raw `response_url` posts) give most of the benefit?
-- **Proof on real features.** Build the Slack conventions for one or two rebuilt features first (for example `incident/scribe` and `user_rotations`, the feature packages that call Bolt's client directly today), and decide from what they actually needed.
+- **Proof on real features.** Build the Slack conventions for one or two rebuilt features first (for example `incident/scribe`, whose status-update modal is the first registered view, and `user_rotations`), and decide from what they actually needed. With native listeners in entry points, documented conventions plus lint checks are the leading option.
 - **Staying thin over time.** How the no-wrapper rule is enforced in review once the toolkit has several consumers.
 - **Teams.** Whether a Teams toolkit is needed at all, decided when the first Teams feature exists.
 
@@ -60,3 +62,6 @@ The `pluggy` allowance and a platform's model types are then the same kind of de
 ## Migration
 
 Tickets are created on acceptance. Tolerated until then: handlers calling Bolt's `client`, `respond` and `ack` directly.
+
+**Changes:**
+- 2026-10-06: action and view-submission registration and native-SDK entry points are decided in transport-slack.md and platform-entrypoints.md; this record stays Draft for the conventions toolkit (TASK-140.1).
