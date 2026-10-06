@@ -6,10 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:56'
+updated_date: '2026-10-06 16:23'
 labels:
   - incident
   - docs
-dependencies: []
+dependencies:
+  - TASK-110.2
 references:
   - app/packages/incident/scribe/README.md
   - decisions/incident-management.md

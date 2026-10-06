@@ -4,6 +4,7 @@ title: Store incident status updates as their own records under the incident id
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:57'
+updated_date: '2026-10-06 16:23'
 labels:
   - incident
 dependencies:
@@ -27,3 +28,9 @@ A frozen StatusUpdate record (incident id, sequence, state draft/approved/publis
 - [ ] #3 Records never touch the legacy incidents item or its incident_updates attribute
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Ordering: the sre_bot_incident_status_updates table must be applied in Terraform before TASK-140.5 is deployed.
+<!-- SECTION:NOTES:END -->

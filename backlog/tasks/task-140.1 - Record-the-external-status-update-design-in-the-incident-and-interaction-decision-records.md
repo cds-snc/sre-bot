@@ -6,9 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:57'
+updated_date: '2026-10-06 16:23'
 labels:
   - incident
-dependencies: []
+dependencies:
+  - TASK-110.2
 parent_task_id: TASK-140
 priority: high
 type: docs
