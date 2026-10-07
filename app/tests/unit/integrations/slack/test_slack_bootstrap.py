@@ -19,8 +19,13 @@ from slack_sdk.http_retry.builtin_async_handlers import (
     AsyncServerErrorRetryHandler,
 )
 from slack_sdk.web.async_client import AsyncWebClient
+from structlog.testing import capture_logs
 
-from integrations.slack.bootstrap import LegacySlackBootstrap, SlackBootstrap
+from integrations.slack.bootstrap import (
+    LegacySlackBootstrap,
+    SlackBootstrap,
+    log_listener_error,
+)
 from integrations.slack.settings import SlackSettings
 
 pytestmark = pytest.mark.unit
@@ -140,3 +145,54 @@ class TestSlackBootstrapAppCreation:
 
         app_cls.assert_called_once()
         assert app_cls.call_args.kwargs["request_verification_enabled"] is False
+
+
+class TestLegacyListenerErrorLogging:
+    """Failed Bolt listeners are logged as one structured ``slack_listener_error`` event."""
+
+    def test_legacy_create_app_registers_error_handler(self) -> None:
+        with patch("integrations.slack.bootstrap.App") as app_cls:
+            app = MagicMock()
+            app_cls.return_value = app
+
+            LegacySlackBootstrap().create_app()
+
+        app.error.assert_called_once_with(log_listener_error)
+
+    def test_interactive_message_failure_logs_button_identifiers(self) -> None:
+        """A legacy attachment button failure is findable by callback id, button name, channel and user."""
+        body = {
+            "type": "interactive_message",
+            "callback_id": "handle_incident_action_buttons",
+            "actions": [{"name": "ignore-incident", "value": "hook-1"}],
+            "channel": {"id": "C1"},
+            "user": {"id": "U1"},
+            "original_message": {"text": "must not be logged"},
+        }
+
+        with capture_logs() as entries:
+            log_listener_error(RuntimeError("boom"), body)
+
+        assert len(entries) == 1
+        entry = entries[0]
+        assert entry["event"] == "slack_listener_error"
+        assert entry["log_level"] == "error"
+        assert entry["callback_id"] == "handle_incident_action_buttons"
+        assert entry["action_name"] == "ignore-incident"
+        assert entry["channel_id"] == "C1"
+        assert entry["user_id"] == "U1"
+        assert entry["error"] == "boom"
+        assert "original_message" not in entry
+
+    def test_view_submission_failure_logs_view_callback_id(self) -> None:
+        body = {
+            "type": "view_submission",
+            "view": {"callback_id": "incident_view"},
+            "user": {"id": "U1"},
+        }
+
+        with capture_logs() as entries:
+            log_listener_error(ValueError("bad"), body)
+
+        assert entries[0]["callback_id"] == "incident_view"
+        assert entries[0]["action_id"] is None
