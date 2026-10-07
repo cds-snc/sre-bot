@@ -69,6 +69,25 @@ resource "aws_dynamodb_table" "sre_bot_access_requests" {
 }
 
 
+# One item per incident status update: PK INCIDENT#<incident uuid>, SK UPDATE#<sequence>
+resource "aws_dynamodb_table" "sre_bot_incident_status_updates" {
+  name           = "sre_bot_incident_status_updates"
+  hash_key       = "PK"
+  range_key      = "SK"
+  read_capacity  = 2
+  write_capacity = 2
+
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+}
+
 resource "aws_dynamodb_table" "incidents_table" {
   name           = "incidents"
   hash_key       = "id"

@@ -4,7 +4,8 @@ Subdomains of the incident feature import this module and nothing else from
 ``core``: the interfaces every subdomain works on, their domain types, the
 provider functions that resolve the default implementations, and
 ``find_incident_for_conversation``, the command check every incident command
-applies first.
+applies first. ``StatusUpdateStore`` keeps each public status update as its own
+record under the incident id.
 """
 
 from collections.abc import Sequence
@@ -15,15 +16,28 @@ from typing import Protocol, runtime_checkable
 from contracts.operations.result import OperationResult
 from packages.incident.core.adapters.legacy_incidents import build_legacy_incident_lookup
 from packages.incident.core.adapters.slack import build_incident_transcript_reader
-from packages.incident.core.domain import TranscriptMessage
+from packages.incident.core.adapters.status_updates import build_status_update_store
+from packages.incident.core.domain import (
+    StatusUpdate,
+    StatusUpdateStage,
+    StatusUpdateState,
+    StatusUpdateText,
+    TranscriptMessage,
+)
 
 __all__ = [
     "IncidentLookup",
     "IncidentTranscriptReader",
+    "StatusUpdate",
+    "StatusUpdateStage",
+    "StatusUpdateState",
+    "StatusUpdateStore",
+    "StatusUpdateText",
     "TranscriptMessage",
     "find_incident_for_conversation",
     "get_incident_lookup",
     "get_incident_transcript_reader",
+    "get_status_update_store",
 ]
 
 
@@ -84,6 +98,46 @@ class IncidentTranscriptReader(Protocol):
         ...
 
 
+@runtime_checkable
+class StatusUpdateStore(Protocol):
+    """Interface keeping an incident's public status updates, each its own record.
+
+    Records live under the incident id, never on the incident item. Every
+    write is a single conditional write, never a read-modify-write. A store
+    failure is a classified error result, never an exception; a conflict is
+    PERMANENT_ERROR with ``STATUS_UPDATE_CONFLICT``.
+    """
+
+    def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
+        """Store a new update at its sequence.
+
+        The caller numbers it: the latest update's sequence plus one, or 1.
+        A different record already at that sequence is a conflict; the same
+        record (a replay) is success.
+        """
+        ...
+
+    def latest(self, incident_id: str) -> OperationResult[StatusUpdate | None]:
+        """Return the incident's highest-sequence update in one read; success with ``None`` when it has none."""
+        ...
+
+    def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
+        """Return every update of the incident, newest first."""
+        ...
+
+    def transition(self, update: StatusUpdate, *, expected_state: StatusUpdateState) -> OperationResult[StatusUpdate]:
+        """Replace the stored update with ``update`` while its stored state is ``expected_state``.
+
+        Used to approve (with the approver and edited text) and to publish. A
+        stored state that moved on, or no stored record, is a conflict; the
+        same write repeated is success.
+
+        Raises:
+            ValueError: ``expected_state`` cannot move to ``update.state``.
+        """
+        ...
+
+
 @lru_cache(maxsize=1)
 def get_incident_transcript_reader() -> IncidentTranscriptReader:
     """Return the process-wide Slack-backed ``IncidentTranscriptReader``."""
@@ -99,3 +153,9 @@ def get_incident_lookup() -> IncidentLookup:
 def find_incident_for_conversation(conversation_id: str) -> OperationResult[str]:
     """Resolve the command's conversation to its incident id, or a classified refusal."""
     return get_incident_lookup().find_incident_for_conversation(conversation_id)
+
+
+@lru_cache(maxsize=1)
+def get_status_update_store() -> StatusUpdateStore:
+    """Return the process-wide DynamoDB-backed ``StatusUpdateStore``."""
+    return build_status_update_store()

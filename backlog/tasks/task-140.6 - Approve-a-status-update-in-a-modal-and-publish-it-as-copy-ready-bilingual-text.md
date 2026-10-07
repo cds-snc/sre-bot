@@ -4,7 +4,7 @@ title: Approve a status update in a modal and publish it as copy-ready bilingual
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-06 20:05'
+updated_date: '2026-10-07 14:20'
 labels:
   - incident
 dependencies:
@@ -30,3 +30,9 @@ The draft opens in a modal with editable EN and FR fields and the stage; submit 
 - [ ] #4 A security incident cannot be approved without the second confirmation
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-07 (TASK-140.4): approve with StatusUpdateStore.transition(replace(draft, state=APPROVED, approver=..., approved_at=..., en=..., fr=..., stage=...), expected_state=DRAFT); publish with expected_state=APPROVED and published_at. A concurrent approval returns PERMANENT_ERROR STATUS_UPDATE_CONFLICT; a repeated identical submit is success. The in-memory fake is packages.incident.core.adapters.in_memory.InMemoryStatusUpdateStore.
+<!-- SECTION:NOTES:END -->

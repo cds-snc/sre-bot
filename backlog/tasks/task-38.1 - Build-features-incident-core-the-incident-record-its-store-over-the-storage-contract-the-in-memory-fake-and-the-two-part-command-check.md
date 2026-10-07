@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
-updated_date: '2026-10-07 13:28'
+updated_date: '2026-10-07 14:20'
 labels:
   - migration
   - phase-5
@@ -58,4 +58,6 @@ No read-modify-write and no vendor list-append: timeline entries are records und
 2026-10-06: TASK-140.3 adds core's find_incident_for_conversation with an interim adapter over the legacy incidents table, and TASK-140.4 adds StatusUpdate records under the incident id (table sre_bot_incident_status_updates). This task's store replaces the interim lookup adapter behind the same interface; the status-update records keep their keys.
 
 2026-10-07 (TASK-140.3 planning): TASK-140.3 adds a standalone lookup Protocol in core/api.py whose one method is find_incident_for_conversation (conversation id -> OperationResult with the legacy UUID, or a classified not-an-incident refusal), served by an interim direct DynamoDB adapter in core/adapters/ that scans the legacy incidents table. This task must serve that Protocol from the store without a scan, and its plan chooses how (for example an index record per conversation, or another key-addressable read); the interim adapter is deleted here.
+
+2026-10-07 (TASK-140.4): core/api.py now has StatusUpdateStore served by core/adapters/status_updates.py, an interim adapter directly over integrations.aws (table sre_bot_incident_status_updates, PK INCIDENT#<uuid>, SK UPDATE#<seq:06d>), plus core/adapters/in_memory.py. When this task puts core on the storage contract (after TASK-108/109), move that adapter onto it too: same Protocol and keys, conditional put with ALL_OLD replay detection must stay expressible through the contract.
 <!-- SECTION:NOTES:END -->
