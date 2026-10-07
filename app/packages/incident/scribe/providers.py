@@ -9,7 +9,9 @@ from functools import lru_cache
 
 from packages.incident.scribe.adapters.google_docs import GoogleDocsIncidentDocument
 from packages.incident.scribe.adapters.slack import build_incident_report_link_lookup
+from packages.incident.scribe.adapters.text_generation import build_status_update_text_generator
 from packages.incident.scribe.service import IncidentReportLinkLookup
+from packages.incident.scribe.status_update import TextGenerator
 
 
 @lru_cache(maxsize=1)
@@ -22,3 +24,9 @@ def get_incident_document_store() -> GoogleDocsIncidentDocument:
 def get_incident_report_link_lookup() -> IncidentReportLinkLookup:
     """Return the process-wide Slack-backed ``IncidentReportLinkLookup``."""
     return build_incident_report_link_lookup()
+
+
+@lru_cache(maxsize=1)
+def get_status_update_text_generator() -> TextGenerator:
+    """Return the process-wide ``TextGenerator`` that drafts status updates."""
+    return build_status_update_text_generator()

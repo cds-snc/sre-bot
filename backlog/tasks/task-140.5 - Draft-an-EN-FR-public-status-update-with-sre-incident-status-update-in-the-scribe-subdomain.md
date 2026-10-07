@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-07 15:17'
+updated_date: '2026-10-07 15:41'
 labels:
   - incident
 dependencies:
@@ -27,9 +27,9 @@ Scribe use case: resolve the incident through core, read the transcript since th
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 With new channel activity, one model call produces EN and FR drafts with every field, stored as a draft record and shown only to the invoker
-- [ ] #2 With no new human messages since the latest update, no model call is made and the prior update is carried forward with the no-new-information wording
-- [ ] #3 Running it twice with nothing new returns the same pending draft and stores nothing new
-- [ ] #4 A drafted stage earlier than the latest approved stage is raised to it
+- [x] #2 With no new human messages since the latest update, no model call is made and the prior update is carried forward with the no-new-information wording
+- [x] #3 Running it twice with nothing new returns the same pending draft and stores nothing new
+- [x] #4 A drafted stage earlier than the latest approved stage is raised to it
 - [ ] #5 Outside an incident channel the command refuses with a localized message; all bot strings are in EN and FR catalogues
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->

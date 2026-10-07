@@ -15,11 +15,14 @@ class TranscriptMessage:
         posted_at: When the message was posted, timezone-aware UTC. ``None``
             when the platform gave no usable time. Formatting it for display is
             the consumer's job.
+        is_bot: Whether a bot or an integration posted the message rather than
+            a person.
     """
 
     author: str
     text: str
     posted_at: datetime | None = None
+    is_bot: bool = False
 
 
 class StatusUpdateStage(StrEnum):

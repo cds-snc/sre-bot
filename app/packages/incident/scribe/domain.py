@@ -1,10 +1,14 @@
-"""Domain values for the incident scribe drafting use case.
+"""Domain values for the incident scribe use cases.
 
-Frozen, platform-neutral dataclasses shared by the service, the document
-adapter, and the platform adapters. This module depends only on the stdlib.
+Frozen, platform-neutral dataclasses shared by the services, the document
+adapter, and the platform adapters. This module depends only on the stdlib and
+the incident core's public types.
 """
 
 from dataclasses import dataclass
+from enum import StrEnum
+
+from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateText
 
 # Written into Author(s). The responders who spoke in the channel did not author
 # this document, and a reader needs to know it was machine-written.
@@ -95,3 +99,47 @@ class DraftedDocument:
     drafted_headings: tuple[str, ...]
     unanswered_headings: tuple[str, ...]
     partial: bool = False
+
+
+class StatusUpdateOutcomeKind(StrEnum):
+    """How a status-update run produced the draft it returns."""
+
+    DRAFTED = "drafted"
+    CARRIED_FORWARD = "carried_forward"
+    PENDING = "pending"
+
+
+@dataclass(frozen=True)
+class StatusUpdateDraftOutcome:
+    """The draft a status-update run returns, and how it came to be.
+
+    Attributes:
+        update: The draft record, as stored.
+        kind: ``DRAFTED`` from new activity by one model call,
+            ``CARRIED_FORWARD`` from the prior update with nothing new, or
+            ``PENDING`` when an existing draft already covers everything.
+    """
+
+    update: StatusUpdate
+    kind: StatusUpdateOutcomeKind
+
+
+@dataclass(frozen=True)
+class DraftedFields:
+    """The stage and the language-specific fields the model filled."""
+
+    stage: StatusUpdateStage
+    en: StatusUpdateText
+    fr: StatusUpdateText
+
+
+@dataclass(frozen=True)
+class NoNewInformationWording:
+    """The current-action wording of a carried-forward update, per language.
+
+    Supplied by the platform layer from the catalogues, so the service stays
+    free of translation lookups.
+    """
+
+    en: str
+    fr: str

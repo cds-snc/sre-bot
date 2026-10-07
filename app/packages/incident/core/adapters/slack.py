@@ -94,21 +94,25 @@ class SlackIncidentTranscriptReader:
         for raw in reversed(raw_messages):
             text = (raw.get("text") or "").strip()
             user_id = raw.get("user")
-            if not text or not user_id:
+            if not text or not (user_id or raw.get("bot_id")):
                 continue
             if exclude_own_and_system_messages and _is_channel_event(raw):
                 # "set the channel topic", joins/leaves and similar system events
                 # are channel plumbing, never incident facts.
                 skipped += 1
                 continue
-            author = self._resolve_display_name(user_id, name_cache, log)
+            # Webhook and alerting posts carry only a bot id; they are named
+            # from their bot fields rather than looked up as a user.
+            author = self._resolve_display_name(user_id, name_cache, log) if user_id else _bot_name(raw)
             if _is_own_message(raw, author, identity):
                 # This bot's own posts (topic changes, hangout links, "an incident
                 # report has been created at...") are scaffolding. Other bots are
                 # kept: an alerting bot's message is often the first real event.
                 skipped += 1
                 continue
-            messages.append(TranscriptMessage(author=author, text=text, posted_at=_posted_at(raw.get("ts"))))
+            messages.append(
+                TranscriptMessage(author=author, text=text, posted_at=_posted_at(raw.get("ts")), is_bot=_is_bot_post(raw))
+            )
 
         log.info(
             "incident_transcript_history_fetched",
@@ -186,6 +190,17 @@ def _is_channel_event(raw: Mapping[str, Any]) -> bool:
     """Whether a message is a Slack system event rather than someone talking."""
     subtype = str(raw.get("subtype") or "")
     return subtype.startswith("channel_") or subtype in _SYSTEM_SUBTYPES
+
+
+def _is_bot_post(raw: Mapping[str, Any]) -> bool:
+    """Whether a bot or an integration posted the message rather than a person."""
+    return bool(raw.get("bot_id")) or raw.get("subtype") == "bot_message"
+
+
+def _bot_name(raw: Mapping[str, Any]) -> str:
+    """Name a user-less bot post by its username, then its bot profile name, then its bot id."""
+    profile: Mapping[str, Any] = raw.get("bot_profile") or {}
+    return str(raw.get("username") or profile.get("name") or raw.get("bot_id"))
 
 
 def _normalize_name(name: str) -> str:

@@ -1,10 +1,10 @@
 ---
 id: TASK-140.5.1
 title: Draft or carry forward an incident status update in the scribe service
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-07 14:54'
-updated_date: '2026-10-07 14:56'
+updated_date: '2026-10-07 15:41'
 labels:
   - incident
 dependencies:
@@ -24,13 +24,13 @@ Scribe service slice of TASK-140.5. draft_status_update resolves the incident th
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With new human messages since the latest record's cutoff, one model call produces every EN and FR field and a DRAFT record is stored with author, transcript cutoff and fingerprint
-- [ ] #2 With no new human messages since the latest approved or published record's cutoff, no model call is made and a new DRAFT carries the prior update forward with the no-new-information wording and a new next update time
-- [ ] #3 Running it twice with nothing new returns the same pending draft and stores nothing new; a concurrent draft that wins the sequence is returned as pending, any other conflict is refused
-- [ ] #4 A drafted stage earlier than the latest approved or published stage is raised to it
-- [ ] #5 Unparseable model output or a model failure stores nothing and returns a classified error
-- [ ] #6 Bot-posted messages (bot_id, with or without a user) are kept in the transcript, flagged as bots, and never count as new activity
-- [ ] #7 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 With new human messages since the latest record's cutoff, one model call produces every EN and FR field and a DRAFT record is stored with author, transcript cutoff and fingerprint
+- [x] #2 With no new human messages since the latest approved or published record's cutoff, no model call is made and a new DRAFT carries the prior update forward with the no-new-information wording and a new next update time
+- [x] #3 Running it twice with nothing new returns the same pending draft and stores nothing new; a concurrent draft that wins the sequence is returned as pending, any other conflict is refused
+- [x] #4 A drafted stage earlier than the latest approved or published stage is raised to it
+- [x] #5 Unparseable model output or a model failure stores nothing and returns a classified error
+- [x] #6 Bot-posted messages (bot_id, with or without a user) are kept in the transcript, flagged as bots, and never count as new activity
+- [x] #7 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -103,6 +103,34 @@ Reverse: steps 1-2 serve AC2/AC6; 3 serves AC1/AC2; 4 serves AC1-AC3; 5 serves A
 ## Blast radius and rollback
 Only new DRAFT rows in sre_bot_incident_status_updates, and only once TASK-140.5.2 wires the command. The bot-message fix changes draft and summarize input (more context from alert bots). One git revert restores behaviour; rows already written are harmless. Ordering: the TASK-140.4 Terraform table and IAM grant must be applied before deploy.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-07: implemented per the approved plan, TDD (tests written first and seen failing on import).
+
+Production:
+- core/domain.py: TranscriptMessage.is_bot (default False).
+- core/adapters/slack.py: is_bot from bot_id or subtype bot_message; bot posts with a bot_id and no user are now kept (bug fix), named from username, then bot_profile.name, then bot_id, without a users.info call. This bot's own user-less posts are still dropped by bot_id. draft and summarize now also see alert and webhook posts.
+- scribe/settings.py: IncidentStatusUpdateSettings (INCIDENT_STATUS_UPDATE__*) and its cached getter.
+- scribe/domain.py: StatusUpdateOutcomeKind, StatusUpdateDraftOutcome, DraftedFields, NoNewInformationWording (module now imports core.api types).
+- scribe/status_update_prompt.py: INSTRUCTIONS, build_transcript, strict parse_drafted_fields (raw_decode of the first object, fields trimmed and capped at 600 chars, no salvage).
+- scribe/adapters/text_generation.py + providers.get_status_update_text_generator: binds TextGenerator to get_summarizer(); no new import-linter exemption.
+- scribe/status_update.py: TextGenerator Protocol and draft_status_update. The default generator is resolved through a lazy providers import, as service.py does, because providers imports TextGenerator.
+- scribe/README.md: new modules documented; "Adding a use case" now says new use cases get their own module and must not join service.py's shrink-only integrations.openai exemption.
+
+For TASK-140.5.2: call draft_status_update(conversation_id, author=<user id>, wording=NoNewInformationWording(en, fr), on_started=...). DRAFT_UNPARSEABLE_CODE is exported from status_update.py; other refusals use ErrorCode NOT_AN_INCIDENT, AMBIGUOUS_INCIDENT_CONVERSATION, EMPTY_HISTORY, STATUS_UPDATE_CONFLICT. Settings TIMEZONE is unused here and is for the comms profile.
+
+Not verified by unit tests: whether the configured model returns parseable JSON for the prompt. Check by hand against the real model before layer 3 merges.
+
+Gates (cd app):
+- uv run ruff check . -> All checks passed!
+- uv run ruff format --check packages/incident tests/unit/packages/incident -> 73 files already formatted
+- uv run lint-imports -> Contracts: 10 kept, 0 broken.
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 57 errors in 20 files (pre-existing); 0 in touched files.
+- uv run pytest tests --ignore=tests/smoke -> 6 failed, 3860 passed; the 6 are the known order leaks (webhooks SNS x3, directory google x3) tracked by TASK-90 (To Do).
+- make test -> 3096 passed and 770 passed, no failures.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

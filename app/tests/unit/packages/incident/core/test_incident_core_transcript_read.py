@@ -98,18 +98,51 @@ class TestReadTranscript:
 
         client.conversations_history.assert_called_once_with(channel="C123", limit=25, oldest=oldest)
 
-    def test_messages_without_text_or_without_a_user_are_dropped(self) -> None:
-        """Blank text and user-less entries carry nothing to attribute, so they never reach the transcript."""
+    def test_messages_without_text_or_without_any_poster_are_dropped(self) -> None:
+        """Blank text, and entries with neither a user nor a bot id, carry nothing to attribute."""
         client = _client(
             [
                 {"user": "U1", "text": "kept", "ts": "4"},
-                {"text": "no user", "ts": "3"},
+                {"text": "no poster", "ts": "3"},
                 {"user": "U1", "text": "   ", "ts": "2"},
                 {"user": "U1", "ts": "1"},
             ]
         )
 
         assert [m.text for m in _read(client)] == ["kept"]
+
+    @pytest.mark.parametrize(
+        ("raw", "expected_author"),
+        [
+            ({"bot_id": "B9", "username": "Alertmanager", "bot_profile": {"name": "alerts"}}, "Alertmanager"),
+            ({"bot_id": "B9", "bot_profile": {"name": "alerts"}}, "alerts"),
+            ({"bot_id": "B9"}, "B9"),
+        ],
+    )
+    def test_a_bot_post_without_a_user_is_kept_and_named_from_its_bot_fields(
+        self, raw: dict[str, Any], expected_author: str
+    ) -> None:
+        """Webhook and alerting posts carry only a bot id; they are incident facts, named by username, bot profile, then bot id."""
+        client = _client([{**raw, "text": "ALARM: 5xx", "ts": "1"}])
+
+        messages = _read(client)
+
+        assert [(m.author, m.text, m.is_bot) for m in messages] == [(expected_author, "ALARM: 5xx", True)]
+        client.users_info.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("raw", "is_bot"),
+        [
+            ({"user": "U1"}, False),
+            ({"user": "UALERT", "bot_id": "B9"}, True),
+            ({"user": "UALERT", "subtype": "bot_message"}, True),
+        ],
+    )
+    def test_messages_are_flagged_as_bot_posts_from_their_bot_id_or_subtype(self, raw: dict[str, Any], is_bot: bool) -> None:
+        """A consumer can tell people from bots: a bot id or the bot_message subtype marks a bot post."""
+        client = _client([{**raw, "text": "hello", "ts": "1"}])
+
+        assert [m.is_bot for m in _read(client)] == [is_bot]
 
     @pytest.mark.parametrize(
         ("user", "expected"),
@@ -206,6 +239,18 @@ class TestReadTranscriptFiltered:
         )
 
         assert [m.author for m in _read(client, exclude=True)] == ["Alertmanager"]
+
+    def test_this_bots_post_without_a_user_is_still_dropped_by_bot_id(self) -> None:
+        """Keeping user-less bot posts must not let this bot's own scaffolding back in."""
+        client = _client(
+            [
+                {"bot_id": "B1", "username": "sre-bot", "text": "report created", "ts": "2"},
+                {"user": "U1", "text": "hello", "ts": "1"},
+            ],
+            identity={"user_id": "UBOT", "bot_id": "B1", "user": "sre-bot"},
+        )
+
+        assert [m.text for m in _read(client, exclude=True)] == ["hello"]
 
     def test_a_similarly_named_human_is_kept(self) -> None:
         """Name matching is exact after normalization, so a person named like the bot plus more is not filtered."""

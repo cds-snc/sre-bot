@@ -62,13 +62,24 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   `sre.incident` by one `register_commands`; the draft handler posts the
   progress notice when the service signals the start; ephemeral responses; no
   `slack_sdk` import.
-- `service.py` — both use cases and the two scribe-owned interfaces
-  (`IncidentDocumentStore`, `IncidentReportLinkLookup`). The only module of the
-  subdomain that imports `packages/incident/core`, through `core/api.py`.
-  Empty history returns an `OperationResult` with `error_code="EMPTY_HISTORY"`.
+- `service.py` — the draft and summarize use cases and the two scribe-owned
+  interfaces (`IncidentDocumentStore`, `IncidentReportLinkLookup`). It imports
+  `packages/incident/core` through `core/api.py` only. Empty history returns an
+  `OperationResult` with `error_code="EMPTY_HISTORY"`.
+- `status_update.py` — the status-update use case, `draft_status_update`, and
+  its `TextGenerator` interface. It returns the pending draft, carries the
+  prior update forward, or drafts with one model call, and stores the draft as
+  a `StatusUpdate` record (decisions/incident-management.md, External status
+  updates). Only messages posted by people after the latest record's cutoff
+  count as new; thread replies are not read. It imports `core/api.py` only from
+  `core` and no integration.
+- `status_update_prompt.py` — the status-update prompt and its strict answer
+  parser, which rejects any partial or malformed answer.
 - `domain.py` — frozen values of the drafting use case: `DocumentSection`
   (heading + instructions), `SectionDraft`, `DocumentField`,
-  `DraftWriteResult`, `DraftedDocument`. `TranscriptMessage` comes from
+  `DraftWriteResult`, `DraftedDocument`; and of the status-update use case:
+  `StatusUpdateDraftOutcome` and its `StatusUpdateOutcomeKind`,
+  `DraftedFields`, `NoNewInformationWording`. `TranscriptMessage` comes from
   `packages/incident/core`.
 - `adapters/slack.py` — the report-link lookup on Slack bookmarks; returns
   plain strings and no links on an API error.
@@ -76,8 +87,10 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   (Docs read + Drive copy + Docs populate). `service.py` imports the
   `Summarizer` interface and `platforms/slack.py` the transport models, both by
   design.
-- `providers.py` — feature-local DI wiring for the document store and the
-  report-link lookup.
+- `adapters/text_generation.py` — binds `TextGenerator` to the OpenAI
+  `Summarizer`; the status-update path's only integration import.
+- `providers.py` — feature-local DI wiring for the document store, the
+  report-link lookup and the status-update text generator.
 - `settings.py` — partitioned feature settings, one class and one cached getter
   per use case.
 - `locales/` — EN/FR message catalogues, one pair per use case. One
@@ -86,11 +99,13 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
 
 ## Adding a use case
 
-1. **Service.** Add the use case's function to `service.py`, taking typed
-   values and returning `OperationResult`. Declare any new interface as a
-   `Protocol` beside it. Read the channel through `IncidentTranscriptReader`
-   from `core/api.py` and generate text through `Summarizer`; import nothing
-   else from `core`.
+1. **Service.** Add the use case in its own module, as `status_update.py`
+   does, taking typed values and returning `OperationResult`. Declare any new
+   interface as a `Protocol` beside it. Read the channel through
+   `IncidentTranscriptReader` from `core/api.py`; import nothing else from
+   `core`. Generate text through a scribe-local interface bound in
+   `adapters/`: `service.py`'s direct `integrations.openai` import is a
+   shrink-only import-linter exemption that no new module may join.
 2. **Domain values.** Add frozen dataclasses to `domain.py` only if the use
    case needs its own values.
 3. **Adapters.** A new external call goes in `adapters/<system>.py`, wired
