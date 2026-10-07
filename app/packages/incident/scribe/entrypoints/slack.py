@@ -53,9 +53,7 @@ def handle_draft_action(ack: Callable[[], Any], body: dict[str, Any], client: An
     channel_id = str(metadata.get("channel_id", ""))
     locale = str(metadata.get("locale") or "en-US")
     private_metadata = json.dumps({"channel_id": channel_id, "locale": locale})
-    log = logger.bind(
-        action="incident_status_update_draft", user_id=user_id, channel_id=channel_id, view_id=view_id
-    )
+    log = logger.bind(action="incident_status_update_draft", user_id=user_id, channel_id=channel_id, view_id=view_id)
 
     new_hash: str | None = None
     try:
