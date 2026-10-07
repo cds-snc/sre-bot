@@ -7,8 +7,13 @@ a model call so the modal shows a drafting state only then. For a security or
 unknown-flag incident the service refuses until the responder confirms, so the
 modal shows a confirmation view whose Confirm and draft button calls the
 service again with confirmation; Cancel is the view's close button. Slack API
-failures are logged and never raised; nothing is posted to the channel. Wording and views come from ``platforms.slack``, the only module that
-translates.
+failures are logged and never raised; nothing is posted to the channel.
+
+The Review button replaces the modal in place with the review form. Submitting
+it acks with field errors for blank fields, or with a saving view; the approval
+and the copy-ready rendering then run in one event loop and the modal is updated
+by view id to the copy-ready text or an error. Wording and views come from
+``platforms.slack``, the only module that translates.
 """
 
 import asyncio
@@ -18,30 +23,49 @@ from typing import Any
 
 import structlog
 
+from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from contracts.slack.registrar import SlackCommandRegistrar
+from packages.incident.scribe import providers
+from packages.incident.scribe.domain import CopyReadyText, StatusUpdateEdit
 from packages.incident.scribe.platforms.slack import (
     CONFIRM_ACTION_ID,
     DRAFT_ACTION_ID,
+    REVIEW_ACTION_ID,
+    REVIEW_CALLBACK_ID,
+    build_copy_ready_view,
     build_draft_error_view,
     build_drafting_view,
     build_no_new_information_wording,
+    build_profile_labels,
     build_result_view,
+    build_review_error_view,
+    build_review_field_errors,
+    build_review_view,
+    build_saving_view,
     build_security_confirmation_view,
+    parse_review_submission,
 )
 from packages.incident.scribe.status_update import draft_status_update
+from packages.incident.scribe.status_update_approval import (
+    approve_status_update,
+    get_draft_for_review,
+    validate_approval_edit,
+)
 
 logger = structlog.get_logger()
 
 
 def register(registrar: SlackCommandRegistrar) -> None:
-    """Register the Draft and Confirm and draft buttons' block-action listeners.
+    """Register the Draft, Confirm and draft and Review listeners and the approval submission listener.
 
     Args:
         registrar: Slack command registrar.
     """
     registrar.register_block_action(DRAFT_ACTION_ID, handle_draft_action)
     registrar.register_block_action(CONFIRM_ACTION_ID, handle_draft_confirmed_action)
+    registrar.register_block_action(REVIEW_ACTION_ID, handle_review_action)
+    registrar.register_view_submission(REVIEW_CALLBACK_ID, handle_review_submission)
 
 
 def handle_draft_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
@@ -131,6 +155,109 @@ def _run_draft(body: dict[str, Any], client: Any, *, security_confirmed: bool) -
         result_view = build_draft_error_view(result.error_code, locale, private_metadata)
         failure_event = "incident_status_update_result_update_failed"
     modal.update(result_view, failure_event=failure_event)
+
+
+def handle_review_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+    """Handle a press of the Review button: replace the modal in place with the review form.
+
+    Args:
+        ack: Bolt ack callable, called first.
+        body: Block-actions payload; the button value names the incident and sequence.
+        client: Bolt Slack web client.
+    """
+    ack()
+    view = body.get("view") or {}
+    view_id = str(view.get("id", ""))
+    metadata = _parse_metadata(view.get("private_metadata"))
+    channel_id = str(metadata.get("channel_id", ""))
+    locale = str(metadata.get("locale") or "en-US")
+    private_metadata = json.dumps({"channel_id": channel_id, "locale": locale})
+    log = logger.bind(
+        action="incident_status_update_review",
+        user_id=str((body.get("user") or {}).get("id", "")),
+        channel_id=channel_id,
+        view_id=view_id,
+    )
+    target = _parse_metadata(((body.get("actions") or [{}])[0]).get("value"))
+    incident_id = str(target.get("incident_id", ""))
+    sequence = target.get("sequence")
+
+    result = asyncio.run(get_draft_for_review(incident_id, sequence)) if isinstance(sequence, int) else None
+    if result is not None and result.is_success and result.data is not None:
+        review_metadata = json.dumps(
+            {"channel_id": channel_id, "locale": locale, "incident_id": incident_id, "sequence": sequence}
+        )
+        next_view = build_review_view(result.data, locale, review_metadata)
+    else:
+        error_code = result.error_code if result is not None else None
+        log.warning("incident_status_update_review_failed", error_code=error_code)
+        next_view = build_review_error_view(error_code, locale, private_metadata)
+    _ModalCursor(client, view_id, view.get("hash"), log).update(
+        next_view, failure_event="incident_status_update_review_update_failed"
+    )
+
+
+def handle_review_submission(ack: Callable[..., Any], body: dict[str, Any], client: Any) -> None:
+    """Handle the review modal's submission: validate, approve, then show the copy-ready text.
+
+    Blank fields and an unreadable stage ack with field errors and call nothing.
+    Otherwise the ack replaces the form with the saving view inside Slack's
+    window, and the modal is updated by view id (no hash, the ack changed it).
+
+    Args:
+        ack: Bolt ack callable, called exactly once.
+        body: View-submission payload; carries the view, its state and the submitting user.
+        client: Bolt Slack web client.
+    """
+    view = body.get("view") or {}
+    view_id = str(view.get("id", ""))
+    approver = str((body.get("user") or {}).get("id", ""))
+    metadata = _parse_metadata(view.get("private_metadata"))
+    locale = str(metadata.get("locale") or "en-US")
+    private_metadata = json.dumps(
+        {
+            "channel_id": str(metadata.get("channel_id", "")),
+            "locale": locale,
+            "incident_id": str(metadata.get("incident_id", "")),
+            "sequence": metadata.get("sequence"),
+        }
+    )
+    edit = parse_review_submission(view)
+    blank = ("stage",) if edit is None else validate_approval_edit(edit)
+    if edit is None or blank:
+        ack(response_action="errors", errors=build_review_field_errors(blank, locale))
+        return
+    ack(response_action="update", view=build_saving_view(locale, private_metadata))
+
+    log = logger.bind(action="incident_status_update_approval", user_id=approver, view_id=view_id)
+    result = asyncio.run(
+        _approve_and_publish(str(metadata.get("incident_id", "")), int(metadata.get("sequence") or 0), approver, edit)
+    )
+    if result.is_success and result.data is not None:
+        next_view = build_copy_ready_view(result.data, locale, private_metadata)
+    else:
+        log.warning("incident_status_update_approval_failed", status=result.status, error_code=result.error_code)
+        next_view = build_review_error_view(result.error_code, locale, private_metadata)
+    _ModalCursor(client, view_id, None, log).update(next_view, failure_event="incident_status_update_approval_update_failed")
+
+
+async def _approve_and_publish(
+    incident_id: str, sequence: int, approver: str, edit: StatusUpdateEdit
+) -> OperationResult[CopyReadyText]:
+    """Approve the draft, then render the approved record as copy-ready text.
+
+    One coroutine so a submission needs one event loop, and an async Bolt
+    listener could await it directly. A refused approval is returned as a
+    failure without publishing.
+    """
+    approved = await approve_status_update(incident_id, sequence, approver=approver, edit=edit)
+    if not approved.is_success or approved.data is None:
+        return OperationResult.error(
+            approved.status, message=approved.message or "approval failed", error_code=approved.error_code
+        )
+    return await providers.get_status_page_publisher().publish(
+        approved.data, labels_en=build_profile_labels("en-US"), labels_fr=build_profile_labels("fr-FR")
+    )
 
 
 def _parse_metadata(raw: Any) -> dict[str, Any]:

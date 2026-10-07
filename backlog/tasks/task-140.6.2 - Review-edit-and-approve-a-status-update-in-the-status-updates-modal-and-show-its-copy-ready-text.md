@@ -3,10 +3,10 @@ id: TASK-140.6.2
 title: >-
   Review, edit and approve a status update in the status-updates modal and show
   its copy-ready text
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-07 18:52'
-updated_date: '2026-10-07 21:25'
+updated_date: '2026-10-07 22:24'
 labels:
   - incident
 dependencies:
@@ -25,11 +25,11 @@ Slack slice of TASK-140.6. A Review button beside Draft on views showing a DRAFT
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The Review button opens the review modal in place with the draft's EN, FR and stage prefilled
-- [ ] #2 Submitting with a blank field shows field errors in the modal and does not call the service
-- [ ] #3 A valid submit approves the record and the modal shows the copy-ready EN and FR text; service refusals and conflicts show an in-modal error with Close
-- [ ] #4 No message is posted to the incident channel
-- [ ] #5 Block action and view submission dispatch through a real SlackPlatformProvider in an integration test
+- [x] #1 The Review button opens the review modal in place with the draft's EN, FR and stage prefilled
+- [x] #2 Submitting with a blank field shows field errors in the modal and does not call the service
+- [x] #3 A valid submit approves the record and the modal shows the copy-ready EN and FR text; service refusals and conflicts show an in-modal error with Close
+- [x] #4 No message is posted to the incident channel
+- [x] #5 Block action and view submission dispatch through a real SlackPlatformProvider in an integration test
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
@@ -79,6 +79,8 @@ For later layers: TASK-140.8 reuses build_copy_ready_view and a shared copy-read
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-07: the 6 planning questions were settled by the human on 2026-10-07: async get_draft_for_review/approve_status_update for Q3 (approve and publish in one asyncio.run helper, pivot path to an async Bolt listener), the recommended answers for Q1, Q2, Q4, Q5 and Q6. Re-rendering the form with submitted values on a refusal is a possible follow-up, not in scope.
+
+Implemented 2026-10-07. Files (production, +added lines): scribe/platforms/slack.py +159/-12, scribe/entrypoints/slack.py +130/-3, locales en-US/fr-FR +8 each; about 305 LOC, 4 files, README skipped. Gates: ruff format --check clean (837 files); mypy 57 errors in 20 files, all pre-existing in modules/*, 0 in touched files; lint-imports 10 kept 0 broken; pytest tests/unit tests/integration 3376 passed and legacy set 783 passed (make test split green). Single-process pytest tests --ignore=tests/smoke: the 6 known TASK-90 failures plus 4 log-capture failures (2 draft entrypoint tests, 2 review entrypoint tests) caused by the new dispatch test being the first to call the module logger.bind under a cached structlog config; same TASK-90 leak class, passes in every split run. ruff check . reports 3 unused imports in tests/integration/integrations/slack/test_slack_provider_listener_dispatch.py (harness extraction leftover, not touched here). Deviation: added build_review_error_view (required by the pre-authored tests) because the review CONFLICT wording differs from the drafting conflict; _status_error_text is unchanged. Manual check needed in a real workspace: rich_text_preformatted rendering and copy fidelity in a modal, and views.update by view id after a view_submission update ack. AC6 left unchecked pending the ruff and single-process items above.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
