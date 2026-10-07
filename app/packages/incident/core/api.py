@@ -1,8 +1,10 @@
 """Public surface of the incident core package.
 
 Subdomains of the incident feature import this module and nothing else from
-``core``: the interfaces every subdomain works on, their domain types and the
-provider functions that resolve the default implementations.
+``core``: the interfaces every subdomain works on, their domain types, the
+provider functions that resolve the default implementations, and
+``find_incident_for_conversation``, the command check every incident command
+applies first.
 """
 
 from collections.abc import Sequence
@@ -10,10 +12,35 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Protocol, runtime_checkable
 
+from contracts.operations.result import OperationResult
+from packages.incident.core.adapters.legacy_incidents import build_legacy_incident_lookup
 from packages.incident.core.adapters.slack import build_incident_transcript_reader
 from packages.incident.core.domain import TranscriptMessage
 
-__all__ = ["IncidentTranscriptReader", "TranscriptMessage", "get_incident_transcript_reader"]
+__all__ = [
+    "IncidentLookup",
+    "IncidentTranscriptReader",
+    "TranscriptMessage",
+    "find_incident_for_conversation",
+    "get_incident_lookup",
+    "get_incident_transcript_reader",
+]
+
+
+@runtime_checkable
+class IncidentLookup(Protocol):
+    """Interface resolving a conversation to the incident it belongs to."""
+
+    def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
+        """Return the incident id for the conversation, or a classified refusal.
+
+        Success carries the incident's id (the legacy UUID). A conversation
+        that belongs to no incident is NOT_FOUND with ``NOT_AN_INCIDENT``; one
+        that maps to several is PERMANENT_ERROR with
+        ``AMBIGUOUS_INCIDENT_CONVERSATION``. A store failure is a classified
+        error result, never an exception.
+        """
+        ...
 
 
 @runtime_checkable
@@ -61,3 +88,14 @@ class IncidentTranscriptReader(Protocol):
 def get_incident_transcript_reader() -> IncidentTranscriptReader:
     """Return the process-wide Slack-backed ``IncidentTranscriptReader``."""
     return build_incident_transcript_reader()
+
+
+@lru_cache(maxsize=1)
+def get_incident_lookup() -> IncidentLookup:
+    """Return the process-wide ``IncidentLookup`` over the legacy incidents table."""
+    return build_legacy_incident_lookup()
+
+
+def find_incident_for_conversation(conversation_id: str) -> OperationResult[str]:
+    """Resolve the command's conversation to its incident id, or a classified refusal."""
+    return get_incident_lookup().find_incident_for_conversation(conversation_id)
