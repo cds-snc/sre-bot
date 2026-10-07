@@ -12,8 +12,6 @@ vendor adapters live under ``adapters/``. Swapping OpsGenie or Slack is a
 ``providers.py`` change.
 """
 
-from __future__ import annotations
-
 from datetime import timedelta
 
 from contracts.plugins.namespace import hookimpl
@@ -25,7 +23,8 @@ SYNC_INTERVAL = timedelta(minutes=5)
 
 def _run_oncall_sync() -> None:
     """Entry point for the scheduled job."""
-    from packages.oncall_sync.providers import get_oncall_sync_service
+    # Deferred: plugin __init__ stays import-light (decisions/plugins.md).
+    from packages.oncall_sync.providers import get_oncall_sync_service  # noqa: PLC0415
 
     get_oncall_sync_service().sync_all()
 

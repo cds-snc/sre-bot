@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from modules.incident import schedule_retro
 from packages.incident.scheduling import availability
 from packages.incident.scheduling.adapters import google_calendar
 
@@ -35,8 +36,6 @@ def test_relocated_helper_absent_from_google_workspace_sources(name):
 
 
 def test_schedule_retro_uses_relocated_availability_helpers():
-    from modules.incident import schedule_retro
-
     assert schedule_retro.find_first_available_slot is availability.find_first_available_slot
     assert schedule_retro.identify_unavailable_users is availability.identify_unavailable_users
     assert schedule_retro.get_freebusy is google_calendar.get_freebusy

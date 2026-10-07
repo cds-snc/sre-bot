@@ -4,6 +4,7 @@ Tests the scheduling logic, error handling, and task integration without
 executing the actual scheduled work.
 """
 
+from datetime import timedelta
 from unittest.mock import MagicMock, create_autospec, patch
 
 import pytest
@@ -205,8 +206,6 @@ class TestScheduleBackgroundJobRegistry:
     @pytest.mark.unit
     @patch("jobs.scheduled_tasks.schedule_lib")
     def test_register_interval_with_minutes(self, mock_schedule_lib) -> None:
-        from datetime import timedelta
-
         registry = _ScheduleBackgroundJobRegistry()
         job = MagicMock()
 
@@ -218,8 +217,6 @@ class TestScheduleBackgroundJobRegistry:
     @pytest.mark.unit
     @patch("jobs.scheduled_tasks.schedule_lib")
     def test_register_interval_with_hours(self, mock_schedule_lib) -> None:
-        from datetime import timedelta
-
         registry = _ScheduleBackgroundJobRegistry()
         job = MagicMock()
 

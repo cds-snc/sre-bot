@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 import pytest
 from botocore.exceptions import ClientError
 
+import infrastructure.storage.service as service_module
 from infrastructure.storage.service import DynamoDBStorageService
 
 
@@ -314,8 +315,6 @@ class TestStorageServiceProviderAndSdkExceptions:
     """Contract tests for provider wiring and SDK exception mapping."""
 
     def test_get_storage_service_uses_integrations_get_aws_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import infrastructure.storage.service as service_module
-
         service_module.get_storage_service.cache_clear()
 
         dynamodb_client = MagicMock()

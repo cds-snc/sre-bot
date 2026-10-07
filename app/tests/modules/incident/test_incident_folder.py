@@ -6,7 +6,7 @@ from botocore.exceptions import ClientError
 
 from contracts.operations import OperationResult, OperationStatus
 from infrastructure.spreadsheets import RANGE_NOT_FOUND, SheetCell
-from modules.incident import incident_folder
+from modules.incident import db_operations, incident_folder
 from packages.aws_platform.adapters.dynamodb import DynamoDBAdapter
 
 
@@ -555,8 +555,6 @@ def test_store_update_propagates_programmer_error(mock_current_time_est, adapter
 def test_store_update_propagates_when_lookup_fails(adapter, logger_mock):
     """When lookup_incident raises, the error is not caught."""
     with patch("modules.incident.incident_folder.db_operations.lookup_incident") as mock_lookup:
-        from modules.incident import db_operations
-
         mock_lookup.side_effect = db_operations.IncidentStoreUnavailableError(
             OperationStatus.PERMANENT_ERROR,
             error_code="ValidationException",

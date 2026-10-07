@@ -8,6 +8,7 @@ in-modal with a Close button and logged; nothing is posted to the channel.
 """
 
 import json
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -17,6 +18,7 @@ from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
 from packages.incident.scribe.domain import StatusUpdateDraftOutcome, StatusUpdateOutcomeKind
+from packages.incident.scribe.entrypoints.slack import handle_draft_action
 
 pytestmark = pytest.mark.unit
 
@@ -37,8 +39,6 @@ def _text(language: str) -> StatusUpdateText:
 
 
 def _pending_update(sequence: int = 1) -> StatusUpdate:
-    from datetime import UTC, datetime
-
     now = datetime(2026, 10, 7, 15, 0, tzinfo=UTC)
     return StatusUpdate(
         incident_id=_INCIDENT,
@@ -83,8 +83,6 @@ class TestHandleDraftAction:
 
     def test_acks_before_any_other_call(self):
         """The listener acks first, synchronously, so Slack gets a 200 immediately."""
-        from packages.incident.scribe.entrypoints.slack import handle_draft_action
-
         ack = MagicMock()
         client = MagicMock()
         body = _block_action_body()
@@ -99,8 +97,6 @@ class TestHandleDraftAction:
 
     def test_sends_drafting_view_with_view_id_hash_and_no_button(self):
         """First views_update uses body's view_id and hash; view is drafting state (no button, localized text)."""
-        from packages.incident.scribe.entrypoints.slack import handle_draft_action
-
         ack = MagicMock()
         client = MagicMock()
         # Second call returns response with new hash
@@ -135,8 +131,6 @@ class TestHandleDraftAction:
 
     def test_result_view_pending_outcome_rendered_in_en_and_fr(self):
         """When a draft already covers everything, result view shows pending draft in EN and FR."""
-        from packages.incident.scribe.entrypoints.slack import handle_draft_action
-
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -160,8 +154,6 @@ class TestHandleDraftAction:
 
     def test_result_view_drafted_outcome_rendered(self):
         """After model drafting, result view shows drafted update."""
-        from packages.incident.scribe.entrypoints.slack import handle_draft_action
-
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -179,8 +171,6 @@ class TestHandleDraftAction:
 
     def test_result_view_carried_forward_outcome_rendered(self):
         """When no new activity, result view shows carried-forward update."""
-        from packages.incident.scribe.entrypoints.slack import handle_draft_action
-
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -198,8 +188,6 @@ class TestHandleDraftAction:
 
     def test_maps_empty_history_error_to_modal_with_close_no_button(self):
         """Error: no history. View shows error with Close button, no Draft button."""
-        from packages.incident.scribe.entrypoints.slack import handle_draft_action
-
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -227,8 +215,6 @@ class TestHandleDraftAction:
 
     def test_maps_draft_unparseable_error_to_modal_with_close_no_button(self):
         """Error: unparseable model output. View shows error with Close, no Draft button."""
-        from packages.incident.scribe.entrypoints.slack import handle_draft_action
-
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -254,8 +240,6 @@ class TestHandleDraftAction:
 
     def test_maps_status_update_conflict_error_to_modal_with_close_no_button(self):
         """Error: conflict from concurrent write. View shows error with Close, no Draft button."""
-        from packages.incident.scribe.entrypoints.slack import handle_draft_action
-
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -281,8 +265,6 @@ class TestHandleDraftAction:
 
     def test_maps_not_an_incident_error_to_modal_with_close_no_button(self):
         """Error: channel is not an incident. View shows error with Close, no Draft button."""
-        from packages.incident.scribe.entrypoints.slack import handle_draft_action
-
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -308,8 +290,6 @@ class TestHandleDraftAction:
 
     def test_maps_ambiguous_incident_error_to_modal_with_close_no_button(self):
         """Error: ambiguous incident. View shows error with Close, no Draft button."""
-        from packages.incident.scribe.entrypoints.slack import handle_draft_action
-
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -335,8 +315,6 @@ class TestHandleDraftAction:
 
     def test_maps_unexpected_classified_error_to_generic_modal_with_close_no_button(self):
         """Error: unexpected classified error (e.g., store failure). View shows generic error with Close, no Draft button."""
-        from packages.incident.scribe.entrypoints.slack import handle_draft_action
-
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -362,8 +340,6 @@ class TestHandleDraftAction:
 
     def test_logs_when_drafting_view_update_fails_but_continues(self):
         """When drafting state update fails, error is logged; listener still drafts and updates result view."""
-        from packages.incident.scribe.entrypoints.slack import handle_draft_action
-
         ack = MagicMock()
         client = MagicMock()
         # First call fails (drafting update), second succeeds (result update)
@@ -388,8 +364,6 @@ class TestHandleDraftAction:
 
     def test_logs_when_result_view_update_fails(self):
         """When result view update fails, error is logged; listener doesn't raise."""
-        from packages.incident.scribe.entrypoints.slack import handle_draft_action
-
         ack = MagicMock()
         client = MagicMock()
         # First call succeeds (drafting), second fails (result)
@@ -412,8 +386,6 @@ class TestHandleDraftAction:
 
     def test_makes_no_post_message_or_post_ephemeral_calls(self):
         """The listener never posts to the channel; all output goes in the modal."""
-        from packages.incident.scribe.entrypoints.slack import handle_draft_action
-
         ack = MagicMock()
         client = MagicMock()
         body = _block_action_body()
@@ -432,8 +404,6 @@ class TestHandleDraftAction:
 
     def test_calls_draft_status_update_with_channel_id_and_user_id(self):
         """The service is called with the channel id from private_metadata and the user id from the body."""
-        from packages.incident.scribe.entrypoints.slack import handle_draft_action
-
         ack = MagicMock()
         client = MagicMock()
         body = _block_action_body(user_id="U999")

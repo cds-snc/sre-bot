@@ -6,6 +6,7 @@ from googleapiclient.errors import HttpError
 
 from contracts.operations import OperationResult
 from infrastructure.drive.models import DriveFile
+from packages.incident.drive.adapters import google_drive
 
 
 def _http_error(status: int) -> HttpError:
@@ -22,8 +23,6 @@ def _http_error(status: int) -> HttpError:
 
 @patch("packages.incident.drive.adapters.google_drive.get_drive_provider")
 def test_list_child_folders_filters_templates_from_results(mock_get_provider):
-    from packages.incident.drive.adapters import google_drive
-
     provider = MagicMock()
     provider.list_folders.return_value = OperationResult.success(
         data=[
@@ -42,8 +41,6 @@ def test_list_child_folders_filters_templates_from_results(mock_get_provider):
 
 @patch("packages.incident.drive.adapters.google_drive.get_drive_provider")
 def test_find_document_by_channel_name_enriches_match_with_app_properties(mock_get_provider):
-    from packages.incident.drive.adapters import google_drive
-
     provider = MagicMock()
     provider.find_files_by_name.return_value = OperationResult.success(data=[DriveFile(id="doc-1", name="incident-2024-001")])
     mock_get_provider.return_value = provider
@@ -68,8 +65,6 @@ def test_find_document_by_channel_name_enriches_match_with_app_properties(mock_g
 
 @patch("packages.incident.drive.adapters.google_drive.get_drive_provider")
 def test_incident_drive_healthcheck_returns_false_when_metadata_lookup_raises(mock_get_provider):
-    from packages.incident.drive.adapters import google_drive
-
     provider = MagicMock()
     mock_get_provider.return_value = provider
 
@@ -79,8 +74,6 @@ def test_incident_drive_healthcheck_returns_false_when_metadata_lookup_raises(mo
 
 def test_add_metadata_returns_updated_file_on_success():
     """add_metadata calls files().update() with appProperties and returns the updated file."""
-    from packages.incident.drive.adapters import google_drive
-
     with patch.object(google_drive, "_drive_service") as mock_drive_service:
         files_resource = MagicMock()
         files_resource.update.return_value.execute.return_value = {
@@ -102,8 +95,6 @@ def test_add_metadata_returns_updated_file_on_success():
 
 def test_add_metadata_reraises_classified_http_error():
     """add_metadata catches HttpError, classifies it via logger, and re-raises."""
-    from packages.incident.drive.adapters import google_drive
-
     error = _http_error(429)
 
     with patch.object(google_drive, "_drive_service") as mock_drive_service:
@@ -137,8 +128,6 @@ def test_add_metadata_reraises_classified_http_error():
 
 def test_delete_metadata_returns_updated_file_on_success():
     """delete_metadata calls files().update() with appProperties[key]=None and returns the updated file."""
-    from packages.incident.drive.adapters import google_drive
-
     with patch.object(google_drive, "_drive_service") as mock_drive_service:
         files_resource = MagicMock()
         files_resource.update.return_value.execute.return_value = {
@@ -158,8 +147,6 @@ def test_delete_metadata_returns_updated_file_on_success():
 
 def test_delete_metadata_reraises_classified_http_error():
     """delete_metadata catches HttpError, classifies it via logger, and re-raises."""
-    from packages.incident.drive.adapters import google_drive
-
     error = _http_error(404)
 
     with patch.object(google_drive, "_drive_service") as mock_drive_service:
@@ -193,8 +180,6 @@ def test_delete_metadata_reraises_classified_http_error():
 
 def test_get_metadata_returns_file_on_success():
     """get_metadata calls files().get() with fields parameter and returns the file."""
-    from packages.incident.drive.adapters import google_drive
-
     with patch.object(google_drive, "_drive_service") as mock_drive_service:
         files_resource = MagicMock()
         files_resource.get.return_value.execute.return_value = {
@@ -214,8 +199,6 @@ def test_get_metadata_returns_file_on_success():
 
 def test_get_metadata_reraises_classified_http_error():
     """get_metadata catches HttpError, classifies it via logger, and re-raises."""
-    from packages.incident.drive.adapters import google_drive
-
     error = _http_error(403)
 
     with patch.object(google_drive, "_drive_service") as mock_drive_service:

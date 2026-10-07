@@ -1,11 +1,11 @@
 from pathlib import Path
 
+from packages.incident.documents import utils
+
 APP_ROOT = Path(__file__).resolve().parents[5]
 
 
 def test_incident_documents_package_exposes_extract_google_doc_id():
-    from packages.incident.documents import utils
-
     assert callable(utils.extract_google_doc_id)
 
 
