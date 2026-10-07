@@ -4,7 +4,7 @@ title: Draft or carry forward an incident status update in the scribe service
 status: In Progress
 assignee: []
 created_date: '2026-10-07 14:54'
-updated_date: '2026-10-07 15:41'
+updated_date: '2026-10-07 16:40'
 labels:
   - incident
 dependencies:
@@ -130,6 +130,8 @@ Gates (cd app):
 - uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 57 errors in 20 files (pre-existing); 0 in touched files.
 - uv run pytest tests --ignore=tests/smoke -> 6 failed, 3860 passed; the 6 are the known order leaks (webhooks SNS x3, directory google x3) tracked by TASK-90 (To Do).
 - make test -> 3096 passed and 770 passed, no failures.
+
+Added sre_bot_incident_status_updates to .devcontainer/dynamodb-create.sh (PK/SK strings, 2/2 capacity, matching terraform/dynamodb.tf). TASK-140.4 added the table to Terraform only, so DynamoDB Local lacked it and the status-update store failed locally. Fixed here because #1544 was already in review.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
