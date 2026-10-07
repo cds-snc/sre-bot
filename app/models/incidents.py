@@ -27,6 +27,7 @@ class Incident(BaseModel):
     severity: str | None = None
     retrospective_url: str | None = None
     incident_updates: list[str | dict] | None = []
+    security_incident: bool | None = None
 
     model_config = {
         "extra": "forbid",

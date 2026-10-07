@@ -304,3 +304,76 @@ def test_open_incident_info_view_responds_when_store_unavailable(mock_db_operati
 
     mock_respond.assert_called_once_with(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
     mock_client.views_open.assert_not_called()
+
+
+@patch("modules.incident.information_display.incident_information_view")
+@patch("modules.incident.information_display.db_operations")
+def test_open_incident_info_view_with_security_incident_attribute(mock_db_operations, mock_incident_information_view):
+    """The view builds correctly from an item with the security_incident attribute."""
+    mock_client = MagicMock()
+    mock_respond = MagicMock()
+    body = {
+        "channel_id": "C12345",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+        "trigger_id": "T12345",
+        "view": {"id": "V12345"},
+    }
+    mock_db_operations.get_incident_by_channel_id.return_value = {
+        "id": {"S": "incident-id"},
+        "channel_id": {"S": "C1234567890"},
+        "channel_name": {"S": "incident-channel"},
+        "name": {"S": "Test Incident"},
+        "user_id": {"S": "U12345"},
+        "teams": {"L": [{"S": "team1"}]},
+        "report_url": {"S": "http://example.com/report"},
+        "status": {"S": "Open"},
+        "security_incident": {"BOOL": True},
+    }
+
+    mock_incident_information_view.return_value = {"view": [{"block": "block_id"}]}
+    information_display.open_incident_info_view(mock_client, body, mock_respond)
+    mock_client.views_open.assert_called_once_with(
+        trigger_id="T12345",
+        view={"view": [{"block": "block_id"}]},
+    )
+    # Verify the view was called with an Incident that has the security_incident field
+    assert mock_incident_information_view.called
+    called_incident = mock_incident_information_view.call_args[0][0]
+    assert called_incident.security_incident is True
+
+
+@patch("modules.incident.information_display.incident_information_view")
+@patch("modules.incident.information_display.db_operations")
+def test_open_incident_info_view_without_security_incident_attribute(mock_db_operations, mock_incident_information_view):
+    """The view builds correctly from an item without the security_incident attribute."""
+    mock_client = MagicMock()
+    mock_respond = MagicMock()
+    body = {
+        "channel_id": "C12345",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+        "trigger_id": "T12345",
+        "view": {"id": "V12345"},
+    }
+    mock_db_operations.get_incident_by_channel_id.return_value = {
+        "id": {"S": "incident-id"},
+        "channel_id": {"S": "C1234567890"},
+        "channel_name": {"S": "incident-channel"},
+        "name": {"S": "Test Incident"},
+        "user_id": {"S": "U12345"},
+        "teams": {"L": [{"S": "team1"}]},
+        "report_url": {"S": "http://example.com/report"},
+        "status": {"S": "Open"},
+    }
+
+    mock_incident_information_view.return_value = {"view": [{"block": "block_id"}]}
+    information_display.open_incident_info_view(mock_client, body, mock_respond)
+    mock_client.views_open.assert_called_once_with(
+        trigger_id="T12345",
+        view={"view": [{"block": "block_id"}]},
+    )
+    # Verify the view was called with an Incident that doesn't have the security_incident field
+    assert mock_incident_information_view.called
+    called_incident = mock_incident_information_view.call_args[0][0]
+    assert called_incident.security_incident is None

@@ -190,6 +190,7 @@ _Type_ `/sre incident help` _for complete command list_"""
             "meet_url": "https://meet.google.com/aaa-bbbb-ccc",
             "environment": "prod",
             "severity": None,
+            "security_incident": True,
         }
     )
 
@@ -822,3 +823,122 @@ def test_contract_security_group_invite_uses_environment_not_prefix(
     core.initiate_resources_creation(client, incident_payload)
 
     client.conversations_invite.assert_called_once_with(channel="channel_id", users="user_id")
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
+def test_declare_stores_security_incident_true_for_yes(
+    _mock_create_incident_conversation,
+    _mock_incident_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call_users_from_folder,
+    _mock_logger,
+):
+    """When security_incident is 'yes', it is stored as True in the database."""
+    incident_payload = helper_generate_default_incident_params()
+    incident_payload.security_incident = "yes"
+    mock_get_on_call_users_from_folder.return_value = []
+    mock_google_meet.create_space.return_value = {"meetingUri": "meet_url"}
+    mock_incident_document.create_incident_document.return_value = "doc_id"
+    mock_db_operations.create_incident.return_value = "incident_id"
+    client = MagicMock()
+
+    core.initiate_resources_creation(client, incident_payload)
+
+    call_kwargs = mock_db_operations.create_incident.call_args.kwargs
+    incident_data = (
+        call_kwargs.get("incident_data") if "incident_data" in call_kwargs else mock_db_operations.create_incident.call_args[0][0]
+    )
+    assert incident_data.get("security_incident") is True
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
+def test_declare_stores_security_incident_false_for_no(
+    _mock_create_incident_conversation,
+    _mock_incident_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call_users_from_folder,
+    _mock_logger,
+):
+    """When security_incident is 'no', it is stored as False in the database."""
+    incident_payload = helper_generate_default_incident_params()
+    incident_payload.security_incident = "no"
+    mock_get_on_call_users_from_folder.return_value = []
+    mock_google_meet.create_space.return_value = {"meetingUri": "meet_url"}
+    mock_incident_document.create_incident_document.return_value = "doc_id"
+    mock_db_operations.create_incident.return_value = "incident_id"
+    client = MagicMock()
+
+    core.initiate_resources_creation(client, incident_payload)
+
+    call_kwargs = mock_db_operations.create_incident.call_args.kwargs
+    incident_data = (
+        call_kwargs.get("incident_data") if "incident_data" in call_kwargs else mock_db_operations.create_incident.call_args[0][0]
+    )
+    assert incident_data.get("security_incident") is False
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+@patch("modules.incident.incident_conversation.create_incident_conversation")
+def test_declare_stores_security_incident_none_for_other_values(
+    _mock_create_incident_conversation,
+    _mock_incident_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call_users_from_folder,
+    _mock_logger,
+):
+    """When security_incident is any other value, it is stored as None in the database."""
+    incident_payload = helper_generate_default_incident_params()
+    incident_payload.security_incident = "unknown"
+    mock_get_on_call_users_from_folder.return_value = []
+    mock_google_meet.create_space.return_value = {"meetingUri": "meet_url"}
+    mock_incident_document.create_incident_document.return_value = "doc_id"
+    mock_db_operations.create_incident.return_value = "incident_id"
+    client = MagicMock()
+
+    core.initiate_resources_creation(client, incident_payload)
+
+    call_kwargs = mock_db_operations.create_incident.call_args.kwargs
+    incident_data = (
+        call_kwargs.get("incident_data") if "incident_data" in call_kwargs else mock_db_operations.create_incident.call_args[0][0]
+    )
+    assert "security_incident" in incident_data
+    assert incident_data["security_incident"] is None
+
+
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.db_operations")
+def test_recreate_database_record_leaves_security_incident_unset(mock_db_operations, _mock_logger):
+    """The recreate-missing-resources path has no security answer, so its incident data
+    carries no security_incident key and the model default stores the flag as unknown."""
+    mock_db_operations.create_incident.return_value = "incident_id"
+    results: dict = {"success": [], "errors": []}
+
+    core._create_database_record(
+        "channel_id", "channel_name", "incident_name", "product", "user_id", "doc_link", "meet_url", results
+    )
+
+    incident_data = mock_db_operations.create_incident.call_args.args[0]
+    assert "security_incident" not in incident_data

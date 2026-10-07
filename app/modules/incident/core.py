@@ -26,6 +26,11 @@ SLACK_NOTIFY_MGMT_USER_GROUP_ID = incident_settings.SLACK_NOTIFY_MGMT_USER_GROUP
 logger = get_logger()
 
 
+def _security_answer_to_flag(answer: str) -> bool | None:
+    """Map the declare modal's yes/no answer to the stored flag; anything else is NULL."""
+    return {"yes": True, "no": False}.get(answer)
+
+
 def _get_channel_info_and_topic(client: WebClient, channel_id: str) -> tuple:
     """Extract channel information and parse incident details from topic.
 
@@ -506,6 +511,7 @@ def initiate_resources_creation(
         "meet_url": meet_link["meetingUri"],
         "environment": environment,
         "severity": incident_payload.severity,
+        "security_incident": _security_answer_to_flag(incident_payload.security_incident),
     }
     incident_id = db_operations.create_incident(incident_data)
     logger.info("incident_record_created", incident_id=incident_id)
