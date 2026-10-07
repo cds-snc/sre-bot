@@ -3,7 +3,7 @@ id: doc-5
 title: Stack H handoff
 type: guide
 created_date: '2026-10-07 14:30'
-updated_date: '2026-10-07 20:04'
+updated_date: '2026-10-07 20:07'
 ---
 # Stack H handoff
 
@@ -46,6 +46,7 @@ TASK-140.5 and TASK-140.6 are coordinators with no branch (140.6 split 2026-10-0
    git add app decisions "backlog/docs/stacks/doc-5 - Stack-H-handoff.md" backlog/tasks/task-140.10.2*
    git commit -m "Confirm before drafting a security incident update"
    gh stack submit
+   gh stack add stack-h/task-140.6.1-status-update-approve
    ```
 2. **agent**: plan TASK-140.6.1, then TASK-140.6.2, with the task-planner agent (tell it: imports at module top level only, tests included; a circular import is a design flaw, not a reason for a lazy import); ask questions in chat and wait for approval.
 3. **human**: reviews; merge #1547 when approved. Do not merge/deploy #1548 until layer 6 (140.10.2) can merge right after it.
@@ -63,4 +64,4 @@ Merging: bottom-up, one layer at a time, with a re-approval for each rebased lay
 - TASK-140.10.2: plan approved and implemented.
 - TASK-140.6.1, TASK-140.6.2: tasks created; plans not yet written. Inputs: the draft is core's `StatusUpdate` (DRAFT), rendered by `scribe/comms_profile.py`; `t()` only in `scribe/platforms/slack.py`; listeners in `scribe/entrypoints/slack.py` `register()`; real-Bolt dispatch harness in `tests/integration/integrations/slack/test_slack_provider_listener_dispatch.py`.
 - TASK-140.8, TASK-140.9: no plan; wait on 140.6.1 and 140.6.2.
-- Follow-ups outside the stack: TASK-143 (move scribe Protocols to `scribe/ports.py`, remove 3 function-level imports; standalone off `main`, not planned yet), TASK-140.11 (timer pre-generated drafts, low), TASK-140.12 (un-approve or correct, to be decided, low).
+- Follow-ups outside the stack: TASK-143 (move scribe Protocols to `scribe/ports.py`, remove 3 function-level imports; standalone off `main`, worked in a parallel session; whichever of TASK-143 and the stack lands second rebases onto the other), TASK-140.11 (timer pre-generated drafts, low), TASK-140.12 (un-approve or correct, to be decided, low).
