@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-07 14:55'
-updated_date: '2026-10-07 16:20'
+updated_date: '2026-10-07 17:45'
 labels:
   - incident
 dependencies:
@@ -94,6 +94,8 @@ Files: contracts/slack/reply.py (open_view returns the view id; update_view adde
 Test edits in place (contract change, not weakening): test_slack_provider_reply_classifies_errors open_view test now returns a view id; tests/factories/slack_bolt.py FakeSlackClient has a canned views_open reply with view.id; legacy_surface registration test pins the new sre.incident.status-update node and its rotations view test passes again; scribe plugin registration test enumerates status-update and the new locale domain.
 Gates (from app/): ruff check . -> All checks passed. mypy . (excluding .venv) -> 57 errors in 20 files, all pre-existing in untouched files (modules/*, integrations/slack/channels.py etc.); 0 in touched files. lint-imports -> Contracts: 10 kept, 0 broken. pytest tests --ignore=tests/smoke -> 6 failed, 3894 passed; the 6 are the known TASK-90 order leaks (3 tests/modules/webhooks/test_webhooks_aws_sns.py, 3 tests/unit/infrastructure/directory/test_google.py), unrelated to this change. tests/integration/legacy_surface/test_slack_command_registration_surface.py -> 20 passed.
 Deviation: none from the plan beyond the registered MISSING_VIEW_ID code and the in-place test edits above. TASK-140.5 ACs: none newly checkable by 140.5.2 alone (AC2-4 already checked; AC1, AC5, AC6 also need 140.5.3), so none were checked.
+
+Fixed 2026-10-07 after local testing: status-update was registered with arguments=[], which the provider treats as no arguments, so it called the handler with the payload only; the registered handler required parsed_args and every call failed. Now one payload-only dispatcher with no arguments or fallback. New test_incident_scribe_status_update_dispatch.py routes the command through a real SlackPlatformProvider.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

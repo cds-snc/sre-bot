@@ -95,10 +95,7 @@ def register_commands(registrar: SlackCommandRegistrar) -> None:
     def _dispatch_summarize_default(payload: CommandPayload) -> CommandResponse:
         return handle_summarize_command(payload, {})
 
-    def _dispatch_status_update(payload: CommandPayload, parsed_args: dict[str, Any]) -> CommandResponse:
-        return handle_status_update_command(payload, parsed_args, registrar.reply)
-
-    def _dispatch_status_update_default(payload: CommandPayload) -> CommandResponse:
+    def _dispatch_status_update(payload: CommandPayload) -> CommandResponse:
         return handle_status_update_command(payload, {}, registrar.reply)
 
     registrar.register_command(
@@ -154,8 +151,6 @@ def register_commands(registrar: SlackCommandRegistrar) -> None:
         usage_hint="",
         examples=[""],
         example_keys=[f"{_STATUS_UPDATE_DOMAIN}.examples.default"],
-        arguments=[],
-        fallback_handler=_dispatch_status_update_default,
     )
 
 

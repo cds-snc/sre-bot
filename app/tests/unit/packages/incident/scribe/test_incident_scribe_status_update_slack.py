@@ -66,7 +66,6 @@ class TestRegisterCommands:
         kwargs = status_update_calls[0]
         assert kwargs["command"] == "status-update"
         assert kwargs["parent"] == "sre.incident"
-        assert kwargs["fallback_handler"] is not None
 
 
 class TestHandleStatusUpdateCommand:
