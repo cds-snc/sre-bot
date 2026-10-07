@@ -18,7 +18,7 @@ Paths are relative to `app/packages/incident/scribe/` unless they start with
 | --- | --- | --- |
 | Slack handler | `handle_draft_command` in `platforms/slack.py` | `handle_summarize_command` in `platforms/slack.py` |
 | Service function | `draft_incident_document_from_conversation` → `draft_incident_document` in `service.py` | `summarize_incident_conversation` → `summarize_transcript` in `service.py` |
-| Interfaces | `IncidentReportLinkLookup`, `IncidentDocumentStore` (`service.py`); `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) | `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) |
+| Interfaces | `IncidentReportLinkLookup`, `IncidentDocumentStore` (`ports.py`); `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) | `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) |
 | Adapters | `adapters/slack.py` (report link from bookmarks), `adapters/google_docs.py` (read report, copy, fill copy), `core/adapters/slack.py` (transcript), `app/integrations/openai/` | `core/adapters/slack.py` (transcript), `app/integrations/openai/` |
 | Wiring | `providers.py`: `get_incident_report_link_lookup`, `get_incident_document_store`; `core/api.py`: `get_incident_transcript_reader` | `core/api.py`: `get_incident_transcript_reader` |
 | Settings | `IncidentDraftSettings`, prefix `INCIDENT_DRAFT__` | `IncidentSummarySettings`, prefix `INCIDENT_SUMMARY__` |
@@ -62,12 +62,13 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   `sre.incident` by one `register_commands`; the draft handler posts the
   progress notice when the service signals the start; ephemeral responses; no
   `slack_sdk` import.
-- `service.py` — the draft and summarize use cases and the two scribe-owned
-  interfaces (`IncidentDocumentStore`, `IncidentReportLinkLookup`). It imports
+- `ports.py` — the scribe-owned interfaces: `IncidentDocumentStore`,
+  `IncidentReportLinkLookup` and `TextGenerator`.
+- `service.py` — the draft and summarize use cases. It imports
   `packages/incident/core` through `core/api.py` only. Empty history returns an
   `OperationResult` with `error_code="EMPTY_HISTORY"`.
-- `status_update.py` — the status-update use case, `draft_status_update`, and
-  its `TextGenerator` interface. It returns the pending draft, carries the
+- `status_update.py` — the status-update use case, `draft_status_update`. It
+  returns the pending draft, carries the
   prior update forward, or drafts with one model call, and stores the draft as
   a `StatusUpdate` record (decisions/incident-management.md, External status
   updates). Only messages posted by people after the latest record's cutoff

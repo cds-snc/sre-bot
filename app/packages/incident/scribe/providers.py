@@ -10,8 +10,7 @@ from functools import lru_cache
 from packages.incident.scribe.adapters.google_docs import GoogleDocsIncidentDocument
 from packages.incident.scribe.adapters.slack import build_incident_report_link_lookup
 from packages.incident.scribe.adapters.text_generation import build_status_update_text_generator
-from packages.incident.scribe.service import IncidentReportLinkLookup
-from packages.incident.scribe.status_update import TextGenerator
+from packages.incident.scribe.ports import IncidentReportLinkLookup, TextGenerator
 
 
 @lru_cache(maxsize=1)

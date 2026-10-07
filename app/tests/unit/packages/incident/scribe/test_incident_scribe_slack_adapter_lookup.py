@@ -7,7 +7,7 @@ from slack_sdk.errors import SlackApiError
 
 from packages.incident.scribe.adapters import slack as slack_adapter
 from packages.incident.scribe.adapters.slack import SlackIncidentReportLinkLookup, build_incident_report_link_lookup
-from packages.incident.scribe.service import IncidentReportLinkLookup
+from packages.incident.scribe.ports import IncidentReportLinkLookup
 
 pytestmark = pytest.mark.unit
 

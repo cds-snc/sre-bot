@@ -11,10 +11,10 @@ from contracts.operations import OperationResult, OperationStatus
 from packages.incident.core.api import IncidentTranscriptReader, TranscriptMessage
 from packages.incident.scribe import providers, service
 from packages.incident.scribe.domain import DocumentSection, DraftedDocument
+from packages.incident.scribe.ports import IncidentReportLinkLookup
 from packages.incident.scribe.service import (
     EMPTY_HISTORY_CODE,
     NO_DOCUMENT_CODE,
-    IncidentReportLinkLookup,
     draft_incident_document_from_conversation,
 )
 from packages.incident.scribe.settings import IncidentDraftSettings
