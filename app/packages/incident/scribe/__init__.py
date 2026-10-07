@@ -11,6 +11,7 @@ from pathlib import Path
 from contracts.i18n.resources import I18nResourceRegistrar, I18nResourceSpec
 from contracts.plugins.namespace import hookimpl
 from contracts.slack.registrar import SlackCommandRegistrar
+from packages.incident.scribe.entrypoints import slack as slack_entrypoints
 from packages.incident.scribe.platforms import slack
 
 
@@ -22,6 +23,7 @@ def register_slack_commands(registrar: SlackCommandRegistrar) -> None:
         registrar: Slack command registrar.
     """
     slack.register_commands(registrar)
+    slack_entrypoints.register(registrar)
 
 
 @hookimpl

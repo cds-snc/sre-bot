@@ -40,7 +40,12 @@ from contracts.slack.reply import SlackReplySender
 from infrastructure.i18n import t
 from packages.incident.core.api import StatusUpdate, StatusUpdateStage
 from packages.incident.scribe.comms_profile import ProfileLabels, render_profile
-from packages.incident.scribe.domain import DraftedDocument
+from packages.incident.scribe.domain import (
+    DraftedDocument,
+    NoNewInformationWording,
+    StatusUpdateDraftOutcome,
+    StatusUpdateOutcomeKind,
+)
 from packages.incident.scribe.service import (
     DOCUMENT_UNREADABLE_CODE,
     EMPTY_HISTORY_CODE,
@@ -49,7 +54,7 @@ from packages.incident.scribe.service import (
     draft_incident_document_from_conversation,
     summarize_incident_conversation,
 )
-from packages.incident.scribe.status_update import get_pending_status_update
+from packages.incident.scribe.status_update import DRAFT_UNPARSEABLE_CODE, get_pending_status_update
 
 logger = structlog.get_logger()
 
@@ -57,6 +62,7 @@ _DRAFT_DOMAIN = "incident_draft"
 _SUMMARY_DOMAIN = "incident_summary"
 _STATUS_UPDATE_DOMAIN = "incident_status_update"
 _SLACK_TEXT_LIMIT = 3000
+DRAFT_ACTION_ID = "incident.scribe.status_update.draft"
 _SINCE_UNITS = {"m": 60, "h": 3600, "d": 86400}
 
 # Slack renders its own "mrkdwn", not standard/GitHub Markdown: headers (``#``)
@@ -529,9 +535,12 @@ def handle_status_update_command(
 
     pending = get_pending_status_update(payload.channel_id)
     if pending.is_success and pending.data is not None:
-        blocks = _pending_blocks(pending.data)
+        blocks = [*_pending_blocks(pending.data), _draft_button_block(locale)]
     elif pending.is_success:
-        blocks = _mrkdwn_blocks(_status_t("no_pending", locale, "There is no status update draft for this incident yet."))
+        blocks = [
+            *_mrkdwn_blocks(_status_t("no_pending", locale, "There is no status update draft for this incident yet.")),
+            _draft_button_block(locale),
+        ]
     else:
         log.warning("incident_status_update_failed", status=pending.status, error_code=pending.error_code, error=pending.message)
         blocks = _mrkdwn_blocks(_status_error_text(pending.error_code, locale))
@@ -547,7 +556,13 @@ def _status_t(key: str, locale: str, fallback: str) -> str:
 
 
 def _status_error_text(error_code: str | None, locale: str) -> str:
-    """Map a lookup or store error code onto its localized in-modal message."""
+    """Map a lookup, store or drafting error code onto its localized in-modal message."""
+    if error_code == ErrorCode.EMPTY_HISTORY:
+        return _status_t("empty_history", locale, "There is no channel history to draft a status update from yet.")
+    if error_code == DRAFT_UNPARSEABLE_CODE:
+        return _status_t("unparseable", locale, "I couldn't turn the model's answer into a status update. Please try again.")
+    if error_code == ErrorCode.STATUS_UPDATE_CONFLICT:
+        return _status_t("conflict", locale, "Another status update was saved at the same time. Please try again.")
     if error_code == ErrorCode.NOT_AN_INCIDENT:
         return _status_t(
             "not_an_incident", locale, "This channel is not an incident channel, so there are no status updates to show."
@@ -612,4 +627,51 @@ def build_profile_labels(locale: str) -> ProfileLabels:
         stage_names=MappingProxyType(
             {stage: _status_t(f"stage.{stage.value}", locale, stage.value.capitalize()) for stage in StatusUpdateStage}
         ),
+    )
+
+
+def _draft_button_block(locale: str) -> dict[str, Any]:
+    """Build the actions block holding the Draft button."""
+    return {
+        "type": "actions",
+        "block_id": "draft_button",
+        "elements": [
+            {
+                "type": "button",
+                "action_id": DRAFT_ACTION_ID,
+                "text": {"type": "plain_text", "text": _status_t("draft_button", locale, "Draft")},
+                "style": "primary",
+            }
+        ],
+    }
+
+
+def build_drafting_view(locale: str, private_metadata: str) -> dict[str, Any]:
+    """Build the modal shown while the draft is being written; no buttons."""
+    blocks = _mrkdwn_blocks(_status_t("drafting", locale, "Drafting the status update. This usually takes up to a minute..."))
+    return _status_update_view(locale, private_metadata, blocks, close=False)
+
+
+def build_result_view(outcome: StatusUpdateDraftOutcome, locale: str, private_metadata: str) -> dict[str, Any]:
+    """Build the modal showing the drafted, carried-forward or pending update in EN and FR."""
+    blocks = _pending_blocks(outcome.update)
+    if outcome.kind == StatusUpdateOutcomeKind.CARRIED_FORWARD:
+        note = _status_t("carried_forward", locale, "Nothing new since the last update, so it was repeated as a new draft.")
+    elif outcome.kind == StatusUpdateOutcomeKind.PENDING:
+        note = _status_t("pending", locale, "This draft already covers the latest activity, so no new draft was written.")
+    else:
+        note = _status_t("drafted", locale, "Drafted from the incident channel.")
+    return _status_update_view(locale, private_metadata, [*_mrkdwn_blocks(note), *blocks], close=True)
+
+
+def build_draft_error_view(error_code: str | None, locale: str, private_metadata: str) -> dict[str, Any]:
+    """Build the modal showing a localized drafting error with a Close button."""
+    return _status_update_view(locale, private_metadata, _mrkdwn_blocks(_status_error_text(error_code, locale)), close=True)
+
+
+def build_no_new_information_wording() -> NoNewInformationWording:
+    """Build the carried-forward current-action wording in both languages."""
+    return NoNewInformationWording(
+        en=_status_t("no_new_information", "en-US", "No new information since the last update."),
+        fr=_status_t("no_new_information", "fr-FR", "Aucune nouvelle information depuis la dernière mise à jour."),
     )

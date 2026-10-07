@@ -59,6 +59,20 @@ def pytest_configure(config):
 
 
 @pytest.fixture(autouse=True)
+def fresh_slack_provider():
+    """Give every test its own Slack provider.
+
+    The provider is a cached singleton whose native listener ids are unique per
+    instance, so each app lifespan started in one process needs a fresh one.
+    """
+    from integrations.slack.provider import get_slack_provider
+
+    get_slack_provider.cache_clear()
+    yield
+    get_slack_provider.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def suppress_structlog_output():
     """Suppress structlog output during tests.
 
