@@ -4,7 +4,7 @@ title: Store incident status updates as their own records under the incident id
 status: In Progress
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-07 14:20'
+updated_date: '2026-10-07 14:30'
 labels:
   - incident
 dependencies:
@@ -127,3 +127,12 @@ Evidence (from app/):
 Synced: notes on TASK-38.1 (adapter migration to the storage contract), TASK-108, TASK-140.5, TASK-140.6.
 Ordering: tf_apply must create sre_bot_incident_status_updates and the IAM grant before TASK-140.5 deploys.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-07 14:30
+---
+2026-10-07: plan approved by the human ("approved as written"); implemented and committed as 56debe1c on task-140.4-status-update-records (pushed). Bottom layer of Stack H (human decision 2026-10-07: 140.4 -> 140.5 -> 140.6 as a stack).
+---
+<!-- COMMENTS:END -->
