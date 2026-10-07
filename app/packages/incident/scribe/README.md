@@ -509,3 +509,10 @@ localized no-draft notice, or to a localized error with a Close button
 (outside an incident channel, ambiguous incident, store failure). Opening never
 drafts. Strings live in `locales/incident_status_update.{en-US,fr-FR}.yml`;
 `t()` is called only in `platforms/slack.py`.
+
+Security gate: when a model call is needed, `draft_status_update` refuses a
+security, unknown-flag or unreadable-flag incident with
+`SECURITY_CONFIRMATION_REQUIRED` unless called with `security_confirmed=True`.
+The Draft handler then shows a confirmation view in the modal; its Confirm and
+draft button (`incident.scribe.status_update.draft_confirmed`) drafts with
+confirmation and Cancel closes the modal with no model call.

@@ -30,6 +30,8 @@ from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from packages.incident.core.api import (
     IncidentLookup,
+    IncidentSecurityFlag,
+    IncidentSecurityReader,
     IncidentTranscriptReader,
     StatusUpdate,
     StatusUpdateStage,
@@ -37,6 +39,7 @@ from packages.incident.core.api import (
     StatusUpdateStore,
     TranscriptMessage,
     get_incident_lookup,
+    get_incident_security_reader,
     get_incident_transcript_reader,
     get_status_update_store,
 )
@@ -97,10 +100,12 @@ async def draft_status_update(
     author: str,
     wording: NoNewInformationWording,
     on_started: Callable[[], None] | None = None,
+    security_confirmed: bool = False,
     lookup: IncidentLookup | None = None,
     reader: IncidentTranscriptReader | None = None,
     store: StatusUpdateStore | None = None,
     generator: TextGenerator | None = None,
+    security_reader: IncidentSecurityReader | None = None,
     now: datetime | None = None,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
     """Return the incident's pending, carried-forward or newly drafted status update.
@@ -109,12 +114,16 @@ async def draft_status_update(
         conversation_id: The incident conversation the command ran in.
         author: Platform user id of the responder asking for the draft.
         wording: The no-new-information wording of a carried-forward update.
-        on_started: Called once just before the model call, so the caller can
-            say drafting has begun; never called when no model call is made.
+        on_started: Called once just before the model call, after the security
+            gate, so the caller can say drafting has begun; never called when no
+            model call is made.
+        security_confirmed: The responder confirmed drafting for a security or
+            unknown-flag incident; the flag is then not read.
         lookup: Resolves the conversation to its incident; core's by default.
         reader: Reads the conversation; core's by default.
         store: Holds the incident's status updates; core's by default.
         generator: Drafts the fields; the scribe provider's by default.
+        security_reader: Reads the incident's security flag; core's by default.
         now: The current time; injected in tests.
 
     Returns:
@@ -124,7 +133,9 @@ async def draft_status_update(
         there is no update yet and no person has posted, ``DRAFT_UNPARSEABLE``
         when the model's answer is not fully usable, or
         ``STATUS_UPDATE_CONFLICT`` when another writer took the sequence with
-        something other than a draft.
+        something other than a draft, or ``SECURITY_CONFIRMATION_REQUIRED`` when
+        a model call is needed, the incident is or may be a security incident
+        (or its flag cannot be read) and ``security_confirmed`` is false.
     """
     settings = get_incident_status_update_settings()
     now = now or datetime.now(UTC)
@@ -163,6 +174,10 @@ async def draft_status_update(
         carried = _carry_forward(latest, author=author, wording=wording, settings=settings, now=now)
         return _append(store, carried, StatusUpdateOutcomeKind.CARRIED_FORWARD, log)
 
+    refusal = _security_gate(incident_id, security_confirmed, security_reader, log)
+    if refusal is not None:
+        return refusal
+
     if on_started is not None:
         on_started()
     generator = generator or _default_generator()
@@ -193,6 +208,37 @@ async def draft_status_update(
         now=now,
     )
     return _append(store, drafted, StatusUpdateOutcomeKind.DRAFTED, log)
+
+
+def _security_gate(
+    incident_id: str,
+    security_confirmed: bool,
+    security_reader: IncidentSecurityReader | None,
+    log: structlog.stdlib.BoundLogger,
+) -> OperationResult[StatusUpdateDraftOutcome] | None:
+    """Return a refusal unless drafting for this incident may reach the model.
+
+    Confirmation is explicit consent, so the flag is not read when given. A
+    security, unknown or unreadable flag refuses with one code; the underlying
+    read error is logged, never returned.
+    """
+    if security_confirmed:
+        return None
+    flag = (security_reader or get_incident_security_reader()).read_security_flag(incident_id)
+    if flag.is_success and flag.data is IncidentSecurityFlag.NO:
+        return None
+    if flag.is_success:
+        log.info("incident_status_update_security_confirmation_required", error_code=ErrorCode.SECURITY_CONFIRMATION_REQUIRED)
+        message = "Drafting this status update needs the responder's security confirmation"
+    else:
+        log.warning(
+            "incident_status_update_security_flag_unreadable",
+            status=flag.status,
+            read_error_code=flag.error_code,
+            error_code=ErrorCode.SECURITY_CONFIRMATION_REQUIRED,
+        )
+        message = "The incident's security flag could not be read, so drafting needs the responder's confirmation"
+    return OperationResult.permanent_error(message=message, error_code=ErrorCode.SECURITY_CONFIRMATION_REQUIRED)
 
 
 def _read_window(

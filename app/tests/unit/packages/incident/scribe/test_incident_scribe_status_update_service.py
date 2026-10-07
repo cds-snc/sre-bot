@@ -20,6 +20,7 @@ from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
 from packages.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from packages.incident.core.api import (
+    IncidentSecurityFlag,
     StatusUpdate,
     StatusUpdateStage,
     StatusUpdateState,
@@ -94,6 +95,14 @@ class _StubLookup:
     def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
         self.calls.append(conversation_id)
         return self._result
+
+
+class _StubSecurityReader:
+    def __init__(self, flag: IncidentSecurityFlag = IncidentSecurityFlag.NO) -> None:
+        self._flag = flag
+
+    def read_security_flag(self, incident_id: str) -> OperationResult[IncidentSecurityFlag]:
+        return OperationResult.success(data=self._flag)
 
 
 class _StubReader:
@@ -175,6 +184,8 @@ async def _draft(
     generator: _StubGenerator | None = None,
     lookup: _StubLookup | None = None,
     on_started: Any = None,
+    security_reader: Any = None,
+    security_confirmed: bool = False,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
     return await draft_status_update(
         _CHANNEL,
@@ -185,6 +196,8 @@ async def _draft(
         reader=reader or _StubReader(),
         store=store if store is not None else InMemoryStatusUpdateStore(),
         generator=generator or _StubGenerator(),
+        security_reader=security_reader or _StubSecurityReader(),
+        security_confirmed=security_confirmed,
         now=_NOW,
     )
 

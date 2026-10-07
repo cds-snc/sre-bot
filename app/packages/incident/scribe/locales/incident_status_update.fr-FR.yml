@@ -31,3 +31,6 @@ incident_status_update:
   unparseable: "Je n'ai pas pu transformer la réponse du modèle en mise à jour de statut. Veuillez réessayer."
   conflict: "Une autre mise à jour de statut a été enregistrée en même temps. Veuillez réessayer."
   no_new_information: "Aucune nouvelle information depuis la dernière mise à jour."
+  security_confirmation: "Cet incident est, ou pourrait être, un incident de sécurité. La rédaction envoie le contenu du canal de l'incident et des communications au modèle d'IA. Voulez-vous continuer?"
+  confirm_button: "Confirmer et rédiger"
+  cancel: "Annuler"
