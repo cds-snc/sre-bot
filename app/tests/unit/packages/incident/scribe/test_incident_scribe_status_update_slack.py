@@ -252,3 +252,64 @@ class TestHandleStatusUpdateCommand:
 
         assert len(reply.calls_to("post_message")) == 0
         assert len(reply.calls_to("post_ephemeral")) == 0
+
+
+class TestDraftButtonInViews:
+    """The Draft button appears in the status-updates modal for pending and no-pending drafts."""
+
+    def test_draft_button_present_in_pending_view(self):
+        """The pending draft view includes a Draft button with action id incident.scribe.status_update.draft."""
+        payload = CommandPayload(text="", user_id="U9", channel_id=_CHANNEL, platform_metadata={"trigger_id": _TRIGGER})
+        reply = FakeSlackReply(OperationResult.success(data="view-id-123"))
+
+        with patch(
+            "packages.incident.scribe.platforms.slack.get_pending_status_update",
+            new=MagicMock(return_value=OperationResult.success(data=_pending_update())),
+        ):
+            handle_status_update_command(payload, {}, reply)
+
+        update_calls = reply.calls_to("update_view")
+        assert len(update_calls) >= 1
+        view = update_calls[0]["view"]
+        view_str = str(view)
+        assert "incident.scribe.status_update.draft" in view_str
+
+    def test_draft_button_present_in_no_pending_view(self):
+        """The no-pending view includes a Draft button."""
+        payload = CommandPayload(text="", user_id="U9", channel_id=_CHANNEL, platform_metadata={"trigger_id": _TRIGGER})
+        reply = FakeSlackReply(OperationResult.success(data="view-id-123"))
+
+        with patch(
+            "packages.incident.scribe.platforms.slack.get_pending_status_update",
+            new=MagicMock(return_value=OperationResult.success(data=None)),
+        ):
+            handle_status_update_command(payload, {}, reply)
+
+        update_calls = reply.calls_to("update_view")
+        assert len(update_calls) >= 1
+        view = update_calls[0]["view"]
+        view_str = str(view)
+        assert "incident.scribe.status_update.draft" in view_str
+
+    def test_draft_button_absent_in_error_view(self):
+        """Error views (not-an-incident, ambiguous, etc.) do not include a Draft button."""
+        payload = CommandPayload(text="", user_id="U9", channel_id=_CHANNEL, platform_metadata={"trigger_id": _TRIGGER})
+        reply = FakeSlackReply(OperationResult.success(data="view-id-123"))
+
+        with patch(
+            "packages.incident.scribe.platforms.slack.get_pending_status_update",
+            new=MagicMock(
+                return_value=OperationResult.error(
+                    OperationStatus.NOT_FOUND,
+                    message="no incident",
+                    error_code=ErrorCode.NOT_AN_INCIDENT,
+                )
+            ),
+        ):
+            handle_status_update_command(payload, {}, reply)
+
+        update_calls = reply.calls_to("update_view")
+        assert len(update_calls) >= 1
+        view = update_calls[0]["view"]
+        view_str = str(view)
+        assert "incident.scribe.status_update.draft" not in view_str

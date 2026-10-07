@@ -26,6 +26,20 @@ def test_one_hookimpl_registers_both_commands_under_sre_incident() -> None:
     assert registered == {("sre.incident", "draft"), ("sre.incident", "summarize"), ("sre.incident", "status-update")}
 
 
+def test_block_action_draft_is_registered_once() -> None:
+    """The package registers the Draft button's block action with the plugin prefix.
+
+    The action id is ``incident.scribe.status_update.draft``, starting with the
+    entry-point name ``incident.scribe`` and the action suffix ``status_update.draft``.
+    """
+    registrar = FakeSlackRegistrar()
+
+    scribe_pkg.register_slack_commands(registrar=registrar)
+
+    assert "incident.scribe.status_update.draft" in registrar.block_actions
+    assert len([key for key in registrar.block_actions if "draft" in key]) == 1
+
+
 def test_one_i18n_registration_covers_both_catalogues() -> None:
     """The package registers its ``locales`` directory once, owned by the subdomain.
 

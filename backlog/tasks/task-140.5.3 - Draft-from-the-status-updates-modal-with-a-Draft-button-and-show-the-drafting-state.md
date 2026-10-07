@@ -3,10 +3,10 @@ id: TASK-140.5.3
 title: >-
   Draft from the status-updates modal with a Draft button and show the drafting
   state
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-07 16:06'
-updated_date: '2026-10-07 16:08'
+updated_date: '2026-10-07 17:04'
 labels:
   - incident
 dependencies:
@@ -27,10 +27,10 @@ Draft button slice of TASK-140.5 (direction 2026-10-07, decisions/incident-manag
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Opening the modal never drafts; pressing Draft acks, shows a drafting state in the same modal, then shows the drafted, carried-forward or pending draft in EN and FR
-- [ ] #2 Every service error and every Slack update failure maps to a localized message shown in the modal, never a channel post
-- [ ] #3 All new bot strings are in EN and FR catalogues with matching keys
-- [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 Opening the modal never drafts; pressing Draft acks, shows a drafting state in the same modal, then shows the drafted, carried-forward or pending draft in EN and FR
+- [x] #2 Every service error and every Slack update failure maps to a localized message shown in the modal, never a channel post
+- [x] #3 All new bot strings are in EN and FR catalogues with matching keys
+- [x] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -80,6 +80,21 @@ Size gate: about 6 production files (platforms/slack.py, entrypoints/__init__.py
 
 Blast radius and rollback: single revert removes the button and listener, leaving the 140.5.2 read-only modal. Drafts are stored by 140.5.1 and survive. Requires TASK-140.2 registrar (already in the stack) and the status-update table from TASK-140.4 applied before deploy.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented 2026-10-07.
+- New scribe/entrypoints/slack.py: handle_draft_action (ack first; views_update to the drafting view with the body's view hash; asyncio.run(draft_status_update); views_update to the result or error view with the hash from the first response, or none) and register(), called from the register_slack_commands hookimpl. Slack API failures are logged as warnings and never raised; a failed drafting update still drafts and still attempts the result update. Module-level structlog logger.
+- scribe/platforms/slack.py: DRAFT_ACTION_ID (incident.scribe.status_update.draft) button on the pending and no-pending views only; build_drafting_view, build_result_view, build_draft_error_view (EMPTY_HISTORY, DRAFT_UNPARSEABLE, STATUS_UPDATE_CONFLICT, NOT_AN_INCIDENT, AMBIGUOUS_INCIDENT_CONVERSATION, generic fallback; Close, no Draft button), build_no_new_information_wording. 9 new keys in both incident_status_update catalogues.
+- Beyond the plan: tests/conftest.py autouse fixture clears the get_slack_provider cache around each test. This is the first real block-action registration, and the cached provider rejects a duplicate listener id on the second app lifespan in one pytest process. The access discovery test's fake provider also gained no-op register_block_action and register_view_submission methods.
+- Two pre-authored tests filtered capture_logs on 'level' (structlog uses 'log_level'); they now assert the specific warning events.
+Gates (from app/):
+- uv run ruff check . -> All checks passed!
+- uv run lint-imports -> Contracts: 10 kept, 0 broken.
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 57 errors in 20 files, 0 in touched files (same baseline as layer 3).
+- uv run pytest tests --ignore=tests/smoke -> 6 failed, 3913 passed. The 6 are the known TASK-90 order leaks (3 in tests/modules/webhooks/test_webhooks_aws_sns.py, 3 in tests/unit/infrastructure/directory/test_google.py).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
