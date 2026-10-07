@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-06 19:08'
+updated_date: '2026-10-07 15:17'
 labels:
   - incident
   - features
@@ -30,6 +30,8 @@ Teams want a current public status update instead of the unused legacy /sre inci
 Conventions (research 2026-10-06): stages Investigating / Identified / Monitoring / Resolved (FR: Enquête en cours / Problème identifié / Sous surveillance / Résolu); fields: stage, affected service by public name, user-visible impact, what we are doing (no root-cause speculation), workaround or 'no action needed', next update time in ET with date; plain language per Canada.ca style and GC Notify's published wording; update about every 30 minutes, never silent. AI drafting with human approval matches FireHydrant/Rootly practice; security incidents need a second confirmation.
 
 Decisions (human, 2026-10-06): modal approval over a minimal Slack interaction contract; copy-ready text as the first publish target; records keyed by the existing incident UUID, resolved from the channel through core, never by channel; command /sre incident status-update; legacy updates retired after this ships, legacy status (internal lifecycle state) stays with TASK-38.4. Public stage and internal lifecycle status are distinct vocabularies.
+
+Decisions (human, 2026-10-07): status updates never reach the incident channel; drafting, review, redrafting with reviewer instructions and the approved history all live in modals private to the responder, opened by /sre incident status-update and later from the central incident modal (DRAFT-11). Approved text is proofread and copied by hand; nothing is pushed automatically. Slices: 140.5 (140.5.1 service, 140.5.2 status-updates modal), 140.6 review and approve, 140.8 history, 140.9 redraft with instructions, then 140.7 retires the legacy command.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

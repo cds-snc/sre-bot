@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-07 14:20'
+updated_date: '2026-10-07 15:17'
 labels:
   - incident
 dependencies:
@@ -34,6 +34,12 @@ Scribe use case: resolve the incident through core, read the transcript since th
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Coordinator. Split on 2026-10-07 at the single-PR size gate (~14 files, ~520 LOC as one PR) into TASK-140.5.1 (scribe service: draft, carry forward, pending, stage floor, bot flag) and TASK-140.5.2 (/sre incident status-update opening the status-updates modal, drafting from it, and the default comms profile). Each is one Stack H layer and PR. The same day all status-update interaction moved into modals (decisions/incident-management.md), so 'shown only to the invoker' means a private modal, never a channel or ephemeral post. The ACs here are checked as the subtasks verify them: AC1 by 140.5.1 AC1 + 140.5.2 AC1-AC2; AC2 by 140.5.1 AC2; AC3 by 140.5.1 AC3; AC4 by 140.5.1 AC4; AC5 by 140.5.2 AC4-AC5; AC6 by both gates.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -41,3 +47,12 @@ Scribe use case: resolve the incident through core, read the transcript since th
 
 2026-10-07 (TASK-140.4): core/api.py exports StatusUpdate (+StatusUpdateText, StatusUpdateStage in forward declaration order, StatusUpdateState with can_move_to), StatusUpdateStore (append, latest, list_for_incident newest first, transition(update, expected_state=...)) and get_status_update_store(). The caller numbers updates: latest().sequence + 1, or 1; a concurrent draft at the same sequence returns PERMANENT_ERROR STATUS_UPDATE_CONFLICT (decide retry vs refusal here). transcript_fingerprint is an opaque string this task defines. author/approver are platform user ids. Tests inject packages.incident.core.adapters.in_memory.InMemoryStatusUpdateStore. Terraform sre_bot_incident_status_updates and its IAM grant must be applied before deploy.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-07 14:56
+---
+Plan approved by the human 2026-10-07 (all recommended decisions, including the 140.5.1/140.5.2 split). Clarified: nothing is ever pushed automatically; approved EN and FR text is proofread and copied by hand into whatever system the product team uses.
+---
+<!-- COMMENTS:END -->
