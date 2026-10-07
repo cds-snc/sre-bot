@@ -14,10 +14,14 @@ from functools import lru_cache
 from typing import Protocol, runtime_checkable
 
 from contracts.operations.result import OperationResult
-from packages.incident.core.adapters.legacy_incidents import build_legacy_incident_lookup
+from packages.incident.core.adapters.legacy_incidents import (
+    build_legacy_incident_lookup,
+    build_legacy_incident_security_reader,
+)
 from packages.incident.core.adapters.slack import build_incident_transcript_reader
 from packages.incident.core.adapters.status_updates import build_status_update_store
 from packages.incident.core.domain import (
+    IncidentSecurityFlag,
     StatusUpdate,
     StatusUpdateStage,
     StatusUpdateState,
@@ -27,6 +31,8 @@ from packages.incident.core.domain import (
 
 __all__ = [
     "IncidentLookup",
+    "IncidentSecurityFlag",
+    "IncidentSecurityReader",
     "IncidentTranscriptReader",
     "StatusUpdate",
     "StatusUpdateStage",
@@ -36,6 +42,7 @@ __all__ = [
     "TranscriptMessage",
     "find_incident_for_conversation",
     "get_incident_lookup",
+    "get_incident_security_reader",
     "get_incident_transcript_reader",
     "get_status_update_store",
 ]
@@ -53,6 +60,21 @@ class IncidentLookup(Protocol):
         that maps to several is PERMANENT_ERROR with
         ``AMBIGUOUS_INCIDENT_CONVERSATION``. A store failure is a classified
         error result, never an exception.
+        """
+        ...
+
+
+@runtime_checkable
+class IncidentSecurityReader(Protocol):
+    """Interface reading whether an incident was declared as a security incident."""
+
+    def read_security_flag(self, incident_id: str) -> OperationResult[IncidentSecurityFlag]:
+        """Return the incident's security flag, or a classified refusal.
+
+        Success carries YES, NO or UNKNOWN (never stored). An incident that does
+        not exist (or a blank id) is NOT_FOUND with ``NOT_AN_INCIDENT``. A store
+        failure is a classified error result with a generic message, never an
+        exception and never NO.
         """
         ...
 
@@ -148,6 +170,12 @@ def get_incident_transcript_reader() -> IncidentTranscriptReader:
 def get_incident_lookup() -> IncidentLookup:
     """Return the process-wide ``IncidentLookup`` over the legacy incidents table."""
     return build_legacy_incident_lookup()
+
+
+@lru_cache(maxsize=1)
+def get_incident_security_reader() -> IncidentSecurityReader:
+    """Return the process-wide ``IncidentSecurityReader`` over the legacy incidents table."""
+    return build_legacy_incident_security_reader()
 
 
 def find_incident_for_conversation(conversation_id: str) -> OperationResult[str]:

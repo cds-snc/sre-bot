@@ -6,6 +6,7 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-10-06 19:05'
+updated_date: '2026-10-07 18:53'
 labels:
   - incident
   - later-wave
@@ -29,3 +30,9 @@ EXPANSION (after TASK-140). TASK-140 ships one default comms profile modelled on
 - [ ] #2 Changing a profile changes no prompt and no stored StatusUpdate field
 - [ ] #3 At least one status-page adapter publishes behind StatusPagePublisher, selected by the product's profile
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-07 (human): the default profile renders structured plain text that pastes into most platforms; per-product custom formatting (Markdown, plain text, platform-specific) belongs to these profiles.
+<!-- SECTION:NOTES:END -->

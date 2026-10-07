@@ -547,3 +547,139 @@ def test_get_incident_by_channel_id_propagates_when_lookup_fails(logger_mock):
 
         with pytest.raises(db_operations.IncidentStoreUnavailableError):
             db_operations.get_incident_by_channel_id("bar")
+
+
+# -- security_incident field ------------------------------------------
+
+
+def test_incident_model_accepts_security_incident_true():
+    """Incident model accepts security_incident=True."""
+    from models.incidents import Incident
+
+    incident = Incident(
+        channel_id="C123",
+        channel_name="test-channel",
+        name="Test Incident",
+        user_id="U123",
+        teams=["team1"],
+        report_url="http://example.com",
+        security_incident=True,
+    )
+
+    assert incident.security_incident is True
+
+
+def test_incident_model_accepts_security_incident_false():
+    """Incident model accepts security_incident=False."""
+    from models.incidents import Incident
+
+    incident = Incident(
+        channel_id="C123",
+        channel_name="test-channel",
+        name="Test Incident",
+        user_id="U123",
+        teams=["team1"],
+        report_url="http://example.com",
+        security_incident=False,
+    )
+
+    assert incident.security_incident is False
+
+
+def test_incident_model_accepts_security_incident_none():
+    """Incident model accepts security_incident=None."""
+    from models.incidents import Incident
+
+    incident = Incident(
+        channel_id="C123",
+        channel_name="test-channel",
+        name="Test Incident",
+        user_id="U123",
+        teams=["team1"],
+        report_url="http://example.com",
+        security_incident=None,
+    )
+
+    assert incident.security_incident is None
+
+
+def test_incident_model_accepts_missing_security_incident():
+    """Incident model validates without security_incident field (defaults to None)."""
+    from models.incidents import Incident
+
+    incident = Incident(
+        channel_id="C123",
+        channel_name="test-channel",
+        name="Test Incident",
+        user_id="U123",
+        teams=["team1"],
+        report_url="http://example.com",
+    )
+
+    assert incident.security_incident is None
+
+
+def test_create_incident_with_security_incident_true(adapter, logger_mock):
+    """When security_incident=True, it is serialized as BOOL in the DynamoDB item."""
+    adapter.put_item.return_value = OperationResult.success()
+
+    incident_data = {
+        "id": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "name": "name",
+        "user_id": "user_id",
+        "teams": ["teams"],
+        "report_url": "report_url",
+        "meet_url": "meet_url",
+        "security_incident": True,
+    }
+
+    result = db_operations.create_incident(incident_data)
+
+    assert isinstance(result, str)
+    adapter.put_item.assert_called_once()
+
+
+def test_create_incident_with_security_incident_false(adapter, logger_mock):
+    """When security_incident=False, it is serialized as BOOL in the DynamoDB item."""
+    adapter.put_item.return_value = OperationResult.success()
+
+    incident_data = {
+        "id": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "name": "name",
+        "user_id": "user_id",
+        "teams": ["teams"],
+        "report_url": "report_url",
+        "meet_url": "meet_url",
+        "security_incident": False,
+    }
+
+    result = db_operations.create_incident(incident_data)
+
+    assert isinstance(result, str)
+    adapter.put_item.assert_called_once()
+
+
+def test_create_incident_with_security_incident_none(adapter, logger_mock):
+    """When security_incident=None, it is serialized as NULL in the DynamoDB item."""
+    adapter.put_item.return_value = OperationResult.success()
+
+    incident_data = {
+        "id": "978f1d91-f2b4-4ad2-9f2f-86c0f1fce72d",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "name": "name",
+        "user_id": "user_id",
+        "teams": ["teams"],
+        "report_url": "report_url",
+        "meet_url": "meet_url",
+        "security_incident": None,
+    }
+
+    result = db_operations.create_incident(incident_data)
+
+    assert isinstance(result, str)
+    adapter.put_item.assert_called_once()

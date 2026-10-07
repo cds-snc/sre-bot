@@ -26,10 +26,12 @@ def _clear_provider_cache() -> Iterator[None]:
     """Keep the cached reader, lookup and store from leaking between tests."""
     api.get_incident_transcript_reader.cache_clear()
     api.get_incident_lookup.cache_clear()
+    api.get_incident_security_reader.cache_clear()
     api.get_status_update_store.cache_clear()
     yield
     api.get_incident_transcript_reader.cache_clear()
     api.get_incident_lookup.cache_clear()
+    api.get_incident_security_reader.cache_clear()
     api.get_status_update_store.cache_clear()
 
 
@@ -37,6 +39,8 @@ def test_api_exports_exactly_the_public_names() -> None:
     """Subdomains reach core through these names only; a new export is a deliberate change."""
     assert sorted(api.__all__) == [
         "IncidentLookup",
+        "IncidentSecurityFlag",
+        "IncidentSecurityReader",
         "IncidentTranscriptReader",
         "StatusUpdate",
         "StatusUpdateStage",
@@ -46,6 +50,7 @@ def test_api_exports_exactly_the_public_names() -> None:
         "TranscriptMessage",
         "find_incident_for_conversation",
         "get_incident_lookup",
+        "get_incident_security_reader",
         "get_incident_transcript_reader",
         "get_status_update_store",
     ]
@@ -134,6 +139,27 @@ def test_find_incident_for_conversation_returns_the_provided_lookup_result(monke
 
     assert api.find_incident_for_conversation("C0INCIDENT") is expected
     assert fake.asked == ["C0INCIDENT"]
+
+
+def test_security_reader_signature_carries_only_incident_id_and_operation_result() -> None:
+    """No table, item or SDK shape crosses the reader interface, so the store can replace the adapter behind it."""
+    read = inspect.signature(api.IncidentSecurityReader.read_security_flag)
+
+    assert {name: p.annotation for name, p in read.parameters.items() if name != "self"} == {"incident_id": str}
+    assert "OperationResult" in str(read.return_annotation)
+
+
+def test_security_reader_provider_returns_one_cached_reader_built_by_the_legacy_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The provider builds the legacy-table security reader once and hands out that same instance."""
+    built = MagicMock(spec=legacy_incidents_adapter.LegacyIncidentTableLookup)
+    builder = MagicMock(return_value=built)
+    monkeypatch.setattr(api, "build_legacy_incident_security_reader", builder)
+
+    reader = api.get_incident_security_reader()
+
+    assert reader is built
+    assert api.get_incident_security_reader() is built
+    builder.assert_called_once_with()
 
 
 def test_status_update_store_signatures_carry_only_domain_types_and_operation_results() -> None:
