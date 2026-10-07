@@ -4,7 +4,7 @@ title: Approve a status update in a modal and publish it as copy-ready bilingual
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-06 19:08'
+updated_date: '2026-10-06 20:05'
 labels:
   - incident
 dependencies:

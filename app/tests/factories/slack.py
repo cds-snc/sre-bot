@@ -39,11 +39,13 @@ class FakeSlackReply:
 
 
 class FakeSlackRegistrar:
-    """Records each registered command's keyword arguments and exposes a fake reply interface."""
+    """Records each registered command, block action and view submission, and exposes a fake reply interface."""
 
     def __init__(self, reply: FakeSlackReply | None = None) -> None:
         self._reply = reply or FakeSlackReply()
         self.commands: list[dict[str, Any]] = []
+        self.block_actions: dict[str, Callable[..., object]] = {}
+        self.view_submissions: dict[str, Callable[..., object]] = {}
 
     @property
     def reply(self) -> SlackReplySender:
@@ -82,6 +84,12 @@ class FakeSlackRegistrar:
                 "fallback_handler": fallback_handler,
             }
         )
+
+    def register_block_action(self, action_id: str, listener: Callable[..., object]) -> None:
+        self.block_actions[action_id] = listener
+
+    def register_view_submission(self, callback_id: str, listener: Callable[..., object]) -> None:
+        self.view_submissions[callback_id] = listener
 
     def command(self, name: str, parent: str | None = None) -> dict[str, Any]:
         """Return the one registration matching ``name`` and ``parent``."""

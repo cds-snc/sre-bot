@@ -1,7 +1,7 @@
 """Hook specifications for feature plugin lifecycle.
 
 Covers the full lifecycle of a feature package:
-  - Slack command registration
+  - Slack command, block action and view submission registration
   - HTTP route registration
   - Startup settings validation / cache warmup
 """
@@ -34,7 +34,7 @@ class FeatureLifecycleSpecs:
 
     This includes:
         - Startup validation and warmup
-        - Slack command registration (through the registrar Protocol)
+        - Slack command, block action and view submission registration (through the registrar Protocol)
         - HTTP route registration
         - Background job registration
         - i18n resource registration
@@ -46,11 +46,14 @@ class FeatureLifecycleSpecs:
 
     @hookspec
     def register_slack_commands(self, registrar: SlackCommandRegistrar) -> None:
-        """Register Slack commands through the registrar.
+        """Register Slack commands, block actions and view submissions through the registrar.
+
+        Called once per plugin, at startup, with a registrar scoped to that
+        plugin's entry-point name.
 
         Args:
-            registrar: Registrar to attach command handlers to; handlers reply
-                through ``registrar.reply``.
+            registrar: Registrar to attach command handlers and Bolt listeners
+                to; command handlers reply through ``registrar.reply``.
         """
 
     @hookspec

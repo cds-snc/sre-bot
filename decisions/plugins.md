@@ -48,7 +48,7 @@ Entry-point names are dotted `<package>.<subdomain>` for subdomains, so the flat
 
 **Credential checks are an opt-in hook.** A feature or capability that depends on a credential may implement `register_credential_checks`, returning checks as value types (a name and an async callable that returns `OperationResult`). The host runs them once, concurrently, after registration, and logs a failure at ERROR without aborting boot or unregistering the plugin ([lifecycle.md](lifecycle.md)). Plugins that don't implement the hook make no network call at boot.
 
-**Hookimpl signatures** may receive a platform runtime object where the platform requires it (the FastAPI app for routes, the Bolt app for listeners). Cross-platform hookspecs (i18n, jobs, extension points) take contracts and value types only. Recurring jobs attach only through `register_background_jobs`, carrying schedule, tier and lease TTL as value types; the host never imports a feature's job body directly ([reliability.md](reliability.md)).
+**Hookimpl signatures** may receive a platform runtime object where the platform requires it (the FastAPI app for routes). Slack commands, block actions and view submissions attach through the registrar Protocol and never receive the Bolt app ([platform-entrypoints.md](platform-entrypoints.md) rule 2). Cross-platform hookspecs (i18n, jobs, extension points) take contracts and value types only. Recurring jobs attach only through `register_background_jobs`, carrying schedule, tier and lease TTL as value types; the host never imports a feature's job body directly ([reliability.md](reliability.md)).
 
 **Marker discipline.** Plugins import `hookimpl` from `contracts`, never from `pluggy` directly.
 
@@ -95,3 +95,4 @@ Tolerated until closed:
 - 2026-10-01: an umbrella's `core/` and `common/` are never entry points, per feature-packages.md.
 - 2026-10-01: TASK-107 moved the hookspecs, the markers and the namespace constant to `contracts/plugins/` and the plugin manager to `server/plugins/`; `infrastructure/plugins/` is deleted and its two tolerated items are closed.
 - 2026-10-06: TASK-110 replaced the filesystem walk with entry-point loading; an import failure now aborts boot, and that tolerated item is closed.
+- 2026-10-06: Slack hookimpls attach through the registrar Protocol, never the Bolt app, matching platform-entrypoints.md rule 2 (TASK-140.2).

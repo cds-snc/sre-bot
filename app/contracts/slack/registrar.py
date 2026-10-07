@@ -1,7 +1,9 @@
-"""Registrar Protocol features use to attach Slack command handlers.
+"""Registrar Protocol features use to attach Slack handlers.
 
 The ``register_slack_commands`` hookspec hands features this Protocol, never
-the Slack SDK runtime (the Bolt app or the platform provider).
+the Slack SDK runtime (the Bolt app or the platform provider). Through it a
+feature registers commands, and native Bolt listeners for block actions and
+view submissions.
 
 See: decisions/platform-entrypoints.md, decisions/transport-slack.md
 """
@@ -54,5 +56,40 @@ class SlackCommandRegistrar(Protocol):
             schema: Pydantic schema validating the parsed arguments.
             argument_mapper: Transforms parsed arguments into schema fields.
             fallback_handler: Called when the command expects arguments but none are given.
+        """
+        ...
+
+    def register_block_action(self, action_id: str, listener: Callable[..., object]) -> None:
+        """Register a native Bolt listener for one block action.
+
+        The listener takes Bolt's own arguments by name (``ack``, ``body``,
+        ``client``, ``respond``, ...), acks first, then does its work.
+
+        Args:
+            action_id: Exact ``action_id``, starting with the plugin's
+                entry-point name (e.g. "incident.scribe.approve").
+            listener: The Bolt listener.
+
+        Raises:
+            ValueError: The id is blank, lacks the plugin's prefix or is
+                already registered; this aborts boot.
+        """
+        ...
+
+    def register_view_submission(self, callback_id: str, listener: Callable[..., object]) -> None:
+        """Register a native Bolt listener for one modal's view submission.
+
+        The listener takes Bolt's own arguments by name (``ack``, ``body``,
+        ``view``, ``client``, ...) and acks first, returning field errors in
+        that ack (``ack(response_action="errors", errors=...)``).
+
+        Args:
+            callback_id: Exact view ``callback_id``, starting with the plugin's
+                entry-point name (e.g. "incident.scribe.submit").
+            listener: The Bolt listener.
+
+        Raises:
+            ValueError: The id is blank, lacks the plugin's prefix or is
+                already registered; this aborts boot.
         """
         ...
