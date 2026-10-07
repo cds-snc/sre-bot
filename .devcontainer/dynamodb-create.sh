@@ -77,6 +77,25 @@ else
   echo "✓ sre_bot_access_requests table created"
 fi
 
+# sre_bot_incident_status_updates table - One item per incident status update (PK/SK pattern)
+if table_exists "sre_bot_incident_status_updates"; then
+  echo "✓ sre_bot_incident_status_updates table already exists"
+else
+  echo "Creating sre_bot_incident_status_updates table..."
+  aws dynamodb create-table \
+    --table-name sre_bot_incident_status_updates \
+    --attribute-definitions \
+      AttributeName=PK,AttributeType=S \
+      AttributeName=SK,AttributeType=S \
+    --key-schema \
+      AttributeName=PK,KeyType=HASH \
+      AttributeName=SK,KeyType=RANGE \
+    --provisioned-throughput ReadCapacityUnits=2,WriteCapacityUnits=2 \
+    --endpoint-url "$ENDPOINT" \
+    --no-cli-pager >/dev/null
+  echo "✓ sre_bot_incident_status_updates table created"
+fi
+
 # incidents table - Simple hash key
 if table_exists "incidents"; then
   echo "✓ incidents table already exists"
