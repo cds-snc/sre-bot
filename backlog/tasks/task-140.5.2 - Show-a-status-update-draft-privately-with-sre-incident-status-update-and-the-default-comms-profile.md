@@ -3,10 +3,10 @@ id: TASK-140.5.2
 title: >-
   Open the incident's status-updates modal with /sre incident status-update and
   show the pending draft with the default comms profile
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-07 14:55'
-updated_date: '2026-10-07 17:45'
+updated_date: '2026-10-07 23:45'
 labels:
   - incident
 dependencies:

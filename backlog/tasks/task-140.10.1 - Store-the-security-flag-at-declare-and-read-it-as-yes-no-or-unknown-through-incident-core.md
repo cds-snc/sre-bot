@@ -3,10 +3,10 @@ id: TASK-140.10.1
 title: >-
   Store the security flag at declare and read it as yes, no or unknown through
   incident core
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-07 19:02'
-updated_date: '2026-10-07 19:26'
+updated_date: '2026-10-07 23:45'
 labels:
   - incident
 dependencies:

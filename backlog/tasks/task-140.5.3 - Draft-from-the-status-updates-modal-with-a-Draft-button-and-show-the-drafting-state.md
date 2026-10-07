@@ -3,10 +3,10 @@ id: TASK-140.5.3
 title: >-
   Draft from the status-updates modal with a Draft button and show the drafting
   state
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-07 16:06'
-updated_date: '2026-10-07 17:04'
+updated_date: '2026-10-07 23:45'
 labels:
   - incident
 dependencies:

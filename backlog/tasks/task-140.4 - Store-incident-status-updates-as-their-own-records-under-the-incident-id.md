@@ -1,10 +1,10 @@
 ---
 id: TASK-140.4
 title: Store incident status updates as their own records under the incident id
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-07 14:30'
+updated_date: '2026-10-07 23:45'
 labels:
   - incident
 dependencies:

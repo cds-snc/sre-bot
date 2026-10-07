@@ -1,10 +1,10 @@
 ---
 id: TASK-140.5.1
 title: Draft or carry forward an incident status update in the scribe service
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-07 14:54'
-updated_date: '2026-10-07 16:40'
+updated_date: '2026-10-07 23:45'
 labels:
   - incident
 dependencies:
