@@ -155,5 +155,3 @@ def test_returns_store_error_when_list_fails():
     assert result.status == OperationStatus.TRANSIENT_ERROR
     assert result.error_code == ErrorCode.RATE_LIMITED
     assert result.retry_after == 3
-
-

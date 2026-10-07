@@ -24,12 +24,14 @@ def test_render_profile_shows_all_fields_in_order():
         current_action="Rolling back deploy",
         workaround="Try again in 5 minutes",
     )
-    stage_names = MappingProxyType({
-        StatusUpdateStage.IDENTIFIED: "Identified",
-        StatusUpdateStage.INVESTIGATING: "Investigating",
-        StatusUpdateStage.MONITORING: "Monitoring",
-        StatusUpdateStage.RESOLVED: "Resolved",
-    })
+    stage_names = MappingProxyType(
+        {
+            StatusUpdateStage.IDENTIFIED: "Identified",
+            StatusUpdateStage.INVESTIGATING: "Investigating",
+            StatusUpdateStage.MONITORING: "Monitoring",
+            StatusUpdateStage.RESOLVED: "Resolved",
+        }
+    )
     labels = ProfileLabels(
         stage="Stage",
         affected_service="Affected Service",
@@ -60,12 +62,14 @@ def test_render_profile_omits_next_update_when_stage_is_resolved():
         current_action="Incident resolved",
         workaround="No action needed",
     )
-    stage_names = MappingProxyType({
-        StatusUpdateStage.IDENTIFIED: "Identified",
-        StatusUpdateStage.INVESTIGATING: "Investigating",
-        StatusUpdateStage.MONITORING: "Monitoring",
-        StatusUpdateStage.RESOLVED: "Resolved",
-    })
+    stage_names = MappingProxyType(
+        {
+            StatusUpdateStage.IDENTIFIED: "Identified",
+            StatusUpdateStage.INVESTIGATING: "Investigating",
+            StatusUpdateStage.MONITORING: "Monitoring",
+            StatusUpdateStage.RESOLVED: "Resolved",
+        }
+    )
     labels = ProfileLabels(
         stage="Stage",
         affected_service="Affected Service",
@@ -92,12 +96,14 @@ def test_render_profile_converts_time_to_america_toronto_en():
         current_action="Monitoring",
         workaround="N/A",
     )
-    stage_names = MappingProxyType({
-        StatusUpdateStage.IDENTIFIED: "Identified",
-        StatusUpdateStage.INVESTIGATING: "Investigating",
-        StatusUpdateStage.MONITORING: "Monitoring",
-        StatusUpdateStage.RESOLVED: "Resolved",
-    })
+    stage_names = MappingProxyType(
+        {
+            StatusUpdateStage.IDENTIFIED: "Identified",
+            StatusUpdateStage.INVESTIGATING: "Investigating",
+            StatusUpdateStage.MONITORING: "Monitoring",
+            StatusUpdateStage.RESOLVED: "Resolved",
+        }
+    )
     labels = ProfileLabels(
         stage="Stage",
         affected_service="Affected Service",
@@ -124,12 +130,14 @@ def test_render_profile_converts_time_to_america_toronto_across_dst_boundary():
         current_action="Investigating",
         workaround="N/A",
     )
-    stage_names = MappingProxyType({
-        StatusUpdateStage.IDENTIFIED: "Identified",
-        StatusUpdateStage.INVESTIGATING: "Investigating",
-        StatusUpdateStage.MONITORING: "Monitoring",
-        StatusUpdateStage.RESOLVED: "Resolved",
-    })
+    stage_names = MappingProxyType(
+        {
+            StatusUpdateStage.IDENTIFIED: "Identified",
+            StatusUpdateStage.INVESTIGATING: "Investigating",
+            StatusUpdateStage.MONITORING: "Monitoring",
+            StatusUpdateStage.RESOLVED: "Resolved",
+        }
+    )
     labels = ProfileLabels(
         stage="Stage",
         affected_service="Affected Service",
@@ -156,12 +164,14 @@ def test_render_profile_with_french_labels_and_he_suffix():
         current_action="Déploiement annulé",
         workaround="Réessayez dans 5 minutes",
     )
-    stage_names = MappingProxyType({
-        StatusUpdateStage.IDENTIFIED: "Identifié",
-        StatusUpdateStage.INVESTIGATING: "En cours d'investigation",
-        StatusUpdateStage.MONITORING: "Surveillance",
-        StatusUpdateStage.RESOLVED: "Résolu",
-    })
+    stage_names = MappingProxyType(
+        {
+            StatusUpdateStage.IDENTIFIED: "Identifié",
+            StatusUpdateStage.INVESTIGATING: "En cours d'investigation",
+            StatusUpdateStage.MONITORING: "Surveillance",
+            StatusUpdateStage.RESOLVED: "Résolu",
+        }
+    )
     labels = ProfileLabels(
         stage="Étape",
         affected_service="Service Affecté",
@@ -195,12 +205,14 @@ def test_render_profile_every_stage():
         current_action="Action",
         workaround="Workaround",
     )
-    stage_names = MappingProxyType({
-        StatusUpdateStage.IDENTIFIED: "Identified",
-        StatusUpdateStage.INVESTIGATING: "Investigating",
-        StatusUpdateStage.MONITORING: "Monitoring",
-        StatusUpdateStage.RESOLVED: "Resolved",
-    })
+    stage_names = MappingProxyType(
+        {
+            StatusUpdateStage.IDENTIFIED: "Identified",
+            StatusUpdateStage.INVESTIGATING: "Investigating",
+            StatusUpdateStage.MONITORING: "Monitoring",
+            StatusUpdateStage.RESOLVED: "Resolved",
+        }
+    )
     labels = ProfileLabels(
         stage="Stage",
         affected_service="Service",
@@ -227,12 +239,14 @@ def test_render_profile_stage_line_uses_label_from_stage_names():
         current_action="Investigating",
         workaround="N/A",
     )
-    stage_names = MappingProxyType({
-        StatusUpdateStage.IDENTIFIED: "Problème Identifié",
-        StatusUpdateStage.INVESTIGATING: "En cours d'investigation",
-        StatusUpdateStage.MONITORING: "Surveillance",
-        StatusUpdateStage.RESOLVED: "Résolu",
-    })
+    stage_names = MappingProxyType(
+        {
+            StatusUpdateStage.IDENTIFIED: "Problème Identifié",
+            StatusUpdateStage.INVESTIGATING: "En cours d'investigation",
+            StatusUpdateStage.MONITORING: "Surveillance",
+            StatusUpdateStage.RESOLVED: "Résolu",
+        }
+    )
     labels = ProfileLabels(
         stage="Étape",
         affected_service="Service",

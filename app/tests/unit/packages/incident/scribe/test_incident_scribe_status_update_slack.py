@@ -58,9 +58,7 @@ class TestRegisterCommands:
         register_commands(provider)
 
         status_update_calls = [
-            call.kwargs
-            for call in provider.register_command.call_args_list
-            if call.kwargs.get("command") == "status-update"
+            call.kwargs for call in provider.register_command.call_args_list if call.kwargs.get("command") == "status-update"
         ]
         assert len(status_update_calls) == 1
         kwargs = status_update_calls[0]

@@ -27,9 +27,7 @@ def provider() -> SlackPlatformProvider:
 
 
 @pytest.mark.parametrize("text", ["incident status-update", "incident status-update  "])
-def test_status_update_routes_from_sre_to_its_handler_with_the_payload(
-    provider: SlackPlatformProvider, text: str
-) -> None:
+def test_status_update_routes_from_sre_to_its_handler_with_the_payload(provider: SlackPlatformProvider, text: str) -> None:
     """``/sre incident status-update`` reaches the handler with the payload, empty args and the provider's reply sender."""
     payload = CommandPayload(
         text=text, user_id="U9", channel_id="C1", user_locale="fr-FR", platform_metadata={"trigger_id": "T1"}
