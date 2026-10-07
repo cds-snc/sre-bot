@@ -8,7 +8,10 @@ from collections.abc import Mapping, Sequence
 from typing import Protocol, runtime_checkable
 
 from contracts.operations import OperationResult
+from packages.incident.core.api import StatusUpdate
+from packages.incident.scribe.comms_profile import ProfileLabels
 from packages.incident.scribe.domain import (
+    CopyReadyText,
     DocumentField,
     DocumentSection,
     DraftWriteResult,
@@ -65,4 +68,19 @@ class TextGenerator(Protocol):
         max_output_tokens: int | None = None,
     ) -> OperationResult[str]:
         """Return the generated text, or the provider's classified error."""
+        ...
+
+
+@runtime_checkable
+class StatusPagePublisher(Protocol):
+    """Interface turning an approved status update into the text for a status page."""
+
+    async def publish(
+        self,
+        update: StatusUpdate,
+        *,
+        labels_en: ProfileLabels,
+        labels_fr: ProfileLabels,
+    ) -> OperationResult[CopyReadyText]:
+        """Return the update's text per language, or ``STATUS_UPDATE_NOT_APPROVED`` for a draft."""
         ...

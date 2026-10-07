@@ -45,13 +45,13 @@ class ProfileLabels:
     stage_names: Mapping[StatusUpdateStage, str]
 
 
-def render_profile(
+def render_profile_sections(
     text: StatusUpdateText,
     stage: StatusUpdateStage,
     next_update_at: datetime,
     labels: ProfileLabels,
-) -> str:
-    """Render one language of a status update, one ``Label: value`` line per field.
+) -> tuple[str, ...]:
+    """Return one language of a status update as ``Label: value`` lines, one per field.
 
     Args:
         text: The update's fields in this language.
@@ -74,4 +74,14 @@ def render_profile(
     if stage is not StatusUpdateStage.RESOLVED:
         local = next_update_at.astimezone(_PROFILE_ZONE)
         lines.append(f"{labels.next_update}: {local.strftime(_TIME_FORMAT)} {labels.time_suffix}")
-    return "\n".join(lines)
+    return tuple(lines)
+
+
+def render_profile(
+    text: StatusUpdateText,
+    stage: StatusUpdateStage,
+    next_update_at: datetime,
+    labels: ProfileLabels,
+) -> str:
+    """Render one language of a status update, the lines of ``render_profile_sections`` one per row."""
+    return "\n".join(render_profile_sections(text, stage, next_update_at, labels))

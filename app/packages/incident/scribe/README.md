@@ -74,6 +74,8 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   updates). Only messages posted by people after the latest record's cutoff
   count as new; thread replies are not read. It imports `core/api.py` only from
   `core` and no integration.
+- `status_update_approval.py`, `publisher.py` — approving a draft (stops at `APPROVED`, never
+  publishes) and rendering an approved update as copy-ready EN/FR text.
 - `status_update_prompt.py` — the status-update prompt and its strict answer
   parser, which rejects any partial or malformed answer.
 - `domain.py` — frozen values of the drafting use case: `DocumentSection`

@@ -7,10 +7,11 @@ keeping ``service.py`` and ``platforms/`` free of adapter (and therefore
 
 from functools import lru_cache
 
+from packages.incident.scribe.adapters.copy_ready import CopyReadyPublisher
 from packages.incident.scribe.adapters.google_docs import GoogleDocsIncidentDocument
 from packages.incident.scribe.adapters.slack import build_incident_report_link_lookup
 from packages.incident.scribe.adapters.text_generation import build_status_update_text_generator
-from packages.incident.scribe.ports import IncidentReportLinkLookup, TextGenerator
+from packages.incident.scribe.ports import IncidentReportLinkLookup, StatusPagePublisher, TextGenerator
 
 
 @lru_cache(maxsize=1)
@@ -29,3 +30,9 @@ def get_incident_report_link_lookup() -> IncidentReportLinkLookup:
 def get_status_update_text_generator() -> TextGenerator:
     """Return the process-wide ``TextGenerator`` that drafts status updates."""
     return build_status_update_text_generator()
+
+
+@lru_cache(maxsize=1)
+def get_status_page_publisher() -> StatusPagePublisher:
+    """Return the process-wide ``StatusPagePublisher`` that renders copy-ready text."""
+    return CopyReadyPublisher()

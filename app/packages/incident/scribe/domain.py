@@ -143,3 +143,20 @@ class NoNewInformationWording:
 
     en: str
     fr: str
+
+
+@dataclass(frozen=True)
+class StatusUpdateEdit:
+    """What the approver submits: the reviewed stage and both languages' fields."""
+
+    stage: StatusUpdateStage
+    en: StatusUpdateText
+    fr: StatusUpdateText
+
+
+@dataclass(frozen=True)
+class CopyReadyText:
+    """An approved update rendered as plain text to paste, one string per language."""
+
+    en: str
+    fr: str
