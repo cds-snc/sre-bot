@@ -6,12 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-07 15:17'
+updated_date: '2026-10-07 22:57'
 labels:
   - incident
 dependencies:
   - TASK-140.6
-  - TASK-140.8
+  - TASK-140.8.1
 parent_task_id: TASK-140
 priority: medium
 type: chore

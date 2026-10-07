@@ -160,3 +160,16 @@ class CopyReadyText:
 
     en: str
     fr: str
+
+
+@dataclass(frozen=True)
+class StatusUpdateOverview:
+    """An incident's status updates as the modal lists them.
+
+    Attributes:
+        pending: The latest record when it is a draft, else ``None``.
+        approved: Every approved or published record, newest first.
+    """
+
+    pending: StatusUpdate | None
+    approved: tuple[StatusUpdate, ...]

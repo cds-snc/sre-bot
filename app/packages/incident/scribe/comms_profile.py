@@ -45,6 +45,11 @@ class ProfileLabels:
     stage_names: Mapping[StatusUpdateStage, str]
 
 
+def format_profile_time(moment: datetime, labels: ProfileLabels) -> str:
+    """Return ``moment`` as ``YYYY-MM-DD HH:MM`` in America/Toronto followed by the language's zone suffix."""
+    return f"{moment.astimezone(_PROFILE_ZONE).strftime(_TIME_FORMAT)} {labels.time_suffix}"
+
+
 def render_profile_sections(
     text: StatusUpdateText,
     stage: StatusUpdateStage,
@@ -72,8 +77,7 @@ def render_profile_sections(
         f"{labels.workaround}: {text.workaround}",
     ]
     if stage is not StatusUpdateStage.RESOLVED:
-        local = next_update_at.astimezone(_PROFILE_ZONE)
-        lines.append(f"{labels.next_update}: {local.strftime(_TIME_FORMAT)} {labels.time_suffix}")
+        lines.append(f"{labels.next_update}: {format_profile_time(next_update_at, labels)}")
     return tuple(lines)
 
 
