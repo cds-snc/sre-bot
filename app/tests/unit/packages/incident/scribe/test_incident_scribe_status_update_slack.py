@@ -5,6 +5,7 @@ the incident, reads the pending draft and updates the view to it rendered with t
 default comms profile in EN and FR, or to a localized error view.
 """
 
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -33,8 +34,6 @@ def _text(language: str) -> StatusUpdateText:
 
 
 def _pending_update(sequence: int = 1) -> StatusUpdate:
-    from datetime import UTC, datetime
-
     now = datetime(2026, 10, 7, 15, 0, tzinfo=UTC)
     return StatusUpdate(
         incident_id=_INCIDENT,

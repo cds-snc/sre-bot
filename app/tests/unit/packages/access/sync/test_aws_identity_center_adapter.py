@@ -15,6 +15,7 @@ from botocore.exceptions import ClientError
 
 from contracts.operations import OperationResult, OperationStatus
 from packages.access.common.config import EntitlementRule
+from packages.access.sync.adapters import aws_identity_center
 from packages.access.sync.adapters.aws_identity_center import (
     AwsIdentityCenterAdapter,
     normalize_group_name,
@@ -467,8 +468,6 @@ class _FakeAwsSettings:
 @pytest.mark.unit
 def test_build_aws_identity_center_adapter_wires_typed_client_no_facade(monkeypatch: pytest.MonkeyPatch) -> None:
     """The factory builds the adapter from get_aws_client("identitystore") and the configured instance id."""
-    from packages.access.sync.adapters import aws_identity_center as module
-
     fake_client = make_client()
     fake_client.get_user_id.return_value = {"UserId": "user-123"}
     captured: dict[str, Any] = {}
@@ -477,14 +476,14 @@ def test_build_aws_identity_center_adapter_wires_typed_client_no_facade(monkeypa
         captured["service_name"] = service_name
         return fake_client
 
-    monkeypatch.setattr(module, "get_aws_client", _fake_get_aws_client)
+    monkeypatch.setattr(aws_identity_center, "get_aws_client", _fake_get_aws_client)
     monkeypatch.setattr(
-        module,
+        aws_identity_center,
         "get_aws_settings",
         lambda: _FakeAwsSettings(instance_id="d-9876543210", identitystore_role_arn="arn:aws:iam::111111111111:role/org-role"),
     )
 
-    adapter = module.build_aws_identity_center_adapter()
+    adapter = aws_identity_center.build_aws_identity_center_adapter()
 
     assert isinstance(adapter, AwsIdentityCenterAdapter)
     assert captured["service_name"] == "identitystore"
@@ -495,22 +494,20 @@ def test_build_aws_identity_center_adapter_wires_typed_client_no_facade(monkeypa
 @pytest.mark.unit
 def test_build_aws_identity_center_adapter_assumes_org_role_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     """identitystore must be assumed under SERVICE_ROLE_MAP's org role, not the bot's own credentials."""
-    from packages.access.sync.adapters import aws_identity_center as module
-
     captured: dict[str, Any] = {}
 
     def _fake_get_aws_client(service_name: str, role_arn: str | None = None) -> MagicMock:
         captured["role_arn"] = role_arn
         return make_client()
 
-    monkeypatch.setattr(module, "get_aws_client", _fake_get_aws_client)
+    monkeypatch.setattr(aws_identity_center, "get_aws_client", _fake_get_aws_client)
     monkeypatch.setattr(
-        module,
+        aws_identity_center,
         "get_aws_settings",
         lambda: _FakeAwsSettings(instance_id="d-9876543210", identitystore_role_arn="arn:aws:iam::111111111111:role/org-role"),
     )
 
-    module.build_aws_identity_center_adapter()
+    aws_identity_center.build_aws_identity_center_adapter()
 
     assert captured["role_arn"] == "arn:aws:iam::111111111111:role/org-role"
 
@@ -522,22 +519,20 @@ def test_build_aws_identity_center_adapter_omits_role_arn_when_unset(monkeypatch
     Prevents a spurious STS AssumeRole call with an empty-string RoleArn in
     default/test configuration.
     """
-    from packages.access.sync.adapters import aws_identity_center as module
-
     captured: dict[str, Any] = {}
 
     def _fake_get_aws_client(service_name: str, role_arn: str | None = None) -> MagicMock:
         captured["role_arn"] = role_arn
         return make_client()
 
-    monkeypatch.setattr(module, "get_aws_client", _fake_get_aws_client)
+    monkeypatch.setattr(aws_identity_center, "get_aws_client", _fake_get_aws_client)
     monkeypatch.setattr(
-        module,
+        aws_identity_center,
         "get_aws_settings",
         lambda: _FakeAwsSettings(instance_id="d-9876543210", identitystore_role_arn=""),
     )
 
-    module.build_aws_identity_center_adapter()
+    aws_identity_center.build_aws_identity_center_adapter()
 
     assert captured["role_arn"] is None
 

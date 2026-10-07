@@ -10,6 +10,7 @@ project_root = "/workspace/app"
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+from integrations.slack.provider import get_slack_provider  # noqa: E402
 from tests.factories.aws import (  # noqa: E402
     make_aws_groups,
     make_aws_groups_memberships,
@@ -66,8 +67,6 @@ def fresh_slack_provider():
     The provider is a cached singleton whose native listener ids are unique per
     instance, so each app lifespan started in one process needs a fresh one.
     """
-    from integrations.slack.provider import get_slack_provider
-
     get_slack_provider.cache_clear()
     yield
     get_slack_provider.cache_clear()

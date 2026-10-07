@@ -4,8 +4,6 @@ These tests define expected error-classification and service-construction
 behavior for Google Directory API adapter wiring.
 """
 
-from __future__ import annotations
-
 import importlib
 from types import SimpleNamespace
 from typing import Any
@@ -18,6 +16,7 @@ from googleapiclient.http import HttpRequest
 from pydantic import ValidationError
 
 from contracts.operations.status import OperationStatus
+from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
 
 
 def _http_error(status: int, reason: str = "boom", retry_after: str | None = None) -> HttpError:
@@ -262,8 +261,6 @@ def test_request_builder_defaults_and_honors_explicit_retry_count(
 def test_google_workspace_settings_retry_count_defaults_and_reads_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
-
     assert GoogleWorkspaceSettings().GOOGLE_API_NUM_RETRIES == 3
     monkeypatch.setenv("GOOGLE_API_NUM_RETRIES", "7")
     assert GoogleWorkspaceSettings().GOOGLE_API_NUM_RETRIES == 7
@@ -401,8 +398,6 @@ def test_google_workspace_settings_timeout_defaults_and_reads_environment(
     The settings class is constructed directly rather than through its cached
     provider so each assertion sees a fresh read of the environment.
     """
-    from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
-
     assert GoogleWorkspaceSettings().GOOGLE_API_TIMEOUT_SECONDS == 10.0
     monkeypatch.setenv("GOOGLE_API_TIMEOUT_SECONDS", "2.5")
     assert GoogleWorkspaceSettings().GOOGLE_API_TIMEOUT_SECONDS == 2.5
@@ -420,8 +415,6 @@ def test_google_workspace_settings_timeout_rejects_non_positive(
     the misconfiguration must surface at startup rather than as opaque socket
     errors at call time.
     """
-    from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
-
     monkeypatch.setenv("GOOGLE_API_TIMEOUT_SECONDS", invalid_timeout)
 
     with pytest.raises(ValidationError):

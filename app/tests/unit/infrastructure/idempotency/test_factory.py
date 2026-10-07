@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+import infrastructure.idempotency.factory as factory_module
 from infrastructure import idempotency
 from infrastructure.idempotency.dynamodb import DynamoDBIdempotencyStore
 from infrastructure.idempotency.factory import get_idempotency_store, reset_idempotency_store
@@ -14,8 +15,6 @@ pytestmark = pytest.mark.unit
 
 @pytest.fixture
 def mock_get_aws_client(monkeypatch: pytest.MonkeyPatch) -> tuple[MagicMock, MagicMock]:
-    import infrastructure.idempotency.factory as factory_module
-
     dynamodb_client = MagicMock(spec=["put_item", "get_item", "delete_item"])
     get_aws_client = MagicMock(return_value=dynamodb_client)
     monkeypatch.setattr(factory_module, "get_aws_client", get_aws_client, raising=False)

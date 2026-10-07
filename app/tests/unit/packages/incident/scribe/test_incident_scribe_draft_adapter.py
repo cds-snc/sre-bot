@@ -8,7 +8,7 @@ from googleapiclient.errors import HttpError
 
 from contracts.operations.status import OperationStatus
 from integrations.google_workspace import client as google_workspace_client
-from packages.incident.scribe.adapters.google_docs import GoogleDocsIncidentDocument
+from packages.incident.scribe.adapters.google_docs import GoogleDocsIncidentDocument, _merge_overlapping
 from packages.incident.scribe.domain import DocumentField, DocumentSection, SectionDraft
 
 pytestmark = pytest.mark.unit
@@ -1393,8 +1393,6 @@ class TestEditsNeverOverlap:
         assert swallowed == [], f"these inserts would be deleted again: {swallowed}"
 
     def test_merging_joins_overlapping_and_touching_spans(self):
-        from packages.incident.scribe.adapters.google_docs import _merge_overlapping
-
         assert _merge_overlapping([(271, 305), (286, 305)]) == [(271, 305)]
         assert _merge_overlapping([(10, 20), (20, 30)]) == [(10, 30)]
         assert _merge_overlapping([(10, 20), (25, 30)]) == [(10, 20), (25, 30)]
