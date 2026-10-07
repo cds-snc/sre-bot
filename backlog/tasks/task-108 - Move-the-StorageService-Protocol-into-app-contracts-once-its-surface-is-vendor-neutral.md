@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:58'
+updated_date: '2026-10-07 14:20'
 labels:
   - plugin-architecture
   - contracts
@@ -37,3 +38,9 @@ Mechanical: the Protocol and its value types move; the DynamoDB implementation a
 - [ ] #3 grep finds no import of the Protocol at its old path and no re-export
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-07 (TASK-140.4): packages.incident.core.adapters.status_updates is a second interim direct-boto3 store (after TASK-140.3's legacy lookup) waiting on this Protocol; its migration is tracked on TASK-38.1. It needs conditional put with ReturnValuesOnConditionCheckFailure=ALL_OLD semantics and a descending, limited key query from the vendor-neutral surface.
+<!-- SECTION:NOTES:END -->

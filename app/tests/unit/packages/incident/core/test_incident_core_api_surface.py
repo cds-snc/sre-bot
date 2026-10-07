@@ -2,7 +2,7 @@
 
 import dataclasses
 import inspect
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -16,18 +16,21 @@ from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from packages.incident.core import api
 from packages.incident.core.adapters import legacy_incidents as legacy_incidents_adapter
 from packages.incident.core.adapters import slack as slack_adapter
+from packages.incident.core.adapters import status_updates as status_updates_adapter
 
 pytestmark = pytest.mark.unit
 
 
 @pytest.fixture(autouse=True)
 def _clear_provider_cache() -> Iterator[None]:
-    """Keep the cached reader and lookup from leaking between tests."""
+    """Keep the cached reader, lookup and store from leaking between tests."""
     api.get_incident_transcript_reader.cache_clear()
     api.get_incident_lookup.cache_clear()
+    api.get_status_update_store.cache_clear()
     yield
     api.get_incident_transcript_reader.cache_clear()
     api.get_incident_lookup.cache_clear()
+    api.get_status_update_store.cache_clear()
 
 
 def test_api_exports_exactly_the_public_names() -> None:
@@ -35,10 +38,16 @@ def test_api_exports_exactly_the_public_names() -> None:
     assert sorted(api.__all__) == [
         "IncidentLookup",
         "IncidentTranscriptReader",
+        "StatusUpdate",
+        "StatusUpdateStage",
+        "StatusUpdateState",
+        "StatusUpdateStore",
+        "StatusUpdateText",
         "TranscriptMessage",
         "find_incident_for_conversation",
         "get_incident_lookup",
         "get_incident_transcript_reader",
+        "get_status_update_store",
     ]
     assert all(hasattr(api, name) for name in api.__all__)
 
@@ -125,6 +134,38 @@ def test_find_incident_for_conversation_returns_the_provided_lookup_result(monke
 
     assert api.find_incident_for_conversation("C0INCIDENT") is expected
     assert fake.asked == ["C0INCIDENT"]
+
+
+def test_status_update_store_signatures_carry_only_domain_types_and_operation_results() -> None:
+    """No table, key or SDK shape crosses the store interface, so the storage contract can serve it later."""
+    store = api.StatusUpdateStore
+
+    def params(method: object) -> dict[str, object]:
+        return {name: p.annotation for name, p in inspect.signature(method).parameters.items() if name != "self"}  # type: ignore[arg-type]
+
+    assert params(store.append) == {"update": api.StatusUpdate}
+    assert params(store.latest) == {"incident_id": str}
+    assert params(store.list_for_incident) == {"incident_id": str}
+    assert params(store.transition) == {"update": api.StatusUpdate, "expected_state": api.StatusUpdateState}
+    assert inspect.signature(store.append).return_annotation == OperationResult[api.StatusUpdate]
+    assert inspect.signature(store.latest).return_annotation == OperationResult[api.StatusUpdate | None]
+    assert inspect.signature(store.list_for_incident).return_annotation == OperationResult[Sequence[api.StatusUpdate]]
+    assert inspect.signature(store.transition).return_annotation == OperationResult[api.StatusUpdate]
+
+
+def test_status_update_store_provider_returns_one_cached_store_built_by_the_dynamodb_adapter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The provider builds the DynamoDB-backed store once and hands out that same instance."""
+    built = MagicMock(spec=status_updates_adapter.DynamoDbStatusUpdateStore)
+    builder = MagicMock(return_value=built)
+    monkeypatch.setattr(api, "build_status_update_store", builder)
+
+    store = api.get_status_update_store()
+
+    assert store is built
+    assert api.get_status_update_store() is built
+    builder.assert_called_once_with()
 
 
 def test_core_is_not_a_plugin() -> None:
