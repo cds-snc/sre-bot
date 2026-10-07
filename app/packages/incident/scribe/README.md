@@ -495,3 +495,16 @@ The bot must be able to read channel history and look up users:
 The bot must be a member of the channel (or have `channels:history` via an
 appropriate install). After changing scopes, reinstall the app and restart the
 bot so the Web API client picks up the new token.
+
+### `/sre incident status-update`
+
+Opens the incident's status-updates modal, private to the invoker; no status
+update text is posted to the channel. The handler opens a loading view at once
+with the command's trigger id (it expires after about three seconds), then
+`get_pending_status_update` in `status_update.py` resolves the incident and
+reads the latest record. The view is updated to the pending draft, rendered in
+English then French by the default comms profile (`comms_profile.py`), or to a
+localized no-draft notice, or to a localized error with a Close button
+(outside an incident channel, ambiguous incident, store failure). Opening never
+drafts. Strings live in `locales/incident_status_update.{en-US,fr-FR}.yml`;
+`t()` is called only in `platforms/slack.py`.

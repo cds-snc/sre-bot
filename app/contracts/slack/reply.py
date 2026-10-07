@@ -30,6 +30,14 @@ class SlackReplySender(Protocol):
         """Post a message in a channel that only one user sees."""
         ...
 
-    def open_view(self, *, trigger_id: str, view: dict[str, Any]) -> OperationResult[None]:
-        """Open a modal view for the interaction identified by ``trigger_id``."""
+    def open_view(self, *, trigger_id: str, view: dict[str, Any]) -> OperationResult[str]:
+        """Open a modal view for the interaction identified by ``trigger_id``.
+
+        Returns:
+            Success carrying the opened view's id, for ``update_view``.
+        """
+        ...
+
+    def update_view(self, *, view_id: str, view: dict[str, Any], hash: str | None = None) -> OperationResult[None]:  # noqa: A002 -- Slack's parameter name
+        """Replace an open modal view; ``hash`` guards against concurrent updates."""
         ...

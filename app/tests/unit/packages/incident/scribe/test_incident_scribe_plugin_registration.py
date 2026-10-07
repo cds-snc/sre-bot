@@ -13,7 +13,7 @@ pytestmark = pytest.mark.unit
 
 
 def test_one_hookimpl_registers_both_commands_under_sre_incident() -> None:
-    """The package's single Slack hookimpl registers ``draft`` and ``summarize``, both children of ``sre.incident``.
+    """The package's single Slack hookimpl registers ``draft``, ``summarize`` and ``status-update``, all children of ``sre.incident``.
 
     A recording fake registrar stands in for the Slack provider, so the
     assertion is on what the hookimpl asked to be registered.
@@ -23,7 +23,7 @@ def test_one_hookimpl_registers_both_commands_under_sre_incident() -> None:
     scribe_pkg.register_slack_commands(registrar=registrar)
 
     registered = {(command["parent"], command["command"]) for command in registrar.commands}
-    assert registered == {("sre.incident", "draft"), ("sre.incident", "summarize")}
+    assert registered == {("sre.incident", "draft"), ("sre.incident", "summarize"), ("sre.incident", "status-update")}
 
 
 def test_one_i18n_registration_covers_both_catalogues() -> None:
@@ -42,7 +42,7 @@ def test_one_i18n_registration_covers_both_catalogues() -> None:
 
 
 def test_registered_locales_path_loads_both_i18n_domains_in_every_locale() -> None:
-    """Loading the registered path yields the ``incident_draft`` and ``incident_summary`` domains in each locale.
+    """Loading the registered path yields the ``incident_draft``, ``incident_summary`` and ``incident_status_update`` domains in each locale.
 
     The catalogues are read with the production YAML loader from the path the
     package registered, which is what startup does with the collected specs.
@@ -55,4 +55,4 @@ def test_registered_locales_path_loads_both_i18n_domains_in_every_locale() -> No
 
     assert {locale.value for locale in catalogs} == {"en-US", "fr-FR"}
     for catalog in catalogs.values():
-        assert {"incident_draft", "incident_summary"} <= set(catalog.messages)
+        assert {"incident_draft", "incident_summary", "incident_status_update"} <= set(catalog.messages)

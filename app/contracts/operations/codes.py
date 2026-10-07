@@ -74,6 +74,7 @@ class ErrorCode(StrEnum):
     IP_NOT_FOUND = "IP_NOT_FOUND"
     MISSING_APP_TOKEN = "MISSING_APP_TOKEN"  # noqa: S105 -- error-code name, not a credential
     MISSING_BOT_TOKEN = "MISSING_BOT_TOKEN"  # noqa: S105 -- error-code name, not a credential
+    MISSING_VIEW_ID = "MISSING_VIEW_ID"
     NOT_AN_INCIDENT = "NOT_AN_INCIDENT"
     NOT_FOUND = "NOT_FOUND"
     NOT_PROVISIONED = "NOT_PROVISIONED"

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-07 15:41'
+updated_date: '2026-10-07 16:07'
 labels:
   - incident
 dependencies:
@@ -37,7 +37,15 @@ Scribe use case: resolve the incident through core, read the transcript since th
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-Coordinator. Split on 2026-10-07 at the single-PR size gate (~14 files, ~520 LOC as one PR) into TASK-140.5.1 (scribe service: draft, carry forward, pending, stage floor, bot flag) and TASK-140.5.2 (/sre incident status-update opening the status-updates modal, drafting from it, and the default comms profile). Each is one Stack H layer and PR. The same day all status-update interaction moved into modals (decisions/incident-management.md), so 'shown only to the invoker' means a private modal, never a channel or ephemeral post. The ACs here are checked as the subtasks verify them: AC1 by 140.5.1 AC1 + 140.5.2 AC1-AC2; AC2 by 140.5.1 AC2; AC3 by 140.5.1 AC3; AC4 by 140.5.1 AC4; AC5 by 140.5.2 AC4-AC5; AC6 by both gates.
+Coordinator. Split on 2026-10-07 at the single-PR size gate (~14 files, ~520 LOC as one PR) into TASK-140.5.1 (scribe service: draft, carry forward, pending, stage floor, bot flag), TASK-140.5.2 (/sre incident status-update opens the status-updates modal, loading view first, shows the pending draft rendered by the default comms profile, in-modal localized refusal) and TASK-140.5.3 (Draft button, native Bolt listener, drafting state, drafted, carried-forward or pending result). 140.5.2 was split again the same day when its re-plan reached about 11 files. Each is one Stack H layer and PR. All status-update interaction lives in modals (decisions/incident-management.md), so 'shown only to the invoker' means a private modal, never a channel or ephemeral post.
+
+AC mapping, checked as the subtasks verify them:
+- AC1: 140.5.1 AC1 (one model call, EN and FR, stored as a draft) + 140.5.2 AC1 (modal opens, nothing posted) + 140.5.3 AC1 (Draft button, drafting state, result).
+- AC2: 140.5.1 AC2.
+- AC3: 140.5.1 AC3.
+- AC4: 140.5.1 AC4.
+- AC5: 140.5.2 AC3-AC4 (refusal, EN and FR catalogue for the open flow) + 140.5.3 AC2-AC3 (error mapping and catalogue keys for the Draft flow).
+- AC6: gates of 140.5.1, 140.5.2 and 140.5.3.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes

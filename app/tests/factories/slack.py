@@ -9,10 +9,18 @@ from contracts.slack.reply import SlackReplySender
 
 
 class FakeSlackReply:
-    """Records every reply call and answers each with the same configured result."""
+    """Records every reply call and answers each with the same configured result.
 
-    def __init__(self, result: OperationResult[None] | None = None) -> None:
-        self.result: OperationResult[None] = result or OperationResult.success()
+    For open_view success, returns a canned view id. For errors, returns the configured error.
+    """
+
+    def __init__(self, result: OperationResult[Any] | None = None) -> None:
+        if result is None:
+            # Default success case: open_view gets a view id, others get None
+            self.result = result
+        else:
+            # Keep the provided result as-is; may be error or success with data
+            self.result = result
         self.calls: list[tuple[str, dict[str, Any]]] = []
 
     def post_message(
@@ -24,15 +32,39 @@ class FakeSlackReply:
         icon_url: str | None = None,
     ) -> OperationResult[None]:
         self.calls.append(("post_message", {"channel_id": channel_id, "text": text, "username": username, "icon_url": icon_url}))
-        return self.result
+        # For post_message, if we have a configured result, return it as-is for errors, else default success
+        if self.result is None:
+            return OperationResult.success()
+        if self.result.is_success:
+            return OperationResult.success()  # Discard the data for this call
+        return self.result  # type: ignore[return-value]
 
     def post_ephemeral(self, *, channel_id: str, user_id: str, text: str) -> OperationResult[None]:
         self.calls.append(("post_ephemeral", {"channel_id": channel_id, "user_id": user_id, "text": text}))
-        return self.result
+        # Same as post_message
+        if self.result is None:
+            return OperationResult.success()
+        if self.result.is_success:
+            return OperationResult.success()
+        return self.result  # type: ignore[return-value]
 
-    def open_view(self, *, trigger_id: str, view: dict[str, Any]) -> OperationResult[None]:
+    def open_view(self, *, trigger_id: str, view: dict[str, Any]) -> OperationResult[str]:
         self.calls.append(("open_view", {"trigger_id": trigger_id, "view": view}))
-        return self.result
+        if self.result is None:
+            return OperationResult.success(data="view-id-canned")
+        if self.result.is_success:
+            # If success but has no data, provide canned id
+            return OperationResult.success(data=self.result.data or "view-id-canned")  # type: ignore[arg-type]
+        # Return error as-is
+        return self.result  # type: ignore[return-value]
+
+    def update_view(self, *, view_id: str, view: dict[str, Any], hash: str | None = None) -> OperationResult[None]:
+        self.calls.append(("update_view", {"view_id": view_id, "view": view, "hash": hash}))
+        if self.result is None:
+            return OperationResult.success()
+        if self.result.is_success:
+            return OperationResult.success()
+        return self.result  # type: ignore[return-value]
 
     def calls_to(self, name: str) -> list[dict[str, Any]]:
         return [kwargs for called, kwargs in self.calls if called == name]

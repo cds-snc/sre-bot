@@ -92,6 +92,7 @@ REGISTERED_COMMAND_TREE: dict[str, bool] = {
     "sre.geolocate": False,
     "sre.incident": False,
     "sre.incident.draft": False,
+    "sre.incident.status-update": False,
     "sre.incident.summarize": False,
     "sre.rotations": False,
     "sre.rotations.view": False,
@@ -105,7 +106,7 @@ def test_registered_command_tree_is_unchanged(slack_command_harness: SlackComman
 
     The literal is the whole tree, so an added, lost or replaced node fails
     the test, including the legacy /sre incident handler being shadowed by
-    the auto-generated parent of its draft and summarize children.
+    the auto-generated parent of its draft, summarize and status-update children.
     """
     commands = slack_command_harness.provider._commands
 
