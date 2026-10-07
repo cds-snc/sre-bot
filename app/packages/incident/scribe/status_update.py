@@ -22,7 +22,7 @@ import hashlib
 from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from typing import Any, Protocol, runtime_checkable
+from typing import Any
 
 import structlog
 
@@ -40,12 +40,14 @@ from packages.incident.core.api import (
     get_incident_transcript_reader,
     get_status_update_store,
 )
+from packages.incident.scribe import providers
 from packages.incident.scribe.domain import (
     DraftedFields,
     NoNewInformationWording,
     StatusUpdateDraftOutcome,
     StatusUpdateOutcomeKind,
 )
+from packages.incident.scribe.ports import TextGenerator
 from packages.incident.scribe.settings import IncidentStatusUpdateSettings, get_incident_status_update_settings
 from packages.incident.scribe.status_update_prompt import INSTRUCTIONS, build_transcript, parse_drafted_fields
 
@@ -54,21 +56,6 @@ logger = structlog.get_logger()
 DRAFT_UNPARSEABLE_CODE = "DRAFT_UNPARSEABLE"
 
 _STAGE_ORDER = tuple(StatusUpdateStage)
-
-
-@runtime_checkable
-class TextGenerator(Protocol):
-    """Interface producing text from a transcript and instructions."""
-
-    async def summarize(
-        self,
-        transcript: str,
-        *,
-        instructions: str | None = None,
-        max_output_tokens: int | None = None,
-    ) -> OperationResult[str]:
-        """Return the generated text, or the provider's classified error."""
-        ...
 
 
 def get_pending_status_update(
@@ -333,10 +320,7 @@ def _posted_at(message: TranscriptMessage) -> datetime:
 
 
 def _default_generator() -> TextGenerator:
-    # Imported here: providers imports this module for ``TextGenerator``.
-    from packages.incident.scribe.providers import get_status_update_text_generator
-
-    return get_status_update_text_generator()
+    return providers.get_status_update_text_generator()
 
 
 def _failure[T](result: OperationResult[Any]) -> OperationResult[T]:

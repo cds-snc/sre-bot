@@ -9,9 +9,9 @@ from packages.incident.core.api import TranscriptMessage
 from packages.incident.scribe import providers
 from packages.incident.scribe.adapters.google_docs import GoogleDocsIncidentDocument
 from packages.incident.scribe.domain import DocumentSection, DraftWriteResult
+from packages.incident.scribe.ports import IncidentDocumentStore
 from packages.incident.scribe.service import (
     DOCUMENT_UNREADABLE_CODE,
-    IncidentDocumentStore,
     draft_incident_document,
 )
 

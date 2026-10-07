@@ -26,11 +26,11 @@ platform adapter can reuse it.
 
 import json
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from itertools import pairwise
-from typing import Any, Protocol, runtime_checkable
+from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import structlog
@@ -38,14 +38,15 @@ import structlog
 from contracts.operations import OperationResult
 from integrations.openai import Summarizer, get_summarizer
 from packages.incident.core.api import IncidentTranscriptReader, TranscriptMessage, get_incident_transcript_reader
+from packages.incident.scribe import providers
 from packages.incident.scribe.domain import (
     AI_AUTHOR,
     DocumentField,
     DocumentSection,
     DraftedDocument,
-    DraftWriteResult,
     SectionDraft,
 )
+from packages.incident.scribe.ports import IncidentDocumentStore, IncidentReportLinkLookup
 from packages.incident.scribe.settings import (
     IncidentDraftSettings,
     IncidentSummarySettings,
@@ -220,43 +221,6 @@ _LIST_HEADING_MARKERS = (
 )
 
 
-@runtime_checkable
-class IncidentDocumentStore(Protocol):
-    """Behavior contract for reading the incident document and creating the draft."""
-
-    def read_sections(self, document_id: str) -> list[DocumentSection]:
-        """Return the document's sections in document order (empty on failure)."""
-        ...
-
-    def write_draft_document(
-        self,
-        source_document_id: str,
-        drafts: Sequence[SectionDraft],
-        fields: Sequence[DocumentField],
-        links: Mapping[str, str],
-    ) -> DraftWriteResult | None:
-        """Write the draft document (creating or rewriting it); ``None`` on failure."""
-        ...
-
-
-@runtime_checkable
-class IncidentReportLinkLookup(Protocol):
-    """Interface finding where an incident conversation's report lives.
-
-    Implementations never raise for a platform failure: they log it and return
-    no links.
-    """
-
-    def find_report_links(self, conversation_id: str) -> Sequence[str]:
-        """Return the links the conversation holds to its incident report.
-
-        The links are plain strings in the order the platform lists them; a
-        report entry with no link is an empty string. Empty when the
-        conversation has no report entry or the platform lookup failed.
-        """
-        ...
-
-
 async def draft_incident_document_from_conversation(
     conversation_id: str,
     *,
@@ -291,9 +255,7 @@ async def draft_incident_document_from_conversation(
     log = logger.bind(operation="draft_incident_document_from_conversation", conversation_id=conversation_id)
 
     if report_links is None:
-        from packages.incident.scribe.providers import get_incident_report_link_lookup
-
-        report_links = get_incident_report_link_lookup()
+        report_links = providers.get_incident_report_link_lookup()
 
     document_id = _find_report_document_id(report_links.find_report_links(conversation_id), log)
     if document_id is None:
@@ -352,9 +314,7 @@ async def draft_incident_document(
     )
 
     if documents is None:
-        from packages.incident.scribe.providers import get_incident_document_store
-
-        documents = get_incident_document_store()
+        documents = providers.get_incident_document_store()
 
     sections = [s for s in documents.read_sections(document_id) if not _is_human_only(s.heading)]
     if not sections:
