@@ -63,6 +63,7 @@ _SUMMARY_DOMAIN = "incident_summary"
 _STATUS_UPDATE_DOMAIN = "incident_status_update"
 _SLACK_TEXT_LIMIT = 3000
 DRAFT_ACTION_ID = "incident.scribe.status_update.draft"
+CONFIRM_ACTION_ID = "incident.scribe.status_update.draft_confirmed"
 _SINCE_UNITS = {"m": 60, "h": 3600, "d": 86400}
 
 # Slack renders its own "mrkdwn", not standard/GitHub Markdown: headers (``#``)
@@ -644,6 +645,42 @@ def _draft_button_block(locale: str) -> dict[str, Any]:
             }
         ],
     }
+
+
+def build_security_confirmation_view(locale: str, private_metadata: str) -> dict[str, Any]:
+    """Build the modal asking the responder to confirm drafting for a security or unknown-flag incident.
+
+    The Confirm and draft button re-runs the draft with confirmation; the
+    view's Cancel close button closes the modal without a model call.
+    """
+    fr = locale.startswith("fr")
+    text = _status_t(
+        "security_confirmation",
+        locale,
+        "Cet incident est, ou pourrait être, un incident de sécurité. La rédaction envoie le contenu du canal de "
+        "l'incident et des communications au modèle d'IA. Voulez-vous continuer?"
+        if fr
+        else "This incident is, or may be, a security incident. Drafting sends the incident channel and comms content "
+        "to the AI model. Do you want to continue?",
+    )
+    confirm_block = {
+        "type": "actions",
+        "block_id": "draft_confirm_button",
+        "elements": [
+            {
+                "type": "button",
+                "action_id": CONFIRM_ACTION_ID,
+                "text": {
+                    "type": "plain_text",
+                    "text": _status_t("confirm_button", locale, "Confirmer et rédiger" if fr else "Confirm and draft"),
+                },
+                "style": "primary",
+            }
+        ],
+    }
+    view = _status_update_view(locale, private_metadata, [*_mrkdwn_blocks(text), confirm_block], close=False)
+    view["close"] = {"type": "plain_text", "text": _status_t("cancel", locale, "Annuler" if fr else "Cancel")}
+    return view
 
 
 def build_drafting_view(locale: str, private_metadata: str) -> dict[str, Any]:

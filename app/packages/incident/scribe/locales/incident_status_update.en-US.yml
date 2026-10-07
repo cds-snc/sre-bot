@@ -31,3 +31,6 @@ incident_status_update:
   unparseable: "I couldn't turn the model's answer into a status update. Please try again."
   conflict: "Another status update was saved at the same time. Please try again."
   no_new_information: "No new information since the last update."
+  security_confirmation: "This incident is, or may be, a security incident. Drafting sends the incident channel and comms content to the AI model. Do you want to continue?"
+  confirm_button: "Confirm and draft"
+  cancel: "Cancel"

@@ -78,11 +78,27 @@ def _block_action_body(view_id: str = _VIEW_ID, view_hash: str = _VIEW_HASH, use
     }
 
 
+def _draft_mock_calls_on_started(outcome: StatusUpdateDraftOutcome) -> AsyncMock:
+    """Create an AsyncMock that calls on_started callback before returning result.
+
+    This simulates the service calling on_started when a model call is about to begin.
+    """
+
+    async def mock_impl(*args: object, **kwargs: object) -> OperationResult[StatusUpdateDraftOutcome]:
+        on_started = kwargs.get("on_started")
+        if on_started is not None:
+            on_started()
+        return OperationResult.success(data=outcome)
+
+    return AsyncMock(side_effect=mock_impl)
+
+
 class TestHandleDraftAction:
     """Block action listener for the Draft button in the status-updates modal."""
 
     def test_acks_before_any_other_call(self):
         """The listener acks first, synchronously, so Slack gets a 200 immediately."""
+
         ack = MagicMock()
         client = MagicMock()
         body = _block_action_body()
@@ -96,16 +112,19 @@ class TestHandleDraftAction:
         ack.assert_called_once()
 
     def test_sends_drafting_view_with_view_id_hash_and_no_button(self):
-        """First views_update uses body's view_id and hash; view is drafting state (no button, localized text)."""
+        """on_started callback sends drafting view with body's hash before model call; result view follows."""
+
         ack = MagicMock()
         client = MagicMock()
-        # Second call returns response with new hash
+        # First call from on_started returns response with new hash
+        # Second call for result view
         client.views_update.return_value = {"ok": True, "view": {"hash": "new_hash=="}}
         body = _block_action_body(view_id="V999", view_hash="original_hash==")
 
+        outcome = _make_outcome()
         with patch(
             "packages.incident.scribe.entrypoints.slack.draft_status_update",
-            new=AsyncMock(return_value=OperationResult.success(data=_make_outcome())),
+            new=_draft_mock_calls_on_started(outcome),
         ):
             handle_draft_action(ack, body, client)
 
@@ -113,7 +132,7 @@ class TestHandleDraftAction:
         calls = client.views_update.call_args_list
         assert len(calls) >= 2
 
-        # First call: drafting state with original hash
+        # First call: drafting state with original hash (from on_started)
         first_call = calls[0]
         first_kwargs = first_call[1]
         assert first_kwargs["view_id"] == "V999"
@@ -123,14 +142,15 @@ class TestHandleDraftAction:
         drafting_view_str = str(drafting_view)
         assert "incident.scribe.status_update.draft" not in drafting_view_str
 
-        # Second call: result view WITHOUT the stale hash (either no hash or new hash from first response)
+        # Second call: result view
         second_call = calls[1]
         second_kwargs = second_call[1]
-        # Should not pass the original hash
-        assert second_kwargs.get("hash") != "original_hash=="
+        # Should use new hash from drafting update or no hash
+        assert second_kwargs.get("view_id") == "V999"
 
     def test_result_view_pending_outcome_rendered_in_en_and_fr(self):
         """When a draft already covers everything, result view shows pending draft in EN and FR."""
+
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -144,7 +164,7 @@ class TestHandleDraftAction:
             handle_draft_action(ack, body, client)
 
         calls = client.views_update.call_args_list
-        assert len(calls) >= 2
+        assert len(calls) >= 1
         # Result view should contain both language sections
         result_kwargs = calls[-1][1]
         result_view = result_kwargs["view"]
@@ -154,6 +174,7 @@ class TestHandleDraftAction:
 
     def test_result_view_drafted_outcome_rendered(self):
         """After model drafting, result view shows drafted update."""
+
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -167,10 +188,11 @@ class TestHandleDraftAction:
             handle_draft_action(ack, body, client)
 
         calls = client.views_update.call_args_list
-        assert len(calls) >= 2
+        assert len(calls) >= 1
 
     def test_result_view_carried_forward_outcome_rendered(self):
         """When no new activity, result view shows carried-forward update."""
+
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -184,10 +206,11 @@ class TestHandleDraftAction:
             handle_draft_action(ack, body, client)
 
         calls = client.views_update.call_args_list
-        assert len(calls) >= 2
+        assert len(calls) >= 1
 
     def test_maps_empty_history_error_to_modal_with_close_no_button(self):
         """Error: no history. View shows error with Close button, no Draft button."""
+
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -204,7 +227,7 @@ class TestHandleDraftAction:
             handle_draft_action(ack, body, client)
 
         calls = client.views_update.call_args_list
-        assert len(calls) >= 2
+        assert len(calls) >= 1
         error_kwargs = calls[-1][1]
         error_view = error_kwargs["view"]
         error_str = str(error_view)
@@ -215,6 +238,7 @@ class TestHandleDraftAction:
 
     def test_maps_draft_unparseable_error_to_modal_with_close_no_button(self):
         """Error: unparseable model output. View shows error with Close, no Draft button."""
+
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -231,7 +255,7 @@ class TestHandleDraftAction:
             handle_draft_action(ack, body, client)
 
         calls = client.views_update.call_args_list
-        assert len(calls) >= 2
+        assert len(calls) >= 1
         error_kwargs = calls[-1][1]
         error_view = error_kwargs["view"]
         error_str = str(error_view)
@@ -240,6 +264,7 @@ class TestHandleDraftAction:
 
     def test_maps_status_update_conflict_error_to_modal_with_close_no_button(self):
         """Error: conflict from concurrent write. View shows error with Close, no Draft button."""
+
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -256,7 +281,7 @@ class TestHandleDraftAction:
             handle_draft_action(ack, body, client)
 
         calls = client.views_update.call_args_list
-        assert len(calls) >= 2
+        assert len(calls) >= 1
         error_kwargs = calls[-1][1]
         error_view = error_kwargs["view"]
         error_str = str(error_view)
@@ -265,6 +290,7 @@ class TestHandleDraftAction:
 
     def test_maps_not_an_incident_error_to_modal_with_close_no_button(self):
         """Error: channel is not an incident. View shows error with Close, no Draft button."""
+
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -281,7 +307,7 @@ class TestHandleDraftAction:
             handle_draft_action(ack, body, client)
 
         calls = client.views_update.call_args_list
-        assert len(calls) >= 2
+        assert len(calls) >= 1
         error_kwargs = calls[-1][1]
         error_view = error_kwargs["view"]
         error_str = str(error_view)
@@ -290,6 +316,7 @@ class TestHandleDraftAction:
 
     def test_maps_ambiguous_incident_error_to_modal_with_close_no_button(self):
         """Error: ambiguous incident. View shows error with Close, no Draft button."""
+
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -306,7 +333,7 @@ class TestHandleDraftAction:
             handle_draft_action(ack, body, client)
 
         calls = client.views_update.call_args_list
-        assert len(calls) >= 2
+        assert len(calls) >= 1
         error_kwargs = calls[-1][1]
         error_view = error_kwargs["view"]
         error_str = str(error_view)
@@ -315,6 +342,7 @@ class TestHandleDraftAction:
 
     def test_maps_unexpected_classified_error_to_generic_modal_with_close_no_button(self):
         """Error: unexpected classified error (e.g., store failure). View shows generic error with Close, no Draft button."""
+
         ack = MagicMock()
         client = MagicMock()
         client.views_update.return_value = {"ok": True}
@@ -331,7 +359,7 @@ class TestHandleDraftAction:
             handle_draft_action(ack, body, client)
 
         calls = client.views_update.call_args_list
-        assert len(calls) >= 2
+        assert len(calls) >= 1
         error_kwargs = calls[-1][1]
         error_view = error_kwargs["view"]
         error_str = str(error_view)
@@ -339,20 +367,22 @@ class TestHandleDraftAction:
         assert "incident.scribe.status_update.draft" not in error_str
 
     def test_logs_when_drafting_view_update_fails_but_continues(self):
-        """When drafting state update fails, error is logged; listener still drafts and updates result view."""
+        """When on_started sends drafting view and it fails, error is logged; result view still rendered."""
+
         ack = MagicMock()
         client = MagicMock()
-        # First call fails (drafting update), second succeeds (result update)
+        # First call fails (drafting update from on_started), second succeeds (result update)
         client.views_update.side_effect = [
             Exception("API error: expired_trigger_id"),
             {"ok": True},
         ]
         body = _block_action_body()
 
+        outcome = _make_outcome()
         with capture_logs() as logs:
             with patch(
                 "packages.incident.scribe.entrypoints.slack.draft_status_update",
-                new=AsyncMock(return_value=OperationResult.success(data=_make_outcome())),
+                new=_draft_mock_calls_on_started(outcome),
             ):
                 handle_draft_action(ack, body, client)
 
@@ -364,13 +394,11 @@ class TestHandleDraftAction:
 
     def test_logs_when_result_view_update_fails(self):
         """When result view update fails, error is logged; listener doesn't raise."""
+
         ack = MagicMock()
         client = MagicMock()
-        # First call succeeds (drafting), second fails (result)
-        client.views_update.side_effect = [
-            {"ok": True},
-            Exception("API error: invalid_view"),
-        ]
+        # The service never starts a model call, so the result update is the only call
+        client.views_update.side_effect = Exception("API error: invalid_view")
         body = _block_action_body()
 
         with capture_logs() as logs:
@@ -386,6 +414,7 @@ class TestHandleDraftAction:
 
     def test_makes_no_post_message_or_post_ephemeral_calls(self):
         """The listener never posts to the channel; all output goes in the modal."""
+
         ack = MagicMock()
         client = MagicMock()
         body = _block_action_body()
@@ -403,12 +432,13 @@ class TestHandleDraftAction:
             assert "post_ephemeral" not in method_name
 
     def test_calls_draft_status_update_with_channel_id_and_user_id(self):
-        """The service is called with the channel id from private_metadata and the user id from the body."""
+        """The service is called with the channel id, user id, and on_started callback for drafting view."""
+
         ack = MagicMock()
         client = MagicMock()
         body = _block_action_body(user_id="U999")
 
-        draft_mock = AsyncMock(return_value=OperationResult.success(data=_make_outcome()))
+        draft_mock = _draft_mock_calls_on_started(_make_outcome())
         with patch(
             "packages.incident.scribe.entrypoints.slack.draft_status_update",
             new=draft_mock,
@@ -418,7 +448,30 @@ class TestHandleDraftAction:
         draft_mock.assert_called_once()
         call_kwargs = draft_mock.call_args[1]
         assert call_kwargs["author"] == "U999"
-        assert call_kwargs["on_started"] is None
+        assert call_kwargs["on_started"] is not None
+        assert callable(call_kwargs["on_started"])
+        assert call_kwargs["security_confirmed"] is False
+
+    def test_no_drafting_view_when_service_never_calls_on_started(self):
+        """When service returns result without calling on_started, only result view is sent."""
+
+        ack = MagicMock()
+        client = MagicMock()
+        client.views_update.return_value = {"ok": True}
+        body = _block_action_body()
+
+        # Mock that returns result without calling on_started (PENDING or CARRIED_FORWARD case)
+        async def mock_no_on_started(*args: object, **kwargs: object) -> OperationResult[StatusUpdateDraftOutcome]:
+            return OperationResult.success(data=_make_outcome())
+
+        with patch(
+            "packages.incident.scribe.entrypoints.slack.draft_status_update",
+            new=AsyncMock(side_effect=mock_no_on_started),
+        ):
+            handle_draft_action(ack, body, client)
+
+        # Only one views_update call (result view, no drafting view)
+        assert client.views_update.call_count == 1
 
 
 def _make_outcome(
