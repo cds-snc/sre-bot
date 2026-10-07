@@ -13,6 +13,7 @@ import pytest
 from botocore.exceptions import ClientError
 
 from contracts.operations import OperationResult, OperationStatus
+from models.incidents import Incident
 from modules.incident import db_operations
 from packages.aws_platform.adapters.dynamodb import DynamoDBAdapter
 
@@ -554,8 +555,6 @@ def test_get_incident_by_channel_id_propagates_when_lookup_fails(logger_mock):
 
 def test_incident_model_accepts_security_incident_true():
     """Incident model accepts security_incident=True."""
-    from models.incidents import Incident
-
     incident = Incident(
         channel_id="C123",
         channel_name="test-channel",
@@ -571,8 +570,6 @@ def test_incident_model_accepts_security_incident_true():
 
 def test_incident_model_accepts_security_incident_false():
     """Incident model accepts security_incident=False."""
-    from models.incidents import Incident
-
     incident = Incident(
         channel_id="C123",
         channel_name="test-channel",
@@ -588,8 +585,6 @@ def test_incident_model_accepts_security_incident_false():
 
 def test_incident_model_accepts_security_incident_none():
     """Incident model accepts security_incident=None."""
-    from models.incidents import Incident
-
     incident = Incident(
         channel_id="C123",
         channel_name="test-channel",
@@ -605,8 +600,6 @@ def test_incident_model_accepts_security_incident_none():
 
 def test_incident_model_accepts_missing_security_incident():
     """Incident model validates without security_incident field (defaults to None)."""
-    from models.incidents import Incident
-
     incident = Incident(
         channel_id="C123",
         channel_name="test-channel",

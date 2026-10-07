@@ -3,7 +3,7 @@ id: doc-5
 title: Stack H handoff
 type: guide
 created_date: '2026-10-07 14:30'
-updated_date: '2026-10-07 19:28'
+updated_date: '2026-10-07 19:35'
 ---
 # Stack H handoff
 
@@ -22,8 +22,8 @@ updated_date: '2026-10-07 19:28'
 | 1 | TASK-140.4 status-update records and table | `task-140.4-status-update-records` | [#1544](https://github.com/cds-snc/sre-bot/pull/1544) | merged | Squash-merged 2026-10-07 as f3525fd8; Terraform table `sre_bot_incident_status_updates` and IAM grant applied by the merge workflow. |
 | 2 | TASK-140.5.1 status-update draft service | `stack-h/task-140.5-status-update-draft` | [#1545](https://github.com/cds-snc/sre-bot/pull/1545) | merged | Squash-merged 2026-10-07 as 6c3c57a0. Included the DynamoDB Local table in `.devcontainer/dynamodb-create.sh` and the bot-message fix in `core/adapters/slack.py`. |
 | 3 | TASK-140.5.2 command opens the status-updates modal with the pending draft | `stack-h/task-140.5.2-status-updates-modal` | [#1547](https://github.com/cds-snc/sre-bot/pull/1547) | in review | Base `main`, rebased onto 6c3c57a0. Commits: modal (5b158387), "Fix status-update command dispatch" (1d7db039, was 5b2b94be before the rebase: the command was registered with `arguments=[]`, so the provider called the handler with the payload only; covered by `test_incident_scribe_status_update_dispatch.py` through a real `SlackPlatformProvider`), and `chore: fmt` (ac5f7531). Loading view then `update_view`; `scribe/comms_profile.py`, `get_pending_status_update`, Slack contract change (`open_view` returns the view id, `update_view`, `MISSING_VIEW_ID`). |
-| 4 | TASK-140.5.3 Draft button and drafting state | `stack-h/task-140.5.3-status-update-draft-button` | [#1548](https://github.com/cds-snc/sre-bot/pull/1548) | in review | Commit 57bd2965. Creates `scribe/entrypoints/slack.py` (block action `incident.scribe.status_update.draft`) and an autouse `get_slack_provider` cache-clear fixture in `tests/conftest.py`. CI `tests` fails on `fmt-ci` only: `packages/incident/scribe/entrypoints/slack.py` needs `ruff format` (one `logger.bind` line); fix on this layer (Next actions). |
-| 5 | TASK-140.10.1 store and read the security flag | `stack-h/task-140.6-status-update-approve` (name kept: `gh stack modify` cannot rename it) | - | in progress | Plan approved 2026-10-07; implemented, ACs 1-5 checked, gates green (notes in the task); uncommitted. Rollback: never revert the `Incident` field (extra forbid); revert only the declare write. |
+| 4 | TASK-140.5.3 Draft button and drafting state | `stack-h/task-140.5.3-status-update-draft-button` | [#1548](https://github.com/cds-snc/sre-bot/pull/1548) | in review | Commits 57bd2965 and `chore: fmt` b7e758fa (fixed the CI `fmt-ci` failure). Creates `scribe/entrypoints/slack.py` (block action `incident.scribe.status_update.draft`) and an autouse `get_slack_provider` cache-clear fixture in `tests/conftest.py`. Do not deploy before layer 6 merges. |
+| 5 | TASK-140.10.1 store and read the security flag | `stack-h/task-140.6-status-update-approve` (name kept: `gh stack modify` cannot rename it) | [#1549](https://github.com/cds-snc/sre-bot/pull/1549) | in review | Commit 5112b599 plus a pending commit moving 4 function-level test imports to module top (`test_db_operations.py`). ACs 1-5 checked, gates in the task notes. Rollback: never revert the `Incident` field (extra forbid); revert only the declare write. |
 | 6 | TASK-140.10.2 confirm before drafting a security or unknown-flag incident | `stack-h/task-140.10.2-security-draft-confirm` | - | planned | No plan yet. Confirmation view, gate in `draft_status_update`, drafting view moves to `on_started`, decision record update. #1548 must not deploy before this merges. |
 | 7 | TASK-140.6.1 approve service and copy-ready publisher | `stack-h/task-140.6.1-status-update-approve` | - | planned | No plan yet. Platform-neutral; approval stops at APPROVED. |
 | 8 | TASK-140.6.2 review modal and copy-ready view | `stack-h/task-140.6.2-status-update-review` | - | planned | No plan yet. Review button, views.update in place, preformatted copy-ready text. |
@@ -34,30 +34,22 @@ TASK-140.5 and TASK-140.6 are coordinators with no branch (140.6 split 2026-10-0
 
 ## Position
 
-- Checked out: `stack-h/task-140.6-status-update-approve` (layer 5). Uncommitted, all for layer 5: TASK-140.10.1 production code and tests under `app/`, plus backlog edits from this session (doc-5, DRAFT-10, TASK-140.6/140.8/140.10/140.11/140.12 and the new 140.6.1, 140.6.2, 140.10.1, 140.10.2 task files).
-- Stack #1546: #1544 and #1545 merged; #1547 (base `main`) <- #1548 <- layer 5. #1547 and #1548 open, review required. #1548's CI fails on formatting only.
-- Gates on layer 5 (2026-10-07): ruff check clean; ruff format clean except layer 4's file; lint-imports 10 kept; mypy 0 new errors (9 pre-existing in `modules/incident/core.py` on untouched lines); `make test` green; incident suites 955 passed.
+- Checked out: `stack-h/task-140.6-status-update-approve` (layer 5). Uncommitted, all for layer 5: `app/tests/modules/incident/test_db_operations.py` (4 `from models.incidents import Incident` moved to module top; ruff check/format clean, tests deliberately not re-run as the change is import placement only) and this doc.
+- Stack #1546: #1544 and #1545 merged; #1547 (base `main`) <- #1548 <- #1549. All three open, review required.
+- Function-level imports: ruff `PLC0415` is not selected in `app/pyproject.toml`, so gates miss them. Layers 3-4 test files still have 18 (`tests/conftest.py:67`, `test_incident_scribe_status_update_entrypoint.py` x16, `test_incident_scribe_status_update_slack.py` x1); left as is by the human on 2026-10-07. Enabling the rule repo-wide is a separate branch off `main`, independent of this stack, run by the human later.
 - No background agents.
 
 ## Next actions
 
-1. **human**: commit layer 5:
+1. **human**: commit the layer 5 import fix and push:
    ```bash
    git add app backlog
-   git commit -m "Store and read the incident security flag"
-   ```
-2. **human**: fix layer 4's formatting, restack, push and open layer 5's PR:
-   ```bash
-   gh stack checkout stack-h/task-140.5.3-status-update-draft-button
-   (cd app && uv run ruff format packages/incident/scribe/entrypoints/slack.py)
-   git commit -am "chore: fmt"
-   gh stack rebase
+   git commit -m "Move test imports to module top"
    gh stack submit
-   gh stack checkout stack-h/task-140.6-status-update-approve
    ```
-3. **human**: add layer 6: `gh stack add stack-h/task-140.10.2-security-draft-confirm`.
-4. **agent**: plan TASK-140.10.2 on layer 6 with the task-planner agent; wait for approval. Then 140.6.1 and 140.6.2.
-5. **human**: reviews; merge #1547 when approved. Do not merge/deploy #1548 until layer 6 (140.10.2) can merge right after it.
+2. **human**: add layer 6: `gh stack add stack-h/task-140.10.2-security-draft-confirm`.
+3. **agent**: plan TASK-140.10.2 on layer 6 with the task-planner agent (tell it: imports at module top level only, tests included); ask questions in chat and wait for approval. Then 140.6.1 and 140.6.2.
+4. **human**: reviews; merge #1547 when approved. Do not merge/deploy #1548 until layer 6 (140.10.2) can merge right after it.
 
 Merging: bottom-up, one layer at a time, with a re-approval for each rebased layer (doc-2 rule; whole-stack merges fail on `main`).
 
