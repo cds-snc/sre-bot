@@ -79,6 +79,7 @@ class TestWebApiCalls:
 
     def test_open_view_passes_the_trigger_and_view(self) -> None:
         client = MagicMock()
+        client.views_open.return_value = {"view": {"id": "V1"}}
         view = {"type": "modal"}
 
         result = _provider(client).reply.open_view(trigger_id="T1", view=view)

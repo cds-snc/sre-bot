@@ -71,6 +71,39 @@ class TextGenerator(Protocol):
         ...
 
 
+def get_pending_status_update(
+    conversation_id: str,
+    *,
+    lookup: IncidentLookup | None = None,
+    store: StatusUpdateStore | None = None,
+) -> OperationResult[StatusUpdate | None]:
+    """Return the incident's pending draft, without drafting anything.
+
+    Args:
+        conversation_id: The incident conversation the command ran in.
+        lookup: Resolves the conversation to its incident; core's by default.
+        store: Holds the incident's status updates; core's by default.
+
+    Returns:
+        Success with the latest record when it is a draft, or ``None`` when
+        there is no record or the latest is not a draft. Otherwise the lookup's
+        refusal (``NOT_AN_INCIDENT``, ``AMBIGUOUS_INCIDENT_CONVERSATION``) or
+        the store's classified error.
+    """
+    lookup = lookup or get_incident_lookup()
+    incident = lookup.find_incident_for_conversation(conversation_id)
+    if not incident.is_success or incident.data is None:
+        return _failure(incident)
+
+    store = store or get_status_update_store()
+    listed = store.list_for_incident(incident.data)
+    if not listed.is_success or listed.data is None:
+        return _failure(listed)
+    latest = listed.data[0] if listed.data else None
+    pending = latest if latest is not None and latest.state is StatusUpdateState.DRAFT else None
+    return OperationResult.success(data=pending)
+
+
 async def draft_status_update(
     conversation_id: str,
     *,

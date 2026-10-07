@@ -43,7 +43,8 @@ class FakeSlackClient:
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.replies: dict[str, dict[str, Any] | Exception] = {
-            "auth_test": {"ok": True, "user_id": "UBOT", "bot_id": "BBOT", "user": "sre-bot"}
+            "auth_test": {"ok": True, "user_id": "UBOT", "bot_id": "BBOT", "user": "sre-bot"},
+            "views_open": {"ok": True, "view": {"id": "VFAKE"}},
         }
 
     def __getattr__(self, name: str) -> Callable[..., dict[str, Any]]:

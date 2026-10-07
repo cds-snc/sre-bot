@@ -70,12 +70,35 @@ class SlackWebReply:
             lambda client: client.chat_postEphemeral(channel=channel_id, user=user_id, text=text),
         )
 
-    def open_view(self, *, trigger_id: str, view: dict[str, Any]) -> OperationResult[None]:
-        """Open a modal view for the interaction identified by ``trigger_id``."""
-        return self._call("views_open", lambda client: client.views_open(trigger_id=trigger_id, view=view))
+    def open_view(self, *, trigger_id: str, view: dict[str, Any]) -> OperationResult[str]:
+        """Open a modal view and return its id."""
+        response = self._request("views_open", lambda client: client.views_open(trigger_id=trigger_id, view=view))
+        if not response.is_success:
+            return _carry_error(response)
+        view_id = _view_id(response.data)
+        if view_id is None:
+            return OperationResult.permanent_error(
+                "Slack views_open returned no view id",
+                error_code=ErrorCode.MISSING_VIEW_ID,
+            )
+        return OperationResult.success(data=view_id)
+
+    def update_view(self, *, view_id: str, view: dict[str, Any], hash: str | None = None) -> OperationResult[None]:  # noqa: A002 -- Slack's parameter name
+        """Replace an open modal view."""
+        return self._call(
+            "views_update",
+            lambda client: client.views_update(view=view, view_id=view_id, hash=hash),
+        )
 
     def _call(self, method: str, call: Callable[[WebClient], object]) -> OperationResult[None]:
-        """Run one Web API call and turn any failure into an error result."""
+        """Run one Web API call whose response is not needed."""
+        result = self._request(method, call)
+        if result.is_success:
+            return OperationResult.success()
+        return _carry_error(result)
+
+    def _request(self, method: str, call: Callable[[WebClient], object]) -> OperationResult[Any]:
+        """Run one Web API call and return its response, or turn any failure into an error result."""
         client = self._client()
         if client is None:
             return OperationResult.permanent_error(
@@ -84,7 +107,7 @@ class SlackWebReply:
             )
 
         try:
-            call(client)
+            response = call(client)
         except SlackApiError as exc:
             return _classified(method, exc)
         except Exception as exc:  # noqa: BLE001 - a reply failure is reported to the handler, never raised
@@ -95,7 +118,27 @@ class SlackWebReply:
                 error_code=ErrorCode.UNEXPECTED_ERROR,
                 cause=exc,
             )
-        return OperationResult.success()
+        return OperationResult.success(data=response)
+
+
+def _carry_error[T](result: OperationResult[Any]) -> OperationResult[T]:
+    """Carry an error result's classification over to another payload type."""
+    return OperationResult(
+        status=result.status,
+        message=result.message,
+        error_code=result.error_code,
+        retry_after=result.retry_after,
+        cause=result.cause,
+    )
+
+
+def _view_id(response: Any) -> str | None:
+    """Read ``view.id`` from a Slack ``views.open`` response, or ``None`` when absent."""
+    try:
+        view_id = response["view"]["id"]
+    except KeyError, TypeError:
+        return None
+    return view_id if isinstance(view_id, str) and view_id else None
 
 
 def _classified(method: str, exc: SlackApiError) -> OperationResult[None]:
