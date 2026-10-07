@@ -49,6 +49,7 @@ def pytest_configure(config):
         self.view = MagicMock()
         self.action = MagicMock()
         self.event = MagicMock()
+        self.error = MagicMock()
         self.middleware = MagicMock()
         self.add_middleware = MagicMock()
         self.add_event_handler = MagicMock()

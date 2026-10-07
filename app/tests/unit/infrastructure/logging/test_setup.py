@@ -9,12 +9,16 @@ Tests cover:
   surfaced in production, see decisions/observability.md)
 """
 
+import io
+import json
 import logging
+from collections.abc import Iterator
 
 import pytest
 import structlog
 from structlog.testing import capture_logs
 
+from infrastructure.logging import setup as logging_setup
 from infrastructure.logging.settings import LoggingSettings
 from infrastructure.logging.setup import (
     _build_base_processors,
@@ -198,6 +202,64 @@ class TestPipelineRedaction:
         assert entries[0]["password"] == "***REDACTED***"
 
 
+def _root_renderer() -> object:
+    """Return the final renderer of the root handler's structlog formatter."""
+    formatter = logging.getLogger().handlers[0].formatter
+    assert isinstance(formatter, structlog.stdlib.ProcessorFormatter)
+    return formatter.processors[-1]
+
+
+@pytest.fixture
+def production_logging(mock_settings, monkeypatch) -> Iterator[io.StringIO]:
+    """Configure the real production pipeline writing to a buffer, then restore root logging and structlog."""
+    root = logging.getLogger()
+    saved_handlers, saved_level = root.handlers[:], root.level
+    saved_config = structlog.get_config()
+    monkeypatch.setattr(logging_setup, "_is_test_environment", lambda: False)
+    monkeypatch.setattr(logging_setup, "get_logging_settings", LoggingSettings)
+    mock_settings.ENVIRONMENT = "production"
+    configure_logging(settings=mock_settings)
+    stream = io.StringIO()
+    handler = root.handlers[0]
+    assert isinstance(handler, logging.StreamHandler)
+    handler.setStream(stream)
+    yield stream
+    root.handlers, root.level = saved_handlers, saved_level
+    structlog.configure(**saved_config)
+
+
+@pytest.mark.unit
+class TestStdlibLoggingBridge:
+    """Third-party stdlib loggers render through the structlog JSON pipeline in production."""
+
+    def test_stdlib_exception_renders_as_one_json_line_with_level_and_logger(self, production_logging):
+        """A third-party stdlib ``logger.exception`` becomes a single JSON object carrying level, logger and traceback.
+
+        Uses a logger name no other test configures; Bolt pins its own loggers' levels when an App is built.
+        """
+        try:
+            raise RuntimeError("boom")
+        except RuntimeError:
+            logging.getLogger("third_party.sdk").exception("Failed to run listener function")
+
+        lines = production_logging.getvalue().strip().splitlines()
+        assert len(lines) == 1
+        record = json.loads(lines[0])
+        assert record["level"] == "error"
+        assert record["logger"] == "third_party.sdk"
+        assert record["event"] == "Failed to run listener function"
+        assert "RuntimeError: boom" in record["exception"]
+
+    def test_structlog_events_still_render_as_redacted_json(self, production_logging):
+        """Native structlog events keep their fields and redaction after moving rendering to the handler."""
+        structlog.get_logger().error("structlog_event", api_token="secret")
+
+        record = json.loads(production_logging.getvalue().strip())
+        assert record["event"] == "structlog_event"
+        assert record["level"] == "error"
+        assert record["api_token"] == "***REDACTED***"
+
+
 @pytest.mark.unit
 class TestConfigureLoggingRealCodePath:
     """Exercises configure_logging's non-test-environment branch.
@@ -213,7 +275,10 @@ class TestConfigureLoggingRealCodePath:
 
     @pytest.fixture(autouse=True)
     def _reset_structlog(self):
+        root = logging.getLogger()
+        saved_handlers, saved_level = root.handlers[:], root.level
         yield
+        root.handlers, root.level = saved_handlers, saved_level
         structlog.reset_defaults()
 
     def test_production_mode_builds_processors_without_error(self, mock_settings, monkeypatch):
@@ -224,8 +289,7 @@ class TestConfigureLoggingRealCodePath:
         logger = configure_logging(settings=mock_settings)
 
         assert logger is not None
-        config = structlog.get_config()
-        assert isinstance(config["processors"][-1], structlog.processors.JSONRenderer)
+        assert isinstance(_root_renderer(), structlog.processors.JSONRenderer)
 
     def test_development_mode_builds_processors_without_error(self, mock_settings, monkeypatch):
         """The real code path builds the pipeline in development mode without raising."""
@@ -235,8 +299,7 @@ class TestConfigureLoggingRealCodePath:
         logger = configure_logging(settings=mock_settings)
 
         assert logger is not None
-        config = structlog.get_config()
-        assert isinstance(config["processors"][-1], structlog.dev.ConsoleRenderer)
+        assert isinstance(_root_renderer(), structlog.dev.ConsoleRenderer)
 
     def test_production_mode_redacts_through_full_pipeline(self, mock_settings, monkeypatch):
         """Secrets are redacted end-to-end when the production pipeline is built for real."""

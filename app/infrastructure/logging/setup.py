@@ -204,26 +204,36 @@ def configure_logging(
     processors = _build_base_processors(logging_settings=resolved_logging_settings)
 
     # 6. Final rendering (environment-specific)
+    renderers: list[Any] = [structlog.stdlib.ProcessorFormatter.remove_processors_meta]
     if not prod_mode:  # Development mode
         # Pretty exceptions with colors (requires rich or better-exceptions)
         with contextlib.suppress(ImportError):
-            processors.append(structlog.processors.ExceptionPrettyPrinter())
-        processors.append(structlog.dev.ConsoleRenderer())
+            renderers.append(structlog.processors.ExceptionPrettyPrinter())
+        renderers.append(structlog.dev.ConsoleRenderer())
     else:  # Production mode
-        processors.append(structlog.processors.JSONRenderer())
+        renderers.append(structlog.processors.JSONRenderer())
 
     structlog.configure(
-        processors=processors,
+        processors=[
+            *processors,
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
         logger_factory=structlog.stdlib.LoggerFactory(),
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
 
-    # Configure standard logging
-    effective_log_level = log_level or settings.LOG_LEVEL
-    logging.basicConfig(
-        format="%(message)s",
-        level=getattr(logging, effective_log_level.upper(), logging.INFO),
+    # Render stdlib records (slack_bolt, slack_sdk, botocore, ...) through the same pipeline.
+    handler = logging.StreamHandler()
+    handler.setFormatter(
+        structlog.stdlib.ProcessorFormatter(
+            foreign_pre_chain=[structlog.stdlib.add_logger_name, *processors],
+            processors=renderers,
+        )
     )
+    effective_log_level = log_level or settings.LOG_LEVEL
+    root_logger = logging.getLogger()
+    root_logger.handlers = [handler]
+    root_logger.setLevel(getattr(logging, effective_log_level.upper(), logging.INFO))
 
     return structlog.stdlib.get_logger()
