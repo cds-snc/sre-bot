@@ -212,7 +212,7 @@ def mock_sns_signature_validation_disabled(monkeypatch):
     """Disable SNS signature validation in tests to allow deterministic fake payloads."""
     mock = MagicMock(return_value=None)
     monkeypatch.setattr(
-        "modules.webhooks.aws_sns.sns_message_validator.validate_message",
+        "modules.webhooks.aws_sns.SNSMessageValidator.validate_message",
         mock,
     )
     return mock

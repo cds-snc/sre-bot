@@ -184,7 +184,8 @@ def configure_logging(
             ],
             logger_factory=structlog.stdlib.LoggerFactory(),
             wrapper_class=structlog.stdlib.BoundLogger,
-            cache_logger_on_first_use=True,
+            # Cached loggers keep a stale processor list across reconfigures, which breaks capture_logs.
+            cache_logger_on_first_use=False,
         )
 
         # Configure standard logging with silent handler

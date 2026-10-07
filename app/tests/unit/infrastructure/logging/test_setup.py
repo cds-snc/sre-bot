@@ -56,6 +56,22 @@ class TestConfigureLogging:
         assert hasattr(result, "warning")
         assert hasattr(result, "error")
 
+    def test_capture_logs_reaches_a_logger_used_before_a_reconfigure(self, mock_settings):
+        """A long-lived logger used under one configuration is still captured after configure_logging runs again.
+
+        Mirrors a module-level logger that first logs during one app lifespan and is later
+        asserted on with capture_logs after another lifespan has reconfigured structlog.
+        """
+        configure_logging(settings=mock_settings)
+        logger = structlog.get_logger()
+        logger.info("first_use")
+        configure_logging(settings=mock_settings)
+
+        with capture_logs() as entries:
+            logger.warning("after_reconfigure")
+
+        assert [entry["event"] for entry in entries] == ["after_reconfigure"]
+
     def test_configure_logging_default_parameters(self, mock_settings):
         """configure_logging works with default parameters."""
         logger = configure_logging(settings=mock_settings)
