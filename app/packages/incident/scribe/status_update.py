@@ -286,7 +286,7 @@ def _carry_forward(
         stage=latest.stage,
         en=replace(latest.en, current_action=wording.en),
         fr=replace(latest.fr, current_action=wording.fr),
-        next_update_at=_next_update_at(latest.stage, settings, now),
+        next_update_at=next_update_at_for(latest.stage, settings, now),
         author=author,
         transcript_cutoff=latest.transcript_cutoff,
         transcript_fingerprint=latest.transcript_fingerprint,
@@ -314,7 +314,7 @@ def _draft_record(
         stage=stage,
         en=fields.en,
         fr=fields.fr,
-        next_update_at=_next_update_at(stage, settings, now),
+        next_update_at=next_update_at_for(stage, settings, now),
         author=author,
         transcript_cutoff=max(_posted_at(message) for message in people),
         transcript_fingerprint=_fingerprint(people),
@@ -345,7 +345,7 @@ def _append(
     return _failure(appended)
 
 
-def _next_update_at(stage: StatusUpdateStage, settings: IncidentStatusUpdateSettings, now: datetime) -> datetime:
+def next_update_at_for(stage: StatusUpdateStage, settings: IncidentStatusUpdateSettings, now: datetime) -> datetime:
     """When the next update is due; a resolved incident has none, so it is ``now``."""
     if stage is StatusUpdateStage.RESOLVED:
         return now
