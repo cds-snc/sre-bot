@@ -10,7 +10,9 @@ locals {
   error_logged_regex_filter = "[eE][rR][rR][oO][rR]|[eE][xX][cC][eE][pP][tT][iI][oO][nN]"
   # Regex matched against the raw log line to exclude known false positives
   # from the error metric. Extend to silence new ones.
-  error_logged_skip_regex_filter = "level.{0,6}warning|level.{0,6}info"
+  # Non-5xx uvicorn access lines are skipped because the client controls the
+  # request line: a query string such as ?error=1 would otherwise raise the alarm.
+  error_logged_skip_regex_filter = "level.{0,6}warning|level.{0,6}info|HTTP/1.[01]. [1-4][0-9][0-9] "
   error_logged_pattern           = "[w=%${local.error_logged_regex_filter}% && w!=%${local.error_logged_skip_regex_filter}%]"
 
   # Plain-text terms that indicate a warning-level log line
