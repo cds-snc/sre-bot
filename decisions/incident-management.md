@@ -148,8 +148,7 @@ Tolerated until then, each closing in the slice named:
 - `packages/incident/documents`, `drive` and `meet` as adapter-only siblings (TASK-38.2, TASK-38.3), and `scheduling` as a feature-owned calendar adapter (TASK-138);
 - the retro flow limited to creating one meeting, and action items as tables in the report (expansion drafts);
 - the single Google tenant as the implied system for every new incident, until the policy setting exists (TASK-38.3);
-- `find_incident_for_conversation` served by an adapter that pages through a scan of the legacy incidents table by channel id and returns its UUID, until the store replaces it (TASK-38);
-- the legacy `/sre incident updates` command and the `incident_updates` attribute, retired once status updates ship (TASK-140).
+- `find_incident_for_conversation` served by an adapter that pages through a scan of the legacy incidents table by channel id and returns its UUID, until the store replaces it (TASK-38).
 
 **Changes:**
 - 2026-10-02: Accepted (TASK-97). Option A with the external-platform seam kept optional; subdomains `lifecycle`, `retrospective` and `scribe`; `core/` contents and the two-part command check per the 2026-10-01 direction.
@@ -157,3 +156,4 @@ Tolerated until then, each closing in the slice named:
 - 2026-10-06: external status updates are a `scribe` use case with records under the legacy UUID in `core/`, a publisher and comms profiles, and an interim lookup over the legacy table (TASK-140).
 - 2026-10-07: status updates never reach the incident conversation: drafting, review, redrafting with instructions and the approved history live in modals, and approved text is copied by hand with no automatic publishing (TASK-140). Direction recorded for the primary message and the central incident modal.
 - 2026-10-07: the security confirmation moves from approval to drafting: a security or unknown-flag incident asks the responder to confirm before the model is called (TASK-140.10).
+- 2026-10-08: the legacy `/sre incident updates` command is retired: it answers with a bilingual pointer to `/sre incident status-update`, and the `summary` and `add_summary` commands and the `incident_updates` read and write paths are deleted. The `Incident` model drops the attribute and ignores it when loading a stored row; stored data stays in DynamoDB untouched (TASK-140.7).

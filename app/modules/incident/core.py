@@ -1,5 +1,7 @@
 """Core module to handle Incident creation"""
 
+from typing import Any
+
 from slack_sdk import WebClient
 from slack_sdk.models import blocks
 from structlog import get_logger
@@ -66,17 +68,18 @@ def _get_channel_info_and_topic(client: WebClient, channel_id: str) -> tuple:
         return None, "", "Unknown"
 
 
-def _get_existing_bookmarks(client: WebClient, channel_id: str) -> dict:
+def _get_existing_bookmarks(client: WebClient, channel_id: str) -> dict[str, str]:
     """Retrieve existing bookmarks in the channel.
 
     Returns:
         dict: Mapping of bookmark titles to links
     """
-    existing_bookmarks = {}
+    existing_bookmarks: dict[str, str] = {}
     try:
         bookmark_response = client.bookmarks_list(channel_id=channel_id)
         if bookmark_response.get("ok"):
-            for bookmark in bookmark_response.get("bookmarks", []):
+            bookmarks: list[dict[str, Any]] = bookmark_response.get("bookmarks", [])
+            for bookmark in bookmarks:
                 existing_bookmarks[bookmark["title"]] = bookmark["link"]
     except Exception as e:
         logger.warning(
@@ -87,11 +90,11 @@ def _get_existing_bookmarks(client: WebClient, channel_id: str) -> dict:
     return existing_bookmarks
 
 
-def _find_product_folder(product: str) -> str:
+def _find_product_folder(product: str) -> str | None:
     """Find the folder ID for a given product.
 
     Returns:
-        str: Folder ID or None if not found
+        str | None: Folder ID or None if not found
     """
     if product == "Unknown":
         return None
@@ -100,7 +103,8 @@ def _find_product_folder(product: str) -> str:
         folders = incident_folder.list_incident_folders()
         for folder in folders:
             if folder["name"].lower() == product.lower():
-                return folder["id"]
+                folder_id: str = folder["id"]
+                return folder_id
     except Exception as e:
         logger.warning(
             "recreate_missing_resources_folder_lookup_failed",
@@ -110,7 +114,7 @@ def _find_product_folder(product: str) -> str:
     return None
 
 
-def _create_meet_link_bookmark(client: WebClient, channel_id: str, existing_bookmarks: dict, results: dict) -> str:
+def _create_meet_link_bookmark(client: WebClient, channel_id: str, existing_bookmarks: dict[str, str], results: dict) -> str:
     """Create Meet link bookmark if it doesn't exist.
 
     Returns:
@@ -122,19 +126,20 @@ def _create_meet_link_bookmark(client: WebClient, channel_id: str, existing_book
 
     try:
         meet_link = meet.create_space()
+        meeting_uri: str = meet_link["meetingUri"]
         client.bookmarks_add(
             channel_id=channel_id,
             title="Meet link",
             type="link",
-            link=meet_link["meetingUri"],
+            link=meeting_uri,
         )
-        results["success"].append(f"Created Meet link: {meet_link['meetingUri']}")
+        results["success"].append(f"Created Meet link: {meeting_uri}")
         logger.info(
             "recreate_missing_resources_meet_created",
             channel_id=channel_id,
-            meet_url=meet_link["meetingUri"],
+            meet_url=meeting_uri,
         )
-        return meet_link["meetingUri"]
+        return meeting_uri
     except Exception as e:
         logger.error(
             "recreate_missing_resources_meet_failed",
@@ -149,8 +154,8 @@ def _create_document_bookmark(
     client: WebClient,
     channel_id: str,
     channel_name: str,
-    existing_bookmarks: dict,
-    folder_id: str,
+    existing_bookmarks: dict[str, str],
+    folder_id: str | None,
     incident_name: str,
     product: str,
     results: dict,
@@ -171,7 +176,7 @@ def _create_document_bookmark(
     try:
         slug = channel_slug(channel_name)
         document_id = None
-        document_link = None
+        document_link = ""
 
         # Search for document by name in the folder
         files = incident_drive.list_folder_files(folder_id)
@@ -548,10 +553,13 @@ def initiate_resources_creation(
             users_to_invite.append(user["id"])
 
     # Get users from the @security group
-    if incident_payload.security_incident == "yes":
+    security_group_id = SLACK_SECURITY_USER_GROUP_ID
+    if incident_payload.security_incident == "yes" and not security_group_id:
+        logger.warning("security_user_group_not_configured", channel_id=incident_payload.channel_id)
+    elif incident_payload.security_incident == "yes" and security_group_id:
         # If this is a security incident, get users from the security user group
         # and add them to the list of users to invite
-        response = client.usergroups_users_list(usergroup=SLACK_SECURITY_USER_GROUP_ID)
+        response = client.usergroups_users_list(usergroup=security_group_id)
 
         # Avoid inviting security group users outside production to prevent spam.
         if response.get("ok") and app_settings.ENVIRONMENT == "production":
@@ -584,7 +592,7 @@ def initiate_resources_creation(
 • `/sre incident schedule retro` - Schedule a retrospective meeting
 • `/sre incident close` - Close and archive this incident
 • `/sre incident status update <status>` - Update incident status
-• `/sre incident updates add` - Add incident updates
+• `/sre incident status-update` - Draft, review and approve a public status update
 • `/sre incident show` - View incident details
 • `/sre incident summarize` - Summarize the channel to catch up someone joining the incident (optionally add `--since 30m` or `--since 2h` to limit the time range)
 • `/sre incident draft` - Draft an incident report from this channel into a new document, ready for you to review and edit
