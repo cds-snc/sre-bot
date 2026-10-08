@@ -6,6 +6,32 @@ from modules.slack import webhooks
 
 logger = get_logger()
 
+# Writable legacy attachment fields; Slack echoes read-only keys (id, app_unfurl_url, from_url, ...) that chat.update rejects.
+ALLOWED_ATTACHMENT_KEYS = frozenset(
+    {
+        "fallback",
+        "color",
+        "pretext",
+        "author_name",
+        "author_link",
+        "author_icon",
+        "title",
+        "title_link",
+        "text",
+        "fields",
+        "image_url",
+        "thumb_url",
+        "footer",
+        "footer_icon",
+        "ts",
+        "mrkdwn_in",
+        "blocks",
+        "callback_id",
+        "actions",
+        "attachment_type",
+    }
+)
+
 
 def _get_source_alert_metadata(body):
     channel_id = body.get("channel", {}).get("id")
@@ -41,14 +67,22 @@ def handle_incident_action_buttons(client, ack, body):
         webhooks.increment_acknowledged_count(value)
         attachments = body["original_message"]["attachments"]
         msg = f"🙈  <@{user}> has acknowledged and ignored the incident.\n<@{user}> a pris connaissance et ignoré l'incident."
-        # if the last attachment is a preview from a link, switch the places of the last 2 attachments so that the incident buttons can be appended properly
-        if len(attachments) > 1 and "app_unfurl_url" in attachments[-1]:
-            attachments[-2], attachments[-1] = attachments[-1], attachments[-2]
-        attachments[-1] = {
-            "color": "3AA3E3",
-            "fallback": f"{msg}",
-            "text": f"{msg}",
-        }
+        buttons_index = next(
+            (i for i, attachment in enumerate(attachments) if attachment.get("callback_id") == "handle_incident_action_buttons"),
+            len(attachments) - 1,
+        )
+        attachments = [
+            {key: val for key, val in attachment.items() if key in ALLOWED_ATTACHMENT_KEYS}
+            for i, attachment in enumerate(attachments)
+            if i != buttons_index
+        ]
+        attachments.append(
+            {
+                "color": "3AA3E3",
+                "fallback": f"{msg}",
+                "text": f"{msg}",
+            }
+        )
         body["original_message"]["attachments"] = attachments
         body["original_message"]["channel"] = body["channel"]["id"]
 
