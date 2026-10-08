@@ -238,11 +238,11 @@ class TestReviewView:
         assert view["close"] == {"type": "plain_text", "text": close}
 
     def test_input_block_ids_in_order(self) -> None:
-        """Inputs are the stage then the four EN then the four FR fields, keyed by validation field name."""
+        """Inputs are the redraft instructions, the stage, then the four EN and the four FR fields, keyed by validation field name."""
         view = build_review_view(_draft(), "en-US", _METADATA)
 
         input_ids = [block["block_id"] for block in view["blocks"] if block["type"] == "input"]
-        assert input_ids == ["stage", *_FIELD_BLOCK_IDS]
+        assert input_ids == ["instructions", "stage", *_FIELD_BLOCK_IDS]
 
     def test_language_headers_precede_their_fields(self) -> None:
         """A header block sits right before the first EN field and right before the first FR field."""

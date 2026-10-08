@@ -3,10 +3,10 @@ id: TASK-140.6.1
 title: >-
   Approve a status update and render its copy-ready bilingual text in the scribe
   service
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-07 18:52'
-updated_date: '2026-10-07 21:38'
+updated_date: '2026-10-08 15:49'
 labels:
   - incident
 dependencies:

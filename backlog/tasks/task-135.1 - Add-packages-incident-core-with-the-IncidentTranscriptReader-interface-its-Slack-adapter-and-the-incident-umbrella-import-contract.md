@@ -3,10 +3,10 @@ id: TASK-135.1
 title: >-
   Add packages/incident/core with the IncidentTranscriptReader interface, its
   Slack adapter and the incident umbrella import contract
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-02 15:38'
-updated_date: '2026-10-02 17:18'
+updated_date: '2026-10-08 15:43'
 labels:
   - plugin-architecture
   - features

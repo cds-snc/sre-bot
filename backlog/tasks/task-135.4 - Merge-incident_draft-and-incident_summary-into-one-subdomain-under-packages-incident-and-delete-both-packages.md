@@ -3,10 +3,10 @@ id: TASK-135.4
 title: >-
   Add packages/incident/scribe holding the draft and summarize use cases, not
   yet registered
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-02 15:39'
-updated_date: '2026-10-02 18:01'
+updated_date: '2026-10-08 15:43'
 labels:
   - plugin-architecture
   - features

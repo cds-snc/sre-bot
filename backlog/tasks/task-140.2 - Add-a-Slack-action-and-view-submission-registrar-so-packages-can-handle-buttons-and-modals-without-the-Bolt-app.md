@@ -3,10 +3,10 @@ id: TASK-140.2
 title: >-
   Add a Slack action and view-submission registrar so packages can handle
   buttons and modals without the Bolt app
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-06 20:07'
+updated_date: '2026-10-08 15:48'
 labels:
   - incident
 dependencies:

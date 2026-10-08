@@ -523,3 +523,9 @@ security, unknown-flag or unreadable-flag incident with
 The Draft handler then shows a confirmation view in the modal; its Confirm and
 draft button (`incident.scribe.status_update.draft_confirmed`) drafts with
 confirmation and Cancel closes the modal with no model call.
+
+Redraft: the review form opens with an optional instructions input and a
+Redraft button (`incident.scribe.status_update.redraft`). `redraft_status_update`
+makes one model call from the reviewer's current values, the same transcript
+window and the instructions, keeps the stage floor and strict parsing, and
+stores the result as the next draft; any failure keeps the previous draft.

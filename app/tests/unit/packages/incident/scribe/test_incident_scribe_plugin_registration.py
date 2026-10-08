@@ -36,9 +36,10 @@ def test_block_actions_draft_and_confirm_are_registered_once() -> None:
 
     scribe_pkg.register_slack_commands(registrar=registrar)
 
-    assert "incident.scribe.status_update.draft" in registrar.block_actions
-    assert "incident.scribe.status_update.draft_confirmed" in registrar.block_actions
-    assert len([key for key in registrar.block_actions if "draft" in key]) == 2
+    assert [key for key in registrar.block_actions if key.startswith("incident.scribe.status_update.draft")] == [
+        "incident.scribe.status_update.draft",
+        "incident.scribe.status_update.draft_confirmed",
+    ]
 
 
 def test_one_i18n_registration_covers_both_catalogues() -> None:

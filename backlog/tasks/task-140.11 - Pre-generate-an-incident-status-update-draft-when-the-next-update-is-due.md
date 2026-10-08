@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-07 18:52'
-updated_date: '2026-10-08 00:23'
+updated_date: '2026-10-08 16:41'
 labels:
   - incident
 dependencies:
@@ -21,6 +21,8 @@ ordinal: 335000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+Deferred (human, 2026-10-08): the current status-update feature is good enough; this task is not planned or implemented yet. Business requirements are settled below; the implementation plan is written when the task is picked up.
+
 Status updates for an incident always begin with a person: the first draft is made only when a responder presses Draft in the status-updates modal opened by /sre incident status-update. Today every draft is manual; NEXT_UPDATE_MINUTES (30) only sets the "next update" time printed in the text, and nothing drafts on a schedule.
 
 A status update gives the state of things since the previous update, or since the incident began when it is the first one. The draft service already works that way: it reads the conversation since the latest update's transcript cutoff.
@@ -42,12 +44,22 @@ Design direction (human, 2026-10-08):
 - Trigger: the simplest option is one interval job registered through the plugin BackgroundJobRegistry (register_interval) and run under a Tier-2 lease (jobs/scheduled_tasks.py) so only one replica runs it. Each run sweeps every incident with periodic drafting on and handles each one independently, so several incidents in parallel are covered and a failure on one does not stop the others. Model calls in one run may need bounded concurrency. The job is synchronous and the draft service is async, so the job needs an explicit event-loop boundary.
 - Closed: the run checks the incident's status through incident core and skips closed incidents.
 
-To decide when planning:
-- How far ahead of the next update time the draft is prepared, and the sweep interval.
-- Whether and how a responder is told a draft is ready, without posting in the incident channel.
-- Whether reopening a closed incident brings back periodic drafting or needs a responder to turn it on again.
+Settled (human, 2026-10-08, second session):
+- Lead time: a periodic draft is ready about 5 minutes before the latest approved update's next update time.
+- No notification: no message in the incident channel (not even ephemeral) and no DM; responders find the draft in the status-updates modal when they open it at the next update time.
+- Label: a periodic draft is shown in the modal as prepared automatically with its time (for example "Prepared automatically at 14:25 ET") instead of a person as author.
+- Human drafts win: if a draft made with Draft or Redraft is pending, no periodic draft is prepared and the pending draft is never replaced.
+- One per approved update: if a periodic draft is not approved before the next update time passes, it is left as is; the responder presses Draft or Redraft to refresh it.
+- Reopen: closing the incident stops periodic drafting; reopening does not bring it back. A responder turns it on again, consistent with "never paused or resumed automatically".
+- Who: any responder who can open the status-updates modal can turn periodic drafting on, pause it and resume it.
 
-Over the single-PR size gate: decompose before implementation, for example (1) the per-incident state item and its store in incident core, (2) the Start / Pause / Resume control and state display in the status-updates modal, (3) the sweep job.
+Technical notes from 2026-10-08 research (for the future plan, not decisions):
+- Scheduler: register_interval exists on the BackgroundJobRegistry contract (app/contracts/scheduler/registry.py; used by packages/oncall_sync) through the register_background_jobs hookimpl. The Tier-2 lease is still the private _tier2 wrapper in app/jobs/scheduled_tasks.py, so a package cannot declare it until TASK-64; until then a per-incident claim in the idempotency store (as packages/access/sync does) keeps one periodic draft per approved update across replicas. Scheduled jobs start only in production (server/lifespan.py), so the job cannot be observed in dev or staging.
+- Draft service: draft_status_update (scribe/status_update.py) is async and keyed by conversation id; the sync job body calls it with asyncio.run, a system author and security_confirmed=False (the service itself refuses yes/unknown flags). The state item should hold the channel id so the sweep avoids the legacy channel scan.
+- GSI vs scan: a sparse GSI over items with periodic drafting on is preferred. A filtered Scan bills every EN/FR update item read before filtering, against 2 provisioned RCU, and would throttle as history grows. The GSI needs its attribute, the index, an IAM "<table arn>/index/*" grant (terraform/iam.tf lists table ARNs only) and the .devcontainer/dynamodb-create.sh entry, applied before the code that queries it.
+- Closed status: incident core has no lifecycle-status read; add one beside read_security_flag on the legacy adapter (core/adapters/legacy_incidents.py), replaced by TASK-38.1. Legacy statuses: Open, In Progress, Ready to be Reviewed, Reviewed, Closed.
+
+Over the single-PR size gate: decompose before implementation, for example (1) the Terraform sparse GSI and IAM index grant, (2) the per-incident state item and its store in incident core, with the incident status read, (3) the Start / Pause / Resume control, state display and periodic-draft label in the status-updates modal, (4) the sweep job. Single PRs off main, not a stack (behaviour changes; 3 and 4 are independent).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -66,6 +78,11 @@ Over the single-PR size gate: decompose before implementation, for example (1) t
 - [ ] #12 A periodic run with no new human messages since the latest update makes no model call
 - [ ] #13 A periodic run never adds a second pending draft
 - [ ] #14 No message is posted to the incident channel; the draft appears in the status-updates modal
+- [ ] #15 A periodic draft is ready about 5 minutes before the latest approved update's next update time
+- [ ] #16 A periodic draft is shown in the status-updates modal as prepared automatically with its time; no DM or other notification is sent
+- [ ] #17 A pending draft made with Draft or Redraft is never replaced, and at most one periodic draft is prepared per approved update
+- [ ] #18 Reopening a closed incident does not restart periodic drafting; a responder turns it on again
+- [ ] #19 Any responder who can open the status-updates modal can turn periodic drafting on, pause it and resume it
 <!-- AC:END -->
 
 ## Comments
@@ -79,5 +96,10 @@ created: 2026-10-08 00:17
 created: 2026-10-08 00:23
 ---
 2026-10-08 (human): opt-in with an explicit control, off by default; the simplest trigger that handles many incidents in parallel (a scheduled sweep job is acceptable); on resume, draft from the messages since the latest update; closing the incident stops periodic drafting. Storage: the state is a separate per-incident item in the status-updates table, not on a StatusUpdate record or the legacy incidents table.
+---
+
+created: 2026-10-08 16:41
+---
+2026-10-08 (human, second session): status-update follow-ups deferred; the current feature is good enough. Settled: 5-minute lead time, no notification, periodic-draft label, human drafts win, one periodic draft per approved update, reopening needs a responder to turn it on again, any responder controls it. Kept the opt-in, manual pause/resume model over an on-by-default alternative.
 ---
 <!-- COMMENTS:END -->
