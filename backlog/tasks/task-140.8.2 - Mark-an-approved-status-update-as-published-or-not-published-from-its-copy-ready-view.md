@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-07 22:57'
-updated_date: '2026-10-08 00:15'
+updated_date: '2026-10-08 15:36'
 labels:
   - incident
 dependencies:
@@ -80,6 +80,13 @@ Gates (cd app):
 - uv run pytest tests --ignore=tests/smoke -q (single process) -> 16 failed, 4311 passed: 6 known TASK-90 (SNS, google directory) + 8 known scribe capture_logs + 2 new capture_logs tests of the same leak-2 kind (test_incident_scribe_status_update_published_entrypoint.py test_toggle_failure_is_logged, test_slack_failure_is_logged_not_raised); that file passes alone (20 passed).
 - grep of touched .py files for __import__/importlib/inline imports -> only the existing TYPE_CHECKING boto3 import.
 Manual workspace checks pending: toggle in place in a real modal (accessory button on the status section), ET/HE published line.
+
+Re-verified 2026-10-08 after gh stack rebase onto main (layers 8-9 merged; branch is 2 commits above df070fc8). PR #1558 retitled via REST (gh pr edit fails on the reviewRequests GraphQL lookup). Gates (cd app):
+- uv run ruff check . -> All checks passed!
+- uv run lint-imports -> Contracts: 10 kept, 0 broken.
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 57 errors in 20 files (checked 384 source files); 0 in the 22 files this layer touches.
+- uv run pytest tests/integration/legacy_surface -q -> 20 passed, 4 warnings
+- uv run pytest tests --ignore=tests/smoke -q -p no:randomly -> 4328 passed, 2051 warnings in 49.15s
 <!-- SECTION:NOTES:END -->
 
 ## Comments
