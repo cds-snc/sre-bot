@@ -71,6 +71,7 @@ REVIEW_ACTION_ID = "incident.scribe.status_update.review"
 REVIEW_CALLBACK_ID = "incident.scribe.status_update.approve"
 OPEN_ACTION_ID = "incident.scribe.status_update.open"
 HISTORY_ACTION_ID = "incident.scribe.status_update.history"
+PUBLISHED_ACTION_ID = "incident.scribe.status_update.published"
 _APPROVED_ROW_CAP = 50
 _TEXT_FIELDS = ("affected_service", "impact", "current_action", "workaround")
 _SINCE_UNITS = {"m": 60, "h": 3600, "d": 86400}
@@ -836,6 +837,20 @@ def build_review_error_view(error_code: str | None, locale: str, private_metadat
     return _status_update_view(locale, private_metadata, _mrkdwn_blocks(text), close=True)
 
 
+def build_published_error_view(error_code: str | None, locale: str, private_metadata: str) -> dict[str, Any]:
+    """Build the Close-only modal for a failed published toggle; only a conflict has its own wording."""
+    if error_code != ErrorCode.STATUS_UPDATE_CONFLICT:
+        return build_draft_error_view(error_code, locale, private_metadata)
+    text = _status_t(
+        "toggle_conflict",
+        locale,
+        "Cette mise à jour a été marquée comme publiée ou non publiée ailleurs. Rouvrez les mises à jour de statut pour voir la dernière version."
+        if locale.startswith("fr")
+        else "This update was marked published or not published elsewhere. Reopen the status updates to see the latest version.",
+    )
+    return _status_update_view(locale, private_metadata, _mrkdwn_blocks(text), close=True)
+
+
 def _review_input(block_id: str, label: str, element: dict[str, Any]) -> dict[str, Any]:
     return {"type": "input", "block_id": block_id, "label": {"type": "plain_text", "text": label}, "element": element}
 
@@ -927,8 +942,11 @@ def build_copy_ready_view(
 ) -> dict[str, Any]:
     """Build the modal showing the approved text, one preformatted block per language, with Close.
 
-    With ``update`` (a reopened approved update) a status line comes first and a
-    Back button, valued with the channel id from the metadata, comes last.
+    With ``update`` (a reopened approved update) a status line comes first, with
+    a toggle button carrying the target published state (so a stale view cannot
+    invert a newer one), then who marked it published and when if it is
+    published, and a Back button, valued with the channel id from the metadata,
+    comes last.
     """
     note = _status_t(
         "approved_note",
@@ -944,11 +962,32 @@ def build_copy_ready_view(
         preformatted = {"type": "rich_text_preformatted", "elements": [{"type": "text", "text": text}]}
         blocks.append({"type": "rich_text", "elements": [preformatted]})
     if update is not None:
-        status = {
-            "type": "section",
-            "block_id": "approved_status",
-            "text": {"type": "mrkdwn", "text": _stage_line(update, locale)},
+        fr = locale.startswith("fr")
+        published = update.state is StatusUpdateState.PUBLISHED
+        if published:
+            toggle_text = _status_t("mark_unpublished", locale, "Marquer comme non publiée" if fr else "Mark as not published")
+        else:
+            toggle_text = _status_t("mark_published", locale, "Marquer comme publiée" if fr else "Mark as published")
+        toggle = {
+            "type": "button",
+            "action_id": PUBLISHED_ACTION_ID,
+            "text": {"type": "plain_text", "text": toggle_text},
+            "value": json.dumps({"incident_id": update.incident_id, "sequence": update.sequence, "published": not published}),
         }
+        status: list[dict[str, Any]] = [
+            {
+                "type": "section",
+                "block_id": "approved_status",
+                "text": {"type": "mrkdwn", "text": _stage_line(update, locale)},
+                "accessory": toggle,
+            }
+        ]
+        if published and update.published_by and update.published_at is not None:
+            by = _status_t("published_line.by", locale, "Publiée par" if fr else "Published by")
+            at = _status_t("published_line.at", locale, "le" if fr else "at")
+            when = format_profile_time(update.published_at, build_profile_labels(locale))
+            line = f"{by} <@{update.published_by}> {at} {when}"
+            status.append({"type": "section", "block_id": "published_status", "text": {"type": "mrkdwn", "text": line}})
         channel_id = json.loads(private_metadata).get("channel_id", "")
         back = {
             "type": "button",
@@ -959,7 +998,7 @@ def build_copy_ready_view(
             },
             "value": json.dumps({"channel_id": channel_id}),
         }
-        blocks = [status, *blocks, {"type": "actions", "block_id": "history_button", "elements": [back]}]
+        blocks = [*status, *blocks, {"type": "actions", "block_id": "history_button", "elements": [back]}]
     return _status_update_view(locale, private_metadata, blocks, close=True)
 
 

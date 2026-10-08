@@ -176,6 +176,8 @@ def _to_item(update: StatusUpdate) -> _Item:
         item["approved_at"] = _time_to_item(update.approved_at)
     if update.published_at is not None:
         item["published_at"] = _time_to_item(update.published_at)
+    if update.published_by is not None:
+        item["published_by"] = {"S": update.published_by}
     return item
 
 
@@ -211,6 +213,7 @@ def _from_item(item: _Item) -> StatusUpdate:
             approver=item["approver"]["S"] if "approver" in item else None,
             approved_at=datetime.fromisoformat(item["approved_at"]["S"]) if "approved_at" in item else None,
             published_at=datetime.fromisoformat(item["published_at"]["S"]) if "published_at" in item else None,
+            published_by=item["published_by"]["S"] if "published_by" in item else None,
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise _UnreadableItemError(f"{type(exc).__name__}: {exc}") from exc

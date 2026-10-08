@@ -50,3 +50,8 @@ incident_status_update:
   row.not_published: "Not published"
   open_button: "Open"
   back_button: "Back"
+  mark_published: "Mark as published"
+  mark_unpublished: "Mark as not published"
+  published_line.by: "Published by"
+  published_line.at: "at"
+  toggle_conflict: "This update was marked published or not published elsewhere. Reopen the status updates to see the latest version."

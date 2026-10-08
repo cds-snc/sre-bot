@@ -14,6 +14,10 @@ it acks with field errors for blank fields, or with a saving view; the approval
 and the copy-ready rendering then run in one event loop and the modal is updated
 by view id to the copy-ready text or an error. Wording and views come from
 ``platforms.slack``, the only module that translates.
+
+The reopened copy-ready view's toggle marks the update published or not
+published (the button carries the target state), then re-renders the stored
+record in place. It writes only the update's state; nothing is posted.
 """
 
 import asyncio
@@ -34,6 +38,7 @@ from packages.incident.scribe.platforms.slack import (
     DRAFT_ACTION_ID,
     HISTORY_ACTION_ID,
     OPEN_ACTION_ID,
+    PUBLISHED_ACTION_ID,
     REVIEW_ACTION_ID,
     REVIEW_CALLBACK_ID,
     build_copy_ready_view,
@@ -42,6 +47,7 @@ from packages.incident.scribe.platforms.slack import (
     build_no_new_information_wording,
     build_overview_view,
     build_profile_labels,
+    build_published_error_view,
     build_result_view,
     build_review_error_view,
     build_review_field_errors,
@@ -56,13 +62,13 @@ from packages.incident.scribe.status_update_approval import (
     get_draft_for_review,
     validate_approval_edit,
 )
-from packages.incident.scribe.status_update_history import get_approved_update
+from packages.incident.scribe.status_update_history import get_approved_update, set_published
 
 logger = structlog.get_logger()
 
 
 def register(registrar: SlackCommandRegistrar) -> None:
-    """Register the Draft, Confirm and draft, Review, Open and Back listeners and the approval submission listener.
+    """Register the Draft, Confirm and draft, Review, Open, Back and published toggle listeners and the approval submission.
 
     Args:
         registrar: Slack command registrar.
@@ -72,6 +78,7 @@ def register(registrar: SlackCommandRegistrar) -> None:
     registrar.register_block_action(REVIEW_ACTION_ID, handle_review_action)
     registrar.register_block_action(OPEN_ACTION_ID, handle_open_action)
     registrar.register_block_action(HISTORY_ACTION_ID, handle_history_action)
+    registrar.register_block_action(PUBLISHED_ACTION_ID, handle_published_action)
     registrar.register_view_submission(REVIEW_CALLBACK_ID, handle_review_submission)
 
 
@@ -269,9 +276,56 @@ def handle_history_action(ack: Callable[[], Any], body: dict[str, Any], client: 
     )
 
 
+def handle_published_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+    """Handle a press of the published toggle: set the target state, then show the record's copy-ready text.
+
+    Args:
+        ack: Bolt ack callable, called first.
+        body: Block-actions payload; the button value names the incident, sequence and target state.
+        client: Bolt Slack web client.
+    """
+    ack()
+    view = body.get("view") or {}
+    view_id = str(view.get("id", ""))
+    user_id = str((body.get("user") or {}).get("id", ""))
+    metadata = _parse_metadata(view.get("private_metadata"))
+    locale = str(metadata.get("locale") or "en-US")
+    private_metadata = json.dumps({"channel_id": str(metadata.get("channel_id", "")), "locale": locale})
+    log = logger.bind(action="incident_status_update_published", user_id=user_id, view_id=view_id)
+    target = _parse_metadata(((body.get("actions") or [{}])[0]).get("value"))
+    incident_id = str(target.get("incident_id", ""))
+    sequence = target.get("sequence")
+    published = target.get("published")
+
+    result = None
+    if isinstance(sequence, int) and isinstance(published, bool):
+        result = asyncio.run(_toggle_and_publish(incident_id, sequence, published=published, actor=user_id))
+    if result is not None and result.is_success and result.data is not None:
+        update, copy = result.data
+        next_view = build_copy_ready_view(copy, locale, private_metadata, update=update)
+    else:
+        error_code = result.error_code if result is not None else None
+        log.warning("incident_status_update_published_failed", error_code=error_code)
+        next_view = build_published_error_view(error_code, locale, private_metadata)
+    _ModalCursor(client, view_id, view.get("hash"), log).update(
+        next_view, failure_event="incident_status_update_published_update_failed"
+    )
+
+
 async def _read_and_publish(incident_id: str, sequence: int) -> OperationResult[tuple[StatusUpdate, CopyReadyText]]:
     """Read the approved update, then render it as copy-ready text in one event loop."""
-    read = await get_approved_update(incident_id, sequence)
+    return await _render_record(await get_approved_update(incident_id, sequence))
+
+
+async def _toggle_and_publish(
+    incident_id: str, sequence: int, *, published: bool, actor: str
+) -> OperationResult[tuple[StatusUpdate, CopyReadyText]]:
+    """Set the update's published state, then render the stored record as copy-ready text in one event loop."""
+    return await _render_record(await set_published(incident_id, sequence, published=published, actor=actor))
+
+
+async def _render_record(read: OperationResult[StatusUpdate]) -> OperationResult[tuple[StatusUpdate, CopyReadyText]]:
+    """Render a read or toggled record through the status page publisher; a failed ``read`` is passed on."""
     if not read.is_success or read.data is None:
         return OperationResult.error(read.status, message=read.message or "read failed", error_code=read.error_code)
     published = await providers.get_status_page_publisher().publish(

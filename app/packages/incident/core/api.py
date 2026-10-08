@@ -150,7 +150,8 @@ class StatusUpdateStore(Protocol):
     def transition(self, update: StatusUpdate, *, expected_state: StatusUpdateState) -> OperationResult[StatusUpdate]:
         """Replace the stored update with ``update`` while its stored state is ``expected_state``.
 
-        Used to approve (with the approver and edited text) and to publish. A
+        Used to approve (with the approver and edited text), to publish (with
+        the time and the person) and to unpublish (clearing both). A
         stored state that moved on, or no stored record, is a conflict; the
         same write repeated is success.
 

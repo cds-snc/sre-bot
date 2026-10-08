@@ -2,7 +2,8 @@
 
 Plain value tests: no store or stub is involved. They pin the record's
 invariants (a named incident, a positive sequence, timezone-aware times) and
-the only state moves a store may perform.
+the only state moves a store may perform, including marking a published
+update not published again.
 """
 
 import dataclasses
@@ -45,6 +46,7 @@ def test_a_draft_record_is_frozen_and_starts_without_an_approver() -> None:
     assert update.approver is None
     assert update.approved_at is None
     assert update.published_at is None
+    assert update.published_by is None
     with pytest.raises(dataclasses.FrozenInstanceError):
         update.sequence = 2  # type: ignore[misc]
 
@@ -78,13 +80,22 @@ def test_a_naive_time_is_rejected(field: str) -> None:
         (StatusUpdateState.DRAFT, StatusUpdateState.DRAFT, False),
         (StatusUpdateState.APPROVED, StatusUpdateState.DRAFT, False),
         (StatusUpdateState.PUBLISHED, StatusUpdateState.DRAFT, False),
-        (StatusUpdateState.PUBLISHED, StatusUpdateState.APPROVED, False),
+        (StatusUpdateState.PUBLISHED, StatusUpdateState.APPROVED, True),
         (StatusUpdateState.PUBLISHED, StatusUpdateState.PUBLISHED, False),
     ],
 )
-def test_state_moves_only_one_step_forward(current: StatusUpdateState, target: StatusUpdateState, allowed: bool) -> None:
-    """Nothing is published unapproved and nothing goes back to draft."""
+def test_only_the_declared_state_moves_are_allowed(current: StatusUpdateState, target: StatusUpdateState, allowed: bool) -> None:
+    """Nothing is published unapproved and nothing goes back to draft; a published update can return to approved."""
     assert current.can_move_to(target) is allowed
+
+
+def test_a_published_record_names_who_published_it() -> None:
+    """The person who marked the update published is kept beside the publication time."""
+    update = _update(
+        state=StatusUpdateState.PUBLISHED, approver="U0APPROVER", approved_at=AT, published_at=AT, published_by="U0PUBLISHER"
+    )
+
+    assert (update.published_by, update.published_at) == ("U0PUBLISHER", AT)
 
 
 def test_stages_are_declared_in_their_public_forward_order() -> None:

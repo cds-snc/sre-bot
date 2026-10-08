@@ -50,3 +50,8 @@ incident_status_update:
   row.not_published: "Non publiée"
   open_button: "Ouvrir"
   back_button: "Retour"
+  mark_published: "Marquer comme publiée"
+  mark_unpublished: "Marquer comme non publiée"
+  published_line.by: "Publiée par"
+  published_line.at: "le"
+  toggle_conflict: "Cette mise à jour a été marquée comme publiée ou non publiée ailleurs. Rouvrez les mises à jour de statut pour voir la dernière version."
