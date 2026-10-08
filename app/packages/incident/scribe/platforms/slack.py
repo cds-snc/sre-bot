@@ -38,12 +38,14 @@ from contracts.slack.models import Argument, ArgumentType, CommandPayload, Comma
 from contracts.slack.registrar import SlackCommandRegistrar
 from contracts.slack.reply import SlackReplySender
 from infrastructure.i18n import t
-from packages.incident.core.api import StatusUpdate, StatusUpdateStage
+from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateText
 from packages.incident.scribe.comms_profile import ProfileLabels, render_profile
 from packages.incident.scribe.domain import (
+    CopyReadyText,
     DraftedDocument,
     NoNewInformationWording,
     StatusUpdateDraftOutcome,
+    StatusUpdateEdit,
     StatusUpdateOutcomeKind,
 )
 from packages.incident.scribe.service import (
@@ -64,6 +66,9 @@ _STATUS_UPDATE_DOMAIN = "incident_status_update"
 _SLACK_TEXT_LIMIT = 3000
 DRAFT_ACTION_ID = "incident.scribe.status_update.draft"
 CONFIRM_ACTION_ID = "incident.scribe.status_update.draft_confirmed"
+REVIEW_ACTION_ID = "incident.scribe.status_update.review"
+REVIEW_CALLBACK_ID = "incident.scribe.status_update.approve"
+_TEXT_FIELDS = ("affected_service", "impact", "current_action", "workaround")
 _SINCE_UNITS = {"m": 60, "h": 3600, "d": 86400}
 
 # Slack renders its own "mrkdwn", not standard/GitHub Markdown: headers (``#``)
@@ -536,11 +541,11 @@ def handle_status_update_command(
 
     pending = get_pending_status_update(payload.channel_id)
     if pending.is_success and pending.data is not None:
-        blocks = [*_pending_blocks(pending.data), _draft_button_block(locale)]
+        blocks = [*_pending_blocks(pending.data), _draft_button_block(locale, pending.data, with_draft=True)]
     elif pending.is_success:
         blocks = [
             *_mrkdwn_blocks(_status_t("no_pending", locale, "There is no status update draft for this incident yet.")),
-            _draft_button_block(locale),
+            _draft_button_block(locale, None, with_draft=True),
         ]
     else:
         log.warning("incident_status_update_failed", status=pending.status, error_code=pending.error_code, error=pending.message)
@@ -631,20 +636,31 @@ def build_profile_labels(locale: str) -> ProfileLabels:
     )
 
 
-def _draft_button_block(locale: str) -> dict[str, Any]:
-    """Build the actions block holding the Draft button."""
-    return {
-        "type": "actions",
-        "block_id": "draft_button",
-        "elements": [
+def _draft_button_block(locale: str, update: StatusUpdate | None, *, with_draft: bool) -> dict[str, Any]:
+    """Build the actions block holding the Draft button and, for a shown draft, the Review button."""
+    elements: list[dict[str, Any]] = []
+    if with_draft:
+        elements.append(
             {
                 "type": "button",
                 "action_id": DRAFT_ACTION_ID,
                 "text": {"type": "plain_text", "text": _status_t("draft_button", locale, "Draft")},
                 "style": "primary",
             }
-        ],
-    }
+        )
+    if update is not None:
+        elements.append(
+            {
+                "type": "button",
+                "action_id": REVIEW_ACTION_ID,
+                "text": {
+                    "type": "plain_text",
+                    "text": _status_t("review_button", locale, "Réviser" if locale.startswith("fr") else "Review"),
+                },
+                "value": json.dumps({"incident_id": update.incident_id, "sequence": update.sequence}),
+            }
+        )
+    return {"type": "actions", "block_id": "draft_button", "elements": elements}
 
 
 def build_security_confirmation_view(locale: str, private_metadata: str) -> dict[str, Any]:
@@ -691,7 +707,7 @@ def build_drafting_view(locale: str, private_metadata: str) -> dict[str, Any]:
 
 def build_result_view(outcome: StatusUpdateDraftOutcome, locale: str, private_metadata: str) -> dict[str, Any]:
     """Build the modal showing the drafted, carried-forward or pending update in EN and FR."""
-    blocks = _pending_blocks(outcome.update)
+    blocks = [*_pending_blocks(outcome.update), _draft_button_block(locale, outcome.update, with_draft=False)]
     if outcome.kind == StatusUpdateOutcomeKind.CARRIED_FORWARD:
         note = _status_t("carried_forward", locale, "Nothing new since the last update, so it was repeated as a new draft.")
     elif outcome.kind == StatusUpdateOutcomeKind.PENDING:
@@ -704,6 +720,137 @@ def build_result_view(outcome: StatusUpdateDraftOutcome, locale: str, private_me
 def build_draft_error_view(error_code: str | None, locale: str, private_metadata: str) -> dict[str, Any]:
     """Build the modal showing a localized drafting error with a Close button."""
     return _status_update_view(locale, private_metadata, _mrkdwn_blocks(_status_error_text(error_code, locale)), close=True)
+
+
+def build_review_error_view(error_code: str | None, locale: str, private_metadata: str) -> dict[str, Any]:
+    """Build the modal showing a localized review or approval error with a Close button.
+
+    Differs from ``build_draft_error_view`` in the wording of a conflict (the
+    draft changed or was approved elsewhere) and in the stage-below-floor refusal.
+    """
+    if error_code == ErrorCode.STATUS_UPDATE_STAGE_BELOW_FLOOR:
+        text = _status_t(
+            "stage_below_floor",
+            locale,
+            "L'étape ne peut pas précéder celle de la dernière mise à jour approuvée. Rouvrez la révision et choisissez une étape ultérieure."
+            if locale.startswith("fr")
+            else "The stage cannot be earlier than the latest approved update's stage. Reopen the review and pick a later stage.",
+        )
+    elif error_code == ErrorCode.STATUS_UPDATE_CONFLICT:
+        text = _status_t(
+            "review_conflict",
+            locale,
+            "Ce brouillon a changé ou a été approuvé ailleurs. Rouvrez les mises à jour de statut pour voir la dernière version."
+            if locale.startswith("fr")
+            else "This draft changed or was approved elsewhere. Reopen the status updates to see the latest version.",
+        )
+    else:
+        text = _status_error_text(error_code, locale)
+    return _status_update_view(locale, private_metadata, _mrkdwn_blocks(text), close=True)
+
+
+def _review_input(block_id: str, label: str, element: dict[str, Any]) -> dict[str, Any]:
+    return {"type": "input", "block_id": block_id, "label": {"type": "plain_text", "text": label}, "element": element}
+
+
+def build_review_view(update: StatusUpdate, locale: str, private_metadata: str, notice: str | None = None) -> dict[str, Any]:
+    """Build the review modal: the stage select and the four EN and four FR fields, prefilled from the draft.
+
+    Field inputs are optional so Slack never blocks a blank field itself; the
+    submission listener validates and names the blank ones.
+    """
+    fr = locale.startswith("fr")
+    stage_names = build_profile_labels(locale).stage_names
+    options = [{"text": {"type": "plain_text", "text": stage_names[stage]}, "value": stage.value} for stage in StatusUpdateStage]
+    blocks = _mrkdwn_blocks(notice) if notice else []
+    blocks.append(
+        _review_input(
+            "stage",
+            _status_t("label.stage", locale, "Étape" if fr else "Stage"),
+            {
+                "type": "static_select",
+                "action_id": "stage",
+                "options": options,
+                "initial_option": next(option for option in options if option["value"] == update.stage.value),
+            },
+        )
+    )
+    for profile_locale, language, text in (("en-US", "en", update.en), ("fr-FR", "fr", update.fr)):
+        labels = build_profile_labels(profile_locale)
+        heading = _status_t(f"language.{language}", profile_locale, "English" if language == "en" else "French")
+        blocks.append({"type": "header", "text": {"type": "plain_text", "text": heading}})
+        for name in _TEXT_FIELDS:
+            element = {
+                "type": "plain_text_input",
+                "action_id": "text",
+                "multiline": True,
+                "initial_value": getattr(text, name),
+            }
+            block = _review_input(f"{language}.{name}", getattr(labels, name), element)
+            block["optional"] = True
+            blocks.append(block)
+    view = _status_update_view(locale, private_metadata, blocks, close=False)
+    view["title"] = {
+        "type": "plain_text",
+        "text": _status_t("review_title", locale, "Réviser la mise à jour" if fr else "Review update"),
+    }
+    view["callback_id"] = REVIEW_CALLBACK_ID
+    view["submit"] = {"type": "plain_text", "text": _status_t("approve_button", locale, "Approuver" if fr else "Approve")}
+    view["close"] = {"type": "plain_text", "text": _status_t("cancel", locale, "Annuler" if fr else "Cancel")}
+    return view
+
+
+def parse_review_submission(view: dict[str, Any]) -> StatusUpdateEdit | None:
+    """Read the submitted stage and fields back into an edit; ``None`` when the stage is missing or unknown.
+
+    Text is not trimmed and a cleared field (Slack sends null) reads as ``""``,
+    so ``validate_approval_edit`` is the single blank-handling path.
+    """
+    values: dict[str, Any] = (view.get("state") or {}).get("values") or {}
+    selected = ((values.get("stage") or {}).get("stage") or {}).get("selected_option") or {}
+    try:
+        stage = StatusUpdateStage(str(selected.get("value", "")))
+    except ValueError:
+        return None
+
+    def read(language: str) -> StatusUpdateText:
+        return StatusUpdateText(
+            **{name: ((values.get(f"{language}.{name}") or {}).get("text") or {}).get("value") or "" for name in _TEXT_FIELDS}
+        )
+
+    return StatusUpdateEdit(stage=stage, en=read("en"), fr=read("fr"))
+
+
+def build_review_field_errors(block_ids: tuple[str, ...], locale: str) -> dict[str, str]:
+    """Map each rejected block id to the localized blank-field message for ``ack(response_action="errors")``."""
+    message = _status_t("field_blank", locale, "Entrez une valeur." if locale.startswith("fr") else "Enter a value.")
+    return dict.fromkeys(block_ids, message)
+
+
+def build_saving_view(locale: str, private_metadata: str) -> dict[str, Any]:
+    """Build the modal shown while the approval is saved; no buttons and no submit."""
+    blocks = _mrkdwn_blocks(
+        _status_t("saving", locale, "Enregistrement de l'approbation..." if locale.startswith("fr") else "Saving the approval...")
+    )
+    return _status_update_view(locale, private_metadata, blocks, close=False)
+
+
+def build_copy_ready_view(copy: CopyReadyText, locale: str, private_metadata: str) -> dict[str, Any]:
+    """Build the modal showing the approved text, one preformatted block per language, with Close only."""
+    note = _status_t(
+        "approved_note",
+        locale,
+        "Approuvé. Relisez, puis copiez dans le canal de votre produit. Rien n'a été publié."
+        if locale.startswith("fr")
+        else "Approved. Proofread, then copy into your product's channel. Nothing was posted.",
+    )
+    blocks = _mrkdwn_blocks(note)
+    for profile_locale, language, text in (("en-US", "en", copy.en), ("fr-FR", "fr", copy.fr)):
+        heading = _status_t(f"language.{language}", profile_locale, "English" if language == "en" else "French")
+        blocks.append({"type": "header", "text": {"type": "plain_text", "text": heading}})
+        preformatted = {"type": "rich_text_preformatted", "elements": [{"type": "text", "text": text}]}
+        blocks.append({"type": "rich_text", "elements": [preformatted]})
+    return _status_update_view(locale, private_metadata, blocks, close=True)
 
 
 def build_no_new_information_wording() -> NoNewInformationWording:

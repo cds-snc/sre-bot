@@ -3,7 +3,7 @@ id: doc-5
 title: Stack H handoff
 type: guide
 created_date: '2026-10-07 14:30'
-updated_date: '2026-10-07 21:38'
+updated_date: '2026-10-07 22:37'
 ---
 # Stack H handoff
 
@@ -25,8 +25,8 @@ updated_date: '2026-10-07 21:38'
 | 4 | TASK-140.5.3 Draft button and drafting state | `stack-h/task-140.5.3-status-update-draft-button` | [#1548](https://github.com/cds-snc/sre-bot/pull/1548) | merged | Squash-merged 2026-10-07 as aca15521. Merged before layer 6 (#1550), although the earlier hold said not to deploy it until layer 6 merged. Creates `scribe/entrypoints/slack.py` (block action `incident.scribe.status_update.draft`) and an autouse `get_slack_provider` cache-clear fixture in `tests/conftest.py`. |
 | 5 | TASK-140.10.1 store and read the security flag | `stack-h/task-140.6-status-update-approve` (name kept: `gh stack modify` cannot rename it) | [#1549](https://github.com/cds-snc/sre-bot/pull/1549) | in review | Commits 5112b599 and 6f9d677f (4 function-level test imports moved to module top in `test_db_operations.py`), submitted. ACs 1-5 checked, gates in the task notes. Rollback: never revert the `Incident` field (extra forbid); revert only the declare write. |
 | 6 | TASK-140.10.2 confirm before drafting a security or unknown-flag incident | `stack-h/task-140.10.2-security-draft-confirm` | [#1550](https://github.com/cds-snc/sre-bot/pull/1550) | in review | Commits 452b2f3b (implementation, ACs 1-8 checked, gates in the task notes) and 1d091820 (handoff doc). Gate in `draft_status_update` (`SECURITY_CONFIRMATION_REQUIRED`), confirm listener `incident.scribe.status_update.draft_confirmed`, drafting view sent from `on_started`, `_ModalCursor`, decision record update. Base #1549. |
-| 7 | TASK-140.6.1 approve service and copy-ready publisher | `stack-h/task-140.6.1-status-update-approve` | - | ready (uncommitted) | Plan approved 2026-10-07. Implemented: ACs 1-5 checked, gates in the task notes (ruff, format, lint-imports green; mypy 0 in touched files; pytest 4021 passed, 6 known TASK-90 leaks). New `status_update_approval.py` (async `get_draft_for_review` / `approve_status_update`), `publisher.py` (`render_copy_ready`), `adapters/copy_ready.py`, `StatusPagePublisher` in `ports.py`, `render_profile_sections`, `next_update_at_for`, 3 error codes. ~240 production LOC, 10 files. Commit also carries the 140.6.2 plan file and this doc. |
-| 8 | TASK-140.6.2 review modal and copy-ready view | `stack-h/task-140.6.2-status-update-review` | - | plan approved | Plan approved 2026-10-07 (6 decisions settled in the notes). Review button, review form via `views.update` in place, approve and publish in one `asyncio.run` helper, `rich_text_preformatted` copy-ready view, dispatch harness moved to `tests/factories/slack_bolt.py`; ~340 LOC, 4-5 files. |
+| 7 | TASK-140.6.1 approve service and copy-ready publisher | `stack-h/task-140.6.1-status-update-approve` | [#1555](https://github.com/cds-snc/sre-bot/pull/1555) | in review | Commit c99de0b6 (also carries the 140.6.2 plan and this doc). ACs 1-5 checked, gates in the task notes. Approval service (async), `CopyReadyPublisher`, `StatusPagePublisher` in `ports.py`, 3 error codes. |
+| 8 | TASK-140.6.2 review modal and copy-ready view | `stack-h/task-140.6.2-status-update-review` | - | ready (uncommitted) | Implemented. ACs 1-6 checked. Single-process pytest has 4 extra `capture_logs` failures from TASK-90 leak 2 (human: fixed in TASK-90, not here); `pytest tests/unit tests/integration` 3376 passed, ruff/format/lint-imports green, mypy 0 in touched files. One plan deviation: `build_review_error_view` (review conflict wording differs from drafting). Also moves the Bolt test harness into `tests/factories/slack_bolt.py`. Manual check in a real workspace still needed: `rich_text_preformatted` copy fidelity, `views.update` after an update ack. |
 | 9 | TASK-140.8 approved history in the status-updates modal | `stack-h/task-140.8-status-update-history` | - | planned | No plan yet. Gains the published / not published toggle (APPROVED <-> PUBLISHED). |
 | 10 | TASK-140.9 redraft from reviewer instructions | `stack-h/task-140.9-status-update-redraft` | - | planned | No plan yet. |
 
@@ -34,22 +34,30 @@ TASK-140.5 and TASK-140.6 are coordinators with no branch (140.6 split 2026-10-0
 
 ## Position
 
-- Checked out: `stack-h/task-140.6.1-status-update-approve` (layer 7), created with `gh stack add` on top of layer 6 after the stack was rebased onto `main` 7315eb33 (#1552 merged). Uncommitted, all for layer 7: the production and test changes under `app/`, the TASK-140.6.1 and TASK-140.6.2 task files (plans, approval comments) and this doc.
-- Stack #1546: #1544, #1545, #1547, #1548 merged; #1549 (base `main`) <- #1550 <- layer 7 (no PR yet). #1549 and #1550 were force-pushed by the rebase and need re-approval.
-- Function-level imports: ruff `PLC0415` is not selected in `app/pyproject.toml`, so gates miss them, and inline `__import__(...)` is the same violation; check touched files by hand. Enabling the rule repo-wide is a separate branch off `main`, run by the human later.
+- Checked out: `stack-h/task-140.6.2-status-update-review` (layer 8), on c99de0b6. Uncommitted, all for layer 8: production (`scribe/platforms/slack.py`, `scribe/entrypoints/slack.py`, both `incident_status_update` locale files), tests (`tests/factories/slack_bolt.py`, `tests/integration/integrations/slack/test_slack_provider_listener_dispatch.py`, the two `test_incident_scribe_status_update_review_*` unit files, `tests/integration/packages/incident/scribe/`), the TASK-140.6.2 task file and this doc.
+- Stack #1546: #1544, #1545, #1547, #1548 merged; #1549 (base `main`) <- #1550 <- #1555 (layer 7) <- layer 8 (no PR yet). #1549 and #1550 need re-approval after the rebase.
+- Function-level imports: ruff `PLC0415` is enabled on `main` by #1554; the stack gets it on the next rebase. Inline `__import__(...)` is the same violation and the rule misses it; check touched files by hand.
+- Subagent quality: the tests-creation agent twice produced vacuous tests for Slack views (str(view) matching, `or` assertions, invented stages, stub plugins); a general-purpose agent on opus with an explicit quality bar did it right. Review subagent tests structurally before implementing.
 - No background agents.
 
 ## Next actions
 
-1. **human**: review the layer 7 diff, then commit, submit and create layer 8:
+1. **human**: review the layer 8 diff, commit and submit it:
    ```bash
-   git add app backlog/tasks/task-140.6.1* backlog/tasks/task-140.6.2* "backlog/docs/stacks/doc-5 - Stack-H-handoff.md"
-   git commit -m "Approve a status update and render copy-ready text"
+   git add app backlog/tasks/task-140.6.2* "backlog/docs/stacks/doc-5 - Stack-H-handoff.md"
+   git commit -m "Review and approve a status update in the modal"
    gh stack submit
-   gh stack add stack-h/task-140.6.2-status-update-review
    ```
-2. **agent**: implement TASK-140.6.2 test-first (tests-creation then implementation agents; imports at module top level only, tests included, no `__import__`; a circular import is a design flaw), verify gates, check ACs, update this doc.
-3. **human**: review and merge #1549, then #1550, then layer 7, bottom-up with re-approval after each rebase.
+2. **human**: rebase the stack onto `main` (now has #1554, ruff PLC0415 on). Expect a conflict in `app/tests/unit/packages/incident/scribe/test_incident_scribe_status_update_entrypoint.py` while replaying layer 6 (#1550): keep layer 6's tests and #1554's top-level imports. Then run `cd app && uv run ruff check .` on the top layer before submitting.
+   ```bash
+   git checkout main && git pull
+   gh stack checkout stack-h/task-140.6.2-status-update-review
+   gh stack rebase
+   gh stack submit
+   ```
+3. **human (parallel session)**: work TASK-90 in its own session off `main` (standalone PR, not a stack layer); once merged and the stack is rebased, the 4 extra single-process `capture_logs` failures on layer 8 go away.
+4. **agent**: plan TASK-140.8, then TASK-140.9, with a planner agent (imports at module top level only, tests included, no `__import__`); ask questions in chat and wait for approval. Create layer 9 first: `gh stack add stack-h/task-140.8-status-update-history` (human).
+5. **human**: review and merge #1549, #1550, #1555, then layer 8, bottom-up with re-approval after each rebase.
 
 Merging: bottom-up, one layer at a time, with a re-approval for each rebased layer (doc-2 rule; whole-stack merges fail on `main`).
 
@@ -63,6 +71,6 @@ Merging: bottom-up, one layer at a time, with a re-approval for each rebased lay
 - TASK-140.10.1: plan approved and implemented.
 - TASK-140.10.2: plan approved and implemented.
 - TASK-140.6.1: plan approved and implemented.
-- TASK-140.6.2: plan approved 2026-10-07; implementation waits on layer 7's commit and `gh stack add`. Consumes 140.6.1's contract (async service, `validate_approval_edit` field names `en.affected_service`..`fr.workaround`).
-- TASK-140.8, TASK-140.9: no plan; wait on 140.6.1 and 140.6.2.
-- Follow-ups outside the stack: TASK-143 (PR #1552, move scribe Protocols to `scribe/ports.py`, remove 3 function-level imports; standalone off `main`; lands first, the stack rebases onto it), TASK-140.11 (timer pre-generated drafts, low), TASK-140.12 (un-approve or correct, to be decided, low).
+- TASK-140.6.2: plan approved and implemented. Consumes 140.6.1's contract (async service, `validate_approval_edit` field names `en.affected_service`..`fr.workaround`).
+- TASK-140.8, TASK-140.9: no plan; next to plan. 140.8 reuses `build_copy_ready_view`, `_approve_and_publish`, `_ModalCursor`/`_parse_metadata`; 140.9 extends `build_review_view` (optional `notice`), block ids `stage`/`en.*`/`fr.*`, input action ids `stage`/`text`, review metadata `{channel_id, locale, incident_id, sequence}`.
+- Follow-ups outside the stack: TASK-143 (PR #1552, move scribe Protocols to `scribe/ports.py`, remove 3 function-level imports; standalone off `main`; lands first, the stack rebases onto it), TASK-90 (test-order leaks; human 2026-10-07: run in parallel off `main`, it clears layer 8's 4 extra single-process `capture_logs` failures), TASK-140.11 (timer pre-generated drafts, low), TASK-140.12 (un-approve or correct, to be decided, low).

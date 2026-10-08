@@ -12,23 +12,15 @@ Interaction payloads are form-encoded as Slack posts them and fed to
 import json
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from types import SimpleNamespace
 from typing import Any
-from unittest.mock import MagicMock
-from urllib.parse import urlencode
 
-import pluggy
 import pytest
-from slack_bolt import Ack, App, BoltRequest, BoltResponse
+from slack_bolt import Ack
 from slack_sdk import WebClient
 
-from contracts.plugins.hookspecs import FeatureLifecycleSpecs
-from contracts.plugins.namespace import PLUGIN_NAMESPACE, hookimpl
+from contracts.plugins.namespace import hookimpl
 from contracts.slack.registrar import SlackCommandRegistrar
-from integrations.slack.formatter import SlackBlockKitFormatter
-from integrations.slack.provider import SlackPlatformProvider
-from server.plugins.manager import register_feature_integrations
-from tests.factories.slack_bolt import TEAM_ID, InlineExecutor, authorize_single_workspace, unpatched_app_init
+from tests.factories.slack_bolt import Harness, harness_fixture
 
 pytestmark = pytest.mark.integration
 
@@ -65,45 +57,11 @@ class DemoPlugin:
         self.submitted.append(summary)
 
 
-@dataclass
-class Harness:
-    app: App
-    plugin: DemoPlugin
-    api_calls: list[tuple[str, dict[str, Any]]]
-
-    def dispatch(self, payload: dict[str, Any]) -> BoltResponse:
-        body = urlencode({"payload": json.dumps({"team": {"id": TEAM_ID}, "user": {"id": USER_ID}, **payload})})
-        request = BoltRequest(body=body, headers={"content-type": ["application/x-www-form-urlencoded"]})
-        return self.app.dispatch(request)
-
-
 @pytest.fixture
 def harness(monkeypatch: pytest.MonkeyPatch) -> Iterator[Harness]:
-    monkeypatch.setattr(App, "__init__", unpatched_app_init())
-    api_calls: list[tuple[str, dict[str, Any]]] = []
-
-    def record_api_call(self: WebClient, api_method: str, **kwargs: Any) -> dict[str, Any]:
-        api_calls.append((api_method, kwargs.get("json") or kwargs.get("params") or {}))
-        return {"ok": True}
-
-    monkeypatch.setattr(WebClient, "api_call", record_api_call)
-
     plugin = DemoPlugin()
-    plugin_manager = pluggy.PluginManager(PLUGIN_NAMESPACE)
-    plugin_manager.add_hookspecs(FeatureLifecycleSpecs)
-    plugin_manager.register(plugin, name=PLUGIN_NAME)
-    monkeypatch.setattr("server.plugins.manager.get_plugin_manager", lambda: plugin_manager)
-
-    app = App(authorize=authorize_single_workspace, request_verification_enabled=False, listener_executor=InlineExecutor())
-    settings = SimpleNamespace(ENABLED=True, SOCKET_MODE=True, APP_TOKEN="xapp-test", BOT_TOKEN="xoxb-test")
-    provider = SlackPlatformProvider(settings=settings, formatter=SlackBlockKitFormatter())
-    monkeypatch.setattr("integrations.slack.provider.LegacySlackBootstrap", lambda: SimpleNamespace(create_app=lambda: app))
-    monkeypatch.setattr("integrations.slack.provider.SocketModeHandler", lambda app, token: SimpleNamespace(app=app))
-
-    register_feature_integrations(app=MagicMock(), logger=MagicMock(), slack_provider=provider)
-    assert provider.initialize_app().is_success
-
-    yield Harness(app=app, plugin=plugin, api_calls=api_calls)
+    fixture_fn = harness_fixture(PLUGIN_NAME)
+    yield from fixture_fn(monkeypatch, plugin)
 
 
 def block_action(action_id: str) -> dict[str, Any]:
