@@ -3,10 +3,10 @@ id: TASK-90
 title: >-
   Fix the test-order state leaks that break the combined pytest run: SNS
   validator instance monkeypatch and cached structlog loggers
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-11 16:49'
-updated_date: '2026-10-07 23:50'
+updated_date: '2026-10-08 15:43'
 labels:
   - tests
 dependencies: []

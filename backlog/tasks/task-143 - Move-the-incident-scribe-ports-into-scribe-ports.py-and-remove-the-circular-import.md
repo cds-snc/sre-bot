@@ -3,10 +3,10 @@ id: TASK-143
 title: >-
   Move the incident scribe ports into scribe/ports.py and remove the circular
   import
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-07 19:46'
-updated_date: '2026-10-07 20:41'
+updated_date: '2026-10-08 15:54'
 labels:
   - incident
   - refactor

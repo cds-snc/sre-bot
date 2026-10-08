@@ -25,36 +25,28 @@ updated_date: '2026-10-08 00:51'
 | 5 | TASK-140.10.1 security flag | `stack-h/task-140.6-status-update-approve` | [#1549](https://github.com/cds-snc/sre-bot/pull/1549) | merged | 2ae430d1. Never revert the `Incident` field. |
 | 6 | TASK-140.10.2 confirm before drafting | `stack-h/task-140.10.2-security-draft-confirm` | [#1550](https://github.com/cds-snc/sre-bot/pull/1550) | merged | 162f6fa9. |
 | 7 | TASK-140.6.1 approval service + copy-ready publisher | `stack-h/task-140.6.1-status-update-approve` | [#1555](https://github.com/cds-snc/sre-bot/pull/1555) | merged | 5a23e162. |
-| 8 | TASK-140.6.2 review modal + copy-ready view | `stack-h/task-140.6.2-status-update-review` | [#1556](https://github.com/cds-snc/sre-bot/pull/1556) | in review | 449c3588, base main 5a23e162. ACs 1-6 checked. Deviation: `build_review_error_view`. Bolt harness in `tests/factories/slack_bolt.py`. Manual workspace checks pending: `rich_text_preformatted` copy fidelity, `views.update` after an update ack. |
-| 9 | TASK-140.8.1 approved-updates list + reopen | `stack-h/task-140.8-status-update-history` (pre-split name) | [#1557](https://github.com/cds-snc/sre-bot/pull/1557) | in review | 3627148c. ACs 1-6 checked. Manual checks: Open/Back in place, ET/HE row times. |
-| 10 | TASK-140.8.2 published / not published toggle | `stack-h/task-140.8.2-status-update-published` | [#1558](https://github.com/cds-snc/sre-bot/pull/1558) | in review | 9c1227e2. ACs 1-5 checked. Core `published_by` + PUBLISHED -> APPROVED. Never revert the core field once data exists. Manual checks: toggle in place in a real modal, ET/HE published line. |
-| 11 | TASK-140.9 redraft from reviewer instructions | `stack-h/task-140.9-status-update-redraft` | - (created at submit) | ready (uncommitted) | ACs 1-5 checked, notes with gate evidence. +430/-26 Python lines (net ~404, mostly docstrings) + 22 locale lines, 8 files: a little over the planned ~300. Manual checks: view.state in block_actions, views.update with the action hash, checkbox in the form, real model follows the guidance suffix. Last layer of the stack. |
+| 8 | TASK-140.6.2 review modal + copy-ready view | `stack-h/task-140.6.2-status-update-review` | [#1556](https://github.com/cds-snc/sre-bot/pull/1556) | merged | Squash-merged 2026-10-08 as e820711e. 449c3588, base main 5a23e162. ACs 1-6 checked. Deviation: `build_review_error_view`. Bolt harness in `tests/factories/slack_bolt.py`. Manual workspace checks pending: `rich_text_preformatted` copy fidelity, `views.update` after an update ack. |
+| 9 | TASK-140.8.1 approved-updates list + reopen | `stack-h/task-140.8-status-update-history` (pre-split name) | [#1557](https://github.com/cds-snc/sre-bot/pull/1557) | merged | Squash-merged 2026-10-08 as fc310275. 3627148c. ACs 1-6 checked. Manual checks: Open/Back in place, ET/HE row times. |
+| 10 | TASK-140.8.2 published / not published toggle | `stack-h/task-140.8.2-status-update-published` | [#1558](https://github.com/cds-snc/sre-bot/pull/1558) | in review | Rebased onto main 2026-10-08 (4b2a518c + gate-record commit 7b6a6e92); PR retitled via REST. 9c1227e2. ACs 1-5 checked. Core `published_by` + PUBLISHED -> APPROVED. Never revert the core field once data exists. Manual checks: toggle in place in a real modal, ET/HE published line. |
+| 11 | TASK-140.9 redraft from reviewer instructions | `stack-h/task-140.9-status-update-redraft` | [#1561](https://github.com/cds-snc/sre-bot/pull/1561) | in review | Rebased onto layer 10 2026-10-08 (562e3cdc), re-verified, gates in the task notes.  ACs 1-5 checked, notes with gate evidence. +430/-26 Python lines (net ~404, mostly docstrings) + 22 locale lines, 8 files: a little over the planned ~300. Manual checks: view.state in block_actions, views.update with the action hash, checkbox in the form, real model follows the guidance suffix. Last layer of the stack. |
 
 Coordinators with no branch: TASK-140.5 (140.5.1-3), TASK-140.6 (140.6.1-2), TASK-140.8 (140.8.1-2), TASK-140.10 (140.10.1-2); AC mappings in their notes. After the stack: TASK-140.7 (legacy cutover, standalone PR, depends on 140.6 and 140.8.1).
 
 ## Position
 
-- Checked out: `stack-h/task-140.9-status-update-redraft` (layer 11), branch tip 9c1227e2 (same as layer 10), stacked on #1558.
-- Uncommitted, all layer 11 (TASK-140.9) plus this doc:
-  - production: `app/contracts/operations/codes.py`, `app/packages/incident/scribe/{status_update.py,status_update_prompt.py,platforms/slack.py,entrypoints/slack.py,README.md}`, `app/packages/incident/scribe/locales/incident_status_update.{en-US,fr-FR}.yml`
-  - tests edited: `app/tests/unit/packages/incident/scribe/test_incident_scribe_plugin_registration.py`, `..._status_update_{review,history,published}_entrypoint.py` (TestRegister), `..._status_update_review_view.py`
-  - tests new: `app/tests/unit/packages/incident/scribe/test_incident_scribe_status_update_redraft{,_prompt,_view,_entrypoint}.py`, `app/tests/integration/packages/incident/scribe/test_incident_scribe_status_update_redraft_dispatch.py`
-  - backlog: the TASK-140.9 task file (CLI edits: In Progress, ACs, notes), this doc.
-- Gates on layer 11 (app/): ruff check and format clean, lint-imports 10 kept, mypy 57 repo-wide with 0 in touched files, `pytest tests/unit tests/integration` 3653 passed. Single-process `pytest tests --ignore=tests/smoke`: 4416 passed, 20 failed = 6 known TASK-90 + 14 scribe `capture_logs` tests (TASK-90 leak 2: `configure_logging`'s pytest branch sets `cache_logger_on_first_use=True`). All 14 pass in isolation. TASK-90 is deferred by the human to a later standalone PR (local branch `fix/task-90-test-order-leaks`).
+- Checked out: `stack-h/task-140.9-status-update-redraft` (layer 11, PR #1561), stacked on layer 10 (`stack-h/task-140.8.2-status-update-published`, PR #1558, base `main`). Layers 1-9 merged (last: #1557 as fc310275; trunk tip df070fc8).
+- 2026-10-08: `gh stack rebase` dropped the merged layers; layers 10 and 11 re-verified on the rebased branches, gates appended to the TASK-140.8.2 and TASK-140.9 notes (layer 10: 4328 passed; layer 11: 4437 passed; single-process, 0 failed now that TASK-90 #1560 is merged; mypy 57 repo-wide, 0 in each layer's touched files).
+- PR #1558 was titled "Update Stack H handoff"; retitled to "Mark a status update published or not" with `gh api -X PATCH repos/cds-snc/sre-bot/pulls/1558 -f title=...` because `gh pr edit` fails on the `reviewRequests` GraphQL lookup ("Resource not accessible by integration"). Use the REST call for PR edits.
+- TASK-140.7 (legacy cutover) is open as standalone PR #1564 off `main` (branch `task-140.7-retire-legacy-incident-updates`; ACs 1-3 checked, In Progress; also fixes the 9 mypy errors in `modules/incident/core.py` and an unset security-group crash at declare). It shares only this doc with layers 10-11, so the doc conflicts for whichever merges second: keep this version and fold in 140.7's state.
 - No background agents.
 
 ## Next actions
 
-1. **human**: commit layer 11 and submit:
-   ```bash
-   git add app/contracts/operations/codes.py app/packages/incident/scribe app/tests/unit/packages/incident/scribe app/tests/integration/packages/incident/scribe "backlog/tasks/task-140.9 - Redraft-a-status-update-from-reviewer-instructions-in-the-review-modal.md" "backlog/docs/stacks/doc-5 - Stack-H-handoff.md"
-   git commit -m "Redraft a status update from instructions"
-   gh stack submit
-   ```
-2. **human**: run the manual workspace checks listed in the Layers notes for layers 8-11.
-3. **human**: merge bottom-up, re-approving after each rebase: #1556, #1557, #1558, then layer 11's PR. After each merge, `gh stack rebase` and push, then set that layer's task to Done. Agents never set Done.
-4. **human**: set Done for the merged layers 140.4, 140.5.1, 140.5.2, 140.5.3, 140.10.1, 140.10.2, 140.6.1 and for the coordinators 140.5, 140.10, 140.6 (after 140.6.2) and 140.8 (after 140.8.2).
-5. **agent** (new session): TASK-140.7 legacy cutover as a standalone PR off main, once Stack H is merged.
+1. **human**: commit the layer 11 gate record and this doc, push the stack (commands in the session hand-off).
+2. **human**: run the manual workspace checks listed in the Layers notes for layers 10-11.
+3. **human**: merge bottom-up with re-approval after each rebase: #1558, then `gh stack rebase` + `gh stack push`, then #1561. Then #1564 (TASK-140.7), resolving the doc-5 conflict in favour of this version. #1564 can also go first; its code does not overlap the stack.
+4. **human**: set Done (agents never set Done) for the merged layers 140.4, 140.5.1, 140.5.2, 140.5.3, 140.10.1, 140.10.2, 140.6.1, 140.6.2, 140.8.1, then 140.8.2, 140.9 and 140.7 after their merges, and the coordinators 140.5, 140.10, 140.6 and 140.8 once their ACs are checked.
+5. Then Stack H is closed. Follow-ups outside the stack: TASK-140.11 (timer pre-generated drafts, low), TASK-140.12 (un-approve or correct, low).
 
 ## Open decisions
 

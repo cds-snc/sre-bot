@@ -3,10 +3,10 @@ id: TASK-139
 title: >-
   Restructure the incident umbrella and scribe READMEs so developers can find
   where new incident work goes
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-06 15:56'
-updated_date: '2026-10-06 19:22'
+updated_date: '2026-10-08 15:45'
 labels:
   - incident
   - docs

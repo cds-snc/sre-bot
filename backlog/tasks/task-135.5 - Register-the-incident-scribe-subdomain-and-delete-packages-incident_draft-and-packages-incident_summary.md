@@ -3,10 +3,10 @@ id: TASK-135.5
 title: >-
   Register the incident scribe subdomain and delete packages/incident_draft and
   packages/incident_summary
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-02 18:00'
-updated_date: '2026-10-02 18:01'
+updated_date: '2026-10-08 15:44'
 labels:
   - plugin-architecture
   - features

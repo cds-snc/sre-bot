@@ -4,7 +4,7 @@ title: Redraft a status update from reviewer instructions in the review modal
 status: In Progress
 assignee: []
 created_date: '2026-10-07 15:17'
-updated_date: '2026-10-08 00:50'
+updated_date: '2026-10-08 15:39'
 labels:
   - incident
 dependencies:
@@ -86,6 +86,13 @@ Blast radius and rollback: only new DRAFT rows; first draft and approval paths u
 - Tests: new test_incident_scribe_status_update_redraft{,_prompt,_view,_entrypoint}.py (unit) and test_incident_scribe_status_update_redraft_dispatch.py (integration, real incident.scribe plugin through harness_fixture). Edited in place: TestRegister dicts in the review/history/published entrypoint tests (PUBLISHED_ACTION_ID kept, REDRAFT_ACTION_ID added), review view input order, and plugin registration (the old 'draft' substring count also matched 'redraft').
 - Gates (app/): ruff check . -> All checks passed!; ruff format --check . -> 852 files already formatted; lint-imports -> Contracts: 10 kept, 0 broken; mypy -> Found 57 errors in 20 files, 0 in touched files; pytest tests/unit tests/integration -> 3653 passed; single-process pytest tests --ignore=tests/smoke -> 4416 passed, 20 failed = the 6 known TASK-90 SNS/google-directory failures + 14 scribe capture_logs tests (TASK-90 leak 2; 10 known on layer 10, the new redraft TestLogging plus 3 order-shifted ones). All 14 pass in isolation. A grep of touched files for __import__, importlib and indented imports found none.
 - Manual checks pending in a real workspace (plan assumptions): view.state in block_actions from the modal, views.update with the action's view.hash, the checkbox inside the form, the real model following the guidance suffix and returning parseable JSON.
+
+Re-verified 2026-10-08 after gh stack rebase onto layer 10 (7b6a6e92; layers 8-9 merged on main). Gates (cd app):
+- uv run ruff check . -> All checks passed!
+- uv run lint-imports -> Contracts: 10 kept, 0 broken.
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 57 errors in 20 files (checked 384 source files); 0 in the 20 files this layer touches.
+- uv run pytest tests/integration/legacy_surface -q -> 20 passed, 4 warnings
+- uv run pytest tests --ignore=tests/smoke -q -p no:randomly -> 4437 passed, 2420 warnings in 49.70s
 <!-- SECTION:NOTES:END -->
 
 ## Comments
