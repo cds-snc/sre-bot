@@ -24,6 +24,7 @@ from packages.incident.scribe.domain import (
     StatusUpdateDraftOutcome,
     StatusUpdateEdit,
     StatusUpdateOutcomeKind,
+    StatusUpdateOverview,
 )
 from packages.incident.scribe.platforms import slack as platform_slack
 from packages.incident.scribe.platforms.slack import (
@@ -115,9 +116,9 @@ def _section_text(view: dict[str, Any]) -> str:
     return "".join(block["text"]["text"] for block in view["blocks"] if block["type"] == "section")
 
 
-def _pending_view(monkeypatch: pytest.MonkeyPatch, pending: OperationResult[StatusUpdate]) -> dict[str, Any]:
-    """Run the status-update command with the pending lookup stubbed and return the final modal view."""
-    monkeypatch.setattr(platform_slack, "get_pending_status_update", lambda channel_id: pending)
+def _pending_view(monkeypatch: pytest.MonkeyPatch, overview: OperationResult[StatusUpdateOverview]) -> dict[str, Any]:
+    """Run the status-update command with the overview read stubbed and return the final modal view."""
+    monkeypatch.setattr(platform_slack, "get_status_update_overview", lambda channel_id: overview)
     reply = FakeSlackReply()
     payload = CommandPayload(
         text="", user_id="U9", channel_id=_CHANNEL, user_locale="en-US", platform_metadata={"trigger_id": "T1"}
@@ -155,20 +156,20 @@ def _selected(value: str | None) -> dict[str, Any]:
 class TestReviewButton:
     def test_pending_view_shows_draft_then_review(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """The pending view's buttons are Draft then Review, so a draft can be reviewed without redrafting."""
-        view = _pending_view(monkeypatch, OperationResult.success(data=_draft()))
+        view = _pending_view(monkeypatch, OperationResult.success(data=StatusUpdateOverview(pending=_draft(), approved=())))
 
         assert _button_action_ids(view) == [DRAFT_ACTION_ID, REVIEW_ACTION_ID]
 
     def test_pending_view_review_value_names_the_draft(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """The Review button's value is JSON naming the shown draft's incident id and sequence."""
-        view = _pending_view(monkeypatch, OperationResult.success(data=_draft()))
+        view = _pending_view(monkeypatch, OperationResult.success(data=StatusUpdateOverview(pending=_draft(), approved=())))
 
         button = _button(view, REVIEW_ACTION_ID)
         assert json.loads(button["value"]) == {"incident_id": _INCIDENT, "sequence": _SEQUENCE}
 
     def test_review_button_label(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """The Review button is a plain-text button labelled Review in English."""
-        view = _pending_view(monkeypatch, OperationResult.success(data=_draft()))
+        view = _pending_view(monkeypatch, OperationResult.success(data=StatusUpdateOverview(pending=_draft(), approved=())))
 
         button = _button(view, REVIEW_ACTION_ID)
         assert button["type"] == "button"
@@ -176,7 +177,7 @@ class TestReviewButton:
 
     def test_no_pending_view_has_draft_only(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """With no draft there is nothing to review, so only Draft is offered."""
-        view = _pending_view(monkeypatch, OperationResult.success(data=None))
+        view = _pending_view(monkeypatch, OperationResult.success(data=StatusUpdateOverview(pending=None, approved=())))
 
         assert _button_action_ids(view) == [DRAFT_ACTION_ID]
 

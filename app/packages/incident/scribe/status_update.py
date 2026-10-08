@@ -49,6 +49,7 @@ from packages.incident.scribe.domain import (
     NoNewInformationWording,
     StatusUpdateDraftOutcome,
     StatusUpdateOutcomeKind,
+    StatusUpdateOverview,
 )
 from packages.incident.scribe.ports import TextGenerator
 from packages.incident.scribe.settings import IncidentStatusUpdateSettings, get_incident_status_update_settings
@@ -59,6 +60,40 @@ logger = structlog.get_logger()
 DRAFT_UNPARSEABLE_CODE = "DRAFT_UNPARSEABLE"
 
 _STAGE_ORDER = tuple(StatusUpdateStage)
+
+
+def get_status_update_overview(
+    conversation_id: str,
+    *,
+    lookup: IncidentLookup | None = None,
+    store: StatusUpdateStore | None = None,
+) -> OperationResult[StatusUpdateOverview]:
+    """Return the incident's pending draft and approved updates, without drafting anything.
+
+    Args:
+        conversation_id: The incident conversation the command ran in.
+        lookup: Resolves the conversation to its incident; core's by default.
+        store: Holds the incident's status updates; core's by default.
+
+    Returns:
+        Success with the latest record as ``pending`` when it is a draft, and
+        every approved or published record newest first. Otherwise the lookup's
+        refusal (``NOT_AN_INCIDENT``, ``AMBIGUOUS_INCIDENT_CONVERSATION``) or
+        the store's classified error.
+    """
+    lookup = lookup or get_incident_lookup()
+    incident = lookup.find_incident_for_conversation(conversation_id)
+    if not incident.is_success or incident.data is None:
+        return _failure(incident)
+
+    store = store or get_status_update_store()
+    listed = store.list_for_incident(incident.data)
+    if not listed.is_success or listed.data is None:
+        return _failure(listed)
+    latest = listed.data[0] if listed.data else None
+    pending = latest if latest is not None and latest.state is StatusUpdateState.DRAFT else None
+    approved = tuple(update for update in listed.data if update.state is not StatusUpdateState.DRAFT)
+    return OperationResult.success(data=StatusUpdateOverview(pending=pending, approved=approved))
 
 
 def get_pending_status_update(
@@ -76,22 +111,13 @@ def get_pending_status_update(
 
     Returns:
         Success with the latest record when it is a draft, or ``None`` when
-        there is no record or the latest is not a draft. Otherwise the lookup's
-        refusal (``NOT_AN_INCIDENT``, ``AMBIGUOUS_INCIDENT_CONVERSATION``) or
-        the store's classified error.
+        there is no record or the latest is not a draft. Otherwise the error
+        of ``get_status_update_overview``.
     """
-    lookup = lookup or get_incident_lookup()
-    incident = lookup.find_incident_for_conversation(conversation_id)
-    if not incident.is_success or incident.data is None:
-        return _failure(incident)
-
-    store = store or get_status_update_store()
-    listed = store.list_for_incident(incident.data)
-    if not listed.is_success or listed.data is None:
-        return _failure(listed)
-    latest = listed.data[0] if listed.data else None
-    pending = latest if latest is not None and latest.state is StatusUpdateState.DRAFT else None
-    return OperationResult.success(data=pending)
+    overview = get_status_update_overview(conversation_id, lookup=lookup, store=store)
+    if not overview.is_success or overview.data is None:
+        return _failure(overview)
+    return OperationResult.success(data=overview.data.pending)
 
 
 async def draft_status_update(

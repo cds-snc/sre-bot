@@ -26,17 +26,21 @@ import structlog
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from contracts.slack.registrar import SlackCommandRegistrar
+from packages.incident.core.api import StatusUpdate
 from packages.incident.scribe import providers
 from packages.incident.scribe.domain import CopyReadyText, StatusUpdateEdit
 from packages.incident.scribe.platforms.slack import (
     CONFIRM_ACTION_ID,
     DRAFT_ACTION_ID,
+    HISTORY_ACTION_ID,
+    OPEN_ACTION_ID,
     REVIEW_ACTION_ID,
     REVIEW_CALLBACK_ID,
     build_copy_ready_view,
     build_draft_error_view,
     build_drafting_view,
     build_no_new_information_wording,
+    build_overview_view,
     build_profile_labels,
     build_result_view,
     build_review_error_view,
@@ -46,18 +50,19 @@ from packages.incident.scribe.platforms.slack import (
     build_security_confirmation_view,
     parse_review_submission,
 )
-from packages.incident.scribe.status_update import draft_status_update
+from packages.incident.scribe.status_update import draft_status_update, get_status_update_overview
 from packages.incident.scribe.status_update_approval import (
     approve_status_update,
     get_draft_for_review,
     validate_approval_edit,
 )
+from packages.incident.scribe.status_update_history import get_approved_update
 
 logger = structlog.get_logger()
 
 
 def register(registrar: SlackCommandRegistrar) -> None:
-    """Register the Draft, Confirm and draft and Review listeners and the approval submission listener.
+    """Register the Draft, Confirm and draft, Review, Open and Back listeners and the approval submission listener.
 
     Args:
         registrar: Slack command registrar.
@@ -65,6 +70,8 @@ def register(registrar: SlackCommandRegistrar) -> None:
     registrar.register_block_action(DRAFT_ACTION_ID, handle_draft_action)
     registrar.register_block_action(CONFIRM_ACTION_ID, handle_draft_confirmed_action)
     registrar.register_block_action(REVIEW_ACTION_ID, handle_review_action)
+    registrar.register_block_action(OPEN_ACTION_ID, handle_open_action)
+    registrar.register_block_action(HISTORY_ACTION_ID, handle_history_action)
     registrar.register_view_submission(REVIEW_CALLBACK_ID, handle_review_submission)
 
 
@@ -195,6 +202,86 @@ def handle_review_action(ack: Callable[[], Any], body: dict[str, Any], client: A
     _ModalCursor(client, view_id, view.get("hash"), log).update(
         next_view, failure_event="incident_status_update_review_update_failed"
     )
+
+
+def handle_open_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+    """Handle a press of Open on an approved update: replace the modal in place with its copy-ready text.
+
+    Args:
+        ack: Bolt ack callable, called first.
+        body: Block-actions payload; the button value names the incident and sequence.
+        client: Bolt Slack web client.
+    """
+    ack()
+    view = body.get("view") or {}
+    view_id = str(view.get("id", ""))
+    metadata = _parse_metadata(view.get("private_metadata"))
+    locale = str(metadata.get("locale") or "en-US")
+    private_metadata = json.dumps({"channel_id": str(metadata.get("channel_id", "")), "locale": locale})
+    log = logger.bind(action="incident_status_update_open", user_id=str((body.get("user") or {}).get("id", "")), view_id=view_id)
+    target = _parse_metadata(((body.get("actions") or [{}])[0]).get("value"))
+    incident_id = str(target.get("incident_id", ""))
+    sequence = target.get("sequence")
+
+    result = asyncio.run(_read_and_publish(incident_id, sequence)) if isinstance(sequence, int) else None
+    if result is not None and result.is_success and result.data is not None:
+        update, copy = result.data
+        next_view = build_copy_ready_view(copy, locale, private_metadata, update=update)
+    else:
+        error_code = result.error_code if result is not None else None
+        log.warning("incident_status_update_open_failed", error_code=error_code)
+        next_view = build_draft_error_view(error_code, locale, private_metadata)
+    _ModalCursor(client, view_id, view.get("hash"), log).update(
+        next_view, failure_event="incident_status_update_open_update_failed"
+    )
+
+
+def handle_history_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+    """Handle a press of Back: replace the modal in place with the incident's status-updates list.
+
+    Args:
+        ack: Bolt ack callable, called first.
+        body: Block-actions payload; the button value names the channel.
+        client: Bolt Slack web client.
+    """
+    ack()
+    view = body.get("view") or {}
+    view_id = str(view.get("id", ""))
+    metadata = _parse_metadata(view.get("private_metadata"))
+    locale = str(metadata.get("locale") or "en-US")
+    channel_id = str(_parse_metadata(((body.get("actions") or [{}])[0]).get("value")).get("channel_id", ""))
+    private_metadata = json.dumps({"channel_id": channel_id, "locale": locale})
+    log = logger.bind(
+        action="incident_status_update_history",
+        user_id=str((body.get("user") or {}).get("id", "")),
+        channel_id=channel_id,
+        view_id=view_id,
+    )
+
+    result = get_status_update_overview(channel_id)
+    if result.is_success and result.data is not None:
+        next_view = build_overview_view(result.data, locale, private_metadata)
+    else:
+        log.warning("incident_status_update_history_failed", status=result.status, error_code=result.error_code)
+        next_view = build_draft_error_view(result.error_code, locale, private_metadata)
+    _ModalCursor(client, view_id, view.get("hash"), log).update(
+        next_view, failure_event="incident_status_update_history_update_failed"
+    )
+
+
+async def _read_and_publish(incident_id: str, sequence: int) -> OperationResult[tuple[StatusUpdate, CopyReadyText]]:
+    """Read the approved update, then render it as copy-ready text in one event loop."""
+    read = await get_approved_update(incident_id, sequence)
+    if not read.is_success or read.data is None:
+        return OperationResult.error(read.status, message=read.message or "read failed", error_code=read.error_code)
+    published = await providers.get_status_page_publisher().publish(
+        read.data, labels_en=build_profile_labels("en-US"), labels_fr=build_profile_labels("fr-FR")
+    )
+    if not published.is_success or published.data is None:
+        return OperationResult.error(
+            published.status, message=published.message or "publish failed", error_code=published.error_code
+        )
+    return OperationResult.success(data=(read.data, published.data))
 
 
 def handle_review_submission(ack: Callable[..., Any], body: dict[str, Any], client: Any) -> None:

@@ -14,7 +14,8 @@ from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
 from contracts.slack.models import CommandPayload
 from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
-from packages.incident.scribe.platforms.slack import handle_status_update_command, register_commands
+from packages.incident.scribe.domain import StatusUpdateOverview
+from packages.incident.scribe.platforms.slack import DRAFT_ACTION_ID, handle_status_update_command, register_commands
 from tests.factories.slack import FakeSlackReply
 
 pytestmark = pytest.mark.unit
@@ -72,8 +73,10 @@ class TestHandleStatusUpdateCommand:
         reply = FakeSlackReply()
 
         with patch(
-            "packages.incident.scribe.platforms.slack.get_pending_status_update",
-            new=MagicMock(return_value=OperationResult.success(data=_pending_update())),
+            "packages.incident.scribe.platforms.slack.get_status_update_overview",
+            new=MagicMock(
+                return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
+            ),
         ):
             handle_status_update_command(payload, {}, reply)
 
@@ -87,8 +90,10 @@ class TestHandleStatusUpdateCommand:
         reply = FakeSlackReply(OperationResult.success(data="view-id-123"))
 
         with patch(
-            "packages.incident.scribe.platforms.slack.get_pending_status_update",
-            new=MagicMock(return_value=OperationResult.success(data=_pending_update())),
+            "packages.incident.scribe.platforms.slack.get_status_update_overview",
+            new=MagicMock(
+                return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
+            ),
         ):
             handle_status_update_command(payload, {}, reply)
 
@@ -96,8 +101,15 @@ class TestHandleStatusUpdateCommand:
         assert len(update_calls) >= 1
         # The view should contain both EN and FR sections
         view = update_calls[0]["view"]
-        view_str = str(view)
-        assert "en service" in view_str or "affected_service" in view_str.lower()
+        sections = [block["text"]["text"] for block in view["blocks"] if block["type"] == "section"]
+        assert sections[0] == (
+            "Stage: Identified\n"
+            "Affected service: en service\n"
+            "Impact: en impact\n"
+            "Current action: en action\n"
+            "Workaround: en workaround\n"
+            "Next update: 2026-10-07 11:00 ET"
+        )
 
     def test_shows_no_pending_view_when_no_draft_exists(self):
         """When no draft exists, the view is updated to show a no-pending message."""
@@ -105,8 +117,8 @@ class TestHandleStatusUpdateCommand:
         reply = FakeSlackReply(OperationResult.success(data="view-id-123"))
 
         with patch(
-            "packages.incident.scribe.platforms.slack.get_pending_status_update",
-            new=MagicMock(return_value=OperationResult.success(data=None)),
+            "packages.incident.scribe.platforms.slack.get_status_update_overview",
+            new=MagicMock(return_value=OperationResult.success(data=StatusUpdateOverview(pending=None, approved=()))),
         ):
             handle_status_update_command(payload, {}, reply)
 
@@ -129,7 +141,7 @@ class TestHandleStatusUpdateCommand:
         reply = FakeSlackReply(OperationResult.success(data="view-id-123"))
 
         with patch(
-            "packages.incident.scribe.platforms.slack.get_pending_status_update",
+            "packages.incident.scribe.platforms.slack.get_status_update_overview",
             new=MagicMock(
                 return_value=OperationResult.error(
                     OperationStatus.NOT_FOUND,
@@ -150,7 +162,7 @@ class TestHandleStatusUpdateCommand:
         reply = FakeSlackReply(OperationResult.success(data="view-id-123"))
 
         with patch(
-            "packages.incident.scribe.platforms.slack.get_pending_status_update",
+            "packages.incident.scribe.platforms.slack.get_status_update_overview",
             new=MagicMock(
                 return_value=OperationResult.permanent_error(
                     message="multiple incidents",
@@ -169,7 +181,7 @@ class TestHandleStatusUpdateCommand:
         reply = FakeSlackReply(OperationResult.success(data="view-id-123"))
 
         with patch(
-            "packages.incident.scribe.platforms.slack.get_pending_status_update",
+            "packages.incident.scribe.platforms.slack.get_status_update_overview",
             new=MagicMock(
                 return_value=OperationResult.transient_error(
                     message="throttled",
@@ -195,8 +207,10 @@ class TestHandleStatusUpdateCommand:
         )
 
         with patch(
-            "packages.incident.scribe.platforms.slack.get_pending_status_update",
-            new=MagicMock(return_value=OperationResult.success(data=_pending_update())),
+            "packages.incident.scribe.platforms.slack.get_status_update_overview",
+            new=MagicMock(
+                return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
+            ),
         ):
             response = handle_status_update_command(payload, {}, reply)
 
@@ -229,8 +243,10 @@ class TestHandleStatusUpdateCommand:
         reply = _FailOnUpdateReply()  # type: ignore[assignment]
 
         with patch(
-            "packages.incident.scribe.platforms.slack.get_pending_status_update",
-            new=MagicMock(return_value=OperationResult.success(data=_pending_update())),
+            "packages.incident.scribe.platforms.slack.get_status_update_overview",
+            new=MagicMock(
+                return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
+            ),
         ):
             handle_status_update_command(payload, {}, reply)
 
@@ -244,8 +260,10 @@ class TestHandleStatusUpdateCommand:
         reply = FakeSlackReply(OperationResult.success(data="view-id-123"))
 
         with patch(
-            "packages.incident.scribe.platforms.slack.get_pending_status_update",
-            new=MagicMock(return_value=OperationResult.success(data=_pending_update())),
+            "packages.incident.scribe.platforms.slack.get_status_update_overview",
+            new=MagicMock(
+                return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
+            ),
         ):
             handle_status_update_command(payload, {}, reply)
 
@@ -262,16 +280,18 @@ class TestDraftButtonInViews:
         reply = FakeSlackReply(OperationResult.success(data="view-id-123"))
 
         with patch(
-            "packages.incident.scribe.platforms.slack.get_pending_status_update",
-            new=MagicMock(return_value=OperationResult.success(data=_pending_update())),
+            "packages.incident.scribe.platforms.slack.get_status_update_overview",
+            new=MagicMock(
+                return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
+            ),
         ):
             handle_status_update_command(payload, {}, reply)
 
         update_calls = reply.calls_to("update_view")
         assert len(update_calls) >= 1
         view = update_calls[0]["view"]
-        view_str = str(view)
-        assert "incident.scribe.status_update.draft" in view_str
+        (draft_block,) = [block for block in view["blocks"] if block.get("block_id") == "draft_button"]
+        assert draft_block["elements"][0]["action_id"] == DRAFT_ACTION_ID
 
     def test_draft_button_present_in_no_pending_view(self):
         """The no-pending view includes a Draft button."""
@@ -279,16 +299,16 @@ class TestDraftButtonInViews:
         reply = FakeSlackReply(OperationResult.success(data="view-id-123"))
 
         with patch(
-            "packages.incident.scribe.platforms.slack.get_pending_status_update",
-            new=MagicMock(return_value=OperationResult.success(data=None)),
+            "packages.incident.scribe.platforms.slack.get_status_update_overview",
+            new=MagicMock(return_value=OperationResult.success(data=StatusUpdateOverview(pending=None, approved=()))),
         ):
             handle_status_update_command(payload, {}, reply)
 
         update_calls = reply.calls_to("update_view")
         assert len(update_calls) >= 1
         view = update_calls[0]["view"]
-        view_str = str(view)
-        assert "incident.scribe.status_update.draft" in view_str
+        (draft_block,) = [block for block in view["blocks"] if block.get("block_id") == "draft_button"]
+        assert draft_block["elements"][0]["action_id"] == DRAFT_ACTION_ID
 
     def test_draft_button_absent_in_error_view(self):
         """Error views (not-an-incident, ambiguous, etc.) do not include a Draft button."""
@@ -296,7 +316,7 @@ class TestDraftButtonInViews:
         reply = FakeSlackReply(OperationResult.success(data="view-id-123"))
 
         with patch(
-            "packages.incident.scribe.platforms.slack.get_pending_status_update",
+            "packages.incident.scribe.platforms.slack.get_status_update_overview",
             new=MagicMock(
                 return_value=OperationResult.error(
                     OperationStatus.NOT_FOUND,
@@ -310,5 +330,4 @@ class TestDraftButtonInViews:
         update_calls = reply.calls_to("update_view")
         assert len(update_calls) >= 1
         view = update_calls[0]["view"]
-        view_str = str(view)
-        assert "incident.scribe.status_update.draft" not in view_str
+        assert [block for block in view["blocks"] if block.get("block_id") == "draft_button"] == []

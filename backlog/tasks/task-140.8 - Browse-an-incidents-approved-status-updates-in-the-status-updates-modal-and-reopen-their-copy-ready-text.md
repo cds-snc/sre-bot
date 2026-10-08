@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-07 15:17'
-updated_date: '2026-10-07 18:53'
+updated_date: '2026-10-07 22:57'
 labels:
   - incident
 dependencies:
@@ -37,4 +37,6 @@ The status-updates modal (TASK-140.5.2) lists the incident's approved updates (A
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-07 (human): PUBLISHED is a user confirmation, not set by approval; added the published / not published toggle (undoable). Verify StatusUpdateStore.transition allows PUBLISHED -> APPROVED for the undo.
+
+2026-10-07 decisions (human): split at the size gate into 140.8.1 (list + reopen, scribe only; ACs 1, 2, 3, 5, 6) and 140.8.2 (published toggle incl. core published_by and PUBLISHED -> APPROVED; ACs 4, 5, 6). 140.8 is coordinator with no branch; its ACs are checked as the slices verify them. Open an update in place with a Back button (not views.push); undo clears published_at and published_by; one get_status_update_overview with get_pending_status_update delegating; draft-result and approval views unchanged; list capped at 50 rows with a localized note.
 <!-- SECTION:NOTES:END -->

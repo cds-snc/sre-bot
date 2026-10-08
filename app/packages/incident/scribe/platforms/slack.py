@@ -38,8 +38,8 @@ from contracts.slack.models import Argument, ArgumentType, CommandPayload, Comma
 from contracts.slack.registrar import SlackCommandRegistrar
 from contracts.slack.reply import SlackReplySender
 from infrastructure.i18n import t
-from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateText
-from packages.incident.scribe.comms_profile import ProfileLabels, render_profile
+from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from packages.incident.scribe.comms_profile import ProfileLabels, format_profile_time, render_profile
 from packages.incident.scribe.domain import (
     CopyReadyText,
     DraftedDocument,
@@ -47,6 +47,7 @@ from packages.incident.scribe.domain import (
     StatusUpdateDraftOutcome,
     StatusUpdateEdit,
     StatusUpdateOutcomeKind,
+    StatusUpdateOverview,
 )
 from packages.incident.scribe.service import (
     DOCUMENT_UNREADABLE_CODE,
@@ -56,7 +57,7 @@ from packages.incident.scribe.service import (
     draft_incident_document_from_conversation,
     summarize_incident_conversation,
 )
-from packages.incident.scribe.status_update import DRAFT_UNPARSEABLE_CODE, get_pending_status_update
+from packages.incident.scribe.status_update import DRAFT_UNPARSEABLE_CODE, get_status_update_overview
 
 logger = structlog.get_logger()
 
@@ -68,6 +69,9 @@ DRAFT_ACTION_ID = "incident.scribe.status_update.draft"
 CONFIRM_ACTION_ID = "incident.scribe.status_update.draft_confirmed"
 REVIEW_ACTION_ID = "incident.scribe.status_update.review"
 REVIEW_CALLBACK_ID = "incident.scribe.status_update.approve"
+OPEN_ACTION_ID = "incident.scribe.status_update.open"
+HISTORY_ACTION_ID = "incident.scribe.status_update.history"
+_APPROVED_ROW_CAP = 50
 _TEXT_FIELDS = ("affected_service", "impact", "current_action", "workaround")
 _SINCE_UNITS = {"m": 60, "h": 3600, "d": 86400}
 
@@ -539,19 +543,18 @@ def handle_status_update_command(
         return _status_update_open_failed(locale)
     view_id = opened.data
 
-    pending = get_pending_status_update(payload.channel_id)
-    if pending.is_success and pending.data is not None:
-        blocks = [*_pending_blocks(pending.data), _draft_button_block(locale, pending.data, with_draft=True)]
-    elif pending.is_success:
-        blocks = [
-            *_mrkdwn_blocks(_status_t("no_pending", locale, "There is no status update draft for this incident yet.")),
-            _draft_button_block(locale, None, with_draft=True),
-        ]
+    overview = get_status_update_overview(payload.channel_id)
+    if overview.is_success and overview.data is not None:
+        view = build_overview_view(overview.data, locale, private_metadata)
     else:
-        log.warning("incident_status_update_failed", status=pending.status, error_code=pending.error_code, error=pending.message)
-        blocks = _mrkdwn_blocks(_status_error_text(pending.error_code, locale))
+        log.warning(
+            "incident_status_update_failed", status=overview.status, error_code=overview.error_code, error=overview.message
+        )
+        view = _status_update_view(
+            locale, private_metadata, _mrkdwn_blocks(_status_error_text(overview.error_code, locale)), close=True
+        )
 
-    updated = reply.update_view(view_id=view_id, view=_status_update_view(locale, private_metadata, blocks, close=True))
+    updated = reply.update_view(view_id=view_id, view=view)
     if not updated.is_success:
         log.warning("incident_status_update_view_update_failed", error=updated.message, error_code=updated.error_code)
     return CommandResponse(message="", ephemeral=True)
@@ -589,12 +592,18 @@ def _status_update_view(locale: str, private_metadata: str, blocks: list[dict[st
     """Build the status-updates modal; the loading view has no Close button."""
     view: dict[str, Any] = {
         "type": "modal",
-        "title": {"type": "plain_text", "text": _status_t("title", locale, "Status updates")},
+        "title": {
+            "type": "plain_text",
+            "text": _status_t("title", locale, "Mises à jour de statut" if locale.startswith("fr") else "Status updates"),
+        },
         "private_metadata": private_metadata,
         "blocks": blocks,
     }
     if close:
-        view["close"] = {"type": "plain_text", "text": _status_t("close", locale, "Close")}
+        view["close"] = {
+            "type": "plain_text",
+            "text": _status_t("close", locale, "Fermer" if locale.startswith("fr") else "Close"),
+        }
     return view
 
 
@@ -602,6 +611,12 @@ def _mrkdwn_blocks(text: str) -> list[dict[str, Any]]:
     """Split ``text`` into section blocks, each under Slack's text limit."""
     chunks = [text[i : i + _SLACK_TEXT_LIMIT] for i in range(0, len(text), _SLACK_TEXT_LIMIT)] or [""]
     return [{"type": "section", "text": {"type": "mrkdwn", "text": chunk}} for chunk in chunks]
+
+
+def _language_heading(language: str) -> str:
+    """Name a profile language in that language ("English", "Français"), matching the catalogue."""
+    locale, fallback = ("en-US", "English") if language == "en" else ("fr-FR", "Français")
+    return _status_t(f"language.{language}", locale, fallback)
 
 
 def _pending_blocks(update: StatusUpdate) -> list[dict[str, Any]]:
@@ -612,7 +627,7 @@ def _pending_blocks(update: StatusUpdate) -> list[dict[str, Any]]:
     """
     blocks: list[dict[str, Any]] = []
     for locale, language, text in (("en-US", "en", update.en), ("fr-FR", "fr", update.fr)):
-        heading = _status_t(f"language.{language}", locale, "English" if language == "en" else "French")
+        heading = _language_heading(language)
         profile = render_profile(text, update.stage, update.next_update_at, build_profile_labels(locale))
         blocks.append({"type": "header", "text": {"type": "plain_text", "text": heading}})
         blocks.extend(_mrkdwn_blocks(profile))
@@ -699,6 +714,78 @@ def build_security_confirmation_view(locale: str, private_metadata: str) -> dict
     return view
 
 
+def _stage_line(update: StatusUpdate, locale: str) -> str:
+    """Return ``*Stage* - time - approved by <@U> - Published`` for an approved or published update."""
+    fr = locale.startswith("fr")
+    labels = build_profile_labels(locale)
+    parts = [f"*{labels.stage_names[update.stage]}*", format_profile_time(update.approved_at or update.created_at, labels)]
+    if update.approver:
+        by = _status_t("row.approved_by", locale, "approuvée par" if fr else "approved by")
+        parts.append(f"{by} <@{update.approver}>")
+    if update.state is StatusUpdateState.PUBLISHED:
+        parts.append(_status_t("row.published", locale, "Publiée" if fr else "Published"))
+    else:
+        parts.append(_status_t("row.not_published", locale, "Non publiée" if fr else "Not published"))
+    return " - ".join(parts)
+
+
+def _approved_blocks(approved: tuple[StatusUpdate, ...], locale: str) -> list[dict[str, Any]]:
+    """Render the approved-updates header, then one Open row per update (newest 50), an empty state or a cap note."""
+    fr = locale.startswith("fr")
+    header = _status_t("history_header", locale, "Mises à jour approuvées" if fr else "Approved updates")
+    blocks: list[dict[str, Any]] = [
+        {"type": "header", "block_id": "approved_updates", "text": {"type": "plain_text", "text": header}}
+    ]
+    if not approved:
+        empty = _status_t(
+            "history_empty",
+            locale,
+            "Aucune mise à jour de statut n'a encore été approuvée pour cet incident."
+            if fr
+            else "No status update has been approved for this incident yet.",
+        )
+        blocks.append({"type": "section", "block_id": "approved_updates_empty", "text": {"type": "mrkdwn", "text": empty}})
+        return blocks
+    open_text = _status_t("open_button", locale, "Ouvrir" if fr else "Open")
+    for update in approved[:_APPROVED_ROW_CAP]:
+        blocks.append(
+            {
+                "type": "section",
+                "block_id": f"approved_update.{update.sequence}",
+                "text": {"type": "mrkdwn", "text": _stage_line(update, locale)},
+                "accessory": {
+                    "type": "button",
+                    "action_id": OPEN_ACTION_ID,
+                    "text": {"type": "plain_text", "text": open_text},
+                    "value": json.dumps({"incident_id": update.incident_id, "sequence": update.sequence}),
+                },
+            }
+        )
+    if len(approved) > _APPROVED_ROW_CAP:
+        note = _status_t(
+            "history_truncated",
+            locale,
+            "Affichage des 50 dernières mises à jour approuvées." if fr else "Showing the latest 50 approved updates.",
+        )
+        blocks.append(
+            {"type": "context", "block_id": "approved_updates_truncated", "elements": [{"type": "mrkdwn", "text": note}]}
+        )
+    return blocks
+
+
+def build_overview_view(overview: StatusUpdateOverview, locale: str, private_metadata: str) -> dict[str, Any]:
+    """Build the status-updates modal: the pending draft part, then the approved-updates list."""
+    if overview.pending is not None:
+        blocks = [*_pending_blocks(overview.pending), _draft_button_block(locale, overview.pending, with_draft=True)]
+    else:
+        blocks = [
+            *_mrkdwn_blocks(_status_t("no_pending", locale, "There is no status update draft for this incident yet.")),
+            _draft_button_block(locale, None, with_draft=True),
+        ]
+    blocks.extend(_approved_blocks(overview.approved, locale))
+    return _status_update_view(locale, private_metadata, blocks, close=True)
+
+
 def build_drafting_view(locale: str, private_metadata: str) -> dict[str, Any]:
     """Build the modal shown while the draft is being written; no buttons."""
     blocks = _mrkdwn_blocks(_status_t("drafting", locale, "Drafting the status update. This usually takes up to a minute..."))
@@ -777,7 +864,7 @@ def build_review_view(update: StatusUpdate, locale: str, private_metadata: str, 
     )
     for profile_locale, language, text in (("en-US", "en", update.en), ("fr-FR", "fr", update.fr)):
         labels = build_profile_labels(profile_locale)
-        heading = _status_t(f"language.{language}", profile_locale, "English" if language == "en" else "French")
+        heading = _language_heading(language)
         blocks.append({"type": "header", "text": {"type": "plain_text", "text": heading}})
         for name in _TEXT_FIELDS:
             element = {
@@ -835,8 +922,14 @@ def build_saving_view(locale: str, private_metadata: str) -> dict[str, Any]:
     return _status_update_view(locale, private_metadata, blocks, close=False)
 
 
-def build_copy_ready_view(copy: CopyReadyText, locale: str, private_metadata: str) -> dict[str, Any]:
-    """Build the modal showing the approved text, one preformatted block per language, with Close only."""
+def build_copy_ready_view(
+    copy: CopyReadyText, locale: str, private_metadata: str, update: StatusUpdate | None = None
+) -> dict[str, Any]:
+    """Build the modal showing the approved text, one preformatted block per language, with Close.
+
+    With ``update`` (a reopened approved update) a status line comes first and a
+    Back button, valued with the channel id from the metadata, comes last.
+    """
     note = _status_t(
         "approved_note",
         locale,
@@ -845,11 +938,28 @@ def build_copy_ready_view(copy: CopyReadyText, locale: str, private_metadata: st
         else "Approved. Proofread, then copy into your product's channel. Nothing was posted.",
     )
     blocks = _mrkdwn_blocks(note)
-    for profile_locale, language, text in (("en-US", "en", copy.en), ("fr-FR", "fr", copy.fr)):
-        heading = _status_t(f"language.{language}", profile_locale, "English" if language == "en" else "French")
+    for language, text in (("en", copy.en), ("fr", copy.fr)):
+        heading = _language_heading(language)
         blocks.append({"type": "header", "text": {"type": "plain_text", "text": heading}})
         preformatted = {"type": "rich_text_preformatted", "elements": [{"type": "text", "text": text}]}
         blocks.append({"type": "rich_text", "elements": [preformatted]})
+    if update is not None:
+        status = {
+            "type": "section",
+            "block_id": "approved_status",
+            "text": {"type": "mrkdwn", "text": _stage_line(update, locale)},
+        }
+        channel_id = json.loads(private_metadata).get("channel_id", "")
+        back = {
+            "type": "button",
+            "action_id": HISTORY_ACTION_ID,
+            "text": {
+                "type": "plain_text",
+                "text": _status_t("back_button", locale, "Retour" if locale.startswith("fr") else "Back"),
+            },
+            "value": json.dumps({"channel_id": channel_id}),
+        }
+        blocks = [status, *blocks, {"type": "actions", "block_id": "history_button", "elements": [back]}]
     return _status_update_view(locale, private_metadata, blocks, close=True)
 
 
