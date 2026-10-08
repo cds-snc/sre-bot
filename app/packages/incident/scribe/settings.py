@@ -59,6 +59,11 @@ class IncidentSummarySettings(BaseSettings):
     MAX_HISTORY_LIMIT: int = Field(default=1000, alias="INCIDENT_SUMMARY__MAX_HISTORY_LIMIT")
     DEFAULT_SINCE_HOURS: int = Field(default=24, alias="INCIDENT_SUMMARY__DEFAULT_SINCE_HOURS")
 
+    # Transcript lines and the "current time" anchor are stamped in this zone,
+    # matching the draft's ET convention. Without times the model cannot tell a
+    # day-one measure from one that was lifted a week later.
+    TIMEZONE: str = Field(default="America/Toronto", alias="INCIDENT_SUMMARY__TIMEZONE")
+
 
 @lru_cache(maxsize=1)
 def get_incident_summary_settings() -> IncidentSummarySettings:

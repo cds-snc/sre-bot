@@ -1,12 +1,27 @@
 """Tests for the platform-agnostic incident scribe service: summarizing a transcript."""
 
+from datetime import UTC, datetime
+
 import pytest
 
 from contracts.operations import OperationResult, OperationStatus
 from packages.incident.core.api import TranscriptMessage
+from packages.incident.scribe import service
 from packages.incident.scribe.service import EMPTY_HISTORY_CODE, summarize_transcript
+from packages.incident.scribe.settings import IncidentSummarySettings
 
 pytestmark = pytest.mark.unit
+
+# 2026-09-25 16:00 UTC is 12:00 EDT in Toronto.
+_NOW = datetime(2026, 9, 25, 16, 0, tzinfo=UTC)
+
+
+@pytest.fixture(autouse=True)
+def _fixed_clock_and_timezone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the service clock and the summary timezone so rendered times are exact."""
+    settings = IncidentSummarySettings.model_validate({"INCIDENT_SUMMARY__TIMEZONE": "America/Toronto"})
+    monkeypatch.setattr(service, "get_incident_summary_settings", lambda: settings)
+    monkeypatch.setattr(service, "_now", lambda: _NOW)
 
 
 class _StubSummarizer:
@@ -48,7 +63,76 @@ class TestSummarizeTranscript:
 
         assert result.is_success
         assert result.data == "A tidy summary"
-        assert stub.received_transcript == "Ada: prod is down\nBob: on it, rolling back"
+        assert stub.received_transcript is not None
+        assert stub.received_transcript.endswith("Ada: prod is down\nBob: on it, rolling back")
+
+    @pytest.mark.asyncio
+    async def test_lines_carry_their_local_time_and_the_request_states_the_current_time(self):
+        """The model sees when each message was posted and what time it is now, both in the summary timezone.
+
+        Without times a multi-day transcript reads as one moment, so an early
+        measure that was later lifted looks current. A message without a time
+        is rendered without a prefix rather than dropped.
+        """
+        stub = _StubSummarizer(OperationResult.success(data="ok"))
+        messages = [
+            TranscriptMessage(author="Ada", text="prod is down", posted_at=datetime(2026, 9, 17, 3, 56, tzinfo=UTC)),
+            TranscriptMessage(author="Bob", text="on it"),
+        ]
+
+        await summarize_transcript(messages, summarizer=stub)
+
+        assert stub.received_transcript == (
+            "Current time: 2026-09-25 12:00 EDT\n"
+            "\n"
+            "Incident channel transcript:\n"
+            "[2026-09-16 23:56 EDT] Ada: prod is down\n"
+            "Bob: on it"
+        )
+
+    @pytest.mark.asyncio
+    async def test_multi_day_transcript_keeps_a_later_reversal_after_the_earlier_state(self):
+        """A measure reported working on day one and lifted a week later reaches the model in that order, each dated.
+
+        The order and the dates are what let the model tell the lifted geo-block
+        from the current state; the instructions tell it to use them.
+        """
+        stub = _StubSummarizer(OperationResult.success(data="ok"))
+        messages = [
+            TranscriptMessage(
+                author="Nathaniel",
+                text="All out-of-country requests are blocked now.",
+                posted_at=datetime(2026, 9, 17, 14, 52, tzinfo=UTC),
+            ),
+            TranscriptMessage(
+                author="Nathaniel",
+                text="Either that or we block PK at the WAF again.",
+                posted_at=datetime(2026, 9, 24, 13, 13, tzinfo=UTC),
+            ),
+        ]
+
+        await summarize_transcript(messages, summarizer=stub)
+
+        assert stub.received_transcript is not None
+        transcript_lines = stub.received_transcript.splitlines()[-2:]
+        assert transcript_lines == [
+            "[2026-09-17 10:52 EDT] Nathaniel: All out-of-country requests are blocked now.",
+            "[2026-09-24 09:13 EDT] Nathaniel: Either that or we block PK at the WAF again.",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_instructions_tell_the_model_to_judge_current_status_by_recency(self):
+        """The content prompt carries the recency rules that keep superseded facts out of the current status."""
+        stub = _StubSummarizer(OperationResult.success(data="ok"))
+
+        await summarize_transcript([TranscriptMessage(author="Ada", text="prod is down")], summarizer=stub)
+
+        instructions = stub.received_instructions or ""
+        assert "Later messages supersede earlier ones" in instructions
+        assert "current time" in instructions
+        assert "last confirmed" in instructions
+        assert "past tense" in instructions
+        assert "no later message answers" in instructions
 
     @pytest.mark.asyncio
     async def test_content_prompt_is_always_sent_and_formatting_is_appended(self):
