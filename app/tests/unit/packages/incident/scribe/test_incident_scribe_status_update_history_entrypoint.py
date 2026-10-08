@@ -47,6 +47,7 @@ from packages.incident.scribe.entrypoints.slack import (
     handle_redraft_action,
     handle_review_action,
     handle_review_submission,
+    handle_write_action,
     register,
 )
 from packages.incident.scribe.platforms.slack import (
@@ -58,6 +59,7 @@ from packages.incident.scribe.platforms.slack import (
     REDRAFT_ACTION_ID,
     REVIEW_ACTION_ID,
     REVIEW_CALLBACK_ID,
+    WRITE_ACTION_ID,
     build_copy_ready_view,
     build_draft_error_view,
     build_overview_view,
@@ -242,6 +244,7 @@ class TestRegister:
         assert registrar.block_actions == {
             DRAFT_ACTION_ID: handle_draft_action,
             CONFIRM_ACTION_ID: handle_draft_confirmed_action,
+            WRITE_ACTION_ID: handle_write_action,
             REVIEW_ACTION_ID: handle_review_action,
             OPEN_ACTION_ID: handle_open_action,
             HISTORY_ACTION_ID: handle_history_action,

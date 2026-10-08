@@ -35,6 +35,7 @@ from packages.incident.scribe.platforms.slack import (
     OPEN_ACTION_ID,
     PUBLISHED_ACTION_ID,
     REVIEW_ACTION_ID,
+    WRITE_ACTION_ID,
     build_copy_ready_view,
     build_overview_view,
     build_profile_labels,
@@ -183,8 +184,8 @@ class TestFormatProfileTime:
 
 
 class TestOverviewPendingPart:
-    def test_pending_draft_then_draft_and_review_buttons(self) -> None:
-        """With a pending draft the view opens with its EN and FR profile and the Draft and Review buttons."""
+    def test_pending_draft_then_draft_write_and_review_buttons(self) -> None:
+        """With a pending draft the view opens with its EN and FR profile and the Draft, Write it myself and Review buttons."""
         view = build_overview_view(StatusUpdateOverview(pending=_DRAFT, approved=(_APPROVED,)), "en-US", _METADATA)
 
         assert _blocks(view)[:5] == [
@@ -216,6 +217,11 @@ class TestOverviewPendingPart:
                     },
                     {
                         "type": "button",
+                        "action_id": WRITE_ACTION_ID,
+                        "text": {"type": "plain_text", "text": "Write it myself"},
+                    },
+                    {
+                        "type": "button",
                         "action_id": REVIEW_ACTION_ID,
                         "text": {"type": "plain_text", "text": "Review"},
                         "value": {"incident_id": _INCIDENT, "sequence": _DRAFT.sequence},
@@ -224,8 +230,8 @@ class TestOverviewPendingPart:
             },
         ]
 
-    def test_no_pending_notice_then_draft_button_only(self) -> None:
-        """Without a pending draft the view opens with the no-draft notice and the Draft button alone."""
+    def test_no_pending_notice_then_draft_and_write_buttons(self) -> None:
+        """Without a pending draft the view opens with the no-draft notice, then Draft and Write it myself."""
         view = build_overview_view(StatusUpdateOverview(pending=None, approved=(_APPROVED,)), "en-US", _METADATA)
 
         assert _blocks(view)[:2] == [
@@ -239,7 +245,12 @@ class TestOverviewPendingPart:
                         "action_id": DRAFT_ACTION_ID,
                         "text": {"type": "plain_text", "text": "Draft"},
                         "style": "primary",
-                    }
+                    },
+                    {
+                        "type": "button",
+                        "action_id": WRITE_ACTION_ID,
+                        "text": {"type": "plain_text", "text": "Write it myself"},
+                    },
                 ],
             },
         ]

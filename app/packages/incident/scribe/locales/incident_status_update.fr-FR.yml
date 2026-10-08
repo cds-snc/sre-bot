@@ -23,6 +23,7 @@ incident_status_update:
   stage.monitoring: "Surveillance"
   stage.resolved: "Résolu"
   draft_button: "Rédiger"
+  write_button: "Rédiger moi-même"
   drafting: "Rédaction de la mise à jour de statut en cours. Cela prend généralement jusqu'à une minute..."
   drafted: "Brouillon rédigé à partir du canal d'incident."
   carried_forward: "Rien de nouveau depuis la dernière mise à jour; elle a été reprise comme nouveau brouillon."
@@ -66,3 +67,4 @@ incident_status_update:
   redraft_security: "Cet incident est, ou pourrait être, un incident de sécurité. La nouvelle rédaction envoie le contenu du canal de l'incident et des communications au modèle d'IA. Pour continuer, cochez la case ci-dessous, puis appuyez sur Rédiger à nouveau."
   security_confirm_title: "Confirmation de sécurité"
   security_confirm_label: "Je confirme l'envoi de ce contenu au modèle d'IA"
+  manual_fallback: "La rédaction par IA n'est pas disponible pour le moment. Rédigez la mise à jour dans les champs ci-dessous, puis appuyez sur Approuver."
