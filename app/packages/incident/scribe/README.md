@@ -69,7 +69,8 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   `OperationResult` with `error_code="EMPTY_HISTORY"`.
 - `status_update.py` — the status-update use case, `draft_status_update`. It
   returns the pending draft, carries the
-  prior update forward, or drafts with one model call, and stores the draft as
+  prior update forward, drafts with one model call, or prefills a manual draft
+  from the latest approved update, and stores the draft as
   a `StatusUpdate` record (decisions/incident-management.md, External status
   updates). Only messages posted by people after the latest record's cutoff
   count as new; thread replies are not read. It imports `core/api.py` only from
@@ -529,3 +530,15 @@ Redraft button (`incident.scribe.status_update.redraft`). `redraft_status_update
 makes one model call from the reviewer's current values, the same transcript
 window and the instructions, keeps the stage floor and strict parsing, and
 stores the result as the next draft; any failure keeps the previous draft.
+
+Write it myself: the modal's second button (`incident.scribe.status_update.write`)
+calls `draft_status_update` with `manual=True`: no model call and no security
+gate. With new activity it stores a `MANUAL` draft prefilled from the latest
+approved update (blank at Investigating for the first one); otherwise it
+returns the pending or carried-forward draft. The modal then switches to the
+review form; a `MANUAL` draft's form has no Redraft section. A Draft whose model
+call fails for any reason (no `OPENAI_API_KEY`, provider error, unparseable
+answer) falls back to the same `MANUAL` draft and form, with a notice. A
+pending draft still equal to its prefill was never written (only approval
+saves edits), so Draft retries the model over it rather than returning it as
+pending; when the model fails again the same draft is offered, not a copy.

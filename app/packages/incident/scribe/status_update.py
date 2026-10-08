@@ -11,6 +11,13 @@ update, and returns a draft record in one of three ways:
   since, so the prior update is carried forward with the no-new-information
   wording, without a model call;
 - ``DRAFTED``: people have posted since, so one model call fills the fields.
+- ``MANUAL``: people have posted since and the responder chose to write the
+  update, or the model call failed, so the draft is the latest approved update
+  (blank at the first stage when there is none) for the responder to edit.
+
+A pending draft still equal to that prefill is a manual draft nobody wrote
+(approval is the only way to save edits), so Draft asks the model again over
+it rather than returning it as pending.
 
 Code, not the model, decides that nothing is new: only messages posted by a
 person strictly after the latest record's transcript cutoff count. Stages only
@@ -41,6 +48,7 @@ from packages.incident.core.api import (
     StatusUpdateStage,
     StatusUpdateState,
     StatusUpdateStore,
+    StatusUpdateText,
     TranscriptMessage,
     get_incident_lookup,
     get_incident_security_reader,
@@ -139,6 +147,7 @@ async def draft_status_update(
     wording: NoNewInformationWording,
     on_started: Callable[[], None] | None = None,
     security_confirmed: bool = False,
+    manual: bool = False,
     lookup: IncidentLookup | None = None,
     reader: IncidentTranscriptReader | None = None,
     store: StatusUpdateStore | None = None,
@@ -146,7 +155,7 @@ async def draft_status_update(
     security_reader: IncidentSecurityReader | None = None,
     now: datetime | None = None,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
-    """Return the incident's pending, carried-forward or newly drafted status update.
+    """Return the incident's pending, carried-forward, drafted or manual status update.
 
     Args:
         conversation_id: The incident conversation the command ran in.
@@ -157,6 +166,8 @@ async def draft_status_update(
             model call is made.
         security_confirmed: The responder confirmed drafting for a security or
             unknown-flag incident; the flag is then not read.
+        manual: The responder writes the update: no model call and no
+            security gate, and a pending draft is always returned as is.
         lookup: Resolves the conversation to its incident; core's by default.
         reader: Reads the conversation; core's by default.
         store: Holds the incident's status updates; core's by default.
@@ -165,11 +176,11 @@ async def draft_status_update(
         now: The current time; injected in tests.
 
     Returns:
-        Success with the draft and how it was produced. Otherwise the lookup's
+        Success with the draft and how it was produced; a failed or unusable
+        model call is a ``MANUAL`` draft, never an error. Otherwise the lookup's
         refusal (``NOT_AN_INCIDENT``, ``AMBIGUOUS_INCIDENT_CONVERSATION``), the
-        store's or the generator's classified error, ``EMPTY_HISTORY`` when
-        there is no update yet and no person has posted, ``DRAFT_UNPARSEABLE``
-        when the model's answer is not fully usable, or
+        store's classified error, ``EMPTY_HISTORY`` when there is no update yet
+        and no person has posted, or
         ``STATUS_UPDATE_CONFLICT`` when another writer took the sequence with
         something other than a draft, or ``SECURITY_CONFIRMATION_REQUIRED`` when
         a model call is needed, the incident is or may be a security incident
@@ -198,8 +209,11 @@ async def draft_status_update(
     messages = _read_window(reader, conversation_id, last_public, settings, now, log)
     people = [message for message in messages if not message.is_bot and message.posted_at is not None]
     new_from_people = [message for message in people if latest is None or _posted_at(message) > latest.transcript_cutoff]
+    prefill = _prefill_fields(last_public)
+    # With new activity a fresh draft is due anyway, so only an otherwise-pending draft can be abandoned.
+    abandoned = latest if not new_from_people and not manual and latest is not None and _holds(latest, prefill) else None
 
-    if not new_from_people:
+    if not new_from_people and abandoned is None:
         if latest is None:
             log.info("incident_status_update_empty_history")
             return OperationResult.permanent_error(
@@ -212,6 +226,22 @@ async def draft_status_update(
         carried = _carry_forward(latest, author=author, wording=wording, settings=settings, now=now)
         return _append(store, carried, StatusUpdateOutcomeKind.CARRIED_FORWARD, log)
 
+    def record(fields: DraftedFields) -> StatusUpdate:
+        return _draft_record(
+            incident_id,
+            sequence=latest.sequence + 1 if latest else 1,
+            fields=fields,
+            floor=last_public.stage if last_public else None,
+            people=people,
+            author=author,
+            settings=settings,
+            now=now,
+            previous=latest,
+        )
+
+    if manual:
+        return _append(store, record(prefill), StatusUpdateOutcomeKind.MANUAL, log)
+
     refusal = _security_gate(incident_id, security_confirmed, security_reader, log)
     if refusal is not None:
         return refusal
@@ -219,20 +249,13 @@ async def draft_status_update(
     if on_started is not None:
         on_started()
     generated = await _generate_fields(generator or _default_generator(), build_transcript(messages), INSTRUCTIONS, settings, log)
-    if not generated.is_success or generated.data is None:
-        return _failure(generated)
+    if generated.is_success and generated.data is not None:
+        return _append(store, record(generated.data), StatusUpdateOutcomeKind.DRAFTED, log)
 
-    drafted = _draft_record(
-        incident_id,
-        sequence=latest.sequence + 1 if latest else 1,
-        fields=generated.data,
-        floor=last_public.stage if last_public else None,
-        people=people,
-        author=author,
-        settings=settings,
-        now=now,
-    )
-    return _append(store, drafted, StatusUpdateOutcomeKind.DRAFTED, log)
+    log.info("incident_status_update_manual_fallback", error_code=generated.error_code, retried=abandoned is not None)
+    if abandoned is not None:
+        return OperationResult.success(data=StatusUpdateDraftOutcome(update=abandoned, kind=StatusUpdateOutcomeKind.MANUAL))
+    return _append(store, record(prefill), StatusUpdateOutcomeKind.MANUAL, log)
 
 
 async def redraft_status_update(
@@ -367,6 +390,23 @@ async def _generate_fields(
             error_code=DRAFT_UNPARSEABLE_CODE,
         )
     return OperationResult.success(data=fields)
+
+
+def _prefill_fields(last_public: StatusUpdate | None) -> DraftedFields:
+    """The fields a manual draft starts from: the latest approved update, else blank at the first stage."""
+    if last_public is None:
+        blank = StatusUpdateText(affected_service="", impact="", current_action="", workaround="")
+        return DraftedFields(stage=_STAGE_ORDER[0], en=blank, fr=blank)
+    return DraftedFields(stage=last_public.stage, en=last_public.en, fr=last_public.fr)
+
+
+def _holds(update: StatusUpdate, fields: DraftedFields) -> bool:
+    """Whether ``update`` is a draft whose stage and text are exactly ``fields``."""
+    return update.state is StatusUpdateState.DRAFT and (update.stage, update.en, update.fr) == (
+        fields.stage,
+        fields.en,
+        fields.fr,
+    )
 
 
 def _security_gate(

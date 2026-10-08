@@ -107,6 +107,7 @@ class StatusUpdateOutcomeKind(StrEnum):
     DRAFTED = "drafted"
     CARRIED_FORWARD = "carried_forward"
     PENDING = "pending"
+    MANUAL = "manual"
 
 
 @dataclass(frozen=True)
@@ -116,8 +117,10 @@ class StatusUpdateDraftOutcome:
     Attributes:
         update: The draft record, as stored.
         kind: ``DRAFTED`` from new activity by one model call,
-            ``CARRIED_FORWARD`` from the prior update with nothing new, or
-            ``PENDING`` when an existing draft already covers everything.
+            ``CARRIED_FORWARD`` from the prior update with nothing new,
+            ``PENDING`` when an existing draft already covers everything, or
+            ``MANUAL`` for the responder to write, prefilled from the latest
+            approved update, when they chose to or the model call failed.
     """
 
     update: StatusUpdate

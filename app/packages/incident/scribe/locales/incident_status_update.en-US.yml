@@ -23,6 +23,7 @@ incident_status_update:
   stage.monitoring: "Monitoring"
   stage.resolved: "Resolved"
   draft_button: "Draft"
+  write_button: "Write it myself"
   drafting: "Drafting the status update. This usually takes up to a minute..."
   drafted: "Drafted from the incident channel."
   carried_forward: "Nothing new since the last update, so it was repeated as a new draft."
@@ -66,3 +67,4 @@ incident_status_update:
   redraft_security: "This incident is, or may be, a security incident. Redrafting sends the incident channel and comms content to the AI model. To continue, check the box below, then press Redraft."
   security_confirm_title: "Security confirmation"
   security_confirm_label: "I confirm sending this content to the AI model"
+  manual_fallback: "AI drafting isn't available right now. Write the update in the fields below, then press Approve."

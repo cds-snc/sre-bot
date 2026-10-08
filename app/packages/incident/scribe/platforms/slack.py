@@ -74,6 +74,7 @@ OPEN_ACTION_ID = "incident.scribe.status_update.open"
 HISTORY_ACTION_ID = "incident.scribe.status_update.history"
 PUBLISHED_ACTION_ID = "incident.scribe.status_update.published"
 REDRAFT_ACTION_ID = "incident.scribe.status_update.redraft"
+WRITE_ACTION_ID = "incident.scribe.status_update.write"
 _APPROVED_ROW_CAP = 50
 _SECURITY_CONFIRMED = "confirmed"
 _REDRAFT_NOTICES_EN = MappingProxyType(
@@ -681,16 +682,24 @@ def build_profile_labels(locale: str) -> ProfileLabels:
 
 
 def _draft_button_block(locale: str, update: StatusUpdate | None, *, with_draft: bool) -> dict[str, Any]:
-    """Build the actions block holding the Draft button and, for a shown draft, the Review button."""
+    """Build the actions block holding the Draft and Write it myself buttons and, for a shown draft, the Review button."""
     elements: list[dict[str, Any]] = []
     if with_draft:
-        elements.append(
-            {
-                "type": "button",
-                "action_id": DRAFT_ACTION_ID,
-                "text": {"type": "plain_text", "text": _status_t("draft_button", locale, "Draft")},
-                "style": "primary",
-            }
+        write = "Rédiger moi-même" if locale.startswith("fr") else "Write it myself"
+        elements.extend(
+            [
+                {
+                    "type": "button",
+                    "action_id": DRAFT_ACTION_ID,
+                    "text": {"type": "plain_text", "text": _status_t("draft_button", locale, "Draft")},
+                    "style": "primary",
+                },
+                {
+                    "type": "button",
+                    "action_id": WRITE_ACTION_ID,
+                    "text": {"type": "plain_text", "text": _status_t("write_button", locale, write)},
+                },
+            ]
         )
     if update is not None:
         elements.append(
@@ -934,6 +943,7 @@ def build_review_view(
     *,
     instructions: str | None = None,
     security_confirm: bool = False,
+    with_redraft: bool = True,
 ) -> dict[str, Any]:
     """Build the review modal: any notice, the Redraft section, then the stage select and the EN and FR fields.
 
@@ -941,13 +951,15 @@ def build_review_view(
     submission listener validates and names the blank ones. The Redraft button
     is a block action, so Approve stays the only submit. ``instructions``
     prefills the instructions input and ``security_confirm`` adds the security
-    confirmation checkbox.
+    confirmation checkbox. ``with_redraft=False`` leaves the Redraft section out,
+    for a draft the responder writes by hand.
     """
     fr = locale.startswith("fr")
     stage_names = build_profile_labels(locale).stage_names
     options = [{"text": {"type": "plain_text", "text": stage_names[stage]}, "value": stage.value} for stage in StatusUpdateStage]
     blocks = _mrkdwn_blocks(notice) if notice else []
-    blocks.extend(_redraft_blocks(locale, instructions, security_confirm=security_confirm))
+    if with_redraft:
+        blocks.extend(_redraft_blocks(locale, instructions, security_confirm=security_confirm))
     blocks.append(
         _review_input(
             "stage",
@@ -1040,6 +1052,17 @@ def redraft_notice(key: str, locale: str) -> str:
     fr = locale.startswith("fr")
     fallback = _REDRAFT_NOTICES_FR[key] if fr else _REDRAFT_NOTICES_EN[key]
     return _status_t(key, locale, fallback)
+
+
+def manual_fallback_notice(locale: str) -> str:
+    """Return the localized notice above a review form opened because AI drafting failed."""
+    fallback = (
+        "La rédaction par IA n'est pas disponible pour le moment. Rédigez la mise à jour dans les champs ci-dessous, "
+        "puis appuyez sur Approuver."
+        if locale.startswith("fr")
+        else "AI drafting isn't available right now. Write the update in the fields below, then press Approve."
+    )
+    return _status_t("manual_fallback", locale, fallback)
 
 
 def build_review_field_errors(block_ids: tuple[str, ...], locale: str) -> dict[str, str]:

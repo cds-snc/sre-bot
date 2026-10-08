@@ -9,6 +9,12 @@ modal shows a confirmation view whose Confirm and draft button calls the
 service again with confirmation; Cancel is the view's close button. Slack API
 failures are logged and never raised; nothing is posted to the channel.
 
+The Write it myself button runs the same service in manual mode (no model call,
+no security gate) and replaces the modal with the review form for the returned
+draft. A Draft whose model call failed comes back as a manual draft and lands
+on the same form with a notice. A hand-written draft's form has no Redraft
+section.
+
 The Review button replaces the modal in place with the review form. Submitting
 it acks with field errors for blank fields, or with a saving view; the approval
 and the copy-ready rendering then run in one event loop and the modal is updated
@@ -38,7 +44,7 @@ from contracts.operations.codes import ErrorCode
 from contracts.slack.registrar import SlackCommandRegistrar
 from packages.incident.core.api import StatusUpdate
 from packages.incident.scribe import providers
-from packages.incident.scribe.domain import CopyReadyText, StatusUpdateEdit
+from packages.incident.scribe.domain import CopyReadyText, StatusUpdateDraftOutcome, StatusUpdateEdit, StatusUpdateOutcomeKind
 from packages.incident.scribe.platforms.slack import (
     CONFIRM_ACTION_ID,
     DRAFT_ACTION_ID,
@@ -48,6 +54,7 @@ from packages.incident.scribe.platforms.slack import (
     REDRAFT_ACTION_ID,
     REVIEW_ACTION_ID,
     REVIEW_CALLBACK_ID,
+    WRITE_ACTION_ID,
     build_copy_ready_view,
     build_draft_error_view,
     build_drafting_view,
@@ -62,6 +69,7 @@ from packages.incident.scribe.platforms.slack import (
     build_review_view,
     build_saving_view,
     build_security_confirmation_view,
+    manual_fallback_notice,
     parse_redraft_form,
     parse_review_submission,
     redraft_notice,
@@ -83,13 +91,14 @@ logger = structlog.get_logger()
 
 
 def register(registrar: SlackCommandRegistrar) -> None:
-    """Register the Draft, Confirm and draft, Review, Open, Back, published toggle and Redraft listeners and the approval submission.
+    """Register the Draft, Confirm and draft, Write it myself, Review, Open, Back, published toggle and Redraft listeners and the approval submission.
 
     Args:
         registrar: Slack command registrar.
     """
     registrar.register_block_action(DRAFT_ACTION_ID, handle_draft_action)
     registrar.register_block_action(CONFIRM_ACTION_ID, handle_draft_confirmed_action)
+    registrar.register_block_action(WRITE_ACTION_ID, handle_write_action)
     registrar.register_block_action(REVIEW_ACTION_ID, handle_review_action)
     registrar.register_block_action(OPEN_ACTION_ID, handle_open_action)
     registrar.register_block_action(HISTORY_ACTION_ID, handle_history_action)
@@ -122,6 +131,18 @@ def handle_draft_confirmed_action(ack: Callable[[], Any], body: dict[str, Any], 
     _run_draft(body, client, security_confirmed=True)
 
 
+def handle_write_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+    """Handle a press of Write it myself in the status-updates modal.
+
+    Args:
+        ack: Bolt ack callable, called first.
+        body: Block-actions payload; carries the view id, hash and private metadata.
+        client: Bolt Slack web client.
+    """
+    ack()
+    _run_draft(body, client, security_confirmed=False, manual=True)
+
+
 class _ModalCursor:
     """The modal's view id and latest hash; updates log Slack errors and never raise."""
 
@@ -143,8 +164,8 @@ class _ModalCursor:
             self._log.warning(failure_event, exc_info=True)
 
 
-def _run_draft(body: dict[str, Any], client: Any, *, security_confirmed: bool) -> None:
-    """Draft through the service and update the modal with the confirmation, result or error."""
+def _run_draft(body: dict[str, Any], client: Any, *, security_confirmed: bool, manual: bool = False) -> None:
+    """Draft through the service and update the modal with the confirmation, result, review form or error."""
     view = body.get("view") or {}
     view_id = str(view.get("id", ""))
     user_id = str((body.get("user") or {}).get("id", ""))
@@ -158,6 +179,7 @@ def _run_draft(body: dict[str, Any], client: Any, *, security_confirmed: bool) -
         channel_id=channel_id,
         view_id=view_id,
         confirmed=security_confirmed,
+        manual=manual,
     )
     modal = _ModalCursor(client, view_id, view.get("hash"), log)
 
@@ -171,9 +193,13 @@ def _run_draft(body: dict[str, Any], client: Any, *, security_confirmed: bool) -
             wording=build_no_new_information_wording(),
             on_started=show_drafting,
             security_confirmed=security_confirmed,
+            manual=manual,
         )
     )
-    if result.is_success and result.data is not None:
+    if result.is_success and result.data is not None and (manual or result.data.kind is StatusUpdateOutcomeKind.MANUAL):
+        result_view = _manual_review_view(result.data, locale, channel_id, manual=manual)
+        failure_event = "incident_status_update_review_update_failed"
+    elif result.is_success and result.data is not None:
         result_view = build_result_view(result.data, locale, private_metadata)
         failure_event = "incident_status_update_result_update_failed"
     elif result.error_code == ErrorCode.SECURITY_CONFIRMATION_REQUIRED:
@@ -185,6 +211,17 @@ def _run_draft(body: dict[str, Any], client: Any, *, security_confirmed: bool) -
         result_view = build_draft_error_view(result.error_code, locale, private_metadata)
         failure_event = "incident_status_update_result_update_failed"
     modal.update(result_view, failure_event=failure_event)
+
+
+def _manual_review_view(outcome: StatusUpdateDraftOutcome, locale: str, channel_id: str, *, manual: bool) -> dict[str, Any]:
+    """The review form for a draft the responder writes; only a failed Draft explains why."""
+    update = outcome.update
+    hand_written = outcome.kind is StatusUpdateOutcomeKind.MANUAL
+    review_metadata = json.dumps(
+        {"channel_id": channel_id, "locale": locale, "incident_id": update.incident_id, "sequence": update.sequence}
+    )
+    notice = manual_fallback_notice(locale) if hand_written and not manual else None
+    return build_review_view(update, locale, review_metadata, notice, with_redraft=not hand_written)
 
 
 def handle_review_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
