@@ -1,10 +1,10 @@
 ---
 id: TASK-140.9
 title: Redraft a status update from reviewer instructions in the review modal
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-07 15:17'
-updated_date: '2026-10-07 23:01'
+updated_date: '2026-10-08 00:50'
 labels:
   - incident
 dependencies:
@@ -24,11 +24,11 @@ In the review modal (TASK-140.6) the responder can, instead of editing, write in
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Submitting instructions makes one model call and stores the redraft as a new DRAFT record that the review modal then shows
-- [ ] #2 The instructions are passed to the model as reviewer guidance and the redraft keeps the stage floor and the strict field parsing of the first draft
-- [ ] #3 Blank instructions are rejected in the modal; a model failure or unparseable output keeps the previous draft and shows a localized error
-- [ ] #4 Nothing is posted to the incident channel; all strings are in EN and FR catalogues
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 Submitting instructions makes one model call and stores the redraft as a new DRAFT record that the review modal then shows
+- [x] #2 The instructions are passed to the model as reviewer guidance and the redraft keeps the stage floor and the strict field parsing of the first draft
+- [x] #3 Blank instructions are rejected in the modal; a model failure or unparseable output keeps the previous draft and shows a localized error
+- [x] #4 Nothing is posted to the incident channel; all strings are in EN and FR catalogues
+- [x] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -78,6 +78,14 @@ Blast radius and rollback: only new DRAFT rows; first draft and approval paths u
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-07: the human settled the 7 planning questions with the recommended answers (service additive in status_update.py with the _generate_fields extraction; security gate with the in-form checkbox; form values as model base; Redraft section at the top; conflict without adoption; new ErrorCode STATUS_UPDATE_INSTRUCTIONS_INVALID; instructions not persisted).
+
+2026-10-08 implementation (layer 11, branch stack-h/task-140.9-status-update-redraft, on #1558):
+- Production: contracts/operations/codes.py (STATUS_UPDATE_INSTRUCTIONS_INVALID); scribe/status_update_prompt.py (MAX_INSTRUCTIONS_CHARS, normalize_instructions, build_redraft_instructions, build_redraft_input); scribe/status_update.py (redraft_status_update, _generate_fields shared with draft_status_update, _draft_record gains previous= for cutoff/fingerprint when no people's messages were read); scribe/platforms/slack.py (REDRAFT_ACTION_ID, Redraft section at the top of build_review_view with instructions input, optional security_confirm checkbox and button, parse_redraft_form, build_redrafting_view, redraft_notice); scribe/entrypoints/slack.py (handle_redraft_action, registered next to PUBLISHED_ACTION_ID); 11 keys in each incident_status_update locale; README paragraph.
+- Size: +430/-26 Python lines (net ~404, much of it docstrings) plus 22 locale lines, 8 files, one subsystem. Slightly above the planned ~300; the human was told.
+- Judgement calls beyond the plan: t() fallbacks are FR for fr locales and EN otherwise, each equal to its catalogue value (the module's existing pattern); if get_draft_for_review fails when a re-render needs it, the modal shows build_review_error_view with that code; a security refusal re-renders from the stored draft with the reviewer's edits applied.
+- Tests: new test_incident_scribe_status_update_redraft{,_prompt,_view,_entrypoint}.py (unit) and test_incident_scribe_status_update_redraft_dispatch.py (integration, real incident.scribe plugin through harness_fixture). Edited in place: TestRegister dicts in the review/history/published entrypoint tests (PUBLISHED_ACTION_ID kept, REDRAFT_ACTION_ID added), review view input order, and plugin registration (the old 'draft' substring count also matched 'redraft').
+- Gates (app/): ruff check . -> All checks passed!; ruff format --check . -> 852 files already formatted; lint-imports -> Contracts: 10 kept, 0 broken; mypy -> Found 57 errors in 20 files, 0 in touched files; pytest tests/unit tests/integration -> 3653 passed; single-process pytest tests --ignore=tests/smoke -> 4416 passed, 20 failed = the 6 known TASK-90 SNS/google-directory failures + 14 scribe capture_logs tests (TASK-90 leak 2; 10 known on layer 10, the new redraft TestLogging plus 3 order-shifted ones). All 14 pass in isolation. A grep of touched files for __import__, importlib and indented imports found none.
+- Manual checks pending in a real workspace (plan assumptions): view.state in block_actions from the modal, views.update with the action's view.hash, the checkbox inside the form, the real model following the guidance suffix and returning parseable JSON.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

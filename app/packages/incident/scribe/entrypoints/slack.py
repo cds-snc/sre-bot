@@ -18,11 +18,17 @@ by view id to the copy-ready text or an error. Wording and views come from
 The reopened copy-ready view's toggle marks the update published or not
 published (the button carries the target state), then re-renders the stored
 record in place. It writes only the update's state; nothing is posted.
+
+The review form's Redraft button sends the reviewer's instructions and current
+form values to the redraft service. Blank instructions, a refusal or a failure
+re-render the form with a notice (the previous draft is kept); a redraft shows
+the new draft's form. Only the modal is updated.
 """
 
 import asyncio
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 import structlog
@@ -39,6 +45,7 @@ from packages.incident.scribe.platforms.slack import (
     HISTORY_ACTION_ID,
     OPEN_ACTION_ID,
     PUBLISHED_ACTION_ID,
+    REDRAFT_ACTION_ID,
     REVIEW_ACTION_ID,
     REVIEW_CALLBACK_ID,
     build_copy_ready_view,
@@ -48,15 +55,23 @@ from packages.incident.scribe.platforms.slack import (
     build_overview_view,
     build_profile_labels,
     build_published_error_view,
+    build_redrafting_view,
     build_result_view,
     build_review_error_view,
     build_review_field_errors,
     build_review_view,
     build_saving_view,
     build_security_confirmation_view,
+    parse_redraft_form,
     parse_review_submission,
+    redraft_notice,
 )
-from packages.incident.scribe.status_update import draft_status_update, get_status_update_overview
+from packages.incident.scribe.status_update import (
+    DRAFT_UNPARSEABLE_CODE,
+    draft_status_update,
+    get_status_update_overview,
+    redraft_status_update,
+)
 from packages.incident.scribe.status_update_approval import (
     approve_status_update,
     get_draft_for_review,
@@ -68,7 +83,7 @@ logger = structlog.get_logger()
 
 
 def register(registrar: SlackCommandRegistrar) -> None:
-    """Register the Draft, Confirm and draft, Review, Open, Back and published toggle listeners and the approval submission.
+    """Register the Draft, Confirm and draft, Review, Open, Back, published toggle and Redraft listeners and the approval submission.
 
     Args:
         registrar: Slack command registrar.
@@ -79,6 +94,7 @@ def register(registrar: SlackCommandRegistrar) -> None:
     registrar.register_block_action(OPEN_ACTION_ID, handle_open_action)
     registrar.register_block_action(HISTORY_ACTION_ID, handle_history_action)
     registrar.register_block_action(PUBLISHED_ACTION_ID, handle_published_action)
+    registrar.register_block_action(REDRAFT_ACTION_ID, handle_redraft_action)
     registrar.register_view_submission(REVIEW_CALLBACK_ID, handle_review_submission)
 
 
@@ -310,6 +326,103 @@ def handle_published_action(ack: Callable[[], Any], body: dict[str, Any], client
     _ModalCursor(client, view_id, view.get("hash"), log).update(
         next_view, failure_event="incident_status_update_published_update_failed"
     )
+
+
+def handle_redraft_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+    """Handle a press of Redraft in the review form: redraft from the instructions, then update the modal in place.
+
+    Blank instructions re-render the form with a notice and call no service. A
+    redraft shows the new draft's form; a refusal or failure keeps the previous
+    draft and re-renders the form from the reviewer's values with their
+    instructions; a conflict shows the review conflict view.
+
+    Args:
+        ack: Bolt ack callable, called first.
+        body: Block-actions payload; carries the view id, hash, review metadata and form state.
+        client: Bolt Slack web client.
+    """
+    ack()
+    view = body.get("view") or {}
+    view_id = str(view.get("id", ""))
+    user_id = str((body.get("user") or {}).get("id", ""))
+    metadata = _parse_metadata(view.get("private_metadata"))
+    channel_id = str(metadata.get("channel_id", ""))
+    locale = str(metadata.get("locale") or "en-US")
+    incident_id = str(metadata.get("incident_id", ""))
+    sequence = int(metadata.get("sequence") or 0)
+    instructions, security_confirmed = parse_redraft_form(view)
+    edit = parse_review_submission(view)
+    log = logger.bind(action="incident_status_update_redraft", user_id=user_id, channel_id=channel_id, view_id=view_id)
+    modal = _ModalCursor(client, view_id, view.get("hash"), log)
+
+    def review_metadata(target: int) -> str:
+        return json.dumps({"channel_id": channel_id, "locale": locale, "incident_id": incident_id, "sequence": target})
+
+    def show_redrafting() -> None:
+        modal.update(
+            build_redrafting_view(locale, review_metadata(sequence)),
+            failure_event="incident_status_update_redrafting_update_failed",
+        )
+
+    async def run() -> tuple[OperationResult[StatusUpdate] | None, OperationResult[StatusUpdate] | None]:
+        """Redraft unless blank; read the stored draft only when it is the model's base or a re-render needs it."""
+        stored = await get_draft_for_review(incident_id, sequence) if edit is None else None
+        current = edit or (_as_edit(stored.data) if stored is not None and stored.data is not None else None)
+        if not instructions.strip() or current is None:
+            return None, stored or await get_draft_for_review(incident_id, sequence)
+        result = await redraft_status_update(
+            channel_id,
+            sequence,
+            instructions=instructions,
+            current=current,
+            author=user_id,
+            security_confirmed=security_confirmed,
+            on_started=show_redrafting,
+        )
+        if result.is_success or result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT:
+            return result, stored
+        return result, stored or await get_draft_for_review(incident_id, sequence)
+
+    result, stored = asyncio.run(run())
+    if result is not None and result.is_success and result.data is not None:
+        notice = redraft_notice("redrafted_note", locale)
+        next_view = build_review_view(result.data, locale, review_metadata(result.data.sequence), notice=notice)
+    elif (result is not None and result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT) or stored is None or stored.data is None:
+        failed = stored if stored is not None and not stored.is_success else result
+        error_code = failed.error_code if failed is not None else None
+        log.warning("incident_status_update_redraft_failed", error_code=error_code)
+        next_view = build_review_error_view(error_code, locale, review_metadata(sequence))
+    else:
+        form = stored.data if edit is None else replace(stored.data, stage=edit.stage, en=edit.en, fr=edit.fr)
+        if result is None:
+            log.info("incident_status_update_redraft_blank")
+            next_view = build_review_view(form, locale, review_metadata(sequence), notice=redraft_notice("redraft_blank", locale))
+        else:
+            log.warning("incident_status_update_redraft_failed", status=result.status, error_code=result.error_code)
+            refused = result.error_code == ErrorCode.SECURITY_CONFIRMATION_REQUIRED
+            next_view = build_review_view(
+                form,
+                locale,
+                review_metadata(sequence),
+                notice=redraft_notice(_redraft_failure_key(result.error_code), locale),
+                instructions=instructions,
+                security_confirm=refused,
+            )
+    modal.update(next_view, failure_event="incident_status_update_redraft_update_failed")
+
+
+def _as_edit(update: StatusUpdate) -> StatusUpdateEdit:
+    """The stored draft's stage and fields as the model's base."""
+    return StatusUpdateEdit(stage=update.stage, en=update.en, fr=update.fr)
+
+
+def _redraft_failure_key(error_code: str | None) -> str:
+    """Map a redraft refusal or failure onto its notice key; the previous draft was kept."""
+    if error_code == ErrorCode.SECURITY_CONFIRMATION_REQUIRED:
+        return "redraft_security"
+    if error_code == DRAFT_UNPARSEABLE_CODE:
+        return "redraft_unparseable"
+    return "redraft_failed"
 
 
 async def _read_and_publish(incident_id: str, sequence: int) -> OperationResult[tuple[StatusUpdate, CopyReadyText]]:
