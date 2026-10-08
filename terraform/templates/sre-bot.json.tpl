@@ -63,6 +63,10 @@
         "value": "${cors_allowed_origins}"
       },
       {
+        "name": "FORWARDED_ALLOW_IPS",
+        "value": "${forwarded_allow_ips}"
+      },
+      {
         "name": "SLACK__COMMAND_PREFIX",
         "value": ""
       }

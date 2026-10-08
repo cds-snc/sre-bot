@@ -26,6 +26,7 @@ resource "aws_ecs_task_definition" "sre-bot" {
     fargate_memory                   = var.fargate_memory
     aws_region                       = "ca-central-1"
     cors_allowed_origins             = jsonencode(var.cors_allowed_origins)
+    forwarded_allow_ips              = join(",", module.vpc.public_subnet_cidr_blocks)
     GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = aws_ssm_parameter.gcp_sre_service_account_key.arn
   })
 }

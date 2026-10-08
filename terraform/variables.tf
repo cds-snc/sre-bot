@@ -31,6 +31,12 @@ variable "warning_threshold" {
   default     = "10"
 }
 
+variable "landing_page_max_query_string_bytes" {
+  description = "Largest query string, in bytes, the WAF allows on the landing page before blocking the request"
+  type        = number
+  default     = 256
+}
+
 variable "slack_webhook_url" {
   description = "The URL of the Slack webhook."
   type        = string

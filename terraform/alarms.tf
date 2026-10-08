@@ -105,3 +105,21 @@ resource "aws_cloudwatch_metric_alarm" "sre_bot_high_memory" {
   alarm_actions = [aws_sns_topic.cloudwatch_warning.arn]
   ok_actions    = [aws_sns_topic.cloudwatch_warning.arn]
 }
+
+# Passive probing trend view, no alarm: background scanning is continuous and
+# blocked requests need no action. Open it in CloudWatch > Contributor Insights.
+resource "aws_cloudwatch_contributor_insight_rule" "sre_bot_waf_blocked_by_client_ip" {
+  provider   = aws.core_services
+  rule_name  = "sre-bot-waf-blocked-by-client-ip"
+  rule_state = "ENABLED"
+  rule_definition = jsonencode({
+    Schema        = { Name = "CloudWatchLogRule", Version = 1 }
+    LogGroupNames = [aws_cloudwatch_log_group.sre_bot_waf_log_group.name]
+    LogFormat     = "JSON"
+    Contribution = {
+      Keys    = ["$.httpRequest.clientIp"]
+      Filters = [{ Match = "$.action", In = ["BLOCK"] }]
+    }
+    AggregateOn = "Count"
+  })
+}

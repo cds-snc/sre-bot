@@ -238,6 +238,53 @@ resource "aws_wafv2_web_acl" "sre-bot" {
       sampled_requests_enabled   = true
     }
   }
+  # The landing page takes no parameters; long query strings on it are
+  # parameter-discovery probes that stay under the Common Rule Set size limit.
+  rule {
+    name     = "LandingPageQueryLimit"
+    priority = 8
+
+    action {
+      block {}
+    }
+
+    statement {
+      and_statement {
+        statement {
+          byte_match_statement {
+            search_string = "/"
+            field_to_match {
+              uri_path {}
+            }
+            text_transformation {
+              priority = 0
+              type     = "NONE"
+            }
+            positional_constraint = "EXACTLY"
+          }
+        }
+        statement {
+          size_constraint_statement {
+            comparison_operator = "GT"
+            size                = var.landing_page_max_query_string_bytes
+            field_to_match {
+              query_string {}
+            }
+            text_transformation {
+              priority = 0
+              type     = "NONE"
+            }
+          }
+        }
+      }
+    }
+
+    visibility_config {
+      sampled_requests_enabled   = true
+      cloudwatch_metrics_enabled = true
+      metric_name                = "LandingPageQueryLimit"
+    }
+  }
 
   visibility_config {
     cloudwatch_metrics_enabled = true
