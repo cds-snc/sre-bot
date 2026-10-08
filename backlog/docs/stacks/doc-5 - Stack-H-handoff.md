@@ -54,7 +54,7 @@ TASK-140.5, TASK-140.6 and TASK-140.8 are coordinators with no branch (140.8 spl
 2. **agent**: implement TASK-140.8.2 (layer 10) test-first (tests by a general-purpose opus agent with the quality bar, then the implementation agent), verify gates, check ACs.
 3. **human**: commit layer 10, `gh stack submit`, `gh stack add stack-h/task-140.9-status-update-redraft`; agent implements TASK-140.9 (layer 11) the same way.
 4. **human**: review and merge #1549, #1550, #1555, #1556, then layers 9-11, bottom-up with re-approval after each rebase; move each task to Done after its merge (agents never set Done).
-5. Then TASK-140.7 (legacy cutover, standalone after the stack, depends on 140.6 and 140.8.1).
+5. Then TASK-140.7 (legacy cutover, standalone after the stack, depends on 140.6 and 140.8.1). Plan approved 2026-10-08 (decisions in the plan; summary/add_summary deleted, bilingual pointer, data left in DynamoDB with notes on TASK-38.5/38.7). Implement on a branch off `main` in two commits: the agent stops after step 1 (pin before) for the human to commit, then does the cutover.
 
 Merging: bottom-up, one layer at a time, with a re-approval for each rebased layer (doc-2 rule; whole-stack merges fail on `main`).
 
