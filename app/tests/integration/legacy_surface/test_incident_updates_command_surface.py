@@ -1,39 +1,40 @@
-"""Pinning tests for the ``/sre incident updates``, ``summary`` and ``add_summary`` commands.
+"""Pinning tests for the retired ``/sre incident updates``, ``summary`` and ``add_summary`` commands.
 
 Each test sends a form-encoded slash command through ``slack_bolt.App.dispatch``
 on the harness app and asserts only what Slack and the backing seams observe:
 the HTTP ack, the message posted to ``response_url``, the Web API calls
 (``views_open``, ``chat_postMessage``) made on the fake Slack client, and the
-calls recorded on the patched incident store lookups.
+calls recorded on the incident store lookups.
+
+``/sre incident updates`` answers every action with a bilingual pointer to
+``/sre incident status-update``; ``summary`` and ``add_summary`` fall to the
+incident dispatcher's unknown-command reply. That ``status-update`` stays
+registered is pinned by ``test_registered_command_tree_is_unchanged``.
 
 The legacy incident handler posts through the SRE platform module's own Web
 API client, so that client is replaced with the harness's fake. The incident
-store is never reached: the channel lookup and the updates fetch are replaced
-with recorders on the module attributes the handler resolves at call time.
+store lookups are replaced with recorders on the module attributes the legacy
+paths resolve at call time, so any store access would be recorded.
 """
 
-import json
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
 
-from modules.incident import db_operations, incident_folder
+from modules.incident import db_operations
 from modules.sre.platforms import slack as sre_slack
 
-from .conftest import CHANNEL_ID, RESPONSE_URL, TRIGGER_ID, SlackCommandHarness
+from .conftest import RESPONSE_URL, SlackCommandHarness
 
 pytestmark = pytest.mark.integration
 
-INCIDENT_ID = "incident-42"
-STORED_INCIDENT: dict[str, Any] = {"id": {"S": INCIDENT_ID}, "channel_id": {"S": CHANNEL_ID}}
-COMMAND_EXECUTED_TEXT = "Incident command executed"
-ADD_SUMMARY_DEPRECATION_TEXT = (
-    "The `/sre incident add_summary` command is deprecated and will be discontinued after 2025-11-01. "
-    "Please use `/sre incident updates add` instead."
-)
-SUMMARY_DEPRECATION_TEXT = (
-    "The `/sre incident summary` command is deprecated and will be discontinued after 2025-11-01. "
-    "Please use `/sre incident updates show` instead."
+UPDATES_RETIRED_POINTER = (
+    "`/sre incident updates` has been retired. "
+    "Use `/sre incident status-update` to draft, review and approve a public status update."
+    "\n\n"
+    "`/sre incident updates` a été retirée. "
+    "Utilisez `/sre incident status-update` pour rédiger, réviser et approuver une mise à jour publique."
 )
 
 
@@ -49,6 +50,20 @@ class Recorder:
         return self.returns
 
 
+@dataclass(frozen=True)
+class IncidentStore:
+    """Recorders standing in for every incident store read the legacy paths used."""
+
+    channel_lookup: Recorder
+    field_lookup: Recorder
+    adapter_builder: Recorder
+
+    def assert_untouched(self) -> None:
+        assert self.channel_lookup.calls == []
+        assert self.field_lookup.calls == []
+        assert self.adapter_builder.calls == []
+
+
 @pytest.fixture
 def harness(slack_command_harness: SlackCommandHarness, monkeypatch: pytest.MonkeyPatch) -> SlackCommandHarness:
     """The command harness with the legacy SRE handler posting through its fake Slack client."""
@@ -57,18 +72,17 @@ def harness(slack_command_harness: SlackCommandHarness, monkeypatch: pytest.Monk
 
 
 @pytest.fixture
-def incident_lookup(monkeypatch: pytest.MonkeyPatch) -> Recorder:
-    """Channel-to-incident lookup answering with one stored incident row."""
-    recorder = Recorder(returns=STORED_INCIDENT)
-    monkeypatch.setattr(db_operations, "get_incident_by_channel_id", recorder)
-    return recorder
-
-
-def stub_fetch_updates(monkeypatch: pytest.MonkeyPatch, updates: list[str] | None) -> Recorder:
-    """Replace the stored-updates fetch with a recorder answering ``updates``."""
-    recorder = Recorder(returns=updates)
-    monkeypatch.setattr(incident_folder, "fetch_updates", recorder)
-    return recorder
+def incident_store(monkeypatch: pytest.MonkeyPatch) -> IncidentStore:
+    """Record the channel lookup, the field lookup and the DynamoDB adapter builder."""
+    store = IncidentStore(
+        channel_lookup=Recorder(returns={"id": {"S": "incident-42"}}),
+        field_lookup=Recorder(returns=[{"incident_updates": {"L": [{"S": "stored update"}]}}]),
+        adapter_builder=Recorder(),
+    )
+    monkeypatch.setattr(db_operations, "get_incident_by_channel_id", store.channel_lookup)
+    monkeypatch.setattr(db_operations, "lookup_incident", store.field_lookup)
+    monkeypatch.setattr(db_operations, "build_dynamodb_adapter", store.adapter_builder)
+    return store
 
 
 def only_response_text(harness: SlackCommandHarness) -> str:
@@ -81,120 +95,45 @@ def only_response_text(harness: SlackCommandHarness) -> str:
     return text
 
 
-def assert_updates_modal_opened_for_channel_incident(harness: SlackCommandHarness, incident_lookup: Recorder) -> None:
-    """Exactly one updates modal opened on the command's trigger, keyed to the channel's incident."""
-    assert incident_lookup.calls == [(CHANNEL_ID,)]
-    opened = harness.client.calls_to("views_open")
-    assert len(opened) == 1
-    assert opened[0]["trigger_id"] == TRIGGER_ID
-    view = opened[0]["view"]
-    assert view["callback_id"] == "incident_updates_view"
-    assert json.loads(view["private_metadata"]) == {"incident_id": INCIDENT_ID, "channel_id": CHANNEL_ID}
-    assert harness.client.calls_to("chat_postMessage") == []
-
-
 def assert_nothing_shown_in_slack(harness: SlackCommandHarness) -> None:
     """No modal opened and no message posted to the channel."""
     assert harness.client.calls_to("views_open") == []
     assert harness.client.calls_to("chat_postMessage") == []
 
 
-def assert_updates_posted_to_channel(harness: SlackCommandHarness, fetch: Recorder) -> None:
-    """The stored updates were fetched for the channel and posted to it exactly once.
+@pytest.mark.parametrize(
+    "text",
+    ["incident updates add", "incident updates show", "incident updates", "incident updates bogus"],
+    ids=["add", "show", "bare", "unknown-action"],
+)
+def test_updates_with_any_action_points_to_status_update(
+    harness: SlackCommandHarness, incident_store: IncidentStore, text: str
+) -> None:
+    """/sre incident updates answers every action with the EN/FR pointer to /sre incident status-update.
 
-    The fetch receives the channel id where an incident id is named; that is
-    the current lookup key and is pinned as observed.
+    The pointer is the whole reply; no modal opens, nothing is posted to the
+    channel and the incident store is never read.
     """
-    assert fetch.calls == [(CHANNEL_ID,)]
-    assert harness.client.calls_to("chat_postMessage") == [{"channel": CHANNEL_ID, "text": "Current updates:\nfirst\nsecond"}]
-    assert harness.client.calls_to("views_open") == []
-
-
-def test_updates_add_opens_the_updates_modal_for_the_channel_incident(
-    harness: SlackCommandHarness, incident_lookup: Recorder
-) -> None:
-    """/sre incident updates add resolves the channel's incident and opens the updates modal.
-
-    The modal carries the incident and channel ids so its submission can store
-    the update; nothing else is said back beyond the generic acknowledgement.
-    """
-    response = harness.dispatch("sre", "incident updates add")
-
-    assert response.status == 200
-    assert_updates_modal_opened_for_channel_incident(harness, incident_lookup)
-    assert only_response_text(harness) == COMMAND_EXECUTED_TEXT
-
-
-def test_updates_show_posts_the_stored_updates_to_the_channel(
-    harness: SlackCommandHarness, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """/sre incident updates show posts every stored update, one per line, in the channel."""
-    fetch = stub_fetch_updates(monkeypatch, ["first", "second"])
-
-    response = harness.dispatch("sre", "incident updates show")
-
-    assert response.status == 200
-    assert_updates_posted_to_channel(harness, fetch)
-    assert only_response_text(harness) == COMMAND_EXECUTED_TEXT
-
-
-@pytest.mark.parametrize("stored", [[], None], ids=["empty", "missing"])
-def test_updates_show_without_stored_updates_says_none_were_found(
-    harness: SlackCommandHarness, monkeypatch: pytest.MonkeyPatch, stored: list[str] | None
-) -> None:
-    """/sre incident updates show with nothing stored answers privately and posts nothing to the channel."""
-    fetch = stub_fetch_updates(monkeypatch, stored)
-
-    response = harness.dispatch("sre", "incident updates show")
-
-    assert response.status == 200
-    assert fetch.calls == [(CHANNEL_ID,)]
-    assert only_response_text(harness) == "No updates found for this incident."
-    assert_nothing_shown_in_slack(harness)
-
-
-@pytest.mark.parametrize("text", ["incident updates", "incident updates bogus"], ids=["bare", "unknown-action"])
-def test_updates_without_a_known_action_replies_with_updates_help(
-    harness: SlackCommandHarness, monkeypatch: pytest.MonkeyPatch, incident_lookup: Recorder, text: str
-) -> None:
-    """/sre incident updates with no or an unknown action lists the add and show actions only.
-
-    Both store seams are recorders so any lookup would be visible; neither is
-    called, and no modal or channel message is produced.
-    """
-    fetch = stub_fetch_updates(monkeypatch, ["first"])
-
     response = harness.dispatch("sre", text)
 
     assert response.status == 200
-    reply = only_response_text(harness)
-    assert reply.startswith("`/sre incident updates <action>")
-    assert "• `add` — add updates to the incident" in reply
-    assert "• `show` — show current incident updates" in reply
+    assert only_response_text(harness) == UPDATES_RETIRED_POINTER
     assert_nothing_shown_in_slack(harness)
-    assert incident_lookup.calls == []
-    assert fetch.calls == []
+    incident_store.assert_untouched()
 
 
-def test_add_summary_warns_it_is_deprecated_and_opens_the_updates_modal(
-    harness: SlackCommandHarness, incident_lookup: Recorder
+@pytest.mark.parametrize("command", ["summary", "add_summary"])
+def test_removed_summary_commands_answer_unknown_command(
+    harness: SlackCommandHarness, incident_store: IncidentStore, command: str
 ) -> None:
-    """/sre incident add_summary points to ``updates add`` and still opens the updates modal."""
-    response = harness.dispatch("sre", "incident add_summary")
+    """/sre incident summary and add_summary are no longer handled and get the unknown-command reply.
+
+    No modal opens, nothing is posted to the channel and the incident store is
+    never read.
+    """
+    response = harness.dispatch("sre", f"incident {command}")
 
     assert response.status == 200
-    assert only_response_text(harness) == ADD_SUMMARY_DEPRECATION_TEXT
-    assert_updates_modal_opened_for_channel_incident(harness, incident_lookup)
-
-
-def test_summary_warns_it_is_deprecated_and_posts_the_stored_updates(
-    harness: SlackCommandHarness, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """/sre incident summary points to ``updates show`` and still posts the stored updates to the channel."""
-    fetch = stub_fetch_updates(monkeypatch, ["first", "second"])
-
-    response = harness.dispatch("sre", "incident summary")
-
-    assert response.status == 200
-    assert only_response_text(harness) == SUMMARY_DEPRECATION_TEXT
-    assert_updates_posted_to_channel(harness, fetch)
+    assert only_response_text(harness) == f"Unknown command: {command}. Type `/sre incident help` to see a list of commands."
+    assert_nothing_shown_in_slack(harness)
+    incident_store.assert_untouched()

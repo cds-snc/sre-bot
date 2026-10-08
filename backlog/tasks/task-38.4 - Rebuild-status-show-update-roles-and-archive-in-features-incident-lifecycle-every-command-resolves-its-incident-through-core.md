@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
-updated_date: '2026-10-06 15:57'
+updated_date: '2026-10-08 15:21'
 labels:
   - migration
   - phase-5
@@ -26,7 +26,7 @@ ordinal: 309000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Slice 4 of TASK-38 (migrate, second lifecycle slice). Rebuilds the /sre incident subcommands and interactions that read and change an incident: status updates (incident_status), the information display and update modals (information_display, information_update, update_incident_field, update_field_modal, incident_updates_view), roles (view_save_incident_roles, user_select_action), the folder-metadata interactions (add_folder_metadata, view_folder_metadata, view_folder_metadata_modal, add_metadata_view, delete_folder_metadata) over ProductCatalog, archive_channel, confirm_click, and the recreate-missing-resources path.
+Slice 4 of TASK-38 (migrate, second lifecycle slice). Rebuilds the /sre incident subcommands and interactions that read and change an incident: status updates (incident_status), the information display and update modals (information_display, information_update, update_incident_field, update_field_modal), roles (view_save_incident_roles, user_select_action), the folder-metadata interactions (add_folder_metadata, view_folder_metadata, view_folder_metadata_modal, add_metadata_view, delete_folder_metadata) over ProductCatalog, archive_channel, confirm_click, and the recreate-missing-resources path.
 
 RULES
 - Every command resolves its incident through find_incident_for_conversation; only operations that write to the conversation call conversation_is_writable. A status, severity, timing or report update on an incident whose channel is archived succeeds and reports that the channel message was skipped.
