@@ -61,8 +61,10 @@ class StatusUpdateState(StrEnum):
     def can_move_to(self, target: StatusUpdateState) -> bool:
         """Return whether a store may change a record from this state to ``target``.
 
-        Only draft to approved and approved to published exist: nothing is
-        published unapproved and nothing goes back to draft.
+        Draft to approved, approved to published and, as a deliberate
+        reversal, published back to approved (an update marked published by
+        mistake can be marked not published). Nothing is published unapproved
+        and nothing goes back to draft.
         """
         return (self, target) in _STATE_MOVES
 
@@ -71,6 +73,7 @@ _STATE_MOVES = frozenset(
     {
         (StatusUpdateState.DRAFT, StatusUpdateState.APPROVED),
         (StatusUpdateState.APPROVED, StatusUpdateState.PUBLISHED),
+        (StatusUpdateState.PUBLISHED, StatusUpdateState.APPROVED),
     }
 )
 
@@ -110,7 +113,8 @@ class StatusUpdate:
         created_at: When the draft was created.
         approver: Platform user id of the responder who approved it.
         approved_at: When it was approved.
-        published_at: When it was published.
+        published_at: When it was marked published.
+        published_by: Platform user id of the person who marked it published.
 
     Every time is timezone-aware.
     """
@@ -129,6 +133,7 @@ class StatusUpdate:
     approver: str | None = None
     approved_at: datetime | None = None
     published_at: datetime | None = None
+    published_by: str | None = None
 
     def __post_init__(self) -> None:
         if not self.incident_id.strip():

@@ -33,6 +33,7 @@ from packages.incident.scribe.platforms.slack import (
     DRAFT_ACTION_ID,
     HISTORY_ACTION_ID,
     OPEN_ACTION_ID,
+    PUBLISHED_ACTION_ID,
     REVIEW_ACTION_ID,
     build_copy_ready_view,
     build_overview_view,
@@ -498,7 +499,7 @@ class TestCopyReadyViewWithUpdate:
         assert _frame(view) == _frame(build_copy_ready_view(_COPY, "en-US", _METADATA))
 
     def test_status_line_for_an_approved_update(self) -> None:
-        """The first block names the stage, the ET approval time, the approver and Not published."""
+        """The first block names the stage, the ET approval time, the approver and Not published, beside the toggle."""
         view = build_copy_ready_view(_COPY, "en-US", _METADATA, update=_APPROVED)
 
         assert _blocks(view)[0] == {
@@ -507,6 +508,12 @@ class TestCopyReadyViewWithUpdate:
             "text": {
                 "type": "mrkdwn",
                 "text": "*Identified* - 2026-10-07 11:00 ET - approved by <@U0APPROVER> - Not published",
+            },
+            "accessory": {
+                "type": "button",
+                "action_id": PUBLISHED_ACTION_ID,
+                "text": {"type": "plain_text", "text": "Mark as published"},
+                "value": {"incident_id": _INCIDENT, "sequence": 2, "published": True},
             },
         }
 

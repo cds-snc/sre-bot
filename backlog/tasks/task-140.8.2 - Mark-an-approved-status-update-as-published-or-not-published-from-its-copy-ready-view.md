@@ -3,10 +3,10 @@ id: TASK-140.8.2
 title: >-
   Mark an approved status update as published or not published from its
   copy-ready view
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-07 22:57'
-updated_date: '2026-10-07 23:01'
+updated_date: '2026-10-08 00:15'
 labels:
   - incident
 dependencies:
@@ -25,11 +25,11 @@ Toggle slice of TASK-140.8 (Stack H layer 10), the only slice touching incident 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A published toggle moves an update between APPROVED and PUBLISHED, recording published_at and who set it, and can be undone (undo clears both); it is the only store write
-- [ ] #2 The toggle button carries the target state, so a stale view cannot invert it; a repeated toggle is success with no write and a draft is refused
-- [ ] #3 Core allows PUBLISHED -> APPROVED, StatusUpdate has published_by, and the DynamoDB adapter round-trips it
-- [ ] #4 Nothing is posted to the incident channel; all strings are in EN and FR catalogues; the toggle dispatches through a real SlackPlatformProvider in an integration test
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 A published toggle moves an update between APPROVED and PUBLISHED, recording published_at and who set it, and can be undone (undo clears both); it is the only store write
+- [x] #2 The toggle button carries the target state, so a stale view cannot invert it; a repeated toggle is success with no write and a draft is refused
+- [x] #3 Core allows PUBLISHED -> APPROVED, StatusUpdate has published_by, and the DynamoDB adapter round-trips it
+- [x] #4 Nothing is posted to the incident channel; all strings are in EN and FR catalogues; the toggle dispatches through a real SlackPlatformProvider in an integration test
+- [x] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -65,6 +65,21 @@ Blast radius and rollback: first core change since layer 1. Revert only the togg
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-07: the human settled the 6 planning questions (split, in-place open with Back, overview function, draft/approval views unchanged, undo clears both, 50-row cap) with the recommended answers.
+
+2026-10-08 implemented test-first (tests by a general-purpose opus agent, reviewed; then the implementation agent; diff reviewed and every gate rerun by the session).
+Core: StatusUpdate.published_by (str | None = None), _STATE_MOVES adds PUBLISHED -> APPROVED (still no move to DRAFT), DynamoDB _to_item/_from_item write and read published_by (absent -> None). No Terraform or IAM change. Never revert the core field once data exists.
+Service: set_published in status_update_history.py; get_approved_update's body moved into a shared _read_approved used for the first read and the one re-read; _failure helper mirrors status_update_approval.py.
+UI: the toggle is the accessory of the approved_status section (value carries the target), published_status line at blocks[1] when PUBLISHED with a publisher, Back stays last; build_published_error_view (toggle_conflict wording, else build_draft_error_view). Entrypoint handle_published_action shares the render path with Open via _render_record; registered after Back. 5 new keys in both locale files (FR feminine: publiée, matching row.published). README entry for status_update_history.py. Sibling tests updated in place: TestRegister in the history and review entrypoint files, the approved status-line test in the history view file.
+Production diff: 9 files, +220/-25 (incl. README and locales).
+Gates (cd app):
+- uv run ruff check . -> All checks passed!
+- uv run ruff format --check . -> 847 files already formatted
+- uv run lint-imports -> Contracts: 10 kept, 0 broken.
+- uv run mypy . --exclude ... -> Found 57 errors in 20 files; 0 in touched files (3 under packages/incident are in scheduling/google_calendar.py and meet/google_meet.py, untouched).
+- uv run pytest tests/unit tests/integration -q -> 3544 passed
+- uv run pytest tests --ignore=tests/smoke -q (single process) -> 16 failed, 4311 passed: 6 known TASK-90 (SNS, google directory) + 8 known scribe capture_logs + 2 new capture_logs tests of the same leak-2 kind (test_incident_scribe_status_update_published_entrypoint.py test_toggle_failure_is_logged, test_slack_failure_is_logged_not_raised); that file passes alone (20 passed).
+- grep of touched .py files for __import__/importlib/inline imports -> only the existing TYPE_CHECKING boto3 import.
+Manual workspace checks pending: toggle in place in a real modal (accessory button on the status section), ET/HE published line.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

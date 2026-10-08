@@ -10,6 +10,7 @@ the classification plus a message free of provider text.
 """
 
 from collections.abc import Iterator
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,7 @@ PK = f"INCIDENT#{INCIDENT_ID}"
 PROVIDER_DETAIL = "provider detail that must not reach callers"
 AT = datetime(2026, 10, 7, 14, 0, tzinfo=UTC)
 LATER = datetime(2026, 10, 7, 14, 20, tzinfo=UTC)
+PUBLISHED_AT = datetime(2026, 10, 7, 14, 40, tzinfo=UTC)
 
 EN = StatusUpdateText(
     affected_service="GC Notify", impact="Emails are delayed.", current_action="Restarting workers.", workaround=""
@@ -75,6 +77,11 @@ APPROVED = StatusUpdate(
 )
 
 
+def _published(published_by: str | None = "U0PUBLISHER") -> StatusUpdate:
+    """The approved record marked published at PUBLISHED_AT by ``published_by``."""
+    return replace(APPROVED, state=StatusUpdateState.PUBLISHED, published_at=PUBLISHED_AT, published_by=published_by)
+
+
 def _text_item(text: StatusUpdateText) -> dict[str, Any]:
     return {
         "M": {
@@ -109,6 +116,12 @@ APPROVED_ITEM: dict[str, Any] = {
     "approver": {"S": "U0APPROVER"},
     "approved_at": {"S": "2026-10-07T14:20:00+00:00"},
 }
+PUBLISHED_ITEM: dict[str, Any] = {
+    **APPROVED_ITEM,
+    "state": {"S": "published"},
+    "published_at": {"S": "2026-10-07T14:40:00+00:00"},
+    "published_by": {"S": "U0PUBLISHER"},
+}
 SECOND_ITEM: dict[str, Any] = {**DRAFT_ITEM, "SK": {"S": "UPDATE#000002"}, "sequence": {"N": "2"}}
 
 APPEND_PARAMS: dict[str, Any] = {
@@ -124,6 +137,16 @@ TRANSITION_PARAMS: dict[str, Any] = {
     "ExpressionAttributeNames": {"#state": "state"},
     "ExpressionAttributeValues": {":expected": {"S": "draft"}},
     "ReturnValuesOnConditionCheckFailure": "ALL_OLD",
+}
+PUBLISH_PARAMS: dict[str, Any] = {
+    **TRANSITION_PARAMS,
+    "Item": PUBLISHED_ITEM,
+    "ExpressionAttributeValues": {":expected": {"S": "approved"}},
+}
+UNPUBLISH_PARAMS: dict[str, Any] = {
+    **TRANSITION_PARAMS,
+    "Item": APPROVED_ITEM,
+    "ExpressionAttributeValues": {":expected": {"S": "published"}},
 }
 QUERY_PARAMS: dict[str, Any] = {
     "TableName": TABLE,
@@ -322,12 +345,14 @@ def test_transition_retry_of_the_same_write_is_success(client: Any) -> None:
     [
         (StatusUpdateState.DRAFT, DRAFT),
         (StatusUpdateState.APPROVED, APPROVED),
+        (StatusUpdateState.PUBLISHED, DRAFT),
+        (StatusUpdateState.PUBLISHED, replace(APPROVED, state=StatusUpdateState.PUBLISHED, published_at=PUBLISHED_AT)),
     ],
 )
 def test_an_illegal_transition_raises_before_any_write(
     client: Any, expected_state: StatusUpdateState, update: StatusUpdate
 ) -> None:
-    """Only draft->approved and approved->published exist; anything else is a programmer error and sends nothing."""
+    """Only draft->approved, approved->published and published->approved exist; anything else sends nothing."""
     store = DynamoDbStatusUpdateStore(client)
 
     with Stubber(client) as stub:
@@ -335,6 +360,82 @@ def test_an_illegal_transition_raises_before_any_write(
             store.transition(update, expected_state=expected_state)
 
         stub.assert_no_pending_responses()
+
+
+def test_publishing_writes_who_published_it_while_the_record_is_approved(client: Any) -> None:
+    """The publish is one put of the record with published_at and published_by, conditioned on the stored approved state."""
+    store = DynamoDbStatusUpdateStore(client)
+
+    with Stubber(client) as stub:
+        stub.add_response("put_item", {}, expected_params=PUBLISH_PARAMS)
+
+        result = store.transition(_published(), expected_state=StatusUpdateState.APPROVED)
+
+        stub.assert_no_pending_responses()
+
+    assert result.is_success
+    assert result.data == _published()
+
+
+def test_marking_not_published_writes_the_approved_record_while_it_is_published(client: Any) -> None:
+    """The undo puts the record back without published_at and published_by, conditioned on the stored published state."""
+    store = DynamoDbStatusUpdateStore(client)
+
+    with Stubber(client) as stub:
+        stub.add_response("put_item", {}, expected_params=UNPUBLISH_PARAMS)
+
+        result = store.transition(APPROVED, expected_state=StatusUpdateState.PUBLISHED)
+
+        stub.assert_no_pending_responses()
+
+    assert result.is_success
+    assert result.data == APPROVED
+
+
+def test_marking_not_published_after_someone_else_did_is_a_conflict(client: Any) -> None:
+    """The stored record is already approved with other data, so the published-state condition fails."""
+    store = DynamoDbStatusUpdateStore(client)
+
+    with Stubber(client) as stub:
+        _condition_failed(stub, UNPUBLISH_PARAMS, {**APPROVED_ITEM, "approver": {"S": "U0OTHER"}})
+
+        result = store.transition(APPROVED, expected_state=StatusUpdateState.PUBLISHED)
+
+        stub.assert_no_pending_responses()
+
+    assert result.status is OperationStatus.PERMANENT_ERROR
+    assert result.error_code == "STATUS_UPDATE_CONFLICT"
+
+
+def test_a_published_record_round_trips_who_published_it(client: Any) -> None:
+    """A stored published_by reads back into the record with the publication time."""
+    store = DynamoDbStatusUpdateStore(client)
+
+    with Stubber(client) as stub:
+        stub.add_response("query", {"Items": [PUBLISHED_ITEM]}, expected_params=LATEST_PARAMS)
+
+        result = store.latest(INCIDENT_ID)
+
+        stub.assert_no_pending_responses()
+
+    assert result.is_success
+    assert result.data == _published()
+
+
+def test_a_published_item_without_published_by_reads_as_nobody(client: Any) -> None:
+    """An item stored before published_by existed reads with published_by None, not as unreadable."""
+    store = DynamoDbStatusUpdateStore(client)
+    legacy = {key: value for key, value in PUBLISHED_ITEM.items() if key != "published_by"}
+
+    with Stubber(client) as stub:
+        stub.add_response("query", {"Items": [legacy]}, expected_params=LATEST_PARAMS)
+
+        result = store.latest(INCIDENT_ID)
+
+        stub.assert_no_pending_responses()
+
+    assert result.is_success
+    assert result.data == _published(published_by=None)
 
 
 def test_a_malformed_stored_item_is_unreadable(client: Any) -> None:
@@ -417,7 +518,9 @@ def test_a_connection_failure_is_transient(client: Any) -> None:
     assert result.error_code == "EndpointConnectionError"
 
 
-@pytest.mark.parametrize("params", [APPEND_PARAMS, TRANSITION_PARAMS, QUERY_PARAMS, LATEST_PARAMS])
+@pytest.mark.parametrize(
+    "params", [APPEND_PARAMS, TRANSITION_PARAMS, PUBLISH_PARAMS, UNPUBLISH_PARAMS, QUERY_PARAMS, LATEST_PARAMS]
+)
 def test_every_request_targets_only_the_status_update_table(params: dict[str, Any]) -> None:
     """Stubber matches these exact params, so no request reaches the legacy incidents item or its incident_updates list."""
     assert params["TableName"] == TABLE
