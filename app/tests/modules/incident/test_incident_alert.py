@@ -294,14 +294,19 @@ def test_handle_incident_action_buttons_link_preview(incident_mock, increment_ac
         "original_message": {
             "attachments": [
                 {
+                    "id": 1,
                     "color": "3AA3E3",
                     "fallback": "foo",
                     "text": "bar",
+                    "callback_id": "handle_incident_action_buttons",
                 },
                 {
+                    "id": 2,
                     "text": "test",
                     "title": "title",
                     "app_unfurl_url": "http://blah.com",
+                    "is_app_unfurl": True,
+                    "from_url": "http://blah.com",
                     "thumb_url": "http://blah.com/g/200/200",
                     "image_url": "http://blah.com/g/200/200",
                 },
@@ -322,7 +327,6 @@ def test_handle_incident_action_buttons_link_preview(incident_mock, increment_ac
                 {
                     "text": "test",
                     "title": "title",
-                    "app_unfurl_url": "http://blah.com",
                     "thumb_url": "http://blah.com/g/200/200",
                     "image_url": "http://blah.com/g/200/200",
                 },
