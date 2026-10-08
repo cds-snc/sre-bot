@@ -3,10 +3,10 @@ id: TASK-140.7
 title: >-
   Retire the legacy /sre incident updates command and the incident_updates
   attribute
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-08 15:01'
+updated_date: '2026-10-08 15:08'
 labels:
   - incident
 dependencies:
@@ -75,3 +75,9 @@ Per decisions/migration.md: pin the surface, cut over to /sre incident status-up
 
 Approved by the human on 2026-10-08.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Step 1 (pin before): app/tests/integration/legacy_surface/test_incident_updates_command_surface.py, 8 tests green on current code. The legacy /sre handler posts through modules.sre.platforms.slack.client (LegacySlackBootstrap().web), so the test fixture swaps it for the harness fake client. The SRE wrapper posts only the last respond() text to response_url, or 'Incident command executed' when the handler never calls respond. Mutation checks (modal, show, deprecation and help each no-op'd) fail exactly the tests that cover them. cd app && uv run pytest tests/integration/legacy_surface -q -> 28 passed, 4 warnings in 0.37s. ruff check: All checks passed!
+<!-- SECTION:NOTES:END -->
