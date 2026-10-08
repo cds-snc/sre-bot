@@ -81,5 +81,7 @@ def _clear_caches():
 - Tests outside `app/tests/`.
 - Status-code-only assertions.
 - Missing `dependency_overrides` cleanup.
+- Monkeypatching an attribute on a module-level singleton instance (`module.instance.method`). Teardown writes the saved bound method back onto the instance, which shadows later class-level patches. Patch the class (`module.Class.method`).
+- Turning structlog's logger cache on under pytest. `configure_logging`'s test branch keeps `cache_logger_on_first_use=False`; a cached module logger keeps a stale processor list after any later reconfigure, and `capture_logs` then captures nothing.
 - Full Settings objects in fixtures.
 - Docstrings that reference external documents, task/ticket identifiers, sprint labels, plan step numbers, implementation phases, or transitory states (e.g. "before implementation", "AC#2 of TASK-X", "Step 1 of the plan"). Docstrings must describe behavior, stub strategy, and assertion rationale — nothing that becomes inaccurate as the project evolves.
