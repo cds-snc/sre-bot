@@ -3,10 +3,10 @@ id: TASK-140.5
 title: >-
   Draft an EN/FR public status update with /sre incident status-update in the
   scribe subdomain
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-07 17:04'
+updated_date: '2026-10-08 15:54'
 labels:
   - incident
 dependencies:

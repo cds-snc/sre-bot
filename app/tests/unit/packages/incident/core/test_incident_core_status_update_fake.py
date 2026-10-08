@@ -134,3 +134,46 @@ def test_an_illegal_transition_raises() -> None:
         store.transition(
             dataclasses.replace(_draft(1), state=StatusUpdateState.PUBLISHED), expected_state=StatusUpdateState.DRAFT
         )
+
+
+def _published(approved: StatusUpdate, publisher: str = "U0PUBLISHER") -> StatusUpdate:
+    return dataclasses.replace(approved, state=StatusUpdateState.PUBLISHED, published_at=AT, published_by=publisher)
+
+
+def test_a_published_record_can_be_marked_not_published() -> None:
+    """Undo moves a published record back to approved from the expected published state, clearing the publication."""
+    store = InMemoryStatusUpdateStore()
+    store.append(_draft(1))
+    approved = _approved(_draft(1))
+    store.transition(approved, expected_state=StatusUpdateState.DRAFT)
+    store.transition(_published(approved), expected_state=StatusUpdateState.APPROVED)
+
+    result = store.transition(approved, expected_state=StatusUpdateState.PUBLISHED)
+
+    assert result.is_success
+    assert store.latest(INCIDENT_ID).data == approved
+
+
+def test_undo_after_the_record_was_already_unpublished_by_someone_else_is_a_conflict() -> None:
+    """The undo is conditioned on the stored state being published; a record back at approved with other data refuses it."""
+    store = InMemoryStatusUpdateStore()
+    store.append(_draft(1))
+    approved = _approved(_draft(1))
+    store.transition(approved, expected_state=StatusUpdateState.DRAFT)
+
+    result = store.transition(dataclasses.replace(approved, approver="U0OTHER"), expected_state=StatusUpdateState.PUBLISHED)
+
+    assert result.error_code == "STATUS_UPDATE_CONFLICT"
+    assert store.latest(INCIDENT_ID).data == approved
+
+
+def test_a_published_record_still_cannot_go_back_to_draft() -> None:
+    """Only the undo to approved is allowed from published; a move to draft is a programmer error."""
+    store = InMemoryStatusUpdateStore()
+    store.append(_draft(1))
+    approved = _approved(_draft(1))
+    store.transition(approved, expected_state=StatusUpdateState.DRAFT)
+    store.transition(_published(approved), expected_state=StatusUpdateState.APPROVED)
+
+    with pytest.raises(ValueError, match="transition"):
+        store.transition(_draft(1), expected_state=StatusUpdateState.PUBLISHED)

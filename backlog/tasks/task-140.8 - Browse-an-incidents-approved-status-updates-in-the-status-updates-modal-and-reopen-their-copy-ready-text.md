@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-07 15:17'
-updated_date: '2026-10-07 22:57'
+updated_date: '2026-10-08 15:56'
 labels:
   - incident
 dependencies:
@@ -25,9 +25,9 @@ The status-updates modal (TASK-140.5.2) lists the incident's approved updates (A
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The status-updates modal lists approved updates newest first with stage, approval time in ET/HE, approver and published state
-- [ ] #2 Opening an approved update shows its copy-ready EN and FR text, identical to what was shown at approval
-- [ ] #3 An incident with no approved updates shows a localized empty state; all strings are in EN and FR catalogues
+- [x] #1 The status-updates modal lists approved updates newest first with stage, approval time in ET/HE, approver and published state
+- [x] #2 Opening an approved update shows its copy-ready EN and FR text, identical to what was shown at approval
+- [x] #3 An incident with no approved updates shows a localized empty state; all strings are in EN and FR catalogues
 - [ ] #4 A published toggle moves an update between APPROVED and PUBLISHED, recording published_at and who set it, and can be undone; it is the only store write
 - [ ] #5 Nothing is posted to the incident channel
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
@@ -39,4 +39,6 @@ The status-updates modal (TASK-140.5.2) lists the incident's approved updates (A
 2026-10-07 (human): PUBLISHED is a user confirmation, not set by approval; added the published / not published toggle (undoable). Verify StatusUpdateStore.transition allows PUBLISHED -> APPROVED for the undo.
 
 2026-10-07 decisions (human): split at the size gate into 140.8.1 (list + reopen, scribe only; ACs 1, 2, 3, 5, 6) and 140.8.2 (published toggle incl. core published_by and PUBLISHED -> APPROVED; ACs 4, 5, 6). 140.8 is coordinator with no branch; its ACs are checked as the slices verify them. Open an update in place with a Back button (not views.push); undo clears published_at and published_by; one get_status_update_overview with get_pending_status_update delegating; draft-result and approval views unchanged; list capped at 50 rows with a localized note.
+
+ACs 1-3 checked 2026-10-08 from 140.8.1 #1-#3 (merged, #1557). AC4 (published toggle) is 140.8.2 (#1558, open); AC5 and AC6 also cover 140.8.2's code, so they wait for that merge.
 <!-- SECTION:NOTES:END -->

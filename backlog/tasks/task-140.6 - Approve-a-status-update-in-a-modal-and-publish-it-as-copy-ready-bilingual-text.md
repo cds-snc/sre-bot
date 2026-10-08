@@ -3,10 +3,10 @@ id: TASK-140.6
 title: >-
   Review and approve a status update in a modal and show its copy-ready
   bilingual text
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-07 18:52'
+updated_date: '2026-10-08 15:57'
 labels:
   - incident
 dependencies:
@@ -26,10 +26,10 @@ From the status-updates modal (TASK-140.5.2) the responder opens the review moda
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The review modal opens from the status-updates modal and edits EN, FR and stage; submit stores the approved record with the approver and edited text
-- [ ] #2 Both languages must be non-empty to approve; validation errors show in the modal
-- [ ] #3 After approval the modal shows the copy-ready EN and FR text from the publisher, and nothing is posted to the incident channel
-- [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 The review modal opens from the status-updates modal and edits EN, FR and stage; submit stores the approved record with the approver and edited text
+- [x] #2 Both languages must be non-empty to approve; validation errors show in the modal
+- [x] #3 After approval the modal shows the copy-ready EN and FR text from the publisher, and nothing is posted to the incident channel
+- [x] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -38,6 +38,8 @@ From the status-updates modal (TASK-140.5.2) the responder opens the review moda
 2026-10-07 (TASK-140.4): approve with StatusUpdateStore.transition(replace(draft, state=APPROVED, approver=..., approved_at=..., en=..., fr=..., stage=...), expected_state=DRAFT); publish with expected_state=APPROVED and published_at. A concurrent approval returns PERMANENT_ERROR STATUS_UPDATE_CONFLICT; a repeated identical submit is success. The in-memory fake is packages.incident.core.adapters.in_memory.InMemoryStatusUpdateStore.
 
 2026-10-07 decisions (human): split into 140.6.1 service and 140.6.2 Slack UI, 140.6 is coordinator. Review modal reached by views.update in place from a Review button. Approval stops at APPROVED; PUBLISHED is a user toggle in TASK-140.8. Both languages non-empty means all four fields in each language non-blank after trim. Stage floor enforced at approval (forward only); un-approve/correct is TASK-140.12. next_update_at kept unless the stage changes, then recomputed; fresh drafts (on demand, or TASK-140.11 timer) cover stale times. Copy-ready text: default profile renders structured plain text (label lines, blank line between sections) shown in a preformatted block per language, verify Slack modal support and copy fidelity at implementation; per-platform formats belong to DRAFT-10. Security confirmation moved from approval to drafting: removed former AC #4, now TASK-140.10.
+
+ACs checked 2026-10-08 from the merged subtasks: AC1 by 140.6.2 #1/#3 and 140.6.1 #1; AC2 by 140.6.1 #2 and 140.6.2 #2; AC3 by 140.6.2 #3/#4 and 140.6.1 #4; AC4 by both subtasks' gates (#1555, #1556).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

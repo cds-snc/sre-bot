@@ -58,6 +58,7 @@ from packages.incident.scribe.service import (
     summarize_incident_conversation,
 )
 from packages.incident.scribe.status_update import DRAFT_UNPARSEABLE_CODE, get_status_update_overview
+from packages.incident.scribe.status_update_prompt import MAX_INSTRUCTIONS_CHARS
 
 logger = structlog.get_logger()
 
@@ -71,7 +72,35 @@ REVIEW_ACTION_ID = "incident.scribe.status_update.review"
 REVIEW_CALLBACK_ID = "incident.scribe.status_update.approve"
 OPEN_ACTION_ID = "incident.scribe.status_update.open"
 HISTORY_ACTION_ID = "incident.scribe.status_update.history"
+PUBLISHED_ACTION_ID = "incident.scribe.status_update.published"
+REDRAFT_ACTION_ID = "incident.scribe.status_update.redraft"
 _APPROVED_ROW_CAP = 50
+_SECURITY_CONFIRMED = "confirmed"
+_REDRAFT_NOTICES_EN = MappingProxyType(
+    {
+        "redrafted_note": "Redrafted from your instructions. Review the new draft before you approve it.",
+        "redraft_blank": "Enter instructions for the new draft, then press Redraft.",
+        "redraft_failed": "Couldn't redraft the status update right now, so the previous draft was kept. "
+        "Please try again shortly.",
+        "redraft_unparseable": "I couldn't turn the model's answer into a status update, so the previous draft was kept. "
+        "Please try again.",
+        "redraft_security": "This incident is, or may be, a security incident. Redrafting sends the incident channel and "
+        "comms content to the AI model. To continue, check the box below, then press Redraft.",
+    }
+)
+_REDRAFT_NOTICES_FR = MappingProxyType(
+    {
+        "redrafted_note": "Nouveau brouillon rédigé selon vos instructions. Révisez-le avant de l'approuver.",
+        "redraft_blank": "Entrez des instructions pour le nouveau brouillon, puis appuyez sur Rédiger à nouveau.",
+        "redraft_failed": "Impossible de rédiger à nouveau la mise à jour de statut pour le moment; le brouillon "
+        "précédent a été conservé. Veuillez réessayer sous peu.",
+        "redraft_unparseable": "Je n'ai pas pu transformer la réponse du modèle en mise à jour de statut; le brouillon "
+        "précédent a été conservé. Veuillez réessayer.",
+        "redraft_security": "Cet incident est, ou pourrait être, un incident de sécurité. La nouvelle rédaction envoie le "
+        "contenu du canal de l'incident et des communications au modèle d'IA. Pour continuer, cochez la case "
+        "ci-dessous, puis appuyez sur Rédiger à nouveau.",
+    }
+)
 _TEXT_FIELDS = ("affected_service", "impact", "current_action", "workaround")
 _SINCE_UNITS = {"m": 60, "h": 3600, "d": 86400}
 
@@ -836,20 +865,89 @@ def build_review_error_view(error_code: str | None, locale: str, private_metadat
     return _status_update_view(locale, private_metadata, _mrkdwn_blocks(text), close=True)
 
 
+def build_published_error_view(error_code: str | None, locale: str, private_metadata: str) -> dict[str, Any]:
+    """Build the Close-only modal for a failed published toggle; only a conflict has its own wording."""
+    if error_code != ErrorCode.STATUS_UPDATE_CONFLICT:
+        return build_draft_error_view(error_code, locale, private_metadata)
+    text = _status_t(
+        "toggle_conflict",
+        locale,
+        "Cette mise à jour a été marquée comme publiée ou non publiée ailleurs. Rouvrez les mises à jour de statut pour voir la dernière version."
+        if locale.startswith("fr")
+        else "This update was marked published or not published elsewhere. Reopen the status updates to see the latest version.",
+    )
+    return _status_update_view(locale, private_metadata, _mrkdwn_blocks(text), close=True)
+
+
 def _review_input(block_id: str, label: str, element: dict[str, Any]) -> dict[str, Any]:
     return {"type": "input", "block_id": block_id, "label": {"type": "plain_text", "text": label}, "element": element}
 
 
-def build_review_view(update: StatusUpdate, locale: str, private_metadata: str, notice: str | None = None) -> dict[str, Any]:
-    """Build the review modal: the stage select and the four EN and four FR fields, prefilled from the draft.
+def _redraft_blocks(locale: str, instructions: str | None, *, security_confirm: bool) -> list[dict[str, Any]]:
+    """Build the Redraft section: the optional instructions input, the optional confirmation checkbox, the button."""
+    fr = locale.startswith("fr")
+    element: dict[str, Any] = {
+        "type": "plain_text_input",
+        "action_id": "text",
+        "multiline": True,
+        "max_length": MAX_INSTRUCTIONS_CHARS,
+    }
+    if instructions:
+        element["initial_value"] = instructions
+    label = _status_t("redraft_label", locale, "Instructions pour un nouveau brouillon" if fr else "Instructions for a new draft")
+    hint = _status_t(
+        "redraft_hint",
+        locale,
+        "Indiquez à l'IA ce qu'il faut changer, par exemple : ne pas nommer le fournisseur. "
+        "Appuyez ensuite sur Rédiger à nouveau."
+        if fr
+        else "Tell the AI what to change, for example: do not name the vendor. Then press Redraft.",
+    )
+    blocks = [_review_input("instructions", label, element) | {"hint": {"type": "plain_text", "text": hint}, "optional": True}]
+    if security_confirm:
+        title = _status_t("security_confirm_title", locale, "Confirmation de sécurité" if fr else "Security confirmation")
+        option = _status_t(
+            "security_confirm_label",
+            locale,
+            "Je confirme l'envoi de ce contenu au modèle d'IA" if fr else "I confirm sending this content to the AI model",
+        )
+        checkbox = {
+            "type": "checkboxes",
+            "action_id": "confirm",
+            "options": [{"text": {"type": "plain_text", "text": option}, "value": _SECURITY_CONFIRMED}],
+        }
+        blocks.append(_review_input("security_confirm", title, checkbox) | {"optional": True})
+    button = {
+        "type": "button",
+        "action_id": REDRAFT_ACTION_ID,
+        "text": {"type": "plain_text", "text": _status_t("redraft_button", locale, "Rédiger à nouveau" if fr else "Redraft")},
+    }
+    blocks.append({"type": "actions", "block_id": "redraft_button", "elements": [button]})
+    return blocks
+
+
+def build_review_view(
+    update: StatusUpdate,
+    locale: str,
+    private_metadata: str,
+    notice: str | None = None,
+    *,
+    instructions: str | None = None,
+    security_confirm: bool = False,
+) -> dict[str, Any]:
+    """Build the review modal: any notice, the Redraft section, then the stage select and the EN and FR fields.
 
     Field inputs are optional so Slack never blocks a blank field itself; the
-    submission listener validates and names the blank ones.
+    submission listener validates and names the blank ones. The Redraft button
+    is a block action, so Approve stays the only submit. ``instructions``
+    prefills the instructions input and ``security_confirm`` adds the security
+    confirmation checkbox.
     """
     fr = locale.startswith("fr")
     stage_names = build_profile_labels(locale).stage_names
     options = [{"text": {"type": "plain_text", "text": stage_names[stage]}, "value": stage.value} for stage in StatusUpdateStage]
     blocks = _mrkdwn_blocks(notice) if notice else []
+    blocks.extend(_redraft_blocks(locale, instructions, security_confirm=security_confirm))
     blocks.append(
         _review_input(
             "stage",
@@ -908,6 +1006,42 @@ def parse_review_submission(view: dict[str, Any]) -> StatusUpdateEdit | None:
     return StatusUpdateEdit(stage=stage, en=read("en"), fr=read("fr"))
 
 
+def parse_redraft_form(view: dict[str, Any]) -> tuple[str, bool]:
+    """Read the untrimmed instructions and whether the security confirmation is checked from a block action's view.
+
+    A missing or cleared input (Slack sends null) reads as ``""``; only the
+    confirmed option counts as a confirmation.
+    """
+    values: dict[str, Any] = (view.get("state") or {}).get("values") or {}
+    instructions = ((values.get("instructions") or {}).get("text") or {}).get("value") or ""
+    selected = ((values.get("security_confirm") or {}).get("confirm") or {}).get("selected_options") or []
+    confirmed = any(isinstance(option, dict) and option.get("value") == _SECURITY_CONFIRMED for option in selected)
+    return str(instructions), confirmed
+
+
+def build_redrafting_view(locale: str, private_metadata: str) -> dict[str, Any]:
+    """Build the modal shown while the redraft is being written; no buttons."""
+    text = _status_t(
+        "redrafting",
+        locale,
+        "Nouvelle rédaction de la mise à jour de statut en cours. Cela prend généralement jusqu'à une minute..."
+        if locale.startswith("fr")
+        else "Redrafting the status update. This usually takes up to a minute...",
+    )
+    return _status_update_view(locale, private_metadata, _mrkdwn_blocks(text), close=False)
+
+
+def redraft_notice(key: str, locale: str) -> str:
+    """Return the localized Redraft notice for ``key``.
+
+    ``key`` is one of ``redrafted_note``, ``redraft_blank``, ``redraft_failed``,
+    ``redraft_unparseable`` or ``redraft_security``.
+    """
+    fr = locale.startswith("fr")
+    fallback = _REDRAFT_NOTICES_FR[key] if fr else _REDRAFT_NOTICES_EN[key]
+    return _status_t(key, locale, fallback)
+
+
 def build_review_field_errors(block_ids: tuple[str, ...], locale: str) -> dict[str, str]:
     """Map each rejected block id to the localized blank-field message for ``ack(response_action="errors")``."""
     message = _status_t("field_blank", locale, "Entrez une valeur." if locale.startswith("fr") else "Enter a value.")
@@ -927,8 +1061,11 @@ def build_copy_ready_view(
 ) -> dict[str, Any]:
     """Build the modal showing the approved text, one preformatted block per language, with Close.
 
-    With ``update`` (a reopened approved update) a status line comes first and a
-    Back button, valued with the channel id from the metadata, comes last.
+    With ``update`` (a reopened approved update) a status line comes first, with
+    a toggle button carrying the target published state (so a stale view cannot
+    invert a newer one), then who marked it published and when if it is
+    published, and a Back button, valued with the channel id from the metadata,
+    comes last.
     """
     note = _status_t(
         "approved_note",
@@ -944,11 +1081,32 @@ def build_copy_ready_view(
         preformatted = {"type": "rich_text_preformatted", "elements": [{"type": "text", "text": text}]}
         blocks.append({"type": "rich_text", "elements": [preformatted]})
     if update is not None:
-        status = {
-            "type": "section",
-            "block_id": "approved_status",
-            "text": {"type": "mrkdwn", "text": _stage_line(update, locale)},
+        fr = locale.startswith("fr")
+        published = update.state is StatusUpdateState.PUBLISHED
+        if published:
+            toggle_text = _status_t("mark_unpublished", locale, "Marquer comme non publiée" if fr else "Mark as not published")
+        else:
+            toggle_text = _status_t("mark_published", locale, "Marquer comme publiée" if fr else "Mark as published")
+        toggle = {
+            "type": "button",
+            "action_id": PUBLISHED_ACTION_ID,
+            "text": {"type": "plain_text", "text": toggle_text},
+            "value": json.dumps({"incident_id": update.incident_id, "sequence": update.sequence, "published": not published}),
         }
+        status: list[dict[str, Any]] = [
+            {
+                "type": "section",
+                "block_id": "approved_status",
+                "text": {"type": "mrkdwn", "text": _stage_line(update, locale)},
+                "accessory": toggle,
+            }
+        ]
+        if published and update.published_by and update.published_at is not None:
+            by = _status_t("published_line.by", locale, "Publiée par" if fr else "Published by")
+            at = _status_t("published_line.at", locale, "le" if fr else "at")
+            when = format_profile_time(update.published_at, build_profile_labels(locale))
+            line = f"{by} <@{update.published_by}> {at} {when}"
+            status.append({"type": "section", "block_id": "published_status", "text": {"type": "mrkdwn", "text": line}})
         channel_id = json.loads(private_metadata).get("channel_id", "")
         back = {
             "type": "button",
@@ -959,7 +1117,7 @@ def build_copy_ready_view(
             },
             "value": json.dumps({"channel_id": channel_id}),
         }
-        blocks = [status, *blocks, {"type": "actions", "block_id": "history_button", "elements": [back]}]
+        blocks = [*status, *blocks, {"type": "actions", "block_id": "history_button", "elements": [back]}]
     return _status_update_view(locale, private_metadata, blocks, close=True)
 
 

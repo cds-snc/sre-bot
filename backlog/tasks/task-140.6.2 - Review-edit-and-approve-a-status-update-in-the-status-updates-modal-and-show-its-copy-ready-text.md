@@ -3,10 +3,10 @@ id: TASK-140.6.2
 title: >-
   Review, edit and approve a status update in the status-updates modal and show
   its copy-ready text
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-07 18:52'
-updated_date: '2026-10-07 22:37'
+updated_date: '2026-10-08 15:50'
 labels:
   - incident
 dependencies:

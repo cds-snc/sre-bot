@@ -3,10 +3,10 @@ id: TASK-140.3
 title: >-
   Resolve a conversation to its incident id in packages/incident/core over the
   legacy incidents table
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-07 13:44'
+updated_date: '2026-10-08 15:48'
 labels:
   - incident
 dependencies:

@@ -76,6 +76,11 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   `core` and no integration.
 - `status_update_approval.py`, `publisher.py` — approving a draft (stops at `APPROVED`, never
   publishes) and rendering an approved update as copy-ready EN/FR text.
+- `status_update_history.py` — reopening an approved update and `set_published`,
+  the copy-ready view's toggle: one store transition between `APPROVED` and
+  `PUBLISHED` (recording or clearing `published_at`/`published_by`), with the
+  button carrying the target state. It records a person's confirmation that
+  they posted the text; nothing is posted to the channel.
 - `status_update_prompt.py` — the status-update prompt and its strict answer
   parser, which rejects any partial or malformed answer.
 - `domain.py` — frozen values of the drafting use case: `DocumentSection`
@@ -518,3 +523,9 @@ security, unknown-flag or unreadable-flag incident with
 The Draft handler then shows a confirmation view in the modal; its Confirm and
 draft button (`incident.scribe.status_update.draft_confirmed`) drafts with
 confirmation and Cancel closes the modal with no model call.
+
+Redraft: the review form opens with an optional instructions input and a
+Redraft button (`incident.scribe.status_update.redraft`). `redraft_status_update`
+makes one model call from the reviewer's current values, the same transcript
+window and the instructions, keeps the stage floor and strict parsing, and
+stores the result as the next draft; any failure keeps the previous draft.

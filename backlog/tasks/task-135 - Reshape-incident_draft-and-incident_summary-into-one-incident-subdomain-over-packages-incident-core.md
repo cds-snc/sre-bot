@@ -3,10 +3,10 @@ id: TASK-135
 title: >-
   Reshape incident_draft and incident_summary into one incident subdomain over
   packages/incident/core
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-01 14:05'
-updated_date: '2026-10-02 18:01'
+updated_date: '2026-10-08 15:44'
 labels:
   - plugin-architecture
   - features

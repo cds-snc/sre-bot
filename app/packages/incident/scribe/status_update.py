@@ -14,7 +14,11 @@ update, and returns a draft record in one of three ways:
 
 Code, not the model, decides that nothing is new: only messages posted by a
 person strictly after the latest record's transcript cutoff count. Stages only
-move forward from the latest approved or published stage. This module imports
+move forward from the latest approved or published stage.
+
+``redraft_status_update`` revises the pending draft from a reviewer's
+instructions with one model call over the same window and stores the result as
+the next draft; the instructions steer the fields only. This module imports
 only ``core.api`` from the core and no platform SDK.
 """
 
@@ -48,12 +52,20 @@ from packages.incident.scribe.domain import (
     DraftedFields,
     NoNewInformationWording,
     StatusUpdateDraftOutcome,
+    StatusUpdateEdit,
     StatusUpdateOutcomeKind,
     StatusUpdateOverview,
 )
 from packages.incident.scribe.ports import TextGenerator
 from packages.incident.scribe.settings import IncidentStatusUpdateSettings, get_incident_status_update_settings
-from packages.incident.scribe.status_update_prompt import INSTRUCTIONS, build_transcript, parse_drafted_fields
+from packages.incident.scribe.status_update_prompt import (
+    INSTRUCTIONS,
+    build_redraft_input,
+    build_redraft_instructions,
+    build_transcript,
+    normalize_instructions,
+    parse_drafted_fields,
+)
 
 logger = structlog.get_logger()
 
@@ -206,12 +218,144 @@ async def draft_status_update(
 
     if on_started is not None:
         on_started()
-    generator = generator or _default_generator()
-    generated = await generator.summarize(
-        build_transcript(messages),
-        instructions=INSTRUCTIONS,
-        max_output_tokens=settings.MAX_OUTPUT_TOKENS,
+    generated = await _generate_fields(generator or _default_generator(), build_transcript(messages), INSTRUCTIONS, settings, log)
+    if not generated.is_success or generated.data is None:
+        return _failure(generated)
+
+    drafted = _draft_record(
+        incident_id,
+        sequence=latest.sequence + 1 if latest else 1,
+        fields=generated.data,
+        floor=last_public.stage if last_public else None,
+        people=people,
+        author=author,
+        settings=settings,
+        now=now,
     )
+    return _append(store, drafted, StatusUpdateOutcomeKind.DRAFTED, log)
+
+
+async def redraft_status_update(
+    conversation_id: str,
+    sequence: int,
+    *,
+    instructions: str,
+    current: StatusUpdateEdit,
+    author: str,
+    security_confirmed: bool = False,
+    on_started: Callable[[], None] | None = None,
+    lookup: IncidentLookup | None = None,
+    reader: IncidentTranscriptReader | None = None,
+    store: StatusUpdateStore | None = None,
+    generator: TextGenerator | None = None,
+    security_reader: IncidentSecurityReader | None = None,
+    now: datetime | None = None,
+) -> OperationResult[StatusUpdate]:
+    """Redraft the pending draft from the reviewer's instructions and store it as the next draft.
+
+    Args:
+        conversation_id: The incident conversation the review modal was opened from.
+        sequence: The pending draft's sequence the reviewer is looking at.
+        instructions: The reviewer's guidance; trimmed and capped before use.
+        current: The reviewer's current stage and fields, the model's base.
+        author: Platform user id of the redrafting responder.
+        security_confirmed: The responder confirmed sending a security or
+            unknown-flag incident to the model; the flag is then not read.
+        on_started: Called once just before the model call.
+        lookup: Resolves the conversation to its incident; core's by default.
+        reader: Reads the conversation; core's by default.
+        store: Holds the incident's status updates; core's by default.
+        generator: Redrafts the fields; the scribe provider's by default.
+        security_reader: Reads the incident's security flag; core's by default.
+        now: The current time; injected in tests.
+
+    Returns:
+        Success with the new draft. Otherwise ``STATUS_UPDATE_INSTRUCTIONS_INVALID``
+        for blank instructions (nothing is read), the lookup's refusal, the
+        store's or the generator's classified error, ``STATUS_UPDATE_CONFLICT``
+        when the latest record is not the draft at ``sequence`` or another
+        writer took the next sequence, ``SECURITY_CONFIRMATION_REQUIRED``, or
+        ``DRAFT_UNPARSEABLE``. Every failure leaves the previous draft as the latest.
+    """
+    log = logger.bind(operation="redraft_status_update", conversation_id=conversation_id, sequence=sequence)
+    guidance = normalize_instructions(instructions)
+    if not guidance:
+        log.info("incident_status_update_redraft_blank", error_code=ErrorCode.STATUS_UPDATE_INSTRUCTIONS_INVALID)
+        return OperationResult.permanent_error(
+            message="Redraft instructions are blank",
+            error_code=ErrorCode.STATUS_UPDATE_INSTRUCTIONS_INVALID,
+        )
+    settings = get_incident_status_update_settings()
+    now = now or datetime.now(UTC)
+    lookup = lookup or get_incident_lookup()
+
+    incident = lookup.find_incident_for_conversation(conversation_id)
+    if not incident.is_success or incident.data is None:
+        return _failure(incident)
+    incident_id = incident.data
+    log = log.bind(incident_id=incident_id, instructions_length=len(guidance))
+
+    store = store or get_status_update_store()
+    listed = store.list_for_incident(incident_id)
+    if not listed.is_success or listed.data is None:
+        return _failure(listed)
+    records = listed.data
+    latest = records[0] if records else None
+    if latest is None or latest.sequence != sequence or latest.state is not StatusUpdateState.DRAFT:
+        log.info("incident_status_update_redraft_stale", error_code=ErrorCode.STATUS_UPDATE_CONFLICT)
+        return OperationResult.permanent_error(
+            message="The status update is no longer the pending draft",
+            error_code=ErrorCode.STATUS_UPDATE_CONFLICT,
+        )
+    last_public = next((record for record in records if record.state is not StatusUpdateState.DRAFT), None)
+
+    messages = _read_window(reader or get_incident_transcript_reader(), conversation_id, last_public, settings, now, log)
+    people = [message for message in messages if not message.is_bot and message.posted_at is not None]
+
+    refusal = _security_gate(incident_id, security_confirmed, security_reader, log)
+    if refusal is not None:
+        return _failure(refusal)
+
+    if on_started is not None:
+        on_started()
+    generated = await _generate_fields(
+        generator or _default_generator(),
+        build_redraft_input(current, build_transcript(messages)),
+        build_redraft_instructions(guidance),
+        settings,
+        log,
+    )
+    if not generated.is_success or generated.data is None:
+        return _failure(generated)
+
+    redrafted = _draft_record(
+        incident_id,
+        sequence=latest.sequence + 1,
+        fields=generated.data,
+        floor=last_public.stage if last_public else None,
+        people=people,
+        author=author,
+        settings=settings,
+        now=now,
+        previous=latest,
+    )
+    appended = store.append(redrafted)
+    if not appended.is_success:
+        log.warning("incident_status_update_redraft_store_failed", status=appended.status, error_code=appended.error_code)
+        return _failure(appended)
+    log.info("incident_status_update_redrafted", new_sequence=redrafted.sequence)
+    return OperationResult.success(data=redrafted)
+
+
+async def _generate_fields(
+    generator: TextGenerator,
+    transcript: str,
+    instructions: str,
+    settings: IncidentStatusUpdateSettings,
+    log: structlog.stdlib.BoundLogger,
+) -> OperationResult[DraftedFields]:
+    """Make the one model call and parse its answer strictly; never logs the transcript or instructions."""
+    generated = await generator.summarize(transcript, instructions=instructions, max_output_tokens=settings.MAX_OUTPUT_TOKENS)
     if not generated.is_success or generated.data is None:
         log.warning("incident_status_update_generation_failed", status=generated.status, error_code=generated.error_code)
         return _failure(generated)
@@ -222,18 +366,7 @@ async def draft_status_update(
             message="The drafted status update could not be read",
             error_code=DRAFT_UNPARSEABLE_CODE,
         )
-
-    drafted = _draft_record(
-        incident_id,
-        sequence=latest.sequence + 1 if latest else 1,
-        fields=fields,
-        floor=last_public.stage if last_public else None,
-        people=people,
-        author=author,
-        settings=settings,
-        now=now,
-    )
-    return _append(store, drafted, StatusUpdateOutcomeKind.DRAFTED, log)
+    return OperationResult.success(data=fields)
 
 
 def _security_gate(
@@ -330,9 +463,18 @@ def _draft_record(
     author: str,
     settings: IncidentStatusUpdateSettings,
     now: datetime,
+    previous: StatusUpdate | None = None,
 ) -> StatusUpdate:
-    """Return the draft record for freshly drafted fields, with the stage floor applied."""
+    """Return the draft record for freshly drafted fields, with the stage floor applied.
+
+    Cutoff and fingerprint come from the people's messages read; with none
+    (a redraft from instructions alone) they stay ``previous``'s.
+    """
     stage = fields.stage if floor is None else max(fields.stage, floor, key=_STAGE_ORDER.index)
+    if people or previous is None:
+        cutoff, fingerprint = max(_posted_at(message) for message in people), _fingerprint(people)
+    else:
+        cutoff, fingerprint = previous.transcript_cutoff, previous.transcript_fingerprint
     return StatusUpdate(
         incident_id=incident_id,
         sequence=sequence,
@@ -342,8 +484,8 @@ def _draft_record(
         fr=fields.fr,
         next_update_at=next_update_at_for(stage, settings, now),
         author=author,
-        transcript_cutoff=max(_posted_at(message) for message in people),
-        transcript_fingerprint=_fingerprint(people),
+        transcript_cutoff=cutoff,
+        transcript_fingerprint=fingerprint,
         created_at=now,
     )
 

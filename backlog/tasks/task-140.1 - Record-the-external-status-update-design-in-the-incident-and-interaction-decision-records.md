@@ -3,10 +3,10 @@ id: TASK-140.1
 title: >-
   Record the external status update design in the incident and interaction
   decision records
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-06 19:22'
+updated_date: '2026-10-08 15:48'
 labels:
   - incident
 dependencies:
