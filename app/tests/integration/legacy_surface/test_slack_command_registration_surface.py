@@ -453,6 +453,7 @@ def test_incident_summarize_returns_the_summary_ephemerally(
     assert reply["text"].startswith("🧾 AI-generated Incident summary\n\n")
     assert "The deploy was rolled back." in reply["text"]
 
+
 def test_incident_summarize_with_empty_history_says_there_is_nothing_yet(
     incident_channel: SlackCommandHarness, monkeypatch: pytest.MonkeyPatch
 ) -> None:
