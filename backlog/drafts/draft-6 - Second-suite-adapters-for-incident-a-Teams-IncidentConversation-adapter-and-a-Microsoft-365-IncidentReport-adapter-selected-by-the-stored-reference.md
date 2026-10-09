@@ -6,12 +6,13 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-10-02 16:44'
+updated_date: '2026-10-09 17:14'
 labels:
   - incident
   - later-wave
 milestone: m-6
 dependencies:
-  - TASK-38.8
+  - TASK-145.13
   - TASK-83
 references:
   - decisions/incident-management.md

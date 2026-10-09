@@ -6,10 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:00'
+updated_date: '2026-10-09 16:49'
 labels:
   - plugin-architecture
   - capabilities
   - rotations
+  - superseded
 milestone: m-7
 dependencies:
   - TASK-106
@@ -27,6 +29,8 @@ ordinal: 265000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+SUPERSEDED (2026-10-09) by TASK-146.1: rotations are a schedule source inside the on-call capability, not a capability of their own. This task is kept as history and is not to be planned or implemented.
+
 Human decision 2026-09-24: user rotations become a capability. decisions/plugin-architecture.md: features never import each other, and a need two features share becomes a capability when it passes the three tests.
 
 Verified 2026-09-24: packages/oncall_sync imports packages.user_rotations in three places (providers.py get_user_rotations_service, __init__.py get_rotations, ports.py CurrentUserRotation), a live violation of "features never import each other". Rotations qualify as a capability:

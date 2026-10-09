@@ -6,10 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:01'
-updated_date: '2026-10-02 16:59'
+updated_date: '2026-10-09 16:49'
 labels:
   - plugin-architecture
   - features
+  - superseded
 milestone: m-7
 dependencies:
   - TASK-109
@@ -33,6 +34,8 @@ ordinal: 271000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+SUPERSEDED (2026-10-09) by TASK-145.13: the umbrella is renamed only once it is finished; nothing waits for the rename. This task is kept as history and is not to be planned or implemented.
+
 Child of TASK-124. Rescoped 2026-10-01 to the amended decisions/feature-packages.md and 2026-10-02 to decisions/incident-management.md (TASK-97): incident_draft and incident_summary are no longer moved as two subdomains. TASK-135 first reshapes them into the scribe subdomain over packages/incident/core, and TASK-134 moves the generic answer parsing into the text-generation capability. This task then moves the incident umbrella as it stands: packages/incident/ -> features/incident/, with core/ and the scribe subdomain TASK-135 created, and the dotted entry-point name incident.scribe. core/ gets no entry point.
 
 The adapter-only packages packages/incident/documents, drive, meet and scheduling (no hookimpls, built for modules/incident) move with the umbrella as they are, with no entry point; TASK-38.2, TASK-38.3 and TASK-38.6 fold them into core/adapters/, lifecycle/adapters/ and retrospective/adapters/ afterwards. The umbrella layers contract keeps them as independent siblings above core until then.

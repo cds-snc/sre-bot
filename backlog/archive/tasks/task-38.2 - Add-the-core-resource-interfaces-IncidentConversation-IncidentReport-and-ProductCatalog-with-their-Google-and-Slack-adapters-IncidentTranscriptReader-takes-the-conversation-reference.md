@@ -7,14 +7,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
-updated_date: '2026-10-02 20:51'
+updated_date: '2026-10-09 17:00'
 labels:
   - migration
   - phase-5
   - incident
+  - superseded
 milestone: m-5
-dependencies:
-  - TASK-38.1
+dependencies: []
 references:
   - decisions/incident-management.md
   - decisions/feature-packages.md
@@ -29,6 +29,8 @@ ordinal: 307000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+SUPERSEDED (2026-10-09) by TASK-145.5: same slice, re-cut for the response | comms | postmortem subdomains, the interim store in packages/incident and the five roles. This task is kept as history and is not to be planned or implemented.
+
 Slice 2 of TASK-38 (expand). decisions/incident-management.md: core/ holds the resource interfaces with two or more subdomain consumers, one adapter per system in core/adapters/, selected by the stored reference.
 
 THIS SLICE

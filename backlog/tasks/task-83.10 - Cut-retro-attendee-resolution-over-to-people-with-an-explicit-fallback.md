@@ -4,12 +4,12 @@ title: Cut retro attendee resolution over to people with an explicit fallback
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
-updated_date: '2026-09-24 20:09'
+updated_date: '2026-10-09 17:01'
 labels:
   - identity
 dependencies:
   - TASK-83.9
-  - TASK-38
+  - TASK-145
 references:
   - app/modules/incident/schedule_retro.py
 parent_task_id: TASK-83
@@ -20,7 +20,7 @@ ordinal: 177000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Updated 2026-09-24: decisions/migration.md rule 1 freezes modules/incident to bug fixes, so the person-based comparison and cutover cannot be added to modules/incident/schedule_retro.py. They run against the rebuilt retro surface in app/features/incident/ (TASK-38), which reaches attendees' calendars through the calendar capability or a feature adapter. The steps below still apply; read 'modules/incident/schedule_retro.py' as 'the rebuilt retro surface'.
+Updated 2026-09-24: decisions/migration.md rule 1 freezes modules/incident to bug fixes, so the person-based comparison and cutover cannot be added to modules/incident/schedule_retro.py. They run against the rebuilt retro surface in app/features/incident/ (TASK-145), which reaches attendees' calendars through the calendar capability or a feature adapter. The steps below still apply; read 'modules/incident/schedule_retro.py' as 'the rebuilt retro surface'.
 
 After SRE reviews the shadow comparison, retro invitations use each attendee's calendar home from people. Attendees without a link fall back to their Slack profile email, visibly, so nobody silently drops off an invitation.
 <!-- SECTION:DESCRIPTION:END -->

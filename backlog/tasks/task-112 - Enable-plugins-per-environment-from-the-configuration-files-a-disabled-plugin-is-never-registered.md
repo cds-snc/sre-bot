@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-09-25 15:00'
+updated_date: '2026-10-09 16:48'
 labels:
   - plugin-architecture
   - plugins
@@ -38,6 +38,7 @@ Today which features and jobs run is decided by environment variables and ENVIRO
 - [ ] #2 A plugin disabled in the environment file is never registered: no routes, no OpenAPI entries, no hookimpl calls, no settings reads (boot test)
 - [ ] #3 grep finds no environment-variable feature switch or ENVIRONMENT check deciding whether a plugin runs
 - [ ] #4 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [ ] #5 Enablement keys in the base configuration are grouped by product area as decisions/product-scope.md names them (incident response, cloud operations, platform access, workplace utilities)
 <!-- AC:END -->
 
 ## Comments

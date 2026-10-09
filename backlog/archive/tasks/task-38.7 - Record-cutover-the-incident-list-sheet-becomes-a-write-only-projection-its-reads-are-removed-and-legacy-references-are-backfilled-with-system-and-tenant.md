@@ -6,15 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
-updated_date: '2026-10-08 15:01'
+updated_date: '2026-10-09 17:00'
 labels:
   - migration
   - phase-5
   - incident
+  - superseded
 milestone: m-5
-dependencies:
-  - TASK-38.5
-  - TASK-38.6
+dependencies: []
 references:
   - decisions/incident-management.md
   - decisions/feature-packages.md
@@ -28,6 +27,8 @@ ordinal: 312000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+SUPERSEDED (2026-10-09) by TASK-145.11: same slice, re-cut for the response | comms | postmortem subdomains, the interim store in packages/incident and the five roles. This task is kept as history and is not to be planned or implemented.
+
 Slice 7 of TASK-38 (cut over). decisions/workplace-systems.md rule 5 and incident-management.md: no record of truth in a spreadsheet; a surviving sheet is a write-only projection rebuilt from storage.
 
 THIS SLICE

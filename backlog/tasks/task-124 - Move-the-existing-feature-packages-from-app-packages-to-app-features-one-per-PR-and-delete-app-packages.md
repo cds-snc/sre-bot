@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:01'
-updated_date: '2026-10-01 14:06'
+updated_date: '2026-10-09 17:14'
 labels:
   - plugin-architecture
   - features
@@ -14,10 +14,8 @@ milestone: m-7
 dependencies:
   - TASK-88
   - TASK-124.1
-  - TASK-124.2
   - TASK-124.3
   - TASK-124.4
-  - TASK-124.5
   - TASK-124.6
 references:
   - decisions/plugin-architecture.md
@@ -32,8 +30,7 @@ ordinal: 266000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 COORDINATOR: contains no implementation. decisions/plugin-architecture.md: "Features already in packages/ move to features/ one per PR, with every importer rewritten, legacy ones included." feature-packages.md accepts the cost: every package renames platforms/ and interactions/ to entrypoints/. Amended 2026-10-01: incident_draft and incident_summary are reshaped before they move (TASK-135, TASK-134), and umbrellas may hold a core/ layer between their subdomains and common/.
 
-Children (one PR each): access (umbrella), geolocate, oncall_sync, rant, talent, and the incident umbrella (core, scheduling, and the subdomain TASK-135 makes of draft and summary).
-user_rotations becomes a capability instead (its own ticket). packages/aws_platform is dissolved by TASK-88, not moved.
+Children (one PR each): access (umbrella), geolocate, rant, talent. Since 2026-10-09 oncall_sync moves as TASK-146.2, once it consumes the on-call capability, and the incident umbrella moves as TASK-145.1, the first slice of its rebuild; the former children TASK-124.2 and TASK-124.5 are archived. user_rotations becomes a schedule source of the on-call capability (TASK-146.1). packages/aws_platform is dissolved by TASK-88, not moved.
 
 Rule that keeps each move final: a package moves only once every infrastructure service it uses is reachable as a contract from the service registry, or as a capability's api.py. Its move then adds no import-linter ignore entry, and nothing is moved and then rewired later. Each child's dependencies encode that.
 

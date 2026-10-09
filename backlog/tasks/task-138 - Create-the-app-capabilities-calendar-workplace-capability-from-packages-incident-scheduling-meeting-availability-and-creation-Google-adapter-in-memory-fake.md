@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:59'
+updated_date: '2026-10-09 17:01'
 labels:
   - plugin-architecture
   - capabilities
@@ -38,7 +39,7 @@ SCOPE (behaviour-preserving; plugin-architecture.md capability tests: incident n
 - modules/incident/schedule_retro.py and packages/incident/scheduling consumers are repointed to capabilities.calendar.api (migration.md rule 5: an import-path change in a frozen module); packages/incident/scheduling is deleted; the incident umbrella layers contract drops it.
 - No vocabulary from incident (retro, incident, channel) appears in the capability.
 
-Sequencing: Wave 4 capability move like TASK-119 to TASK-121, after TASK-110 and TASK-114. TASK-38.6 depends on it. TASK-124.5 moves the incident umbrella without scheduling if this lands first, with it otherwise.
+Sequencing: Wave 4 capability move like TASK-119 to TASK-121, after TASK-110 and TASK-114. TASK-145.9 depends on it. TASK-145.13 moves the incident umbrella without scheduling if this lands first, with it otherwise.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

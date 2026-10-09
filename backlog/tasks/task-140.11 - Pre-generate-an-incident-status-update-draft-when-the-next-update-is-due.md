@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-07 18:52'
-updated_date: '2026-10-09 15:34'
+updated_date: '2026-10-09 16:59'
 labels:
   - incident
 dependencies:
@@ -21,7 +21,7 @@ ordinal: 335000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Deferred (human, 2026-10-08): the current status-update feature is good enough; this task is not planned or implemented yet. Business requirements are settled below; the implementation plan is written when the task is picked up.
+Deferred (human, 2026-10-08): the current status-update feature is good enough; this task is not planned or implemented yet. It belongs to the comms subdomain (incident.comms, TASK-145.3); where this text says scribe or the scribe service, read comms. Business requirements are settled below; the implementation plan is written when the task is picked up.
 
 Status updates for an incident always begin with a person: the first draft is made only when a responder presses Draft in the status-updates modal opened by /sre incident status-update. Today every draft is manual; NEXT_UPDATE_MINUTES (30) only sets the "next update" time printed in the text, and nothing drafts on a schedule.
 

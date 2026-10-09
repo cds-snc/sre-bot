@@ -6,13 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
+updated_date: '2026-10-09 17:00'
 labels:
   - migration
   - phase-5
   - incident
+  - superseded
 milestone: m-5
-dependencies:
-  - TASK-38.7
+dependencies: []
 references:
   - decisions/incident-management.md
   - decisions/feature-packages.md
@@ -25,6 +26,8 @@ ordinal: 313000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+SUPERSEDED (2026-10-09) by TASK-145.12: same slice, re-cut for the response | comms | postmortem subdomains, the interim store in packages/incident and the five roles. This task is kept as history and is not to be planned or implemented.
+
 Slice 8 of TASK-38 (contract). After slices 3 to 7 every surface in the TASK-36 inventory assigned to app/features/incident/ is rebuilt and cut over.
 
 THIS SLICE

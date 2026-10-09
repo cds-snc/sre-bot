@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 12:51'
-updated_date: '2026-10-09 12:52'
+updated_date: '2026-10-09 17:01'
 labels:
   - incident
   - features
@@ -31,7 +31,7 @@ DIRECTION (human, 2026-10-09): TASK-140 started from AI drafting and made the re
 
 STARTING POINT (main at af6a316e, 2026-10-09): #1566 "Let responders write status updates by hand" is merged. It added a Write it myself button beside Draft in the overview, a manual mode in draft_status_update (prefilled draft, no model call, no security gate, MANUAL outcome), _prefill_fields and _holds, UnavailableTextGenerator with TEXT_GENERATION_UNAVAILABLE when the OpenAI settings do not load, and build_review_view(with_redraft=False). The modal is still AI-first; this task turns it around and reuses those pieces. #1564 retired the legacy /sre incident updates command (TASK-140.7), so nothing legacy remains in scope here.
 
-LEAST REWORK (human, 2026-10-09): everything ships in place in packages/incident/scribe and packages/incident/core, with the interim DynamoDB StatusUpdateStore adapter. Later rework is mechanical: TASK-124.5 renames the paths, TASK-108/TASK-109 swap the inside of the one adapter for the storage contract, TASK-25.10 replaces the AI-availability predicate with the text-generation capability's own signal. No new Protocol method: a saved or AI-filled draft is appended as the next DRAFT record, as a redraft already is.
+LEAST REWORK (human, 2026-10-09): everything ships in place in packages/incident/scribe and packages/incident/core, with the interim DynamoDB StatusUpdateStore adapter. Later rework is mechanical: TASK-145.13 renames the paths, TASK-108/TASK-109 swap the inside of the one adapter for the storage contract, TASK-25.10 replaces the AI-availability predicate with the text-generation capability's own signal. No new Protocol method: a saved or AI-filled draft is appended as the next DRAFT record, as a redraft already is.
 
 ASSUMPTIONS IN FORCE (stated 2026-10-09; change them here before the slice that depends on them starts):
 - one pending draft per incident, as today; "New update" is hidden while one is pending (TASK-140.11 keeps "human drafts win");

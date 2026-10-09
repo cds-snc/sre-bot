@@ -44,7 +44,7 @@ The `pluggy` allowance and a platform's model types are then the same kind of de
 ## Open before acceptance
 
 - **Toolkit, shared helpers or conventions only.** Is a host-owned toolkit worth its cost, or do a few documented conventions plus lint checks (no manual `ack()` after work, no raw `response_url` posts) give most of the benefit?
-- **Proof on real features.** Build the Slack conventions for one or two rebuilt features first (for example `incident/scribe`, whose status-update modal is the first registered view, and `user_rotations`), and decide from what they actually needed. With native listeners in entry points, documented conventions plus lint checks are the leading option.
+- **Proof on real features.** Build the Slack conventions for one or two rebuilt features first (for example `incident/comms`, whose status-update modal is the first registered view, and the on-call capability's rotation commands), and decide from what they actually needed. With native listeners in entry points, documented conventions plus lint checks are the leading option.
 - **Staying thin over time.** How the no-wrapper rule is enforced in review once the toolkit has several consumers.
 - **Teams.** Whether a Teams toolkit is needed at all, decided when the first Teams feature exists.
 
@@ -65,4 +65,4 @@ Tickets are created on acceptance. Tolerated until then: handlers calling Bolt's
 
 **Changes:**
 - 2026-10-06: action and view-submission registration and native-SDK entry points are decided in transport-slack.md and platform-entrypoints.md; this record stays Draft for the conventions toolkit (TASK-140.1).
-- 2026-10-09: the first consumer is the human-first status-update modal, a form that saves, AI-fills and approves in place (TASK-144).
+- 2026-10-09: the first consumer is the human-first status-update modal, a form that saves, AI-fills and approves in place (TASK-144); it lives in `incident/comms` once TASK-145 carves that subdomain out.

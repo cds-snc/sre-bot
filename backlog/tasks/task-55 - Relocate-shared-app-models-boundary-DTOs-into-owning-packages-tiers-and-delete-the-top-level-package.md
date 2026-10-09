@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-27 16:07'
-updated_date: '2026-09-24 20:07'
+updated_date: '2026-10-09 17:01'
 labels:
   - architecture
   - layers
@@ -31,7 +31,7 @@ app/models/ is a top-level directory outside the three-tier model (decisions/mig
 
 Important: unlike locales/ (deleted wholesale at strangler completion, TASK-41), app/models/ has live consumers OUTSIDE app/modules/ - app/api/v1/routes/webhooks.py imports models.webhooks - so it cannot simply vanish when modules/ is deleted; each DTO must be repointed to its owning feature package (webhooks/incident, per decisions/migration.md ordering) or the tier that owns the boundary, then the top-level package removed.
 
-Scope of this task: enumerate every models/* symbol and its consumers, assign each a target owner (feature package boundary module), repoint imports, and delete app/models/. Coordinated with the webhooks (TASK-37) and incident (TASK-38) migrations that own most consumers.
+Scope of this task: enumerate every models/* symbol and its consumers, assign each a target owner (feature package boundary module), repoint imports, and delete app/models/. Coordinated with the webhooks (TASK-37) and incident (TASK-145) migrations that own most consumers.
 
 Needs a human-approved implementation plan (task-planner) before any code; may need decomposition per the single-PR size gate if the webhooks and incident DTO moves cannot land in one reviewable PR.
 <!-- SECTION:DESCRIPTION:END -->
