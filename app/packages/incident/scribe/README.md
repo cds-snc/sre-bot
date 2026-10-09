@@ -78,7 +78,8 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   from the latest approved update, and stores the draft as
   a `StatusUpdate` record (decisions/incident-management.md, External status
   updates). Only messages posted by people after the latest record's cutoff
-  count as new; thread replies are not read. It imports `core/api.py` only from
+  count as new; thread replies count when their thread started after the
+  cutoff, while new replies in an older thread are not read. It imports `core/api.py` only from
   `core` and no integration.
 - `status_update_approval.py`, `publisher.py` — approving a draft (stops at `APPROVED`, never
   publishes) and rendering an approved update as copy-ready EN/FR text.
@@ -508,7 +509,7 @@ have safe defaults:
 
 | Env var | Default | Meaning |
 | --- | --- | --- |
-| `INCIDENT_SUMMARY__DEFAULT_HISTORY_LIMIT` | `500` | Messages fetched when `--limit` is omitted |
+| `INCIDENT_SUMMARY__DEFAULT_HISTORY_LIMIT` | `750` | Messages fetched when `--limit` is omitted |
 | `INCIDENT_SUMMARY__MAX_HISTORY_LIMIT` | `1000` | Hard cap on `--limit` |
 | `INCIDENT_SUMMARY__DEFAULT_SINCE_HOURS` | `24` | Fallback look-back window when `--since` is omitted and the channel start cannot be determined |
 | `INCIDENT_SUMMARY__TIMEZONE` | `America/Toronto` | Zone for the transcript line times and the current-time line; an unknown zone falls back to UTC |
