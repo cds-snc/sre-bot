@@ -33,7 +33,7 @@ from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
-from features.incident.scribe import providers
+from features.incident.scribe import providers, status_update_history
 from features.incident.scribe.adapters.copy_ready import CopyReadyPublisher
 from features.incident.scribe.comms_profile import ProfileLabels
 from features.incident.scribe.domain import CopyReadyText, StatusUpdateOverview
@@ -185,7 +185,7 @@ def events() -> list[str]:
 @pytest.fixture
 def services(monkeypatch: pytest.MonkeyPatch, events: list[str]) -> _Services:
     fakes = _Services(events=events)
-    monkeypatch.setattr(slack_entrypoints, "get_approved_update", fakes.get_approved_update)
+    monkeypatch.setattr(status_update_history, "get_approved_update", fakes.get_approved_update)
     monkeypatch.setattr(slack_entrypoints, "get_status_update_overview", fakes.get_status_update_overview)
     monkeypatch.setattr(providers, "get_status_page_publisher", lambda: fakes)
     return fakes
@@ -376,7 +376,7 @@ class TestHandleOpenActionOverRealServices:
         label sets, which is what the approval view showed for that record.
         """
         store = _CountingStore(_APPROVED, _DRAFT)
-        monkeypatch.setattr(slack_entrypoints, "get_approved_update", partial(get_approved_update, store=store))
+        monkeypatch.setattr(status_update_history, "get_approved_update", partial(get_approved_update, store=store))
         monkeypatch.setattr(providers, "get_status_page_publisher", CopyReadyPublisher)
 
         handle_open_action(ack, _open_body(), client)

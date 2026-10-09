@@ -1,11 +1,14 @@
-"""Tests for the incident scribe Slack platform adapter: the status-update command.
+"""Tests for the incident scribe Slack platform adapter: the status-update command and handler shape.
 
 The command opens a loading view first with the command's trigger id, then resolves
 the incident, reads the pending draft and updates the view to it rendered with the
-default comms profile in EN and FR, or to a localized error view.
+default comms profile in EN and FR, or to a localized error view. Every
+status-update handler makes one service call and builds no domain value itself.
 """
 
+import ast
 from datetime import UTC, datetime
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,6 +18,7 @@ from contracts.operations.codes import ErrorCode
 from contracts.slack.models import CommandPayload
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
 from features.incident.scribe.domain import StatusUpdateOverview
+from features.incident.scribe.entrypoints import slack as slack_entrypoints
 from features.incident.scribe.entrypoints.slack import handle_status_update_command, register
 from features.incident.scribe.entrypoints.slack_views import NEW_ACTION_ID, REVIEW_ACTION_ID
 from tests.factories.slack import FakeSlackReply
@@ -332,3 +336,65 @@ class TestOverviewButtonsInViews:
         assert len(update_calls) >= 1
         view = update_calls[0]["view"]
         assert [block for block in view["blocks"] if block.get("block_id") == "overview_actions"] == []
+
+
+_STATUS_UPDATE_HANDLERS = (
+    "handle_status_update_command",
+    "handle_new_update_action",
+    "handle_review_action",
+    "handle_open_action",
+    "handle_history_action",
+    "handle_published_action",
+    "handle_generate_action",
+    "handle_save_action",
+    "handle_review_submission",
+)
+# "About 30 lines": a long keyword-argument call laid out one argument per line counts each line.
+_MAX_HANDLER_LINES = 35
+
+
+def _entrypoint_tree() -> ast.Module:
+    return ast.parse(Path(slack_entrypoints.__file__).read_text())
+
+
+def _service_names(tree: ast.Module) -> set[str]:
+    """Names the entry point imports from the status-update service modules."""
+    return {
+        alias.asname or alias.name
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom) and (node.module or "").startswith("features.incident.scribe.status_update")
+        for alias in node.names
+    }
+
+
+class TestHandlerDiscipline:
+    """The status-update handlers receive, parse, make one service call and render.
+
+    The entry point's source is parsed, so the checks hold for every handler
+    without running it: the body's length (docstring excluded), the calls to
+    names imported from the status-update service modules, and ``asyncio.run``.
+    """
+
+    @pytest.mark.parametrize("name", _STATUS_UPDATE_HANDLERS)
+    def test_handler_makes_one_service_call_in_at_most_one_event_loop(self, name: str) -> None:
+        tree = _entrypoint_tree()
+        services = _service_names(tree)
+        handler = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == name)
+        calls = [node for node in ast.walk(handler) if isinstance(node, ast.Call)]
+
+        service_calls = [call for call in calls if isinstance(call.func, ast.Name) and call.func.id in services]
+        event_loops = [call for call in calls if ast.unparse(call.func) == "asyncio.run"]
+        body = handler.body[1:] if ast.get_docstring(handler) else handler.body
+        lines = (body[-1].end_lineno or 0) - body[0].lineno + 1
+
+        assert len(service_calls) == 1
+        assert len(event_loops) <= 1
+        assert lines <= _MAX_HANDLER_LINES
+
+    def test_entry_point_imports_no_domain_constructor_or_replace(self) -> None:
+        """Kept drafts are built by the service, so the entry point needs neither the domain types nor ``replace``."""
+        tree = _entrypoint_tree()
+        imports = [node for node in tree.body if isinstance(node, ast.ImportFrom)]
+
+        assert not [node for node in imports if node.module == "features.incident.scribe.domain"]
+        assert not [node for node in imports if node.module == "dataclasses" and any(a.name == "replace" for a in node.names)]

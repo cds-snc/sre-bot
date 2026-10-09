@@ -14,6 +14,8 @@ from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUp
 # this document, and a reader needs to know it was machine-written.
 AI_AUTHOR = "SRE Bot (AI generated)"
 
+_TEXT_FIELDS = ("affected_service", "impact", "current_action", "workaround")
+
 
 @dataclass(frozen=True)
 class DocumentSection:
@@ -156,6 +158,15 @@ class StatusUpdateEdit:
     en: StatusUpdateText
     fr: StatusUpdateText
 
+    def blank_fields(self) -> tuple[str, ...]:
+        """Return the names (``en.impact``, ``fr.workaround``, ...) of the fields blank after trimming."""
+        return tuple(
+            f"{language}.{name}"
+            for language, text in (("en", self.en), ("fr", self.fr))
+            for name in _TEXT_FIELDS
+            if not getattr(text, name).strip()
+        )
+
 
 @dataclass(frozen=True)
 class CopyReadyText:
@@ -176,3 +187,32 @@ class StatusUpdateOverview:
 
     pending: StatusUpdate | None
     approved: tuple[StatusUpdate, ...]
+
+
+@dataclass(frozen=True)
+class StatusUpdateFormState:
+    """The review form to show after a status-update action.
+
+    Attributes:
+        update: The draft whose stage and fields fill the form: the new or
+            stored draft, or, when ``kept``, the stored draft overlaid with the
+            responder's typed values.
+        ai_available: Whether the form offers Draft with AI.
+        kind: How a start or fill produced ``update``; ``None`` for a read or a save.
+        kept: ``True`` when the action changed nothing and the stored draft was kept.
+        failure_code: The classified code that explains a kept draft, when known.
+    """
+
+    update: StatusUpdate
+    ai_available: bool
+    kind: StatusUpdateOutcomeKind | None = None
+    kept: bool = False
+    failure_code: str | None = None
+
+
+@dataclass(frozen=True)
+class PublishedRecord:
+    """An approved status update with its copy-ready text, as the copy-ready view shows it."""
+
+    update: StatusUpdate
+    text: CopyReadyText

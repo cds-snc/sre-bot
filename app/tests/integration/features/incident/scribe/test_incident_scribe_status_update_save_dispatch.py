@@ -33,8 +33,8 @@ from features.incident.core.api import (
     StatusUpdateState,
     StatusUpdateText,
 )
+from features.incident.scribe import status_update_form
 from features.incident.scribe.domain import StatusUpdateEdit
-from features.incident.scribe.entrypoints import slack as slack_entrypoints
 from features.incident.scribe.entrypoints.slack_views import (
     REVIEW_CALLBACK_ID,
     SAVE_ACTION_ID,
@@ -99,12 +99,12 @@ def store(monkeypatch: pytest.MonkeyPatch) -> InMemoryStatusUpdateStore:
     status_updates = InMemoryStatusUpdateStore()
     status_updates.append(_PENDING)
     monkeypatch.setattr(
-        slack_entrypoints,
+        status_update_form,
         "save_status_update_draft",
         partial(save_status_update_draft, lookup=_StubLookup(), store=status_updates, now=_NOW),
     )
-    monkeypatch.setattr(slack_entrypoints, "get_draft_for_review", partial(get_draft_for_review, store=status_updates))
-    monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: True)
+    monkeypatch.setattr(status_update_form, "get_draft_for_review", partial(get_draft_for_review, store=status_updates))
+    monkeypatch.setattr(status_update_form, "text_generation_available", lambda: True)
     return status_updates
 
 

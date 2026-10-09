@@ -37,8 +37,14 @@ Each stack has one doc under `backlog/docs/stacks/`, created with `backlog doc c
 ## End
 
 1. Make sure every layer touched this session has task notes and checked ACs through the CLI, and stays at `In Progress`. Only humans set Done.
-2. Rewrite the handoff doc so that someone with no memory of this session could continue.
-3. End the final message with a resume prompt in a fenced block:
+2. Check the PR state of every layer marked `in review` (`gh pr view <n> --json state`). For each merged layer whose task is not Done yet, print the command the human runs to close it: `backlog task edit <id> --status Done`. The task-file edit is committed with the next layer.
+3. Print the commands that put the human on the next layer's branch before the next session starts, in order:
+   - if a lower layer merged: `gh stack sync` (or `gh stack rebase`), then `gh stack submit` to update the PR bases;
+   - `gh stack checkout <top branch>` if the top of the stack is not checked out;
+   - `gh stack add <next-layer branch>`, which creates the next layer's branch on top of the stack and checks it out.
+   Record these as **human** next actions in the handoff doc, and use the new branch as the expected position in the resume prompt.
+4. Rewrite the handoff doc so that someone with no memory of this session could continue.
+5. End the final message with a resume prompt in a fenced block:
 
 ```text
 Resume <Stack> using the stacked-pr-session skill.

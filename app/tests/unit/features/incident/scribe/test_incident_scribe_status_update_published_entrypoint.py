@@ -34,11 +34,10 @@ from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
-from features.incident.scribe import providers
+from features.incident.scribe import providers, status_update_history
 from features.incident.scribe.adapters.copy_ready import CopyReadyPublisher
 from features.incident.scribe.comms_profile import ProfileLabels
 from features.incident.scribe.domain import CopyReadyText
-from features.incident.scribe.entrypoints import slack as slack_entrypoints
 from features.incident.scribe.entrypoints.slack import (
     handle_generate_action,
     handle_history_action,
@@ -177,7 +176,7 @@ def events() -> list[str]:
 @pytest.fixture
 def services(monkeypatch: pytest.MonkeyPatch, events: list[str]) -> _Services:
     fakes = _Services(events=events)
-    monkeypatch.setattr(slack_entrypoints, "set_published", fakes.set_published)
+    monkeypatch.setattr(status_update_history, "set_published", fakes.set_published)
     monkeypatch.setattr(providers, "get_status_page_publisher", lambda: fakes)
     return fakes
 
@@ -394,7 +393,7 @@ class TestHandlePublishedActionOverRealServices:
         so it carries the presser as publisher and offers Mark as not published.
         """
         store = _CountingStore(_APPROVED)
-        monkeypatch.setattr(slack_entrypoints, "set_published", partial(set_published, now=_NOW, store=store))
+        monkeypatch.setattr(status_update_history, "set_published", partial(set_published, now=_NOW, store=store))
         monkeypatch.setattr(providers, "get_status_page_publisher", CopyReadyPublisher)
 
         handle_published_action(ack, _toggle_body(_target(True)), client)

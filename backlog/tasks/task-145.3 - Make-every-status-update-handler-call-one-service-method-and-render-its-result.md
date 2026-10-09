@@ -1,10 +1,10 @@
 ---
 id: TASK-145.3
 title: Make every status-update handler call one service method and render its result
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 18:22'
+updated_date: '2026-10-09 19:33'
 labels:
   - incident
   - features
@@ -33,11 +33,11 @@ THIS SLICE
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No handler in scribe/entrypoints/slack.py exceeds about 30 lines or calls more than one service function
-- [ ] #2 scribe/entrypoints/slack.py imports no domain constructor and does not import dataclasses.replace
-- [ ] #3 approve_and_publish and toggle_published exist as single service functions with tests for success and each error outcome
-- [ ] #4 The status-update modal flows (start, save, generate, approve, history, published) behave as before: existing integration tests pass with handler stubs updated only
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 No handler in scribe/entrypoints/slack.py exceeds about 30 lines or calls more than one service function
+- [x] #2 scribe/entrypoints/slack.py imports no domain constructor and does not import dataclasses.replace
+- [x] #3 approve_and_publish and toggle_published exist as single service functions with tests for success and each error outcome
+- [x] #4 The status-update modal flows (start, save, generate, approve, history, published) behave as before: existing integration tests pass with handler stubs updated only
+- [x] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -84,3 +84,30 @@ status_update.py about +120, status_update_approval.py +30, status_update_histor
 ## Blast radius and rollback
 Modal behaviour only; a regression shows as a wrong view, caught by the entrypoint tests. Single `git revert`.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented on stack-j/task-145.3-status-update-handlers, re-grounded on layer 2.
+
+Changes against the plan:
+- The form functions live in a new status_update_form.py (start/open/save/fill_status_update_form), not in status_update.py: they compose get_draft_for_review from status_update_approval, which already imports status_update, and status_update.py is 666 lines.
+- start_status_update_form and open_status_update_form were added: the New update and Review handlers also called text_generation_available(), a second service call under AC 1.
+- StatusUpdateFormState has a kept flag besides failure_code, since an OperationResult error code may be None. StatusUpdateOverview did not gain ai_available: the overview view does not use it.
+- validate_approval_edit became StatusUpdateEdit.blank_fields() so the approval submission makes one service call (approve_and_publish); the approval test class calls the method.
+- form_view_for became two view builders, build_saved_form_view and build_filled_form_view (the save and fill notices differ for the same state); _GENERATE_FAILURE_KEYS moved to slack_views.
+- Entry point: a _ModalAction parser replaces the per-handler payload parsing; _approve_and_publish, _read_and_publish, _toggle_and_publish, _render_record, _as_edit, _generate_failure_key and the replace import are gone.
+
+Tests: existing entrypoint and dispatch tests pass with only their stub targets moved from the entry point module to status_update_form, status_update_approval and status_update_history. New: test_incident_scribe_status_update_form_save.py (save, start, open), ..._form_fill.py, ..._approval_publish.py, ..._history_render.py, ..._form_view.py, and TestHandlerDiscipline in ..._status_update_slack.py (AST check: one service call, at most one asyncio.run, body at most 35 lines, no domain import or replace). handle_status_update_command and handle_generate_action are 35 lines each, counting one keyword argument per line.
+
+Gates (app/): ruff check . passed; ruff format --check passed; lint-imports 10 kept, 0 broken; mypy 0 errors in touched files (48 pre-existing elsewhere); pytest tests --ignore=tests/smoke 4603 passed.
+<!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-09 19:17
+---
+Plan approved
+---
+<!-- COMMENTS:END -->
