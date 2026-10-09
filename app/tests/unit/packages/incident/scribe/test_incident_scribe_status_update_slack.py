@@ -309,7 +309,7 @@ class TestDraftButtonInViews:
         assert len(update_calls) >= 1
         view = update_calls[0]["view"]
         (draft_block,) = [block for block in view["blocks"] if block.get("block_id") == "draft_button"]
-        assert draft_block["elements"][0]["action_id"] == DRAFT_ACTION_ID
+        assert DRAFT_ACTION_ID in [element["action_id"] for element in draft_block["elements"]]
 
     def test_draft_button_absent_in_error_view(self):
         """Error views (not-an-incident, ambiguous, etc.) do not include a Draft button."""

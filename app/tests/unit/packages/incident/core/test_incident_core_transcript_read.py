@@ -7,6 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
+from structlog.testing import capture_logs
 
 from packages.incident.core.adapters.slack import SlackIncidentTranscriptReader
 from packages.incident.core.domain import TranscriptMessage
@@ -315,3 +316,205 @@ class TestReadTranscriptFailures:
         client.auth_test.side_effect = _slack_error()
 
         assert [m.text for m in _read(client, exclude=True)] == ["hello", "report created"]
+
+
+def _paged_client(
+    history_pages: list[list[dict[str, Any]]],
+    replies: dict[str, list[list[dict[str, Any]]]] | None = None,
+    *,
+    identity: dict[str, Any] | None = None,
+) -> MagicMock:
+    """Return a fake Web client serving history and per-thread replies as cursor-linked pages.
+
+    Page ``n`` carries ``next_cursor`` ``"<kind>-<n+1>"`` when another page follows.
+    Every author is unnamed, so messages are attributed to their user id.
+    """
+    client = _client([], identity=identity)
+
+    def page(pages: list[list[dict[str, Any]]], kind: str, cursor: str | None) -> dict[str, Any]:
+        index = int(cursor.rsplit("-", 1)[1]) if cursor else 0
+        more = index + 1 < len(pages)
+        return {
+            "ok": True,
+            "messages": pages[index],
+            "has_more": more,
+            "response_metadata": {"next_cursor": f"{kind}-{index + 1}" if more else ""},
+        }
+
+    def history(**kwargs: Any) -> dict[str, Any]:
+        return page(history_pages, "history", kwargs.get("cursor"))
+
+    def thread(**kwargs: Any) -> dict[str, Any]:
+        return page((replies or {})[kwargs["ts"]], f"replies:{kwargs['ts']}", kwargs.get("cursor"))
+
+    client.conversations_history.side_effect = history
+    client.conversations_replies.side_effect = thread
+    return client
+
+
+def _parent(text: str, ts: str, reply_count: int) -> dict[str, Any]:
+    return {"user": "U1", "text": text, "ts": ts, "thread_ts": ts, "reply_count": reply_count}
+
+
+def _reply(text: str, ts: str, parent_ts: str, **extra: Any) -> dict[str, Any]:
+    return {"user": "U2", "text": text, "ts": ts, "thread_ts": parent_ts, **extra}
+
+
+class TestReadTranscriptThreads:
+    def test_thread_replies_are_interleaved_chronologically_without_repeating_the_parent(self) -> None:
+        """Replies join the conversation in time order; Slack's leading copy of the parent is not repeated."""
+        parent = _parent("prod is down", "1700000100.000000", 2)
+        client = _paged_client(
+            [[{"user": "U1", "text": "later top-level", "ts": "1700000300.000000"}, parent]],
+            {
+                "1700000100.000000": [
+                    [
+                        parent,
+                        _reply("deployed the fix", "1700000150.000000", "1700000100.000000"),
+                        _reply("confirmed in prod", "1700000400.000000", "1700000100.000000"),
+                    ]
+                ]
+            },
+        )
+
+        messages = _read(client)
+
+        assert [m.text for m in messages] == ["prod is down", "deployed the fix", "later top-level", "confirmed in prod"]
+        assert messages[1].posted_at == datetime.fromtimestamp(1700000150, tz=UTC)
+        client.conversations_replies.assert_called_once_with(channel="C123", ts="1700000100.000000", limit=50)
+
+    def test_messages_without_replies_trigger_no_replies_call(self) -> None:
+        """Only messages Slack reports as having replies are expanded."""
+        client = _paged_client([[{"user": "U1", "text": "solo", "ts": "1700000100.000000"}]])
+
+        _read(client)
+
+        client.conversations_replies.assert_not_called()
+
+    def test_a_reply_also_sent_to_the_channel_appears_once(self) -> None:
+        """A broadcast reply is in both the history and the thread; the transcript holds it once."""
+        broadcast = _reply("rolled back", "1700000200.000000", "1700000100.000000", subtype="thread_broadcast")
+        parent = _parent("prod is down", "1700000100.000000", 1)
+        client = _paged_client([[broadcast, parent]], {"1700000100.000000": [[parent, broadcast]]})
+
+        assert [m.text for m in _read(client)] == ["prod is down", "rolled back"]
+
+    def test_own_posts_and_system_events_in_a_thread_are_filtered_like_top_level_ones(self) -> None:
+        """The exclusion rules apply to replies the same way."""
+        parent = _parent("prod is down", "1700000100.000000", 3)
+        client = _paged_client(
+            [[parent]],
+            {
+                "1700000100.000000": [
+                    [
+                        parent,
+                        {"user": "UBOT", "text": "report created", "ts": "1700000110.000000", "thread_ts": parent["ts"]},
+                        _reply("joined", "1700000120.000000", parent["ts"], subtype="channel_join"),
+                        _reply("on it", "1700000130.000000", parent["ts"]),
+                    ]
+                ]
+            },
+            identity={"user_id": "UBOT", "bot_id": "B1", "user": "sre-bot"},
+        )
+
+        assert [m.text for m in _read(client, exclude=True)] == ["prod is down", "on it"]
+
+    def test_a_failed_replies_fetch_skips_only_that_thread_and_is_logged(self) -> None:
+        """One unreadable thread never costs the rest of the transcript."""
+        parent = _parent("prod is down", "1700000100.000000", 1)
+        client = _paged_client([[{"user": "U1", "text": "later", "ts": "1700000300.000000"}, parent]])
+        client.conversations_replies.side_effect = _slack_error()
+
+        with capture_logs() as logs:
+            messages = _read(client)
+
+        assert [m.text for m in messages] == ["prod is down", "later"]
+        assert [log["thread_ts"] for log in logs if log["event"] == "incident_transcript_replies_fetch_failed"] == [
+            "1700000100.000000"
+        ]
+
+
+class TestReadTranscriptPagination:
+    def test_history_pages_are_followed_until_no_cursor_remains(self) -> None:
+        """Every history page is read, each later call carrying the cursor and the remaining budget."""
+        client = _paged_client(
+            [
+                [
+                    {"user": "U1", "text": "three", "ts": "1700000300.000000"},
+                    {"user": "U1", "text": "two", "ts": "1700000200.000000"},
+                ],
+                [{"user": "U1", "text": "one", "ts": "1700000100.000000"}],
+            ]
+        )
+
+        assert [m.text for m in _read(client, limit=50)] == ["one", "two", "three"]
+        assert client.conversations_history.call_args_list[1].kwargs == {
+            "channel": "C123",
+            "limit": 48,
+            "oldest": "1700000000.000000",
+            "cursor": "history-1",
+        }
+
+    def test_history_paging_stops_once_the_limit_is_reached(self) -> None:
+        """A full page at the limit ends the read even when Slack offers more."""
+        client = _paged_client(
+            [
+                [
+                    {"user": "U1", "text": "three", "ts": "1700000300.000000"},
+                    {"user": "U1", "text": "two", "ts": "1700000200.000000"},
+                ],
+                [{"user": "U1", "text": "one", "ts": "1700000100.000000"}],
+            ]
+        )
+
+        assert [m.text for m in _read(client, limit=2)] == ["two", "three"]
+        assert client.conversations_history.call_count == 1
+
+    def test_a_failed_later_history_page_keeps_the_pages_already_read(self) -> None:
+        """Only a failed first page empties the transcript; a later failure is logged and the earlier pages kept."""
+        client = _paged_client(
+            [
+                [{"user": "U1", "text": "two", "ts": "1700000200.000000"}],
+                [{"user": "U1", "text": "one", "ts": "1700000100.000000"}],
+            ]
+        )
+        first_page = client.conversations_history.side_effect
+
+        def fail_on_second_page(**kwargs: Any) -> dict[str, Any]:
+            if kwargs.get("cursor"):
+                raise _slack_error()
+            return first_page(**kwargs)
+
+        client.conversations_history.side_effect = fail_on_second_page
+
+        with capture_logs() as logs:
+            messages = _read(client)
+
+        assert [m.text for m in messages] == ["two"]
+        assert any(log["event"] == "incident_transcript_history_page_failed" for log in logs)
+
+    def test_reply_pages_are_followed_until_no_cursor_remains(self) -> None:
+        """A long thread is read across all its pages."""
+        parent = _parent("prod is down", "1700000100.000000", 2)
+        client = _paged_client(
+            [[parent]],
+            {
+                "1700000100.000000": [
+                    [parent, _reply("first", "1700000110.000000", parent["ts"])],
+                    [_reply("second", "1700000120.000000", parent["ts"])],
+                ]
+            },
+        )
+
+        assert [m.text for m in _read(client)] == ["prod is down", "first", "second"]
+        assert client.conversations_replies.call_args_list[1].kwargs["cursor"] == "replies:1700000100.000000-1"
+
+    def test_the_limit_caps_the_whole_transcript_keeping_the_newest_messages(self) -> None:
+        """With replies added, the oldest messages give way so the most recent ``limit`` remain."""
+        parent = _parent("prod is down", "1700000100.000000", 1)
+        client = _paged_client(
+            [[{"user": "U1", "text": "fixed", "ts": "1700000300.000000"}, parent]],
+            {"1700000100.000000": [[parent, _reply("rolling back", "1700000200.000000", parent["ts"])]]},
+        )
+
+        assert [m.text for m in _read(client, limit=2)] == ["rolling back", "fixed"]

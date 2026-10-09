@@ -16,7 +16,13 @@ from contracts.operations.codes import ErrorCode
 from contracts.slack.models import CommandPayload, CommandResponse
 from contracts.slack.reply import SlackReplySender
 from infrastructure.i18n import t
-from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from packages.incident.core.api import (
+    StatusUpdate,
+    StatusUpdateOrigin,
+    StatusUpdateStage,
+    StatusUpdateState,
+    StatusUpdateText,
+)
 from packages.incident.scribe.comms_profile import ProfileLabels, format_profile_time, render_profile
 from packages.incident.scribe.domain import (
     CopyReadyText,
@@ -48,7 +54,8 @@ OPEN_ACTION_ID = "incident.scribe.status_update.open"
 HISTORY_ACTION_ID = "incident.scribe.status_update.history"
 PUBLISHED_ACTION_ID = "incident.scribe.status_update.published"
 REDRAFT_ACTION_ID = "incident.scribe.status_update.redraft"
-WRITE_ACTION_ID = "incident.scribe.status_update.write"
+NEW_ACTION_ID = "incident.scribe.status_update.new"
+SAVE_ACTION_ID = "incident.scribe.status_update.save"
 _APPROVED_ROW_CAP = 50
 _SECURITY_CONFIRMED = "confirmed"
 _REDRAFT_NOTICES_EN = MappingProxyType(
@@ -74,6 +81,37 @@ _REDRAFT_NOTICES_FR = MappingProxyType(
         "redraft_security": "Cet incident est, ou pourrait être, un incident de sécurité. La nouvelle rédaction envoie le "
         "contenu du canal de l'incident et des communications au modèle d'IA. Pour continuer, cochez la case "
         "ci-dessous, puis appuyez sur Rédiger à nouveau.",
+    }
+)
+_SAVE_NOTICES_EN = MappingProxyType(
+    {
+        "saved_note": "Draft saved.",
+        "save_failed": "The draft could not be saved; your text is still here.",
+    }
+)
+_SAVE_NOTICES_FR = MappingProxyType(
+    {
+        "saved_note": "Brouillon enregistré.",
+        "save_failed": "Le brouillon n'a pas pu être enregistré; votre texte est toujours là.",
+    }
+)
+# Keyed by ``StatusUpdateOrigin`` value; ``unknown`` is a record written before origins existed.
+_ORIGIN_TEMPLATES_EN = MappingProxyType(
+    {
+        StatusUpdateOrigin.HAND.value: "Written by {author} at {time}",
+        StatusUpdateOrigin.MODEL.value: "Drafted by AI at {time}",
+        StatusUpdateOrigin.MODEL_INSTRUCTED.value: "Redrafted with instructions at {time}",
+        StatusUpdateOrigin.CARRIED_FORWARD.value: "Carried forward at {time}",
+        "unknown": "By {author} at {time}",
+    }
+)
+_ORIGIN_TEMPLATES_FR = MappingProxyType(
+    {
+        StatusUpdateOrigin.HAND.value: "Rédigée par {author} le {time}",
+        StatusUpdateOrigin.MODEL.value: "Rédigée par l'IA le {time}",
+        StatusUpdateOrigin.MODEL_INSTRUCTED.value: "Rédigée à nouveau selon des instructions le {time}",
+        StatusUpdateOrigin.CARRIED_FORWARD.value: "Reprise de la mise à jour précédente le {time}",
+        "unknown": "Par {author} le {time}",
     }
 )
 _TEXT_FIELDS = ("affected_service", "impact", "current_action", "workaround")
@@ -369,38 +407,51 @@ def build_profile_labels(locale: str) -> ProfileLabels:
 
 
 def _draft_button_block(locale: str, update: StatusUpdate | None, *, with_draft: bool) -> dict[str, Any]:
-    """Build the actions block holding the Draft and Write it myself buttons and, for a shown draft, the Review button."""
+    """Build the overview's actions block: New update (primary) and Draft with nothing pending, Draft and Review with a draft.
+
+    ``with_draft=False`` (a result view) leaves only the Review button.
+    """
+    fr = locale.startswith("fr")
     elements: list[dict[str, Any]] = []
-    if with_draft:
-        write = "Rédiger moi-même" if locale.startswith("fr") else "Write it myself"
-        elements.extend(
-            [
-                {
-                    "type": "button",
-                    "action_id": DRAFT_ACTION_ID,
-                    "text": {"type": "plain_text", "text": status_t("draft_button", locale, "Draft")},
-                    "style": "primary",
-                },
-                {
-                    "type": "button",
-                    "action_id": WRITE_ACTION_ID,
-                    "text": {"type": "plain_text", "text": status_t("write_button", locale, write)},
-                },
-            ]
-        )
+    draft = {
+        "type": "button",
+        "action_id": DRAFT_ACTION_ID,
+        "text": {"type": "plain_text", "text": status_t("draft_button", locale, "Rédiger" if fr else "Draft")},
+    }
+    if with_draft and update is None:
+        new_update = {
+            "type": "button",
+            "action_id": NEW_ACTION_ID,
+            "text": {
+                "type": "plain_text",
+                "text": status_t("new_update_button", locale, "Nouvelle mise à jour" if fr else "New update"),
+            },
+            "style": "primary",
+        }
+        elements.extend([new_update, draft])
+    elif with_draft:
+        elements.append(draft | {"style": "primary"})
     if update is not None:
         elements.append(
             {
                 "type": "button",
                 "action_id": REVIEW_ACTION_ID,
-                "text": {
-                    "type": "plain_text",
-                    "text": status_t("review_button", locale, "Réviser" if locale.startswith("fr") else "Review"),
-                },
+                "text": {"type": "plain_text", "text": status_t("review_button", locale, "Réviser" if fr else "Review")},
                 "value": json.dumps({"incident_id": update.incident_id, "sequence": update.sequence}),
             }
         )
     return {"type": "actions", "block_id": "draft_button", "elements": elements}
+
+
+def origin_line(update: StatusUpdate, locale: str) -> str:
+    """Say who made the draft, how and when, for example ``Written by <@U1> at 2026-10-07 11:00 ET``.
+
+    A record from before origins existed names only its author.
+    """
+    key = update.origin.value if update.origin is not None else "unknown"
+    template = (_ORIGIN_TEMPLATES_FR if locale.startswith("fr") else _ORIGIN_TEMPLATES_EN)[key]
+    variables = {"author": f"<@{update.author}>", "time": format_profile_time(update.created_at, build_profile_labels(locale))}
+    return t(f"{STATUS_UPDATE_DOMAIN}.origin.{key}", locale, template.format(**variables), **variables)
 
 
 def build_security_confirmation_view(locale: str, private_metadata: str) -> dict[str, Any]:
@@ -499,9 +550,14 @@ def _approved_blocks(approved: tuple[StatusUpdate, ...], locale: str) -> list[di
 
 
 def build_overview_view(overview: StatusUpdateOverview, locale: str, private_metadata: str) -> dict[str, Any]:
-    """Build the status-updates modal: the pending draft part, then the approved-updates list."""
+    """Build the status-updates modal: the pending draft part (who made it, the draft, the buttons), then the approved-updates list."""
     if overview.pending is not None:
-        blocks = [*_pending_blocks(overview.pending), _draft_button_block(locale, overview.pending, with_draft=True)]
+        origin = {
+            "type": "context",
+            "block_id": "pending_origin",
+            "elements": [{"type": "mrkdwn", "text": origin_line(overview.pending, locale)}],
+        }
+        blocks = [origin, *_pending_blocks(overview.pending), _draft_button_block(locale, overview.pending, with_draft=True)]
     else:
         blocks = [
             *mrkdwn_blocks(status_t("no_pending", locale, "There is no status update draft for this incident yet.")),
@@ -632,11 +688,11 @@ def build_review_view(
     security_confirm: bool = False,
     with_redraft: bool = True,
 ) -> dict[str, Any]:
-    """Build the review modal: any notice, the Redraft section, then the stage select and the EN and FR fields.
+    """Build the review modal: any notice, the Redraft section, the stage select, the EN and FR fields, then Save draft.
 
     Field inputs are optional so Slack never blocks a blank field itself; the
-    submission listener validates and names the blank ones. The Redraft button
-    is a block action, so Approve stays the only submit. ``instructions``
+    submission listener validates and names the blank ones. The Redraft and
+    Save draft buttons are block actions, so Approve stays the only submit. ``instructions``
     prefills the instructions input and ``security_confirm`` adds the security
     confirmation checkbox. ``with_redraft=False`` leaves the Redraft section out,
     for a draft the responder writes by hand.
@@ -673,6 +729,15 @@ def build_review_view(
             block = _review_input(f"{language}.{name}", getattr(labels, name), element)
             block["optional"] = True
             blocks.append(block)
+    save = {
+        "type": "button",
+        "action_id": SAVE_ACTION_ID,
+        "text": {
+            "type": "plain_text",
+            "text": status_t("save_button", locale, "Enregistrer le brouillon" if fr else "Save draft"),
+        },
+    }
+    blocks.append({"type": "actions", "block_id": "save_button", "elements": [save]})
     view = status_update_view(locale, private_metadata, blocks, close=False)
     view["title"] = {
         "type": "plain_text",
@@ -738,6 +803,12 @@ def redraft_notice(key: str, locale: str) -> str:
     """
     fr = locale.startswith("fr")
     fallback = _REDRAFT_NOTICES_FR[key] if fr else _REDRAFT_NOTICES_EN[key]
+    return status_t(key, locale, fallback)
+
+
+def save_notice(key: str, locale: str) -> str:
+    """Return the localized Save draft notice for ``key``: ``saved_note`` or ``save_failed``."""
+    fallback = _SAVE_NOTICES_FR[key] if locale.startswith("fr") else _SAVE_NOTICES_EN[key]
     return status_t(key, locale, fallback)
 
 

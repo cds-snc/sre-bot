@@ -78,7 +78,8 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   from the latest approved update, and stores the draft as
   a `StatusUpdate` record (decisions/incident-management.md, External status
   updates). Only messages posted by people after the latest record's cutoff
-  count as new; thread replies are not read. It imports `core/api.py` only from
+  count as new; thread replies count when their thread started after the
+  cutoff, while new replies in an older thread are not read. It imports `core/api.py` only from
   `core` and no integration.
 - `status_update_approval.py`, `publisher.py` — approving a draft (stops at `APPROVED`, never
   publishes) and rendering an approved update as copy-ready EN/FR text.
@@ -487,7 +488,7 @@ So the model is given:
 #### Usage
 
 ```
-/sre incident summarize                      # since channel creation, up to 500 messages (defaults)
+/sre incident summarize                      # since channel creation, up to 750 messages (defaults)
 /sre incident summarize --since 30m           # last 30 minutes
 /sre incident summarize --since 2h           # last 2 hours
 /sre incident summarize --since 90m --limit 100
@@ -498,7 +499,7 @@ So the model is given:
   treated as hours). Omitted → the incident channel's creation time (falling
   back to `INCIDENT_SUMMARY__DEFAULT_SINCE_HOURS`, 24h, if the channel start
   cannot be determined).
-- `--limit` — maximum messages to include. Omitted/invalid → default (500);
+- `--limit` — maximum messages to include. Omitted/invalid → default (750);
   capped at `INCIDENT_SUMMARY__MAX_HISTORY_LIMIT` (1000).
 
 #### Settings
@@ -508,7 +509,7 @@ have safe defaults:
 
 | Env var | Default | Meaning |
 | --- | --- | --- |
-| `INCIDENT_SUMMARY__DEFAULT_HISTORY_LIMIT` | `500` | Messages fetched when `--limit` is omitted |
+| `INCIDENT_SUMMARY__DEFAULT_HISTORY_LIMIT` | `750` | Messages fetched when `--limit` is omitted |
 | `INCIDENT_SUMMARY__MAX_HISTORY_LIMIT` | `1000` | Hard cap on `--limit` |
 | `INCIDENT_SUMMARY__DEFAULT_SINCE_HOURS` | `24` | Fallback look-back window when `--since` is omitted and the channel start cannot be determined |
 | `INCIDENT_SUMMARY__TIMEZONE` | `America/Toronto` | Zone for the transcript line times and the current-time line; an unknown zone falls back to UTC |
@@ -542,7 +543,7 @@ the layer that lands it; until then the behaviour under
   starts a draft by hand, saves a draft from the form, and AI-fills a draft
   (`generate_status_update_draft`, blank instructions mean "draft from the
   conversation"). A predicate says whether text generation is available.
-- **Modal and form** (TASK-144.4): the status-updates modal shows the pending
+- **Modal and form** (TASK-144.4, shipped): the status-updates modal shows the pending
   draft with an origin line (who, how, when) or a "New update" button, and the
   approved history. "New update" stores a draft prefilled from the latest
   approved update (blank at the first stage) and opens the form. The form has
@@ -553,8 +554,7 @@ the layer that lands it; until then the behaviour under
   human messages since the latest approved update means no model call and the
   carried-forward wording; otherwise one model call fills the fields. A
   security or unknown-flag incident shows the confirmation checkbox first; a
-  hand-written draft needs none. The overview's Draft and Write it myself
-  buttons go away.
+  hand-written draft needs none. The overview's Draft button goes away.
 - **Unchanged**: approval, copy-ready text, history and the published toggle.
   Nothing is posted to the incident conversation.
 
@@ -584,14 +584,28 @@ makes one model call from the reviewer's current values, the same transcript
 window and the instructions, keeps the stage floor and strict parsing, and
 stores the result as the next draft; any failure keeps the previous draft.
 
-Write it myself: the modal's second button (`incident.scribe.status_update.write`)
-calls `draft_status_update` with `manual=True`: no model call and no security
-gate. With new activity it stores a `MANUAL` draft prefilled from the latest
+Origin line: above a pending draft the modal says who made it, how and when
+("Written by @user", "Drafted by AI", "Redrafted with instructions", "Carried
+forward", with the creation time in Eastern time); a record written before
+origins existed names only its author. The pending draft keeps the Draft and
+Review buttons.
+
+New update: with no pending draft the modal's primary button
+(`incident.scribe.status_update.new`, beside Draft) calls `draft_status_update`
+with `manual=True`: no model call and no security gate. With new activity it stores a `MANUAL` draft prefilled from the latest
 approved update (blank at Investigating for the first one); otherwise it
 returns the pending or carried-forward draft. The modal then switches to the
 review form; a `MANUAL` draft's form has no Redraft section. A Draft whose model
 call fails for any reason (no `OPENAI_API_KEY`, provider error, unparseable
 answer) falls back to the same `MANUAL` draft and form, with a notice. A
-pending draft still equal to its prefill was never written (only approval
-saves edits), so Draft retries the model over it rather than returning it as
+pending draft still equal to its prefill was never written (neither Save draft
+nor approval stored edits), so Draft retries the model over it rather than returning it as
 pending; when the model fails again the same draft is offered, not a copy.
+
+Save draft: the review form ends with a Save draft button
+(`incident.scribe.status_update.save`); Approve stays the only submit.
+`save_status_update_draft` stores the typed stage and fields, blanks included,
+as the next draft with origin `HAND`, and the form re-renders for the new
+sequence with a "Draft saved." notice. A form opened on an older sequence shows
+the conflict view; any other failure re-renders the typed values with a notice
+and stores nothing. Only the modal is updated.

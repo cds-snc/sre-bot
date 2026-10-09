@@ -1,7 +1,8 @@
 """Slack adapter implementing ``IncidentTranscriptReader`` on the Slack Web API.
 
-The adapter owns everything Slack-shaped about a transcript: the history call
-and its timestamp format, display-name resolution, chronological ordering, and
+The adapter owns everything Slack-shaped about a transcript: the history and
+thread-replies calls, their cursor paging and timestamp format, display-name
+resolution, chronological ordering, and
 the optional filtering of this bot's own posts and Slack system events. It also
 owns every degradation: a Web API failure is logged here and never raised.
 """
@@ -13,6 +14,7 @@ from typing import Any
 
 import structlog
 from slack_sdk import WebClient
+from slack_sdk.web import SlackResponse
 
 from integrations.slack.client import get_slack_web_client
 from packages.incident.core.domain import TranscriptMessage
@@ -68,30 +70,31 @@ class SlackIncidentTranscriptReader:
         limit: int,
         exclude_own_and_system_messages: bool = False,
     ) -> Sequence[TranscriptMessage]:
-        """Return the channel's messages since ``since``, oldest first.
+        """Return the channel's messages since ``since``, thread replies included, oldest first.
 
-        On any Slack API failure of the history call an empty sequence is
-        returned, so the caller renders its empty-history path.
+        Decisive facts often land in threads, so every message Slack reports
+        replies for is expanded with them. ``limit`` caps the whole transcript
+        and the newest messages are kept. A failed first history page returns
+        an empty sequence, so the caller renders its empty-history path; a
+        failed later page or thread is logged and skipped.
         """
         log = logger.bind(conversation_id=conversation_id)
         try:
-            response = self._client.conversations_history(
-                channel=conversation_id,
-                limit=limit,
-                oldest=f"{since.timestamp():.6f}",
-            )
-            raw_messages: Sequence[Mapping[str, Any]] = response.get("messages") or []
+            top_level = self._read_history(conversation_id, since=since, limit=limit, log=log)
         except Exception as exc:  # noqa: BLE001 - degrade to empty history on any API error
             log.warning("incident_transcript_history_fetch_failed", error=str(exc))
             return []
+
+        raw_messages = _merge_chronologically(top_level, self._read_thread_replies(conversation_id, top_level, limit, log))[
+            -limit:
+        ]
 
         name_cache: dict[str, str] = {}
         messages: list[TranscriptMessage] = []
         identity = self._resolve_self_identity(log) if exclude_own_and_system_messages else {}
         skipped = 0
 
-        # conversations_history returns newest-first; the transcript is chronological.
-        for raw in reversed(raw_messages):
+        for raw in raw_messages:
             text = (raw.get("text") or "").strip()
             user_id = raw.get("user")
             if not text or not (user_id or raw.get("bot_id")):
@@ -121,6 +124,75 @@ class SlackIncidentTranscriptReader:
             skipped_own_and_system_messages=skipped,
         )
         return messages
+
+    def _read_history(
+        self,
+        conversation_id: str,
+        *,
+        since: datetime,
+        limit: int,
+        log: structlog.stdlib.BoundLogger,
+    ) -> list[Mapping[str, Any]]:
+        """Return up to ``limit`` top-level messages since ``since``, oldest first.
+
+        Follows Slack's cursor across pages. The first page's failure is raised
+        for the caller to degrade; a later page's failure keeps what was read.
+        """
+        newest_first: list[Mapping[str, Any]] = []
+        cursor = ""
+        while len(newest_first) < limit:
+            kwargs: dict[str, Any] = {
+                "channel": conversation_id,
+                "limit": limit - len(newest_first),
+                "oldest": f"{since.timestamp():.6f}",
+            }
+            if cursor:
+                kwargs["cursor"] = cursor
+            try:
+                response = self._client.conversations_history(**kwargs)
+            except Exception as exc:
+                if not cursor:
+                    raise
+                log.warning("incident_transcript_history_page_failed", error=str(exc), read_so_far=len(newest_first))
+                break
+            newest_first.extend(response.get("messages") or [])
+            cursor = _next_cursor(response)
+            if not cursor:
+                break
+        # conversations_history returns newest-first; the transcript is chronological.
+        return list(reversed(newest_first[:limit]))
+
+    def _read_thread_replies(
+        self,
+        conversation_id: str,
+        top_level: Sequence[Mapping[str, Any]],
+        limit: int,
+        log: structlog.stdlib.BoundLogger,
+    ) -> list[Mapping[str, Any]]:
+        """Return the replies of every threaded top-level message, without the parents.
+
+        A thread whose replies cannot be read is logged and skipped.
+        """
+        replies: list[Mapping[str, Any]] = []
+        for parent in top_level:
+            thread_ts = parent.get("ts")
+            if not thread_ts or not parent.get("reply_count"):
+                continue
+            cursor = ""
+            try:
+                while True:
+                    kwargs: dict[str, Any] = {"channel": conversation_id, "ts": thread_ts, "limit": limit}
+                    if cursor:
+                        kwargs["cursor"] = cursor
+                    response = self._client.conversations_replies(**kwargs)
+                    # Slack repeats the parent as the first message of every thread read.
+                    replies.extend(m for m in response.get("messages") or [] if m.get("ts") != thread_ts)
+                    cursor = _next_cursor(response)
+                    if not cursor:
+                        break
+            except Exception as exc:  # noqa: BLE001 - one unreadable thread must not fail the read
+                log.warning("incident_transcript_replies_fetch_failed", thread_ts=thread_ts, error=str(exc))
+        return replies
 
     def _resolve_self_identity(self, log: structlog.stdlib.BoundLogger) -> dict[str, str]:
         """Return this bot's own ``user_id``, ``bot_id`` and name from ``auth.test``.
@@ -206,6 +278,36 @@ def _bot_name(raw: Mapping[str, Any]) -> str:
 def _normalize_name(name: str) -> str:
     """Reduce a Slack name to a comparable form (``SRE Dev`` -> ``sredev``)."""
     return re.sub(r"[^a-z0-9]+", "", name.lower())
+
+
+def _next_cursor(response: SlackResponse | Mapping[str, Any]) -> str:
+    """Return the cursor of the next page, or ``""`` when this was the last one."""
+    return str((response.get("response_metadata") or {}).get("next_cursor") or "")
+
+
+def _merge_chronologically(
+    top_level: Sequence[Mapping[str, Any]], replies: Sequence[Mapping[str, Any]]
+) -> list[Mapping[str, Any]]:
+    """Interleave replies with the top-level messages by time, each ``ts`` once.
+
+    A reply broadcast to the channel is in both lists and is kept once. A
+    top-level message with an unreadable time stays right after the message
+    before it, so it never jumps to the start or end of the transcript.
+    """
+    seen = {str(raw.get("ts")) for raw in top_level if raw.get("ts")}
+    keyed: list[tuple[float, int, Mapping[str, Any]]] = []
+    previous = float("-inf")
+    for position, raw in enumerate(top_level):
+        posted_at = _posted_at(raw.get("ts"))
+        previous = posted_at.timestamp() if posted_at else previous
+        keyed.append((previous, position, raw))
+    for position, raw in enumerate(replies, start=len(top_level)):
+        posted_at = _posted_at(raw.get("ts"))
+        if posted_at is None or str(raw.get("ts")) in seen:
+            continue
+        seen.add(str(raw.get("ts")))
+        keyed.append((posted_at.timestamp(), position, raw))
+    return [raw for _, _, raw in sorted(keyed, key=lambda item: (item[0], item[1]))]
 
 
 def _posted_at(raw_ts: Any) -> datetime | None:

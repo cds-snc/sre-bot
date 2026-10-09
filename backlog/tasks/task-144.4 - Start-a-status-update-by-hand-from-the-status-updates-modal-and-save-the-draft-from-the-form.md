@@ -3,10 +3,10 @@ id: TASK-144.4
 title: >-
   Start a status update by hand from the status-updates modal and save the draft
   from the form
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-09 12:53'
-updated_date: '2026-10-09 13:01'
+updated_date: '2026-10-09 15:14'
 labels:
   - incident
   - features
@@ -37,11 +37,11 @@ Handlers stay five-step (ack, parse, one service call, render); nothing is poste
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With no pending draft the overview shows New update and no Write it myself button; pressing it stores a prefilled hand-written draft and replaces the modal with its form, in EN and FR
-- [ ] #2 With a pending draft the overview shows who made it, how (origin) and when, plus Review; a record without an origin shows the author only
-- [ ] #3 Save draft appends the next draft with the typed stage and fields and re-renders the form for the new sequence with a saved notice; partial fields are accepted; a stale sequence shows the conflict view; a failure keeps the typed values with a notice
-- [ ] #4 The Draft, Confirm and draft, Review, Open, Back, published and Redraft listeners behave as before; the new action ids are registered once with the plugin prefix
-- [ ] #5 Nothing is posted to the incident channel (test); EN/FR locale parity test passes; ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 With no pending draft the overview shows New update and no Write it myself button; pressing it stores a prefilled hand-written draft and replaces the modal with its form, in EN and FR
+- [x] #2 With a pending draft the overview shows who made it, how (origin) and when, plus Review; a record without an origin shows the author only
+- [x] #3 Save draft appends the next draft with the typed stage and fields and re-renders the form for the new sequence with a saved notice; partial fields are accepted; a stale sequence shows the conflict view; a failure keeps the typed values with a notice
+- [x] #4 The Draft, Confirm and draft, Review, Open, Back, published and Redraft listeners behave as before; the new action ids are registered once with the plugin prefix
+- [x] #5 Nothing is posted to the incident channel (test); EN/FR locale parity test passes; ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -95,3 +95,35 @@ Production: `slack_views.py` about 110 lines (origin line, buttons, save block, 
 
 Only the overview's buttons and the form's Save button change; Draft, Redraft, Review, Approve, Open and the toggle are untouched. A defect in Save leaves the pending draft as it was (append-only). Single `git revert`; records saved with origin HAND remain readable by the previous layer.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented per the approved plan.
+
+Changes
+- slack_views.py: NEW_ACTION_ID (incident.scribe.status_update.new) and SAVE_ACTION_ID (incident.scribe.status_update.save); WRITE_ACTION_ID deleted. Overview with no pending draft: New update (primary) then Draft (no longer primary there); with a pending draft: Draft (primary) and Review, plus a context block `pending_origin` above the draft from origin_line(update, locale). The review form ends with a `save_button` actions block; save_notice() for saved_note / save_failed. Draft button's FR in-code fallback now "Rédiger" (was "Draft", the catalogue already said Rédiger).
+- entrypoints/slack.py: handle_write_action renamed handle_new_update_action (same _run_draft(manual=True) path); new handle_save_action. save_status_update_draft is sync, so it is called directly (the plan said asyncio.run); get_draft_for_review is still run with asyncio.run on the failure branch only.
+- Locales: new_update_button, save_button, saved_note, save_failed, origin.{hand,model,model_instructed,carried_forward,unknown} in EN/FR; write_button deleted. Origin templates use {author}/{time} placeholders (the translator accepts single braces), and the in-code fallback is the same template formatted, so catalogue tests compare them verbatim.
+- README status-update section: origin line, New update and Save draft as shipped.
+
+Tests
+- New: test_incident_scribe_status_update_{origin_line_view,save_view,save_entrypoint,new_entrypoint}.py, integration test_incident_scribe_status_update_save_dispatch.py. new_entrypoint replaces manual_entrypoint (deleted) and adds a real-service test over InMemoryStatusUpdateStore.
+- Edited: manual_view (Write -> New update), history_view, review_view, redraft_view, slack (button order/new blocks), the four listener-map tests, plugin_registration (new/save registered once, write absent).
+
+Gates (from app/): ruff check . clean; ruff format clean on touched dirs; lint-imports 10 kept 0 broken; mypy 48 errors in 19 files repo-wide, 0 in touched files; pytest tests --ignore=tests/smoke 4572 passed.
+
+Review points
+- Save with an unreadable stage (edit None) calls no service and re-renders the stored draft with the save_failed notice.
+- Modals opened before deploy still show Write it myself; pressing it hits an unregistered action id (accepted in the plan).
+- Origin line credits the author only for HAND and pre-origin records; AI/carried-forward lines name no person.
+<!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-09 15:04
+---
+Plan approved (human, 2026-10-09)
+---
+<!-- COMMENTS:END -->

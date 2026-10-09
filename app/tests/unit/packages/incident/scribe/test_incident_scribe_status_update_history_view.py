@@ -33,10 +33,10 @@ from packages.incident.scribe.entrypoints.slack import handle_status_update_comm
 from packages.incident.scribe.entrypoints.slack_views import (
     DRAFT_ACTION_ID,
     HISTORY_ACTION_ID,
+    NEW_ACTION_ID,
     OPEN_ACTION_ID,
     PUBLISHED_ACTION_ID,
     REVIEW_ACTION_ID,
-    WRITE_ACTION_ID,
     build_copy_ready_view,
     build_overview_view,
     build_profile_labels,
@@ -184,11 +184,16 @@ class TestFormatProfileTime:
 
 
 class TestOverviewPendingPart:
-    def test_pending_draft_then_draft_write_and_review_buttons(self) -> None:
-        """With a pending draft the view opens with its EN and FR profile and the Draft, Write it myself and Review buttons."""
+    def test_origin_line_pending_draft_then_draft_and_review_buttons(self) -> None:
+        """With a pending draft the view opens with who made it and when, its EN and FR profile, then Draft and Review."""
         view = build_overview_view(StatusUpdateOverview(pending=_DRAFT, approved=(_APPROVED,)), "en-US", _METADATA)
 
-        assert _blocks(view)[:5] == [
+        assert _blocks(view)[:6] == [
+            {
+                "type": "context",
+                "block_id": "pending_origin",
+                "elements": [{"type": "mrkdwn", "text": "By <@U999> at 2026-10-07 11:00 ET"}],
+            },
             {"type": "header", "text": {"type": "plain_text", "text": "English"}},
             {
                 "type": "section",
@@ -217,11 +222,6 @@ class TestOverviewPendingPart:
                     },
                     {
                         "type": "button",
-                        "action_id": WRITE_ACTION_ID,
-                        "text": {"type": "plain_text", "text": "Write it myself"},
-                    },
-                    {
-                        "type": "button",
                         "action_id": REVIEW_ACTION_ID,
                         "text": {"type": "plain_text", "text": "Review"},
                         "value": {"incident_id": _INCIDENT, "sequence": _DRAFT.sequence},
@@ -230,8 +230,8 @@ class TestOverviewPendingPart:
             },
         ]
 
-    def test_no_pending_notice_then_draft_and_write_buttons(self) -> None:
-        """Without a pending draft the view opens with the no-draft notice, then Draft and Write it myself."""
+    def test_no_pending_notice_then_new_update_and_draft_buttons(self) -> None:
+        """Without a pending draft the view opens with the no-draft notice, then New update (primary) and Draft."""
         view = build_overview_view(StatusUpdateOverview(pending=None, approved=(_APPROVED,)), "en-US", _METADATA)
 
         assert _blocks(view)[:2] == [
@@ -242,14 +242,14 @@ class TestOverviewPendingPart:
                 "elements": [
                     {
                         "type": "button",
-                        "action_id": DRAFT_ACTION_ID,
-                        "text": {"type": "plain_text", "text": "Draft"},
+                        "action_id": NEW_ACTION_ID,
+                        "text": {"type": "plain_text", "text": "New update"},
                         "style": "primary",
                     },
                     {
                         "type": "button",
-                        "action_id": WRITE_ACTION_ID,
-                        "text": {"type": "plain_text", "text": "Write it myself"},
+                        "action_id": DRAFT_ACTION_ID,
+                        "text": {"type": "plain_text", "text": "Draft"},
                     },
                 ],
             },
@@ -272,7 +272,7 @@ class TestOverviewApprovedRows:
         """After the pending draft's buttons come the approved-updates header and one row per update."""
         view = build_overview_view(StatusUpdateOverview(pending=_DRAFT, approved=(_APPROVED, _PUBLISHED)), "en-US", _METADATA)
 
-        assert [block.get("block_id") for block in _blocks(view)[4:]] == [
+        assert [block.get("block_id") for block in _blocks(view)[5:]] == [
             "draft_button",
             "approved_updates",
             "approved_update.2",

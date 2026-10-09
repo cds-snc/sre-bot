@@ -42,24 +42,26 @@ from packages.incident.scribe.entrypoints.slack import (
     handle_draft_action,
     handle_draft_confirmed_action,
     handle_history_action,
+    handle_new_update_action,
     handle_open_action,
     handle_published_action,
     handle_redraft_action,
     handle_review_action,
     handle_review_submission,
-    handle_write_action,
+    handle_save_action,
     register,
 )
 from packages.incident.scribe.entrypoints.slack_views import (
     CONFIRM_ACTION_ID,
     DRAFT_ACTION_ID,
     HISTORY_ACTION_ID,
+    NEW_ACTION_ID,
     OPEN_ACTION_ID,
     PUBLISHED_ACTION_ID,
     REDRAFT_ACTION_ID,
     REVIEW_ACTION_ID,
     REVIEW_CALLBACK_ID,
-    WRITE_ACTION_ID,
+    SAVE_ACTION_ID,
     build_copy_ready_view,
     build_draft_error_view,
     build_overview_view,
@@ -244,12 +246,13 @@ class TestRegister:
         assert registrar.block_actions == {
             DRAFT_ACTION_ID: handle_draft_action,
             CONFIRM_ACTION_ID: handle_draft_confirmed_action,
-            WRITE_ACTION_ID: handle_write_action,
+            NEW_ACTION_ID: handle_new_update_action,
             REVIEW_ACTION_ID: handle_review_action,
             OPEN_ACTION_ID: handle_open_action,
             HISTORY_ACTION_ID: handle_history_action,
             PUBLISHED_ACTION_ID: handle_published_action,
             REDRAFT_ACTION_ID: handle_redraft_action,
+            SAVE_ACTION_ID: handle_save_action,
         }
         assert registrar.view_submissions == {REVIEW_CALLBACK_ID: handle_review_submission}
 

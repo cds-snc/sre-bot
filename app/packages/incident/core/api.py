@@ -109,10 +109,13 @@ class IncidentTranscriptReader(Protocol):
     ) -> Sequence[TranscriptMessage]:
         """Return the conversation's messages posted since ``since``, oldest first.
 
+        Thread replies are included, interleaved by time, each message once.
+
         Args:
             conversation_id: The conversation to read.
             since: Timezone-aware start of the window.
-            limit: Maximum number of messages to fetch from the platform.
+            limit: Maximum number of messages in the transcript, replies
+                included; the newest are kept.
             exclude_own_and_system_messages: Drop this bot's own posts and the
                 platform's system events (joins, topic changes and the like).
 
