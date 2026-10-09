@@ -31,26 +31,22 @@ from packages.incident.scribe.comms_profile import ProfileLabels
 from packages.incident.scribe.domain import CopyReadyText, StatusUpdateEdit
 from packages.incident.scribe.entrypoints import slack as slack_entrypoints
 from packages.incident.scribe.entrypoints.slack import (
-    handle_draft_action,
-    handle_draft_confirmed_action,
+    handle_generate_action,
     handle_history_action,
     handle_new_update_action,
     handle_open_action,
     handle_published_action,
-    handle_redraft_action,
     handle_review_action,
     handle_review_submission,
     handle_save_action,
     register,
 )
 from packages.incident.scribe.entrypoints.slack_views import (
-    CONFIRM_ACTION_ID,
-    DRAFT_ACTION_ID,
+    GENERATE_ACTION_ID,
     HISTORY_ACTION_ID,
     NEW_ACTION_ID,
     OPEN_ACTION_ID,
     PUBLISHED_ACTION_ID,
-    REDRAFT_ACTION_ID,
     REVIEW_ACTION_ID,
     REVIEW_CALLBACK_ID,
     SAVE_ACTION_ID,
@@ -159,6 +155,7 @@ def services(monkeypatch: pytest.MonkeyPatch, events: list[str]) -> _Services:
     monkeypatch.setattr(slack_entrypoints, "get_draft_for_review", fakes.get_draft_for_review)
     monkeypatch.setattr(slack_entrypoints, "approve_status_update", fakes.approve_status_update)
     monkeypatch.setattr(providers, "get_status_page_publisher", lambda: fakes)
+    monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: True)
     return fakes
 
 
@@ -197,7 +194,7 @@ def _review_action_body(locale: str = "en-US") -> dict[str, Any]:
         "actions": [
             {
                 "action_id": REVIEW_ACTION_ID,
-                "block_id": "draft_button",
+                "block_id": "overview_actions",
                 "type": "button",
                 "value": json.dumps({"incident_id": _INCIDENT, "sequence": _SEQUENCE}),
             }
@@ -255,14 +252,12 @@ class TestRegister:
         register(registrar)
 
         assert registrar.block_actions == {
-            DRAFT_ACTION_ID: handle_draft_action,
-            CONFIRM_ACTION_ID: handle_draft_confirmed_action,
             NEW_ACTION_ID: handle_new_update_action,
             REVIEW_ACTION_ID: handle_review_action,
             OPEN_ACTION_ID: handle_open_action,
             HISTORY_ACTION_ID: handle_history_action,
             PUBLISHED_ACTION_ID: handle_published_action,
-            REDRAFT_ACTION_ID: handle_redraft_action,
+            GENERATE_ACTION_ID: handle_generate_action,
             SAVE_ACTION_ID: handle_save_action,
         }
         assert registrar.view_submissions == {REVIEW_CALLBACK_ID: handle_review_submission}
@@ -303,6 +298,17 @@ class TestHandleReviewAction:
 
         view = _sent_view(client)
         assert view == build_review_view(_DRAFT, locale, view["private_metadata"])
+
+    def test_without_text_generation_the_review_form_has_no_ai_section(
+        self, ack: MagicMock, client: MagicMock, services: _Services, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """With the generator unconfigured the form is built without Draft with AI; Save draft and Approve remain."""
+        monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: False)
+
+        handle_review_action(ack, _review_action_body(), client)
+
+        view = _sent_view(client)
+        assert view == build_review_view(_DRAFT, "en-US", view["private_metadata"], with_ai=False)
 
     def test_review_view_metadata_names_channel_locale_and_draft(
         self, ack: MagicMock, client: MagicMock, services: _Services

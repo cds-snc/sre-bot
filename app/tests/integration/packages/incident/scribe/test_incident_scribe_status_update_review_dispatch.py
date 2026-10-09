@@ -107,6 +107,7 @@ def fakes(monkeypatch: pytest.MonkeyPatch) -> ServiceFakes:
     monkeypatch.setattr(slack_entrypoints, "get_draft_for_review", service_fakes.get_draft_for_review)
     monkeypatch.setattr(slack_entrypoints, "approve_status_update", service_fakes.approve_status_update)
     monkeypatch.setattr(providers, "get_status_page_publisher", lambda: service_fakes)
+    monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: True)
     return service_fakes
 
 
@@ -128,7 +129,7 @@ def _review_action() -> dict[str, Any]:
         "actions": [
             {
                 "action_id": REVIEW_ACTION_ID,
-                "block_id": "draft_button",
+                "block_id": "overview_actions",
                 "type": "button",
                 "value": json.dumps({"incident_id": _INCIDENT, "sequence": _SEQUENCE}),
             }

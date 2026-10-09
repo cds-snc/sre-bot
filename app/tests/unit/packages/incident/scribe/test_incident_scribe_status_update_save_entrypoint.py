@@ -131,6 +131,7 @@ def _install(monkeypatch: pytest.MonkeyPatch, saved: OperationResult[StatusUpdat
     services = _Services(saved=saved, stored=OperationResult.success(data=_DRAFT))
     monkeypatch.setattr(slack_entrypoints, "save_status_update_draft", services.save)
     monkeypatch.setattr(slack_entrypoints, "get_draft_for_review", services.read)
+    monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: True)
     return services
 
 
@@ -169,6 +170,16 @@ class TestSaved:
         assert _sent_view(client) == build_review_view(
             _SAVED, locale, _metadata(locale, _SEQUENCE + 1), notice=_SAVED_NOTE[locale]
         )
+
+    def test_without_text_generation_the_saved_form_has_no_ai_section(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """With the generator unconfigured the re-rendered form leaves the AI section out."""
+        services = _install(monkeypatch, OperationResult.success(data=_SAVED))
+        monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: False)
+        client = _client(services)
+
+        handle_save_action(MagicMock(), _body(), client)
+
+        assert not {"instructions", "generate_button"} & {block.get("block_id") for block in _sent_view(client)["blocks"]}
 
     def test_partial_fields_are_saved_as_typed(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """An unfinished draft is saved: cleared fields reach the service as empty strings, not as a refusal."""

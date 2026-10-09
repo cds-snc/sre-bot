@@ -39,26 +39,22 @@ from packages.incident.scribe.comms_profile import ProfileLabels
 from packages.incident.scribe.domain import CopyReadyText, StatusUpdateOverview
 from packages.incident.scribe.entrypoints import slack as slack_entrypoints
 from packages.incident.scribe.entrypoints.slack import (
-    handle_draft_action,
-    handle_draft_confirmed_action,
+    handle_generate_action,
     handle_history_action,
     handle_new_update_action,
     handle_open_action,
     handle_published_action,
-    handle_redraft_action,
     handle_review_action,
     handle_review_submission,
     handle_save_action,
     register,
 )
 from packages.incident.scribe.entrypoints.slack_views import (
-    CONFIRM_ACTION_ID,
-    DRAFT_ACTION_ID,
+    GENERATE_ACTION_ID,
     HISTORY_ACTION_ID,
     NEW_ACTION_ID,
     OPEN_ACTION_ID,
     PUBLISHED_ACTION_ID,
-    REDRAFT_ACTION_ID,
     REVIEW_ACTION_ID,
     REVIEW_CALLBACK_ID,
     SAVE_ACTION_ID,
@@ -244,14 +240,12 @@ class TestRegister:
         register(registrar)
 
         assert registrar.block_actions == {
-            DRAFT_ACTION_ID: handle_draft_action,
-            CONFIRM_ACTION_ID: handle_draft_confirmed_action,
             NEW_ACTION_ID: handle_new_update_action,
             REVIEW_ACTION_ID: handle_review_action,
             OPEN_ACTION_ID: handle_open_action,
             HISTORY_ACTION_ID: handle_history_action,
             PUBLISHED_ACTION_ID: handle_published_action,
-            REDRAFT_ACTION_ID: handle_redraft_action,
+            GENERATE_ACTION_ID: handle_generate_action,
             SAVE_ACTION_ID: handle_save_action,
         }
         assert registrar.view_submissions == {REVIEW_CALLBACK_ID: handle_review_submission}

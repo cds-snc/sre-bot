@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-07 18:52'
-updated_date: '2026-10-09 14:09'
+updated_date: '2026-10-09 15:34'
 labels:
   - incident
 dependencies:
@@ -84,6 +84,12 @@ Over the single-PR size gate: decompose before implementation, for example (1) t
 - [ ] #18 Reopening a closed incident does not restart periodic drafting; a responder turns it on again
 - [ ] #19 Any responder who can open the status-updates modal can turn periodic drafting on, pause it and resume it
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+TASK-144.5 (2026-10-09) changed the services this task builds on; read the description's Draft/Redraft and draft_status_update mentions through this note. draft_status_update and the overview Draft and Redraft buttons are gone. A responder now starts a draft with start_status_update_draft (no model call) and fills it with the form's Draft with AI, generate_status_update_draft(conversation_id, sequence, current=<base fields>, author, wording, instructions='', security_confirmed=False), which needs the pending draft at sequence, carries forward without a model call when nothing is new, and refuses security or unknown-flag incidents. A periodic run would start then generate (or get its own entry beside them); decide when planning.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

@@ -1,10 +1,10 @@
 """Tests for the origin the scribe service records on every draft it appends.
 
-``draft_status_update`` and ``redraft_status_update`` run against the
-in-memory store and stubs for the lookup, the transcript reader, the security
-flag reader and the text generator, with a fixed ``now``. Each test drives one
-path and asserts only the stored record's origin, since the record's other
-fields are pinned by the drafting and redrafting tests.
+``start_status_update_draft`` and ``generate_status_update_draft`` run against
+the in-memory store and stubs for the lookup, the transcript reader, the
+security flag reader and the text generator, with a fixed ``now``. Each test
+drives one path and asserts only the stored record's origin, since the record's
+other fields are pinned by the start and generate tests.
 """
 
 import json
@@ -26,7 +26,7 @@ from packages.incident.core.api import (
     TranscriptMessage,
 )
 from packages.incident.scribe.domain import NoNewInformationWording, StatusUpdateEdit
-from packages.incident.scribe.status_update import draft_status_update, redraft_status_update
+from packages.incident.scribe.status_update import generate_status_update_draft, start_status_update_draft
 
 pytestmark = pytest.mark.unit
 
@@ -125,68 +125,51 @@ def _stubs(messages: Sequence[TranscriptMessage]) -> dict[str, Any]:
     }
 
 
-@pytest.mark.parametrize(
-    ("messages", "manual", "origin"),
-    [
-        ([_NEW_MESSAGE], False, StatusUpdateOrigin.MODEL),
-        ([_NEW_MESSAGE], True, StatusUpdateOrigin.HAND),
-        ([], False, StatusUpdateOrigin.CARRIED_FORWARD),
-    ],
-    ids=["drafted", "manual", "carried-forward"],
-)
-@pytest.mark.asyncio
-async def test_draft_records_how_its_text_came_to_be(
-    messages: list[TranscriptMessage], manual: bool, origin: StatusUpdateOrigin
-) -> None:
-    """A model draft is MODEL, a hand-started one HAND, and a repeat with nothing new CARRIED_FORWARD."""
+_PENDING = _record(2, StatusUpdateState.DRAFT)
+_CURRENT = StatusUpdateEdit(stage=StatusUpdateStage.IDENTIFIED, en=_text("en"), fr=_text("fr"))
+
+
+@pytest.mark.parametrize("messages", [[_NEW_MESSAGE], []], ids=["new-activity", "nothing-new"])
+def test_starting_by_hand_is_hand(messages: list[TranscriptMessage]) -> None:
+    """A responder chose to write, so the started draft is HAND whatever the conversation holds."""
     store = _store(_APPROVED)
 
-    result = await draft_status_update(
-        _CHANNEL, author="U0DRAFTER", wording=_WORDING, manual=manual, store=store, **_stubs(messages)
+    result = start_status_update_draft(
+        _CHANNEL, author="U0WRITER", store=store, lookup=_StubLookup(), reader=_StubReader(messages), now=_NOW
+    )
+
+    assert result.data is not None
+    assert result.data.update.origin is StatusUpdateOrigin.HAND
+    assert store.latest(_INCIDENT).data == result.data.update
+
+
+@pytest.mark.parametrize(
+    ("messages", "instructions", "origin"),
+    [
+        ([_NEW_MESSAGE], "", StatusUpdateOrigin.MODEL),
+        ([_NEW_MESSAGE], "shorter", StatusUpdateOrigin.MODEL_INSTRUCTED),
+        ([], "", StatusUpdateOrigin.CARRIED_FORWARD),
+    ],
+    ids=["drafted", "instructed", "carried-forward"],
+)
+@pytest.mark.asyncio
+async def test_draft_with_ai_records_how_its_text_came_to_be(
+    messages: list[TranscriptMessage], instructions: str, origin: StatusUpdateOrigin
+) -> None:
+    """A model fill is MODEL, a fill steered by guidance MODEL_INSTRUCTED, and a repeat with nothing new CARRIED_FORWARD."""
+    store = _store(_APPROVED, _PENDING)
+
+    result = await generate_status_update_draft(
+        _CHANNEL,
+        _PENDING.sequence,
+        current=_CURRENT,
+        author="U0FILLER",
+        wording=_WORDING,
+        instructions=instructions,
+        store=store,
+        **_stubs(messages),
     )
 
     assert result.data is not None
     assert result.data.update.origin is origin
     assert store.latest(_INCIDENT).data == result.data.update
-
-
-@pytest.mark.asyncio
-async def test_a_failed_model_call_falls_back_to_a_hand_draft() -> None:
-    """The manual fallback holds the prefill for the responder to write, so it is HAND."""
-
-    class _FailingGenerator(_StubGenerator):
-        async def summarize(
-            self,
-            transcript: str,
-            *,
-            instructions: str | None = None,
-            max_output_tokens: int | None = None,
-        ) -> OperationResult[str]:
-            return OperationResult.permanent_error(message="off", error_code="TEXT_GENERATION_UNAVAILABLE")
-
-    store = _store(_APPROVED)
-
-    result = await draft_status_update(
-        _CHANNEL,
-        author="U0DRAFTER",
-        wording=_WORDING,
-        store=store,
-        **(_stubs([_NEW_MESSAGE]) | {"generator": _FailingGenerator()}),
-    )
-
-    assert result.data is not None
-    assert result.data.update.origin is StatusUpdateOrigin.HAND
-
-
-@pytest.mark.asyncio
-async def test_redraft_from_instructions_is_model_instructed() -> None:
-    """A reviewer's guidance steered the model, which the origin keeps apart from a plain model draft."""
-    store = _store(_APPROVED, _record(2, StatusUpdateState.DRAFT))
-    current = StatusUpdateEdit(stage=StatusUpdateStage.IDENTIFIED, en=_text("en"), fr=_text("fr"))
-
-    result = await redraft_status_update(
-        _CHANNEL, 2, instructions="shorter", current=current, author="U0REDRAFTER", store=store, **_stubs([_NEW_MESSAGE])
-    )
-
-    assert result.data is not None
-    assert result.data.origin is StatusUpdateOrigin.MODEL_INSTRUCTED
