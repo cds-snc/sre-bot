@@ -28,7 +28,7 @@ from packages.incident.core.api import (
     TranscriptMessage,
 )
 from packages.incident.scribe.domain import NoNewInformationWording, StatusUpdateDraftOutcome, StatusUpdateOutcomeKind
-from packages.incident.scribe.status_update import DRAFT_UNPARSEABLE_CODE, draft_status_update
+from packages.incident.scribe.status_update import draft_status_update
 
 pytestmark = pytest.mark.unit
 
@@ -186,12 +186,14 @@ async def _draft(
     on_started: Any = None,
     security_reader: Any = None,
     security_confirmed: bool = False,
+    manual: bool = False,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
     return await draft_status_update(
         _CHANNEL,
         author="U123",
         wording=_WORDING,
         on_started=on_started,
+        manual=manual,
         lookup=lookup or _StubLookup(),
         reader=reader or _StubReader(),
         store=store if store is not None else InMemoryStatusUpdateStore(),
@@ -488,33 +490,6 @@ class TestFailures:
         assert reader.reads == [] and generator.calls == [] and _stored(store) == ()
 
     @pytest.mark.asyncio
-    async def test_a_model_failure_passes_through_and_stores_nothing(self) -> None:
-        """The generator's classified error, retry hint included, reaches the caller."""
-        store = InMemoryStatusUpdateStore()
-        failure: OperationResult[str] = OperationResult.transient_error(
-            message="rate limited", error_code="RATE_LIMITED", retry_after=7
-        )
-
-        result = await _draft(store=store, reader=_StubReader([_human("hi", 5)]), generator=_StubGenerator(failure))
-
-        assert (result.status, result.error_code, result.retry_after) == (OperationStatus.TRANSIENT_ERROR, "RATE_LIMITED", 7)
-        assert _stored(store) == ()
-
-    @pytest.mark.asyncio
-    async def test_unparseable_model_output_is_refused_and_stores_nothing(self) -> None:
-        """A partial or malformed answer never becomes a draft."""
-        store = InMemoryStatusUpdateStore()
-
-        result = await _draft(
-            store=store,
-            reader=_StubReader([_human("hi", 5)]),
-            generator=_StubGenerator(OperationResult.success(data='{"stage": "identified"')),
-        )
-
-        assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, DRAFT_UNPARSEABLE_CODE)
-        assert _stored(store) == ()
-
-    @pytest.mark.asyncio
     async def test_a_store_read_failure_passes_through_before_the_transcript_is_read(self) -> None:
         """Without the prior updates nothing can be decided, so the store's error is returned."""
         reader = _StubReader([_human("hi", 5)])
@@ -523,6 +498,177 @@ class TestFailures:
 
         assert (result.status, result.retry_after) == (OperationStatus.TRANSIENT_ERROR, 3)
         assert reader.reads == []
+
+
+_BLANK = StatusUpdateText(affected_service="", impact="", current_action="", workaround="")
+
+
+def _abandoned_manual(sequence: int, approved: StatusUpdate) -> StatusUpdate:
+    """A pending draft still holding the approved update's fields, as a cancelled manual form leaves it."""
+    return replace(
+        _record(sequence, StatusUpdateState.DRAFT, stage=approved.stage, cutoff_minutes_ago=20),
+        en=approved.en,
+        fr=approved.fr,
+    )
+
+
+class TestManualDraft:
+    @pytest.mark.asyncio
+    async def test_writing_it_myself_stores_the_approved_update_as_the_draft_without_a_model_call(self) -> None:
+        """Manual drafting copies the latest approved fields, makes no model call and never says drafting has begun."""
+        prior = _record(1, StatusUpdateState.APPROVED, stage=StatusUpdateStage.MONITORING, cutoff_minutes_ago=60)
+        store = _store(prior)
+        generator = _StubGenerator()
+        started: list[str] = []
+
+        result = await _draft(
+            store=store,
+            reader=_StubReader([_human("still slow", 10)]),
+            generator=generator,
+            on_started=lambda: started.append("x"),
+            manual=True,
+        )
+
+        assert result.is_success and result.data is not None
+        assert result.data.kind is StatusUpdateOutcomeKind.MANUAL
+        update = result.data.update
+        assert generator.calls == [] and started == []
+        assert (update.sequence, update.state, update.stage) == (2, StatusUpdateState.DRAFT, StatusUpdateStage.MONITORING)
+        assert (update.en, update.fr) == (prior.en, prior.fr)
+        assert (update.author, update.transcript_cutoff) == ("U123", _at(10))
+        assert update.next_update_at == _NOW + timedelta(minutes=30)
+        assert _stored(store)[0] == update
+
+    @pytest.mark.asyncio
+    async def test_writing_the_first_update_myself_starts_blank_at_investigating(self) -> None:
+        """With no approved update to copy, every field is blank and the stage is the first one."""
+        result = await _draft(reader=_StubReader([_human("seeing 500s", 5)]), manual=True)
+
+        assert result.data is not None
+        update = result.data.update
+        assert (update.sequence, update.stage, update.en, update.fr) == (1, StatusUpdateStage.INVESTIGATING, _BLANK, _BLANK)
+
+    @pytest.mark.asyncio
+    async def test_writing_it_myself_skips_the_security_confirmation(self) -> None:
+        """Nothing reaches the model, so a security incident needs no confirmation to write by hand."""
+        result = await _draft(
+            reader=_StubReader([_human("hi", 5)]),
+            security_reader=_StubSecurityReader(IncidentSecurityFlag.YES),
+            manual=True,
+        )
+
+        assert result.data is not None and result.data.kind is StatusUpdateOutcomeKind.MANUAL
+
+    @pytest.mark.asyncio
+    async def test_writing_it_myself_with_nothing_new_returns_the_pending_draft(self) -> None:
+        """A pending draft already covers the activity, so it is returned for editing and nothing is stored."""
+        pending = _record(2, StatusUpdateState.DRAFT, cutoff_minutes_ago=20)
+        store = _store(_record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=60), pending)
+
+        result = await _draft(store=store, reader=_StubReader([_human("covered", 20)]), manual=True)
+
+        assert result.data == StatusUpdateDraftOutcome(update=pending, kind=StatusUpdateOutcomeKind.PENDING)
+        assert len(_stored(store)) == 2
+
+    @pytest.mark.parametrize(
+        "generated",
+        [
+            OperationResult.transient_error(message="rate limited", error_code="RATE_LIMITED", retry_after=7),
+            OperationResult.permanent_error(message="no key", error_code="TEXT_GENERATION_UNAVAILABLE"),
+            OperationResult.success(data='{"stage": "identified"'),
+        ],
+        ids=["model-error", "unconfigured", "unparseable"],
+    )
+    @pytest.mark.asyncio
+    async def test_a_failed_model_call_falls_back_to_a_manual_draft(self, generated: OperationResult[str]) -> None:
+        """Whatever stopped the model, the responder gets the approved update to edit instead of an error."""
+        prior = _record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=60)
+        store = _store(prior)
+        generator = _StubGenerator(generated)
+
+        with capture_logs() as logs:
+            result = await _draft(store=store, reader=_StubReader([_human("hi", 5)]), generator=generator)
+
+        assert result.is_success and result.data is not None
+        assert result.data.kind is StatusUpdateOutcomeKind.MANUAL
+        assert len(generator.calls) == 1
+        assert (result.data.update.sequence, result.data.update.en, result.data.update.fr) == (2, prior.en, prior.fr)
+        assert _stored(store)[0] == result.data.update
+        assert any(entry["event"] == "incident_status_update_manual_fallback" for entry in logs)
+
+    @pytest.mark.asyncio
+    async def test_draft_retries_the_model_over_an_abandoned_manual_draft(self) -> None:
+        """A pending draft still equal to its prefill was never written, so Draft asks the model again."""
+        prior = _record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=60)
+        store = _store(prior, _abandoned_manual(2, prior))
+        generator = _StubGenerator()
+
+        result = await _draft(store=store, reader=_StubReader([_human("covered", 20)]), generator=generator)
+
+        assert result.data is not None
+        assert (result.data.kind, result.data.update.sequence) == (StatusUpdateOutcomeKind.DRAFTED, 3)
+        assert len(generator.calls) == 1
+        assert result.data.update.transcript_cutoff == _at(20)
+
+    @pytest.mark.asyncio
+    async def test_draft_retries_over_an_abandoned_blank_first_draft(self) -> None:
+        """With no approved update the abandoned prefill is blank at the first stage, and it is retried too."""
+        blank = replace(
+            _record(1, StatusUpdateState.DRAFT, stage=StatusUpdateStage.INVESTIGATING, cutoff_minutes_ago=20),
+            en=_BLANK,
+            fr=_BLANK,
+        )
+        generator = _StubGenerator()
+
+        result = await _draft(store=_store(blank), reader=_StubReader([_human("covered", 20)]), generator=generator)
+
+        assert result.data is not None and result.data.kind is StatusUpdateOutcomeKind.DRAFTED
+        assert len(generator.calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_a_failed_retry_returns_the_abandoned_draft_without_storing_another(self) -> None:
+        """The model is still unavailable, so the same manual draft is offered again rather than a copy of it."""
+        prior = _record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=60)
+        abandoned = _abandoned_manual(2, prior)
+        store = _store(prior, abandoned)
+        failure: OperationResult[str] = OperationResult.transient_error(message="down", error_code="CONNECTION_ERROR")
+
+        result = await _draft(store=store, reader=_StubReader([_human("covered", 20)]), generator=_StubGenerator(failure))
+
+        assert result.data == StatusUpdateDraftOutcome(update=abandoned, kind=StatusUpdateOutcomeKind.MANUAL)
+        assert len(_stored(store)) == 2
+
+    @pytest.mark.asyncio
+    async def test_retrying_an_abandoned_draft_still_needs_the_security_confirmation(self) -> None:
+        """The retry is a model call like any other, so a security incident is refused until confirmed."""
+        prior = _record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=60)
+        generator = _StubGenerator()
+
+        result = await _draft(
+            store=_store(prior, _abandoned_manual(2, prior)),
+            reader=_StubReader([_human("covered", 20)]),
+            generator=generator,
+            security_reader=_StubSecurityReader(IncidentSecurityFlag.YES),
+        )
+
+        assert result.error_code == ErrorCode.SECURITY_CONFIRMATION_REQUIRED
+        assert generator.calls == []
+
+    @pytest.mark.asyncio
+    async def test_a_pending_carried_forward_draft_is_not_retried(self) -> None:
+        """Its current action differs from the approved update, so it is a real draft and is returned as pending."""
+        prior = _record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=60)
+        carried = replace(
+            _record(2, StatusUpdateState.DRAFT, cutoff_minutes_ago=60),
+            en=replace(prior.en, current_action=_WORDING.en),
+            fr=replace(prior.fr, current_action=_WORDING.fr),
+        )
+        generator = _StubGenerator()
+
+        result = await _draft(store=_store(prior, carried), reader=_StubReader([_human("old", 60)]), generator=generator)
+
+        assert result.data == StatusUpdateDraftOutcome(update=carried, kind=StatusUpdateOutcomeKind.PENDING)
+        assert generator.calls == []
 
 
 class TestLogging:

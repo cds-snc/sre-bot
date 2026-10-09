@@ -26,11 +26,13 @@ from packages.incident.scribe.domain import (
     StatusUpdateOutcomeKind,
     StatusUpdateOverview,
 )
-from packages.incident.scribe.platforms import slack as platform_slack
-from packages.incident.scribe.platforms.slack import (
+from packages.incident.scribe.entrypoints import slack as slack_entrypoints
+from packages.incident.scribe.entrypoints.slack import handle_status_update_command
+from packages.incident.scribe.entrypoints.slack_views import (
     DRAFT_ACTION_ID,
     REVIEW_ACTION_ID,
     REVIEW_CALLBACK_ID,
+    WRITE_ACTION_ID,
     build_copy_ready_view,
     build_draft_error_view,
     build_drafting_view,
@@ -41,7 +43,6 @@ from packages.incident.scribe.platforms.slack import (
     build_review_view,
     build_saving_view,
     build_security_confirmation_view,
-    handle_status_update_command,
     parse_review_submission,
 )
 from tests.factories.slack import FakeSlackReply
@@ -118,7 +119,7 @@ def _section_text(view: dict[str, Any]) -> str:
 
 def _pending_view(monkeypatch: pytest.MonkeyPatch, overview: OperationResult[StatusUpdateOverview]) -> dict[str, Any]:
     """Run the status-update command with the overview read stubbed and return the final modal view."""
-    monkeypatch.setattr(platform_slack, "get_status_update_overview", lambda channel_id: overview)
+    monkeypatch.setattr(slack_entrypoints, "get_status_update_overview", lambda channel_id: overview)
     reply = FakeSlackReply()
     payload = CommandPayload(
         text="", user_id="U9", channel_id=_CHANNEL, user_locale="en-US", platform_metadata={"trigger_id": "T1"}
@@ -155,10 +156,10 @@ def _selected(value: str | None) -> dict[str, Any]:
 
 class TestReviewButton:
     def test_pending_view_shows_draft_then_review(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """The pending view's buttons are Draft then Review, so a draft can be reviewed without redrafting."""
+        """The pending view's buttons are Draft, Write it myself, then Review, so a draft can be reviewed without redrafting."""
         view = _pending_view(monkeypatch, OperationResult.success(data=StatusUpdateOverview(pending=_draft(), approved=())))
 
-        assert _button_action_ids(view) == [DRAFT_ACTION_ID, REVIEW_ACTION_ID]
+        assert _button_action_ids(view) == [DRAFT_ACTION_ID, WRITE_ACTION_ID, REVIEW_ACTION_ID]
 
     def test_pending_view_review_value_names_the_draft(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """The Review button's value is JSON naming the shown draft's incident id and sequence."""
@@ -176,10 +177,10 @@ class TestReviewButton:
         assert button["text"] == {"type": "plain_text", "text": "Review"}
 
     def test_no_pending_view_has_draft_only(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """With no draft there is nothing to review, so only Draft is offered."""
+        """With no draft there is nothing to review, so only Draft and Write it myself are offered."""
         view = _pending_view(monkeypatch, OperationResult.success(data=StatusUpdateOverview(pending=None, approved=())))
 
-        assert _button_action_ids(view) == [DRAFT_ACTION_ID]
+        assert _button_action_ids(view) == [DRAFT_ACTION_ID, WRITE_ACTION_ID]
 
     def test_lookup_error_view_has_no_buttons(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """A failed lookup shows the error with no Draft or Review button."""
@@ -238,11 +239,11 @@ class TestReviewView:
         assert view["close"] == {"type": "plain_text", "text": close}
 
     def test_input_block_ids_in_order(self) -> None:
-        """Inputs are the stage then the four EN then the four FR fields, keyed by validation field name."""
+        """Inputs are the redraft instructions, the stage, then the four EN and the four FR fields, keyed by validation field name."""
         view = build_review_view(_draft(), "en-US", _METADATA)
 
         input_ids = [block["block_id"] for block in view["blocks"] if block["type"] == "input"]
-        assert input_ids == ["stage", *_FIELD_BLOCK_IDS]
+        assert input_ids == ["instructions", "stage", *_FIELD_BLOCK_IDS]
 
     def test_language_headers_precede_their_fields(self) -> None:
         """A header block sits right before the first EN field and right before the first FR field."""

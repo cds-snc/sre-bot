@@ -3,10 +3,10 @@ id: TASK-135.3
 title: >-
   Move incident_draft onto packages/incident/core: the service gathers the
   transcript and the handler makes one service call
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-02 15:39'
-updated_date: '2026-10-02 17:37'
+updated_date: '2026-10-08 15:43'
 labels:
   - plugin-architecture
   - features

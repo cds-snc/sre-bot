@@ -46,22 +46,21 @@ All of these are registered inside a module's `register(bot)`, which
 | --- | --- | --- | --- | --- | --- |
 | view `incident_view` | `modules/incident/incident.py:39` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
 | action `incident_change_locale` | `modules/incident/incident.py:40` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `handle_incident_action_buttons` | `modules/incident/incident_helper.py:150` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `add_folder_metadata` | `modules/incident/incident_helper.py:151` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `view_folder_metadata` | `modules/incident/incident_helper.py:152` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| view `view_folder_metadata_modal` | `modules/incident/incident_helper.py:153` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| view `add_metadata_view` | `modules/incident/incident_helper.py:154` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `delete_folder_metadata` | `modules/incident/incident_helper.py:155` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| view `view_save_incident_roles` | `modules/incident/incident_helper.py:156` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| view `view_save_event` | `modules/incident/incident_helper.py:157` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `confirm_click` | `modules/incident/incident_helper.py:158` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `user_select_action` | `modules/incident/incident_helper.py:159` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `archive_channel` | `modules/incident/incident_helper.py:160` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| event `reaction_added` (floppy-disk matcher) | `modules/incident/incident_helper.py:161` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| event `reaction_removed` (floppy-disk matcher) | `modules/incident/incident_helper.py:162` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| event `reaction_added` (ack-only fallback) | `modules/incident/incident_helper.py:163` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| event `reaction_removed` (ack-only fallback) | `modules/incident/incident_helper.py:164` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| view `incident_updates_view` | `modules/incident/incident_helper.py:165` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| action `handle_incident_action_buttons` | `modules/incident/incident_helper.py:151` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| action `add_folder_metadata` | `modules/incident/incident_helper.py:152` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| action `view_folder_metadata` | `modules/incident/incident_helper.py:153` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| view `view_folder_metadata_modal` | `modules/incident/incident_helper.py:154` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| view `add_metadata_view` | `modules/incident/incident_helper.py:155` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| action `delete_folder_metadata` | `modules/incident/incident_helper.py:156` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| view `view_save_incident_roles` | `modules/incident/incident_helper.py:157` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| view `view_save_event` | `modules/incident/incident_helper.py:158` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| action `confirm_click` | `modules/incident/incident_helper.py:159` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| action `user_select_action` | `modules/incident/incident_helper.py:160` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| action `archive_channel` | `modules/incident/incident_helper.py:161` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| event `reaction_added` (floppy-disk matcher) | `modules/incident/incident_helper.py:162` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| event `reaction_removed` (floppy-disk matcher) | `modules/incident/incident_helper.py:163` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| event `reaction_added` (ack-only fallback) | `modules/incident/incident_helper.py:164` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| event `reaction_removed` (ack-only fallback) | `modules/incident/incident_helper.py:165` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
 | action `update_incident_field` | `modules/incident/incident_helper.py:166` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
 | view `update_field_modal` | `modules/incident/incident_helper.py:167` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
 | view `create_webhooks_view` | `modules/sre/webhook_helper.py:26` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1 |
@@ -79,7 +78,7 @@ All of these are registered inside a module's `register(bot)`, which
 | view `atip_view` | `modules/atip/atip.py:42` | hard-coded `register(bot)` | `app/features/atip/` | TASK-39 | not yet — TASK-36.1 |
 | action `atip_change_locale` | `modules/atip/atip.py:43` | hard-coded `register(bot)` | `app/features/atip/` | TASK-39 | not yet — TASK-36.1 |
 
-Totals: 18 actions, 12 views and 4 events, 34 interactions in all.
+Totals: 18 actions, 11 views and 4 events, 33 interactions in all.
 
 ## Webhook route
 
@@ -116,8 +115,10 @@ generates the help text.
 | `/rant` (root command, no parent) | `packages/rant/__init__.py:9` → `packages/rant/platforms/slack.py:19` | hookimpl | `app/features/rant/` | TASK-124.3 | `test_slack_command_registration_surface.py` `-k rant` |
 | `/sre rotations`; `/sre rotations view <usergroup_handle>` | `packages/user_rotations/__init__.py:7` → `packages/user_rotations/platforms/slack.py:18` | hookimpl | `app/capabilities/rotations/` | TASK-123 | `test_slack_command_registration_surface.py` `-k rotations` |
 | `/sre access` (parent, shared by the access subpackages); `/sre access sync`; `sync user <user_email> <platform> [--dry-run]`; `sync platform <platform> [--dry-run]`; `sync status <job_id>` | `packages/access/sync/__init__.py:26` → `packages/access/sync/interactions/slack.py:38` | hookimpl | `app/features/access/` (sync) | TASK-124.1 | `test_slack_command_registration_surface.py` `-k access_sync` |
-| `/sre incident draft [--limit]` | `packages/incident/scribe/__init__.py:17` → `packages/incident/scribe/platforms/slack.py:85` | hookimpl | `app/features/incident/` (scribe) | TASK-124.5 | `test_slack_command_registration_surface.py` `-k incident_draft` |
-| `/sre incident summarize [--since] [--limit]` | `packages/incident/scribe/__init__.py:17` → `packages/incident/scribe/platforms/slack.py:104` | hookimpl | `app/features/incident/` (scribe) | TASK-124.5 | `test_slack_command_registration_surface.py` `-k incident_summarize` |
+| `/sre incident draft [--limit]` | `packages/incident/scribe/__init__.py:19` → `packages/incident/scribe/entrypoints/slack.py:173` | hookimpl | `app/features/incident/` (scribe) | TASK-124.5 | `test_slack_command_registration_surface.py` `-k incident_draft` |
+| `/sre incident summarize [--since] [--limit]` | `packages/incident/scribe/__init__.py:19` → `packages/incident/scribe/entrypoints/slack.py:192` | hookimpl | `app/features/incident/` (scribe) | TASK-124.5 | `test_slack_command_registration_surface.py` `-k incident_summarize` |
+| `/sre incident status-update` | `packages/incident/scribe/__init__.py:19` → `packages/incident/scribe/entrypoints/slack.py:217` | hookimpl | `app/features/incident/` (scribe) | TASK-124.5 | `test_slack_command_registration_surface.py` `-k registered_command_tree_is_unchanged` |
+| `/sre incident updates` (any action): bilingual pointer to `/sre incident status-update`, no modal and no store access | `modules/incident/incident_helper.py:406` (resource key at `:193`), reached through the legacy `/sre incident` dispatcher | hard-coded `_register_legacy_slack_commands` | delete with the legacy `/sre incident` dispatcher (TASK-38.4 removes it; the pointer goes with it) | TASK-38 | `test_incident_updates_command_surface.py` `-k incident_updates` |
 | `/sre geolocate <ip_address>` | `packages/geolocate/__init__.py:14` → `packages/geolocate/platforms/slack.py:20` | hookimpl | `app/features/geolocate/` | TASK-124.6 | `test_slack_command_registration_surface.py` `-k geolocate` |
 
 ## Other `app/api/` routes

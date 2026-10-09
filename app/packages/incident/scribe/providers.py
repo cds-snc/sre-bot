@@ -1,7 +1,7 @@
 """Feature-local dependency wiring for the incident scribe subdomain.
 
 Resolves the default implementations of the Protocols the service depends on,
-keeping ``service.py`` and ``platforms/`` free of adapter (and therefore
+keeping ``service.py`` and ``entrypoints/`` free of adapter (and therefore
 ``integrations``) imports.
 """
 

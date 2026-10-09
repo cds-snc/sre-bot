@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
-updated_date: '2026-10-02 20:51'
+updated_date: '2026-10-08 15:01'
 labels:
   - migration
   - phase-5
@@ -47,6 +47,12 @@ Legacy registrations and the job hand-import are removed in the same PR; pinned 
 - [ ] #4 The TASK-36.1 and TASK-36.3 pinning tests for these surfaces are green before and after the cutover with no assertion change
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; no baseline grew; the seam baseline only shrank
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Legacy incident rows still carry the incident_updates attribute (every row has it, mostly an empty list; two incidents have real text). TASK-140.7 leaves the data in place and the Incident model ignores the key on read. Decide its fate here: drop, backfill or carry over.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

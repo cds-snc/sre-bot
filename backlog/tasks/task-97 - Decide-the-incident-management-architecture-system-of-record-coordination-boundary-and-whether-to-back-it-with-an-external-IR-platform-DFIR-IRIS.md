@@ -3,10 +3,10 @@ id: TASK-97
 title: >-
   Decide the incident management architecture: system of record, coordination
   boundary, and whether to back it with an external IR platform (DFIR-IRIS)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-16 14:24'
-updated_date: '2026-10-02 17:00'
+updated_date: '2026-10-08 15:54'
 labels:
   - architecture
   - incident

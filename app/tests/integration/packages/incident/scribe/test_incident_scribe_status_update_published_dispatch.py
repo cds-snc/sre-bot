@@ -28,7 +28,11 @@ from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUp
 from packages.incident.scribe import providers
 from packages.incident.scribe.adapters.copy_ready import CopyReadyPublisher
 from packages.incident.scribe.entrypoints import slack as slack_entrypoints
-from packages.incident.scribe.platforms.slack import PUBLISHED_ACTION_ID, build_copy_ready_view, build_profile_labels
+from packages.incident.scribe.entrypoints.slack_views import (
+    PUBLISHED_ACTION_ID,
+    build_copy_ready_view,
+    build_profile_labels,
+)
 from packages.incident.scribe.publisher import render_copy_ready
 from packages.incident.scribe.status_update_history import set_published
 from tests.factories.slack_bolt import TRIGGER_ID, USER_ID, Harness, harness_fixture

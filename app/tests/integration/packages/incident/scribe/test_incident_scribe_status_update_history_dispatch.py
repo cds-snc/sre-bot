@@ -28,7 +28,7 @@ from packages.incident.scribe import providers
 from packages.incident.scribe.comms_profile import ProfileLabels
 from packages.incident.scribe.domain import CopyReadyText, StatusUpdateOverview
 from packages.incident.scribe.entrypoints import slack as slack_entrypoints
-from packages.incident.scribe.platforms.slack import (
+from packages.incident.scribe.entrypoints.slack_views import (
     HISTORY_ACTION_ID,
     OPEN_ACTION_ID,
     build_copy_ready_view,

@@ -10,7 +10,7 @@ scope: The one package shape for features, capabilities and their subdomains, pl
 ## Context
 
 Features live in `app/packages/` today; `features/` and `capabilities/` do not exist yet ([plugin-architecture.md](plugin-architecture.md)). An earlier layout record was a closed filename list that banned names the code needed (no slot for persistence, no `locales/`), so this record was reconciled with the shipped shape. Nothing enforces it, and the shipped packages have drifted:
-- Four packages (`geolocate`, `incident/scribe`, `rant`, `user_rotations`) put Slack handlers in `platforms/`, and `access` puts them in `interactions/`, instead of `entrypoints/`; `geolocate` also has `routes.py`, `oncall_sync` has `ports.py`, and `access/sync` has many extra top-level modules (`application.py`, `job_runner.py`, `presenters.py` and others).
+- Three packages (`geolocate`, `rant`, `user_rotations`) put Slack handlers in `platforms/`, and `access` puts them in `interactions/`, instead of `entrypoints/`; `geolocate` also has `routes.py`, `oncall_sync` has `ports.py`, and `access/sync` has many extra top-level modules (`application.py`, `job_runner.py`, `presenters.py` and others).
 - Handler files in six packages import `integrations.slack` directly, `oncall_sync/providers.py` imports `integrations.slack.settings`, and the `incident/scribe` service imports `integrations.openai`.
 - `access/sync` handlers are synchronous `def` functions.
 - `access/request` and `access/sync` publish and handle domain events through the blinker-backed `infrastructure.events` dispatcher.
@@ -127,3 +127,4 @@ Tolerated until then:
 - 2026-10-01: umbrellas gain an optional `core/` layer that may do I/O, imported through `api.py`; a subdomain is an enablement unit, not a command; sibling independence is kept.
 - 2026-10-02: Protocols are named for their role, never with a `Port` suffix, and prose says "interface" (TASK-136).
 - 2026-10-02: `incident_draft` and `incident_summary` are now the `scribe` subdomain of `packages/incident/`, reading the transcript through `core/` (TASK-135); Context and the tolerated list no longer name them as separate packages.
+- 2026-10-09: `incident/scribe` Slack handlers merged into `entrypoints/` (TASK-144.1); Context no longer lists it among the packages with `platforms/`.

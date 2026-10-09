@@ -302,7 +302,7 @@ ignore_imports = [
     "packages.incident.drive.adapters.google_drive -> infrastructure.drive.models",
     "packages.incident.scribe.adapters.google_docs -> infrastructure.configuration.integrations.google",
     "packages.incident.scribe.adapters.google_docs -> infrastructure.drive",
-    "packages.incident.scribe.platforms.slack -> infrastructure.i18n",
+    "packages.incident.scribe.entrypoints.slack_views -> infrastructure.i18n",
     "packages.talent.adapters.google_drive -> infrastructure.configuration.integrations.google",
     "packages.talent.adapters.google_drive -> infrastructure.drive.factory",
 ]

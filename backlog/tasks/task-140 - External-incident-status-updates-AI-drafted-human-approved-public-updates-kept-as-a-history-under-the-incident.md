@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-07 15:17'
+updated_date: '2026-10-09 13:01'
 labels:
   - incident
   - features
@@ -44,3 +44,12 @@ Decisions (human, 2026-10-07): status updates never reach the incident channel; 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-06 (TASK-140.1): the records now hold the design. Slack interactions follow platform-entrypoints.md rule 3 (business code platform-neutral; a feature's entrypoints/slack.py uses native Bolt listeners; the host owns registration only). StatusPagePublisher and its copy-ready adapter live in scribe/; a comms profile renders the stored fields, with one default modelled on GC Notify's published incident history; per-product profiles and status-page adapters are DRAFT-10. The command model is reassessed in TASK-141.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-09 13:01
+---
+2026-10-09: the AI-first framing of this task (AI-drafted, human-approved) is superseded by TASK-144 (human-first: a responder writes the update, AI assists inside the form when configured). The shipped slices 140.1 to 140.10 stay as history; 140.7 is merged (#1564) and waits for a human to move it to Done; 140.11 and 140.12 stay open here because the CLI cannot re-parent them, and are re-read against TASK-144 (comments added by TASK-144.2). Nothing else from this task is open.
+---
+<!-- COMMENTS:END -->

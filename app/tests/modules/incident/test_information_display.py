@@ -7,19 +7,9 @@ from models.incidents import Incident
 from modules.incident import db_operations, information_display
 
 
-@patch("modules.incident.information_display.incident_information_view")
-@patch("modules.incident.information_display.db_operations")
-def test_open_incident_info_view(mock_db_operations, mock_incident_information_view):
-    mock_client = MagicMock()
-    mock_respond = MagicMock()
-    body = {
-        "channel_id": "C12345",
-        "channel_name": "incident-2024-01-12-test",
-        "user_id": "U12345",
-        "trigger_id": "T12345",
-        "view": {"id": "V12345"},
-    }
-    mock_db_operations.get_incident_by_channel_id.return_value = {
+def _stored_incident_row():
+    """An incidents-table row as DynamoDB returns it."""
+    return {
         "id": {"S": "incident-2024-01-12-test"},
         "channel_id": {"S": "C1234567890"},
         "channel_name": {"S": "incident-2024-01-12-test"},
@@ -39,10 +29,12 @@ def test_open_incident_info_view(mock_db_operations, mock_incident_information_v
         "retrospective_url": {"S": "http://example.com/retrospective"},
         "environment": {"S": "prod"},
         "logs": {"L": []},
-        "incident_updates": {"L": []},
     }
 
-    incident_data = {
+
+def _expected_incident_data():
+    """The same incident as plain values, as the information view receives it."""
+    return {
         "id": "incident-2024-01-12-test",
         "channel_id": "C1234567890",
         "channel_name": "incident-2024-01-12-test",
@@ -62,7 +54,46 @@ def test_open_incident_info_view(mock_db_operations, mock_incident_information_v
         "retrospective_url": "http://example.com/retrospective",
         "environment": "prod",
         "logs": [],
-        "incident_updates": [],
+    }
+
+
+@patch("modules.incident.information_display.incident_information_view")
+@patch("modules.incident.information_display.db_operations")
+def test_open_incident_info_view(mock_db_operations, mock_incident_information_view):
+    mock_client = MagicMock()
+    mock_respond = MagicMock()
+    body = {
+        "channel_id": "C12345",
+        "channel_name": "incident-2024-01-12-test",
+        "user_id": "U12345",
+        "trigger_id": "T12345",
+        "view": {"id": "V12345"},
+    }
+    mock_db_operations.get_incident_by_channel_id.return_value = _stored_incident_row()
+
+    mock_incident_information_view.return_value = {"view": [{"block": "block_id"}]}
+    information_display.open_incident_info_view(mock_client, body, mock_respond)
+    mock_client.views_open.assert_called_once_with(
+        trigger_id="T12345",
+        view={"view": [{"block": "block_id"}]},
+    )
+    mock_incident_information_view.assert_called_once_with(Incident(**_expected_incident_data()))
+
+
+@patch("modules.incident.information_display.incident_information_view")
+@patch("modules.incident.information_display.db_operations")
+def test_open_incident_info_view_ignores_stored_legacy_incident_updates(mock_db_operations, mock_incident_information_view):
+    """A stored row still carrying the legacy incident_updates list opens the modal unchanged.
+
+    The view builder is faked so the assertion is on the Incident it receives:
+    the same incident as a row without the legacy list, and the modal opens once.
+    """
+    mock_client = MagicMock()
+    mock_respond = MagicMock()
+    body = {"channel_id": "C12345", "trigger_id": "T12345"}
+    mock_db_operations.get_incident_by_channel_id.return_value = {
+        **_stored_incident_row(),
+        "incident_updates": {"L": [{"S": "2025-01-31 11:17:06 EST\nlegacy update"}]},
     }
 
     mock_incident_information_view.return_value = {"view": [{"block": "block_id"}]}
@@ -71,7 +102,8 @@ def test_open_incident_info_view(mock_db_operations, mock_incident_information_v
         trigger_id="T12345",
         view={"view": [{"block": "block_id"}]},
     )
-    mock_incident_information_view.assert_called_once_with(Incident(**incident_data))
+    mock_incident_information_view.assert_called_once_with(Incident(**_expected_incident_data()))
+    mock_respond.assert_not_called()
 
 
 @patch("modules.incident.information_display.db_operations")

@@ -16,7 +16,7 @@ Paths are relative to `app/packages/incident/scribe/` unless they start with
 
 | | `/sre incident draft` | `/sre incident summarize` |
 | --- | --- | --- |
-| Slack handler | `handle_draft_command` in `platforms/slack.py` | `handle_summarize_command` in `platforms/slack.py` |
+| Slack handler | `handle_draft_command` in `entrypoints/slack.py` | `handle_summarize_command` in `entrypoints/slack.py` |
 | Service function | `draft_incident_document_from_conversation` → `draft_incident_document` in `service.py` | `summarize_incident_conversation` → `summarize_transcript` in `service.py` |
 | Interfaces | `IncidentReportLinkLookup`, `IncidentDocumentStore` (`ports.py`); `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) | `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) |
 | Adapters | `adapters/slack.py` (report link from bookmarks), `adapters/google_docs.py` (read report, copy, fill copy), `core/adapters/slack.py` (transcript), `app/integrations/openai/` | `core/adapters/slack.py` (transcript), `app/integrations/openai/` |
@@ -39,7 +39,7 @@ Per `decisions/feature-packages.md`, `decisions/transport-slack.md` and
 Slack  /sre incident draft | summarize
   │
   ▼
-platforms/slack.py        parse args → typed values → one service call → OperationResult → render (i18n)
+entrypoints/slack.py      parse args → typed values → one service call → OperationResult → render (slack_views.py, i18n)
   │
   ▼
 service.py                platform-agnostic; no Slack, HTTP or Google SDK imports
@@ -58,10 +58,15 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   `register_i18n_resources`. The plugin is loaded from the `incident.scribe`
   entry point under `[project.entry-points.sre_bot]` in `app/pyproject.toml`
   (`decisions/plugins.md`); no import-time side effects.
-- `platforms/slack.py` — both five-step handlers, registered under
-  `sre.incident` by one `register_commands`; the draft handler posts the
+- `entrypoints/slack.py` — every Slack handler: the three five-step command
+  handlers (`draft`, `summarize`, `status-update`) registered under
+  `sre.incident`, and the status-updates modal's block-action and
+  view-submission listeners, all by one `register`; the draft handler posts the
   progress notice when the service signals the start; ephemeral responses; no
   `slack_sdk` import.
+- `entrypoints/slack_views.py` — the Block Kit view builders, payload parsers,
+  action ids and every translated string; the only scribe module that imports
+  `infrastructure.i18n`. No Slack SDK import.
 - `ports.py` — the scribe-owned interfaces: `IncidentDocumentStore`,
   `IncidentReportLinkLookup` and `TextGenerator`.
 - `service.py` — the draft and summarize use cases. It imports
@@ -69,7 +74,8 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   `OperationResult` with `error_code="EMPTY_HISTORY"`.
 - `status_update.py` — the status-update use case, `draft_status_update`. It
   returns the pending draft, carries the
-  prior update forward, or drafts with one model call, and stores the draft as
+  prior update forward, drafts with one model call, or prefills a manual draft
+  from the latest approved update, and stores the draft as
   a `StatusUpdate` record (decisions/incident-management.md, External status
   updates). Only messages posted by people after the latest record's cutoff
   count as new; thread replies are not read. It imports `core/api.py` only from
@@ -93,7 +99,7 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   plain strings and no links on an API error.
 - `adapters/google_docs.py` — the only file touching **Google**
   (Docs read + Drive copy + Docs populate). `service.py` imports the
-  `Summarizer` interface and `platforms/slack.py` the transport models, both by
+  `Summarizer` interface and `entrypoints/slack.py` the transport models, both by
   design.
 - `adapters/text_generation.py` — binds `TextGenerator` to the OpenAI
   `Summarizer`; the status-update path's only integration import.
@@ -123,9 +129,10 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
 4. **Settings.** Add a `BaseSettings` class and an `lru_cache` getter to
    `settings.py`, with its own `INCIDENT_<USE_CASE>__` prefix. Do not reuse
    another use case's class.
-5. **Slack.** Add the handler to `platforms/slack.py` and one
+5. **Slack.** Add the handler to `entrypoints/slack.py`, its wording to
+   `entrypoints/slack_views.py`, and one
    `registrar.register_command(..., parent="sre.incident")` call inside
-   `register_commands`. No new hookimpl is needed.
+   `register`. No new hookimpl is needed.
 6. **Locales.** Add `locales/<catalogue>.en-US.yml` and
    `locales/<catalogue>.fr-FR.yml`. The existing `register_i18n_resources`
    picks them up.
@@ -143,8 +150,8 @@ shipped with, so nothing deployed has to change:
   classes `IncidentDraftSettings`, `IncidentSummarySettings`) are environment
   variable names already set in deployed configuration.
 - The `incident_draft` and `incident_summary` catalogues are the i18n key
-  prefixes the handlers look up (`_DRAFT_DOMAIN`, `_SUMMARY_DOMAIN` in
-  `platforms/slack.py`).
+  prefixes the handlers look up (`DRAFT_DOMAIN`, `SUMMARY_DOMAIN` in
+  `entrypoints/slack_views.py`).
 - The `incident_draft::` named-range prefix (`adapters/google_docs.py`) is
   already written into existing draft documents.
 
@@ -523,6 +530,36 @@ bot so the Web API client picks up the new token.
 
 ### `/sre incident status-update`
 
+#### Target flow (TASK-144)
+
+A responder writes the update; AI is an optional assist inside the form
+(`decisions/incident-management.md`, External status updates). Each part names
+the layer that lands it; until then the behaviour under
+[Shipped today](#shipped-today) applies.
+
+- **Origin and service** (TASK-144.3): every record carries its origin
+  (hand-written, model, model with instructions, carried forward). The service
+  starts a draft by hand, saves a draft from the form, and AI-fills a draft
+  (`generate_status_update_draft`, blank instructions mean "draft from the
+  conversation"). A predicate says whether text generation is available.
+- **Modal and form** (TASK-144.4): the status-updates modal shows the pending
+  draft with an origin line (who, how, when) or a "New update" button, and the
+  approved history. "New update" stores a draft prefilled from the latest
+  approved update (blank at the first stage) and opens the form. The form has
+  "Save draft", which accepts partial fields, and Approve, which validates
+  blank fields and the stage floor.
+- **AI inside the form** (TASK-144.5): "Draft with AI" and an optional
+  instructions input appear only when text generation is configured. No new
+  human messages since the latest approved update means no model call and the
+  carried-forward wording; otherwise one model call fills the fields. A
+  security or unknown-flag incident shows the confirmation checkbox first; a
+  hand-written draft needs none. The overview's Draft and Write it myself
+  buttons go away.
+- **Unchanged**: approval, copy-ready text, history and the published toggle.
+  Nothing is posted to the incident conversation.
+
+#### Shipped today
+
 Opens the incident's status-updates modal, private to the invoker; no status
 update text is posted to the channel. The handler opens a loading view at once
 with the command's trigger id (it expires after about three seconds), then
@@ -532,7 +569,7 @@ English then French by the default comms profile (`comms_profile.py`), or to a
 localized no-draft notice, or to a localized error with a Close button
 (outside an incident channel, ambiguous incident, store failure). Opening never
 drafts. Strings live in `locales/incident_status_update.{en-US,fr-FR}.yml`;
-`t()` is called only in `platforms/slack.py`.
+`t()` is called only in `entrypoints/slack_views.py`.
 
 Security gate: when a model call is needed, `draft_status_update` refuses a
 security, unknown-flag or unreadable-flag incident with
@@ -540,3 +577,21 @@ security, unknown-flag or unreadable-flag incident with
 The Draft handler then shows a confirmation view in the modal; its Confirm and
 draft button (`incident.scribe.status_update.draft_confirmed`) drafts with
 confirmation and Cancel closes the modal with no model call.
+
+Redraft: the review form opens with an optional instructions input and a
+Redraft button (`incident.scribe.status_update.redraft`). `redraft_status_update`
+makes one model call from the reviewer's current values, the same transcript
+window and the instructions, keeps the stage floor and strict parsing, and
+stores the result as the next draft; any failure keeps the previous draft.
+
+Write it myself: the modal's second button (`incident.scribe.status_update.write`)
+calls `draft_status_update` with `manual=True`: no model call and no security
+gate. With new activity it stores a `MANUAL` draft prefilled from the latest
+approved update (blank at Investigating for the first one); otherwise it
+returns the pending or carried-forward draft. The modal then switches to the
+review form; a `MANUAL` draft's form has no Redraft section. A Draft whose model
+call fails for any reason (no `OPENAI_API_KEY`, provider error, unparseable
+answer) falls back to the same `MANUAL` draft and form, with a notice. A
+pending draft still equal to its prefill was never written (only approval
+saves edits), so Draft retries the model over it rather than returning it as
+pending; when the model fails again the same draft is offered, not a copy.

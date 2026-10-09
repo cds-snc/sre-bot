@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
+updated_date: '2026-10-08 15:01'
 labels:
   - migration
   - phase-5
@@ -46,3 +47,9 @@ Who consumes the sheet and what replaces it is the expansion draft under TASK-97
 - [ ] #4 A status update that fails to reach the sheet is logged as a projection failure and leaves the record correct; the next rebuild repairs the sheet
 - [ ] #5 The legacy_surface suite is green with no assertion change; ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Legacy incident rows still carry the incident_updates attribute (every row has it, mostly an empty list; two incidents have real text). TASK-140.7 leaves the data in place and the Incident model ignores the key on read. Decide its fate here: drop, backfill or carry over.
+<!-- SECTION:NOTES:END -->
