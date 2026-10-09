@@ -866,9 +866,8 @@ def _is_list_heading(heading: str) -> bool:
     return any(marker in lowered for marker in _LIST_HEADING_MARKERS)
 
 
-# Incident-response content prompt owned by this feature. Platform adapters
-# supply additional formatting instructions (e.g. Slack mrkdwn) that are
-# appended to this base prompt.
+# Incident-response content prompt owned by this feature; the Slack mrkdwn
+# rules below are always appended to it, and a caller's extra guidance after both.
 _CONTENT_INSTRUCTIONS = (
     "You are an incident-response assistant. Summarize the following chat "
     "transcript from an incident channel so that a responder joining now can "
@@ -890,6 +889,17 @@ _CONTENT_INSTRUCTIONS = (
     "question in the transcript that no later message answers."
 )
 
+# Slack renders its own "mrkdwn", not standard/GitHub Markdown: headers (``#``)
+# and ``**bold**`` show up as literal text. Steer the model toward Slack-safe
+# formatting so the ephemeral summary renders correctly.
+_SUMMARY_FORMAT_INSTRUCTIONS = (
+    "Format the summary using Slack mrkdwn, NOT standard Markdown. "
+    "Rules: use *single asterisks* for bold (never **double**); use _underscores_ "
+    "for italics; do NOT use Markdown headings (#, ##, ###) -- make section titles "
+    "a bold line instead (e.g. *Current status*); start bullet lines with '• '; "
+    "separate sections with a blank line. Keep links as plain URLs."
+)
+
 
 async def summarize_incident_conversation(
     conversation_id: str,
@@ -908,7 +918,7 @@ async def summarize_incident_conversation(
             configured default window when the start is unknown.
         limit: Maximum number of messages to read. Missing or not positive
             means the configured default; larger values are capped.
-        instructions: Optional additional instructions passed on to
+        instructions: Optional extra guidance passed on to
             ``summarize_transcript``.
         reader: Optional ``IncidentTranscriptReader``; defaults to the incident
             core's process singleton. Injected in tests.
@@ -941,9 +951,9 @@ async def summarize_transcript(
 
     Args:
         messages: Chronologically ordered messages to summarize.
-        instructions: Optional additional instructions (e.g. platform-specific
-            formatting rules) appended to this feature's incident-content
-            prompt before being sent to the ``Summarizer`` interface.
+        instructions: Optional extra guidance appended after this feature's
+            incident-content prompt and its Slack mrkdwn formatting rules
+            before being sent to the ``Summarizer`` interface.
         summarizer: Optional ``Summarizer`` interface; defaults to the process
             singleton. Injected in tests.
 
@@ -963,9 +973,9 @@ async def summarize_transcript(
 
     transcript = _build_summary_payload(messages, get_incident_summary_settings().TIMEZONE)
     summarizer = summarizer or get_summarizer()
-    full_instructions = _CONTENT_INSTRUCTIONS
+    full_instructions = f"{_CONTENT_INSTRUCTIONS}\n\n{_SUMMARY_FORMAT_INSTRUCTIONS}"
     if instructions:
-        full_instructions = f"{_CONTENT_INSTRUCTIONS}\n\n{instructions}"
+        full_instructions = f"{full_instructions}\n\n{instructions}"
     result = await summarizer.summarize(transcript, instructions=full_instructions)
 
     if result.is_success:
