@@ -28,9 +28,7 @@ from packages.incident.scribe.domain import (
     CopyReadyText,
     DraftedDocument,
     NoNewInformationWording,
-    StatusUpdateDraftOutcome,
     StatusUpdateEdit,
-    StatusUpdateOutcomeKind,
     StatusUpdateOverview,
 )
 from packages.incident.scribe.service import (
@@ -46,41 +44,46 @@ DRAFT_DOMAIN = "incident_draft"
 SUMMARY_DOMAIN = "incident_summary"
 STATUS_UPDATE_DOMAIN = "incident_status_update"
 _SLACK_TEXT_LIMIT = 3000
-DRAFT_ACTION_ID = "incident.scribe.status_update.draft"
-CONFIRM_ACTION_ID = "incident.scribe.status_update.draft_confirmed"
 REVIEW_ACTION_ID = "incident.scribe.status_update.review"
 REVIEW_CALLBACK_ID = "incident.scribe.status_update.approve"
 OPEN_ACTION_ID = "incident.scribe.status_update.open"
 HISTORY_ACTION_ID = "incident.scribe.status_update.history"
 PUBLISHED_ACTION_ID = "incident.scribe.status_update.published"
-REDRAFT_ACTION_ID = "incident.scribe.status_update.redraft"
+GENERATE_ACTION_ID = "incident.scribe.status_update.generate"
 NEW_ACTION_ID = "incident.scribe.status_update.new"
 SAVE_ACTION_ID = "incident.scribe.status_update.save"
 _APPROVED_ROW_CAP = 50
 _SECURITY_CONFIRMED = "confirmed"
-_REDRAFT_NOTICES_EN = MappingProxyType(
+_GENERATE_NOTICES_EN = MappingProxyType(
     {
-        "redrafted_note": "Redrafted from your instructions. Review the new draft before you approve it.",
-        "redraft_blank": "Enter instructions for the new draft, then press Redraft.",
-        "redraft_failed": "Couldn't redraft the status update right now, so the previous draft was kept. "
-        "Please try again shortly.",
-        "redraft_unparseable": "I couldn't turn the model's answer into a status update, so the previous draft was kept. "
+        "generated_note": "Drafted with AI. Review the new draft before you approve it.",
+        "generate_carried_forward": "Nothing new since the last approved update, so the current action now says there "
+        "is no new information.",
+        "generate_failed": "Couldn't draft with AI right now, so your text was kept. Please try again shortly.",
+        "generate_unparseable": "I couldn't turn the model's answer into a status update, so your text was kept. "
         "Please try again.",
-        "redraft_security": "This incident is, or may be, a security incident. Redrafting sends the incident channel and "
-        "comms content to the AI model. To continue, check the box below, then press Redraft.",
+        "generate_security": "This incident is, or may be, a security incident. Drafting with AI sends the incident "
+        "channel and comms content to the AI model. To continue, check the box below, then press Draft with AI.",
+        "generate_unavailable": "AI drafting isn't available right now, so your text was kept. Write the update in the "
+        "fields below.",
+        "generate_empty_history": "There's no conversation from people to draft from yet, so your text was kept.",
     }
 )
-_REDRAFT_NOTICES_FR = MappingProxyType(
+_GENERATE_NOTICES_FR = MappingProxyType(
     {
-        "redrafted_note": "Nouveau brouillon rédigé selon vos instructions. Révisez-le avant de l'approuver.",
-        "redraft_blank": "Entrez des instructions pour le nouveau brouillon, puis appuyez sur Rédiger à nouveau.",
-        "redraft_failed": "Impossible de rédiger à nouveau la mise à jour de statut pour le moment; le brouillon "
-        "précédent a été conservé. Veuillez réessayer sous peu.",
-        "redraft_unparseable": "Je n'ai pas pu transformer la réponse du modèle en mise à jour de statut; le brouillon "
-        "précédent a été conservé. Veuillez réessayer.",
-        "redraft_security": "Cet incident est, ou pourrait être, un incident de sécurité. La nouvelle rédaction envoie le "
-        "contenu du canal de l'incident et des communications au modèle d'IA. Pour continuer, cochez la case "
-        "ci-dessous, puis appuyez sur Rédiger à nouveau.",
+        "generated_note": "Brouillon rédigé avec l'IA. Révisez-le avant de l'approuver.",
+        "generate_carried_forward": "Rien de nouveau depuis la dernière mise à jour approuvée; la mesure en cours "
+        "indique maintenant qu'il n'y a aucune nouvelle information.",
+        "generate_failed": "Impossible de rédiger avec l'IA pour le moment; votre texte a été conservé. "
+        "Veuillez réessayer sous peu.",
+        "generate_unparseable": "Je n'ai pas pu transformer la réponse du modèle en mise à jour de statut; votre texte "
+        "a été conservé. Veuillez réessayer.",
+        "generate_security": "Cet incident est, ou pourrait être, un incident de sécurité. La rédaction avec l'IA "
+        "envoie le contenu du canal de l'incident et des communications au modèle d'IA. Pour continuer, cochez la "
+        "case ci-dessous, puis appuyez sur Rédiger avec l'IA.",
+        "generate_unavailable": "La rédaction par IA n'est pas disponible pour le moment; votre texte a été conservé. "
+        "Rédigez la mise à jour dans les champs ci-dessous.",
+        "generate_empty_history": "Il n'y a pas encore de conversation à partir de laquelle rédiger; votre texte a été conservé.",
     }
 )
 _SAVE_NOTICES_EN = MappingProxyType(
@@ -406,41 +409,26 @@ def build_profile_labels(locale: str) -> ProfileLabels:
     )
 
 
-def _draft_button_block(locale: str, update: StatusUpdate | None, *, with_draft: bool) -> dict[str, Any]:
-    """Build the overview's actions block: New update (primary) and Draft with nothing pending, Draft and Review with a draft.
-
-    ``with_draft=False`` (a result view) leaves only the Review button.
-    """
+def _overview_actions(locale: str, update: StatusUpdate | None) -> dict[str, Any]:
+    """Build the overview's actions block: New update with nothing pending, Review with a pending draft."""
     fr = locale.startswith("fr")
-    elements: list[dict[str, Any]] = []
-    draft = {
-        "type": "button",
-        "action_id": DRAFT_ACTION_ID,
-        "text": {"type": "plain_text", "text": status_t("draft_button", locale, "Rédiger" if fr else "Draft")},
-    }
-    if with_draft and update is None:
-        new_update = {
+    if update is None:
+        button = {
             "type": "button",
             "action_id": NEW_ACTION_ID,
             "text": {
                 "type": "plain_text",
                 "text": status_t("new_update_button", locale, "Nouvelle mise à jour" if fr else "New update"),
             },
-            "style": "primary",
         }
-        elements.extend([new_update, draft])
-    elif with_draft:
-        elements.append(draft | {"style": "primary"})
-    if update is not None:
-        elements.append(
-            {
-                "type": "button",
-                "action_id": REVIEW_ACTION_ID,
-                "text": {"type": "plain_text", "text": status_t("review_button", locale, "Réviser" if fr else "Review")},
-                "value": json.dumps({"incident_id": update.incident_id, "sequence": update.sequence}),
-            }
-        )
-    return {"type": "actions", "block_id": "draft_button", "elements": elements}
+    else:
+        button = {
+            "type": "button",
+            "action_id": REVIEW_ACTION_ID,
+            "text": {"type": "plain_text", "text": status_t("review_button", locale, "Réviser" if fr else "Review")},
+            "value": json.dumps({"incident_id": update.incident_id, "sequence": update.sequence}),
+        }
+    return {"type": "actions", "block_id": "overview_actions", "elements": [button | {"style": "primary"}]}
 
 
 def origin_line(update: StatusUpdate, locale: str) -> str:
@@ -452,42 +440,6 @@ def origin_line(update: StatusUpdate, locale: str) -> str:
     template = (_ORIGIN_TEMPLATES_FR if locale.startswith("fr") else _ORIGIN_TEMPLATES_EN)[key]
     variables = {"author": f"<@{update.author}>", "time": format_profile_time(update.created_at, build_profile_labels(locale))}
     return t(f"{STATUS_UPDATE_DOMAIN}.origin.{key}", locale, template.format(**variables), **variables)
-
-
-def build_security_confirmation_view(locale: str, private_metadata: str) -> dict[str, Any]:
-    """Build the modal asking the responder to confirm drafting for a security or unknown-flag incident.
-
-    The Confirm and draft button re-runs the draft with confirmation; the
-    view's Cancel close button closes the modal without a model call.
-    """
-    fr = locale.startswith("fr")
-    text = status_t(
-        "security_confirmation",
-        locale,
-        "Cet incident est, ou pourrait être, un incident de sécurité. La rédaction envoie le contenu du canal de "
-        "l'incident et des communications au modèle d'IA. Voulez-vous continuer?"
-        if fr
-        else "This incident is, or may be, a security incident. Drafting sends the incident channel and comms content "
-        "to the AI model. Do you want to continue?",
-    )
-    confirm_block = {
-        "type": "actions",
-        "block_id": "draft_confirm_button",
-        "elements": [
-            {
-                "type": "button",
-                "action_id": CONFIRM_ACTION_ID,
-                "text": {
-                    "type": "plain_text",
-                    "text": status_t("confirm_button", locale, "Confirmer et rédiger" if fr else "Confirm and draft"),
-                },
-                "style": "primary",
-            }
-        ],
-    }
-    view = status_update_view(locale, private_metadata, [*mrkdwn_blocks(text), confirm_block], close=False)
-    view["close"] = {"type": "plain_text", "text": status_t("cancel", locale, "Annuler" if fr else "Cancel")}
-    return view
 
 
 def _stage_line(update: StatusUpdate, locale: str) -> str:
@@ -557,32 +509,14 @@ def build_overview_view(overview: StatusUpdateOverview, locale: str, private_met
             "block_id": "pending_origin",
             "elements": [{"type": "mrkdwn", "text": origin_line(overview.pending, locale)}],
         }
-        blocks = [origin, *_pending_blocks(overview.pending), _draft_button_block(locale, overview.pending, with_draft=True)]
+        blocks = [origin, *_pending_blocks(overview.pending), _overview_actions(locale, overview.pending)]
     else:
         blocks = [
             *mrkdwn_blocks(status_t("no_pending", locale, "There is no status update draft for this incident yet.")),
-            _draft_button_block(locale, None, with_draft=True),
+            _overview_actions(locale, None),
         ]
     blocks.extend(_approved_blocks(overview.approved, locale))
     return status_update_view(locale, private_metadata, blocks, close=True)
-
-
-def build_drafting_view(locale: str, private_metadata: str) -> dict[str, Any]:
-    """Build the modal shown while the draft is being written; no buttons."""
-    blocks = mrkdwn_blocks(status_t("drafting", locale, "Drafting the status update. This usually takes up to a minute..."))
-    return status_update_view(locale, private_metadata, blocks, close=False)
-
-
-def build_result_view(outcome: StatusUpdateDraftOutcome, locale: str, private_metadata: str) -> dict[str, Any]:
-    """Build the modal showing the drafted, carried-forward or pending update in EN and FR."""
-    blocks = [*_pending_blocks(outcome.update), _draft_button_block(locale, outcome.update, with_draft=False)]
-    if outcome.kind == StatusUpdateOutcomeKind.CARRIED_FORWARD:
-        note = status_t("carried_forward", locale, "Nothing new since the last update, so it was repeated as a new draft.")
-    elif outcome.kind == StatusUpdateOutcomeKind.PENDING:
-        note = status_t("pending", locale, "This draft already covers the latest activity, so no new draft was written.")
-    else:
-        note = status_t("drafted", locale, "Drafted from the incident channel.")
-    return status_update_view(locale, private_metadata, [*mrkdwn_blocks(note), *blocks], close=True)
 
 
 def build_draft_error_view(error_code: str | None, locale: str, private_metadata: str) -> dict[str, Any]:
@@ -635,8 +569,8 @@ def _review_input(block_id: str, label: str, element: dict[str, Any]) -> dict[st
     return {"type": "input", "block_id": block_id, "label": {"type": "plain_text", "text": label}, "element": element}
 
 
-def _redraft_blocks(locale: str, instructions: str | None, *, security_confirm: bool) -> list[dict[str, Any]]:
-    """Build the Redraft section: the optional instructions input, the optional confirmation checkbox, the button."""
+def _ai_blocks(locale: str, instructions: str | None, *, security_confirm: bool) -> list[dict[str, Any]]:
+    """Build the AI section: the optional instructions input, the optional confirmation checkbox, the Draft with AI button."""
     fr = locale.startswith("fr")
     element: dict[str, Any] = {
         "type": "plain_text_input",
@@ -646,14 +580,16 @@ def _redraft_blocks(locale: str, instructions: str | None, *, security_confirm: 
     }
     if instructions:
         element["initial_value"] = instructions
-    label = status_t("redraft_label", locale, "Instructions pour un nouveau brouillon" if fr else "Instructions for a new draft")
+    label = status_t(
+        "generate_label", locale, "Instructions pour l'IA (facultatif)" if fr else "Instructions for the AI (optional)"
+    )
     hint = status_t(
-        "redraft_hint",
+        "generate_hint",
         locale,
-        "Indiquez à l'IA ce qu'il faut changer, par exemple : ne pas nommer le fournisseur. "
-        "Appuyez ensuite sur Rédiger à nouveau."
+        "Laissez vide pour rédiger à partir de la conversation, ou indiquez ce qu'il faut changer, "
+        "par exemple : ne pas nommer le fournisseur."
         if fr
-        else "Tell the AI what to change, for example: do not name the vendor. Then press Redraft.",
+        else "Leave empty to draft from the conversation, or say what to change, for example: do not name the vendor.",
     )
     blocks = [_review_input("instructions", label, element) | {"hint": {"type": "plain_text", "text": hint}, "optional": True}]
     if security_confirm:
@@ -671,10 +607,13 @@ def _redraft_blocks(locale: str, instructions: str | None, *, security_confirm: 
         blocks.append(_review_input("security_confirm", title, checkbox) | {"optional": True})
     button = {
         "type": "button",
-        "action_id": REDRAFT_ACTION_ID,
-        "text": {"type": "plain_text", "text": status_t("redraft_button", locale, "Rédiger à nouveau" if fr else "Redraft")},
+        "action_id": GENERATE_ACTION_ID,
+        "text": {
+            "type": "plain_text",
+            "text": status_t("generate_button", locale, "Rédiger avec l'IA" if fr else "Draft with AI"),
+        },
     }
-    blocks.append({"type": "actions", "block_id": "redraft_button", "elements": [button]})
+    blocks.append({"type": "actions", "block_id": "generate_button", "elements": [button]})
     return blocks
 
 
@@ -686,23 +625,23 @@ def build_review_view(
     *,
     instructions: str | None = None,
     security_confirm: bool = False,
-    with_redraft: bool = True,
+    with_ai: bool = True,
 ) -> dict[str, Any]:
-    """Build the review modal: any notice, the Redraft section, the stage select, the EN and FR fields, then Save draft.
+    """Build the review modal: any notice, the AI section, the stage select, the EN and FR fields, then Save draft.
 
     Field inputs are optional so Slack never blocks a blank field itself; the
-    submission listener validates and names the blank ones. The Redraft and
-    Save draft buttons are block actions, so Approve stays the only submit. ``instructions``
-    prefills the instructions input and ``security_confirm`` adds the security
-    confirmation checkbox. ``with_redraft=False`` leaves the Redraft section out,
-    for a draft the responder writes by hand.
+    submission listener validates and names the blank ones. The Draft with AI
+    and Save draft buttons are block actions, so Approve stays the only submit.
+    ``instructions`` prefills the instructions input and ``security_confirm``
+    adds the security confirmation checkbox. ``with_ai=False`` leaves the AI
+    section out, for when text generation is not configured.
     """
     fr = locale.startswith("fr")
     stage_names = build_profile_labels(locale).stage_names
     options = [{"text": {"type": "plain_text", "text": stage_names[stage]}, "value": stage.value} for stage in StatusUpdateStage]
     blocks = mrkdwn_blocks(notice) if notice else []
-    if with_redraft:
-        blocks.extend(_redraft_blocks(locale, instructions, security_confirm=security_confirm))
+    if with_ai:
+        blocks.extend(_ai_blocks(locale, instructions, security_confirm=security_confirm))
     blocks.append(
         _review_input(
             "stage",
@@ -770,7 +709,7 @@ def parse_review_submission(view: dict[str, Any]) -> StatusUpdateEdit | None:
     return StatusUpdateEdit(stage=stage, en=read("en"), fr=read("fr"))
 
 
-def parse_redraft_form(view: dict[str, Any]) -> tuple[str, bool]:
+def parse_ai_form(view: dict[str, Any]) -> tuple[str, bool]:
     """Read the untrimmed instructions and whether the security confirmation is checked from a block action's view.
 
     A missing or cleared input (Slack sends null) reads as ``""``; only the
@@ -783,26 +722,26 @@ def parse_redraft_form(view: dict[str, Any]) -> tuple[str, bool]:
     return str(instructions), confirmed
 
 
-def build_redrafting_view(locale: str, private_metadata: str) -> dict[str, Any]:
-    """Build the modal shown while the redraft is being written; no buttons."""
+def build_generating_view(locale: str, private_metadata: str) -> dict[str, Any]:
+    """Build the modal shown while the model fills the draft; no buttons."""
     text = status_t(
-        "redrafting",
+        "generating",
         locale,
-        "Nouvelle rédaction de la mise à jour de statut en cours. Cela prend généralement jusqu'à une minute..."
+        "Rédaction de la mise à jour de statut avec l'IA en cours. Cela prend généralement jusqu'à une minute..."
         if locale.startswith("fr")
-        else "Redrafting the status update. This usually takes up to a minute...",
+        else "Drafting the status update with AI. This usually takes up to a minute...",
     )
     return status_update_view(locale, private_metadata, mrkdwn_blocks(text), close=False)
 
 
-def redraft_notice(key: str, locale: str) -> str:
-    """Return the localized Redraft notice for ``key``.
+def generate_notice(key: str, locale: str) -> str:
+    """Return the localized Draft with AI notice for ``key``.
 
-    ``key`` is one of ``redrafted_note``, ``redraft_blank``, ``redraft_failed``,
-    ``redraft_unparseable`` or ``redraft_security``.
+    ``key`` is one of ``generated_note``, ``generate_carried_forward``,
+    ``generate_failed``, ``generate_unparseable``, ``generate_security``,
+    ``generate_unavailable`` or ``generate_empty_history``.
     """
-    fr = locale.startswith("fr")
-    fallback = _REDRAFT_NOTICES_FR[key] if fr else _REDRAFT_NOTICES_EN[key]
+    fallback = _GENERATE_NOTICES_FR[key] if locale.startswith("fr") else _GENERATE_NOTICES_EN[key]
     return status_t(key, locale, fallback)
 
 
@@ -810,17 +749,6 @@ def save_notice(key: str, locale: str) -> str:
     """Return the localized Save draft notice for ``key``: ``saved_note`` or ``save_failed``."""
     fallback = _SAVE_NOTICES_FR[key] if locale.startswith("fr") else _SAVE_NOTICES_EN[key]
     return status_t(key, locale, fallback)
-
-
-def manual_fallback_notice(locale: str) -> str:
-    """Return the localized notice above a review form opened because AI drafting failed."""
-    fallback = (
-        "La rédaction par IA n'est pas disponible pour le moment. Rédigez la mise à jour dans les champs ci-dessous, "
-        "puis appuyez sur Approuver."
-        if locale.startswith("fr")
-        else "AI drafting isn't available right now. Write the update in the fields below, then press Approve."
-    )
-    return status_t("manual_fallback", locale, fallback)
 
 
 def build_review_field_errors(block_ids: tuple[str, ...], locale: str) -> dict[str, str]:

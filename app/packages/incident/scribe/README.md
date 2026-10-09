@@ -72,15 +72,15 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
 - `service.py` — the draft and summarize use cases. It imports
   `packages/incident/core` through `core/api.py` only. Empty history returns an
   `OperationResult` with `error_code="EMPTY_HISTORY"`.
-- `status_update.py` — the status-update use case, `draft_status_update`. It
-  returns the pending draft, carries the
-  prior update forward, drafts with one model call, or prefills a manual draft
-  from the latest approved update, and stores the draft as
-  a `StatusUpdate` record (decisions/incident-management.md, External status
-  updates). Only messages posted by people after the latest record's cutoff
-  count as new; thread replies count when their thread started after the
-  cutoff, while new replies in an older thread are not read. It imports `core/api.py` only from
-  `core` and no integration.
+- `status_update.py` — the status-update use cases: `start_status_update_draft`
+  (the pending draft, or the latest approved update stored as the next draft
+  for a responder to write), `save_status_update_draft` (the typed fields as
+  the next draft) and `generate_status_update_draft` (Draft with AI: carries
+  the typed fields forward when nothing is new, otherwise one model call fills
+  them), each storing a `StatusUpdate` record (decisions/incident-management.md,
+  External status updates). Only messages posted by people after the latest
+  approved update's cutoff count as new; thread replies are not read. It
+  imports `core/api.py` only from `core` and no integration.
 - `status_update_approval.py`, `publisher.py` — approving a draft (stops at `APPROVED`, never
   publishes) and rendering an approved update as copy-ready EN/FR text.
 - `status_update_history.py` — reopening an approved update and `set_published`,
@@ -531,76 +531,59 @@ bot so the Web API client picks up the new token.
 
 ### `/sre incident status-update`
 
-#### Target flow (TASK-144)
-
 A responder writes the update; AI is an optional assist inside the form
-(`decisions/incident-management.md`, External status updates). Each part names
-the layer that lands it; until then the behaviour under
-[Shipped today](#shipped-today) applies.
+(`decisions/incident-management.md`, External status updates; TASK-144).
+Nothing is posted to the incident conversation.
 
-- **Origin and service** (TASK-144.3): every record carries its origin
-  (hand-written, model, model with instructions, carried forward). The service
-  starts a draft by hand, saves a draft from the form, and AI-fills a draft
-  (`generate_status_update_draft`, blank instructions mean "draft from the
-  conversation"). A predicate says whether text generation is available.
-- **Modal and form** (TASK-144.4, shipped): the status-updates modal shows the pending
-  draft with an origin line (who, how, when) or a "New update" button, and the
-  approved history. "New update" stores a draft prefilled from the latest
-  approved update (blank at the first stage) and opens the form. The form has
-  "Save draft", which accepts partial fields, and Approve, which validates
-  blank fields and the stage floor.
-- **AI inside the form** (TASK-144.5): "Draft with AI" and an optional
-  instructions input appear only when text generation is configured. No new
-  human messages since the latest approved update means no model call and the
-  carried-forward wording; otherwise one model call fills the fields. A
-  security or unknown-flag incident shows the confirmation checkbox first; a
-  hand-written draft needs none. The overview's Draft button goes away.
-- **Unchanged**: approval, copy-ready text, history and the published toggle.
-  Nothing is posted to the incident conversation.
+Opens the incident's status-updates modal, private to the invoker. The handler
+opens a loading view at once with the command's trigger id (it expires after
+about three seconds), then `get_status_update_overview` in `status_update.py`
+resolves the incident and reads its records. The view is updated to the
+overview: the pending draft with its origin line, rendered in English then
+French by the default comms profile (`comms_profile.py`), or a localized
+no-draft notice, then the approved updates; or to a localized error with a
+Close button (outside an incident channel, ambiguous incident, store failure).
+Opening never drafts. Strings live in
+`locales/incident_status_update.{en-US,fr-FR}.yml`; `t()` is called only in
+`entrypoints/slack_views.py`.
 
-#### Shipped today
-
-Opens the incident's status-updates modal, private to the invoker; no status
-update text is posted to the channel. The handler opens a loading view at once
-with the command's trigger id (it expires after about three seconds), then
-`get_pending_status_update` in `status_update.py` resolves the incident and
-reads the latest record. The view is updated to the pending draft, rendered in
-English then French by the default comms profile (`comms_profile.py`), or to a
-localized no-draft notice, or to a localized error with a Close button
-(outside an incident channel, ambiguous incident, store failure). Opening never
-drafts. Strings live in `locales/incident_status_update.{en-US,fr-FR}.yml`;
-`t()` is called only in `entrypoints/slack_views.py`.
-
-Security gate: when a model call is needed, `draft_status_update` refuses a
-security, unknown-flag or unreadable-flag incident with
-`SECURITY_CONFIRMATION_REQUIRED` unless called with `security_confirmed=True`.
-The Draft handler then shows a confirmation view in the modal; its Confirm and
-draft button (`incident.scribe.status_update.draft_confirmed`) drafts with
-confirmation and Cancel closes the modal with no model call.
-
-Redraft: the review form opens with an optional instructions input and a
-Redraft button (`incident.scribe.status_update.redraft`). `redraft_status_update`
-makes one model call from the reviewer's current values, the same transcript
-window and the instructions, keeps the stage floor and strict parsing, and
-stores the result as the next draft; any failure keeps the previous draft.
+Overview: with no pending draft the only button is New update
+(`incident.scribe.status_update.new`); with one it is Review
+(`incident.scribe.status_update.review`), which opens the review form. There
+is no Draft button on the overview.
 
 Origin line: above a pending draft the modal says who made it, how and when
 ("Written by @user", "Drafted by AI", "Redrafted with instructions", "Carried
 forward", with the creation time in Eastern time); a record written before
-origins existed names only its author. The pending draft keeps the Draft and
-Review buttons.
+origins existed names only its author.
 
-New update: with no pending draft the modal's primary button
-(`incident.scribe.status_update.new`, beside Draft) calls `draft_status_update`
-with `manual=True`: no model call and no security gate. With new activity it stores a `MANUAL` draft prefilled from the latest
-approved update (blank at Investigating for the first one); otherwise it
-returns the pending or carried-forward draft. The modal then switches to the
-review form; a `MANUAL` draft's form has no Redraft section. A Draft whose model
-call fails for any reason (no `OPENAI_API_KEY`, provider error, unparseable
-answer) falls back to the same `MANUAL` draft and form, with a notice. A
-pending draft still equal to its prefill was never written (neither Save draft
-nor approval stored edits), so Draft retries the model over it rather than returning it as
-pending; when the model fails again the same draft is offered, not a copy.
+New update: `start_status_update_draft` makes no model call and reads no
+security flag. It stores the latest approved update (blank at Investigating
+for the first one) as the next draft with origin `HAND`, or returns the draft
+another responder started meanwhile, and the modal switches to the review form.
+A first update with no message from a person yet is refused with the
+empty-history notice.
+
+Draft with AI: the review form opens with an AI section only when text
+generation is configured (`text_generation_available`): an optional
+instructions input and a Draft with AI button
+(`incident.scribe.status_update.generate`). Without it the form has the stage,
+the fields, Save draft and Approve only. `generate_status_update_draft` takes
+the typed values as the base. With no new message from a person since the
+latest approved update and no instructions, it carries the typed values
+forward with the no-new-information wording and makes no model call;
+otherwise it makes one model call over the conversation since that update,
+with the instructions when given, keeps the stage floor and strict parsing,
+and stores the result as the next draft. The modal shows a generating view
+only while the model runs.
+
+Security gate: before a model call, `generate_status_update_draft` refuses a
+security, unknown-flag or unreadable-flag incident with
+`SECURITY_CONFIRMATION_REQUIRED` unless called with `security_confirmed=True`.
+The form then comes back with a warning and a confirmation checkbox; pressing
+Draft with AI with the box checked confirms. A hand-written or saved draft and
+its approval need no confirmation. Any refusal or failure keeps the previous
+draft and re-renders the typed values with a notice.
 
 Save draft: the review form ends with a Save draft button
 (`incident.scribe.status_update.save`); Approve stays the only submit.

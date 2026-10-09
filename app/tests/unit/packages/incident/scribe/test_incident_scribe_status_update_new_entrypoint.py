@@ -1,14 +1,14 @@
 """Tests for starting a status update by hand from the status-updates modal.
 
-The New update button runs the status-update service with ``manual=True``
-and replaces the modal with the review form for the returned draft. A Draft
-press whose model call failed comes back as a ``MANUAL`` outcome and lands on
-the same form with a notice. A hand-written draft has no Redraft section; a
-pending AI draft opened through New update keeps it. ``draft_status_update`` is
-patched with an ``AsyncMock`` and the Slack client is a ``MagicMock``, so the
-tests assert the service arguments and the view sent to ``views.update``; one
-test binds the real service to a core ``InMemoryStatusUpdateStore``, a stub
-lookup and a stub transcript reader to assert the stored record.
+The New update button calls ``start_status_update_draft`` and replaces the
+modal with the review form for the returned draft, hand-started or already
+pending. The form carries the AI section only when text generation is
+configured. ``start_status_update_draft`` is patched with a ``MagicMock``, the
+availability predicate with a constant, and the Slack client is a
+``MagicMock``, so the tests assert the service arguments and the view sent to
+``views.update``; one test binds the real service to a core
+``InMemoryStatusUpdateStore``, a stub lookup and a stub transcript reader to
+assert the stored record.
 """
 
 import json
@@ -16,7 +16,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from functools import partial
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -32,9 +32,10 @@ from packages.incident.core.api import (
     TranscriptMessage,
 )
 from packages.incident.scribe.domain import StatusUpdateDraftOutcome, StatusUpdateOutcomeKind
-from packages.incident.scribe.entrypoints.slack import handle_draft_action, handle_new_update_action, register
-from packages.incident.scribe.entrypoints.slack_views import NEW_ACTION_ID, REVIEW_CALLBACK_ID
-from packages.incident.scribe.status_update import draft_status_update
+from packages.incident.scribe.entrypoints import slack as slack_entrypoints
+from packages.incident.scribe.entrypoints.slack import handle_new_update_action, register
+from packages.incident.scribe.entrypoints.slack_views import NEW_ACTION_ID, REVIEW_CALLBACK_ID, build_review_view
+from packages.incident.scribe.status_update import start_status_update_draft
 
 pytestmark = pytest.mark.unit
 
@@ -43,8 +44,8 @@ _CHANNEL = "C123"
 _USER = "U123"
 _VIEW_ID = "V456"
 _NOW = datetime(2026, 10, 7, 15, 0, tzinfo=UTC)
-_TARGET = "packages.incident.scribe.entrypoints.slack.draft_status_update"
-_FALLBACK = "AI drafting isn't available right now. Write the update in the fields below, then press Approve."
+_TARGET = "packages.incident.scribe.entrypoints.slack.start_status_update_draft"
+_METADATA = {"channel_id": _CHANNEL, "locale": "en-US", "incident_id": _INCIDENT, "sequence": 4}
 
 
 def _text(language: str) -> StatusUpdateText:
@@ -96,12 +97,18 @@ def _body() -> dict[str, Any]:
         "type": "block_actions",
         "user": {"id": _USER},
         "view": {"id": _VIEW_ID, "hash": "h1", "private_metadata": json.dumps({"channel_id": _CHANNEL, "locale": "en-US"})},
-        "actions": [{"action_id": NEW_ACTION_ID, "block_id": "draft_button", "type": "button"}],
+        "actions": [{"action_id": NEW_ACTION_ID, "block_id": "overview_actions", "type": "button"}],
     }
 
 
-def _service(kind: StatusUpdateOutcomeKind) -> AsyncMock:
-    return AsyncMock(return_value=OperationResult.success(data=StatusUpdateDraftOutcome(update=_DRAFT, kind=kind)))
+def _service(kind: StatusUpdateOutcomeKind) -> MagicMock:
+    return MagicMock(return_value=OperationResult.success(data=StatusUpdateDraftOutcome(update=_DRAFT, kind=kind)))
+
+
+@pytest.fixture(autouse=True)
+def _ai_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Text generation is configured unless a test says otherwise."""
+    monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: True)
 
 
 def _sent_view(client: MagicMock) -> dict[str, Any]:
@@ -116,8 +123,8 @@ def _block_ids(view: dict[str, Any]) -> list[str | None]:
 
 
 class TestNewUpdateAction:
-    def test_acks_then_runs_the_service_in_manual_mode(self) -> None:
-        """The service is asked for a hand-written draft by this responder in this channel, with no security confirmation."""
+    def test_acks_then_starts_a_draft_by_this_responder_in_this_channel(self) -> None:
+        """The service is asked to start a draft for the channel, written by the presser; nothing else is passed."""
         ack = MagicMock()
         service = _service(StatusUpdateOutcomeKind.MANUAL)
 
@@ -125,15 +132,13 @@ class TestNewUpdateAction:
             handle_new_update_action(ack, _body(), MagicMock())
 
         ack.assert_called_once()
-        assert service.call_args.args == (_CHANNEL,)
-        assert (service.call_args.kwargs["author"], service.call_args.kwargs["manual"]) == (_USER, True)
-        assert service.call_args.kwargs["security_confirmed"] is False
+        assert (service.call_args.args, service.call_args.kwargs) == ((_CHANNEL,), {"author": _USER})
 
     def test_stores_a_blank_hand_written_draft_and_shows_its_form(self) -> None:
         """With the real service, the first update is stored as a blank HAND draft by the presser and its form is shown."""
         store = InMemoryStatusUpdateStore()
         client = MagicMock()
-        service = partial(draft_status_update, lookup=_StubLookup(), reader=_StubReader(), store=store, now=_NOW)
+        service = partial(start_status_update_draft, lookup=_StubLookup(), reader=_StubReader(), store=store, now=_NOW)
 
         with patch(_TARGET, new=service):
             handle_new_update_action(MagicMock(), _body(), client)
@@ -152,61 +157,39 @@ class TestNewUpdateAction:
         assert json.loads(view["private_metadata"])["sequence"] == 1
         client.chat_postMessage.assert_not_called()
 
-    def test_a_manual_draft_opens_the_review_form_without_redraft_or_notice(self) -> None:
-        """The responder chose to write, so the form opens on the fields with nothing to explain and no AI to ask."""
+    @pytest.mark.parametrize("kind", [StatusUpdateOutcomeKind.MANUAL, StatusUpdateOutcomeKind.PENDING])
+    def test_the_draft_opens_in_the_form_with_the_ai_section_and_no_notice(self, kind: StatusUpdateOutcomeKind) -> None:
+        """A started or already pending draft opens on the form, with Draft with AI offered and nothing to explain."""
+        client = MagicMock()
+
+        with patch(_TARGET, new=_service(kind)):
+            handle_new_update_action(MagicMock(), _body(), client)
+
+        assert _sent_view(client) == build_review_view(_DRAFT, "en-US", json.dumps(_METADATA), with_ai=True)
+
+    def test_without_text_generation_the_form_has_no_ai_section(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """With the generator unconfigured the form opens on the stage select; Save draft and Approve remain."""
+        monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: False)
         client = MagicMock()
 
         with patch(_TARGET, new=_service(StatusUpdateOutcomeKind.MANUAL)):
             handle_new_update_action(MagicMock(), _body(), client)
 
         view = _sent_view(client)
-        assert view["callback_id"] == REVIEW_CALLBACK_ID
-        assert json.loads(view["private_metadata"]) == {
-            "channel_id": _CHANNEL,
-            "locale": "en-US",
-            "incident_id": _INCIDENT,
-            "sequence": 4,
-        }
-        assert view["blocks"][0]["block_id"] == "stage"
-
-    @pytest.mark.parametrize("kind", [StatusUpdateOutcomeKind.PENDING, StatusUpdateOutcomeKind.CARRIED_FORWARD])
-    def test_an_existing_or_carried_draft_opens_the_review_form_with_redraft(self, kind: StatusUpdateOutcomeKind) -> None:
-        """A draft that was not written by hand can still be redrafted, so its form keeps the Redraft section."""
-        client = MagicMock()
-
-        with patch(_TARGET, new=_service(kind)):
-            handle_new_update_action(MagicMock(), _body(), client)
-
-        view = _sent_view(client)
-        assert view["callback_id"] == REVIEW_CALLBACK_ID
-        assert _block_ids(view)[:3] == ["instructions", "redraft_button", "stage"]
+        assert view == build_review_view(_DRAFT, "en-US", json.dumps(_METADATA), with_ai=False)
+        assert _block_ids(view)[0] == "stage"
 
     def test_a_refusal_shows_the_error_view(self) -> None:
-        """With no conversation to write about, the modal shows the localized error with Close, as Draft does."""
+        """With no conversation to write about, the modal shows the localized error with Close."""
         client = MagicMock()
         refusal = OperationResult.permanent_error(message="empty", error_code=ErrorCode.EMPTY_HISTORY)
 
-        with patch(_TARGET, new=AsyncMock(return_value=refusal)):
+        with patch(_TARGET, new=MagicMock(return_value=refusal)):
             handle_new_update_action(MagicMock(), _body(), client)
 
         view = _sent_view(client)
         assert "callback_id" not in view
         assert view["blocks"][0]["text"]["text"] == "There is no channel history to draft a status update from yet."
-
-
-class TestDraftFallback:
-    def test_a_failed_draft_opens_the_review_form_with_the_fallback_notice(self) -> None:
-        """When the model could not draft, the responder lands on the form with a notice saying why, and no Redraft."""
-        client = MagicMock()
-
-        with patch(_TARGET, new=_service(StatusUpdateOutcomeKind.MANUAL)) as service:
-            handle_draft_action(MagicMock(), _body(), client)
-
-        assert service.call_args.kwargs["manual"] is False
-        view = _sent_view(client)
-        assert view["callback_id"] == REVIEW_CALLBACK_ID
-        assert view["blocks"][0] == {"type": "section", "text": {"type": "mrkdwn", "text": _FALLBACK}}
-        assert _block_ids(view)[1] == "stage"
 
 
 def test_register_includes_the_new_update_action() -> None:

@@ -16,7 +16,7 @@ from contracts.slack.models import CommandPayload
 from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
 from packages.incident.scribe.domain import StatusUpdateOverview
 from packages.incident.scribe.entrypoints.slack import handle_status_update_command, register
-from packages.incident.scribe.entrypoints.slack_views import DRAFT_ACTION_ID
+from packages.incident.scribe.entrypoints.slack_views import NEW_ACTION_ID, REVIEW_ACTION_ID
 from tests.factories.slack import FakeSlackReply
 
 pytestmark = pytest.mark.unit
@@ -272,11 +272,11 @@ class TestHandleStatusUpdateCommand:
         assert len(reply.calls_to("post_ephemeral")) == 0
 
 
-class TestDraftButtonInViews:
-    """The Draft button appears in the status-updates modal for pending and no-pending drafts."""
+class TestOverviewButtonsInViews:
+    """The status-updates modal offers Review for a pending draft and New update without one, never Draft."""
 
-    def test_draft_button_present_in_pending_view(self):
-        """The pending draft view includes a Draft button with action id incident.scribe.status_update.draft."""
+    def test_review_button_alone_in_pending_view(self):
+        """The pending draft view's actions block holds only the Review button."""
         payload = CommandPayload(text="", user_id="U9", channel_id=_CHANNEL, platform_metadata={"trigger_id": _TRIGGER})
         reply = FakeSlackReply(OperationResult.success(data="view-id-123"))
 
@@ -291,11 +291,11 @@ class TestDraftButtonInViews:
         update_calls = reply.calls_to("update_view")
         assert len(update_calls) >= 1
         view = update_calls[0]["view"]
-        (draft_block,) = [block for block in view["blocks"] if block.get("block_id") == "draft_button"]
-        assert draft_block["elements"][0]["action_id"] == DRAFT_ACTION_ID
+        (actions,) = [block for block in view["blocks"] if block.get("block_id") == "overview_actions"]
+        assert [element["action_id"] for element in actions["elements"]] == [REVIEW_ACTION_ID]
 
-    def test_draft_button_present_in_no_pending_view(self):
-        """The no-pending view includes a Draft button."""
+    def test_new_update_button_alone_in_no_pending_view(self):
+        """The no-pending view's actions block holds only the New update button."""
         payload = CommandPayload(text="", user_id="U9", channel_id=_CHANNEL, platform_metadata={"trigger_id": _TRIGGER})
         reply = FakeSlackReply(OperationResult.success(data="view-id-123"))
 
@@ -308,11 +308,11 @@ class TestDraftButtonInViews:
         update_calls = reply.calls_to("update_view")
         assert len(update_calls) >= 1
         view = update_calls[0]["view"]
-        (draft_block,) = [block for block in view["blocks"] if block.get("block_id") == "draft_button"]
-        assert DRAFT_ACTION_ID in [element["action_id"] for element in draft_block["elements"]]
+        (actions,) = [block for block in view["blocks"] if block.get("block_id") == "overview_actions"]
+        assert [element["action_id"] for element in actions["elements"]] == [NEW_ACTION_ID]
 
-    def test_draft_button_absent_in_error_view(self):
-        """Error views (not-an-incident, ambiguous, etc.) do not include a Draft button."""
+    def test_overview_buttons_absent_in_error_view(self):
+        """Error views (not-an-incident, ambiguous, etc.) have no overview actions block."""
         payload = CommandPayload(text="", user_id="U9", channel_id=_CHANNEL, platform_metadata={"trigger_id": _TRIGGER})
         reply = FakeSlackReply(OperationResult.success(data="view-id-123"))
 
@@ -331,4 +331,4 @@ class TestDraftButtonInViews:
         update_calls = reply.calls_to("update_view")
         assert len(update_calls) >= 1
         view = update_calls[0]["view"]
-        assert [block for block in view["blocks"] if block.get("block_id") == "draft_button"] == []
+        assert [block for block in view["blocks"] if block.get("block_id") == "overview_actions"] == []

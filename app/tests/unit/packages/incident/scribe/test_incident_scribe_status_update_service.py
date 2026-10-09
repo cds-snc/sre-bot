@@ -1,13 +1,12 @@
-"""Tests for drafting an incident status update in the scribe service.
+"""Tests for starting an incident status update by hand in the scribe service.
 
 The service runs against the in-memory status-update store and stubs for the
-incident lookup, the transcript reader and the text generator, with a fixed
-``now``, so each test controls exactly which records exist, which messages are
-read and what the model answers, and asserts what was stored and whether the
-model was called.
+incident lookup and the transcript reader, with a fixed ``now``, so each test
+controls exactly which records exist and which messages are read, and asserts
+what was stored. Starting takes no text generator and no security reader, so no
+model call or security read can happen.
 """
 
-import json
 from collections.abc import Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -20,23 +19,23 @@ from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
 from packages.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from packages.incident.core.api import (
-    IncidentSecurityFlag,
     StatusUpdate,
+    StatusUpdateOrigin,
     StatusUpdateStage,
     StatusUpdateState,
     StatusUpdateText,
     TranscriptMessage,
 )
-from packages.incident.scribe.domain import NoNewInformationWording, StatusUpdateDraftOutcome, StatusUpdateOutcomeKind
-from packages.incident.scribe.status_update import draft_status_update
+from packages.incident.scribe.domain import StatusUpdateDraftOutcome, StatusUpdateOutcomeKind
+from packages.incident.scribe.status_update import start_status_update_draft
 
 pytestmark = pytest.mark.unit
 
 _NOW = datetime(2026, 10, 7, 15, 0, tzinfo=UTC)
 _INCIDENT = "inc-uuid-1"
 _CHANNEL = "C123"
-_WORDING = NoNewInformationWording(en="No new information.", fr="Aucune nouvelle information.")
 _FIELDS = ("affected_service", "impact", "current_action", "workaround")
+_BLANK = StatusUpdateText(affected_service="", impact="", current_action="", workaround="")
 
 
 def _at(minutes: int) -> datetime:
@@ -79,14 +78,6 @@ def _record(
     )
 
 
-def _model_answer(stage: str = "identified") -> str:
-    answer: dict[str, str] = {"stage": stage}
-    for language in ("en", "fr"):
-        for field in _FIELDS:
-            answer[f"{language}_{field}"] = f"{language} {field} drafted"
-    return json.dumps(answer)
-
-
 class _StubLookup:
     def __init__(self, result: OperationResult[str] | None = None) -> None:
         self._result = result or OperationResult.success(data=_INCIDENT)
@@ -95,14 +86,6 @@ class _StubLookup:
     def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
         self.calls.append(conversation_id)
         return self._result
-
-
-class _StubSecurityReader:
-    def __init__(self, flag: IncidentSecurityFlag = IncidentSecurityFlag.NO) -> None:
-        self._flag = flag
-
-    def read_security_flag(self, incident_id: str) -> OperationResult[IncidentSecurityFlag]:
-        return OperationResult.success(data=self._flag)
 
 
 class _StubReader:
@@ -126,22 +109,6 @@ class _StubReader:
             {"conversation_id": conversation_id, "since": since, "limit": limit, "exclude": exclude_own_and_system_messages}
         )
         return self._messages
-
-
-class _StubGenerator:
-    def __init__(self, result: OperationResult[str] | None = None) -> None:
-        self._result = result or OperationResult.success(data=_model_answer())
-        self.calls: list[dict[str, Any]] = []
-
-    async def summarize(
-        self,
-        transcript: str,
-        *,
-        instructions: str | None = None,
-        max_output_tokens: int | None = None,
-    ) -> OperationResult[str]:
-        self.calls.append({"transcript": transcript, "instructions": instructions, "max_output_tokens": max_output_tokens})
-        return self._result
 
 
 class _RacingStore(InMemoryStatusUpdateStore):
@@ -177,293 +144,157 @@ def _stored(store: InMemoryStatusUpdateStore) -> tuple[StatusUpdate, ...]:
     return tuple(result.data)
 
 
-async def _draft(
+def _start(
     *,
     store: InMemoryStatusUpdateStore | None = None,
     reader: _StubReader | None = None,
-    generator: _StubGenerator | None = None,
     lookup: _StubLookup | None = None,
-    on_started: Any = None,
-    security_reader: Any = None,
-    security_confirmed: bool = False,
-    manual: bool = False,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
-    return await draft_status_update(
+    return start_status_update_draft(
         _CHANNEL,
         author="U123",
-        wording=_WORDING,
-        on_started=on_started,
-        manual=manual,
         lookup=lookup or _StubLookup(),
         reader=reader or _StubReader(),
         store=store if store is not None else InMemoryStatusUpdateStore(),
-        generator=generator or _StubGenerator(),
-        security_reader=security_reader or _StubSecurityReader(),
-        security_confirmed=security_confirmed,
         now=_NOW,
     )
 
 
-class TestDraftFromNewActivity:
-    @pytest.mark.asyncio
-    async def test_new_human_activity_makes_one_model_call_and_stores_a_complete_draft(self) -> None:
-        """With no prior update, the conversation is drafted once and kept as draft #1 with its provenance."""
-        store = InMemoryStatusUpdateStore()
-        reader = _StubReader([_human("seeing 500s", 20), _human("rolled back", 10, author="Bob")])
-        generator = _StubGenerator()
+class TestStartByHand:
+    def test_the_approved_update_is_stored_as_a_hand_draft_by_the_responder(self) -> None:
+        """Starting copies the latest approved stage and fields into the next draft, written by hand."""
+        prior = _record(1, StatusUpdateState.APPROVED, stage=StatusUpdateStage.MONITORING, cutoff_minutes_ago=60)
+        store = _store(prior)
 
-        result = await _draft(store=store, reader=reader, generator=generator)
+        result = _start(store=store, reader=_StubReader([_human("still slow", 10)]))
 
         assert result.is_success and result.data is not None
-        assert result.data.kind is StatusUpdateOutcomeKind.DRAFTED
+        assert result.data.kind is StatusUpdateOutcomeKind.MANUAL
         update = result.data.update
-        assert len(generator.calls) == 1
-        assert (update.incident_id, update.sequence, update.state) == (_INCIDENT, 1, StatusUpdateState.DRAFT)
-        assert update.stage is StatusUpdateStage.IDENTIFIED
-        assert update.en == StatusUpdateText(**{field: f"en {field} drafted" for field in _FIELDS})
-        assert update.fr == StatusUpdateText(**{field: f"fr {field} drafted" for field in _FIELDS})
-        assert update.author == "U123"
+        assert (update.sequence, update.state, update.stage) == (2, StatusUpdateState.DRAFT, StatusUpdateStage.MONITORING)
+        assert (update.en, update.fr) == (prior.en, prior.fr)
+        assert (update.author, update.origin, update.created_at) == ("U123", StatusUpdateOrigin.HAND, _NOW)
         assert update.transcript_cutoff == _at(10)
-        assert update.transcript_fingerprint.startswith("v1:sha256:")
-        assert update.created_at == _NOW
         assert update.next_update_at == _NOW + timedelta(minutes=30)
-        assert _stored(store) == (update,)
+        assert _stored(store)[0] == update
 
-    @pytest.mark.asyncio
-    async def test_the_model_gets_the_whole_window_with_bot_context_the_prompt_and_the_token_cap(self) -> None:
-        """Bot posts are context for the model even though they never count as new activity."""
-        reader = _StubReader([_bot("ALARM: 5xx", 30), _human("on it", 20)])
-        generator = _StubGenerator()
+    def test_the_first_update_starts_blank_at_investigating(self) -> None:
+        """With no approved update to copy, every field is blank and the stage is the first one."""
+        result = _start(reader=_StubReader([_human("seeing 500s", 5)]))
 
-        await _draft(reader=reader, generator=generator)
+        assert result.data is not None
+        update = result.data.update
+        assert (update.sequence, update.stage, update.en, update.fr) == (1, StatusUpdateStage.INVESTIGATING, _BLANK, _BLANK)
 
-        call = generator.calls[0]
-        assert call["transcript"] == "Alertmanager: ALARM: 5xx\nAda: on it"
-        assert call["instructions"] and "en_affected_service" in call["instructions"]
-        assert call["max_output_tokens"] == 2000
+    def test_with_nothing_new_the_approved_update_is_still_copied_by_hand(self) -> None:
+        """Nothing new is no reason to carry forward: the responder asked to write, so the draft is the approved text, by hand."""
+        prior = _record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=40)
+        store = _store(prior)
 
-    @pytest.mark.asyncio
-    async def test_the_fingerprint_follows_the_human_messages_read(self) -> None:
+        result = _start(store=store, reader=_StubReader([_human("old", 40), _bot("ALARM again", 5)]))
+
+        assert result.data is not None and result.data.kind is StatusUpdateOutcomeKind.MANUAL
+        update = result.data.update
+        assert (update.sequence, update.en, update.fr, update.origin) == (2, prior.en, prior.fr, StatusUpdateOrigin.HAND)
+
+    def test_without_people_after_an_approved_update_the_provenance_is_the_approved_one(self) -> None:
+        """Bot posts are not what anyone read, so the new draft keeps the approved update's cutoff and fingerprint."""
+        prior = _record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=40)
+
+        result = _start(store=_store(prior), reader=_StubReader([_bot("ALARM again", 5)]))
+
+        assert result.data is not None
+        update = result.data.update
+        assert (update.transcript_cutoff, update.transcript_fingerprint) == (
+            prior.transcript_cutoff,
+            prior.transcript_fingerprint,
+        )
+
+    def test_a_resolved_prefill_has_no_next_update_beyond_its_creation(self) -> None:
+        """Resolved means no further update is due, so the next update time is the creation time."""
+        prior = _record(1, StatusUpdateState.APPROVED, stage=StatusUpdateStage.RESOLVED, cutoff_minutes_ago=40)
+
+        result = _start(store=_store(prior), reader=_StubReader([_human("all clear", 5)]))
+
+        assert result.data is not None
+        assert (result.data.update.stage, result.data.update.next_update_at) == (StatusUpdateStage.RESOLVED, _NOW)
+
+    def test_no_update_and_no_human_message_refuses_with_empty_history(self) -> None:
+        """A first draft needs a person's message to date it from; nothing is stored."""
+        store = InMemoryStatusUpdateStore()
+
+        result = _start(store=store, reader=_StubReader([_bot("ALARM", 5)]))
+
+        assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.EMPTY_HISTORY)
+        assert _stored(store) == ()
+
+
+class TestPendingDraft:
+    def test_a_pending_draft_is_returned_as_is_without_reading_the_conversation(self) -> None:
+        """Another responder already started: their draft is opened for editing and nothing is read or stored."""
+        pending = _record(2, StatusUpdateState.DRAFT, cutoff_minutes_ago=20)
+        store = _store(_record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=60), pending)
+        reader = _StubReader([_human("new fact", 5)])
+
+        result = _start(store=store, reader=reader)
+
+        assert result.data == StatusUpdateDraftOutcome(update=pending, kind=StatusUpdateOutcomeKind.PENDING)
+        assert reader.reads == []
+        assert len(_stored(store)) == 2
+
+
+class TestWindow:
+    def test_the_first_update_reads_from_the_conversation_start_without_own_or_system_posts(self) -> None:
+        """With no approved update the window opens when the conversation did, capped at the history limit."""
+        reader = _StubReader([_human("hello", 5)], started_at=_at(600))
+
+        _start(reader=reader)
+
+        assert reader.reads == [{"conversation_id": _CHANNEL, "since": _at(600), "limit": 1000, "exclude": True}]
+
+    def test_an_unknown_conversation_start_falls_back_to_the_default_window(self) -> None:
+        """When the platform cannot say when the conversation started, the last 24 hours are read."""
+        reader = _StubReader([_human("hello", 5)], started_at=None)
+
+        _start(reader=reader)
+
+        assert reader.reads[0]["since"] == _NOW - timedelta(hours=24)
+
+    def test_the_window_opens_at_the_latest_approved_cutoff(self) -> None:
+        """The draft is dated from what people posted since the public last heard from the incident."""
+        reader = _StubReader([_human("new", 5)])
+
+        _start(store=_store(_record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=90)), reader=reader)
+
+        assert reader.reads[0]["since"] == _at(90)
+
+    def test_the_fingerprint_follows_the_human_messages_read(self) -> None:
         """Same human messages give the same fingerprint; different ones give a different fingerprint."""
-        first = await _draft(reader=_StubReader([_human("a", 20)]))
-        same = await _draft(reader=_StubReader([_human("a", 20), _bot("noise", 15)]))
-        other = await _draft(reader=_StubReader([_human("b", 20)]))
+        first = _start(reader=_StubReader([_human("a", 20)]))
+        same = _start(reader=_StubReader([_human("a", 20), _bot("noise", 15)]))
+        other = _start(reader=_StubReader([_human("b", 20)]))
 
         assert first.data and same.data and other.data
         assert first.data.update.transcript_fingerprint == same.data.update.transcript_fingerprint
         assert first.data.update.transcript_fingerprint != other.data.update.transcript_fingerprint
 
-    @pytest.mark.asyncio
-    async def test_the_first_update_reads_from_the_conversation_start_without_own_or_system_posts(self) -> None:
-        """With no approved update the window opens when the conversation did, capped at the history limit."""
-        reader = _StubReader([_human("hello", 5)], started_at=_at(600))
 
-        await _draft(reader=reader)
-
-        assert reader.reads == [{"conversation_id": _CHANNEL, "since": _at(600), "limit": 1000, "exclude": True}]
-
-    @pytest.mark.asyncio
-    async def test_an_unknown_conversation_start_falls_back_to_the_default_window(self) -> None:
-        """When the platform cannot say when the conversation started, the last 24 hours are read."""
-        reader = _StubReader([_human("hello", 5)], started_at=None)
-
-        await _draft(reader=reader)
-
-        assert reader.reads[0]["since"] == _NOW - timedelta(hours=24)
-
-    @pytest.mark.asyncio
-    async def test_the_window_opens_at_the_latest_approved_cutoff_so_a_pending_draft_is_recovered(self) -> None:
-        """A newer draft that was never approved does not narrow what the model reads."""
-        store = _store(
-            _record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=90),
-            _record(2, StatusUpdateState.DRAFT, cutoff_minutes_ago=40),
-        )
-        reader = _StubReader([_human("new", 5)])
-
-        result = await _draft(store=store, reader=reader)
-
-        assert reader.reads[0]["since"] == _at(90)
-        assert result.data is not None and result.data.update.sequence == 3
-
-    @pytest.mark.asyncio
-    async def test_on_started_is_called_once_just_before_the_model_call(self) -> None:
-        """The caller can tell the responder drafting has begun only when a model call follows."""
-        events: list[str] = []
-        generator = _StubGenerator()
-        original = generator.summarize
-
-        async def recording_summarize(transcript: str, **kwargs: Any) -> OperationResult[str]:
-            events.append("model")
-            return await original(transcript, **kwargs)
-
-        generator.summarize = recording_summarize  # type: ignore[method-assign]
-
-        await _draft(reader=_StubReader([_human("hi", 5)]), generator=generator, on_started=lambda: events.append("started"))
-
-        assert events == ["started", "model"]
-
-    @pytest.mark.asyncio
-    async def test_a_resolved_draft_has_no_next_update_beyond_its_creation(self) -> None:
-        """Resolved means no further update is due, so the next update time is the creation time."""
-        result = await _draft(
-            reader=_StubReader([_human("all clear", 5)]),
-            generator=_StubGenerator(OperationResult.success(data=_model_answer("resolved"))),
-        )
-
-        assert result.data is not None
-        assert result.data.update.stage is StatusUpdateStage.RESOLVED
-        assert result.data.update.next_update_at == _NOW
-
-
-class TestNothingNew:
-    @pytest.mark.asyncio
-    async def test_no_new_human_message_carries_the_approved_update_forward_without_a_model_call(self) -> None:
-        """Code decides nothing is new: the prior fields stay and the current action says there is no new information."""
-        prior = _record(1, StatusUpdateState.APPROVED, stage=StatusUpdateStage.MONITORING, cutoff_minutes_ago=40)
-        store = _store(prior)
-        generator = _StubGenerator()
-        started: list[str] = []
-
-        result = await _draft(
-            store=store,
-            reader=_StubReader([_human("old", 40)]),
-            generator=generator,
-            on_started=lambda: started.append("x"),
-        )
-
-        assert result.is_success and result.data is not None
-        assert result.data.kind is StatusUpdateOutcomeKind.CARRIED_FORWARD
-        update = result.data.update
-        assert generator.calls == [] and started == []
-        assert (update.sequence, update.state, update.stage) == (2, StatusUpdateState.DRAFT, StatusUpdateStage.MONITORING)
-        assert update.en == replace(prior.en, current_action=_WORDING.en)
-        assert update.fr == replace(prior.fr, current_action=_WORDING.fr)
-        assert update.next_update_at == _NOW + timedelta(minutes=30)
-        assert (update.transcript_cutoff, update.transcript_fingerprint) == (
-            prior.transcript_cutoff,
-            prior.transcript_fingerprint,
-        )
-        assert (update.author, update.created_at) == ("U123", _NOW)
-        assert _stored(store)[0] == update
-
-    @pytest.mark.asyncio
-    async def test_a_message_exactly_at_the_cutoff_is_not_new(self) -> None:
-        """The cutoff message was already read by the prior update."""
-        store = _store(_record(1, StatusUpdateState.PUBLISHED, cutoff_minutes_ago=30))
-        generator = _StubGenerator()
-
-        result = await _draft(store=store, reader=_StubReader([_human("same", 30)]), generator=generator)
-
-        assert result.data is not None and result.data.kind is StatusUpdateOutcomeKind.CARRIED_FORWARD
-        assert generator.calls == []
-
-    @pytest.mark.asyncio
-    async def test_bot_posts_after_the_cutoff_are_not_new_activity(self) -> None:
-        """Only people moving the incident forward justify a new draft; alerts repeating do not."""
-        store = _store(_record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=30))
-        generator = _StubGenerator()
-
-        result = await _draft(store=store, reader=_StubReader([_bot("ALARM again", 5)]), generator=generator)
-
-        assert result.data is not None and result.data.kind is StatusUpdateOutcomeKind.CARRIED_FORWARD
-        assert generator.calls == []
-
-    @pytest.mark.asyncio
-    async def test_running_twice_with_nothing_new_returns_the_same_pending_draft_and_stores_nothing(self) -> None:
-        """A pending draft is returned as is, so repeated runs neither call the model nor add records."""
-        pending = _record(2, StatusUpdateState.DRAFT, cutoff_minutes_ago=20)
-        store = _store(_record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=60), pending)
-        generator = _StubGenerator()
-        reader = _StubReader([_human("covered", 20)])
-
-        first = await _draft(store=store, reader=reader, generator=generator)
-        second = await _draft(store=store, reader=reader, generator=generator)
-
-        for result in (first, second):
-            assert result.data == StatusUpdateDraftOutcome(update=pending, kind=StatusUpdateOutcomeKind.PENDING)
-        assert generator.calls == []
-        assert len(_stored(store)) == 2
-
-    @pytest.mark.asyncio
-    async def test_new_activity_after_a_pending_draft_drafts_again_at_the_next_sequence(self) -> None:
-        """The store cannot replace a draft, so fresher activity becomes the next draft."""
-        store = _store(_record(1, StatusUpdateState.DRAFT, cutoff_minutes_ago=30))
-        generator = _StubGenerator()
-
-        result = await _draft(store=store, reader=_StubReader([_human("new fact", 5)]), generator=generator)
-
-        assert result.data is not None
-        assert (result.data.kind, result.data.update.sequence) == (StatusUpdateOutcomeKind.DRAFTED, 2)
-        assert len(generator.calls) == 1
-
-    @pytest.mark.asyncio
-    async def test_no_update_and_no_human_message_refuses_with_empty_history(self) -> None:
-        """There is nothing to draft from and nothing to carry forward."""
-        store = InMemoryStatusUpdateStore()
-        generator = _StubGenerator()
-
-        result = await _draft(store=store, reader=_StubReader([_bot("ALARM", 5)]), generator=generator)
-
-        assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.EMPTY_HISTORY)
-        assert generator.calls == [] and _stored(store) == ()
-
-
-class TestStageFloor:
-    @pytest.mark.parametrize(
-        ("approved", "drafted", "expected"),
-        [
-            (StatusUpdateStage.MONITORING, "identified", StatusUpdateStage.MONITORING),
-            (StatusUpdateStage.MONITORING, "monitoring", StatusUpdateStage.MONITORING),
-            (StatusUpdateStage.IDENTIFIED, "monitoring", StatusUpdateStage.MONITORING),
-        ],
-        ids=["earlier-is-raised", "equal-stays", "later-stays"],
-    )
-    @pytest.mark.asyncio
-    async def test_a_drafted_stage_never_goes_behind_the_latest_approved_stage(
-        self, approved: StatusUpdateStage, drafted: str, expected: StatusUpdateStage
-    ) -> None:
-        """Stages only move forward for the public."""
-        store = _store(_record(1, StatusUpdateState.APPROVED, stage=approved, cutoff_minutes_ago=30))
-
-        result = await _draft(
-            store=store,
-            reader=_StubReader([_human("update", 5)]),
-            generator=_StubGenerator(OperationResult.success(data=_model_answer(drafted))),
-        )
-
-        assert result.data is not None and result.data.update.stage is expected
-
-    @pytest.mark.asyncio
-    async def test_an_unapproved_draft_does_not_set_the_floor(self) -> None:
-        """Only what the public saw constrains the stage; a pending draft's stage was never approved."""
-        store = _store(
-            _record(1, StatusUpdateState.APPROVED, stage=StatusUpdateStage.INVESTIGATING, cutoff_minutes_ago=60),
-            _record(2, StatusUpdateState.DRAFT, stage=StatusUpdateStage.RESOLVED, cutoff_minutes_ago=30),
-        )
-
-        result = await _draft(store=store, reader=_StubReader([_human("not fixed after all", 5)]))
-
-        assert result.data is not None and result.data.update.stage is StatusUpdateStage.IDENTIFIED
-
-
-class TestConcurrentDrafts:
-    @pytest.mark.asyncio
-    async def test_a_draft_that_wins_the_sequence_is_returned_as_pending(self) -> None:
-        """Two responders drafting at once see the same draft rather than an error."""
+class TestConcurrentStarts:
+    def test_a_draft_that_wins_the_sequence_is_returned_as_pending(self) -> None:
+        """Two responders starting at once open the same draft rather than an error."""
         store = _RacingStore(StatusUpdateState.DRAFT)
 
-        result = await _draft(store=store, reader=_StubReader([_human("hi", 5)]))
+        result = _start(store=store, reader=_StubReader([_human("hi", 5)]))
 
         assert result.is_success and result.data is not None
         assert result.data == StatusUpdateDraftOutcome(update=store.winner, kind=StatusUpdateOutcomeKind.PENDING)  # type: ignore[arg-type]
         assert _stored(store) == (store.winner,)
 
-    @pytest.mark.asyncio
-    async def test_any_other_conflict_is_refused(self) -> None:
-        """When the winning record is no longer a draft there is nothing pending to show, so the conflict is reported."""
+    def test_any_other_conflict_is_refused(self) -> None:
+        """When the winning record is no longer a draft there is nothing pending to open, so the conflict is reported."""
         store = _RacingStore(StatusUpdateState.APPROVED)
 
-        result = await _draft(store=store, reader=_StubReader([_human("hi", 5)]))
+        result = _start(store=store, reader=_StubReader([_human("hi", 5)]))
 
         assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.STATUS_UPDATE_CONFLICT)
 
@@ -477,217 +308,42 @@ class TestFailures:
         ],
         ids=["not-an-incident", "ambiguous"],
     )
-    @pytest.mark.asyncio
-    async def test_a_lookup_refusal_passes_through_before_anything_is_read(self, refusal: OperationResult[str]) -> None:
-        """Outside an incident nothing is read, drafted or stored."""
+    def test_a_lookup_refusal_passes_through_before_anything_is_read(self, refusal: OperationResult[str]) -> None:
+        """Outside an incident nothing is read or stored."""
         store = InMemoryStatusUpdateStore()
         reader = _StubReader([_human("hi", 5)])
-        generator = _StubGenerator()
 
-        result = await _draft(store=store, reader=reader, generator=generator, lookup=_StubLookup(refusal))
+        result = _start(store=store, reader=reader, lookup=_StubLookup(refusal))
 
         assert (result.status, result.error_code) == (refusal.status, refusal.error_code)
-        assert reader.reads == [] and generator.calls == [] and _stored(store) == ()
+        assert reader.reads == [] and _stored(store) == ()
 
-    @pytest.mark.asyncio
-    async def test_a_store_read_failure_passes_through_before_the_transcript_is_read(self) -> None:
+    def test_a_store_read_failure_passes_through_before_the_transcript_is_read(self) -> None:
         """Without the prior updates nothing can be decided, so the store's error is returned."""
         reader = _StubReader([_human("hi", 5)])
 
-        result = await _draft(store=_FailingListStore(), reader=reader)
+        result = _start(store=_FailingListStore(), reader=reader)
 
         assert (result.status, result.retry_after) == (OperationStatus.TRANSIENT_ERROR, 3)
         assert reader.reads == []
 
 
-_BLANK = StatusUpdateText(affected_service="", impact="", current_action="", workaround="")
-
-
-def _abandoned_manual(sequence: int, approved: StatusUpdate) -> StatusUpdate:
-    """A pending draft still holding the approved update's fields, as a cancelled manual form leaves it."""
-    return replace(
-        _record(sequence, StatusUpdateState.DRAFT, stage=approved.stage, cutoff_minutes_ago=20),
-        en=approved.en,
-        fr=approved.fr,
-    )
-
-
-class TestManualDraft:
-    @pytest.mark.asyncio
-    async def test_writing_it_myself_stores_the_approved_update_as_the_draft_without_a_model_call(self) -> None:
-        """Manual drafting copies the latest approved fields, makes no model call and never says drafting has begun."""
-        prior = _record(1, StatusUpdateState.APPROVED, stage=StatusUpdateStage.MONITORING, cutoff_minutes_ago=60)
-        store = _store(prior)
-        generator = _StubGenerator()
-        started: list[str] = []
-
-        result = await _draft(
-            store=store,
-            reader=_StubReader([_human("still slow", 10)]),
-            generator=generator,
-            on_started=lambda: started.append("x"),
-            manual=True,
-        )
-
-        assert result.is_success and result.data is not None
-        assert result.data.kind is StatusUpdateOutcomeKind.MANUAL
-        update = result.data.update
-        assert generator.calls == [] and started == []
-        assert (update.sequence, update.state, update.stage) == (2, StatusUpdateState.DRAFT, StatusUpdateStage.MONITORING)
-        assert (update.en, update.fr) == (prior.en, prior.fr)
-        assert (update.author, update.transcript_cutoff) == ("U123", _at(10))
-        assert update.next_update_at == _NOW + timedelta(minutes=30)
-        assert _stored(store)[0] == update
-
-    @pytest.mark.asyncio
-    async def test_writing_the_first_update_myself_starts_blank_at_investigating(self) -> None:
-        """With no approved update to copy, every field is blank and the stage is the first one."""
-        result = await _draft(reader=_StubReader([_human("seeing 500s", 5)]), manual=True)
-
-        assert result.data is not None
-        update = result.data.update
-        assert (update.sequence, update.stage, update.en, update.fr) == (1, StatusUpdateStage.INVESTIGATING, _BLANK, _BLANK)
-
-    @pytest.mark.asyncio
-    async def test_writing_it_myself_skips_the_security_confirmation(self) -> None:
-        """Nothing reaches the model, so a security incident needs no confirmation to write by hand."""
-        result = await _draft(
-            reader=_StubReader([_human("hi", 5)]),
-            security_reader=_StubSecurityReader(IncidentSecurityFlag.YES),
-            manual=True,
-        )
-
-        assert result.data is not None and result.data.kind is StatusUpdateOutcomeKind.MANUAL
-
-    @pytest.mark.asyncio
-    async def test_writing_it_myself_with_nothing_new_returns_the_pending_draft(self) -> None:
-        """A pending draft already covers the activity, so it is returned for editing and nothing is stored."""
-        pending = _record(2, StatusUpdateState.DRAFT, cutoff_minutes_ago=20)
-        store = _store(_record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=60), pending)
-
-        result = await _draft(store=store, reader=_StubReader([_human("covered", 20)]), manual=True)
-
-        assert result.data == StatusUpdateDraftOutcome(update=pending, kind=StatusUpdateOutcomeKind.PENDING)
-        assert len(_stored(store)) == 2
-
-    @pytest.mark.parametrize(
-        "generated",
-        [
-            OperationResult.transient_error(message="rate limited", error_code="RATE_LIMITED", retry_after=7),
-            OperationResult.permanent_error(message="no key", error_code="TEXT_GENERATION_UNAVAILABLE"),
-            OperationResult.success(data='{"stage": "identified"'),
-        ],
-        ids=["model-error", "unconfigured", "unparseable"],
-    )
-    @pytest.mark.asyncio
-    async def test_a_failed_model_call_falls_back_to_a_manual_draft(self, generated: OperationResult[str]) -> None:
-        """Whatever stopped the model, the responder gets the approved update to edit instead of an error."""
-        prior = _record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=60)
-        store = _store(prior)
-        generator = _StubGenerator(generated)
-
-        with capture_logs() as logs:
-            result = await _draft(store=store, reader=_StubReader([_human("hi", 5)]), generator=generator)
-
-        assert result.is_success and result.data is not None
-        assert result.data.kind is StatusUpdateOutcomeKind.MANUAL
-        assert len(generator.calls) == 1
-        assert (result.data.update.sequence, result.data.update.en, result.data.update.fr) == (2, prior.en, prior.fr)
-        assert _stored(store)[0] == result.data.update
-        assert any(entry["event"] == "incident_status_update_manual_fallback" for entry in logs)
-
-    @pytest.mark.asyncio
-    async def test_draft_retries_the_model_over_an_abandoned_manual_draft(self) -> None:
-        """A pending draft still equal to its prefill was never written, so Draft asks the model again."""
-        prior = _record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=60)
-        store = _store(prior, _abandoned_manual(2, prior))
-        generator = _StubGenerator()
-
-        result = await _draft(store=store, reader=_StubReader([_human("covered", 20)]), generator=generator)
-
-        assert result.data is not None
-        assert (result.data.kind, result.data.update.sequence) == (StatusUpdateOutcomeKind.DRAFTED, 3)
-        assert len(generator.calls) == 1
-        assert result.data.update.transcript_cutoff == _at(20)
-
-    @pytest.mark.asyncio
-    async def test_draft_retries_over_an_abandoned_blank_first_draft(self) -> None:
-        """With no approved update the abandoned prefill is blank at the first stage, and it is retried too."""
-        blank = replace(
-            _record(1, StatusUpdateState.DRAFT, stage=StatusUpdateStage.INVESTIGATING, cutoff_minutes_ago=20),
-            en=_BLANK,
-            fr=_BLANK,
-        )
-        generator = _StubGenerator()
-
-        result = await _draft(store=_store(blank), reader=_StubReader([_human("covered", 20)]), generator=generator)
-
-        assert result.data is not None and result.data.kind is StatusUpdateOutcomeKind.DRAFTED
-        assert len(generator.calls) == 1
-
-    @pytest.mark.asyncio
-    async def test_a_failed_retry_returns_the_abandoned_draft_without_storing_another(self) -> None:
-        """The model is still unavailable, so the same manual draft is offered again rather than a copy of it."""
-        prior = _record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=60)
-        abandoned = _abandoned_manual(2, prior)
-        store = _store(prior, abandoned)
-        failure: OperationResult[str] = OperationResult.transient_error(message="down", error_code="CONNECTION_ERROR")
-
-        result = await _draft(store=store, reader=_StubReader([_human("covered", 20)]), generator=_StubGenerator(failure))
-
-        assert result.data == StatusUpdateDraftOutcome(update=abandoned, kind=StatusUpdateOutcomeKind.MANUAL)
-        assert len(_stored(store)) == 2
-
-    @pytest.mark.asyncio
-    async def test_retrying_an_abandoned_draft_still_needs_the_security_confirmation(self) -> None:
-        """The retry is a model call like any other, so a security incident is refused until confirmed."""
-        prior = _record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=60)
-        generator = _StubGenerator()
-
-        result = await _draft(
-            store=_store(prior, _abandoned_manual(2, prior)),
-            reader=_StubReader([_human("covered", 20)]),
-            generator=generator,
-            security_reader=_StubSecurityReader(IncidentSecurityFlag.YES),
-        )
-
-        assert result.error_code == ErrorCode.SECURITY_CONFIRMATION_REQUIRED
-        assert generator.calls == []
-
-    @pytest.mark.asyncio
-    async def test_a_pending_carried_forward_draft_is_not_retried(self) -> None:
-        """Its current action differs from the approved update, so it is a real draft and is returned as pending."""
-        prior = _record(1, StatusUpdateState.APPROVED, cutoff_minutes_ago=60)
-        carried = replace(
-            _record(2, StatusUpdateState.DRAFT, cutoff_minutes_ago=60),
-            en=replace(prior.en, current_action=_WORDING.en),
-            fr=replace(prior.fr, current_action=_WORDING.fr),
-        )
-        generator = _StubGenerator()
-
-        result = await _draft(store=_store(prior, carried), reader=_StubReader([_human("old", 60)]), generator=generator)
-
-        assert result.data == StatusUpdateDraftOutcome(update=carried, kind=StatusUpdateOutcomeKind.PENDING)
-        assert generator.calls == []
-
-
 class TestLogging:
-    @pytest.mark.asyncio
-    async def test_a_full_history_page_is_logged_as_possibly_truncated(self) -> None:
+    def test_a_full_history_page_is_logged_as_possibly_truncated(self) -> None:
         """Reading exactly the history limit may have cut off older messages, which is surfaced, not hidden."""
         messages = [_human(f"m{i}", 500 - i // 10) for i in range(1000)]
 
         with capture_logs() as logs:
-            await _draft(reader=_StubReader(messages))
+            _start(reader=_StubReader(messages))
 
         assert any(entry["event"] == "incident_status_update_history_truncated" for entry in logs)
 
-    @pytest.mark.asyncio
-    async def test_logs_name_the_outcome_and_never_carry_transcript_text(self) -> None:
+    def test_logs_name_the_outcome_and_never_carry_transcript_text(self) -> None:
         """Logs identify the incident, sequence and outcome; conversation content stays out of them."""
         with capture_logs() as logs:
-            await _draft(reader=_StubReader([_human("customer SIN 123-456-789", 5)]))
+            _start(reader=_StubReader([_human("customer SIN 123-456-789", 5)]))
 
-        drafted = [entry for entry in logs if entry["event"] == "incident_status_update_drafted"]
-        assert drafted and drafted[0]["incident_id"] == _INCIDENT and drafted[0]["sequence"] == 1
+        started = [entry for entry in logs if entry["event"] == "incident_status_update_manual"]
+        assert started and started[0]["incident_id"] == _INCIDENT and started[0]["sequence"] == 1
+        assert started[0]["operation"] == "start_status_update_draft"
         assert all("123-456-789" not in str(entry) for entry in logs)

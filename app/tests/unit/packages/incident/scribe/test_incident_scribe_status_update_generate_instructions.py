@@ -1,12 +1,14 @@
-"""Tests for redrafting a pending status update from reviewer instructions in the scribe service.
+"""Tests for filling a pending status update with AI from a responder's instructions in the scribe service.
 
-The service runs against the in-memory status-update store and stubs for the
+``generate_status_update_draft`` is called with non-blank instructions, which
+always make one model call with the redraft prompt; the helper returns the
+stored draft so assertions read the record directly. The service runs against the in-memory status-update store and stubs for the
 incident lookup, the transcript reader, the security flag reader and the text
 generator, with a fixed ``now``, so each test controls which records exist,
 which messages are read and what the model answers. Assertions compare the
 exact model call (instructions, input and token cap), the exact stored records
-and the exact result codes, because a redraft must make one model call, add
-one new draft and leave every earlier record as it was.
+and the exact result codes, because an instructed fill must make one model
+call, add one new draft and leave every earlier record as it was.
 """
 
 import hashlib
@@ -31,8 +33,8 @@ from packages.incident.core.api import (
     StatusUpdateText,
     TranscriptMessage,
 )
-from packages.incident.scribe.domain import StatusUpdateEdit
-from packages.incident.scribe.status_update import DRAFT_UNPARSEABLE_CODE, redraft_status_update
+from packages.incident.scribe.domain import NoNewInformationWording, StatusUpdateEdit, StatusUpdateOutcomeKind
+from packages.incident.scribe.status_update import DRAFT_UNPARSEABLE_CODE, generate_status_update_draft
 from packages.incident.scribe.status_update_prompt import build_redraft_input, build_redraft_instructions
 
 pytestmark = pytest.mark.unit
@@ -43,6 +45,7 @@ _CHANNEL = "C123"
 _REDRAFTER = "U0REDRAFTER"
 _GUIDANCE = "do not name the vendor"
 _FIELDS = ("affected_service", "impact", "current_action", "workaround")
+_WORDING = NoNewInformationWording(en="No new information.", fr="Aucune nouvelle information.")
 
 
 def _at(minutes: int) -> datetime:
@@ -221,12 +224,14 @@ async def _redraft(
     security_confirmed: bool = False,
     on_started: Any = None,
 ) -> OperationResult[StatusUpdate]:
-    return await redraft_status_update(
+    """Fill with instructions and return the stored draft, or the refusal with its classification."""
+    result = await generate_status_update_draft(
         _CHANNEL,
         sequence,
-        instructions=instructions,
         current=current,
         author=_REDRAFTER,
+        wording=_WORDING,
+        instructions=instructions,
         security_confirmed=security_confirmed,
         on_started=on_started,
         lookup=lookup or _StubLookup(),
@@ -235,6 +240,12 @@ async def _redraft(
         generator=generator or _StubGenerator(),
         security_reader=security_reader or _StubSecurityReader(),
         now=_NOW,
+    )
+    if result.is_success and result.data is not None:
+        assert result.data.kind is StatusUpdateOutcomeKind.DRAFTED
+        return OperationResult.success(data=result.data.update)
+    return OperationResult.error(
+        result.status, message=result.message or "", error_code=result.error_code, retry_after=result.retry_after
     )
 
 
@@ -443,34 +454,6 @@ class TestStageFloor:
 
 
 class TestRejectedBeforeAnyWork:
-    @pytest.mark.parametrize("instructions", ["", "   ", "\n\t "], ids=["empty", "spaces", "whitespace"])
-    @pytest.mark.asyncio
-    async def test_blank_instructions_are_refused_with_no_read_write_or_model_call(self, instructions: str) -> None:
-        """Blank guidance is refused with its own code before the incident is even looked up."""
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
-        lookup = _StubLookup()
-        reader = _StubReader([_human("x", 5)])
-        generator = _StubGenerator()
-        security_reader = _StubSecurityReader()
-        started: list[str] = []
-
-        result = await _redraft(
-            store=store,
-            instructions=instructions,
-            lookup=lookup,
-            reader=reader,
-            generator=generator,
-            security_reader=security_reader,
-            on_started=lambda: started.append("started"),
-        )
-
-        assert (result.status, result.error_code) == (
-            OperationStatus.PERMANENT_ERROR,
-            ErrorCode.STATUS_UPDATE_INSTRUCTIONS_INVALID,
-        )
-        assert (lookup.calls, reader.reads, generator.calls, security_reader.calls, started) == ([], [], [], [], [])
-        assert _stored(store) == (_PENDING, _APPROVED)
-
     @pytest.mark.parametrize(
         "refusal",
         [

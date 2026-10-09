@@ -31,7 +31,6 @@ from packages.incident.scribe.domain import CopyReadyText, StatusUpdateOverview
 from packages.incident.scribe.entrypoints import slack as slack_entrypoints
 from packages.incident.scribe.entrypoints.slack import handle_status_update_command
 from packages.incident.scribe.entrypoints.slack_views import (
-    DRAFT_ACTION_ID,
     HISTORY_ACTION_ID,
     NEW_ACTION_ID,
     OPEN_ACTION_ID,
@@ -185,7 +184,7 @@ class TestFormatProfileTime:
 
 class TestOverviewPendingPart:
     def test_origin_line_pending_draft_then_draft_and_review_buttons(self) -> None:
-        """With a pending draft the view opens with who made it and when, its EN and FR profile, then Draft and Review."""
+        """With a pending draft the view opens with who made it and when, its EN and FR profile, then Review."""
         view = build_overview_view(StatusUpdateOverview(pending=_DRAFT, approved=(_APPROVED,)), "en-US", _METADATA)
 
         assert _blocks(view)[:6] == [
@@ -212,44 +211,34 @@ class TestOverviewPendingPart:
             },
             {
                 "type": "actions",
-                "block_id": "draft_button",
+                "block_id": "overview_actions",
                 "elements": [
-                    {
-                        "type": "button",
-                        "action_id": DRAFT_ACTION_ID,
-                        "text": {"type": "plain_text", "text": "Draft"},
-                        "style": "primary",
-                    },
                     {
                         "type": "button",
                         "action_id": REVIEW_ACTION_ID,
                         "text": {"type": "plain_text", "text": "Review"},
                         "value": {"incident_id": _INCIDENT, "sequence": _DRAFT.sequence},
+                        "style": "primary",
                     },
                 ],
             },
         ]
 
-    def test_no_pending_notice_then_new_update_and_draft_buttons(self) -> None:
-        """Without a pending draft the view opens with the no-draft notice, then New update (primary) and Draft."""
+    def test_no_pending_notice_then_the_new_update_button(self) -> None:
+        """Without a pending draft the view opens with the no-draft notice, then New update (primary) alone."""
         view = build_overview_view(StatusUpdateOverview(pending=None, approved=(_APPROVED,)), "en-US", _METADATA)
 
         assert _blocks(view)[:2] == [
             {"type": "section", "text": {"type": "mrkdwn", "text": "There is no status update draft for this incident yet."}},
             {
                 "type": "actions",
-                "block_id": "draft_button",
+                "block_id": "overview_actions",
                 "elements": [
                     {
                         "type": "button",
                         "action_id": NEW_ACTION_ID,
                         "text": {"type": "plain_text", "text": "New update"},
                         "style": "primary",
-                    },
-                    {
-                        "type": "button",
-                        "action_id": DRAFT_ACTION_ID,
-                        "text": {"type": "plain_text", "text": "Draft"},
                     },
                 ],
             },
@@ -273,7 +262,7 @@ class TestOverviewApprovedRows:
         view = build_overview_view(StatusUpdateOverview(pending=_DRAFT, approved=(_APPROVED, _PUBLISHED)), "en-US", _METADATA)
 
         assert [block.get("block_id") for block in _blocks(view)[5:]] == [
-            "draft_button",
+            "overview_actions",
             "approved_updates",
             "approved_update.2",
             "approved_update.1",

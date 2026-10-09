@@ -104,6 +104,7 @@ def store(monkeypatch: pytest.MonkeyPatch) -> InMemoryStatusUpdateStore:
         partial(save_status_update_draft, lookup=_StubLookup(), store=status_updates, now=_NOW),
     )
     monkeypatch.setattr(slack_entrypoints, "get_draft_for_review", partial(get_draft_for_review, store=status_updates))
+    monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: True)
     return status_updates
 
 

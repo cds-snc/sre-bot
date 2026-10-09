@@ -67,10 +67,10 @@ _DRAFT = StatusUpdate(
 
 
 class TestSaveButton:
-    @pytest.mark.parametrize("with_redraft", [True, False], ids=["with-redraft", "hand-written"])
-    def test_the_form_ends_with_save_draft(self, with_redraft: bool) -> None:
-        """Every form, with or without Redraft, ends with the Save draft actions block after the French fields."""
-        view = build_review_view(_DRAFT, "en-US", _METADATA, with_redraft=with_redraft)
+    @pytest.mark.parametrize("with_ai", [True, False], ids=["with-ai", "without-ai"])
+    def test_the_form_ends_with_save_draft(self, with_ai: bool) -> None:
+        """Every form, with or without the AI section, ends with the Save draft actions block after the French fields."""
+        view = build_review_view(_DRAFT, "en-US", _METADATA, with_ai=with_ai)
 
         assert view["blocks"][-2]["block_id"] == "fr.workaround"
         assert view["blocks"][-1] == {

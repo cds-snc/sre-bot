@@ -1,15 +1,17 @@
-"""Dispatching the Redraft button of the review modal through a real Bolt app.
+"""Dispatching the Draft with AI button of the review form through a real Bolt app.
 
 The real ``packages.incident.scribe`` plugin is registered on a real pluggy
 PluginManager under its entry-point name ``incident.scribe``, so booting the
-harness proves the Redraft action id passes the provider's plugin-prefix check.
+harness proves the Draft with AI action id passes the provider's plugin-prefix
+check.
 Payloads are form-encoded as Slack posts them, with the review form's state,
 and fed to ``App.dispatch`` with listeners run inline; the harness sends every
 payload as user ``USER_ID``. Only edges are stubbed: ``WebClient.api_call``
-records Web API calls, and the entrypoint's ``redraft_status_update`` and
+records Web API calls, and the entrypoint's ``generate_status_update_draft`` and
 ``get_draft_for_review`` are the real services bound to a core
 ``InMemoryStatusUpdateStore``, a stub incident lookup, a stub transcript reader,
-a stub security flag reader and a stub text generator, with a fixed ``now``.
+a stub security flag reader and a stub text generator, with a fixed ``now``;
+text generation is reported available.
 Assertions read the exact Web API calls in order (only ``views.update``, never
 a channel post), the one model call and the records left in the store.
 """
@@ -39,14 +41,15 @@ from packages.incident.core.api import (
 from packages.incident.scribe.domain import StatusUpdateEdit
 from packages.incident.scribe.entrypoints import slack as slack_entrypoints
 from packages.incident.scribe.entrypoints.slack_views import (
-    REDRAFT_ACTION_ID,
+    GENERATE_ACTION_ID,
     REVIEW_CALLBACK_ID,
-    build_redrafting_view,
+    build_generating_view,
+    build_no_new_information_wording,
     build_review_view,
 )
-from packages.incident.scribe.status_update import redraft_status_update
+from packages.incident.scribe.status_update import generate_status_update_draft
 from packages.incident.scribe.status_update_approval import get_draft_for_review
-from packages.incident.scribe.status_update_prompt import build_redraft_input, build_redraft_instructions
+from packages.incident.scribe.status_update_prompt import INSTRUCTIONS, build_redraft_input, build_redraft_instructions
 from tests.factories.slack_bolt import TRIGGER_ID, USER_ID, Harness, harness_fixture
 
 pytestmark = pytest.mark.integration
@@ -61,8 +64,7 @@ _GUIDANCE = "do not name the vendor"
 _FIELDS = ("affected_service", "impact", "current_action", "workaround")
 _REVIEW_METADATA = json.dumps({"channel_id": _CHANNEL, "locale": "en-US", "incident_id": _INCIDENT, "sequence": _SEQUENCE})
 _NEW_METADATA = json.dumps({"channel_id": _CHANNEL, "locale": "en-US", "incident_id": _INCIDENT, "sequence": _SEQUENCE + 1})
-_REDRAFTED_NOTICE = "Redrafted from your instructions. Review the new draft before you approve it."
-_BLANK_NOTICE = "Enter instructions for the new draft, then press Redraft."
+_DRAFTED_NOTICE = "Drafted with AI. Review the new draft before you approve it."
 _PERSON_AT = _NOW - timedelta(minutes=20)
 _MESSAGES = (
     TranscriptMessage(author="Ada", text="vendor fixed the DNS", posted_at=_PERSON_AT),
@@ -104,11 +106,11 @@ _PENDING = StatusUpdate(
 )
 _EDIT = StatusUpdateEdit(stage=StatusUpdateStage.MONITORING, en=_text("en", "edited"), fr=_text("fr", "edited"))
 _ANSWER = {"stage": "monitoring"} | {
-    f"{language}_{name}": f"{language} {name} redrafted" for language in ("en", "fr") for name in _FIELDS
+    f"{language}_{name}": f"{language} {name} filled" for language in ("en", "fr") for name in _FIELDS
 }
 
 
-def _expected_redraft() -> StatusUpdate:
+def _expected_fill(origin: StatusUpdateOrigin = StatusUpdateOrigin.MODEL_INSTRUCTED) -> StatusUpdate:
     """The record the real service stores: the model's fields at the next sequence, by the presser, with the people's provenance."""
     content = f"{_PERSON_AT.isoformat()}\tvendor fixed the DNS"
     return StatusUpdate(
@@ -116,14 +118,14 @@ def _expected_redraft() -> StatusUpdate:
         sequence=_SEQUENCE + 1,
         state=StatusUpdateState.DRAFT,
         stage=StatusUpdateStage.MONITORING,
-        en=_text("en", "redrafted"),
-        fr=_text("fr", "redrafted"),
+        en=_text("en", "filled"),
+        fr=_text("fr", "filled"),
         next_update_at=_NOW + timedelta(minutes=30),
         author=USER_ID,
         transcript_cutoff=_PERSON_AT,
         transcript_fingerprint=f"v1:sha256:{hashlib.sha256(content.encode()).hexdigest()}",
         created_at=_NOW,
-        origin=StatusUpdateOrigin.MODEL_INSTRUCTED,
+        origin=origin,
     )
 
 
@@ -179,9 +181,9 @@ def store(monkeypatch: pytest.MonkeyPatch, generator: _StubGenerator) -> InMemor
     status_updates.append(_PENDING)
     monkeypatch.setattr(
         slack_entrypoints,
-        "redraft_status_update",
+        "generate_status_update_draft",
         partial(
-            redraft_status_update,
+            generate_status_update_draft,
             lookup=_StubLookup(),
             reader=_StubReader(),
             store=status_updates,
@@ -191,6 +193,7 @@ def store(monkeypatch: pytest.MonkeyPatch, generator: _StubGenerator) -> InMemor
         ),
     )
     monkeypatch.setattr(slack_entrypoints, "get_draft_for_review", partial(get_draft_for_review, store=status_updates))
+    monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: True)
     return status_updates
 
 
@@ -199,7 +202,7 @@ def harness(monkeypatch: pytest.MonkeyPatch, store: InMemoryStatusUpdateStore) -
     yield from harness_fixture("incident.scribe")(monkeypatch, scribe_module)
 
 
-def _redraft_action(instructions: str | None) -> dict[str, Any]:
+def _generate_action(instructions: str | None) -> dict[str, Any]:
     values: dict[str, Any] = {
         f"{language}.{name}": {"text": {"type": "plain_text_input", "value": getattr(text, name)}}
         for language, text in (("en", _EDIT.en), ("fr", _EDIT.fr))
@@ -221,20 +224,22 @@ def _redraft_action(instructions: str | None) -> dict[str, Any]:
             "private_metadata": _REVIEW_METADATA,
             "state": {"values": values},
         },
-        "actions": [{"action_id": REDRAFT_ACTION_ID, "block_id": "redraft_button", "type": "button"}],
+        "actions": [{"action_id": GENERATE_ACTION_ID, "block_id": "generate_button", "type": "button"}],
     }
 
 
-def test_redraft_is_acked(harness: Harness) -> None:
-    """Bolt routes the Redraft press to the plugin's listener and acks it with HTTP 200."""
-    response = harness.dispatch(_redraft_action(_GUIDANCE))
+def test_draft_with_ai_is_acked(harness: Harness) -> None:
+    """Bolt routes the Draft with AI press to the plugin's listener and acks it with HTTP 200."""
+    response = harness.dispatch(_generate_action(_GUIDANCE))
 
     assert response.status == 200
 
 
-def test_redraft_makes_one_model_call_from_the_form_values_and_the_window(harness: Harness, generator: _StubGenerator) -> None:
-    """The model gets the guidance as instructions and the reviewer's edited values with the transcript as input."""
-    harness.dispatch(_redraft_action(_GUIDANCE))
+def test_instructions_make_one_model_call_from_the_form_values_and_the_window(
+    harness: Harness, generator: _StubGenerator
+) -> None:
+    """The model gets the guidance as instructions and the responder's typed values with the transcript as input."""
+    harness.dispatch(_generate_action(_GUIDANCE))
 
     assert generator.calls == [
         {
@@ -245,45 +250,53 @@ def test_redraft_makes_one_model_call_from_the_form_values_and_the_window(harnes
     ]
 
 
-def test_redraft_stores_a_new_draft_and_keeps_the_previous_one(harness: Harness, store: InMemoryStatusUpdateStore) -> None:
-    """The redraft is the next DRAFT by the presser; the reviewed draft and the approved update are unchanged."""
-    harness.dispatch(_redraft_action(_GUIDANCE))
+def test_blank_instructions_draft_from_the_conversation_with_the_base_prompt(
+    harness: Harness, generator: _StubGenerator, store: InMemoryStatusUpdateStore
+) -> None:
+    """Someone posted since the approved update, so blank instructions still make one model call, with the base prompt."""
+    harness.dispatch(_generate_action("   "))
 
-    assert store.list_for_incident(_INCIDENT).data == (_expected_redraft(), _PENDING, _APPROVED)
+    assert [call["instructions"] for call in generator.calls] == [INSTRUCTIONS]
+    assert store.list_for_incident(_INCIDENT).data == (_expected_fill(StatusUpdateOrigin.MODEL), _PENDING, _APPROVED)
 
 
-def test_redraft_shows_redrafting_then_the_new_draft_review_form(harness: Harness) -> None:
-    """The only Web API calls are two views.update: the redrafting view by hash, then the new draft's form by id."""
-    harness.dispatch(_redraft_action(_GUIDANCE))
+def test_the_fill_is_stored_as_a_new_draft_and_keeps_the_previous_one(harness: Harness, store: InMemoryStatusUpdateStore) -> None:
+    """The fill is the next DRAFT by the presser; the reviewed draft and the approved update are unchanged."""
+    harness.dispatch(_generate_action(_GUIDANCE))
+
+    assert store.list_for_incident(_INCIDENT).data == (_expected_fill(), _PENDING, _APPROVED)
+
+
+def test_shows_generating_then_the_new_draft_form_and_posts_nothing(harness: Harness) -> None:
+    """The only Web API calls are two views.update: the generating view by hash, then the new draft's form by id."""
+    harness.dispatch(_generate_action(_GUIDANCE))
 
     assert harness.api_calls == [
-        ("views.update", {"view_id": _VIEW_ID, "hash": _VIEW_HASH, "view": build_redrafting_view("en-US", _REVIEW_METADATA)}),
+        ("views.update", {"view_id": _VIEW_ID, "hash": _VIEW_HASH, "view": build_generating_view("en-US", _REVIEW_METADATA)}),
         (
             "views.update",
             {
                 "view_id": _VIEW_ID,
-                "view": build_review_view(_expected_redraft(), "en-US", _NEW_METADATA, notice=_REDRAFTED_NOTICE),
+                "view": build_review_view(_expected_fill(), "en-US", _NEW_METADATA, notice=_DRAFTED_NOTICE),
             },
         ),
     ]
 
 
-def test_blank_instructions_rerender_the_form_without_a_model_call(
-    harness: Harness, generator: _StubGenerator, store: InMemoryStatusUpdateStore
+def test_nothing_new_carries_the_typed_values_forward_without_a_model_call(
+    harness: Harness, generator: _StubGenerator, store: InMemoryStatusUpdateStore, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Blank instructions update the modal once with the edited form and the blank notice; nothing is drafted or stored."""
-    harness.dispatch(_redraft_action("   "))
+    """With only messages from before the approved cutoff, the new draft repeats the typed values with the wording."""
+    monkeypatch.setattr(_StubReader, "read_transcript", lambda self, conversation_id, **kwargs: ())
 
-    pending_as_edited = replace(_PENDING, stage=_EDIT.stage, en=_EDIT.en, fr=_EDIT.fr)
-    assert harness.api_calls == [
-        (
-            "views.update",
-            {
-                "view_id": _VIEW_ID,
-                "hash": _VIEW_HASH,
-                "view": build_review_view(pending_as_edited, "en-US", _REVIEW_METADATA, notice=_BLANK_NOTICE),
-            },
-        )
-    ]
+    harness.dispatch(_generate_action(""))
+
     assert generator.calls == []
-    assert store.list_for_incident(_INCIDENT).data == (_PENDING, _APPROVED)
+    latest = store.latest(_INCIDENT).data
+    assert latest is not None
+    assert (latest.sequence, latest.origin, latest.en) == (
+        _SEQUENCE + 1,
+        StatusUpdateOrigin.CARRIED_FORWARD,
+        replace(_EDIT.en, current_action=build_no_new_information_wording().en),
+    )
+    assert [method for method, _ in harness.api_calls] == ["views.update"]
