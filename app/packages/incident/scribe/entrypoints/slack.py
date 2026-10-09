@@ -33,11 +33,11 @@ modal shows a confirmation view whose Confirm and draft button calls the
 service again with confirmation; Cancel is the view's close button. Slack API
 failures are logged and never raised; nothing is posted to the channel.
 
-The Write it myself button runs the same service in manual mode (no model call,
-no security gate) and replaces the modal with the review form for the returned
-draft. A Draft whose model call failed comes back as a manual draft and lands
-on the same form with a notice. A hand-written draft's form has no Redraft
-section.
+The New update button, shown when no draft is pending, runs the same service
+in manual mode (no model call, no security gate) and replaces the modal with
+the review form for the returned draft. A Draft whose model call failed comes
+back as a manual draft and lands on the same form with a notice. A
+hand-written draft's form has no Redraft section.
 
 The Review button replaces the modal in place with the review form. Submitting
 it acks with field errors for blank fields, or with a saving view; the approval
@@ -52,6 +52,11 @@ The review form's Redraft button sends the reviewer's instructions and current
 form values to the redraft service. Blank instructions, a refusal or a failure
 re-render the form with a notice (the previous draft is kept); a redraft shows
 the new draft's form. Only the modal is updated.
+
+The review form's Save draft button stores the typed stage and fields as the
+next draft and re-renders the form for it with a notice. A stale sequence shows
+the conflict view; any other failure re-renders the typed values with a notice.
+Only the modal is updated.
 """
 
 import asyncio
@@ -76,15 +81,16 @@ from packages.incident.scribe.entrypoints.slack_views import (
     DRAFT_ACTION_ID,
     DRAFT_DOMAIN,
     HISTORY_ACTION_ID,
+    NEW_ACTION_ID,
     OPEN_ACTION_ID,
     PUBLISHED_ACTION_ID,
     REDRAFT_ACTION_ID,
     REVIEW_ACTION_ID,
     REVIEW_CALLBACK_ID,
+    SAVE_ACTION_ID,
     SLACK_FORMAT_INSTRUCTIONS,
     STATUS_UPDATE_DOMAIN,
     SUMMARY_DOMAIN,
-    WRITE_ACTION_ID,
     build_copy_ready_view,
     build_draft_error_view,
     build_drafting_view,
@@ -108,6 +114,7 @@ from packages.incident.scribe.entrypoints.slack_views import (
     parse_review_submission,
     redraft_notice,
     render_error,
+    save_notice,
     status_error_text,
     status_t,
     status_update_open_failed,
@@ -127,6 +134,7 @@ from packages.incident.scribe.status_update import (
     draft_status_update,
     get_status_update_overview,
     redraft_status_update,
+    save_status_update_draft,
 )
 from packages.incident.scribe.status_update_approval import (
     approve_status_update,
@@ -144,8 +152,8 @@ def register(registrar: SlackCommandRegistrar) -> None:
     """Register the scribe commands, the status-updates modal listeners and the approval submission.
 
     Registers the ``/sre incident draft``, ``summarize`` and ``status-update``
-    subcommands, then the Draft, Confirm and draft, Write it myself, Review,
-    Open, Back, published toggle and Redraft listeners and the approval
+    subcommands, then the Draft, Confirm and draft, New update, Review, Open,
+    Back, published toggle, Redraft and Save draft listeners and the approval
     submission. Draft and summarize work with no arguments (draft: the whole
     incident history; summarize: safe defaults) as well as with their options;
     a ``fallback_handler`` handles the no-argument invocation so the runtime
@@ -226,12 +234,13 @@ def register(registrar: SlackCommandRegistrar) -> None:
     )
     registrar.register_block_action(DRAFT_ACTION_ID, handle_draft_action)
     registrar.register_block_action(CONFIRM_ACTION_ID, handle_draft_confirmed_action)
-    registrar.register_block_action(WRITE_ACTION_ID, handle_write_action)
+    registrar.register_block_action(NEW_ACTION_ID, handle_new_update_action)
     registrar.register_block_action(REVIEW_ACTION_ID, handle_review_action)
     registrar.register_block_action(OPEN_ACTION_ID, handle_open_action)
     registrar.register_block_action(HISTORY_ACTION_ID, handle_history_action)
     registrar.register_block_action(PUBLISHED_ACTION_ID, handle_published_action)
     registrar.register_block_action(REDRAFT_ACTION_ID, handle_redraft_action)
+    registrar.register_block_action(SAVE_ACTION_ID, handle_save_action)
     registrar.register_view_submission(REVIEW_CALLBACK_ID, handle_review_submission)
 
 
@@ -479,8 +488,8 @@ def handle_draft_confirmed_action(ack: Callable[[], Any], body: dict[str, Any], 
     _run_draft(body, client, security_confirmed=True)
 
 
-def handle_write_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
-    """Handle a press of Write it myself in the status-updates modal.
+def handle_new_update_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+    """Handle a press of New update in the status-updates modal: start a hand-written draft and show its form.
 
     Args:
         ack: Bolt ack callable, called first.
@@ -794,6 +803,56 @@ def handle_redraft_action(ack: Callable[[], Any], body: dict[str, Any], client: 
                 security_confirm=refused,
             )
     modal.update(next_view, failure_event="incident_status_update_redraft_update_failed")
+
+
+def handle_save_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+    """Handle a press of Save draft in the review form: store the typed values, then update the modal in place.
+
+    A save shows the saved draft's form with a notice. A stale sequence shows
+    the review conflict view. Any other failure, or a form with no readable
+    stage, re-renders the typed values over the stored draft with a notice.
+
+    Args:
+        ack: Bolt ack callable, called first.
+        body: Block-actions payload; carries the view id, hash, review metadata and form state.
+        client: Bolt Slack web client.
+    """
+    ack()
+    view = body.get("view") or {}
+    view_id = str(view.get("id", ""))
+    user_id = str((body.get("user") or {}).get("id", ""))
+    metadata = _parse_metadata(view.get("private_metadata"))
+    channel_id = str(metadata.get("channel_id", ""))
+    locale = str(metadata.get("locale") or "en-US")
+    incident_id = str(metadata.get("incident_id", ""))
+    sequence = int(metadata.get("sequence") or 0)
+    edit = parse_review_submission(view)
+    log = logger.bind(action="incident_status_update_save", user_id=user_id, channel_id=channel_id, view_id=view_id)
+
+    def review_metadata(target: int) -> str:
+        return json.dumps({"channel_id": channel_id, "locale": locale, "incident_id": incident_id, "sequence": target})
+
+    result = save_status_update_draft(channel_id, sequence, edit=edit, author=user_id) if edit is not None else None
+    if result is not None and result.is_success and result.data is not None:
+        next_view = build_review_view(
+            result.data, locale, review_metadata(result.data.sequence), notice=save_notice("saved_note", locale)
+        )
+    elif result is not None and result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT:
+        log.warning("incident_status_update_save_failed", error_code=result.error_code)
+        next_view = build_review_error_view(result.error_code, locale, review_metadata(sequence))
+    else:
+        if result is not None:
+            log.warning("incident_status_update_save_failed", status=result.status, error_code=result.error_code)
+        stored = asyncio.run(get_draft_for_review(incident_id, sequence))
+        if stored.is_success and stored.data is not None:
+            form = stored.data if edit is None else replace(stored.data, stage=edit.stage, en=edit.en, fr=edit.fr)
+            next_view = build_review_view(form, locale, review_metadata(sequence), notice=save_notice("save_failed", locale))
+        else:
+            log.warning("incident_status_update_save_failed", error_code=stored.error_code)
+            next_view = build_review_error_view(stored.error_code, locale, review_metadata(sequence))
+    _ModalCursor(client, view_id, view.get("hash"), log).update(
+        next_view, failure_event="incident_status_update_save_update_failed"
+    )
 
 
 def _as_edit(update: StatusUpdate) -> StatusUpdateEdit:

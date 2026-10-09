@@ -201,7 +201,7 @@ class TestRedraftSection:
         assert view["blocks"][2]["block_id"] == "stage"
 
     def test_block_order_without_a_notice(self) -> None:
-        """Instructions and Redraft come first, then the stage, the EN header and fields, the FR header and fields."""
+        """Instructions and Redraft come first, then the stage, the EN header and fields, the FR header and fields, then Save draft."""
         view = build_review_view(_DRAFT, "en-US", _METADATA)
 
         assert _block_ids(view) == [
@@ -218,6 +218,7 @@ class TestRedraftSection:
             "fr.impact",
             "fr.current_action",
             "fr.workaround",
+            "save_button",
         ]
 
     def test_a_notice_sits_above_the_redraft_section(self) -> None:
