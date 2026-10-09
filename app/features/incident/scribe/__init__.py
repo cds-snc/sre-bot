@@ -1,8 +1,7 @@
 """Incident scribe subdomain: AI-drafted incident documents and catch-up summaries.
 
-Exposes the ``/sre incident draft``, ``/sre incident summarize`` and
-``/sre incident status-update`` Slack subcommands, the status-updates modal's
-listeners and the scribe i18n resources via pluggy hookimpls. Registration is
+Exposes the ``/sre incident draft`` and ``/sre incident summarize`` Slack
+subcommands and the scribe i18n resources via pluggy hookimpls. Registration is
 startup-driven and side effect free at import time (only decorated hookimpls
 are defined here).
 """
@@ -17,7 +16,7 @@ from features.incident.scribe.entrypoints import slack
 
 @hookimpl
 def register_slack_commands(registrar: SlackCommandRegistrar) -> None:
-    """Register the ``draft``, ``summarize`` and ``status-update`` subcommands and the status-updates modal listeners.
+    """Register the ``draft`` and ``summarize`` subcommands.
 
     Args:
         registrar: Slack command registrar.

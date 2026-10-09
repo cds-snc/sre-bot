@@ -42,6 +42,7 @@ dependencies = [
 "access.request" = "packages.access.request"
 "access.sync" = "packages.access.sync"
 geolocate = "packages.geolocate"
+"incident.comms" = "features.incident.comms"
 "incident.scribe" = "features.incident.scribe"
 oncall_sync = "packages.oncall_sync"
 rant = "packages.rant"
@@ -401,7 +402,7 @@ name = "(i) Incident subdomains are independent siblings over core"
 type = "layers"
 containers = ["features.incident"]
 layers = [
-    "documents | drive | meet | scheduling | scribe",
+    "comms | documents | drive | meet | scheduling | scribe",
     "core",
 ]
 exhaustive = true

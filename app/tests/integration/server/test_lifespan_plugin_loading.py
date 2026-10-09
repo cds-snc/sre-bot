@@ -30,6 +30,7 @@ EXPECTED_PLUGINS = {
     "access.request",
     "access.sync",
     "geolocate",
+    "incident.comms",
     "incident.scribe",
     "oncall_sync",
     "rant",
