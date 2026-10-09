@@ -78,7 +78,8 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   from the latest approved update, and stores the draft as
   a `StatusUpdate` record (decisions/incident-management.md, External status
   updates). Only messages posted by people after the latest record's cutoff
-  count as new; thread replies are not read. It imports `core/api.py` only from
+  count as new; thread replies count when their thread started after the
+  cutoff, while new replies in an older thread are not read. It imports `core/api.py` only from
   `core` and no integration.
 - `status_update_approval.py`, `publisher.py` — approving a draft (stops at `APPROVED`, never
   publishes) and rendering an approved update as copy-ready EN/FR text.
@@ -487,7 +488,7 @@ So the model is given:
 #### Usage
 
 ```
-/sre incident summarize                      # since channel creation, up to 500 messages (defaults)
+/sre incident summarize                      # since channel creation, up to 750 messages (defaults)
 /sre incident summarize --since 30m           # last 30 minutes
 /sre incident summarize --since 2h           # last 2 hours
 /sre incident summarize --since 90m --limit 100
@@ -498,7 +499,7 @@ So the model is given:
   treated as hours). Omitted → the incident channel's creation time (falling
   back to `INCIDENT_SUMMARY__DEFAULT_SINCE_HOURS`, 24h, if the channel start
   cannot be determined).
-- `--limit` — maximum messages to include. Omitted/invalid → default (500);
+- `--limit` — maximum messages to include. Omitted/invalid → default (750);
   capped at `INCIDENT_SUMMARY__MAX_HISTORY_LIMIT` (1000).
 
 #### Settings
@@ -508,7 +509,7 @@ have safe defaults:
 
 | Env var | Default | Meaning |
 | --- | --- | --- |
-| `INCIDENT_SUMMARY__DEFAULT_HISTORY_LIMIT` | `500` | Messages fetched when `--limit` is omitted |
+| `INCIDENT_SUMMARY__DEFAULT_HISTORY_LIMIT` | `750` | Messages fetched when `--limit` is omitted |
 | `INCIDENT_SUMMARY__MAX_HISTORY_LIMIT` | `1000` | Hard cap on `--limit` |
 | `INCIDENT_SUMMARY__DEFAULT_SINCE_HOURS` | `24` | Fallback look-back window when `--since` is omitted and the channel start cannot be determined |
 | `INCIDENT_SUMMARY__TIMEZONE` | `America/Toronto` | Zone for the transcript line times and the current-time line; an unknown zone falls back to UTC |
