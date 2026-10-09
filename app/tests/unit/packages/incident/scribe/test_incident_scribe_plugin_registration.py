@@ -28,32 +28,20 @@ def test_one_hookimpl_registers_both_commands_under_sre_incident() -> None:
     assert registered == {("sre.incident", "draft"), ("sre.incident", "summarize"), ("sre.incident", "status-update")}
 
 
-def test_block_actions_draft_and_confirm_are_registered_once() -> None:
-    """The package registers the Draft and Confirm and draft buttons' block actions with the plugin prefix.
+def test_block_actions_are_the_final_status_update_buttons_with_the_plugin_prefix() -> None:
+    """The package registers exactly the modal's seven buttons, each once, under ``incident.scribe.status_update``.
 
-    The action id is ``incident.scribe.status_update.draft``, starting with the
-    entry-point name ``incident.scribe`` and the action suffix ``status_update.draft``.
+    The overview's Draft and Confirm and draft, the form's Redraft and Write it
+    myself are gone; Draft with AI is ``generate``, inside the form.
     """
     registrar = FakeSlackRegistrar()
 
     scribe_pkg.register_slack_commands(registrar=registrar)
 
-    assert [key for key in registrar.block_actions if key.startswith("incident.scribe.status_update.draft")] == [
-        "incident.scribe.status_update.draft",
-        "incident.scribe.status_update.draft_confirmed",
+    assert sorted(registrar.block_actions) == [
+        f"incident.scribe.status_update.{suffix}"
+        for suffix in ("generate", "history", "new", "open", "published", "review", "save")
     ]
-
-
-def test_block_actions_new_update_and_save_are_registered_once_and_write_is_gone() -> None:
-    """The New update and Save draft buttons are registered with the plugin prefix; Write it myself no longer is."""
-    registrar = FakeSlackRegistrar()
-
-    scribe_pkg.register_slack_commands(registrar=registrar)
-
-    action_ids = list(registrar.block_actions)
-    assert action_ids.count("incident.scribe.status_update.new") == 1
-    assert action_ids.count("incident.scribe.status_update.save") == 1
-    assert "incident.scribe.status_update.write" not in action_ids
 
 
 def test_hookimpl_registers_status_update_command_and_approval_submission_together() -> None:

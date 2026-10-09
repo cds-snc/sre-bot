@@ -1,12 +1,15 @@
-"""Tests for the security confirmation gate in incident status-update drafting.
+"""Tests for the security confirmation gate in filling a status-update draft with AI.
 
-When draft_status_update is called for a YES or UNKNOWN incident, the gate refuses
-with SECURITY_CONFIRMATION_REQUIRED before any model call, unless
-security_confirmed=True. Read failures also refuse with the same code. PENDING and
-CARRIED_FORWARD branches bypass the reader. Refusal logs do not carry incident text.
+When generate_status_update_draft needs a model call for a YES or UNKNOWN
+incident, the gate refuses with SECURITY_CONFIRMATION_REQUIRED before the call,
+unless security_confirmed=True. Read failures also refuse with the same code. A
+stale sequence and the carried-forward branch never read the flag. Refusal logs
+do not carry incident text. The service runs against the in-memory store holding
+one pending draft, with stubbed lookup, reader, generator and flag reader.
 """
 
 import json
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -23,8 +26,8 @@ from packages.incident.core.api import (
     StatusUpdateText,
     TranscriptMessage,
 )
-from packages.incident.scribe.domain import NoNewInformationWording, StatusUpdateDraftOutcome
-from packages.incident.scribe.status_update import draft_status_update
+from packages.incident.scribe.domain import NoNewInformationWording, StatusUpdateDraftOutcome, StatusUpdateEdit
+from packages.incident.scribe.status_update import generate_status_update_draft
 
 pytestmark = pytest.mark.unit
 
@@ -96,6 +99,9 @@ class _StubReader:
 
 
 class _StubGenerator:
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
     async def summarize(
         self,
         transcript: str,
@@ -103,6 +109,7 @@ class _StubGenerator:
         instructions: str | None = None,
         max_output_tokens: int | None = None,
     ) -> OperationResult[str]:
+        self.calls.append(transcript)
         answer = {
             "stage": "identified",
             "en_affected_service": "en service",
@@ -141,23 +148,40 @@ class _FailingSecurityReader:
             return OperationResult.permanent_error(message="not found", error_code=self._error_code)
 
 
+_PENDING = _record(1, StatusUpdateState.DRAFT)
+_CURRENT = StatusUpdateEdit(stage=_PENDING.stage, en=_PENDING.en, fr=_PENDING.fr)
+
+
+def _pending_store(*records: StatusUpdate) -> InMemoryStatusUpdateStore:
+    """A store holding ``records``, or only ``_PENDING`` when none are given."""
+    store = InMemoryStatusUpdateStore()
+    for record in records or (_PENDING,):
+        store.append(record)
+    return store
+
+
 async def _draft(
     *,
     store: InMemoryStatusUpdateStore | None = None,
+    sequence: int | None = None,
     reader: _StubReader | None = None,
     generator: _StubGenerator | None = None,
     lookup: _StubLookup | None = None,
     security_reader: _StubSecurityReader | _FailingSecurityReader | None = None,
     security_confirmed: bool = False,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
-    return await draft_status_update(
+    store = store if store is not None else _pending_store()
+    latest = store.latest(_INCIDENT).data
+    return await generate_status_update_draft(
         _CHANNEL,
+        sequence if sequence is not None else (latest.sequence if latest else 1),
+        current=_CURRENT,
         author="U123",
         wording=_WORDING,
         on_started=None,
         lookup=lookup or _StubLookup(),
         reader=reader or _StubReader(),
-        store=store if store is not None else InMemoryStatusUpdateStore(),
+        store=store,
         generator=generator or _StubGenerator(),
         security_reader=security_reader,
         security_confirmed=security_confirmed,
@@ -169,7 +193,7 @@ class TestSecurityGateRefusesYes:
     @pytest.mark.asyncio
     async def test_refuses_yes_incident_with_security_confirmation_required(self) -> None:
         """A YES incident with security_confirmed=False refuses before any model call."""
-        store = InMemoryStatusUpdateStore()
+        store = _pending_store()
         security_reader = _StubSecurityReader(IncidentSecurityFlag.YES)
         generator = _StubGenerator()
 
@@ -177,10 +201,10 @@ class TestSecurityGateRefusesYes:
 
         assert not result.is_success
         assert result.error_code == ErrorCode.SECURITY_CONFIRMATION_REQUIRED
-        assert len(generator.calls) == 0 if hasattr(generator, "calls") else True
-        # Verify no appends to store
+        assert generator.calls == []
+        # The pending draft is still the only record
         listed = store.list_for_incident(_INCIDENT)
-        assert listed.data == ()
+        assert listed.data == (_PENDING,)
 
     @pytest.mark.asyncio
     async def test_refuses_yes_with_no_on_started_call(self) -> None:
@@ -194,14 +218,16 @@ class TestSecurityGateRefusesYes:
         security_reader = _StubSecurityReader(IncidentSecurityFlag.YES)
         reader = _StubReader([_human("activity", 20)])
 
-        await draft_status_update(
+        await generate_status_update_draft(
             _CHANNEL,
+            _PENDING.sequence,
+            current=_CURRENT,
             author="U123",
             wording=_WORDING,
             on_started=mock_on_started,
             lookup=_StubLookup(),
             reader=reader,
-            store=InMemoryStatusUpdateStore(),
+            store=_pending_store(),
             generator=_StubGenerator(),
             security_reader=security_reader,
             security_confirmed=False,
@@ -215,7 +241,7 @@ class TestSecurityGateRefusesUnknown:
     @pytest.mark.asyncio
     async def test_refuses_unknown_incident_with_security_confirmation_required(self) -> None:
         """An UNKNOWN incident with security_confirmed=False refuses before any model call."""
-        store = InMemoryStatusUpdateStore()
+        store = _pending_store()
         security_reader = _StubSecurityReader(IncidentSecurityFlag.UNKNOWN)
         generator = _StubGenerator()
 
@@ -229,7 +255,7 @@ class TestSecurityGateAllowsNo:
     @pytest.mark.asyncio
     async def test_no_incident_proceeds_without_confirmation(self) -> None:
         """A NO incident proceeds through the gate without security_confirmed."""
-        store = InMemoryStatusUpdateStore()
+        store = _pending_store()
         security_reader = _StubSecurityReader(IncidentSecurityFlag.NO)
 
         result = await _draft(store=store, security_reader=security_reader)
@@ -242,7 +268,7 @@ class TestSecurityGateWithConfirmed:
     @pytest.mark.asyncio
     async def test_yes_incident_proceeds_when_security_confirmed(self) -> None:
         """A YES incident with security_confirmed=True proceeds past the gate."""
-        store = InMemoryStatusUpdateStore()
+        store = _pending_store()
         security_reader = _StubSecurityReader(IncidentSecurityFlag.YES)
 
         result = await _draft(store=store, security_reader=security_reader, security_confirmed=True)
@@ -283,19 +309,15 @@ class TestSecurityGateRefusesReadFailure:
         assert result.error_code == ErrorCode.SECURITY_CONFIRMATION_REQUIRED
 
 
-class TestSecurityGateBypassedByPending:
+class TestSecurityGateBypassedByStaleSequence:
     @pytest.mark.asyncio
-    async def test_pending_branch_does_not_check_reader(self) -> None:
-        """PENDING branch returns pending draft without consulting the reader."""
-        store = InMemoryStatusUpdateStore()
-        store.append(_record(1, StatusUpdateState.DRAFT))
+    async def test_a_stale_sequence_is_refused_before_the_flag_is_read(self) -> None:
+        """A form opened on an older draft is a conflict; nothing about the incident is read."""
         security_reader = _FailingSecurityReader()
 
-        result = await _draft(store=store, reader=_StubReader([_human("before the draft", 90)]), security_reader=security_reader)
+        result = await _draft(sequence=_PENDING.sequence + 1, security_reader=security_reader)
 
-        # Should return the pending without checking reader
-        assert result.is_success
-        # Reader should not have been called
+        assert result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT
         assert len(security_reader.calls) == 0
 
 
@@ -303,9 +325,8 @@ class TestSecurityGateBypassedByCarriedForward:
     @pytest.mark.asyncio
     async def test_carried_forward_branch_does_not_check_reader(self) -> None:
         """CARRIED_FORWARD branch returns carried-forward without consulting the reader."""
-        store = InMemoryStatusUpdateStore()
-        # No new activity, so will go into carried-forward branch
-        store.append(_record(1, StatusUpdateState.APPROVED))
+        # No new activity and no instructions, so will go into carried-forward branch
+        store = _pending_store(_record(1, StatusUpdateState.APPROVED), replace(_PENDING, sequence=2))
         reader = _StubReader([_human("before the approval", 90)])  # No new messages after the cutoff
         security_reader = _FailingSecurityReader()
 

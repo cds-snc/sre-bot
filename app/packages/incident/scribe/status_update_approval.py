@@ -5,7 +5,7 @@ the stage and both languages' fields; approval moves the draft to ``APPROVED``
 with the approver and time and stops there: nothing is published. The caller
 renders the approved record through the ``StatusPagePublisher``.
 
-The functions are async like ``draft_status_update`` and call the synchronous
+The functions are async like ``generate_status_update_draft`` and call the synchronous
 core store inline. This module imports only ``core.api`` from the core.
 """
 
