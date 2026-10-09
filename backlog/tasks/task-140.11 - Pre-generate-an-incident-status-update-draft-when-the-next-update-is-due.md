@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-07 18:52'
-updated_date: '2026-10-08 16:41'
+updated_date: '2026-10-09 14:09'
 labels:
   - incident
 dependencies:
@@ -101,5 +101,10 @@ created: 2026-10-08 00:23
 created: 2026-10-08 16:41
 ---
 2026-10-08 (human, second session): status-update follow-ups deferred; the current feature is good enough. Settled: 5-minute lead time, no notification, periodic-draft label, human drafts win, one periodic draft per approved update, reopening needs a responder to turn it on again, any responder controls it. Kept the opt-in, manual pause/resume model over an on-by-default alternative.
+---
+
+created: 2026-10-09 14:09
+---
+Vocabulary after TASK-144 (human-first status updates; decisions/incident-management.md 2026-10-09): there is no overview Draft button. A responder starts an update with "New update" (a hand-written draft) and drafts or redrafts with the form's "Draft with AI" button, with or without instructions, shown only when text generation is configured. Read "the first draft is made only when a responder presses Draft" as "the first draft is started by a responder (New update or Draft with AI)". Read "Human drafts win: a draft made with Draft or Redraft" as "any pending draft whose origin is hand-written, model or model with instructions". The "Prepared automatically" label becomes the record's origin. "Press Draft or Redraft to refresh" means "Draft with AI". Security and unknown-flag incidents: only Draft with AI with confirmation reaches the model; a hand-written draft needs no confirmation.
 ---
 <!-- COMMENTS:END -->

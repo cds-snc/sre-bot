@@ -4,7 +4,7 @@ title: Un-approve or correct an approved incident status update
 status: To Do
 assignee: []
 created_date: '2026-10-07 18:52'
-updated_date: '2026-10-08 16:41'
+updated_date: '2026-10-09 14:09'
 labels:
   - incident
 dependencies:
@@ -46,3 +46,12 @@ Approval enforces a forward-only stage floor: a draft's stage may not be below t
 - [ ] #8 Nothing is posted in the incident channel
 - [ ] #9 The fixed update sets the next update time; fixing a wrongly approved Resolved update does not restart periodic drafting, a responder turns it on again
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-09 14:09
+---
+Vocabulary after TASK-144 (human-first status updates; decisions/incident-management.md 2026-10-09): the review modal is now the status-update form, with Save draft, Approve and, when text generation is configured, "Draft with AI" (with or without instructions; this replaces Redraft). An un-approved update returns to that form as a draft. Every record carries its origin (hand-written, model, model with instructions, carried forward); a correction is a new draft with its own origin. Its "Correction:" wording is rendered by code, never by the model.
+---
+<!-- COMMENTS:END -->

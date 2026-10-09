@@ -530,6 +530,36 @@ bot so the Web API client picks up the new token.
 
 ### `/sre incident status-update`
 
+#### Target flow (TASK-144)
+
+A responder writes the update; AI is an optional assist inside the form
+(`decisions/incident-management.md`, External status updates). Each part names
+the layer that lands it; until then the behaviour under
+[Shipped today](#shipped-today) applies.
+
+- **Origin and service** (TASK-144.3): every record carries its origin
+  (hand-written, model, model with instructions, carried forward). The service
+  starts a draft by hand, saves a draft from the form, and AI-fills a draft
+  (`generate_status_update_draft`, blank instructions mean "draft from the
+  conversation"). A predicate says whether text generation is available.
+- **Modal and form** (TASK-144.4): the status-updates modal shows the pending
+  draft with an origin line (who, how, when) or a "New update" button, and the
+  approved history. "New update" stores a draft prefilled from the latest
+  approved update (blank at the first stage) and opens the form. The form has
+  "Save draft", which accepts partial fields, and Approve, which validates
+  blank fields and the stage floor.
+- **AI inside the form** (TASK-144.5): "Draft with AI" and an optional
+  instructions input appear only when text generation is configured. No new
+  human messages since the latest approved update means no model call and the
+  carried-forward wording; otherwise one model call fills the fields. A
+  security or unknown-flag incident shows the confirmation checkbox first; a
+  hand-written draft needs none. The overview's Draft and Write it myself
+  buttons go away.
+- **Unchanged**: approval, copy-ready text, history and the published toggle.
+  Nothing is posted to the incident conversation.
+
+#### Shipped today
+
 Opens the incident's status-updates modal, private to the invoker; no status
 update text is posted to the channel. The handler opens a loading view at once
 with the command's trigger id (it expires after about three seconds), then

@@ -3,10 +3,11 @@ id: TASK-144.2
 title: >-
   Record human-first status updates in the decision records and the scribe
   README
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-10-09 12:53'
-updated_date: '2026-10-09 13:01'
+updated_date: '2026-10-09 14:10'
 labels:
   - incident
   - features
@@ -32,11 +33,11 @@ Layer 2 of TASK-144 (documentation only). decisions/incident-management.md "Exte
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 incident-management.md External status updates reads human-first: a responder writes, AI assists inside the form when configured, code still decides nothing-is-new, confirmation precedes any model call, nothing reaches the conversation; Checks and Migration updated; dated Changes line
-- [ ] #2 transport-slack.md and interaction-toolkits.md no longer describe the first registered view as AI drafts reviewed by a human; each has a dated Changes line
-- [ ] #3 feature-packages.md Context no longer lists incident/scribe among the packages with platforms/; dated Changes line
-- [ ] #4 scribe/README.md status-update section describes the target flow and names the layer each part lands with
-- [ ] #5 TASK-140.11 and TASK-140.12 carry a CLI comment translating their Draft/Redraft wording to the human-first flow; no task markdown edited by hand
+- [x] #1 incident-management.md External status updates reads human-first: a responder writes, AI assists inside the form when configured, code still decides nothing-is-new, confirmation precedes any model call, nothing reaches the conversation; Checks and Migration updated; dated Changes line
+- [x] #2 transport-slack.md and interaction-toolkits.md no longer describe the first registered view as AI drafts reviewed by a human; each has a dated Changes line
+- [x] #3 feature-packages.md Context no longer lists incident/scribe among the packages with platforms/; dated Changes line
+- [x] #4 scribe/README.md status-update section describes the target flow and names the layer each part lands with
+- [x] #5 TASK-140.11 and TASK-140.12 carry a CLI comment translating their Draft/Redraft wording to the human-first flow; no task markdown edited by hand
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -90,3 +91,34 @@ None (documentation). Verification: `rg -n 'a way to draft|after pressing Draft'
 
 Five markdown files and two CLI comments. No runtime effect. Single revert.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+What changed (documentation only; no Python, no tests)
+- decisions/incident-management.md, External status updates:
+  - Drafting becomes "Writing and drafting". A responder writes in a form prefilled from the latest approved update; "Draft with AI" is offered inside the form only when text generation is configured. Unchanged: code decides nothing-is-new, confirmation comes before any model call, and automatic drafting skips security incidents. A hand-written draft needs no confirmation.
+  - "Where it happens": pending draft with its origin, or a "New update" button.
+  - Approval: Save draft or Approve; redraft is Draft with AI with instructions; records carry their origin.
+  - Checks: the confirmation test is reworded and a new test covers no AI section when text generation is unconfigured.
+  - Migration names TASK-140 as the shipped first cut and adds TASK-144. Changes line dated 2026-10-09.
+- decisions/transport-slack.md: the first-consumer sentence now reads "a responder writes or AI-drafts the update, then reviews and approves it in place (TASK-140, TASK-144)". Changes line added.
+- decisions/interaction-toolkits.md, line 18 (the plan said 178; the sentence has since moved): the first consumer is the human-first form. Changes line added; Open questions untouched.
+- decisions/feature-packages.md Context: "Three packages (geolocate, rant, user_rotations) put Slack handlers in platforms/". Changes line names TASK-144.1. Lines 14 and 116 still name incident/scribe for its integrations.openai import, which is still true (service.py:39), so they stay. The plan's expectation that rg would find only the Changes line was too strict.
+- app/packages/incident/scribe/README.md, status-update section: new "Target flow (TASK-144)" subsection with each part marked by its layer (144.3 origin, save, generate, availability; 144.4 New update, Save draft, origin line; 144.5 AI inside the form, overview buttons removed; approval, copy-ready, history and published toggle unchanged). The existing description sits under "Shipped today".
+- CLI comments on TASK-140.11 and TASK-140.12 translate Draft and Redraft to New update, Draft with AI and origin. No task markdown was edited by hand.
+
+Verification
+- rg -n 'a way to draft|after pressing Draft' decisions/ -> no matches (exit 1)
+- git diff decisions/ -> four new "2026-10-09" Changes lines, one per record
+- git diff --stat -> 8 files, +72/-13 (README, 4 decision records, 3 task files via CLI); no .py file changed, so the ruff, mypy and pytest gates do not apply. Layer 1's gates are unchanged (TASK-144.1 notes).
+<!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-09 14:07
+---
+Plan approved (human, 2026-10-09); implementation on stack-i/task-144.2-human-first-records, stacked on fix/incident_scribe_shape (PR #1568)
+---
+<!-- COMMENTS:END -->
