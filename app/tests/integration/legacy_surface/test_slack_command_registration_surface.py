@@ -450,7 +450,7 @@ def test_incident_summarize_returns_the_summary_ephemerally(
     assert [message.text for message in transcript] == ["Rolled back the deploy"]
     reply = only_response(incident_channel)
     assert reply["response_type"] == "ephemeral"
-    assert reply["text"].startswith("🧾 Incident summary\n\n")
+    assert reply["text"].startswith("🧾 AI-generated Incident summary\n\n")
     assert "The deploy was rolled back." in reply["text"]
 
 

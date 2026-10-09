@@ -63,6 +63,7 @@ def _fixed_clock_and_settings(monkeypatch: pytest.MonkeyPatch) -> None:
             "INCIDENT_SUMMARY__DEFAULT_HISTORY_LIMIT": 200,
             "INCIDENT_SUMMARY__MAX_HISTORY_LIMIT": 500,
             "INCIDENT_SUMMARY__DEFAULT_SINCE_HOURS": 24,
+            "INCIDENT_SUMMARY__TIMEZONE": "America/Toronto",
         }
     )
     monkeypatch.setattr(service, "get_incident_summary_settings", lambda: settings)
@@ -136,15 +137,17 @@ class TestGathering:
         summarize.assert_awaited_once_with(_MESSAGES, instructions="use mrkdwn")
         assert result is summarize.return_value
 
-    async def test_transcript_is_read_once_for_the_conversation_with_filtering_off(self, summarize: AsyncMock) -> None:
-        """Summaries read every message: the bot's own posts and system events are not excluded."""
+    async def test_transcript_is_read_once_for_the_conversation_without_own_posts_or_system_events(
+        self, summarize: AsyncMock
+    ) -> None:
+        """The bot's own scaffolding posts and channel system events are excluded, as for draft and status update."""
         reader = FakeTranscriptReader()
 
         await summarize_incident_conversation("C123", reader=reader)
 
         assert len(reader.reads) == 1
         assert reader.reads[0]["conversation_id"] == "C123"
-        assert reader.reads[0]["exclude_own_and_system_messages"] is False
+        assert reader.reads[0]["exclude_own_and_system_messages"] is True
 
     async def test_reader_defaults_to_the_core_provider(self, summarize: AsyncMock, monkeypatch: pytest.MonkeyPatch) -> None:
         """With no reader passed, the one the incident core provider resolves is used."""
@@ -155,15 +158,21 @@ class TestGathering:
 
         assert len(reader.reads) == 1
 
-    async def test_model_receives_author_and_text_lines_without_times(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """A message's time never reaches the model: the transcript is ``author: text`` lines in order."""
+    async def test_model_receives_the_current_time_and_time_stamped_lines_in_order(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The model sees now and each message's time in the summary timezone; an untimed message has no prefix."""
         summarizer = MagicMock()
         summarizer.summarize = AsyncMock(return_value=OperationResult.success(data="ok"))
         monkeypatch.setattr(service, "get_summarizer", lambda: summarizer)
 
         await summarize_incident_conversation("C123", reader=FakeTranscriptReader())
 
-        assert summarizer.summarize.await_args.args[0] == "Ada: prod is down\nBob: on it, rolling back"
+        assert summarizer.summarize.await_args.args[0] == (
+            "Current time: 2026-03-01 07:00 EST\n"
+            "\n"
+            "Incident channel transcript:\n"
+            "[2026-02-28 04:30 EST] Ada: prod is down\n"
+            "Bob: on it, rolling back"
+        )
 
 
 class TestFailures:

@@ -418,9 +418,21 @@ def handle_summarize_command(
     )
 
     if result.is_success:
-        header = t(f"{_SUMMARY_DOMAIN}.result.header", locale, "🧾 Incident summary")
+        header = t(f"{_SUMMARY_DOMAIN}.result.header", locale, "🧾 AI-generated Incident summary")
         body = _to_slack_mrkdwn(result.data or "")
-        return CommandResponse(message=f"{header}\n\n{body}", ephemeral=True)
+        disclaimer = t(
+            f"{_SUMMARY_DOMAIN}.result.disclaimer",
+            locale,
+            "This summary is AI-generated and AI can make mistakes, please review for accuracy.",
+        )
+        # Single asterisks are Slack mrkdwn bold. A header block renders the title
+        # bold and larger; the plain message is the notification fallback.
+        blocks = [
+            {"type": "header", "text": {"type": "plain_text", "text": header, "emoji": True}},
+            *_mrkdwn_blocks(body),
+            {"type": "section", "text": {"type": "mrkdwn", "text": f"*{disclaimer}*"}},
+        ]
+        return CommandResponse(message=f"{header}\n\n{body}\n\n*{disclaimer}*", ephemeral=True, blocks=blocks)
 
     if result.error_code == EMPTY_HISTORY_CODE:
         msg = t(

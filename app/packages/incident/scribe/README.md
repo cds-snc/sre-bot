@@ -455,12 +455,28 @@ channel, for someone jumping into an incident.
 #### What it does
 
 Reads the incident conversation's transcript (recent channel history with
-author display names resolved), builds a plain transcript, and asks the
+author display names resolved, without this bot's own posts and Slack system
+events), builds a time-stamped transcript, and asks the
 `Summarizer` interface (OpenAI, see
 `app/integrations/openai/`) to produce a concise, factual summary: what is
 happening, current status, actions taken, and next steps. The summary is
 returned **ephemerally** — only the person who ran
 the command sees it, so it never adds noise to the incident channel.
+
+#### Keeping "current status" current
+
+An incident channel can span weeks, and an early message ("the WAF block is
+working") is often overtaken by a later one ("block PK at the WAF again").
+So the model is given:
+
+- a `Current time: YYYY-MM-DD HH:MM ZZZ` line above the transcript;
+- every transcript line prefixed with its time, `[YYYY-MM-DD HH:MM ZZZ]`, in
+  `INCIDENT_SUMMARY__TIMEZONE` — the same format the draft uses (a message
+  without a time has no prefix);
+- instructions that later messages supersede earlier ones, that current status
+  comes from the latest messages and says when it was last confirmed, that
+  lifted or completed measures are past tense, and that unanswered questions
+  are named.
 
 #### Usage
 
@@ -489,6 +505,7 @@ have safe defaults:
 | `INCIDENT_SUMMARY__DEFAULT_HISTORY_LIMIT` | `500` | Messages fetched when `--limit` is omitted |
 | `INCIDENT_SUMMARY__MAX_HISTORY_LIMIT` | `1000` | Hard cap on `--limit` |
 | `INCIDENT_SUMMARY__DEFAULT_SINCE_HOURS` | `24` | Fallback look-back window when `--since` is omitted and the channel start cannot be determined |
+| `INCIDENT_SUMMARY__TIMEZONE` | `America/Toronto` | Zone for the transcript line times and the current-time line; an unknown zone falls back to UTC |
 
 OpenAI credentials/model are **not** configured here — they belong to the
 vendor client (`OPENAI_API_KEY`, `OPENAI_MODEL`, …) in

@@ -876,7 +876,18 @@ _CONTENT_INSTRUCTIONS = (
     "in under 30 seconds. Cover, each in at most 1-2 short sentences: what is "
     "happening, current status, and key actions taken. End with next steps as "
     "short bullets. Prefer fewer, denser bullets over long chronological logs. "
-    "Do not invent details that are not in the transcript."
+    "Do not invent details that are not in the transcript.\n\n"
+    "The current time is given above the transcript, and each transcript line "
+    "that has a time begins with it in square brackets. An incident can span "
+    "days or weeks. Later messages supersede earlier ones: describe the current "
+    "status from the most recent messages only, and say when that state was "
+    "last confirmed, for example as of Sep 25. A measure, fix or plan that a "
+    "later message shows was lifted, completed, changed or overtaken is written "
+    "in the past tense under actions taken, never as current status or a next "
+    "step. Words such as today, tomorrow or being tested are relative to the "
+    "time of the message that says them. If the channel has been quiet for a long time "
+    "before the current time, say when the last activity was. Name any open "
+    "question in the transcript that no later message answers."
 )
 
 
@@ -910,7 +921,12 @@ async def summarize_incident_conversation(
     reader = reader or get_incident_transcript_reader()
 
     start = _resolve_summary_window_start(reader, conversation_id, since, settings)
-    messages = reader.read_transcript(conversation_id, since=start, limit=_resolve_summary_limit(limit, settings))
+    messages = reader.read_transcript(
+        conversation_id,
+        since=start,
+        limit=_resolve_summary_limit(limit, settings),
+        exclude_own_and_system_messages=True,
+    )
 
     return await summarize_transcript(messages, instructions=instructions)
 
@@ -945,7 +961,7 @@ async def summarize_transcript(
             error_code=EMPTY_HISTORY_CODE,
         )
 
-    transcript = _build_transcript(messages)
+    transcript = _build_summary_payload(messages, get_incident_summary_settings().TIMEZONE)
     summarizer = summarizer or get_summarizer()
     full_instructions = _CONTENT_INSTRUCTIONS
     if instructions:
@@ -963,9 +979,14 @@ async def summarize_transcript(
     return result
 
 
-def _build_transcript(messages: Sequence[TranscriptMessage]) -> str:
-    """Render messages as ``author: text`` lines in the given order."""
-    return "\n".join(f"{message.author}: {message.text}" for message in messages)
+def _build_summary_payload(messages: Sequence[TranscriptMessage], tzname: str) -> str:
+    """Render the current time, then the messages as time-stamped lines in the given order.
+
+    The current time and the per-line times let the model tell what is current
+    from what a later message superseded.
+    """
+    transcript = "\n".join(_transcript_line(message, tzname) for message in messages)
+    return f"Current time: {_format_time(_now(), tzname)}\n\nIncident channel transcript:\n{transcript}"
 
 
 def _resolve_summary_limit(limit: int | None, settings: IncidentSummarySettings) -> int:

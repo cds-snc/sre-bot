@@ -115,9 +115,50 @@ class TestHandleSummarizeCommand:
             response = handle_summarize_command(payload, {})
 
         # Header precedes the summary body, separated by a blank line.
-        assert response.message.endswith("the summary body")
         assert response.message.split("\n\n", 1)[0].strip() != ""
-        assert response.message != "the summary body"
+        assert not response.message.startswith("the summary body")
+
+    def test_success_message_ends_with_ai_disclaimer_after_the_summary(self):
+        """The reader is told, in bold after the summary, that it is AI-generated and needs checking."""
+        payload = CommandPayload(text="", user_id="U9", channel_id="C123")
+
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="the summary body"))):
+            response = handle_summarize_command(payload, {})
+
+        assert response.message.endswith(
+            "the summary body\n\n*This summary is AI-generated and AI can make mistakes, please review for accuracy.*"
+        )
+
+    def test_success_renders_title_as_header_block_then_summary_then_bold_disclaimer(self):
+        """Slack shows a header block bold and larger; the plain message stays as the notification fallback."""
+        payload = CommandPayload(text="", user_id="U9", channel_id="C123")
+
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="the summary body"))):
+            response = handle_summarize_command(payload, {})
+
+        assert response.blocks is not None
+        header, *body, disclaimer = response.blocks
+        assert header["type"] == "header"
+        assert header["text"]["type"] == "plain_text"
+        assert header["text"]["text"].endswith("AI-generated Incident summary")
+        assert [block["text"]["text"] for block in body] == ["the summary body"]
+        assert disclaimer == {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": "*This summary is AI-generated and AI can make mistakes, please review for accuracy.*",
+            },
+        }
+
+    @pytest.mark.parametrize("error_code", [EMPTY_HISTORY_CODE, "SERVER_ERROR"])
+    def test_no_disclaimer_when_no_summary_was_generated(self, error_code):
+        """Notices and errors carry no AI disclaimer, since no AI text is shown."""
+        payload = CommandPayload(text="", user_id="U9", channel_id="C123")
+
+        with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.permanent_error(message="x", error_code=error_code))):
+            response = handle_summarize_command(payload, {})
+
+        assert "AI-generated" not in response.message
 
     def test_summary_body_is_normalized_to_slack_mrkdwn(self):
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
