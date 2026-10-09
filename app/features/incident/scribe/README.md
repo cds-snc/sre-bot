@@ -65,8 +65,8 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   progress notice when the service signals the start; ephemeral responses; no
   `slack_sdk` import.
 - `entrypoints/slack_views.py` — the Block Kit view builders, payload parsers,
-  action ids and every translated string; the only scribe module that imports
-  `infrastructure.i18n`. No Slack SDK import.
+  action ids and every translated string, reached through `core.api.translate`
+  (no scribe module imports `infrastructure.i18n`). No Slack SDK import.
 - `ports.py` — the scribe-owned interfaces: `IncidentDocumentStore`,
   `IncidentReportLinkLookup` and `TextGenerator`.
 - `service.py` — the draft and summarize use cases. It imports

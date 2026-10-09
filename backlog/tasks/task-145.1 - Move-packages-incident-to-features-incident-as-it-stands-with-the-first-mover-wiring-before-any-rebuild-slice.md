@@ -3,11 +3,11 @@ id: TASK-145.1
 title: >-
   Move packages/incident to features/incident as it stands, with the first-mover
   wiring, before any rebuild slice
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 18:33'
+updated_date: '2026-10-09 18:43'
 labels:
   - incident
   - features
