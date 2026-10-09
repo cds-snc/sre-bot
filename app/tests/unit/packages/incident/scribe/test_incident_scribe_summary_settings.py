@@ -22,7 +22,7 @@ class TestIncidentSummarySettings:
 
         settings = IncidentSummarySettings()
 
-        assert settings.DEFAULT_HISTORY_LIMIT == 500
+        assert settings.DEFAULT_HISTORY_LIMIT == 750
         assert settings.MAX_HISTORY_LIMIT == 1000
         assert settings.DEFAULT_SINCE_HOURS == 24
         assert settings.TIMEZONE == "America/Toronto"

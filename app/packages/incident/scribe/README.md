@@ -488,7 +488,7 @@ So the model is given:
 #### Usage
 
 ```
-/sre incident summarize                      # since channel creation, up to 500 messages (defaults)
+/sre incident summarize                      # since channel creation, up to 750 messages (defaults)
 /sre incident summarize --since 30m           # last 30 minutes
 /sre incident summarize --since 2h           # last 2 hours
 /sre incident summarize --since 90m --limit 100
@@ -499,7 +499,7 @@ So the model is given:
   treated as hours). Omitted → the incident channel's creation time (falling
   back to `INCIDENT_SUMMARY__DEFAULT_SINCE_HOURS`, 24h, if the channel start
   cannot be determined).
-- `--limit` — maximum messages to include. Omitted/invalid → default (500);
+- `--limit` — maximum messages to include. Omitted/invalid → default (750);
   capped at `INCIDENT_SUMMARY__MAX_HISTORY_LIMIT` (1000).
 
 #### Settings
