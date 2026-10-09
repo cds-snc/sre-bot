@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 17:13'
+updated_date: '2026-10-09 18:22'
 labels:
   - incident
   - features
@@ -42,3 +42,34 @@ THIS SLICE
 - [ ] #4 The pinned schedule flow passes unchanged
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Outline plan grounded at main d2d973ae (2026-10-09); re-ground at pickup (after TASK-145.6, TASK-138 and TASK-36.1).
+
+## Discovered state
+- modules/incident/schedule_retro.py (389): open_incident_retro_modal (67), view_save_event submission -> handle_schedule_retro_submit, confirm_click and user_select_action (incident_helper.py 158-160); calendar through packages.incident.scheduling (schedule_event 26, 241; availability 14), which TASK-138 turns into capabilities/calendar. Attendees come from channel members. The retrospective_url is written to the legacy item.
+- Not yet pinned (TASK-36.1).
+
+## Steps
+1. features/incident/postmortem/: __init__.py (hookimpls), settings.py (day offset default, meeting length), service.py schedule_meeting(incident, attendees, day_offset): availability and creation through capabilities.calendar.api, PostmortemMeetingReference written through IncidentStore.update_field, confirmation posted through IncidentConversation when writable; domain.py (attendee selection types).
+2. postmortem/entrypoints: /sre incident schedule under sre.incident, the modal (view_save_event -> incident.postmortem.schedule.save), confirm_click and user_select_action under incident.postmortem.* ids; the nudge's schedule button id comes from common/vocabulary (rendered by response, handled here). Views and locales (keys moved from app/locales/incident.*.yml; labels keep "retro" wording pending decision).
+3. Legacy schedule_retro.py registrations removed in the same PR; pinned by TASK-36.1.
+
+## AC traceability
+AC1: steps 1-2 -> registration test (modal and nudge button id). AC2: step 1 -> service tests with the calendar capability fake; `ls features/incident/postmortem` shows no adapters/. AC3: step 1 -> store update test (reference with system, tenant, event id). AC4: pinned flow green. AC5: gates.
+
+## Test matrix
+Schedule: first free slot found -> meeting created, reference stored, confirmation posted; no slot -> notice, nothing stored; archived channel -> stored without post; calendar failure classified. Attendee picker: channel members listed, selection kept across confirm.
+
+## Assumptions and doubts
+- capabilities.calendar.api shape per TASK-138 (MeetingScheduler, MeetingReference); confirm before coding.
+- Whether labels switch from "retro" to "postmortem" is open question 2 in the delivery plan.
+
+## Size
+About 300 production lines. Under the gate.
+
+## Blast radius and rollback
+One modal flow; revert restores the legacy registration.
+<!-- SECTION:PLAN:END -->
