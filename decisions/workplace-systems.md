@@ -61,7 +61,7 @@ Current state:
 
 ## Migration
 
-Tickets: TASK-38 (incident records into storage, decomposed in [incident-management.md](incident-management.md)) and TASK-39 (talent-role records, with the role surface rebuild); TASK-119, TASK-120 and TASK-121 (`directory`, `drive` and `spreadsheets` to `app/capabilities/`).
+Tickets: TASK-145 (incident records into storage, decomposed in [incident-management.md](incident-management.md); replaces TASK-38) and TASK-39 (talent-role records, with the role surface rebuild); TASK-119, TASK-120 and TASK-121 (`directory`, `drive` and `spreadsheets` to `app/capabilities/`).
 
 Tolerated until then:
 - the three workplace providers in `infrastructure/directory/`, `infrastructure/drive/` and `infrastructure/spreadsheets/`;

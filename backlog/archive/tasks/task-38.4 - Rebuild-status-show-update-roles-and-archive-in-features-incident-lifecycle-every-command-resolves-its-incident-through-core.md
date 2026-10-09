@@ -6,14 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
-updated_date: '2026-10-08 15:21'
+updated_date: '2026-10-09 17:00'
 labels:
   - migration
   - phase-5
   - incident
+  - superseded
 milestone: m-5
-dependencies:
-  - TASK-38.3
+dependencies: []
 references:
   - decisions/incident-management.md
   - decisions/feature-packages.md
@@ -26,6 +26,8 @@ ordinal: 309000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+SUPERSEDED (2026-10-09) by TASK-145.7: same slice, re-cut for the response | comms | postmortem subdomains, the interim store in packages/incident and the five roles. This task is kept as history and is not to be planned or implemented.
+
 Slice 4 of TASK-38 (migrate, second lifecycle slice). Rebuilds the /sre incident subcommands and interactions that read and change an incident: status updates (incident_status), the information display and update modals (information_display, information_update, update_incident_field, update_field_modal), roles (view_save_incident_roles, user_select_action), the folder-metadata interactions (add_folder_metadata, view_folder_metadata, view_folder_metadata_modal, add_metadata_view, delete_folder_metadata) over ProductCatalog, archive_channel, confirm_click, and the recreate-missing-resources path.
 
 RULES

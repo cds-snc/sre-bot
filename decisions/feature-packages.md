@@ -58,7 +58,7 @@ app/features/<feature>/
 Imports run one way: subdomains → `core/` → `common/`. Six rules keep the umbrella from becoming a god package:
 
 1. **The umbrella holds no code.** The plugin unit stays the subdomain, so registration granularity, enablement blast radius and strangler increments match a flat layout. [plugins.md](plugins.md) permits subdomain plugins.
-2. **A subdomain is a unit you would enable, own or delete on its own.** It groups the use cases that are switched on together. One command is not a subdomain: two commands that are never enabled separately are two handlers and two service functions in one subdomain. Inside a subdomain, modules import each other freely.
+2. **A subdomain is a purpose in the feature's process, named in the domain's words.** It passes three tests: (a) it has a distinct audience or outcome in that process; (b) its name is the domain's word for that purpose; (c) it is never named for a mechanism or for the capability it uses. A subdomain for everything that calls the text-generation capability is a mechanism bucket, the same mistake as a `database` subdomain. One command is not a subdomain: it joins the subdomain whose users need it at that point in the process, so two commands that are never enabled separately are two handlers and two service functions in one subdomain. Inside a subdomain, modules import each other freely.
 3. **Subdomains never import each other.** A disabled subdomain registers nothing ([plugins.md](plugins.md)), so a sibling that imported it would call into a plugin that was never wired. What two subdomains share moves down into `core/` or `common/`, or out to a capability when its vocabulary is feature-free ([plugin-architecture.md](plugin-architecture.md)).
 4. **`core/` holds what every subdomain works on, and may do I/O.** That is the feature's record and its store, purpose-shaped interfaces for the resources the record references (an incident's conversation, its report) with one adapter per system, and the checks every subdomain applies (which incident does this command refer to, and may it still be changed). An item enters `core/` when it is the feature's record itself or has two or more subdomain consumers. `core/` uses the layout table without `entrypoints/`: it is not a plugin, so it has no hookimpls, no entry point and no enablement key. Subdomains import only `core/api.py` (Protocols, domain types, provider functions), as they would a capability's. Most of an umbrella's `adapters/` live here, so a subdomain often has none.
 5. **`common/` admits only types and values with two or more subdomain consumers and no I/O.** Once an item there calls a backing service, it moves to `core/`.
@@ -93,7 +93,7 @@ A handler (any platform) does five things and nothing else: receive the platform
 - Features and capabilities share one shape, so moving a need from a feature into a capability changes paths and imports, not structure.
 - Subdomains stay small: a handler, a service and little else. Adapters, wiring and the record are written once per feature, in `core/`.
 - Cost, accepted: every current package moves and renames `platforms/` and `interactions/` to `entrypoints/`. These are import-path and entry-point-name changes with no runtime surface change.
-- Cost, accepted: `incident_draft` and `incident_summary` are reshaped, not just moved. They become use cases of one incident subdomain over `core/`, and the I/O in `access/common` moves to `access/core/`.
+- Cost, accepted: `incident_draft` and `incident_summary` are reshaped, not just moved: first into one `scribe` subdomain by mechanism (TASK-135), then into the `postmortem` and `response` subdomains by purpose (TASK-145). The I/O in `access/common` moves to `access/core/`.
 - Risk: `core/` becomes the feature's grab-bag. Mitigation: the admission test in rule 4, `api.py` as its only public surface, and no entry points.
 
 ## Checks
@@ -108,7 +108,7 @@ A handler (any platform) does five things and nothing else: receive the platform
 
 ## Migration
 
-Tickets: TASK-18 (import-linter contracts), TASK-38 (incident), TASK-124 (package moves, including the `access/core/` split), TASK-135 (`incident_draft` and `incident_summary` reshaped onto `core/`), and the generator and shape check listed in [plugin-architecture.md](plugin-architecture.md)'s Migration.
+Tickets: TASK-18 (import-linter contracts), TASK-145 (incident, replacing TASK-38), TASK-146 (on-call), TASK-124 (package moves, including the `access/core/` split), and the generator and shape check listed in [plugin-architecture.md](plugin-architecture.md)'s Migration.
 
 Tolerated until then:
 - packages in `app/packages/`, with no generator and no shape check;
@@ -128,3 +128,4 @@ Tolerated until then:
 - 2026-10-02: Protocols are named for their role, never with a `Port` suffix, and prose says "interface" (TASK-136).
 - 2026-10-02: `incident_draft` and `incident_summary` are now the `scribe` subdomain of `packages/incident/`, reading the transcript through `core/` (TASK-135); Context and the tolerated list no longer name them as separate packages.
 - 2026-10-09: `incident/scribe` Slack handlers merged into `entrypoints/` (TASK-144.1); Context no longer lists it among the packages with `platforms/`.
+- 2026-10-09: rule 2 becomes the purpose test (audience or outcome, the domain's word, never a mechanism); TASK-135 had merged two packages by mechanism and this rule would have caught it (TASK-145).

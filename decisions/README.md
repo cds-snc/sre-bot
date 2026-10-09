@@ -15,13 +15,14 @@ Everything else is reference: read it when the topic comes up.
 
 ## The vision in three sentences
 
-The app is a platform that other teams extend: a host (`app/server/`) loads feature and capability plugins at startup, and plugins build only against a small public API (`app/contracts/`). **Features** (`app/features/`) hold business logic, **capabilities** (`app/capabilities/`) hold engines and shared business services such as approvals, notifications, people and workplace systems, and neither ever imports the host or the hosting code. **Infrastructure** (`app/infrastructure/`) implements the hosting contracts (storage, queue, coordination, secrets) so the app can move between clouds, and **integrations** (`app/integrations/`) are thin clients for third-party services.
+The app is the organisation's internal operations platform, with incident response as its first-class area ([product-scope.md](product-scope.md)), that other teams extend: a host (`app/server/`) loads feature and capability plugins at startup, and plugins build only against a small public API (`app/contracts/`). **Features** (`app/features/`) hold business logic, **capabilities** (`app/capabilities/`) hold engines and shared business services such as approvals, notifications, people and workplace systems, and neither ever imports the host or the hosting code. **Infrastructure** (`app/infrastructure/`) implements the hosting contracts (storage, queue, coordination, secrets) so the app can move between clouds, and **integrations** (`app/integrations/`) are thin clients for third-party services.
 
 ## Record index
 
 | Record | Scope | Applies |
 | --- | --- | --- |
 | [governance.md](governance.md) | How decisions are written and changed | now |
+| [product-scope.md](product-scope.md) | What the bot is for, its four product areas, and when an area would leave for its own app | now |
 | [plugin-architecture.md](plugin-architecture.md) | The six layers, their import rules, the service registry, extension points and plugin enablement | target |
 | [workplace-systems.md](workplace-systems.md) | Hosting services vs workplace systems, records of truth in storage | target |
 | [people-and-accounts.md](people-and-accounts.md) | People, IdP identities and linked platform accounts, caller resolution, conversation origin | target |
@@ -48,6 +49,7 @@ The app is a platform that other teams extend: a host (`app/server/`) loads feat
 | [health-checks.md](health-checks.md) | Static liveness and readiness; container, ECS, ALB and Route53 health-check layering | target |
 | [reliability.md](reliability.md) | Idempotency, queuing, background jobs | target |
 | [approvals.md](approvals.md) | Generic human-approval workflow capability | target |
+| [oncall.md](oncall.md) | On-call as a capability: schedule sources, who is on call now, incident and usergroup-sync consumers | target |
 | [lifecycle.md](lifecycle.md) | Phased startup, which failures abort boot, credential checks, shutdown across replicas | target |
 | [toolchain.md](toolchain.md) | uv, Python version, lint, types, CI gates | target |
 | [testing.md](testing.md) | Test layers, doubles, coverage | target |

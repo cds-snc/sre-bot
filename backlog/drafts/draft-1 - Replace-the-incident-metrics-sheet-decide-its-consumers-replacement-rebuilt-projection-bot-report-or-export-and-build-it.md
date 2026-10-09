@@ -6,11 +6,12 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-10-02 16:44'
+updated_date: '2026-10-09 17:14'
 labels:
   - incident
   - later-wave
 dependencies:
-  - TASK-38.7
+  - TASK-145.12
 references:
   - decisions/incident-management.md
   - decisions/workplace-systems.md
@@ -21,7 +22,7 @@ priority: low
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-EXPANSION (after doc-2 is finished; not before). decisions/incident-management.md keeps the incident list sheet as a write-only projection through the migration (TASK-38.7). This task decides and builds what the sheet's consumers get in the end state.
+EXPANSION (after doc-2 is finished; not before). decisions/incident-management.md keeps the incident list sheet as a write-only projection through the migration (TASK-145.11). This task decides and builds what the sheet's consumers get in the end state.
 
 OPEN QUESTION FOR THE HUMAN before planning: who reads the sheet today (SRE leads, management, the GC Notify team, an audit function), how often and for what (counts by status and product, time to resolve, yearly roll-ups), and whether history must be backfilled into app storage or the old sheet stays a read-only archive. The answer picks among: keep the rebuilt projection; a /sre incident report command or scheduled channel post from the store; a periodic export. Whatever is chosen reads IncidentStore only.
 <!-- SECTION:DESCRIPTION:END -->

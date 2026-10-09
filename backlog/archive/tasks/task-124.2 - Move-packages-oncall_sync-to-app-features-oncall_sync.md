@@ -4,16 +4,16 @@ title: Move packages/oncall_sync to app/features/oncall_sync/
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:01'
-updated_date: '2026-09-29 18:53'
+updated_date: '2026-10-09 17:00'
 labels:
   - plugin-architecture
   - features
+  - superseded
 milestone: m-7
 dependencies:
   - TASK-109
   - TASK-110
   - TASK-114
-  - TASK-123
   - TASK-25.4
   - TASK-25.6
 references:
@@ -28,6 +28,8 @@ ordinal: 268000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+SUPERSEDED (2026-10-09) by TASK-146.2: oncall_sync moves once it consumes the on-call capability. This task is kept as history and is not to be planned or implemented.
+
 Child of TASK-124. oncall_sync has a ports.py outside the layout table. Its Slack client is already built in adapters/slack.py (build_user_group_sync_target, through the TASK-25.4 factory), so providers.py imports nothing from integrations/. It moves after the rotations capability (TASK-123) removes its feature-to-feature import, and after TASK-25.6 moves the Opsgenie operations into its adapters.
 <!-- SECTION:DESCRIPTION:END -->
 

@@ -36,7 +36,7 @@ Current state:
 | --- | --- | --- |
 | `server/` | The host: composition root, lifespan, plugin manager, transport runtimes (Bolt), and the framework services' implementations (i18n, auth, logging setup) | everything |
 | `features/` | Business feature plugins | `contracts`, capabilities' `api.py`; its `adapters/` may import `integrations` |
-| `capabilities/` | Engines and shared business capabilities (approvals, notifications, audit trail, people and accounts, workplace systems, text generation) | `contracts`, lower capabilities' `api.py`; its `adapters/` may import `integrations` |
+| `capabilities/` | Engines and shared business capabilities (approvals, notifications, audit trail, people and accounts, workplace systems, text generation, on-call) | `contracts`, lower capabilities' `api.py`; its `adapters/` may import `integrations` |
 | `infrastructure/` | Hosting implementations of `contracts` Protocols | `contracts`, `integrations` |
 | `integrations/` | Vendor clients ([outbound-clients.md](outbound-clients.md), unchanged) | `contracts` (shared types only) |
 | `contracts/` | The public plugin API | the standard library, `typing`, `pluggy` markers and the third-party types a hookspec parameter names (FastAPI, structlog) only |
@@ -137,3 +137,4 @@ Tolerated until then:
 - 2026-09-28: TASK-106 created `app/contracts/` with `contracts/operations/` and import-linter contract (c); `OperationResult` is no longer a tolerated divergence.
 - 2026-10-01: text generation is a capability; needs shared by one feature's subdomains go to that feature's `core/`, per feature-packages.md.
 - 2026-10-01: `contracts/` may import the third-party types a hookspec parameter names (FastAPI, structlog); pluggy evaluates hookspec annotations at registration, so they cannot be deferred (TASK-107).
+- 2026-10-09: on-call is a capability ([oncall.md](oncall.md), TASK-146).

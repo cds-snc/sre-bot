@@ -45,7 +45,7 @@ No migration is left half-done: a surface is either legacy or rebuilt, never bot
 | Directory | Disposition | Ticket |
 | --- | --- | --- |
 | `packages/` | Current feature home. Each feature moves to `features/`, and shared engines to `capabilities/`, one package per PR. | [plugin-architecture.md](plugin-architecture.md) Migration |
-| `modules/` | Legacy Slack bot. Rebuilt surface by surface into features and capabilities, then deleted. | TASK-37, TASK-38, TASK-39, TASK-40, TASK-41 |
+| `modules/` | Legacy Slack bot. Rebuilt surface by surface into features and capabilities, then deleted. | TASK-37, TASK-145 (incident, replacing TASK-38), TASK-39, TASK-40, TASK-41 |
 | `jobs/` | Scheduler registry. Each job moves to its owning feature or capability and registers through the scheduler contract in `contracts/`; the runtime moves to `server/` and runs each job once across replicas on a coordination lease. | TASK-52 |
 | `api/` | Legacy HTTP surface. Feature routes move to their owning packages; system endpoints (health, version, landing) move to `server/`. | TASK-53 |
 | `bin/` | Operator and dev tooling, not app runtime code, so exempt from the layer contracts. Kept; `entry.sh`'s boot-time secret fetch retires once the secrets contract has an implementation. | TASK-54 |

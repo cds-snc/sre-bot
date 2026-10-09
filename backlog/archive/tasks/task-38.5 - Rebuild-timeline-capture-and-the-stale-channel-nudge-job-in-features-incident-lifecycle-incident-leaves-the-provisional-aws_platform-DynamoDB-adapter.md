@@ -7,14 +7,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
-updated_date: '2026-10-08 15:01'
+updated_date: '2026-10-09 17:00'
 labels:
   - migration
   - phase-5
   - incident
+  - superseded
 milestone: m-5
 dependencies:
-  - TASK-38.4
   - TASK-36.3
   - TASK-64
 references:
@@ -30,6 +30,8 @@ ordinal: 310000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+SUPERSEDED (2026-10-09) by TASK-145.8: same slice, re-cut for the response | comms | postmortem subdomains, the interim store in packages/incident and the five roles. This task is kept as history and is not to be planned or implemented.
+
 Slice 5 of TASK-38 (migrate, third lifecycle slice). Rebuilds the floppy-disk reaction_added and reaction_removed handlers (message captured into the report's timeline and into the record's timeline entries; removal deletes both), the ack-only reaction fallbacks, and the notify_stale_incident_channels job, then deletes modules/incident/db_operations.py.
 
 JOB: registered by lifecycle through the register_background_jobs hookimpl with its schedule, Tier-2 classification and lease TTL from the lifecycle settings slice (reliability.md, the TASK-65 pattern); the hand-import in app/jobs/scheduled_tasks.py is deleted. Stale detection reads the store (incidents with no timeline entry or status change for the configured window), not a channel-name regex; the nudge message carries the archive action id and the schedule-retro action id from common/vocabulary. Safe to run twice.

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-16 13:58'
-updated_date: '2026-09-24 20:11'
+updated_date: '2026-10-09 17:01'
 labels:
   - infrastructure
   - phase-4
@@ -37,7 +37,7 @@ OPERATIONS
 
 SEQUENCING. Merge this immediately before TASK-37.1, or in the same PR if the size gate allows, so no operation lands without a consumer. If TASK-37.1 slips, this slice waits with it.
 
-NOT IN SCOPE. Appending to a list attribute (modules/incident/db_operations.py log_activity uses DynamoDB list_append on an incident logs attribute). That is not a capability-shaped operation, it is a data-model problem: activity log entries almost certainly want to be their own items under the incident partition rather than an unbounded list attribute on one item. The decision belongs to TASK-38 planning, not to the storage Protocol. Also out of scope: the atomic multi-item conditional write TASK-83.2 owns.
+NOT IN SCOPE. Appending to a list attribute (modules/incident/db_operations.py log_activity uses DynamoDB list_append on an incident logs attribute). That is not a capability-shaped operation, it is a data-model problem: activity log entries almost certainly want to be their own items under the incident partition rather than an unbounded list attribute on one item. The decision belongs to TASK-145 planning, not to the storage Protocol. Also out of scope: the atomic multi-item conditional write TASK-83.2 owns.
 
 CONDITIONS FROM SLICE 1. gt and between sort-key conditions are still gated on a real consumer; if TASK-37.1 or a co-landing consumer needs one, add it here with that justification recorded.
 <!-- SECTION:DESCRIPTION:END -->

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-01 14:05'
-updated_date: '2026-10-02 17:44'
+updated_date: '2026-10-09 17:01'
 labels:
   - plugin-architecture
   - capabilities
@@ -37,7 +37,7 @@ RULES
 - Behaviour-preserving for /sre incident draft: same document content for the same model output, pinned by the existing scribe draft service tests (tests/unit/packages/incident/scribe/test_incident_scribe_draft_service.py) and the TASK-36 legacy_surface suite.
 - migration.md rule 6: the capability is not widened to reproduce incident conventions.
 
-Independent of the incident reshape task; either order works, and TASK-124.5 waits for both.
+Independent of the incident reshape task; either order works, and TASK-145.13 waits for both.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

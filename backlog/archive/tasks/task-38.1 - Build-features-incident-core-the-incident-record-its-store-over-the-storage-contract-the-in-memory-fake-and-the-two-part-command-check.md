@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
-updated_date: '2026-10-07 14:20'
+updated_date: '2026-10-09 16:49'
 labels:
   - migration
   - phase-5
   - incident
+  - superseded
 milestone: m-5
 dependencies:
   - TASK-124.5
@@ -30,6 +31,8 @@ ordinal: 306000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+SUPERSEDED (2026-10-09) by TASK-145.4: same slice, re-cut for the response | comms | postmortem subdomains, the interim store in packages/incident and the five roles. This task is kept as history and is not to be planned or implemented.
+
 Slice 1 of TASK-38 (expand). decisions/incident-management.md: the system of record is the incident record in app storage, keyed by an app-generated id; the conversation is a resource of the incident, never its key.
 
 THIS SLICE builds features/incident/core/ and features/incident/common/ with no consumer yet:

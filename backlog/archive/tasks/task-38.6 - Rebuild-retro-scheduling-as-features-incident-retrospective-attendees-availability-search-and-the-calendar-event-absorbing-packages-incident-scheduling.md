@@ -6,14 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
-updated_date: '2026-10-02 16:59'
+updated_date: '2026-10-09 17:00'
 labels:
   - migration
   - phase-5
   - incident
+  - superseded
 milestone: m-5
 dependencies:
-  - TASK-38.2
   - TASK-36.1
   - TASK-138
 references:
@@ -30,6 +30,8 @@ ordinal: 311000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+SUPERSEDED (2026-10-09) by TASK-145.9: same slice, re-cut for the response | comms | postmortem subdomains, the interim store in packages/incident and the five roles. This task is kept as history and is not to be planned or implemented.
+
 Slice 6 of TASK-38 (migrate). Rebuilds schedule_retro (the view_save_event modal flow, the schedule-retro button from the nudge, availability search and meeting creation) as features/incident/retrospective/ (entry point incident.retrospective), independently of the lifecycle slices. A retrospective is a meeting about the incident: calendar operations come from the calendar capability (decisions/incident-management.md; the capability task is a dependency), so this subdomain has no calendar adapter of its own.
 
 THIS SLICE

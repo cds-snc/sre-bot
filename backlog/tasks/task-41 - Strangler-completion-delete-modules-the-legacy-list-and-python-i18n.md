@@ -4,7 +4,7 @@ title: 'Strangler completion: delete modules/, the legacy list, and python-i18n'
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-24 20:06'
+updated_date: '2026-10-09 17:01'
 labels:
   - migration
   - phase-5
@@ -12,7 +12,7 @@ milestone: m-5
 dependencies:
   - TASK-35
   - TASK-37
-  - TASK-38
+  - TASK-145
   - TASK-39
   - TASK-40
   - TASK-88
@@ -27,7 +27,7 @@ ordinal: 41000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-The "Done means" checklist of decisions/migration.md, executed once every legacy surface is rebuilt (TASK-37, TASK-38, TASK-39, TASK-40, TASK-88). Updated 2026-09-24: plugins load only from pyproject entry points (TASK-110), so there are no discovery paths to edit, and app/infrastructure/plugins/ is gone (TASK-107).
+The "Done means" checklist of decisions/migration.md, executed once every legacy surface is rebuilt (TASK-37, TASK-145, TASK-39, TASK-40, TASK-88). Updated 2026-09-24: plugins load only from pyproject entry points (TASK-110), so there are no discovery paths to edit, and app/infrastructure/plugins/ is gone (TASK-107).
 
 Steps:
 1. Delete _register_legacy_handlers() from app/server/lifespan.py.

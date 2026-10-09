@@ -6,10 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-10-02 17:00'
+updated_date: '2026-10-09 16:49'
 labels:
   - migration
   - phase-5
+  - superseded
 milestone: m-5
 dependencies:
   - TASK-36.1
@@ -33,6 +34,8 @@ ordinal: 38000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+SUPERSEDED (2026-10-09) by TASK-145: the rebuild is re-cut over response, comms and postmortem subdomains (scribe dissolved) with the record gaining severity and five roles. This task is kept as history and is not to be planned or implemented.
+
 COORDINATOR since 2026-10-02: contains no implementation. Decided by TASK-97 (decisions/incident-management.md, Accepted 2026-10-02): the bot owns incident management, the system of record is the incident record in app storage, the conversation is a resource of the incident and never its key, and an external case platform is optional behind a feature-owned ExternalCaseRecorder (no adapter in this series). The rebuild is behaviour-preserving: the current behaviour is preserved while doc-2's sequence runs, and the feature expands afterwards (drafts under TASK-97).
 
 Rescoped 2026-09-24 to decisions/plugin-architecture.md and migration.md: legacy modules are rebuilt by surface, not moved. Each user-facing surface of modules/incident is assigned to its target in the TASK-36 inventory, pinned by smoke tests, rebuilt in the standard shape, and cut over; the module is deleted when its last surface has moved. The relocation of the incident umbrella is TASK-124.5, after TASK-135 reshapes incident_draft and incident_summary into the scribe subdomain over incident/core, so this ticket builds on features/incident/ and never on packages/.

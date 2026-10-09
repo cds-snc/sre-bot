@@ -6,14 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-24 20:06'
+updated_date: '2026-10-09 17:01'
 labels:
   - migration
   - phase-5
 milestone: m-5
 dependencies:
   - TASK-37
-  - TASK-38
+  - TASK-145
   - TASK-39
   - TASK-35
   - TASK-26.1
@@ -32,7 +32,7 @@ ordinal: 40000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Rescoped 2026-09-24 to decisions/plugin-architecture.md and migration.md: rebuild by surface, not by module. modules/sre and modules/aws are grab-bags of unrelated commands, so each surface goes to the feature or capability that owns what it does, as assigned in the TASK-36 inventory, never to a module-shaped package.
 
-Scope: every surface still under app/modules/ after TASK-37 (webhooks), TASK-38 (incident) and TASK-39 (role, secret, atip), except aws and provisioning, which TASK-88 owns. Expected remainder (verified 2026-09-24): ops, permissions, slack and dev/sre, after TASK-35 settles their registration. modules/reports holds only __pycache__ (its code was deleted by TASK-25.1.6.10.1); delete the directory here.
+Scope: every surface still under app/modules/ after TASK-37 (webhooks), TASK-145 (incident) and TASK-39 (role, secret, atip), except aws and provisioning, which TASK-88 owns. Expected remainder (verified 2026-09-24): ops, permissions, slack and dev/sre, after TASK-35 settles their registration. modules/reports holds only __pycache__ (its code was deleted by TASK-25.1.6.10.1); delete the directory here.
 
 Steps:
 1. Order the remainder by risk x value with the maintainer; append the chosen order to this task before starting.

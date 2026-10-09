@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 16:51'
-updated_date: '2026-09-25 15:00'
+updated_date: '2026-10-09 17:01'
 labels:
   - clients
   - phase-3
@@ -41,7 +41,7 @@ CONSUMERS (re-grep before planning):
 - modules/incident/on_call.py (get_on_call_users);
 - jobs/scheduled_tasks.py (the healthcheck).
 
-TARGET. The vendor package exports an authenticated HTTP client factory with an explicit timeout and a retry policy set once at construction (the planner picks the HTTP library; the codebase already uses httpx and requests), classify_opsgenie_error, and nothing else. The on-call and alert operations move into the adapters that need them: the oncall_sync adapter, and an adapter for the legacy incident and healthcheck call sites (a legacy caller may keep a thin module-local helper until TASK-38 migrates incident). create_alert is a non-idempotent write: name its idempotency mechanism (Opsgenie alias dedup) or send it with retries disabled.
+TARGET. The vendor package exports an authenticated HTTP client factory with an explicit timeout and a retry policy set once at construction (the planner picks the HTTP library; the codebase already uses httpx and requests), classify_opsgenie_error, and nothing else. The on-call and alert operations move into the adapters that need them: the oncall_sync adapter, and an adapter for the legacy incident and healthcheck call sites (a legacy caller may keep a thin module-local helper until TASK-145 migrates incident). create_alert is a non-idempotent write: name its idempotency mechanism (Opsgenie alias dedup) or send it with retries disabled.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

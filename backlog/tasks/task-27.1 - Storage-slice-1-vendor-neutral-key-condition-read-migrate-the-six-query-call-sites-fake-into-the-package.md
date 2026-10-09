@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-16 13:57'
-updated_date: '2026-09-24 20:11'
+updated_date: '2026-10-09 17:01'
 labels:
   - infrastructure
   - phase-4
@@ -29,7 +29,7 @@ ordinal: 219000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Slice 1 of TASK-27 (see the coordinator plan). Pulled forward: this slice is disjoint from TASK-25.2.5 (different files) and can run in parallel with it rather than waiting for the rest of m-4.
 
-WHY NOW. StorageService.query(table, key_condition: str, ...) leaks DynamoDB KeyConditionExpression through a Path A Protocol, the counterexample decisions/cloud-portability.md contract 4 names by hand. It has exactly six call sites today, in four files, and neither consumer is live in production: infrastructure/audit's service has no importer outside its own package (integrations/sentinel/client.py imports only audit.models), and packages/access is not enabled yet (TASK-25.2 scope note). This is the cheapest this change will ever be, and it gets more expensive with every new consumer: TASK-32, TASK-60, TASK-83, TASK-83.2, TASK-37.1 and TASK-38 all write against this Protocol.
+WHY NOW. StorageService.query(table, key_condition: str, ...) leaks DynamoDB KeyConditionExpression through a Path A Protocol, the counterexample decisions/cloud-portability.md contract 4 names by hand. It has exactly six call sites today, in four files, and neither consumer is live in production: infrastructure/audit's service has no importer outside its own package (integrations/sentinel/client.py imports only audit.models), and packages/access is not enabled yet (TASK-25.2 scope note). This is the cheapest this change will ever be, and it gets more expensive with every new consumer: TASK-32, TASK-60, TASK-83, TASK-83.2, TASK-37.1 and TASK-145 all write against this Protocol.
 
 THE SIX CALL SITES (read 2026-09-16)
 - infrastructure/audit/service.py:151 resource_id = :rid, plus an optional AND timestamp_correlation_id < :ts; Limit, ScanIndexForward=False

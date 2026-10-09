@@ -6,12 +6,12 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-10-02 16:44'
-updated_date: '2026-10-06 19:05'
+updated_date: '2026-10-09 17:14'
 labels:
   - incident
   - later-wave
 dependencies:
-  - TASK-38.8
+  - TASK-145.13
 references:
   - decisions/incident-management.md
 parent_task_id: TASK-97

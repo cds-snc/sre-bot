@@ -7,13 +7,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:43'
+updated_date: '2026-10-09 17:00'
 labels:
   - migration
   - phase-5
   - incident
+  - superseded
 milestone: m-5
 dependencies:
-  - TASK-38.2
   - TASK-36.1
   - TASK-37
 references:
@@ -28,6 +29,8 @@ ordinal: 308000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
+SUPERSEDED (2026-10-09) by TASK-145.6: same slice, re-cut for the response | comms | postmortem subdomains, the interim store in packages/incident and the five roles. This task is kept as history and is not to be planned or implemented.
+
 Slice 3 of TASK-38 (migrate, first lifecycle slice). Rebuilds the /incident command, the incident_view modal, the incident_change_locale action and the call-incident / ignore-incident alert buttons as features/incident/lifecycle/ (entry point incident.lifecycle), and cuts them over.
 
 THIS SLICE
