@@ -16,7 +16,7 @@ Features live in `app/packages/` today; `features/` and `capabilities/` do not e
 - `access/request` and `access/sync` publish and handle domain events through the blinker-backed `infrastructure.events` dispatcher.
 - `access/common` reads runtime-config files and holds a cached provider, although `common/` is meant to do no I/O.
 
-`packages/access/` and `packages/incident/` are umbrellas with empty `__init__.py` files. No entry points are declared yet.
+`packages/access/` and `features/incident/` are umbrellas with empty `__init__.py` files. No entry points are declared yet.
 
 ## Decision
 

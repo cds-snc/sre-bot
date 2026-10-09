@@ -42,7 +42,7 @@ dependencies = [
 "access.request" = "packages.access.request"
 "access.sync" = "packages.access.sync"
 geolocate = "packages.geolocate"
-"incident.scribe" = "packages.incident.scribe"
+"incident.scribe" = "features.incident.scribe"
 oncall_sync = "packages.oncall_sync"
 rant = "packages.rant"
 user_rotations = "packages.user_rotations"
@@ -209,14 +209,14 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["api", "contracts", "infrastructure", "integrations", "jobs", "models", "modules", "packages", "server", "utils"]
+packages = ["api", "contracts", "features", "infrastructure", "integrations", "jobs", "models", "modules", "packages", "server", "utils"]
 
 [tool.importlinter]
 # Enforces decisions/plugin-architecture.md (six layers) with the transitional
-# packages from decisions/migration.md. features and capabilities are listed as
-# optional layers; add each to root_packages in the PR that creates it
+# packages from decisions/migration.md. capabilities is listed as an optional
+# layer; add it to root_packages in the PR that creates it
 # (import-linter rejects a root package that does not exist).
-root_packages = ["server", "packages", "infrastructure", "integrations", "modules", "api", "jobs", "models", "utils", "contracts"]
+root_packages = ["server", "packages", "features", "infrastructure", "integrations", "modules", "api", "jobs", "models", "utils", "contracts"]
 # Third-party packages join the graph so contract (j) can name slack_bolt.
 include_external_packages = true
 
@@ -254,7 +254,7 @@ ignore_imports = [
 id = "no-host-imports"
 name = "(b) Packages, features and capabilities never import infrastructure or server"
 type = "forbidden"
-source_modules = ["packages"]
+source_modules = ["packages", "features"]
 forbidden_modules = ["infrastructure", "server"]
 # Direct imports only: chains through integrations are tracked by contract (d).
 allow_indirect_imports = true
@@ -296,13 +296,13 @@ ignore_imports = [
     "packages.access.sync.providers -> infrastructure.storage",
     "packages.access.sync.store -> infrastructure.storage.protocol",
     "packages.geolocate.platforms.slack -> infrastructure.i18n",
-    "packages.incident.drive.adapters.google_drive -> infrastructure.configuration.integrations.google",
-    "packages.incident.drive.adapters.google_drive -> infrastructure.drive",
-    "packages.incident.drive.adapters.google_drive -> infrastructure.drive.factory",
-    "packages.incident.drive.adapters.google_drive -> infrastructure.drive.models",
-    "packages.incident.scribe.adapters.google_docs -> infrastructure.configuration.integrations.google",
-    "packages.incident.scribe.adapters.google_docs -> infrastructure.drive",
-    "packages.incident.scribe.entrypoints.slack_views -> infrastructure.i18n",
+    "features.incident.drive.adapters.google_drive -> infrastructure.configuration.integrations.google",
+    "features.incident.drive.adapters.google_drive -> infrastructure.drive",
+    "features.incident.drive.adapters.google_drive -> infrastructure.drive.factory",
+    "features.incident.drive.adapters.google_drive -> infrastructure.drive.models",
+    "features.incident.scribe.adapters.google_docs -> infrastructure.configuration.integrations.google",
+    "features.incident.scribe.adapters.google_docs -> infrastructure.drive",
+    "features.incident.scribe.entrypoints.slack_views -> infrastructure.i18n",
     "packages.talent.adapters.google_drive -> infrastructure.configuration.integrations.google",
     "packages.talent.adapters.google_drive -> infrastructure.drive.factory",
 ]
@@ -312,14 +312,14 @@ id = "contracts-leaf"
 name = "(c) contracts imports nothing else from the app"
 type = "forbidden"
 source_modules = ["contracts"]
-forbidden_modules = ["server", "packages", "infrastructure", "integrations", "modules", "api", "jobs", "models", "utils"]
+forbidden_modules = ["server", "packages", "features", "infrastructure", "integrations", "modules", "api", "jobs", "models", "utils"]
 
 [[tool.importlinter.contracts]]
 id = "integrations-leaf"
 name = "(d) integrations imports nothing from the app except contracts"
 type = "forbidden"
 source_modules = ["integrations"]
-forbidden_modules = ["server", "packages", "infrastructure", "modules", "api", "jobs", "models", "utils"]
+forbidden_modules = ["server", "packages", "features", "infrastructure", "modules", "api", "jobs", "models", "utils"]
 unmatched_ignore_imports_alerting = "error"
 ignore_imports = [
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/outbound-clients.md Migration).
@@ -339,19 +339,19 @@ ignore_imports = [
 
 [[tool.importlinter.contracts]]
 id = "integrations-via-adapters"
-name = "(e) packages import integrations only from adapters/ modules"
+name = "(e) packages and features import integrations only from adapters/ modules"
 type = "forbidden"
-source_modules = ["packages"]
+source_modules = ["packages", "features"]
 forbidden_modules = ["integrations"]
 # Direct imports only: chains through infrastructure are tracked by contracts (a) and (b).
 allow_indirect_imports = true
 unmatched_ignore_imports_alerting = "error"
 ignore_imports = [
-    # Permanent: adapters/ is where a package may import integrations (decisions/outbound-clients.md).
-    "packages.**.adapters.** -> integrations.**",
+    # Permanent: adapters/ is where a package or feature may import integrations (decisions/outbound-clients.md).
+    "**.adapters.** -> integrations.**",
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/outbound-clients.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one.
-    "packages.incident.scribe.service -> integrations.openai",
+    "features.incident.scribe.service -> integrations.openai",
 ]
 
 [[tool.importlinter.contracts]]
@@ -362,7 +362,7 @@ modules = [
     "packages.access",
     "packages.aws_platform",
     "packages.geolocate",
-    "packages.incident",
+    "features.incident",
     "packages.oncall_sync",
     "packages.rant",
     "packages.talent",
@@ -381,7 +381,7 @@ ignore_imports = [
 id = "no-legacy-imports"
 name = "(g) Nothing outside the legacy tree imports modules"
 type = "forbidden"
-source_modules = ["packages", "infrastructure", "integrations"]
+source_modules = ["packages", "features", "infrastructure", "integrations"]
 forbidden_modules = ["modules"]
 
 [[tool.importlinter.contracts]]
@@ -399,7 +399,7 @@ exhaustive = true
 id = "incident-umbrella"
 name = "(i) Incident subdomains are independent siblings over core"
 type = "layers"
-containers = ["packages.incident"]
+containers = ["features.incident"]
 layers = [
     "documents | drive | meet | scheduling | scribe",
     "core",

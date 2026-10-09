@@ -14,10 +14,10 @@ from slack_sdk.web import WebClient
 from structlog import get_logger
 
 from contracts.operations import OperationStatus
+from features.incident.drive.adapters import google_drive as incident_drive
 from infrastructure.configuration.integrations.google import get_google_resources_config
 from infrastructure.spreadsheets import RANGE_NOT_FOUND, get_spreadsheet_provider
 from modules.incident import db_operations
-from packages.incident.drive.adapters import google_drive as incident_drive
 
 google_resources = get_google_resources_config()
 SRE_INCIDENT_FOLDER = google_resources.incident_folder_id

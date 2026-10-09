@@ -5,7 +5,7 @@ from typing import Any
 from slack_sdk.web import WebClient
 from structlog import get_logger
 
-from packages.incident.drive.adapters import google_drive as incident_drive
+from features.incident.drive.adapters import google_drive as incident_drive
 
 logger = get_logger()
 

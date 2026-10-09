@@ -3,10 +3,11 @@ id: TASK-145.1
 title: >-
   Move packages/incident to features/incident as it stands, with the first-mover
   wiring, before any rebuild slice
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 18:22'
+updated_date: '2026-10-09 18:33'
 labels:
   - incident
   - features
@@ -35,11 +36,11 @@ THIS SLICE
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/features/incident/ holds core, scribe, documents, drive, meet and scheduling unchanged; app/packages/incident/ does not exist; every importer and patch string is rewritten
-- [ ] #2 features is a hatch wheel package, an import-linter root package and a ruff first-party package; every contract naming packages also names features; the umbrella and independence contracts name features.incident
-- [ ] #3 The entry point incident.scribe targets features.incident.scribe; the import-linter ignore list only renamed entries and did not grow
-- [ ] #4 Tests live under tests/unit/features/incident/ and tests/integration/features/incident/ and pass unchanged apart from paths; the legacy_surface suite passes
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 app/features/incident/ holds core, scribe, documents, drive, meet and scheduling unchanged; app/packages/incident/ does not exist; every importer and patch string is rewritten
+- [x] #2 features is a hatch wheel package, an import-linter root package and a ruff first-party package; every contract naming packages also names features; the umbrella and independence contracts name features.incident
+- [x] #3 The entry point incident.scribe targets features.incident.scribe; the import-linter ignore list only renamed entries and did not grow
+- [x] #4 Tests live under tests/unit/features/incident/ and tests/integration/features/incident/ and pass unchanged apart from paths; the legacy_surface suite passes
+- [x] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -86,3 +87,26 @@ About 130 files, nearly all renames; roughly 60 import lines and 10 pyproject li
 ## Blast radius and rollback
 A missed path fails at import or boot, caught by lint-imports and the plugin-loading tests. Single `git revert`. No data, config or Terraform change.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## What changed
+- `git mv app/packages/incident app/features/incident` (50 files, all R100) and `app/features/__init__.py` added as the namespace marker. Tests moved with `git mv` to `tests/unit/features/incident/` and `tests/integration/features/incident/` (names unchanged); `tests/unit/features/__init__.py` and `tests/integration/features/__init__.py` added.
+- `packages.incident` -> `features.incident` rewritten in 107 files: imports and patch strings in tests, the nine frozen `modules/incident` files (import line only, migration.md rule 5), `jobs/scheduled_tasks.py`, the legacy_surface conftest and registration test, the scribe i18n owner id, pyproject. Slash paths rewritten in the two READMEs, the documents Google Docs adapter docstring, INVENTORY.md rows 118-121, the legacy_surface comment and `decisions/incident-management.md` (tolerated list no longer names the move; dated Changes line added). `decisions/feature-packages.md` context line names `features/incident/`; its dated history line keeps the old path.
+- pyproject: `features` added to hatch wheel packages, import-linter `root_packages`, and contracts (b), (c), (d), (e), (g); feature-independence lists `features.incident`; the incident-umbrella container is `features.incident`; entry point `incident.scribe = features.incident.scribe`. The permanent adapters allowance in (e) became `**.adapters.** -> integrations.**` so one entry covers both roots: the ignore list has 70 entries before and after, every `packages.incident` entry renamed, none added.
+- Tests that encode the path: three boundary tests (drive, scheduling, documents) build the path from `features`; `test_server_plugins_entrypoint_declaration.py` scans both `packages/` and `features/` and accepts `<root>.<name>` targets. One assertion added to the scribe plugin registration test: the installed `incident.scribe` entry point resolves to `features.incident.scribe`.
+- `uv sync` re-installed the project so the entry-point metadata matches; other checkouts need the same after pulling.
+
+## Evidence (from app/)
+- `uv run ruff check .`: All checks passed!
+- `uv run lint-imports`: Contracts: 10 kept, 0 broken (features is a root package; (i) incident-umbrella kept over `features.incident`).
+- `uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'`: Found 48 errors in 19 files, repo-wide and pre-existing. In touched files: `features/incident/scheduling/adapters/google_calendar.py` (2), `features/incident/meet/adapters/google_meet.py` (1), both R100 renames with no content change; `modules/incident/information_update.py` (6) on lines the import rename did not touch. 0 new errors.
+- `uv run pytest tests --ignore=tests/smoke`: 4546 passed, 2357 warnings in 50.76s (includes legacy_surface and the moved suites).
+- `uv build --wheel`: wheel lists 51 `features/incident/` files and 0 `packages/incident/` files; `entry_points.txt` has `incident.scribe = features.incident.scribe`.
+- `rg 'packages[./]incident' app decisions Makefile Dockerfile .github terraform` returns nothing. `git diff HEAD -M --name-status`: 130 renames, 18 modified, 3 added.
+
+## For the human
+- Review the PR by `git diff -M --stat` plus the pyproject hunk; the production diff is import lines only.
+- The deploy image rebuild picks up the new entry-point target; no config or Terraform change.
+<!-- SECTION:NOTES:END -->

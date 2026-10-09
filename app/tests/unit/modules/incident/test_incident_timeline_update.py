@@ -9,9 +9,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from features.incident.documents.adapters.google_docs import DocumentSnapshot
 from modules.incident import incident_conversation, incident_document
 from modules.incident.incident_document import END_HEADING, START_HEADING
-from packages.incident.documents.adapters.google_docs import DocumentSnapshot
 
 PERMALINK = "https://example.slack.com/archives/C123/p{}"
 
