@@ -31,8 +31,8 @@ from features.incident.core.api import (
     StatusUpdateText,
     TranscriptMessage,
 )
+from features.incident.scribe import status_update_form
 from features.incident.scribe.domain import StatusUpdateDraftOutcome, StatusUpdateOutcomeKind
-from features.incident.scribe.entrypoints import slack as slack_entrypoints
 from features.incident.scribe.entrypoints.slack import handle_new_update_action, register
 from features.incident.scribe.entrypoints.slack_views import NEW_ACTION_ID, REVIEW_CALLBACK_ID, build_review_view
 from features.incident.scribe.status_update import start_status_update_draft
@@ -44,7 +44,7 @@ _CHANNEL = "C123"
 _USER = "U123"
 _VIEW_ID = "V456"
 _NOW = datetime(2026, 10, 7, 15, 0, tzinfo=UTC)
-_TARGET = "features.incident.scribe.entrypoints.slack.start_status_update_draft"
+_TARGET = "features.incident.scribe.status_update_form.start_status_update_draft"
 _METADATA = {"channel_id": _CHANNEL, "locale": "en-US", "incident_id": _INCIDENT, "sequence": 4}
 
 
@@ -108,7 +108,7 @@ def _service(kind: StatusUpdateOutcomeKind) -> MagicMock:
 @pytest.fixture(autouse=True)
 def _ai_available(monkeypatch: pytest.MonkeyPatch) -> None:
     """Text generation is configured unless a test says otherwise."""
-    monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: True)
+    monkeypatch.setattr(status_update_form, "text_generation_available", lambda: True)
 
 
 def _sent_view(client: MagicMock) -> dict[str, Any]:
@@ -169,7 +169,7 @@ class TestNewUpdateAction:
 
     def test_without_text_generation_the_form_has_no_ai_section(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """With the generator unconfigured the form opens on the stage select; Save draft and Approve remain."""
-        monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: False)
+        monkeypatch.setattr(status_update_form, "text_generation_available", lambda: False)
         client = MagicMock()
 
         with patch(_TARGET, new=_service(StatusUpdateOutcomeKind.MANUAL)):

@@ -10,7 +10,7 @@ raised, and nothing is posted to a channel.
 The service boundary is stubbed with recording fakes: ``get_draft_for_review``
 and ``approve_status_update`` in the entrypoint module's namespace and the
 publisher returned by ``providers.get_status_page_publisher``. The pure
-``validate_approval_edit`` runs for real. Expected views are built with the
+``StatusUpdateEdit.blank_fields`` runs for real. Expected views are built with the
 platform view builders, so each assertion compares the exact view sent.
 """
 
@@ -26,10 +26,9 @@ from structlog.testing import capture_logs
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
-from features.incident.scribe import providers
+from features.incident.scribe import providers, status_update_approval, status_update_form
 from features.incident.scribe.comms_profile import ProfileLabels
 from features.incident.scribe.domain import CopyReadyText, StatusUpdateEdit
-from features.incident.scribe.entrypoints import slack as slack_entrypoints
 from features.incident.scribe.entrypoints.slack import (
     handle_generate_action,
     handle_history_action,
@@ -152,10 +151,10 @@ def events() -> list[str]:
 @pytest.fixture
 def services(monkeypatch: pytest.MonkeyPatch, events: list[str]) -> _Services:
     fakes = _Services(events=events)
-    monkeypatch.setattr(slack_entrypoints, "get_draft_for_review", fakes.get_draft_for_review)
-    monkeypatch.setattr(slack_entrypoints, "approve_status_update", fakes.approve_status_update)
+    monkeypatch.setattr(status_update_form, "get_draft_for_review", fakes.get_draft_for_review)
+    monkeypatch.setattr(status_update_approval, "approve_status_update", fakes.approve_status_update)
     monkeypatch.setattr(providers, "get_status_page_publisher", lambda: fakes)
-    monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: True)
+    monkeypatch.setattr(status_update_form, "text_generation_available", lambda: True)
     return fakes
 
 
@@ -303,7 +302,7 @@ class TestHandleReviewAction:
         self, ack: MagicMock, client: MagicMock, services: _Services, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """With the generator unconfigured the form is built without Draft with AI; Save draft and Approve remain."""
-        monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: False)
+        monkeypatch.setattr(status_update_form, "text_generation_available", lambda: False)
 
         handle_review_action(ack, _review_action_body(), client)
 

@@ -81,20 +81,28 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   External status updates). Only messages posted by people after the latest
   approved update's cutoff count as new; thread replies are not read. It
   imports `core/api.py` only from `core` and no integration.
+- `status_update_form.py` — the review form each modal action shows, as a
+  `StatusUpdateFormState`: `start_status_update_form`, `open_status_update_form`,
+  `save_status_update_form` and `fill_status_update_form`. A save or fill that
+  changes nothing keeps the stored draft overlaid with the typed values, with
+  the code that explains it, so the Slack handler makes one call and renders.
 - `status_update_approval.py`, `publisher.py` — approving a draft (stops at `APPROVED`, never
-  publishes) and rendering an approved update as copy-ready EN/FR text.
+  publishes) and rendering an approved update as copy-ready EN/FR text;
+  `approve_and_publish` does both in one call.
 - `status_update_history.py` — reopening an approved update and `set_published`,
   the copy-ready view's toggle: one store transition between `APPROVED` and
   `PUBLISHED` (recording or clearing `published_at`/`published_by`), with the
   button carrying the target state. It records a person's confirmation that
-  they posted the text; nothing is posted to the channel.
+  they posted the text; nothing is posted to the channel. `read_published` and
+  `set_published_and_render` return the record with its copy-ready text in one call.
 - `status_update_prompt.py` — the status-update prompt and its strict answer
   parser, which rejects any partial or malformed answer.
 - `domain.py` — frozen values of the drafting use case: `DocumentSection`
   (heading + instructions), `SectionDraft`, `DocumentField`,
   `DraftWriteResult`, `DraftedDocument`; and of the status-update use case:
   `StatusUpdateDraftOutcome` and its `StatusUpdateOutcomeKind`,
-  `DraftedFields`, `NoNewInformationWording`. `TranscriptMessage` comes from
+  `DraftedFields`, `NoNewInformationWording`, `StatusUpdateEdit` (with
+  `blank_fields`), `StatusUpdateFormState`, `PublishedRecord`. `TranscriptMessage` comes from
   `features/incident/core`.
 - `adapters/slack.py` — the report-link lookup on Slack bookmarks; returns
   plain strings and no links on an API error.

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 18:22'
+updated_date: '2026-10-09 19:36'
 labels:
   - incident
   - features
@@ -27,7 +27,7 @@ Layer C2 of TASK-145. Rebuilds the /sre incident subcommands and interactions th
 RULES
 - Every command resolves its incident through find_incident_for_conversation; only operations that write to the conversation call conversation_is_writable. A status, severity, timing or report update on an incident whose channel is archived succeeds and reports that the channel message was skipped.
 - Status change fans out from the record: atomic field update, then the report's status text, then the list projection (write-only), then the channel message when writable.
-- Severity is set at declare and changed from the update modal; it is a record field, never read from a document.
+- Severity is set at declare and changed from the update modal (none and SEV0 to SEV4, SEV0 new); it is a record field, never read from a document.
 - The five roles (incident commander, operations lead, communications lead, policy lead, postmortem owner) are stored on the record and shown in the show modal; the report's Drive properties are no longer written. The roles command offers all five; only IC and OL are required.
 - The show modal renders every link from the record's references through the owning adapter.
 - Legacy registrations removed in the same PR; names, fields and replies unchanged apart from the three added role pickers, pinned by TASK-36.1.

@@ -61,25 +61,16 @@ Only the modal is updated.
 import asyncio
 import json
 from collections.abc import Callable
-from dataclasses import replace
+from dataclasses import dataclass
 from datetime import timedelta
-from typing import Any
+from typing import Any, TypedDict
 
 import structlog
 
-from contracts.operations import OperationResult
-from contracts.operations.codes import ErrorCode
 from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
 from contracts.slack.registrar import SlackCommandRegistrar
 from contracts.slack.reply import SlackReplySender
-from features.incident.core.api import StatusUpdate
-from features.incident.scribe import providers
-from features.incident.scribe.domain import (
-    CopyReadyText,
-    StatusUpdateDraftOutcome,
-    StatusUpdateEdit,
-    StatusUpdateOutcomeKind,
-)
+from features.incident.scribe.comms_profile import ProfileLabels
 from features.incident.scribe.entrypoints.slack_views import (
     DRAFT_DOMAIN,
     GENERATE_ACTION_ID,
@@ -94,6 +85,7 @@ from features.incident.scribe.entrypoints.slack_views import (
     SUMMARY_DOMAIN,
     build_copy_ready_view,
     build_draft_error_view,
+    build_filled_form_view,
     build_generating_view,
     build_no_new_information_wording,
     build_overview_view,
@@ -102,16 +94,15 @@ from features.incident.scribe.entrypoints.slack_views import (
     build_review_error_view,
     build_review_field_errors,
     build_review_view,
+    build_saved_form_view,
     build_saving_view,
     draft_error_response,
     draft_success_response,
-    generate_notice,
     mrkdwn_blocks,
     notify_working,
     parse_ai_form,
     parse_review_submission,
     render_error,
-    save_notice,
     status_error_text,
     status_t,
     status_update_open_failed,
@@ -126,31 +117,19 @@ from features.incident.scribe.service import (
     draft_incident_document_from_conversation,
     summarize_incident_conversation,
 )
-from features.incident.scribe.status_update import (
-    DRAFT_UNPARSEABLE_CODE,
-    generate_status_update_draft,
-    get_status_update_overview,
-    save_status_update_draft,
-    start_status_update_draft,
-    text_generation_available,
+from features.incident.scribe.status_update import get_status_update_overview
+from features.incident.scribe.status_update_approval import approve_and_publish
+from features.incident.scribe.status_update_form import (
+    fill_status_update_form,
+    open_status_update_form,
+    save_status_update_form,
+    start_status_update_form,
 )
-from features.incident.scribe.status_update_approval import (
-    approve_status_update,
-    get_draft_for_review,
-    validate_approval_edit,
-)
-from features.incident.scribe.status_update_history import get_approved_update, set_published
+from features.incident.scribe.status_update_history import read_published, set_published_and_render
 
 logger = structlog.get_logger()
 
 _SINCE_UNITS = {"m": 60, "h": 3600, "d": 86400}
-# Draft with AI refusals and failures with their own notice; any other code is ``generate_failed``.
-_GENERATE_FAILURE_KEYS = {
-    ErrorCode.SECURITY_CONFIRMATION_REQUIRED: "generate_security",
-    ErrorCode.TEXT_GENERATION_UNAVAILABLE: "generate_unavailable",
-    ErrorCode.EMPTY_HISTORY: "generate_empty_history",
-    DRAFT_UNPARSEABLE_CODE: "generate_unparseable",
-}
 
 
 def register(registrar: SlackCommandRegistrar) -> None:
@@ -474,28 +453,18 @@ def handle_new_update_action(ack: Callable[[], Any], body: dict[str, Any], clien
         client: Bolt Slack web client.
     """
     ack()
-    view = body.get("view") or {}
-    view_id = str(view.get("id", ""))
-    user_id = str((body.get("user") or {}).get("id", ""))
-    metadata = _parse_metadata(view.get("private_metadata"))
-    channel_id = str(metadata.get("channel_id", ""))
-    locale = str(metadata.get("locale") or "en-US")
-    log = logger.bind(action="incident_status_update_new", user_id=user_id, channel_id=channel_id, view_id=view_id)
+    action = _parse_action(body)
+    log = action.bind("incident_status_update_new")
 
-    result = start_status_update_draft(channel_id, author=user_id)
+    result = start_status_update_form(action.channel_id, author=action.user_id)
     if result.is_success and result.data is not None:
         update = result.data.update
-        review_metadata = json.dumps(
-            {"channel_id": channel_id, "locale": locale, "incident_id": update.incident_id, "sequence": update.sequence}
-        )
-        next_view = build_review_view(update, locale, review_metadata, with_ai=text_generation_available())
+        metadata = action.review_metadata(update.incident_id, update.sequence)
+        next_view = build_review_view(update, action.locale, metadata, with_ai=result.data.ai_available)
     else:
         log.warning("incident_status_update_new_failed", status=result.status, error_code=result.error_code)
-        private_metadata = json.dumps({"channel_id": channel_id, "locale": locale})
-        next_view = build_draft_error_view(result.error_code, locale, private_metadata)
-    _ModalCursor(client, view_id, view.get("hash"), log).update(
-        next_view, failure_event="incident_status_update_new_update_failed"
-    )
+        next_view = build_draft_error_view(result.error_code, action.locale, action.list_metadata())
+    action.modal(client, log).update(next_view, failure_event="incident_status_update_new_update_failed")
 
 
 class _ModalCursor:
@@ -519,6 +488,80 @@ class _ModalCursor:
             self._log.warning(failure_event, exc_info=True)
 
 
+@dataclass(frozen=True)
+class _ModalAction:
+    """What a status-updates modal payload carries: the view, the user, its private metadata and the button value."""
+
+    view: dict[str, Any]
+    user_id: str
+    metadata: dict[str, Any]
+    target: dict[str, Any]
+
+    @property
+    def view_id(self) -> str:
+        return str(self.view.get("id", ""))
+
+    @property
+    def channel_id(self) -> str:
+        return str(self.metadata.get("channel_id", ""))
+
+    @property
+    def locale(self) -> str:
+        return str(self.metadata.get("locale") or "en-US")
+
+    @property
+    def incident_id(self) -> str:
+        return str(self.metadata.get("incident_id", ""))
+
+    @property
+    def sequence(self) -> int:
+        """The review form's draft sequence, from the private metadata."""
+        return int(self.metadata.get("sequence") or 0)
+
+    def list_metadata(self, channel_id: str | None = None) -> str:
+        """Private metadata for a list or error view: the channel and locale."""
+        return json.dumps({"channel_id": self.channel_id if channel_id is None else channel_id, "locale": self.locale})
+
+    def review_metadata(self, incident_id: str, sequence: Any) -> str:
+        """Private metadata for a review form: the channel, locale, incident and draft sequence."""
+        return json.dumps(
+            {"channel_id": self.channel_id, "locale": self.locale, "incident_id": incident_id, "sequence": sequence}
+        )
+
+    def bind(self, name: str, channel_id: str | None = None) -> structlog.stdlib.BoundLogger:
+        """A logger bound to the action name, user, channel and view."""
+        channel = self.channel_id if channel_id is None else channel_id
+        log: structlog.stdlib.BoundLogger = logger.bind(
+            action=name, user_id=self.user_id, channel_id=channel, view_id=self.view_id
+        )
+        return log
+
+    def modal(self, client: Any, log: structlog.stdlib.BoundLogger, *, hashed: bool = True) -> _ModalCursor:
+        """A cursor on the modal; ``hashed=False`` after an ack that already changed the view."""
+        return _ModalCursor(client, self.view_id, self.view.get("hash") if hashed else None, log)
+
+
+def _parse_action(body: dict[str, Any]) -> _ModalAction:
+    """Read a block-actions or view-submission payload into a ``_ModalAction``."""
+    view = body.get("view") or {}
+    return _ModalAction(
+        view=view,
+        user_id=str((body.get("user") or {}).get("id", "")),
+        metadata=_parse_metadata(view.get("private_metadata")),
+        target=_parse_metadata(((body.get("actions") or [{}])[0]).get("value")),
+    )
+
+
+class _ProfileLabelArgs(TypedDict):
+    labels_en: ProfileLabels
+    labels_fr: ProfileLabels
+
+
+def _profile_labels() -> _ProfileLabelArgs:
+    """The English and French labels the copy-ready text is rendered with, as keyword arguments."""
+    return {"labels_en": build_profile_labels("en-US"), "labels_fr": build_profile_labels("fr-FR")}
+
+
 def handle_review_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
     """Handle a press of the Review button: replace the modal in place with the review form.
 
@@ -528,35 +571,19 @@ def handle_review_action(ack: Callable[[], Any], body: dict[str, Any], client: A
         client: Bolt Slack web client.
     """
     ack()
-    view = body.get("view") or {}
-    view_id = str(view.get("id", ""))
-    metadata = _parse_metadata(view.get("private_metadata"))
-    channel_id = str(metadata.get("channel_id", ""))
-    locale = str(metadata.get("locale") or "en-US")
-    private_metadata = json.dumps({"channel_id": channel_id, "locale": locale})
-    log = logger.bind(
-        action="incident_status_update_review",
-        user_id=str((body.get("user") or {}).get("id", "")),
-        channel_id=channel_id,
-        view_id=view_id,
-    )
-    target = _parse_metadata(((body.get("actions") or [{}])[0]).get("value"))
-    incident_id = str(target.get("incident_id", ""))
-    sequence = target.get("sequence")
+    action = _parse_action(body)
+    log = action.bind("incident_status_update_review")
+    incident_id, sequence = str(action.target.get("incident_id", "")), action.target.get("sequence")
 
-    result = asyncio.run(get_draft_for_review(incident_id, sequence)) if isinstance(sequence, int) else None
+    result = asyncio.run(open_status_update_form(incident_id, sequence)) if isinstance(sequence, int) else None
     if result is not None and result.is_success and result.data is not None:
-        review_metadata = json.dumps(
-            {"channel_id": channel_id, "locale": locale, "incident_id": incident_id, "sequence": sequence}
-        )
-        next_view = build_review_view(result.data, locale, review_metadata, with_ai=text_generation_available())
+        metadata = action.review_metadata(incident_id, sequence)
+        next_view = build_review_view(result.data.update, action.locale, metadata, with_ai=result.data.ai_available)
     else:
         error_code = result.error_code if result is not None else None
         log.warning("incident_status_update_review_failed", error_code=error_code)
-        next_view = build_review_error_view(error_code, locale, private_metadata)
-    _ModalCursor(client, view_id, view.get("hash"), log).update(
-        next_view, failure_event="incident_status_update_review_update_failed"
-    )
+        next_view = build_review_error_view(error_code, action.locale, action.list_metadata())
+    action.modal(client, log).update(next_view, failure_event="incident_status_update_review_update_failed")
 
 
 def handle_open_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
@@ -568,27 +595,20 @@ def handle_open_action(ack: Callable[[], Any], body: dict[str, Any], client: Any
         client: Bolt Slack web client.
     """
     ack()
-    view = body.get("view") or {}
-    view_id = str(view.get("id", ""))
-    metadata = _parse_metadata(view.get("private_metadata"))
-    locale = str(metadata.get("locale") or "en-US")
-    private_metadata = json.dumps({"channel_id": str(metadata.get("channel_id", "")), "locale": locale})
-    log = logger.bind(action="incident_status_update_open", user_id=str((body.get("user") or {}).get("id", "")), view_id=view_id)
-    target = _parse_metadata(((body.get("actions") or [{}])[0]).get("value"))
-    incident_id = str(target.get("incident_id", ""))
-    sequence = target.get("sequence")
+    action = _parse_action(body)
+    log = action.bind("incident_status_update_open")
+    incident_id, sequence = str(action.target.get("incident_id", "")), action.target.get("sequence")
 
-    result = asyncio.run(_read_and_publish(incident_id, sequence)) if isinstance(sequence, int) else None
+    result = None
+    if isinstance(sequence, int):
+        result = asyncio.run(read_published(incident_id, sequence, **_profile_labels()))
     if result is not None and result.is_success and result.data is not None:
-        update, copy = result.data
-        next_view = build_copy_ready_view(copy, locale, private_metadata, update=update)
+        next_view = build_copy_ready_view(result.data.text, action.locale, action.list_metadata(), update=result.data.update)
     else:
         error_code = result.error_code if result is not None else None
         log.warning("incident_status_update_open_failed", error_code=error_code)
-        next_view = build_draft_error_view(error_code, locale, private_metadata)
-    _ModalCursor(client, view_id, view.get("hash"), log).update(
-        next_view, failure_event="incident_status_update_open_update_failed"
-    )
+        next_view = build_draft_error_view(error_code, action.locale, action.list_metadata())
+    action.modal(client, log).update(next_view, failure_event="incident_status_update_open_update_failed")
 
 
 def handle_history_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
@@ -600,28 +620,18 @@ def handle_history_action(ack: Callable[[], Any], body: dict[str, Any], client: 
         client: Bolt Slack web client.
     """
     ack()
-    view = body.get("view") or {}
-    view_id = str(view.get("id", ""))
-    metadata = _parse_metadata(view.get("private_metadata"))
-    locale = str(metadata.get("locale") or "en-US")
-    channel_id = str(_parse_metadata(((body.get("actions") or [{}])[0]).get("value")).get("channel_id", ""))
-    private_metadata = json.dumps({"channel_id": channel_id, "locale": locale})
-    log = logger.bind(
-        action="incident_status_update_history",
-        user_id=str((body.get("user") or {}).get("id", "")),
-        channel_id=channel_id,
-        view_id=view_id,
-    )
+    action = _parse_action(body)
+    channel_id = str(action.target.get("channel_id", ""))
+    log = action.bind("incident_status_update_history", channel_id=channel_id)
+    metadata = action.list_metadata(channel_id)
 
     result = get_status_update_overview(channel_id)
     if result.is_success and result.data is not None:
-        next_view = build_overview_view(result.data, locale, private_metadata)
+        next_view = build_overview_view(result.data, action.locale, metadata)
     else:
         log.warning("incident_status_update_history_failed", status=result.status, error_code=result.error_code)
-        next_view = build_draft_error_view(result.error_code, locale, private_metadata)
-    _ModalCursor(client, view_id, view.get("hash"), log).update(
-        next_view, failure_event="incident_status_update_history_update_failed"
-    )
+        next_view = build_draft_error_view(result.error_code, action.locale, metadata)
+    action.modal(client, log).update(next_view, failure_event="incident_status_update_history_update_failed")
 
 
 def handle_published_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
@@ -633,31 +643,23 @@ def handle_published_action(ack: Callable[[], Any], body: dict[str, Any], client
         client: Bolt Slack web client.
     """
     ack()
-    view = body.get("view") or {}
-    view_id = str(view.get("id", ""))
-    user_id = str((body.get("user") or {}).get("id", ""))
-    metadata = _parse_metadata(view.get("private_metadata"))
-    locale = str(metadata.get("locale") or "en-US")
-    private_metadata = json.dumps({"channel_id": str(metadata.get("channel_id", "")), "locale": locale})
-    log = logger.bind(action="incident_status_update_published", user_id=user_id, view_id=view_id)
-    target = _parse_metadata(((body.get("actions") or [{}])[0]).get("value"))
-    incident_id = str(target.get("incident_id", ""))
-    sequence = target.get("sequence")
-    published = target.get("published")
+    action = _parse_action(body)
+    log = action.bind("incident_status_update_published")
+    incident_id, sequence = str(action.target.get("incident_id", "")), action.target.get("sequence")
+    published = action.target.get("published")
 
     result = None
     if isinstance(sequence, int) and isinstance(published, bool):
-        result = asyncio.run(_toggle_and_publish(incident_id, sequence, published=published, actor=user_id))
+        result = asyncio.run(
+            set_published_and_render(incident_id, sequence, published=published, actor=action.user_id, **_profile_labels())
+        )
     if result is not None and result.is_success and result.data is not None:
-        update, copy = result.data
-        next_view = build_copy_ready_view(copy, locale, private_metadata, update=update)
+        next_view = build_copy_ready_view(result.data.text, action.locale, action.list_metadata(), update=result.data.update)
     else:
         error_code = result.error_code if result is not None else None
         log.warning("incident_status_update_published_failed", error_code=error_code)
-        next_view = build_published_error_view(error_code, locale, private_metadata)
-    _ModalCursor(client, view_id, view.get("hash"), log).update(
-        next_view, failure_event="incident_status_update_published_update_failed"
-    )
+        next_view = build_published_error_view(error_code, action.locale, action.list_metadata())
+    action.modal(client, log).update(next_view, failure_event="incident_status_update_published_update_failed")
 
 
 def handle_generate_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
@@ -674,71 +676,39 @@ def handle_generate_action(ack: Callable[[], Any], body: dict[str, Any], client:
         client: Bolt Slack web client.
     """
     ack()
-    view = body.get("view") or {}
-    view_id = str(view.get("id", ""))
-    user_id = str((body.get("user") or {}).get("id", ""))
-    metadata = _parse_metadata(view.get("private_metadata"))
-    channel_id = str(metadata.get("channel_id", ""))
-    locale = str(metadata.get("locale") or "en-US")
-    incident_id = str(metadata.get("incident_id", ""))
-    sequence = int(metadata.get("sequence") or 0)
-    instructions, security_confirmed = parse_ai_form(view)
-    edit = parse_review_submission(view)
-    log = logger.bind(action="incident_status_update_generate", user_id=user_id, channel_id=channel_id, view_id=view_id)
-    modal = _ModalCursor(client, view_id, view.get("hash"), log)
-
-    def review_metadata(target: int) -> str:
-        return json.dumps({"channel_id": channel_id, "locale": locale, "incident_id": incident_id, "sequence": target})
+    action = _parse_action(body)
+    log = action.bind("incident_status_update_generate")
+    modal = action.modal(client, log)
+    instructions, security_confirmed = parse_ai_form(action.view)
+    current_metadata = action.review_metadata(action.incident_id, action.sequence)
 
     def show_generating() -> None:
         modal.update(
-            build_generating_view(locale, review_metadata(sequence)),
+            build_generating_view(action.locale, current_metadata),
             failure_event="incident_status_update_generating_update_failed",
         )
 
-    async def run() -> tuple[OperationResult[StatusUpdateDraftOutcome] | None, OperationResult[StatusUpdate] | None]:
-        """Fill from the typed values; read the stored draft only when it is the model's base or a re-render needs it."""
-        stored = await get_draft_for_review(incident_id, sequence) if edit is None else None
-        current = edit or (_as_edit(stored.data) if stored is not None and stored.data is not None else None)
-        if current is None:
-            return None, stored
-        result = await generate_status_update_draft(
-            channel_id,
-            sequence,
-            current=current,
-            author=user_id,
+    result = asyncio.run(
+        fill_status_update_form(
+            action.channel_id,
+            action.incident_id,
+            action.sequence,
+            edit=parse_review_submission(action.view),
+            author=action.user_id,
             wording=build_no_new_information_wording(),
             instructions=instructions,
             security_confirmed=security_confirmed,
             on_started=show_generating,
         )
-        if result.is_success or result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT:
-            return result, stored
-        return result, stored or await get_draft_for_review(incident_id, sequence)
-
-    result, stored = asyncio.run(run())
-    if result is not None and result.is_success and result.data is not None:
-        update = result.data.update
-        carried = result.data.kind is StatusUpdateOutcomeKind.CARRIED_FORWARD
-        notice = generate_notice("generate_carried_forward" if carried else "generated_note", locale)
-        next_view = build_review_view(update, locale, review_metadata(update.sequence), notice=notice)
-    elif result is None or result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT or stored is None or stored.data is None:
-        failed = stored if stored is not None and not stored.is_success else result
-        error_code = failed.error_code if failed is not None else None
-        log.warning("incident_status_update_generate_failed", error_code=error_code)
-        next_view = build_review_error_view(error_code, locale, review_metadata(sequence))
+    )
+    if result.is_success and result.data is not None:
+        if result.data.kept:
+            log.warning("incident_status_update_generate_failed", error_code=result.data.failure_code)
+        metadata = action.review_metadata(action.incident_id, result.data.update.sequence)
+        next_view = build_filled_form_view(result.data, action.locale, metadata, instructions=instructions)
     else:
-        log.warning("incident_status_update_generate_failed", status=result.status, error_code=result.error_code)
-        form = stored.data if edit is None else replace(stored.data, stage=edit.stage, en=edit.en, fr=edit.fr)
-        next_view = build_review_view(
-            form,
-            locale,
-            review_metadata(sequence),
-            notice=generate_notice(_generate_failure_key(result.error_code), locale),
-            instructions=instructions,
-            security_confirm=result.error_code == ErrorCode.SECURITY_CONFIRMATION_REQUIRED,
-            with_ai=result.error_code != ErrorCode.TEXT_GENERATION_UNAVAILABLE,
-        )
+        log.warning("incident_status_update_generate_failed", error_code=result.error_code)
+        next_view = build_review_error_view(result.error_code, action.locale, current_metadata)
     modal.update(next_view, failure_event="incident_status_update_generate_update_failed")
 
 
@@ -755,87 +725,23 @@ def handle_save_action(ack: Callable[[], Any], body: dict[str, Any], client: Any
         client: Bolt Slack web client.
     """
     ack()
-    view = body.get("view") or {}
-    view_id = str(view.get("id", ""))
-    user_id = str((body.get("user") or {}).get("id", ""))
-    metadata = _parse_metadata(view.get("private_metadata"))
-    channel_id = str(metadata.get("channel_id", ""))
-    locale = str(metadata.get("locale") or "en-US")
-    incident_id = str(metadata.get("incident_id", ""))
-    sequence = int(metadata.get("sequence") or 0)
-    edit = parse_review_submission(view)
-    log = logger.bind(action="incident_status_update_save", user_id=user_id, channel_id=channel_id, view_id=view_id)
+    action = _parse_action(body)
+    log = action.bind("incident_status_update_save")
+    edit = parse_review_submission(action.view)
 
-    def review_metadata(target: int) -> str:
-        return json.dumps({"channel_id": channel_id, "locale": locale, "incident_id": incident_id, "sequence": target})
-
-    result = save_status_update_draft(channel_id, sequence, edit=edit, author=user_id) if edit is not None else None
-    if result is not None and result.is_success and result.data is not None:
-        next_view = build_review_view(
-            result.data,
-            locale,
-            review_metadata(result.data.sequence),
-            notice=save_notice("saved_note", locale),
-            with_ai=text_generation_available(),
-        )
-    elif result is not None and result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT:
-        log.warning("incident_status_update_save_failed", error_code=result.error_code)
-        next_view = build_review_error_view(result.error_code, locale, review_metadata(sequence))
+    result = asyncio.run(
+        save_status_update_form(action.channel_id, action.incident_id, action.sequence, edit=edit, author=action.user_id)
+    )
+    if result.is_success and result.data is not None:
+        if result.data.kept:
+            log.warning("incident_status_update_save_failed", error_code=result.data.failure_code)
+        metadata = action.review_metadata(action.incident_id, result.data.update.sequence)
+        next_view = build_saved_form_view(result.data, action.locale, metadata)
     else:
-        if result is not None:
-            log.warning("incident_status_update_save_failed", status=result.status, error_code=result.error_code)
-        stored = asyncio.run(get_draft_for_review(incident_id, sequence))
-        if stored.is_success and stored.data is not None:
-            form = stored.data if edit is None else replace(stored.data, stage=edit.stage, en=edit.en, fr=edit.fr)
-            next_view = build_review_view(
-                form,
-                locale,
-                review_metadata(sequence),
-                notice=save_notice("save_failed", locale),
-                with_ai=text_generation_available(),
-            )
-        else:
-            log.warning("incident_status_update_save_failed", error_code=stored.error_code)
-            next_view = build_review_error_view(stored.error_code, locale, review_metadata(sequence))
-    _ModalCursor(client, view_id, view.get("hash"), log).update(
-        next_view, failure_event="incident_status_update_save_update_failed"
-    )
-
-
-def _as_edit(update: StatusUpdate) -> StatusUpdateEdit:
-    """The stored draft's stage and fields as the model's base."""
-    return StatusUpdateEdit(stage=update.stage, en=update.en, fr=update.fr)
-
-
-def _generate_failure_key(error_code: str | None) -> str:
-    """Map a Draft with AI refusal or failure onto its notice key; the previous draft was kept."""
-    return _GENERATE_FAILURE_KEYS.get(error_code or "", "generate_failed")
-
-
-async def _read_and_publish(incident_id: str, sequence: int) -> OperationResult[tuple[StatusUpdate, CopyReadyText]]:
-    """Read the approved update, then render it as copy-ready text in one event loop."""
-    return await _render_record(await get_approved_update(incident_id, sequence))
-
-
-async def _toggle_and_publish(
-    incident_id: str, sequence: int, *, published: bool, actor: str
-) -> OperationResult[tuple[StatusUpdate, CopyReadyText]]:
-    """Set the update's published state, then render the stored record as copy-ready text in one event loop."""
-    return await _render_record(await set_published(incident_id, sequence, published=published, actor=actor))
-
-
-async def _render_record(read: OperationResult[StatusUpdate]) -> OperationResult[tuple[StatusUpdate, CopyReadyText]]:
-    """Render a read or toggled record through the status page publisher; a failed ``read`` is passed on."""
-    if not read.is_success or read.data is None:
-        return OperationResult.error(read.status, message=read.message or "read failed", error_code=read.error_code)
-    published = await providers.get_status_page_publisher().publish(
-        read.data, labels_en=build_profile_labels("en-US"), labels_fr=build_profile_labels("fr-FR")
-    )
-    if not published.is_success or published.data is None:
-        return OperationResult.error(
-            published.status, message=published.message or "publish failed", error_code=published.error_code
-        )
-    return OperationResult.success(data=(read.data, published.data))
+        log.warning("incident_status_update_save_failed", status=result.status, error_code=result.error_code)
+        metadata = action.review_metadata(action.incident_id, action.sequence)
+        next_view = build_review_error_view(result.error_code, action.locale, metadata)
+    action.modal(client, log).update(next_view, failure_event="incident_status_update_save_update_failed")
 
 
 def handle_review_submission(ack: Callable[..., Any], body: dict[str, Any], client: Any) -> None:
@@ -850,55 +756,25 @@ def handle_review_submission(ack: Callable[..., Any], body: dict[str, Any], clie
         body: View-submission payload; carries the view, its state and the submitting user.
         client: Bolt Slack web client.
     """
-    view = body.get("view") or {}
-    view_id = str(view.get("id", ""))
-    approver = str((body.get("user") or {}).get("id", ""))
-    metadata = _parse_metadata(view.get("private_metadata"))
-    locale = str(metadata.get("locale") or "en-US")
-    private_metadata = json.dumps(
-        {
-            "channel_id": str(metadata.get("channel_id", "")),
-            "locale": locale,
-            "incident_id": str(metadata.get("incident_id", "")),
-            "sequence": metadata.get("sequence"),
-        }
-    )
-    edit = parse_review_submission(view)
-    blank = ("stage",) if edit is None else validate_approval_edit(edit)
+    action = _parse_action(body)
+    metadata = action.review_metadata(action.incident_id, action.metadata.get("sequence"))
+    edit = parse_review_submission(action.view)
+    blank = ("stage",) if edit is None else edit.blank_fields()
     if edit is None or blank:
-        ack(response_action="errors", errors=build_review_field_errors(blank, locale))
+        ack(response_action="errors", errors=build_review_field_errors(blank, action.locale))
         return
-    ack(response_action="update", view=build_saving_view(locale, private_metadata))
+    ack(response_action="update", view=build_saving_view(action.locale, metadata))
 
-    log = logger.bind(action="incident_status_update_approval", user_id=approver, view_id=view_id)
+    log = action.bind("incident_status_update_approval")
     result = asyncio.run(
-        _approve_and_publish(str(metadata.get("incident_id", "")), int(metadata.get("sequence") or 0), approver, edit)
+        approve_and_publish(action.incident_id, action.sequence, approver=action.user_id, edit=edit, **_profile_labels())
     )
     if result.is_success and result.data is not None:
-        next_view = build_copy_ready_view(result.data, locale, private_metadata)
+        next_view = build_copy_ready_view(result.data, action.locale, metadata)
     else:
         log.warning("incident_status_update_approval_failed", status=result.status, error_code=result.error_code)
-        next_view = build_review_error_view(result.error_code, locale, private_metadata)
-    _ModalCursor(client, view_id, None, log).update(next_view, failure_event="incident_status_update_approval_update_failed")
-
-
-async def _approve_and_publish(
-    incident_id: str, sequence: int, approver: str, edit: StatusUpdateEdit
-) -> OperationResult[CopyReadyText]:
-    """Approve the draft, then render the approved record as copy-ready text.
-
-    One coroutine so a submission needs one event loop, and an async Bolt
-    listener could await it directly. A refused approval is returned as a
-    failure without publishing.
-    """
-    approved = await approve_status_update(incident_id, sequence, approver=approver, edit=edit)
-    if not approved.is_success or approved.data is None:
-        return OperationResult.error(
-            approved.status, message=approved.message or "approval failed", error_code=approved.error_code
-        )
-    return await providers.get_status_page_publisher().publish(
-        approved.data, labels_en=build_profile_labels("en-US"), labels_fr=build_profile_labels("fr-FR")
-    )
+        next_view = build_review_error_view(result.error_code, action.locale, metadata)
+    action.modal(client, log, hashed=False).update(next_view, failure_event="incident_status_update_approval_update_failed")
 
 
 def _parse_metadata(raw: Any) -> dict[str, Any]:

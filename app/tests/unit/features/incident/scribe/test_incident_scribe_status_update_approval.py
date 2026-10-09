@@ -24,7 +24,6 @@ from features.incident.scribe.domain import StatusUpdateEdit
 from features.incident.scribe.status_update_approval import (
     approve_status_update,
     get_draft_for_review,
-    validate_approval_edit,
 )
 
 pytestmark = pytest.mark.unit
@@ -71,8 +70,8 @@ def _store(*records: StatusUpdate) -> InMemoryStatusUpdateStore:
     return store
 
 
-class TestValidateApprovalEdit:
-    """Tests for validate_approval_edit: a pure sync function checking field blankness."""
+class TestBlankFields:
+    """Tests for StatusUpdateEdit.blank_fields: a pure method checking field blankness."""
 
     def test_all_fields_present_returns_empty_tuple(self) -> None:
         """When all 8 fields are non-blank, validation succeeds."""
@@ -83,7 +82,7 @@ class TestValidateApprovalEdit:
             fr=_text("fr"),
         )
 
-        result = validate_approval_edit(edit)
+        result = edit.blank_fields()
 
         assert result == ()
 
@@ -127,7 +126,7 @@ class TestValidateApprovalEdit:
             fr=StatusUpdateText(**fr_dict),
         )
 
-        result = validate_approval_edit(edit)
+        result = edit.blank_fields()
 
         assert result == expected_names
 
@@ -145,7 +144,7 @@ class TestValidateApprovalEdit:
             fr=_text("fr"),
         )
 
-        result = validate_approval_edit(edit)
+        result = edit.blank_fields()
 
         assert result == ("en.affected_service",)
 
@@ -168,7 +167,7 @@ class TestValidateApprovalEdit:
             ),
         )
 
-        result = validate_approval_edit(edit)
+        result = edit.blank_fields()
 
         assert result == ("en.affected_service", "en.current_action", "fr.workaround")
 
