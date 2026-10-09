@@ -1,7 +1,7 @@
 """Tests for the views of writing a status update by hand.
 
-The status-updates modal offers Write it myself beside Draft, the review form
-can leave out its Redraft section, and ``manual_fallback_notice`` explains why
+With no pending draft the status-updates modal offers New update as its
+primary button beside Draft, the review form can leave out its Redraft section, and ``manual_fallback_notice`` explains why
 the responder is writing the update when AI drafting failed. The builders are
 pure and called directly. The scribe catalogue is not loaded in unit tests, so
 wording is the in-code EN or FR fallback, pinned literally; the catalogue test
@@ -22,8 +22,8 @@ from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUp
 from packages.incident.scribe.domain import StatusUpdateDraftOutcome, StatusUpdateOutcomeKind, StatusUpdateOverview
 from packages.incident.scribe.entrypoints.slack_views import (
     DRAFT_ACTION_ID,
+    NEW_ACTION_ID,
     REVIEW_ACTION_ID,
-    WRITE_ACTION_ID,
     build_overview_view,
     build_result_view,
     build_review_view,
@@ -37,11 +37,11 @@ _METADATA = json.dumps({"channel_id": "C123", "locale": "en-US"})
 _LOCALES_DIR = Path(scribe_pkg.__file__).parent / "locales"
 
 _EN_STRINGS = {
-    "write_button": "Write it myself",
+    "new_update_button": "New update",
     "manual_fallback": "AI drafting isn't available right now. Write the update in the fields below, then press Approve.",
 }
 _FR_STRINGS = {
-    "write_button": "Rédiger moi-même",
+    "new_update_button": "Nouvelle mise à jour",
     "manual_fallback": "La rédaction par IA n'est pas disponible pour le moment. Rédigez la mise à jour dans les champs "
     "ci-dessous, puis appuyez sur Approuver.",
 }
@@ -80,14 +80,22 @@ def _block_ids(view: dict[str, Any]) -> list[str | None]:
     return [block.get("block_id") for block in view["blocks"]]
 
 
-class TestWriteButton:
-    @pytest.mark.parametrize("pending", [_DRAFT, None], ids=["pending", "no-pending"])
-    def test_the_overview_offers_write_it_myself_after_draft(self, pending: StatusUpdate | None) -> None:
-        """Responders can always choose to write the update by hand, with or without a pending draft."""
-        view = build_overview_view(StatusUpdateOverview(pending=pending, approved=()), "en-US", _METADATA)
+class TestNewUpdateButton:
+    def test_with_no_pending_draft_new_update_leads_then_draft(self) -> None:
+        """With nothing pending, writing by hand is the primary path and AI drafting is the secondary one."""
+        view = build_overview_view(StatusUpdateOverview(pending=None, approved=()), "en-US", _METADATA)
 
-        expected = [DRAFT_ACTION_ID, WRITE_ACTION_ID] + ([REVIEW_ACTION_ID] if pending else [])
-        assert _button_ids(view) == expected
+        (actions,) = [block for block in view["blocks"] if block.get("block_id") == "draft_button"]
+        assert [(element["action_id"], element.get("style")) for element in actions["elements"]] == [
+            (NEW_ACTION_ID, "primary"),
+            (DRAFT_ACTION_ID, None),
+        ]
+
+    def test_with_a_pending_draft_draft_and_review_are_offered(self) -> None:
+        """A pending draft is reviewed, not restarted, so New update is absent and Draft and Review stay as before."""
+        view = build_overview_view(StatusUpdateOverview(pending=_DRAFT, approved=()), "en-US", _METADATA)
+
+        assert _button_ids(view) == [DRAFT_ACTION_ID, REVIEW_ACTION_ID]
 
     @pytest.mark.parametrize(("locale", "strings"), [("en-US", _EN_STRINGS), ("fr-FR", _FR_STRINGS)])
     def test_the_button_is_labelled_in_the_responder_locale(self, locale: str, strings: dict[str, str]) -> None:
@@ -95,9 +103,9 @@ class TestWriteButton:
         view = build_overview_view(StatusUpdateOverview(pending=None, approved=()), locale, _METADATA)
 
         (actions,) = [block for block in view["blocks"] if block.get("block_id") == "draft_button"]
-        assert actions["elements"][1]["text"] == {"type": "plain_text", "text": strings["write_button"]}
+        assert actions["elements"][0]["text"] == {"type": "plain_text", "text": strings["new_update_button"]}
 
-    def test_a_result_view_offers_neither_draft_nor_write(self) -> None:
+    def test_a_result_view_offers_neither_draft_nor_new_update(self) -> None:
         """After a run the modal leads to Review only, as before."""
         outcome = StatusUpdateDraftOutcome(update=_DRAFT, kind=StatusUpdateOutcomeKind.DRAFTED)
 
@@ -105,7 +113,7 @@ class TestWriteButton:
 
     def test_action_id_carries_the_plugin_prefix(self) -> None:
         """The button's action id is the scribe's stable, plugin-prefixed id."""
-        assert WRITE_ACTION_ID == "incident.scribe.status_update.write"
+        assert NEW_ACTION_ID == "incident.scribe.status_update.new"
 
 
 class TestReviewWithoutRedraft:

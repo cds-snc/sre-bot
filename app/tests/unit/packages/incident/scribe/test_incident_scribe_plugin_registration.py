@@ -44,6 +44,18 @@ def test_block_actions_draft_and_confirm_are_registered_once() -> None:
     ]
 
 
+def test_block_actions_new_update_and_save_are_registered_once_and_write_is_gone() -> None:
+    """The New update and Save draft buttons are registered with the plugin prefix; Write it myself no longer is."""
+    registrar = FakeSlackRegistrar()
+
+    scribe_pkg.register_slack_commands(registrar=registrar)
+
+    action_ids = list(registrar.block_actions)
+    assert action_ids.count("incident.scribe.status_update.new") == 1
+    assert action_ids.count("incident.scribe.status_update.save") == 1
+    assert "incident.scribe.status_update.write" not in action_ids
+
+
 def test_hookimpl_registers_status_update_command_and_approval_submission_together() -> None:
     """One hookimpl call registers the ``status-update`` command and the approval view submission.
 

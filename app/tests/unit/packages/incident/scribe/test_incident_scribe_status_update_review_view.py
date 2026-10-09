@@ -30,9 +30,9 @@ from packages.incident.scribe.entrypoints import slack as slack_entrypoints
 from packages.incident.scribe.entrypoints.slack import handle_status_update_command
 from packages.incident.scribe.entrypoints.slack_views import (
     DRAFT_ACTION_ID,
+    NEW_ACTION_ID,
     REVIEW_ACTION_ID,
     REVIEW_CALLBACK_ID,
-    WRITE_ACTION_ID,
     build_copy_ready_view,
     build_draft_error_view,
     build_drafting_view,
@@ -156,10 +156,10 @@ def _selected(value: str | None) -> dict[str, Any]:
 
 class TestReviewButton:
     def test_pending_view_shows_draft_then_review(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """The pending view's buttons are Draft, Write it myself, then Review, so a draft can be reviewed without redrafting."""
+        """The pending view's buttons are Draft then Review, so a draft can be reviewed without redrafting."""
         view = _pending_view(monkeypatch, OperationResult.success(data=StatusUpdateOverview(pending=_draft(), approved=())))
 
-        assert _button_action_ids(view) == [DRAFT_ACTION_ID, WRITE_ACTION_ID, REVIEW_ACTION_ID]
+        assert _button_action_ids(view) == [DRAFT_ACTION_ID, REVIEW_ACTION_ID]
 
     def test_pending_view_review_value_names_the_draft(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """The Review button's value is JSON naming the shown draft's incident id and sequence."""
@@ -177,10 +177,10 @@ class TestReviewButton:
         assert button["text"] == {"type": "plain_text", "text": "Review"}
 
     def test_no_pending_view_has_draft_only(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """With no draft there is nothing to review, so only Draft and Write it myself are offered."""
+        """With no draft there is nothing to review, so only New update and Draft are offered."""
         view = _pending_view(monkeypatch, OperationResult.success(data=StatusUpdateOverview(pending=None, approved=())))
 
-        assert _button_action_ids(view) == [DRAFT_ACTION_ID, WRITE_ACTION_ID]
+        assert _button_action_ids(view) == [NEW_ACTION_ID, DRAFT_ACTION_ID]
 
     def test_lookup_error_view_has_no_buttons(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """A failed lookup shows the error with no Draft or Review button."""
