@@ -25,7 +25,13 @@ from contracts.operations.status import OperationStatus
 from integrations.aws.settings import get_aws_settings
 from packages.incident.core.adapters import status_updates
 from packages.incident.core.adapters.status_updates import DynamoDbStatusUpdateStore
-from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from packages.incident.core.api import (
+    StatusUpdate,
+    StatusUpdateOrigin,
+    StatusUpdateStage,
+    StatusUpdateState,
+    StatusUpdateText,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -216,6 +222,38 @@ def test_latest_is_one_newest_first_query_that_round_trips_every_field(client: A
 
     assert result.is_success
     assert result.data == APPROVED
+
+
+@pytest.mark.parametrize("origin", list(StatusUpdateOrigin))
+def test_an_origin_is_written_as_its_own_attribute_and_read_back(client: Any, origin: StatusUpdateOrigin) -> None:
+    """A record with an origin stores it as a plain string attribute; no key or index changes."""
+    store = DynamoDbStatusUpdateStore(client)
+    item = {**DRAFT_ITEM, "origin": {"S": origin.value}}
+
+    with Stubber(client) as stub:
+        stub.add_response("put_item", {}, expected_params={**APPEND_PARAMS, "Item": item})
+        stub.add_response("query", {"Items": [item]}, expected_params=LATEST_PARAMS)
+
+        appended = store.append(replace(DRAFT, origin=origin))
+        latest = store.latest(INCIDENT_ID)
+
+        stub.assert_no_pending_responses()
+
+    assert appended.is_success
+    assert latest.data == replace(DRAFT, origin=origin)
+
+
+def test_a_record_stored_without_an_origin_reads_back_with_none(client: Any) -> None:
+    """Records written before origins existed load unchanged, origin None, and are never rewritten."""
+    store = DynamoDbStatusUpdateStore(client)
+
+    with Stubber(client) as stub:
+        stub.add_response("query", {"Items": [DRAFT_ITEM]}, expected_params=LATEST_PARAMS)
+
+        result = store.latest(INCIDENT_ID)
+
+    assert result.data is not None
+    assert result.data.origin is None
 
 
 def test_latest_for_an_incident_without_updates_is_success_with_nothing(client: Any) -> None:

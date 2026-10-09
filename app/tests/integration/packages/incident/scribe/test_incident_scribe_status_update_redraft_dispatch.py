@@ -30,6 +30,7 @@ from packages.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from packages.incident.core.api import (
     IncidentSecurityFlag,
     StatusUpdate,
+    StatusUpdateOrigin,
     StatusUpdateStage,
     StatusUpdateState,
     StatusUpdateText,
@@ -122,6 +123,7 @@ def _expected_redraft() -> StatusUpdate:
         transcript_cutoff=_PERSON_AT,
         transcript_fingerprint=f"v1:sha256:{hashlib.sha256(content.encode()).hexdigest()}",
         created_at=_NOW,
+        origin=StatusUpdateOrigin.MODEL_INSTRUCTED,
     )
 
 

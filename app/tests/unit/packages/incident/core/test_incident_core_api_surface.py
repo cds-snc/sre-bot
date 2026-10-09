@@ -43,6 +43,7 @@ def test_api_exports_exactly_the_public_names() -> None:
         "IncidentSecurityReader",
         "IncidentTranscriptReader",
         "StatusUpdate",
+        "StatusUpdateOrigin",
         "StatusUpdateStage",
         "StatusUpdateState",
         "StatusUpdateStore",

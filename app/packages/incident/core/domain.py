@@ -78,6 +78,21 @@ _STATE_MOVES = frozenset(
 )
 
 
+class StatusUpdateOrigin(StrEnum):
+    """How a draft's text came to be; approval does not change it.
+
+    HAND: a responder wrote or saved it. MODEL: one model call drafted it from
+    the conversation. MODEL_INSTRUCTED: the model drafted it following a
+    responder's instructions. CARRIED_FORWARD: nothing new was said, so the
+    prior text was repeated with the no-new-information wording, by code.
+    """
+
+    HAND = "hand"
+    MODEL = "model"
+    MODEL_INSTRUCTED = "model_instructed"
+    CARRIED_FORWARD = "carried_forward"
+
+
 @dataclass(frozen=True)
 class StatusUpdateText:
     """The language-specific fields of a status update, in one language.
@@ -115,6 +130,8 @@ class StatusUpdate:
         approved_at: When it was approved.
         published_at: When it was marked published.
         published_by: Platform user id of the person who marked it published.
+        origin: How the text came to be; ``None`` for records written before
+            origins existed.
 
     Every time is timezone-aware.
     """
@@ -134,6 +151,7 @@ class StatusUpdate:
     approved_at: datetime | None = None
     published_at: datetime | None = None
     published_by: str | None = None
+    origin: StatusUpdateOrigin | None = None
 
     def __post_init__(self) -> None:
         if not self.incident_id.strip():

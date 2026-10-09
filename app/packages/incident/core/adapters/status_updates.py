@@ -27,7 +27,13 @@ from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from integrations.aws.client import classify_aws_error, get_aws_client
 from integrations.aws.settings import get_aws_settings
-from packages.incident.core.domain import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from packages.incident.core.domain import (
+    StatusUpdate,
+    StatusUpdateOrigin,
+    StatusUpdateStage,
+    StatusUpdateState,
+    StatusUpdateText,
+)
 
 if TYPE_CHECKING:
     from types_boto3_dynamodb.client import DynamoDBClient
@@ -178,6 +184,8 @@ def _to_item(update: StatusUpdate) -> _Item:
         item["published_at"] = _time_to_item(update.published_at)
     if update.published_by is not None:
         item["published_by"] = {"S": update.published_by}
+    if update.origin is not None:
+        item["origin"] = {"S": update.origin.value}
     return item
 
 
@@ -214,6 +222,7 @@ def _from_item(item: _Item) -> StatusUpdate:
             approved_at=datetime.fromisoformat(item["approved_at"]["S"]) if "approved_at" in item else None,
             published_at=datetime.fromisoformat(item["published_at"]["S"]) if "published_at" in item else None,
             published_by=item["published_by"]["S"] if "published_by" in item else None,
+            origin=StatusUpdateOrigin(item["origin"]["S"]) if "origin" in item else None,
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise _UnreadableItemError(f"{type(exc).__name__}: {exc}") from exc

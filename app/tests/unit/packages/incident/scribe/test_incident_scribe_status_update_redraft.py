@@ -25,6 +25,7 @@ from packages.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from packages.incident.core.api import (
     IncidentSecurityFlag,
     StatusUpdate,
+    StatusUpdateOrigin,
     StatusUpdateStage,
     StatusUpdateState,
     StatusUpdateText,
@@ -277,6 +278,7 @@ class TestRedraft:
             transcript_cutoff=_at(10),
             transcript_fingerprint=_fingerprint((_at(50), "rolled back"), (_at(10), "vendor confirmed")),
             created_at=_NOW,
+            origin=StatusUpdateOrigin.MODEL_INSTRUCTED,
         )
         assert (result.status, result.data) == (OperationStatus.SUCCESS, expected)
         assert _stored(store) == (expected, _PENDING, _APPROVED)

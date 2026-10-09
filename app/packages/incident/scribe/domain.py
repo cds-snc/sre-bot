@@ -150,7 +150,7 @@ class NoNewInformationWording:
 
 @dataclass(frozen=True)
 class StatusUpdateEdit:
-    """What the approver submits: the reviewed stage and both languages' fields."""
+    """The stage and both languages' fields a responder submits, saves or hands to the model as its base."""
 
     stage: StatusUpdateStage
     en: StatusUpdateText

@@ -3,10 +3,10 @@ id: TASK-144.3
 title: >-
   Start, save and AI-fill a status update draft in the scribe service, with the
   draft's origin and the AI availability predicate
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-09 12:53'
-updated_date: '2026-10-09 13:01'
+updated_date: '2026-10-09 14:32'
 labels:
   - incident
   - features
@@ -37,11 +37,11 @@ Behaviour visible to users is unchanged: no handler calls the new functions yet.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 StatusUpdate has origin (HAND, MODEL, MODEL_INSTRUCTED, CARRIED_FORWARD or None); the DynamoDB adapter round-trips it and reads records without the attribute as None; the in-memory fake passes the same tests; draft_status_update and redraft_status_update set it on every record they append
-- [ ] #2 save_status_update_draft appends the next DRAFT record with the edit, origin HAND and the pending draft's cutoff and fingerprint; partial fields are accepted; a stale sequence or non-draft latest is STATUS_UPDATE_CONFLICT; an identical repeat returns the stored draft without a write
-- [ ] #3 generate_status_update_draft with blank instructions and no new human messages makes no model call and returns the carried-forward fields; with new messages it runs the security gate, then one model call; instructions give MODEL_INSTRUCTED; a failed or unparseable model call returns its error and leaves the pending draft as latest
-- [ ] #4 text_generation_available() is False when the OpenAI settings do not load and True otherwise, without any network call; redraft_status_update keeps its signature and behaviour
-- [ ] #5 No entry point changes; every existing scribe and core test passes; ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 StatusUpdate has origin (HAND, MODEL, MODEL_INSTRUCTED, CARRIED_FORWARD or None); the DynamoDB adapter round-trips it and reads records without the attribute as None; the in-memory fake passes the same tests; draft_status_update and redraft_status_update set it on every record they append
+- [x] #2 save_status_update_draft appends the next DRAFT record with the edit, origin HAND and the pending draft's cutoff and fingerprint; partial fields are accepted; a stale sequence or non-draft latest is STATUS_UPDATE_CONFLICT; an identical repeat returns the stored draft without a write
+- [x] #3 generate_status_update_draft with blank instructions and no new human messages makes no model call and returns the carried-forward fields; with new messages it runs the security gate, then one model call; instructions give MODEL_INSTRUCTED; a failed or unparseable model call returns its error and leaves the pending draft as latest
+- [x] #4 text_generation_available() is False when the OpenAI settings do not load and True otherwise, without any network call; redraft_status_update keeps its signature and behaviour
+- [x] #5 No entry point changes; every existing scribe and core test passes; ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -104,3 +104,46 @@ Production: `core/domain.py` about 15 lines, `core/api.py` 2, `core/adapters/sta
 
 New records carry `origin`; the previous code's `_from_item` ignores unknown attributes, so a rollback reads them. No handler calls the new functions, so a defect here is unreachable from Slack until TASK-144.4. Single `git revert`. No Terraform, no config.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented per the approved plan, TDD (tests written and red first).
+
+Changes
+- core: StatusUpdateOrigin (hand, model, model_instructed, carried_forward) in domain.py, exported from core.api; StatusUpdate.origin defaults to None. DynamoDB adapter writes "origin" only when set and reads it when present. Terraform defines only PK/SK, so no table change.
+- scribe/status_update.py: origin on every appended record (draft -> MODEL; manual and the failed-model fallback -> HAND; carry-forward -> CARRIED_FORWARD; redraft -> MODEL_INSTRUCTED). New save_status_update_draft, generate_status_update_draft and text_generation_available. redraft_status_update is now a wrapper over generate that keeps its blank-instructions refusal, signature and return type.
+- scribe/providers.py: text_generation_available() checks for UnavailableTextGenerator, so the service imports no adapter. get_status_update_text_generator is lru_cached, so the answer is stable for the process.
+- Module docstring updated. Fixed two stale lines in it: "one of three ways" listed four, and "approval is the only way to save edits" is no longer true.
+
+Decisions made during implementation
+- Save replay: an identical repeat by the same author is detected before the stale-sequence check, using latest.sequence >= sequence. A double submit (second call still at the old sequence) then returns the stored draft instead of a conflict. The same edit from another author is still a conflict.
+- Generate with blank instructions uses INSTRUCTIONS (the base prompt) and build_redraft_input(current, transcript), as planned. build_redraft_instructions("") would add an empty reviewer-guidance block.
+- Generate append conflicts are not adopted: same as the old redraft, a conflict is returned. Save does adopt a newer winning draft, as planned.
+- Log events: the redraft-specific stale, store-failed and redrafted events became incident_status_update_stale, incident_status_update_store_failed and incident_status_update_{kind}. incident_status_update_redraft_blank is kept.
+
+Tests
+- New: test_incident_scribe_status_update_{save,generate,origin}.py, test_incident_scribe_text_generation_availability.py. Core record/fake/store/api-surface tests extended.
+- Existing expectations updated for the new origin field: one record in the unit redraft test and one in integration test_incident_scribe_status_update_redraft_dispatch.py. Nothing else in them changed.
+
+Gates (from app/)
+- uv run ruff check . -> All checks passed!
+- uv run lint-imports -> Contracts: 10 kept, 0 broken.
+- uv run pytest tests --ignore=tests/smoke -> 4531 passed in 51.88s
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 48 errors in 19 files, 0 in touched files (pre-existing, legacy modules).
+- No change under scribe/entrypoints/ (git diff --stat empty).
+<!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-09 14:18
+---
+Plan approved (human, 2026-10-09)
+---
+
+created: 2026-10-09 14:20
+---
+Plan approved (human, 2026-10-09)
+---
+<!-- COMMENTS:END -->

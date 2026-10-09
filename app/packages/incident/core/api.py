@@ -23,6 +23,7 @@ from packages.incident.core.adapters.status_updates import build_status_update_s
 from packages.incident.core.domain import (
     IncidentSecurityFlag,
     StatusUpdate,
+    StatusUpdateOrigin,
     StatusUpdateStage,
     StatusUpdateState,
     StatusUpdateText,
@@ -35,6 +36,7 @@ __all__ = [
     "IncidentSecurityReader",
     "IncidentTranscriptReader",
     "StatusUpdate",
+    "StatusUpdateOrigin",
     "StatusUpdateStage",
     "StatusUpdateState",
     "StatusUpdateStore",

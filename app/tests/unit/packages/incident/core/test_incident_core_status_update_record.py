@@ -11,7 +11,13 @@ from datetime import UTC, datetime
 
 import pytest
 
-from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from packages.incident.core.api import (
+    StatusUpdate,
+    StatusUpdateOrigin,
+    StatusUpdateStage,
+    StatusUpdateState,
+    StatusUpdateText,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -101,3 +107,14 @@ def test_a_published_record_names_who_published_it() -> None:
 def test_stages_are_declared_in_their_public_forward_order() -> None:
     """Consumers rank stages by declaration order; the values are the stored strings."""
     assert [stage.value for stage in StatusUpdateStage] == ["investigating", "identified", "monitoring", "resolved"]
+
+
+def test_a_record_without_an_origin_is_one_written_before_origins_existed() -> None:
+    """Origin defaults to None so older records still load; a new record names how its text came to be."""
+    assert _update().origin is None
+    assert _update(origin=StatusUpdateOrigin.HAND).origin is StatusUpdateOrigin.HAND
+
+
+def test_origins_are_the_stored_strings() -> None:
+    """The values are what the store writes, so renaming one is a data migration."""
+    assert [origin.value for origin in StatusUpdateOrigin] == ["hand", "model", "model_instructed", "carried_forward"]

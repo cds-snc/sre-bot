@@ -12,7 +12,14 @@ from datetime import UTC, datetime
 import pytest
 
 from packages.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
-from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateStore, StatusUpdateText
+from packages.incident.core.api import (
+    StatusUpdate,
+    StatusUpdateOrigin,
+    StatusUpdateStage,
+    StatusUpdateState,
+    StatusUpdateStore,
+    StatusUpdateText,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -177,3 +184,14 @@ def test_a_published_record_still_cannot_go_back_to_draft() -> None:
 
     with pytest.raises(ValueError, match="transition"):
         store.transition(_draft(1), expected_state=StatusUpdateState.PUBLISHED)
+
+
+@pytest.mark.parametrize("origin", [None, *StatusUpdateOrigin])
+def test_a_record_reads_back_with_its_origin(origin: StatusUpdateOrigin | None) -> None:
+    """The fake keeps the origin as the adapter does, absent included."""
+    store = InMemoryStatusUpdateStore()
+    store.append(dataclasses.replace(_draft(1), origin=origin))
+
+    latest = store.latest(INCIDENT_ID).data
+    assert latest is not None
+    assert latest.origin is origin
