@@ -10,7 +10,7 @@ from functools import lru_cache
 from packages.incident.scribe.adapters.copy_ready import CopyReadyPublisher
 from packages.incident.scribe.adapters.google_docs import GoogleDocsIncidentDocument
 from packages.incident.scribe.adapters.slack import build_incident_report_link_lookup
-from packages.incident.scribe.adapters.text_generation import build_status_update_text_generator
+from packages.incident.scribe.adapters.text_generation import UnavailableTextGenerator, build_status_update_text_generator
 from packages.incident.scribe.ports import IncidentReportLinkLookup, StatusPagePublisher, TextGenerator
 
 
@@ -30,6 +30,11 @@ def get_incident_report_link_lookup() -> IncidentReportLinkLookup:
 def get_status_update_text_generator() -> TextGenerator:
     """Return the process-wide ``TextGenerator`` that drafts status updates."""
     return build_status_update_text_generator()
+
+
+def text_generation_available() -> bool:
+    """Whether the process ``TextGenerator`` is configured rather than the unavailable stand-in."""
+    return not isinstance(get_status_update_text_generator(), UnavailableTextGenerator)
 
 
 @lru_cache(maxsize=1)
