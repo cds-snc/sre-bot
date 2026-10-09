@@ -8,7 +8,7 @@ import pytest
 from contracts.operations import OperationResult, OperationStatus
 from contracts.slack.models import CommandPayload
 from packages.incident.scribe.domain import DraftedDocument
-from packages.incident.scribe.platforms.slack import handle_draft_command, register_commands
+from packages.incident.scribe.entrypoints.slack import handle_draft_command, register
 from packages.incident.scribe.service import (
     DOCUMENT_UNREADABLE_CODE,
     EMPTY_HISTORY_CODE,
@@ -19,7 +19,7 @@ from tests.factories.slack import FakeSlackReply
 
 pytestmark = pytest.mark.unit
 
-_DRAFT = "packages.incident.scribe.platforms.slack.draft_incident_document_from_conversation"
+_DRAFT = "packages.incident.scribe.entrypoints.slack.draft_incident_document_from_conversation"
 
 
 def _service(result: OperationResult[DraftedDocument], *, signal_start: bool = True) -> AsyncMock:
@@ -54,7 +54,7 @@ class TestRegisterCommands:
     def test_registers_draft_under_sre_incident(self):
         provider = MagicMock()
 
-        register_commands(provider)
+        register(provider)
 
         kwargs = _draft_registration(provider)
         assert kwargs["command"] == "draft"
@@ -63,11 +63,11 @@ class TestRegisterCommands:
 
     def test_fallback_dispatches_with_empty_args(self):
         provider = MagicMock()
-        register_commands(provider)
+        register(provider)
         fallback = _draft_registration(provider)["fallback_handler"]
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
-        with patch("packages.incident.scribe.platforms.slack.handle_draft_command") as mock_handle:
+        with patch("packages.incident.scribe.entrypoints.slack.handle_draft_command") as mock_handle:
             fallback(payload)
 
         mock_handle.assert_called_once_with(payload, {}, provider.reply)

@@ -26,8 +26,9 @@ from packages.incident.scribe.domain import (
     StatusUpdateOutcomeKind,
     StatusUpdateOverview,
 )
-from packages.incident.scribe.platforms import slack as platform_slack
-from packages.incident.scribe.platforms.slack import (
+from packages.incident.scribe.entrypoints import slack as slack_entrypoints
+from packages.incident.scribe.entrypoints.slack import handle_status_update_command
+from packages.incident.scribe.entrypoints.slack_views import (
     DRAFT_ACTION_ID,
     REVIEW_ACTION_ID,
     REVIEW_CALLBACK_ID,
@@ -42,7 +43,6 @@ from packages.incident.scribe.platforms.slack import (
     build_review_view,
     build_saving_view,
     build_security_confirmation_view,
-    handle_status_update_command,
     parse_review_submission,
 )
 from tests.factories.slack import FakeSlackReply
@@ -119,7 +119,7 @@ def _section_text(view: dict[str, Any]) -> str:
 
 def _pending_view(monkeypatch: pytest.MonkeyPatch, overview: OperationResult[StatusUpdateOverview]) -> dict[str, Any]:
     """Run the status-update command with the overview read stubbed and return the final modal view."""
-    monkeypatch.setattr(platform_slack, "get_status_update_overview", lambda channel_id: overview)
+    monkeypatch.setattr(slack_entrypoints, "get_status_update_overview", lambda channel_id: overview)
     reply = FakeSlackReply()
     payload = CommandPayload(
         text="", user_id="U9", channel_id=_CHANNEL, user_locale="en-US", platform_metadata={"trigger_id": "T1"}

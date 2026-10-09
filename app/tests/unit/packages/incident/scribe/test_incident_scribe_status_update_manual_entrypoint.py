@@ -21,7 +21,7 @@ from contracts.operations.codes import ErrorCode
 from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
 from packages.incident.scribe.domain import StatusUpdateDraftOutcome, StatusUpdateOutcomeKind
 from packages.incident.scribe.entrypoints.slack import handle_draft_action, handle_write_action, register
-from packages.incident.scribe.platforms.slack import REVIEW_CALLBACK_ID, WRITE_ACTION_ID
+from packages.incident.scribe.entrypoints.slack_views import REVIEW_CALLBACK_ID, WRITE_ACTION_ID
 
 pytestmark = pytest.mark.unit
 

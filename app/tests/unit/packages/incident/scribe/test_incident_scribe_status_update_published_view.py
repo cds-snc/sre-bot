@@ -32,7 +32,7 @@ import packages.incident.scribe as scribe_pkg
 from contracts.operations.codes import ErrorCode
 from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
 from packages.incident.scribe.domain import CopyReadyText
-from packages.incident.scribe.platforms.slack import (
+from packages.incident.scribe.entrypoints.slack_views import (
     HISTORY_ACTION_ID,
     PUBLISHED_ACTION_ID,
     build_copy_ready_view,

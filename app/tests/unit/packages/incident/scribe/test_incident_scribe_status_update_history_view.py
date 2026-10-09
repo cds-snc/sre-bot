@@ -28,8 +28,9 @@ from contracts.slack.models import CommandPayload
 from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
 from packages.incident.scribe.comms_profile import format_profile_time, render_profile, render_profile_sections
 from packages.incident.scribe.domain import CopyReadyText, StatusUpdateOverview
-from packages.incident.scribe.platforms import slack as platform_slack
-from packages.incident.scribe.platforms.slack import (
+from packages.incident.scribe.entrypoints import slack as slack_entrypoints
+from packages.incident.scribe.entrypoints.slack import handle_status_update_command
+from packages.incident.scribe.entrypoints.slack_views import (
     DRAFT_ACTION_ID,
     HISTORY_ACTION_ID,
     OPEN_ACTION_ID,
@@ -39,7 +40,6 @@ from packages.incident.scribe.platforms.slack import (
     build_copy_ready_view,
     build_overview_view,
     build_profile_labels,
-    handle_status_update_command,
 )
 from tests.factories.slack import FakeSlackReply
 
@@ -435,7 +435,7 @@ class TestCommandShowsOverview:
             reads.append(conversation_id)
             return OperationResult.success(data=overview)
 
-        monkeypatch.setattr(platform_slack, "get_status_update_overview", read_overview)
+        monkeypatch.setattr(slack_entrypoints, "get_status_update_overview", read_overview)
         reply = FakeSlackReply()
         payload = CommandPayload(
             text="", user_id="U9", channel_id=_CHANNEL, user_locale="en-US", platform_metadata={"trigger_id": "T1"}

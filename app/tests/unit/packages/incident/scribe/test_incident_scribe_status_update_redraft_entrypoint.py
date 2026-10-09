@@ -43,7 +43,7 @@ from packages.incident.scribe.entrypoints.slack import (
     handle_write_action,
     register,
 )
-from packages.incident.scribe.platforms.slack import (
+from packages.incident.scribe.entrypoints.slack_views import (
     CONFIRM_ACTION_ID,
     DRAFT_ACTION_ID,
     HISTORY_ACTION_ID,

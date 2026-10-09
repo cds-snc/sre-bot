@@ -25,7 +25,7 @@ import yaml
 
 import packages.incident.scribe as scribe_pkg
 from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
-from packages.incident.scribe.platforms.slack import (
+from packages.incident.scribe.entrypoints.slack_views import (
     REDRAFT_ACTION_ID,
     REVIEW_CALLBACK_ID,
     build_redrafting_view,

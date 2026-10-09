@@ -7,6 +7,8 @@ import pytest
 import packages.incident.scribe as scribe_pkg
 from infrastructure.i18n.loader import YAMLTranslationLoader
 from infrastructure.i18n.resources import I18nResourceRegistry
+from packages.incident.scribe.entrypoints.slack import handle_review_submission
+from packages.incident.scribe.entrypoints.slack_views import REVIEW_CALLBACK_ID
 from tests.factories.slack import FakeSlackRegistrar
 
 pytestmark = pytest.mark.unit
@@ -40,6 +42,21 @@ def test_block_actions_draft_and_confirm_are_registered_once() -> None:
         "incident.scribe.status_update.draft",
         "incident.scribe.status_update.draft_confirmed",
     ]
+
+
+def test_hookimpl_registers_status_update_command_and_approval_submission_together() -> None:
+    """One hookimpl call registers the ``status-update`` command and the approval view submission.
+
+    Both come from the scribe Slack entry point's single ``register``, so the
+    command that opens the modal never ships without the listener that
+    approves from it.
+    """
+    registrar = FakeSlackRegistrar()
+
+    scribe_pkg.register_slack_commands(registrar=registrar)
+
+    assert [command["command"] for command in registrar.commands if command["command"] == "status-update"] == ["status-update"]
+    assert registrar.view_submissions == {REVIEW_CALLBACK_ID: handle_review_submission}
 
 
 def test_one_i18n_registration_covers_both_catalogues() -> None:
