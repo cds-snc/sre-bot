@@ -22,20 +22,20 @@ import structlog
 from slack_bolt import App, BoltRequest, BoltResponse
 from slack_sdk.webhook import WebhookClient
 
+import features.incident.scribe as incident_scribe_module
 import packages.access.sync as access_sync_module
 import packages.geolocate as geolocate_module
-import packages.incident.scribe as incident_scribe_module
 import packages.rant as rant_module
 import packages.user_rotations as user_rotations_module
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
+from features.incident.core.adapters.slack import SlackIncidentTranscriptReader
+from features.incident.scribe import providers as incident_scribe_providers
+from features.incident.scribe import service as incident_scribe_service
+from features.incident.scribe.adapters.slack import SlackIncidentReportLinkLookup
 from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
-from packages.incident.core.adapters.slack import SlackIncidentTranscriptReader
-from packages.incident.scribe import providers as incident_scribe_providers
-from packages.incident.scribe import service as incident_scribe_service
-from packages.incident.scribe.adapters.slack import SlackIncidentReportLinkLookup
 from packages.rant.adapters.slack import SlackUserIdentityLookup
 from packages.rant.platforms import slack as rant_slack
 from server.lifespan import _register_legacy_slack_commands

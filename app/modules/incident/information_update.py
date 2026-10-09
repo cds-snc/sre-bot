@@ -5,6 +5,7 @@ from slack_bolt import Ack
 from slack_sdk import WebClient
 from structlog import get_logger
 
+from features.incident.documents import utils
 from models.incidents import Incident
 from modules.incident import (
     db_operations,
@@ -15,7 +16,6 @@ from modules.incident import (
 from modules.incident import (
     utils as incident_utils,
 )
-from packages.incident.documents import utils
 
 FIELD_SCHEMA = {
     "detection_time": {"type": "datetime"},

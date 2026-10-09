@@ -6,6 +6,8 @@ from slack_sdk import WebClient
 from slack_sdk.models import blocks
 from structlog import get_logger
 
+from features.incident.drive.adapters import google_drive as incident_drive
+from features.incident.meet.adapters import google_meet as meet
 from infrastructure.configuration.app import get_app_settings
 from infrastructure.configuration.features.incident import get_incident_settings
 from models.incidents import IncidentPayload
@@ -16,8 +18,6 @@ from modules.incident import (
     on_call,
 )
 from modules.incident.incident_folder import channel_slug
-from packages.incident.drive.adapters import google_drive as incident_drive
-from packages.incident.meet.adapters import google_meet as meet
 
 app_settings = get_app_settings()
 incident_settings = get_incident_settings()

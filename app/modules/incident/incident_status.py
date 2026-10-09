@@ -2,8 +2,8 @@ from slack_bolt import Respond
 from slack_sdk import WebClient
 from structlog import get_logger
 
+from features.incident.documents import utils
 from modules.incident import db_operations, incident_document, incident_folder
-from packages.incident.documents import utils
 
 logger = get_logger()
 

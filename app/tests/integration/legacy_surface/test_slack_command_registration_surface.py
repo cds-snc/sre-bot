@@ -16,12 +16,12 @@ from typing import Any
 import pytest
 
 from contracts.operations import OperationResult, OperationStatus
+from features.incident.scribe import service as incident_scribe_service
+from features.incident.scribe.domain import DraftedDocument
+from features.incident.scribe.service import EMPTY_HISTORY_CODE
 from packages.access.sync.interactions import slack as access_sync_slack
 from packages.access.sync.interactions.ingress import EnqueuedJob
 from packages.geolocate.platforms import slack as geolocate_slack
-from packages.incident.scribe import service as incident_scribe_service
-from packages.incident.scribe.domain import DraftedDocument
-from packages.incident.scribe.service import EMPTY_HISTORY_CODE
 from packages.rant.service import format_rant
 from packages.user_rotations.platforms import slack as user_rotations_slack
 from packages.user_rotations.service import UserRotationShift
@@ -373,7 +373,7 @@ def test_access_sync_user_enqueue_failure_is_reported(
     assert "lock store unavailable" in reply["text"]
 
 
-# --- packages/incident/scribe ------------------------------------------------
+# --- features/incident/scribe ------------------------------------------------
 
 CHANNEL_HISTORY = {
     "ok": True,

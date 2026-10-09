@@ -8,6 +8,7 @@ from slack_sdk.errors import SlackApiError  # type: ignore
 from slack_sdk.web import SlackResponse  # type: ignore
 from structlog import get_logger
 
+from features.incident.documents import utils
 from infrastructure.configuration.app import get_app_settings
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import users as slack_users
@@ -15,7 +16,6 @@ from modules.incident import incident_helper, schedule_retro
 from modules.incident.incident_document import (
     update_timeline_section,
 )
-from packages.incident.documents import utils
 
 settings = get_app_settings()
 

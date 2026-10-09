@@ -6,6 +6,7 @@ from slack_bolt import Ack, App, Respond
 from slack_sdk import WebClient
 from structlog import get_logger
 
+from features.incident.drive.adapters import google_drive as incident_drive
 from infrastructure.configuration.integrations.google import get_google_resources_config
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import (
@@ -29,7 +30,6 @@ from modules.incident import (
     information_update,
     schedule_retro,
 )
-from packages.incident.drive.adapters import google_drive as incident_drive
 
 google_resources = get_google_resources_config()
 SRE_INCIDENT_FOLDER = google_resources.incident_folder_id
