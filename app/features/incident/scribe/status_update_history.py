@@ -4,7 +4,8 @@ Platform-neutral use cases behind the status-updates modal's Open button and the
 copy-ready view's published toggle. The functions are async like the other
 status-update use cases and call the synchronous core store inline. Reading
 writes nothing; the toggle's only write is one store transition. Nothing is
-posted anywhere. This module imports only ``core.api`` from the core.
+posted anywhere. ``read_published`` and ``set_published_and_render`` also render
+the record through the ``StatusPagePublisher`` as copy-ready text, in one call. This module imports only ``core.api`` from the core.
 """
 
 from dataclasses import replace
@@ -16,6 +17,10 @@ import structlog
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.core.api import StatusUpdate, StatusUpdateState, StatusUpdateStore, get_status_update_store
+from features.incident.scribe import providers
+from features.incident.scribe.comms_profile import ProfileLabels
+from features.incident.scribe.domain import PublishedRecord
+from features.incident.scribe.ports import StatusPagePublisher
 
 logger = structlog.get_logger()
 
@@ -96,6 +101,59 @@ async def set_published(
     )
 
 
+async def read_published(
+    incident_id: str,
+    sequence: int,
+    *,
+    labels_en: ProfileLabels,
+    labels_fr: ProfileLabels,
+    publisher: StatusPagePublisher | None = None,
+) -> OperationResult[PublishedRecord]:
+    """Return the approved update at ``sequence`` with its copy-ready text.
+
+    Returns:
+        Success with the record and its text; the read's classified error (see
+        ``get_approved_update``) or the publisher's.
+    """
+    return await _render(await get_approved_update(incident_id, sequence), labels_en, labels_fr, publisher)
+
+
+async def set_published_and_render(
+    incident_id: str,
+    sequence: int,
+    *,
+    published: bool,
+    actor: str,
+    labels_en: ProfileLabels,
+    labels_fr: ProfileLabels,
+    publisher: StatusPagePublisher | None = None,
+) -> OperationResult[PublishedRecord]:
+    """Mark the approved update at ``sequence`` published or not, then return it with its copy-ready text.
+
+    Returns:
+        Success with the stored record and its text; the toggle's classified
+        error (see ``set_published``) or the publisher's.
+    """
+    toggled = await set_published(incident_id, sequence, published=published, actor=actor)
+    return await _render(toggled, labels_en, labels_fr, publisher)
+
+
+async def _render(
+    read: OperationResult[StatusUpdate],
+    labels_en: ProfileLabels,
+    labels_fr: ProfileLabels,
+    publisher: StatusPagePublisher | None,
+) -> OperationResult[PublishedRecord]:
+    """Render a read or toggled record through the publisher; a failed ``read`` is passed on."""
+    if not read.is_success or read.data is None:
+        return _failure(read)
+    publisher = publisher or providers.get_status_page_publisher()
+    rendered = await publisher.publish(read.data, labels_en=labels_en, labels_fr=labels_fr)
+    if not rendered.is_success or rendered.data is None:
+        return _failure(rendered)
+    return OperationResult.success(data=PublishedRecord(update=read.data, text=rendered.data))
+
+
 def _read_approved(store: StatusUpdateStore, incident_id: str, sequence: int) -> OperationResult[StatusUpdate]:
     """Return the record at ``sequence`` when it is approved or published, read from the incident's list."""
     listed = store.list_for_incident(incident_id)
@@ -113,8 +171,8 @@ def _read_approved(store: StatusUpdateStore, incident_id: str, sequence: int) ->
     return OperationResult.success(data=record)
 
 
-def _failure(result: OperationResult[Any]) -> OperationResult[StatusUpdate]:
-    """Carry a store error's classification over to a status update payload type."""
+def _failure[T](result: OperationResult[Any]) -> OperationResult[T]:
+    """Carry an error result's classification over to another payload type."""
     return OperationResult.error(
         result.status,
         message=result.message or "status update failed",

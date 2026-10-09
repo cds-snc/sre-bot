@@ -24,7 +24,7 @@ import pytest
 import features.incident.scribe as scribe_module
 from contracts.operations import OperationResult
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
-from features.incident.scribe import providers
+from features.incident.scribe import providers, status_update_history
 from features.incident.scribe.comms_profile import ProfileLabels
 from features.incident.scribe.domain import CopyReadyText, StatusUpdateOverview
 from features.incident.scribe.entrypoints import slack as slack_entrypoints
@@ -103,7 +103,7 @@ class ServiceFakes:
 @pytest.fixture
 def fakes(monkeypatch: pytest.MonkeyPatch) -> ServiceFakes:
     service_fakes = ServiceFakes()
-    monkeypatch.setattr(slack_entrypoints, "get_approved_update", service_fakes.get_approved_update)
+    monkeypatch.setattr(status_update_history, "get_approved_update", service_fakes.get_approved_update)
     monkeypatch.setattr(slack_entrypoints, "get_status_update_overview", service_fakes.get_status_update_overview)
     monkeypatch.setattr(providers, "get_status_page_publisher", lambda: service_fakes)
     return service_fakes
