@@ -15,7 +15,7 @@ Per-platform handlers then re-implement the same hard parts by hand, each slight
 
 No off-the-shelf library covers these conventions. Bolt and `slack_sdk.models` provide the runtime and Block Kit types; third-party builders (blockkit) add validation; bot frameworks (Slack Machine) compete with the plugin architecture instead of fitting inside it. Microsoft's Teams SDK for Python reached general availability in May 2026, with Pydantic Adaptive Card models (`microsoft-teams-cards`) and dialogs.
 
-Registration is decided elsewhere and is not part of a toolkit: packages attach block actions and view submissions as native Bolt listeners through the host registrar ([transport-slack.md](transport-slack.md)), and business code stays platform-neutral while a feature's entry point uses its platform's SDK ([platform-entrypoints.md](platform-entrypoints.md) rule 3). The first consumer is the incident status-update approval modal (TASK-140).
+Registration is decided elsewhere and is not part of a toolkit: packages attach block actions and view submissions as native Bolt listeners through the host registrar ([transport-slack.md](transport-slack.md)), and business code stays platform-neutral while a feature's entry point uses its platform's SDK ([platform-entrypoints.md](platform-entrypoints.md) rule 3). The first consumer is the incident status-update modal (TASK-140; human-first in TASK-144): a form that saves, AI-fills and approves in place.
 
 The app already paid for wrapping SDKs: the Google API client and boto3 wrappers had to replicate every SDK feature and were deleted ([outbound-clients.md](outbound-clients.md), [sdk-typing.md](sdk-typing.md)).
 
@@ -65,3 +65,4 @@ Tickets are created on acceptance. Tolerated until then: handlers calling Bolt's
 
 **Changes:**
 - 2026-10-06: action and view-submission registration and native-SDK entry points are decided in transport-slack.md and platform-entrypoints.md; this record stays Draft for the conventions toolkit (TASK-140.1).
+- 2026-10-09: the first consumer is the human-first status-update modal, a form that saves, AI-fills and approves in place (TASK-144).
