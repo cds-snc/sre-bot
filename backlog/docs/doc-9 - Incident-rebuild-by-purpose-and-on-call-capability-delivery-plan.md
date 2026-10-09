@@ -3,8 +3,8 @@ id: doc-9
 title: 'Incident rebuild by purpose and on-call capability: delivery plan'
 type: guide
 created_date: '2026-10-09 16:50'
+updated_date: '2026-10-09 19:37'
 ---
-
 # Incident rebuild by purpose and on-call capability: delivery plan
 
 Planning record, 2026-10-09. Not a decision record: the decisions are in `decisions/incident-management.md`, `decisions/oncall.md`, `decisions/product-scope.md` and `decisions/feature-packages.md` (all amended or created the same day on the branch that carries this document). This document holds the delivery chain, what it supersedes, the assumptions each slice relies on and the open questions. When every task below is Done, this document is retired.
@@ -23,7 +23,7 @@ Planning record, 2026-10-09. Not a decision record: the decisions are in `decisi
 | --- | --- |
 | Subdomains are the stages and audiences of the incident process, named in the domain's words; never named for a mechanism; one command joins the subdomain whose users need it | feature-packages.md rule 2; incident-management.md "The feature umbrella" |
 | `response`, `comms`, `postmortem` over `core/` and `common/`; `scribe` dissolves (summarize to response, draft to postmortem, status updates to comms); the umbrella moves to `features/incident/` before the rebuild, not after | incident-management.md |
-| The record gains severity (levels 0 to 3) and the five roles (IC, OL, CL, PL, PO); the four timing fields stay so time to detect and time to recover derive | incident-management.md "The incident record" |
+| The record gains severity (levels 0 to 4) and the five roles (IC, OL, CL, PL, PO); the four timing fields stay so time to detect and time to recover derive | incident-management.md "The incident record" |
 | Communications are defined by audience: the public update first; internal staff and senior management as later profiles, never new subdomains | incident-management.md "Communications" |
 | Detection reaches the bot through alert channels fed by product infrastructure and the SIEM via the webhooks pipeline; the bot owns the call-incident button only | incident-management.md "The feature umbrella" |
 | On-call is a capability with two schedule sources (Opsgenie, self-managed rotations), selected by the reference's system; `oncall_sync` is a feature over it; incident consumes it at declare; paging is the notifications capability's concern | oncall.md |
@@ -99,7 +99,7 @@ Stated on the coordinators; change them there before the slice that depends on t
 - The comms carve-out moves the scribe-local `TextGenerator`, its OpenAI binding and the availability predicate whole; draft and summarize keep calling the Summarizer directly until TASK-25.10, so nothing is duplicated.
 - Each legacy surface is pinned before the slice that rebuilds it; names, fields, replies and i18n keys do not change during the rebuild, apart from three added role pickers.
 - Alert buttons register into the webhooks capability's extension point when it exists, otherwise through the Slack registrar with a later move.
-- Severity levels are 0 to 3, confirmed with the incident process owners before TASK-145.4 merges.
+- Severity levels are 0 to 4 because teams use different scales; the legacy sev-1 to sev-4 values map one to one; narrowed only if the organisation standardises.
 - Renaming a plugin renames its action ids; modals open across that deploy are accepted as broken.
 - The on-call capability works with the self-managed source alone; the Opsgenie adapter is transitional.
 
@@ -123,7 +123,7 @@ Stated on the coordinators; change them there before the slice that depends on t
 
 ## Open questions (human)
 
-1. Severity scale: levels 0 to 3 as recorded, or 1 to 3? Confirm with the incident process owners before TASK-145.5 merges.
+1. Severity scale: decided 2026-10-09: levels 0 to 4, wide because teams use different scales; revisit if the organisation standardises.
 2. "Postmortem" is the code and record word; user-facing labels still say "retro". Rename the labels in the catalogues with TASK-145.10, or leave them?
 3. Pinning (TASK-36.1, TASK-36.3) is kept as a gate before groups C and D. Hold the gate, or allow an incident-only pinning slice?
 4. Interim DynamoDB `IncidentStore` adapter (recorded assumption) versus waiting for TASK-108 and TASK-109: confirm.

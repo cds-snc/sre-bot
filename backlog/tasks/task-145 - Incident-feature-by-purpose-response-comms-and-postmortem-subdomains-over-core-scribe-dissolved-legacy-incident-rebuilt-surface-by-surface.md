@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:41'
-updated_date: '2026-10-09 17:14'
+updated_date: '2026-10-09 19:36'
 labels:
   - incident
   - features
@@ -35,9 +35,9 @@ ASSUMPTIONS IN FORCE (change them here before the slice that depends on them sta
 - the umbrella moves to app/features/incident/ in the first slice, as it stands and with no runtime change, so every later slice builds in its final home; the package-shape check, enablement and TOML settings arrive with TASK-114, TASK-112 and TASK-111 on their own;
 - the incident record store is an interim adapter in core/adapters/ over the existing DynamoDB table, behind an IncidentStore interface and an in-memory fake, as the status-update store already is; TASK-108 and TASK-109 later swap its inside for the storage contract;
 - the comms carve-out moves the scribe-local TextGenerator interface, its OpenAI binding and the availability predicate whole; draft and summarize keep calling the Summarizer directly until TASK-25.10 replaces both with the capability, so nothing is duplicated;
-- each legacy surface is pinned (TASK-36.1 for commands and interactions, TASK-36.3 for jobs) before the slice that rebuilds it; command names, modal fields, replies and i18n keys do not change during the rebuild, apart from three added role pickers;
+- each legacy surface is pinned (TASK-36.1 for commands and interactions, TASK-36.3 for jobs) before the slice that rebuilds it; command names, modal fields, replies and i18n keys do not change during the rebuild, apart from three added role pickers and the SEV0 option in the severity pickers;
 - the alert buttons register into the webhooks capability's extension point when it exists, otherwise through the Slack registrar with a later move;
-- severity is a closed set with levels 0 to 3 (0 for an event spanning several products); the scale is confirmed with the incident process owners before the field lands;
+- severity is a closed set with levels 0 to 4 (0 for an event spanning several products) or unset; the set is wide because teams use different scales today, the legacy sev-1 to sev-4 values map one to one, and it narrows only if the organisation standardises;
 - a subdomain's entry point stays two flat modules, entrypoints/slack.py and entrypoints/slack_views.py; a views split waits for TASK-118;
 - renaming the plugin renames its action ids; modals open across that deploy are accepted as broken, as TASK-144.4 accepted.
 

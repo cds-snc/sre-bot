@@ -3,7 +3,7 @@ id: doc-10
 title: Stack J handoff
 type: guide
 created_date: '2026-10-09 18:23'
-updated_date: '2026-10-09 19:33'
+updated_date: '2026-10-09 19:37'
 ---
 # Stack J handoff
 
@@ -54,7 +54,7 @@ updated_date: '2026-10-09 19:33'
 - TASK-145.6 exceeds the size gate as one task: the plan proposes TASK-145.6.1 (IncidentReport, merging the three Google adapters) and TASK-145.6.2 (IncidentConversation, ProductCatalog, reference-taking reader). Approve the split before Stack K.
 - TASK-145.7, 145.8 and 145.9 each propose a split in their plans (declare in two halves; status/update versus roles/archive/metadata; the summarize move separated from the timeline rebuild because doc-2 forbids mixing a move with a behaviour change). Approve before Stack L.
 - TASK-145.12 needs the spreadsheets capability (TASK-121) for its projection writer, or the legacy writer stays until then: confirm and add the dependency.
-- Severity scale (levels 0 to 3 recorded) to confirm with the incident process owners before TASK-145.5 merges.
+- Severity scale decided 2026-10-09: levels 0 to 4, wide because teams use different scales; revisit if the organisation standardises.
 - Whether user-facing "retro" labels become "postmortem" with TASK-145.10.
 
 ## Planning queue
