@@ -3,7 +3,7 @@ id: doc-10
 title: Stack J handoff
 type: guide
 created_date: '2026-10-09 18:23'
-updated_date: '2026-10-09 19:37'
+updated_date: '2026-10-09 19:52'
 ---
 # Stack J handoff
 
@@ -19,35 +19,31 @@ updated_date: '2026-10-09 19:37'
 | --- | --- | --- | --- | --- | --- |
 | 0 | TASK-145 plans (docs only) | `stack-j/plan` | #1576 | merged | Plans for TASK-145.1 to 145.13 (1-6 grounded in code; 7-13 outlines to re-ground at pickup). |
 | 1 | TASK-145.1 move packages/incident to features/incident with the first-mover wiring | `stack-j/task-145.1-move-incident-to-features` | #1577 | merged | Squash 7cb97921 on `main` (2026-10-09). Task Done. |
-| 2 | TASK-145.2 wording and prompt text out of the views module; translator through core.api | `stack-j/task-145.2-status-update-wording` | #1579 | in review | dd779db, rebased on `main`, PR base `main`, review required. Gates green, all five ACs checked, notes written, task In Progress. After merge: `backlog task edit 145.2 --status Done` (human). |
-| 3 | TASK-145.3 one service call per status-update handler | `stack-j/task-145.3-status-update-handlers` | - | ready | Implemented 2026-10-09, gates green, all five ACs checked, notes written, task In Progress. Uncommitted on the layer-3 branch until Next action 1. New `scribe/status_update_form.py`; `approve_and_publish`, `read_published`, `set_published_and_render`; `StatusUpdateFormState`, `PublishedRecord`, `StatusUpdateEdit.blank_fields()`. Deviations from the plan are in the task notes. |
-| 4 | TASK-145.4 carve `comms` out of scribe as plugin `incident.comms` | `stack-j/task-145.4-comms-subdomain` | - | plan approved | Re-ground on layer 3 first: the task notes list what layer 3 added (`status_update_form.py` moves too, new test files, stub targets). Mechanical move; ids become `incident.comms.status_update.*`; modals open across the deploy are accepted as broken. The comms views module imports `translate` from `core.api` (no new ignore entry); the scribe test conftests that load the catalogues move with the tests. |
+| 2 | TASK-145.2 wording and prompt text out of the views module; translator through core.api | `stack-j/task-145.2-status-update-wording` | #1579 | in review | dd779db, PR base `main`, review required. Task In Progress, ACs checked. After merge: `backlog task edit 145.2 --status Done` (human). |
+| 3 | TASK-145.3 one service call per status-update handler | `stack-j/task-145.3-status-update-handlers` | #1580 | in review | 376b7b1 (the layer) plus ea2ad8f (docs-only severity 0-4 update across the incident docs, tasks and `decisions/incident-management.md`, committed on this branch). PR base layer 2, review required; the PR title is the default branch name (Next action 1 renames it). Task In Progress, ACs checked. |
+| 4 | TASK-145.4 carve `comms` out of scribe as plugin `incident.comms` | `stack-j/task-145.4-comms-subdomain` | - | ready | Implemented 2026-10-09, gates green, all five ACs checked, notes written (deviations listed there), task In Progress. Uncommitted until Next action 1. Ids are now `incident.comms.status_update.*`: deploy in a quiet window, open modals stop responding. |
 
 ## Position
 
-- Checked out: `stack-j/task-145.3-status-update-handlers` (on dd779db, layer 2). Layer 2 (#1579) is open and in review.
-- Uncommitted, all for layer 3: `app/features/incident/scribe/{domain.py,status_update_form.py (new),status_update_approval.py,status_update_history.py,README.md,entrypoints/slack.py,entrypoints/slack_views.py}`; under `app/tests/unit/features/incident/scribe/`, five new test files (`test_incident_scribe_status_update_{form_save,form_fill,form_view,approval_publish,history_render}.py`) and edits to the six `*_entrypoint.py` files, `..._approval.py` and `..._slack.py`; the five `app/tests/integration/features/incident/scribe/*_dispatch.py` (stub targets only); `backlog/tasks/task-145.3*.md` (status, ACs, notes), `backlog/tasks/task-145.4*.md` (re-ground note), the two plan-approval comments, this doc, and `.claude/skills/stacked-pr-session/SKILL.md` (End routine: Done and next-layer commands). The new files are marked intent-to-add in the index (`git add -N`); `git add -A` stages them as usual.
+- Checked out: `stack-j/task-145.4-comms-subdomain` (on ea2ad8f, layer 3).
+- Uncommitted, all for layer 4: new `app/features/incident/comms/` (whole files moved with `git mv` from scribe and staged as renames; the split modules are new untracked files), trimmed `app/features/incident/scribe/`, `app/features/incident/README.md`, `app/pyproject.toml` (entry point, layers contract), tests moved to `app/tests/{unit,integration}/features/incident/comms/` (the integration scribe directory is gone), `app/tests/integration/{server/test_lifespan_plugin_loading.py,legacy_surface/conftest.py,legacy_surface/INVENTORY.md}`, `decisions/incident-management.md`, `backlog/tasks/task-145.4*` (status, ACs, notes), `backlog/tasks/task-140.11*` (re-ground note: status-update paths moved to comms), this doc.
 - Never stage: `backlog/docs/doc-6*`, `backlog/docs/doc-8*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md` (working files, not kept in the repo).
-- Plan approval: TASK-145.2, 145.3 and 145.4 have "Plan approved" comments.
+- Gates on layer 4 (from `app/`): ruff check and format clean; lint-imports 10 kept, 0 broken; mypy 48 errors in 19 files, 0 in touched files; pytest `tests --ignore=tests/smoke` 4607 passed.
 - No background agents.
 
 ## Next actions
 
-1. **human**: commit layer 3 and submit the stack:
+1. **human**: commit layer 4, submit the stack, and give layer 3's PR a real title:
    ```
-   git add -A app backlog/tasks backlog/docs/stacks .claude/skills/stacked-pr-session
-   git commit -m "One service call per status-update handler"
+   git add -A app backlog/tasks backlog/docs/stacks decisions
+   git commit -m "Carve incident comms out of scribe"
    gh stack submit
-   gh pr view --web
-   ```
-2. **human**: create the layer-4 branch on top of layer 3 before the next session:
-   ```
-   gh stack add stack-j/task-145.4-comms-subdomain
+   gh pr edit 1580 --title "One service call per status-update handler"
    gh stack view
    ```
-3. **agent** (layer 4): re-ground the TASK-145.4 plan on the layer-3 code (task notes), then implement it as a mechanical move (`git mv`); run the gates from `app/` (`uv run ruff check .`, `uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'`, `uv run lint-imports`, `uv run pytest tests --ignore=tests/smoke`); check the ACs through the CLI; write the task notes; set the task In Progress; update this doc; hand the human the commit and `gh stack submit` commands. Layer 4 is the top of Stack J, so there is no next layer to add.
-4. **human**, as each PR merges (bottom-up, with re-approvals): `gh stack sync`, `gh stack submit`, then `backlog task edit <id> --status Done` (145.2 when #1579 merges, 145.3 and 145.4 after theirs). The task-file edit goes in the next layer's commit, or a small follow-up commit once the stack is merged.
-5. **human**: Stack K (TASK-145.5, TASK-145.6) can start from `main` now, in parallel with this stack.
+2. **human**, as each PR merges (bottom-up, with re-approvals): `gh stack sync`, `gh stack submit`, then `backlog task edit <id> --status Done` (145.2 when #1579 merges, 145.3 and 145.4 after theirs). The task-file edit goes in the next layer's commit, or a small follow-up commit once the stack is merged. Stack J has no further layer to add.
+3. **agent** (next session): reconcile merges (`gh pr view 1579 1580 <layer-4 PR> --json state`), fix anything a review asks for on the layer it belongs to (`gh stack checkout <branch>`, then `gh stack rebase`), and print the Done commands for merged layers.
+4. **human**: Stack K (TASK-145.5, TASK-145.6) can start from `main` now, in parallel with this stack; approve the TASK-145.6 split first (Open decisions).
 
 ## Open decisions
 
@@ -59,8 +55,8 @@ updated_date: '2026-10-09 19:37'
 
 ## Planning queue
 
-- Stack K (group B): TASK-145.5 (read path of the record, plan written), TASK-145.6 (plan written with the proposed split). Unblocked since TASK-145.1 merged; can start from `main` in parallel with layers 3 and 4.
+- Stack K (group B): TASK-145.5 (read path of the record, plan written), TASK-145.6 (plan written with the proposed split). Unblocked since TASK-145.1 merged; can start from `main` in parallel with this stack.
 - Stack L (group C): TASK-145.7, 145.8, 145.9 (outline plans with proposed splits). Waits for TASK-36.1 and TASK-36.3 (pinning) and Stack K.
 - Stack M (group D): TASK-145.10, 145.11 (outline plans). Waits for TASK-138 (calendar capability), TASK-36.1 and Stack L's TASK-145.9.
 - Standalone: TASK-145.12 (cutover; waits for TASK-145.9 and the TASK-121 decision), TASK-145.13 (contract; waits for TASK-145.11, 145.12 and TASK-118).
-- Every outline plan (7 to 13) says "re-ground at pickup": the umbrella lives in `features/incident/` since layer 1 and the views reach the translator through `core.api` since layer 2.
+- Every outline plan (7 to 13) says "re-ground at pickup": the umbrella lives in `features/incident/` since layer 1, the views reach the translator through `core.api` since layer 2, and status updates live in `features/incident/comms/` (plugin `incident.comms`) since layer 4; scribe holds only draft and summarize.

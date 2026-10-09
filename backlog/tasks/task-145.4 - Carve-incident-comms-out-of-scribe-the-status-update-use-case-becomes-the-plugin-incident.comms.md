@@ -3,10 +3,10 @@ id: TASK-145.4
 title: >-
   Carve incident/comms out of scribe: the status-update use case becomes the
   plugin incident.comms
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 19:33'
+updated_date: '2026-10-09 19:52'
 labels:
   - incident
   - features
@@ -34,11 +34,11 @@ THIS SLICE
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 features/incident/comms/ is registered as incident.comms and owns every status-update module, catalogue, adapter and test; scribe holds only draft and summarize
-- [ ] #2 All status-update action and callback ids start with incident.comms. and no id starting with incident.scribe.status_update remains in code or tests
-- [ ] #3 The import-linter ignore list has not grown: the single infrastructure.i18n entry is renamed, the integrations.openai entry is unchanged
-- [ ] #4 The umbrella layers contract names comms; the umbrella README and the legacy_surface inventory point status updates at comms
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 features/incident/comms/ is registered as incident.comms and owns every status-update module, catalogue, adapter and test; scribe holds only draft and summarize
+- [x] #2 All status-update action and callback ids start with incident.comms. and no id starting with incident.scribe.status_update remains in code or tests
+- [x] #3 The import-linter ignore list has not grown: the single infrastructure.i18n entry is renamed, the integrations.openai entry is unchanged
+- [x] #4 The umbrella layers contract names comms; the umbrella README and the legacy_surface inventory point status updates at comms
+- [x] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -86,7 +86,21 @@ A missed registration leaves a button unhandled; the registration and lifespan t
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-Re-ground at pickup (from TASK-145.3): scribe/status_update_form.py is new (start/open/save/fill_status_update_form) and moves with the status-update code (proposed name comms/form.py). The 145.3 form types are StatusUpdateFormState and PublishedRecord in domain.py; StatusUpdateEdit gained blank_fields() and validate_approval_edit is gone; _GENERATE_FAILURE_KEYS, build_saved_form_view and build_filled_form_view are in slack_views.py. The entrypoint and dispatch tests stub on status_update_form, status_update_approval and status_update_history; their monkeypatch targets follow the renamed modules. New tests to move: test_incident_scribe_status_update_{form_save,form_fill,form_view,approval_publish,history_render}.py.
+Implemented 2026-10-09 on stack-j/task-145.4-comms-subdomain, re-grounded on the layer-3 code.
+
+Done as planned: features/incident/comms/ with __init__ (hookimpls; i18n domain incident_comms over comms/locales), README (the status-update reference moved from scribe's), settings, service.py (was scribe/status_update.py), form.py (status_update_form.py), approval.py, history.py, prompt.py, comms_profile.py, publisher.py, domain.py, ports.py (TextGenerator, StatusPagePublisher), providers.py, adapters/{text_generation,copy_ready}.py, entrypoints/{slack,slack_views}.py, locales/incident_status_update.*.yml. Whole files moved with git mv (git shows renames); the split modules (domain, ports, providers, settings, both entrypoints, READMEs) are new files in comms and trimmed in scribe. Entry point incident.comms; ids incident.comms.status_update.*; layers contract 'comms | documents | drive | meet | scheduling | scribe'. Tests: 41 unit files to tests/unit/features/incident/comms/ and 5 dispatch files to tests/integration/features/incident/comms/ as test_incident_comms_*; imports, monkeypatch targets and the harness plugin name rewritten; the plugin registration test split into a scribe test (two commands, no listeners, two catalogues) and test_incident_comms_plugin_registration.py (one command, seven actions, one submission, one catalogue). Lifespan test and legacy-surface conftest list the comms plugin. Umbrella README (folder row, layers rule, where-new-work row), INVENTORY rows and decisions/incident-management.md (current state, tolerated list, dated Changes line) updated.
+
+Deviations from the plan:
+- AI_AUTHOR stays in scribe/domain.py: only the draft service uses it.
+- mrkdwn_blocks and _SLACK_TEXT_LIMIT exist in both views modules (summarize and the modal both use them; siblings cannot import each other).
+- The integration scribe test directory held only status-update tests, so its conftest and __init__ moved to comms and the directory is gone; the unit comms directory has its own conftest loading the comms catalogue.
+- Test modules imported as attributes are renamed with the modules (status_update_form -> form, status_update_approval -> approval, status_update_history -> history); test_incident_comms_status_update_slack.py finds the service modules by name set instead of the old module prefix. test_incident_scribe_comms_profile_render.py is test_incident_comms_profile_render.py.
+- test_server_plugins_slack_listener_scoping.py and tests/factories/slack_bolt.py are unchanged: they use incident.scribe as a synthetic plugin name, not the real plugin.
+- AC 3: no i18n ignore entry to rename (TASK-145.2 already points it at core.adapters.i18n); the ignore lists are unchanged (0 lines).
+- INVENTORY line numbers for draft and summarize were already stale; all three rows now point at the register_command calls.
+
+Gates (from app/): ruff check . clean; ruff format --check . clean; lint-imports 10 kept, 0 broken; mypy 48 errors in 19 files, 0 in touched files (features/incident/{comms,scribe}, the moved tests); pytest tests --ignore=tests/smoke 4607 passed.
+Deploy note: a status-updates modal open across the deploy carries incident.scribe.status_update.* ids and stops responding; reopen it with the command.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
