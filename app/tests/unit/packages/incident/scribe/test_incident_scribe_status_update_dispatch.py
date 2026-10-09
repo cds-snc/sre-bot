@@ -15,14 +15,14 @@ import pytest
 from contracts.slack.models import CommandPayload, CommandResponse
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
-from packages.incident.scribe.platforms.slack import register_commands
+from packages.incident.scribe.entrypoints.slack import register
 
 
 @pytest.fixture
 def provider() -> SlackPlatformProvider:
     settings = SimpleNamespace(ENABLED=True, SOCKET_MODE=True, APP_TOKEN="xapp-test", BOT_TOKEN="xoxb-test")
     slack_provider = SlackPlatformProvider(settings=settings, formatter=SlackBlockKitFormatter())
-    register_commands(slack_provider)
+    register(slack_provider)
     return slack_provider
 
 
@@ -34,7 +34,7 @@ def test_status_update_routes_from_sre_to_its_handler_with_the_payload(provider:
     )
     handler = MagicMock(return_value=CommandResponse(message="", ephemeral=True))
 
-    with patch("packages.incident.scribe.platforms.slack.handle_status_update_command", handler):
+    with patch("packages.incident.scribe.entrypoints.slack.handle_status_update_command", handler):
         response = provider.route_hierarchical_command("sre", text, payload)
 
     handler.assert_called_once()

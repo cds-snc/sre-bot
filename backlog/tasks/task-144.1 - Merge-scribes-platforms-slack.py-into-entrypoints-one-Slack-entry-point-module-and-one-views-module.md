@@ -3,10 +3,11 @@ id: TASK-144.1
 title: >-
   Merge scribe's platforms/slack.py into entrypoints/: one Slack entry-point
   module and one views module
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-10-09 12:53'
-updated_date: '2026-10-09 13:01'
+updated_date: '2026-10-09 13:53'
 labels:
   - incident
   - features
@@ -34,11 +35,11 @@ Every test import and unittest.mock patch string naming packages.incident.scribe
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 packages/incident/scribe/platforms/ no longer exists; entrypoints/slack.py holds the command, block-action and view-submission handlers and one register() function; entrypoints/slack_views.py holds the builders, parsers, action ids and wording and is the only scribe module importing infrastructure.i18n
-- [ ] #2 scribe/__init__.py's register_slack_commands hookimpl calls one registration function; the plugin-registration test asserts the same commands, block actions and view submission as before
-- [ ] #3 rg finds no 'scribe.platforms' under app/ (code, tests, pyproject.toml, INVENTORY.md, README); the import-linter ignore entry is renamed, not added, and lint-imports passes
-- [ ] #4 Every existing scribe test passes with only import paths and patch strings changed; no assertion changes
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 packages/incident/scribe/platforms/ no longer exists; entrypoints/slack.py holds the command, block-action and view-submission handlers and one register() function; entrypoints/slack_views.py holds the builders, parsers, action ids and wording and is the only scribe module importing infrastructure.i18n
+- [x] #2 scribe/__init__.py's register_slack_commands hookimpl calls one registration function; the plugin-registration test asserts the same commands, block actions and view submission as before
+- [x] #3 rg finds no 'scribe.platforms' under app/ (code, tests, pyproject.toml, INVENTORY.md, README); the import-linter ignore entry is renamed, not added, and lint-imports passes
+- [x] #4 Every existing scribe test passes with only import paths and patch strings changed; no assertion changes
+- [x] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -100,3 +101,43 @@ Moved: about 1,160 lines out of `platforms/slack.py` into two files; net new cod
 
 A missed import or patch string fails at import or patch time; the registration test and the import check in step 8 catch the former, pytest the latter. A plugin import error aborts boot (TASK-110), so this cannot ship half-working. Single `git revert` restores the previous layout. No data, config or Terraform change.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+What changed
+- app/packages/incident/scribe/platforms/slack.py split by line-range slicing, so moved code is unchanged apart from the planned renames:
+  - entrypoints/slack.py: the three command handlers (draft, summarize, status-update), _parse_limit, _parse_since, _parse_since_seconds and _SINCE_UNITS join the existing block-action and view-submission listeners. register_commands is folded into register(registrar): the three register_command calls first, then the existing block-action and view-submission calls. The module docstring merges both modules' docstrings.
+  - entrypoints/slack_views.py (new): constants, action ids, renderers, builders, parsers and every translated string. It is the only scribe module importing infrastructure.i18n, and it imports neither slack_bolt nor slack_sdk. Underscores were dropped on the names the handler module needs: DRAFT_DOMAIN, SUMMARY_DOMAIN, STATUS_UPDATE_DOMAIN (the plan's list missed this one; the status-update register_command uses it), SLACK_FORMAT_INSTRUCTIONS, status_t, status_error_text, status_update_open_failed, status_update_view, mrkdwn_blocks, notify_working, draft_success_response (was _success_response), render_error, draft_error_response, to_slack_mrkdwn, summary_error_response. _SLACK_TEXT_LIMIT stays private because only views code reads it. New helpers summary_success_response(body, locale) and summary_text(key, locale, fallback) hold the three t() calls that were inside handle_summarize_command.
+- platforms/ deleted. scribe/__init__.py: register_slack_commands calls slack.register(registrar) only; docstring names the three subcommands and the modal listeners.
+- app/pyproject.toml: one ignore line renamed to "packages.incident.scribe.entrypoints.slack_views -> infrastructure.i18n" (1 insertion, 1 deletion; entry count unchanged).
+- providers.py docstring: platforms/ -> entrypoints/. README: every platforms/slack.py reference repointed; the Files list now has entrypoints/slack.py and entrypoints/slack_views.py. INVENTORY.md rows 118-120: __init__.py:19 -> entrypoints/slack.py:173/192/217 (the register_command lines; the old __init__.py:17 was already stale).
+- Tests (19 files): import paths and patch strings rewritten (handlers from entrypoints.slack, views and ids from entrypoints.slack_views). Mechanical identifier renames that follow from the plan: register_commands(...) -> register(...) (draft_slack, summary_slack, status_update_slack, status_update_dispatch), _to_slack_mrkdwn -> to_slack_mrkdwn (summary_slack), and module alias platform_slack -> slack_entrypoints (history_view, review_view). No expected value or assertion changed. Added test_hookimpl_registers_status_update_command_and_approval_submission_together to test_incident_scribe_plugin_registration.py.
+
+Function-count check (plan step 8): before, platforms/slack.py 43 defs + entrypoints/slack.py 20 = 63. After, entrypoints/slack.py 26 + slack_views.py 38 = 64 = 63 - register_commands (folded into register) + summary_success_response + summary_text. A name-level diff of the inventories (leading underscore ignored) shows only those three changes plus _success_response -> draft_success_response.
+
+Gates (from app/)
+- uv run ruff check . -> All checks passed!; ruff format --check on scribe package and tests -> 70 files already formatted
+- uv run lint-imports -> Contracts: 10 kept, 0 broken. (b) KEPT (43 ignored imports)
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 48 errors in 19 files (checked 383 source files); 0 in touched files (repo-wide errors are pre-existing)
+- uv run pytest tests --ignore=tests/smoke -> 4476 passed, 2546 warnings in 80.99s
+- focused: pytest tests/unit/packages/incident/scribe tests/integration/packages/incident/scribe tests/integration/legacy_surface -> 935 passed
+- rg -n 'scribe\.platforms|scribe/platforms' app -> no matches; uv run python -c 'import packages.incident.scribe' -> ok
+- rg -n 'infrastructure.i18n' app/packages/incident/scribe -> entrypoints/slack_views.py:18 only (plus README prose)
+
+For the human: review the PR as a move (compare the function inventories); no deploy or config prerequisites.
+<!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-09 13:34
+---
+Plan approved (human, 2026-10-09); implementation starts on stack-i/task-144.1-scribe-entrypoints
+---
+
+created: 2026-10-09 13:53
+---
+Layer 1 branch is fix/incident_scribe_shape (human, 2026-10-09), not stack-i/task-144.1-scribe-entrypoints; it already carries the TASK-144 planning commit 6f89a897
+---
+<!-- COMMENTS:END -->

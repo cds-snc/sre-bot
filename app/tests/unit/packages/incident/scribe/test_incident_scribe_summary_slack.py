@@ -7,18 +7,14 @@ import pytest
 
 from contracts.operations import OperationResult
 from contracts.slack.models import CommandPayload
-from packages.incident.scribe.platforms.slack import (
-    _parse_since_seconds,
-    _to_slack_mrkdwn,
-    handle_summarize_command,
-    register_commands,
-)
+from packages.incident.scribe.entrypoints.slack import _parse_since_seconds, handle_summarize_command, register
+from packages.incident.scribe.entrypoints.slack_views import to_slack_mrkdwn
 from packages.incident.scribe.service import EMPTY_HISTORY_CODE
 
 pytestmark = pytest.mark.unit
 
-_SUMMARIZE = "packages.incident.scribe.platforms.slack.summarize_incident_conversation"
-_HANDLE = "packages.incident.scribe.platforms.slack.handle_summarize_command"
+_SUMMARIZE = "packages.incident.scribe.entrypoints.slack.summarize_incident_conversation"
+_HANDLE = "packages.incident.scribe.entrypoints.slack.handle_summarize_command"
 
 
 def _summarize_registration(provider: MagicMock) -> dict:
@@ -31,7 +27,7 @@ class TestRegisterCommands:
     def test_registers_summarize_under_sre_incident(self):
         provider = MagicMock()
 
-        register_commands(provider)
+        register(provider)
 
         kwargs = _summarize_registration(provider)
         assert kwargs["command"] == "summarize"
@@ -41,7 +37,7 @@ class TestRegisterCommands:
 
     def test_handler_dispatches_with_parsed_args(self):
         provider = MagicMock()
-        register_commands(provider)
+        register(provider)
         handler = _summarize_registration(provider)["handler"]
         payload = CommandPayload(text="--limit 5", user_id="U9", channel_id="C123")
 
@@ -52,7 +48,7 @@ class TestRegisterCommands:
 
     def test_fallback_dispatches_with_empty_args(self):
         provider = MagicMock()
-        register_commands(provider)
+        register(provider)
         fallback = _summarize_registration(provider)["fallback_handler"]
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
@@ -235,41 +231,41 @@ class TestArgumentParsingHelpers:
 
 class TestToSlackMrkdwn:
     def test_converts_double_asterisk_bold_to_single(self):
-        assert _to_slack_mrkdwn("**Key events**") == "*Key events*"
+        assert to_slack_mrkdwn("**Key events**") == "*Key events*"
 
     def test_converts_double_underscore_bold_to_single(self):
-        assert _to_slack_mrkdwn("__Key events__") == "*Key events*"
+        assert to_slack_mrkdwn("__Key events__") == "*Key events*"
 
     def test_markdown_heading_becomes_bold_line(self):
-        assert _to_slack_mrkdwn("### Key events") == "*Key events*"
+        assert to_slack_mrkdwn("### Key events") == "*Key events*"
 
     def test_heading_with_bold_markers_is_not_doubled(self):
-        assert _to_slack_mrkdwn("## **Key events**") == "*Key events*"
+        assert to_slack_mrkdwn("## **Key events**") == "*Key events*"
 
     def test_collapses_double_bullets(self):
-        assert _to_slack_mrkdwn("\u2022 \u2022 item") == "\u2022 item"
+        assert to_slack_mrkdwn("\u2022 \u2022 item") == "\u2022 item"
 
     def test_dash_bullet_becomes_slack_bullet(self):
-        assert _to_slack_mrkdwn("- item") == "\u2022 item"
+        assert to_slack_mrkdwn("- item") == "\u2022 item"
 
     def test_mixed_dash_and_bullet_markers_collapse(self):
-        assert _to_slack_mrkdwn("- \u2022 item") == "\u2022 item"
+        assert to_slack_mrkdwn("- \u2022 item") == "\u2022 item"
 
     def test_asterisk_bullet_becomes_slack_bullet(self):
         # A Markdown "* item" line is a bullet; the asterisk is followed by whitespace.
-        assert _to_slack_mrkdwn("* item") == "\u2022 item"
+        assert to_slack_mrkdwn("* item") == "\u2022 item"
 
     def test_asterisk_bullet_keeps_bold_text_inside_the_item(self):
-        assert _to_slack_mrkdwn("* **Next step**: roll back") == "\u2022 *Next step*: roll back"
+        assert to_slack_mrkdwn("* **Next step**: roll back") == "\u2022 *Next step*: roll back"
 
     def test_bold_title_line_is_preserved_not_treated_as_bullet(self):
         # A standalone *bold* title must not be mistaken for a bullet marker.
-        assert _to_slack_mrkdwn("*Key events*") == "*Key events*"
+        assert to_slack_mrkdwn("*Key events*") == "*Key events*"
 
     def test_plain_text_is_unchanged(self):
-        assert _to_slack_mrkdwn("just a sentence") == "just a sentence"
+        assert to_slack_mrkdwn("just a sentence") == "just a sentence"
 
     def test_multiline_document_is_normalized(self):
         raw = "## **Key events**\n- \u2022 first thing\n- second thing"
         expected = "*Key events*\n\u2022 first thing\n\u2022 second thing"
-        assert _to_slack_mrkdwn(raw) == expected
+        assert to_slack_mrkdwn(raw) == expected

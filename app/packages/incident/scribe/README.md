@@ -16,7 +16,7 @@ Paths are relative to `app/packages/incident/scribe/` unless they start with
 
 | | `/sre incident draft` | `/sre incident summarize` |
 | --- | --- | --- |
-| Slack handler | `handle_draft_command` in `platforms/slack.py` | `handle_summarize_command` in `platforms/slack.py` |
+| Slack handler | `handle_draft_command` in `entrypoints/slack.py` | `handle_summarize_command` in `entrypoints/slack.py` |
 | Service function | `draft_incident_document_from_conversation` → `draft_incident_document` in `service.py` | `summarize_incident_conversation` → `summarize_transcript` in `service.py` |
 | Interfaces | `IncidentReportLinkLookup`, `IncidentDocumentStore` (`ports.py`); `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) | `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) |
 | Adapters | `adapters/slack.py` (report link from bookmarks), `adapters/google_docs.py` (read report, copy, fill copy), `core/adapters/slack.py` (transcript), `app/integrations/openai/` | `core/adapters/slack.py` (transcript), `app/integrations/openai/` |
@@ -39,7 +39,7 @@ Per `decisions/feature-packages.md`, `decisions/transport-slack.md` and
 Slack  /sre incident draft | summarize
   │
   ▼
-platforms/slack.py        parse args → typed values → one service call → OperationResult → render (i18n)
+entrypoints/slack.py      parse args → typed values → one service call → OperationResult → render (slack_views.py, i18n)
   │
   ▼
 service.py                platform-agnostic; no Slack, HTTP or Google SDK imports
@@ -58,10 +58,15 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   `register_i18n_resources`. The plugin is loaded from the `incident.scribe`
   entry point under `[project.entry-points.sre_bot]` in `app/pyproject.toml`
   (`decisions/plugins.md`); no import-time side effects.
-- `platforms/slack.py` — both five-step handlers, registered under
-  `sre.incident` by one `register_commands`; the draft handler posts the
+- `entrypoints/slack.py` — every Slack handler: the three five-step command
+  handlers (`draft`, `summarize`, `status-update`) registered under
+  `sre.incident`, and the status-updates modal's block-action and
+  view-submission listeners, all by one `register`; the draft handler posts the
   progress notice when the service signals the start; ephemeral responses; no
   `slack_sdk` import.
+- `entrypoints/slack_views.py` — the Block Kit view builders, payload parsers,
+  action ids and every translated string; the only scribe module that imports
+  `infrastructure.i18n`. No Slack SDK import.
 - `ports.py` — the scribe-owned interfaces: `IncidentDocumentStore`,
   `IncidentReportLinkLookup` and `TextGenerator`.
 - `service.py` — the draft and summarize use cases. It imports
@@ -94,7 +99,7 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   plain strings and no links on an API error.
 - `adapters/google_docs.py` — the only file touching **Google**
   (Docs read + Drive copy + Docs populate). `service.py` imports the
-  `Summarizer` interface and `platforms/slack.py` the transport models, both by
+  `Summarizer` interface and `entrypoints/slack.py` the transport models, both by
   design.
 - `adapters/text_generation.py` — binds `TextGenerator` to the OpenAI
   `Summarizer`; the status-update path's only integration import.
@@ -124,9 +129,10 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
 4. **Settings.** Add a `BaseSettings` class and an `lru_cache` getter to
    `settings.py`, with its own `INCIDENT_<USE_CASE>__` prefix. Do not reuse
    another use case's class.
-5. **Slack.** Add the handler to `platforms/slack.py` and one
+5. **Slack.** Add the handler to `entrypoints/slack.py`, its wording to
+   `entrypoints/slack_views.py`, and one
    `registrar.register_command(..., parent="sre.incident")` call inside
-   `register_commands`. No new hookimpl is needed.
+   `register`. No new hookimpl is needed.
 6. **Locales.** Add `locales/<catalogue>.en-US.yml` and
    `locales/<catalogue>.fr-FR.yml`. The existing `register_i18n_resources`
    picks them up.
@@ -144,8 +150,8 @@ shipped with, so nothing deployed has to change:
   classes `IncidentDraftSettings`, `IncidentSummarySettings`) are environment
   variable names already set in deployed configuration.
 - The `incident_draft` and `incident_summary` catalogues are the i18n key
-  prefixes the handlers look up (`_DRAFT_DOMAIN`, `_SUMMARY_DOMAIN` in
-  `platforms/slack.py`).
+  prefixes the handlers look up (`DRAFT_DOMAIN`, `SUMMARY_DOMAIN` in
+  `entrypoints/slack_views.py`).
 - The `incident_draft::` named-range prefix (`adapters/google_docs.py`) is
   already written into existing draft documents.
 
@@ -533,7 +539,7 @@ English then French by the default comms profile (`comms_profile.py`), or to a
 localized no-draft notice, or to a localized error with a Close button
 (outside an incident channel, ambiguous incident, store failure). Opening never
 drafts. Strings live in `locales/incident_status_update.{en-US,fr-FR}.yml`;
-`t()` is called only in `platforms/slack.py`.
+`t()` is called only in `entrypoints/slack_views.py`.
 
 Security gate: when a model call is needed, `draft_status_update` refuses a
 security, unknown-flag or unreadable-flag incident with

@@ -20,7 +20,7 @@ import yaml
 import packages.incident.scribe as scribe_pkg
 from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
 from packages.incident.scribe.domain import StatusUpdateDraftOutcome, StatusUpdateOutcomeKind, StatusUpdateOverview
-from packages.incident.scribe.platforms.slack import (
+from packages.incident.scribe.entrypoints.slack_views import (
     DRAFT_ACTION_ID,
     REVIEW_ACTION_ID,
     WRITE_ACTION_ID,

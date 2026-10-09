@@ -18,7 +18,7 @@ from contracts.operations.codes import ErrorCode
 from packages.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
 from packages.incident.scribe.domain import StatusUpdateDraftOutcome, StatusUpdateOutcomeKind
 from packages.incident.scribe.entrypoints.slack import handle_draft_action, handle_draft_confirmed_action, register
-from packages.incident.scribe.platforms.slack import build_security_confirmation_view
+from packages.incident.scribe.entrypoints.slack_views import build_security_confirmation_view
 
 pytestmark = pytest.mark.unit
 

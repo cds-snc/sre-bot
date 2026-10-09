@@ -37,7 +37,7 @@ from packages.incident.core.api import (
 )
 from packages.incident.scribe.domain import StatusUpdateEdit
 from packages.incident.scribe.entrypoints import slack as slack_entrypoints
-from packages.incident.scribe.platforms.slack import (
+from packages.incident.scribe.entrypoints.slack_views import (
     REDRAFT_ACTION_ID,
     REVIEW_CALLBACK_ID,
     build_redrafting_view,
