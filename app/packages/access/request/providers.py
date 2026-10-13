@@ -13,7 +13,7 @@ from infrastructure.directory import get_directory_provider
 from infrastructure.events import (
     get_event_dispatcher,
 )
-from infrastructure.storage import get_storage_service
+from infrastructure.records import get_record_store
 from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.common.providers import get_access_runtime_config
 from packages.access.common.settings import AccessRequestsSettings, get_access_settings
@@ -29,7 +29,7 @@ def get_access_request_settings() -> AccessRequestsSettings:
 @lru_cache(maxsize=1)
 def get_access_request_repository() -> AccessRequestRepository:
     """Return the singleton AccessRequestRepository instance."""
-    return AccessRequestRepository(storage=get_storage_service())
+    return AccessRequestRepository(storage=get_record_store())
 
 
 @lru_cache(maxsize=1)

@@ -1,6 +1,4 @@
-"""In-memory fake storage implementation for tests."""
-
-from __future__ import annotations
+"""In-memory record store fake for tests."""
 
 from copy import deepcopy
 from typing import Any
@@ -9,8 +7,8 @@ from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 
 
-class FakeStorageService:
-    """Simple in-memory storage fake that follows StorageService protocol."""
+class InMemoryRecordStore:
+    """Simple in-memory record store that follows the RecordStore protocol."""
 
     def __init__(self) -> None:
         self._tables: dict[str, list[dict[str, Any]]] = {}

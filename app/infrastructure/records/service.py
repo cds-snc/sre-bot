@@ -1,11 +1,11 @@
-"""Generic storage service for DynamoDB-backed feature repositories.
+"""Generic DynamoDB record store for DynamoDB-backed feature repositories.
 
 Provides a clean interface over a typed boto3 DynamoDB client from
 ``integrations.aws.client.get_aws_client`` with automatic Python ↔ DynamoDB
 type conversion via boto3's built-in ``TypeSerializer`` / ``TypeDeserializer``.
 
 Feature packages MUST NOT call boto3 clients directly. Instead, define a thin
-repository class that takes ``infrastructure.storage.protocol.StorageService``
+repository class that takes ``infrastructure.records.protocol.RecordStore``
 as a constructor argument and delegates all DynamoDB I/O here.
 """
 
@@ -18,7 +18,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
-from infrastructure.storage.protocol import StorageService
+from infrastructure.records.protocol import RecordStore
 from integrations.aws.client import classify_aws_error, get_aws_client
 
 if TYPE_CHECKING:
@@ -48,8 +48,8 @@ def _deserialize_item(item: dict[str, Any]) -> dict[str, Any]:
     return {k: _deserializer.deserialize(v) for k, v in item.items()}
 
 
-class DynamoDBStorageService:
-    """Generic DynamoDB storage service.
+class DynamoDBRecordStore:
+    """Generic DynamoDB record store.
 
     Intended as the single infrastructure-level abstraction over DynamoDB for
     all feature packages.  Handles serialization, deserialization, and error
@@ -64,7 +64,7 @@ class DynamoDBStorageService:
 
     def __init__(self, dynamodb: DynamoDBClient) -> None:
         self._dynamodb = dynamodb
-        logger.info("initialized_storage_service")
+        logger.info("initialized_record_store")
 
     def _map_sdk_exception(self, exc: Exception) -> OperationResult[Any]:
         status, error_code, retry_after = classify_aws_error(exc)
@@ -101,10 +101,10 @@ class DynamoDBStorageService:
         except (ClientError, BotoCoreError) as exc:
             result = self._map_sdk_exception(exc)
         if result.is_success:
-            logger.debug("storage_put_ok", table=table)
+            logger.debug("records_put_ok", table=table)
         else:
             logger.error(
-                "storage_put_error",
+                "records_put_error",
                 table=table,
                 error=result.message,
                 error_code=result.error_code,
@@ -144,13 +144,13 @@ class DynamoDBStorageService:
         except (ClientError, BotoCoreError) as exc:
             result = self._map_sdk_exception(exc)
         if result.is_success:
-            logger.debug("storage_put_if_not_exists_created", table=table)
+            logger.debug("records_put_if_not_exists_created", table=table)
             return OperationResult.success(data=True, message="Item created")
         if result.error_code == "ConditionalCheckFailedException":
-            logger.debug("storage_put_if_not_exists_already_exists", table=table)
+            logger.debug("records_put_if_not_exists_already_exists", table=table)
             return OperationResult.success(data=False, message="Item already exists")
         logger.error(
-            "storage_put_if_not_exists_error",
+            "records_put_if_not_exists_error",
             table=table,
             error=result.message,
             error_code=result.error_code,
@@ -179,10 +179,10 @@ class DynamoDBStorageService:
         except (ClientError, BotoCoreError) as exc:
             result = self._map_sdk_exception(exc)
         if result.is_success:
-            logger.debug("storage_delete_ok", table=table)
+            logger.debug("records_delete_ok", table=table)
         else:
             logger.error(
-                "storage_delete_error",
+                "records_delete_error",
                 table=table,
                 error=result.message,
                 error_code=result.error_code,
@@ -216,7 +216,7 @@ class DynamoDBStorageService:
             result = self._map_sdk_exception(exc)
         if not result.is_success:
             logger.error(
-                "storage_get_error",
+                "records_get_error",
                 table=table,
                 error=result.message,
                 error_code=result.error_code,
@@ -275,7 +275,7 @@ class DynamoDBStorageService:
             result = self._map_sdk_exception(exc)
         if not result.is_success:
             logger.error(
-                "storage_query_error",
+                "records_query_error",
                 table=table,
                 error=result.message,
                 error_code=result.error_code,
@@ -286,11 +286,11 @@ class DynamoDBStorageService:
 
 
 @cache
-def get_storage_service() -> StorageService:
-    """Provider function for the storage service.
+def get_record_store() -> RecordStore:
+    """Provider function for the record store.
 
     Returns:
-        StorageService instance.
+        RecordStore instance.
     """
     dynamodb = get_aws_client("dynamodb")
-    return DynamoDBStorageService(dynamodb)
+    return DynamoDBRecordStore(dynamodb)

@@ -1,4 +1,4 @@
-"""Unit tests for StorageService.
+"""Unit tests for DynamoDBRecordStore.
 
 Tests serialization, deserialization, and error normalisation using a
 mocked DynamoDBClient — no real AWS calls are made.
@@ -10,18 +10,18 @@ from unittest.mock import MagicMock
 import pytest
 from botocore.exceptions import ClientError
 
-import infrastructure.storage.service as service_module
-from infrastructure.storage.service import DynamoDBStorageService
+import infrastructure.records.service as service_module
+from infrastructure.records.service import DynamoDBRecordStore
 
 
-def _make_service() -> tuple[DynamoDBStorageService, MagicMock]:
+def _make_service() -> tuple[DynamoDBRecordStore, MagicMock]:
     mock_dynamo = MagicMock()
-    return DynamoDBStorageService(dynamodb=mock_dynamo), mock_dynamo
+    return DynamoDBRecordStore(dynamodb=mock_dynamo), mock_dynamo
 
 
 @pytest.mark.unit
-class TestStorageServicePut:
-    """Tests for StorageService.put."""
+class TestDynamoDBRecordStorePut:
+    """Tests for DynamoDBRecordStore.put."""
 
     def test_put_success(self):
         service, dynamo = _make_service()
@@ -70,8 +70,8 @@ class TestStorageServicePut:
 
 
 @pytest.mark.unit
-class TestStorageServicePutIfNotExists:
-    """Tests for StorageService.put_if_not_exists."""
+class TestDynamoDBRecordStorePutIfNotExists:
+    """Tests for DynamoDBRecordStore.put_if_not_exists."""
 
     def test_creates_item_returns_true(self):
         service, dynamo = _make_service()
@@ -122,8 +122,8 @@ class TestStorageServicePutIfNotExists:
 
 
 @pytest.mark.unit
-class TestStorageServiceGet:
-    """Tests for StorageService.get."""
+class TestDynamoDBRecordStoreGet:
+    """Tests for DynamoDBRecordStore.get."""
 
     def test_get_returns_deserialized_item(self):
         service, dynamo = _make_service()
@@ -167,8 +167,8 @@ class TestStorageServiceGet:
 
 
 @pytest.mark.unit
-class TestStorageServiceQuery:
-    """Tests for StorageService.query."""
+class TestDynamoDBRecordStoreQuery:
+    """Tests for DynamoDBRecordStore.query."""
 
     def test_query_returns_deserialized_items(self):
         service, dynamo = _make_service()
@@ -278,8 +278,8 @@ class TestStorageServiceQuery:
 
 
 @pytest.mark.unit
-class TestStorageServiceDelete:
-    """Tests for StorageService.delete."""
+class TestDynamoDBRecordStoreDelete:
+    """Tests for DynamoDBRecordStore.delete."""
 
     def test_delete_success(self):
         service, dynamo = _make_service()
@@ -311,23 +311,23 @@ class TestStorageServiceDelete:
 
 
 @pytest.mark.unit
-class TestStorageServiceProviderAndSdkExceptions:
+class TestDynamoDBRecordStoreProviderAndSdkExceptions:
     """Contract tests for provider wiring and SDK exception mapping."""
 
-    def test_get_storage_service_uses_integrations_get_aws_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        service_module.get_storage_service.cache_clear()
+    def test_get_record_store_uses_integrations_get_aws_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        service_module.get_record_store.cache_clear()
 
         dynamodb_client = MagicMock()
         get_aws_client = MagicMock(return_value=dynamodb_client)
         monkeypatch.setattr(service_module, "get_aws_client", get_aws_client, raising=False)
 
         try:
-            service = service_module.get_storage_service()
+            service = service_module.get_record_store()
         finally:
-            service_module.get_storage_service.cache_clear()
+            service_module.get_record_store.cache_clear()
 
         get_aws_client.assert_called_once_with("dynamodb")
-        assert isinstance(service, DynamoDBStorageService)
+        assert isinstance(service, DynamoDBRecordStore)
 
     def test_put_if_not_exists_conditional_client_error_returns_false(self) -> None:
         service, dynamo = _make_service()

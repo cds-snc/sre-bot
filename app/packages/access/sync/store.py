@@ -1,6 +1,6 @@
 """Access Sync persistent run state repository.
 
-Wraps ``StorageService`` to persist and retrieve ``SyncRunRecord`` objects.
+Wraps ``RecordStore`` to persist and retrieve ``SyncRunRecord`` objects.
 Access Sync owns its key scheme and serialization; all DynamoDB I/O is
 delegated to the infrastructure storage service.
 
@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 
 import structlog
 
-from infrastructure.storage.protocol import StorageService
+from infrastructure.records.protocol import RecordStore
 from packages.access.sync.domain import SyncRunRecord
 
 logger = structlog.get_logger()
@@ -26,15 +26,15 @@ class SyncRunRepository:
     """DynamoDB-backed repository for sync run records.
 
     Constructed once at startup in ``providers.py`` using the centralized
-    ``StorageService`` singleton from ``infrastructure.storage``.
+    ``RecordStore`` singleton from ``infrastructure.records``.
 
     Args:
-        storage: Configured ``StorageService`` instance injected by provider.
+        storage: Configured ``RecordStore`` instance injected by provider.
     """
 
     TABLE = "sre_bot_access"
 
-    def __init__(self, storage: StorageService) -> None:
+    def __init__(self, storage: RecordStore) -> None:
         self._storage = storage
 
     def save(self, record: SyncRunRecord) -> None:

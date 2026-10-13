@@ -1,6 +1,6 @@
 """Access Requests DynamoDB repository.
 
-Wraps ``StorageService`` to persist and retrieve ``AccessRequest``,
+Wraps ``RecordStore`` to persist and retrieve ``AccessRequest``,
 ``ApprovalDecision``, and ``RequestAuditEvent`` objects.  Access Requests
 owns its key scheme and serialisation; all DynamoDB I/O is delegated to the
 infrastructure storage service.
@@ -27,7 +27,7 @@ from datetime import UTC, datetime
 
 import structlog
 
-from infrastructure.storage.protocol import StorageService
+from infrastructure.records.protocol import RecordStore
 from packages.access.request.domain import (
     AccessRequest,
     ApprovalDecision,
@@ -41,15 +41,15 @@ class AccessRequestRepository:
     """DynamoDB-backed repository for access request lifecycle records.
 
     Constructed once at startup in ``providers.py`` using the centralized
-    ``StorageService`` singleton from ``infrastructure.storage``.
+    ``RecordStore`` singleton from ``infrastructure.records``.
 
     Args:
-        storage: Configured ``StorageService`` instance injected by provider.
+        storage: Configured ``RecordStore`` instance injected by provider.
     """
 
     TABLE = "sre_bot_access_requests"
 
-    def __init__(self, storage: StorageService) -> None:
+    def __init__(self, storage: RecordStore) -> None:
         self._storage = storage
 
     # ------------------------------------------------------------------

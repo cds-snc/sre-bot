@@ -1,15 +1,15 @@
-"""Fixtures for DynamoDBStorageService integration tests."""
+"""Fixtures for DynamoDBRecordStore integration tests."""
 
 from collections.abc import Iterator
 from typing import Any
 
 import pytest
 
-from infrastructure.storage.service import DynamoDBStorageService
+from infrastructure.records.service import DynamoDBRecordStore
 from integrations.aws import client as aws_client
 from integrations.aws.settings import get_aws_settings
 
-STORAGE_TEST_TABLE_NAME = "test-sre-bot-storage-service"
+RECORDS_TEST_TABLE_NAME = "test-sre-bot-record-store"
 
 
 def _set_moto_aws_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -23,9 +23,9 @@ def _set_moto_aws_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     aws_client.get_aws_settings.cache_clear()
 
 
-def _create_storage_table(client: Any) -> None:
+def _create_records_table(client: Any) -> None:
     client.create_table(
-        TableName=STORAGE_TEST_TABLE_NAME,
+        TableName=RECORDS_TEST_TABLE_NAME,
         KeySchema=[
             {"AttributeName": "pk", "KeyType": "HASH"},
             {"AttributeName": "sk", "KeyType": "RANGE"},
@@ -39,12 +39,12 @@ def _create_storage_table(client: Any) -> None:
 
 
 @pytest.fixture
-def storage_service(monkeypatch: pytest.MonkeyPatch) -> Iterator[DynamoDBStorageService]:
+def record_store(monkeypatch: pytest.MonkeyPatch) -> Iterator[DynamoDBRecordStore]:
     moto = pytest.importorskip("moto")
     boto3 = pytest.importorskip("boto3")
     _set_moto_aws_credentials(monkeypatch)
 
     with moto.mock_aws():
         client = boto3.client("dynamodb", region_name=get_aws_settings().AWS_REGION)
-        _create_storage_table(client)
-        yield DynamoDBStorageService(dynamodb=client)
+        _create_records_table(client)
+        yield DynamoDBRecordStore(dynamodb=client)

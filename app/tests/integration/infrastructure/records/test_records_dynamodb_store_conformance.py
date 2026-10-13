@@ -1,4 +1,4 @@
-"""Moto-backed conformance suite for DynamoDBStorageService.
+"""Moto-backed conformance suite for DynamoDBRecordStore.
 
 Exercises real DynamoDB ConditionExpression and paginator semantics that
 MagicMock-based unit tests cannot verify.
@@ -9,11 +9,11 @@ from decimal import Decimal
 import pytest
 
 from contracts.operations.status import OperationStatus
-from infrastructure.storage.service import DynamoDBStorageService
+from infrastructure.records.service import DynamoDBRecordStore
 
-from .conftest import STORAGE_TEST_TABLE_NAME
+from .conftest import RECORDS_TEST_TABLE_NAME
 
-TABLE = STORAGE_TEST_TABLE_NAME
+TABLE = RECORDS_TEST_TABLE_NAME
 
 pytestmark = pytest.mark.integration
 
@@ -21,12 +21,12 @@ pytestmark = pytest.mark.integration
 class TestPutAndGet:
     """put/get roundtrip including numeric and boolean field serialization."""
 
-    def test_put_get_roundtrip(self, storage_service: DynamoDBStorageService) -> None:
+    def test_put_get_roundtrip(self, record_store: DynamoDBRecordStore) -> None:
         item = {"pk": "test-pk-1", "sk": "2026-01-01", "count": 42, "active": True}
-        put_result = storage_service.put(TABLE, item)
+        put_result = record_store.put(TABLE, item)
         assert put_result.is_success
 
-        get_result = storage_service.get(TABLE, {"pk": "test-pk-1", "sk": "2026-01-01"})
+        get_result = record_store.get(TABLE, {"pk": "test-pk-1", "sk": "2026-01-01"})
         assert get_result.is_success
         data = get_result.data
         assert data is not None
@@ -35,8 +35,8 @@ class TestPutAndGet:
         assert data["count"] == Decimal("42")
         assert data["active"] is True
 
-    def test_get_missing_key_returns_not_found(self, storage_service: DynamoDBStorageService) -> None:
-        result = storage_service.get(TABLE, {"pk": "nonexistent", "sk": "nonexistent"})
+    def test_get_missing_key_returns_not_found(self, record_store: DynamoDBRecordStore) -> None:
+        result = record_store.get(TABLE, {"pk": "nonexistent", "sk": "nonexistent"})
         assert not result.is_success
         assert result.status == OperationStatus.NOT_FOUND
 
@@ -44,19 +44,19 @@ class TestPutAndGet:
 class TestPutIfNotExists:
     """real attribute_not_exists ConditionExpression rejects duplicates."""
 
-    def test_first_call_creates_item(self, storage_service: DynamoDBStorageService) -> None:
+    def test_first_call_creates_item(self, record_store: DynamoDBRecordStore) -> None:
         item = {"pk": "unique-pk", "sk": "sk-1", "value": "hello"}
-        result = storage_service.put_if_not_exists(TABLE, item, pk_attribute="pk")
+        result = record_store.put_if_not_exists(TABLE, item, pk_attribute="pk")
         assert result.is_success
         assert result.data is True
 
-    def test_second_call_with_same_key_is_rejected(self, storage_service: DynamoDBStorageService) -> None:
+    def test_second_call_with_same_key_is_rejected(self, record_store: DynamoDBRecordStore) -> None:
         # attribute_not_exists(pk) guards the exact (pk, sk) coordinate in a composite-key table.
         item = {"pk": "duplicate-pk", "sk": "sk-1", "value": "first"}
-        storage_service.put_if_not_exists(TABLE, item, pk_attribute="pk")
+        record_store.put_if_not_exists(TABLE, item, pk_attribute="pk")
 
         duplicate = {"pk": "duplicate-pk", "sk": "sk-1", "value": "second"}
-        result = storage_service.put_if_not_exists(TABLE, duplicate, pk_attribute="pk")
+        result = record_store.put_if_not_exists(TABLE, duplicate, pk_attribute="pk")
         assert result.is_success
         assert result.data is False
 
@@ -64,27 +64,27 @@ class TestPutIfNotExists:
 class TestDelete:
     """delete removes the item; subsequent get returns NOT_FOUND."""
 
-    def test_delete_removes_item(self, storage_service: DynamoDBStorageService) -> None:
+    def test_delete_removes_item(self, record_store: DynamoDBRecordStore) -> None:
         item = {"pk": "delete-pk", "sk": "sk-1", "value": "to-be-deleted"}
-        storage_service.put(TABLE, item)
+        record_store.put(TABLE, item)
 
-        delete_result = storage_service.delete(TABLE, {"pk": "delete-pk", "sk": "sk-1"})
+        delete_result = record_store.delete(TABLE, {"pk": "delete-pk", "sk": "sk-1"})
         assert delete_result.is_success
 
-        get_result = storage_service.get(TABLE, {"pk": "delete-pk", "sk": "sk-1"})
+        get_result = record_store.get(TABLE, {"pk": "delete-pk", "sk": "sk-1"})
         assert get_result.status == OperationStatus.NOT_FOUND
 
 
 class TestQuery:
     """pagination via get_paginator aggregates items across page boundaries."""
 
-    def _put_items(self, storage_service: DynamoDBStorageService) -> None:
+    def _put_items(self, record_store: DynamoDBRecordStore) -> None:
         for i in range(1, 4):
-            storage_service.put(TABLE, {"pk": "query-pk", "sk": f"sk-{i}", "idx": i})
+            record_store.put(TABLE, {"pk": "query-pk", "sk": f"sk-{i}", "idx": i})
 
-    def test_query_returns_all_items(self, storage_service: DynamoDBStorageService) -> None:
-        self._put_items(storage_service)
-        result = storage_service.query(
+    def test_query_returns_all_items(self, record_store: DynamoDBRecordStore) -> None:
+        self._put_items(record_store)
+        result = record_store.query(
             TABLE,
             key_condition="pk = :pk",
             expression_values={":pk": "query-pk"},
@@ -95,10 +95,10 @@ class TestQuery:
         sk_values = {item["sk"] for item in result.data}
         assert sk_values == {"sk-1", "sk-2", "sk-3"}
 
-    def test_query_with_limit_forces_pagination(self, storage_service: DynamoDBStorageService) -> None:
-        self._put_items(storage_service)
+    def test_query_with_limit_forces_pagination(self, record_store: DynamoDBRecordStore) -> None:
+        self._put_items(record_store)
         # Limit=1 forces the paginator to walk multiple pages; all items must still be returned.
-        result = storage_service.query(
+        result = record_store.query(
             TABLE,
             key_condition="pk = :pk",
             expression_values={":pk": "query-pk"},
