@@ -3,9 +3,9 @@
 ``build_review_view`` ends with an actions block holding Save draft, a block
 action, so Approve stays the form's only submit. ``save_notice`` words the
 notice shown after a save or a failed save. The builders are pure and called
-directly. The scribe catalogue is not loaded in unit tests, so wording is the
-in-code EN or FR fallback, pinned literally; the catalogue test reads both YAML
-files and requires the same strings.
+directly. The scribe catalogues are loaded by the directory's conftest, so
+wording is the catalogue's EN or FR string, pinned literally; the catalogue
+test reads both YAML files and requires the same strings.
 """
 
 import json
@@ -105,7 +105,7 @@ class TestSaveNotice:
 
     @pytest.mark.parametrize(("locale", "strings"), [("en-US", _EN_STRINGS), ("fr-FR", _FR_STRINGS)])
     def test_catalogue_holds_the_save_strings(self, locale: str, strings: dict[str, str]) -> None:
-        """Each string is in the catalogue with exactly the wording the in-code fallback renders."""
+        """Each string is in the catalogue with exactly the wording ``save_notice`` renders."""
         data = yaml.safe_load((_LOCALES_DIR / f"incident_status_update.{locale}.yml").read_text(encoding="utf-8"))
         catalogue: dict[str, str] = data["incident_status_update"]
 

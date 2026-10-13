@@ -148,6 +148,30 @@ class TestSummarizeTranscript:
         assert stub.received_instructions.endswith("USE SLACK MRKDWN")
 
     @pytest.mark.asyncio
+    async def test_slack_mrkdwn_rules_follow_the_content_prompt_once(self):
+        """The prompt carries the Slack mrkdwn formatting rules exactly once, after the content prompt, with no caller input."""
+        stub = _StubSummarizer(OperationResult.success(data="ok"))
+
+        await summarize_transcript([TranscriptMessage(author="Ada", text="prod is down")], summarizer=stub)
+
+        prompt = stub.received_instructions or ""
+        assert prompt.count("Format the summary using Slack mrkdwn") == 1
+        assert prompt.index("incident-response assistant") < prompt.index("Format the summary using Slack mrkdwn")
+
+    @pytest.mark.asyncio
+    async def test_extra_instructions_come_after_the_mrkdwn_rules(self):
+        """A caller's extra guidance lands after both the content prompt and the formatting rules."""
+        stub = _StubSummarizer(OperationResult.success(data="ok"))
+
+        await summarize_transcript(
+            [TranscriptMessage(author="Ada", text="prod is down")], instructions="Be terse.", summarizer=stub
+        )
+
+        prompt = stub.received_instructions or ""
+        assert prompt.index("Format the summary using Slack mrkdwn") < prompt.index("Be terse.")
+        assert prompt.endswith("Be terse.")
+
+    @pytest.mark.asyncio
     async def test_content_prompt_sent_without_extra_instructions(self):
         stub = _StubSummarizer(OperationResult.success(data="ok"))
         messages = [TranscriptMessage(author="Ada", text="prod is down")]

@@ -205,14 +205,14 @@ class TestHandleSummarizeCommand:
 
         assert mock_service.await_args.kwargs["since"] is None
 
-    def test_slack_mrkdwn_instructions_passed_to_service(self):
+    def test_handler_passes_no_formatting_instructions(self):
+        """The Slack mrkdwn rules belong to the service, so the handler sends the window and limit only."""
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
             handle_summarize_command(payload, {})
 
-        instructions = mock_service.await_args.kwargs["instructions"]
-        assert "mrkdwn" in instructions.lower()
+        assert "instructions" not in mock_service.await_args.kwargs
 
 
 class TestArgumentParsingHelpers:

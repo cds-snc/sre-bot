@@ -54,6 +54,7 @@ def test_api_exports_exactly_the_public_names() -> None:
         "get_incident_security_reader",
         "get_incident_transcript_reader",
         "get_status_update_store",
+        "translate",
     ]
     assert all(hasattr(api, name) for name in api.__all__)
 

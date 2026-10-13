@@ -9,10 +9,10 @@ configured) the section is left out and the rest of the form is unchanged.
 action's view state. ``build_generating_view`` is the button-less modal shown
 while the model runs, and ``generate_notice`` renders the outcome notices.
 
-The builders are pure and called directly. The scribe catalogue is not loaded
-in unit tests, so wording is the in-code EN or FR fallback, pinned literally;
-the catalogue test reads both YAML files and requires the same strings, so the
-fallbacks and the catalogue cannot drift apart. Blocks are compared whole, by
+The builders are pure and called directly. The scribe catalogues are loaded by
+the directory's conftest, so wording is the catalogue's EN or FR string, pinned
+literally; the catalogue test reads both YAML files and requires the same
+strings. Blocks are compared whole, by
 block id and in order, because that is what Slack renders and what the
 listener reads back.
 """
@@ -396,7 +396,7 @@ class TestGenerateNotice:
 class TestCatalogue:
     @pytest.mark.parametrize(("locale", "strings"), [("en-US", _EN_STRINGS), ("fr-FR", _FR_STRINGS)])
     def test_catalogue_holds_the_ai_strings(self, locale: str, strings: dict[str, str]) -> None:
-        """Each AI string is in the catalogue with exactly the wording the in-code fallback renders."""
+        """Each AI string is in the catalogue with exactly the wording ``generate_notice`` renders."""
         catalogue = _catalogue(locale)
 
         assert {key: catalogue.get(key) for key in strings} == strings

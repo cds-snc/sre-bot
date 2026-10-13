@@ -7,12 +7,38 @@ Provides deterministic test data builders for:
 - Translation data structures
 """
 
+from collections.abc import Callable
+
 from infrastructure.i18n import (
+    I18nResourceRegistry,
     Locale,
     LocaleResolutionContext,
     TranslationCatalog,
     TranslationKey,
+    get_translation_service,
+    t,
 )
+
+
+def load_plugin_catalogues(*register_hooks: Callable[..., None]) -> None:
+    """Load the catalogues the given ``register_i18n_resources`` hookimpls register into a fresh translation service.
+
+    Mirrors what the lifespan does at startup, so views render catalogue
+    wording instead of their fallback. Call ``reset_translation_service`` after
+    the test so the next one starts from an empty service again.
+    """
+    reset_translation_service()
+    registry = I18nResourceRegistry()
+    for register in register_hooks:
+        register(registry=registry)
+    result = get_translation_service().initialize(resources=registry.list_specs(), strict=True)
+    assert result.is_success, result.message
+
+
+def reset_translation_service() -> None:
+    """Drop the cached translation service and the cached ``t`` results."""
+    get_translation_service.cache_clear()
+    t.cache_clear()
 
 
 def make_translation_key(namespace: str = "incident", message_key: str = "created") -> TranslationKey:

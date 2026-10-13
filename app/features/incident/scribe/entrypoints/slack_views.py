@@ -17,11 +17,11 @@ from contracts.slack.models import CommandPayload, CommandResponse
 from contracts.slack.reply import SlackReplySender
 from features.incident.core.api import (
     StatusUpdate,
-    StatusUpdateOrigin,
     StatusUpdateStage,
     StatusUpdateState,
     StatusUpdateText,
 )
+from features.incident.core.api import translate as t
 from features.incident.scribe.comms_profile import ProfileLabels, format_profile_time, render_profile
 from features.incident.scribe.domain import (
     CopyReadyText,
@@ -38,7 +38,6 @@ from features.incident.scribe.service import (
 )
 from features.incident.scribe.status_update import DRAFT_UNPARSEABLE_CODE
 from features.incident.scribe.status_update_prompt import MAX_INSTRUCTIONS_CHARS
-from infrastructure.i18n import t
 
 DRAFT_DOMAIN = "incident_draft"
 SUMMARY_DOMAIN = "incident_summary"
@@ -54,81 +53,7 @@ NEW_ACTION_ID = "incident.scribe.status_update.new"
 SAVE_ACTION_ID = "incident.scribe.status_update.save"
 _APPROVED_ROW_CAP = 50
 _SECURITY_CONFIRMED = "confirmed"
-_GENERATE_NOTICES_EN = MappingProxyType(
-    {
-        "generated_note": "Drafted with AI. Review the new draft before you approve it.",
-        "generate_carried_forward": "Nothing new since the last approved update, so the current action now says there "
-        "is no new information.",
-        "generate_failed": "Couldn't draft with AI right now, so your text was kept. Please try again shortly.",
-        "generate_unparseable": "I couldn't turn the model's answer into a status update, so your text was kept. "
-        "Please try again.",
-        "generate_security": "This incident is, or may be, a security incident. Drafting with AI sends the incident "
-        "channel and comms content to the AI model. To continue, check the box below, then press Draft with AI.",
-        "generate_unavailable": "AI drafting isn't available right now, so your text was kept. Write the update in the "
-        "fields below.",
-        "generate_empty_history": "There's no conversation from people to draft from yet, so your text was kept.",
-    }
-)
-_GENERATE_NOTICES_FR = MappingProxyType(
-    {
-        "generated_note": "Brouillon rédigé avec l'IA. Révisez-le avant de l'approuver.",
-        "generate_carried_forward": "Rien de nouveau depuis la dernière mise à jour approuvée; la mesure en cours "
-        "indique maintenant qu'il n'y a aucune nouvelle information.",
-        "generate_failed": "Impossible de rédiger avec l'IA pour le moment; votre texte a été conservé. "
-        "Veuillez réessayer sous peu.",
-        "generate_unparseable": "Je n'ai pas pu transformer la réponse du modèle en mise à jour de statut; votre texte "
-        "a été conservé. Veuillez réessayer.",
-        "generate_security": "Cet incident est, ou pourrait être, un incident de sécurité. La rédaction avec l'IA "
-        "envoie le contenu du canal de l'incident et des communications au modèle d'IA. Pour continuer, cochez la "
-        "case ci-dessous, puis appuyez sur Rédiger avec l'IA.",
-        "generate_unavailable": "La rédaction par IA n'est pas disponible pour le moment; votre texte a été conservé. "
-        "Rédigez la mise à jour dans les champs ci-dessous.",
-        "generate_empty_history": "Il n'y a pas encore de conversation à partir de laquelle rédiger; votre texte a été conservé.",
-    }
-)
-_SAVE_NOTICES_EN = MappingProxyType(
-    {
-        "saved_note": "Draft saved.",
-        "save_failed": "The draft could not be saved; your text is still here.",
-    }
-)
-_SAVE_NOTICES_FR = MappingProxyType(
-    {
-        "saved_note": "Brouillon enregistré.",
-        "save_failed": "Le brouillon n'a pas pu être enregistré; votre texte est toujours là.",
-    }
-)
-# Keyed by ``StatusUpdateOrigin`` value; ``unknown`` is a record written before origins existed.
-_ORIGIN_TEMPLATES_EN = MappingProxyType(
-    {
-        StatusUpdateOrigin.HAND.value: "Written by {author} at {time}",
-        StatusUpdateOrigin.MODEL.value: "Drafted by AI at {time}",
-        StatusUpdateOrigin.MODEL_INSTRUCTED.value: "Redrafted with instructions at {time}",
-        StatusUpdateOrigin.CARRIED_FORWARD.value: "Carried forward at {time}",
-        "unknown": "By {author} at {time}",
-    }
-)
-_ORIGIN_TEMPLATES_FR = MappingProxyType(
-    {
-        StatusUpdateOrigin.HAND.value: "Rédigée par {author} le {time}",
-        StatusUpdateOrigin.MODEL.value: "Rédigée par l'IA le {time}",
-        StatusUpdateOrigin.MODEL_INSTRUCTED.value: "Rédigée à nouveau selon des instructions le {time}",
-        StatusUpdateOrigin.CARRIED_FORWARD.value: "Reprise de la mise à jour précédente le {time}",
-        "unknown": "Par {author} le {time}",
-    }
-)
 _TEXT_FIELDS = ("affected_service", "impact", "current_action", "workaround")
-
-# Slack renders its own "mrkdwn", not standard/GitHub Markdown: headers (``#``)
-# and ``**bold**`` show up as literal text. Steer the model toward Slack-safe
-# formatting so the ephemeral summary renders correctly.
-SLACK_FORMAT_INSTRUCTIONS = (
-    "Format the summary using Slack mrkdwn, NOT standard Markdown. "
-    "Rules: use *single asterisks* for bold (never **double**); use _underscores_ "
-    "for italics; do NOT use Markdown headings (#, ##, ###) -- make section titles "
-    "a bold line instead (e.g. *Current status*); start bullet lines with '• '; "
-    "separate sections with a blank line. Keep links as plain URLs."
-)
 
 
 def notify_working(
@@ -318,8 +243,8 @@ def summary_text(key: str, locale: str, fallback: str) -> str:
     return t(f"{SUMMARY_DOMAIN}.{key}", locale, fallback)
 
 
-def status_t(key: str, locale: str, fallback: str) -> str:
-    return t(f"{STATUS_UPDATE_DOMAIN}.{key}", locale, fallback)
+def status_t(key: str, locale: str, fallback: str, **variables: Any) -> str:
+    return t(f"{STATUS_UPDATE_DOMAIN}.{key}", locale, fallback, **variables)
 
 
 def status_error_text(error_code: str | None, locale: str) -> str:
@@ -436,10 +361,9 @@ def origin_line(update: StatusUpdate, locale: str) -> str:
 
     A record from before origins existed names only its author.
     """
-    key = update.origin.value if update.origin is not None else "unknown"
-    template = (_ORIGIN_TEMPLATES_FR if locale.startswith("fr") else _ORIGIN_TEMPLATES_EN)[key]
-    variables = {"author": f"<@{update.author}>", "time": format_profile_time(update.created_at, build_profile_labels(locale))}
-    return t(f"{STATUS_UPDATE_DOMAIN}.origin.{key}", locale, template.format(**variables), **variables)
+    key = f"origin.{update.origin.value if update.origin is not None else 'unknown'}"
+    time = format_profile_time(update.created_at, build_profile_labels(locale))
+    return status_t(key, locale, key, author=f"<@{update.author}>", time=time)
 
 
 def _stage_line(update: StatusUpdate, locale: str) -> str:
@@ -741,14 +665,12 @@ def generate_notice(key: str, locale: str) -> str:
     ``generate_failed``, ``generate_unparseable``, ``generate_security``,
     ``generate_unavailable`` or ``generate_empty_history``.
     """
-    fallback = _GENERATE_NOTICES_FR[key] if locale.startswith("fr") else _GENERATE_NOTICES_EN[key]
-    return status_t(key, locale, fallback)
+    return status_t(key, locale, key)
 
 
 def save_notice(key: str, locale: str) -> str:
     """Return the localized Save draft notice for ``key``: ``saved_note`` or ``save_failed``."""
-    fallback = _SAVE_NOTICES_FR[key] if locale.startswith("fr") else _SAVE_NOTICES_EN[key]
-    return status_t(key, locale, fallback)
+    return status_t(key, locale, key)
 
 
 def build_review_field_errors(block_ids: tuple[str, ...], locale: str) -> dict[str, str]:

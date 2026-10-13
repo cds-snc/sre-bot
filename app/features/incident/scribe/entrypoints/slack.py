@@ -90,7 +90,6 @@ from features.incident.scribe.entrypoints.slack_views import (
     REVIEW_ACTION_ID,
     REVIEW_CALLBACK_ID,
     SAVE_ACTION_ID,
-    SLACK_FORMAT_INSTRUCTIONS,
     STATUS_UPDATE_DOMAIN,
     SUMMARY_DOMAIN,
     build_copy_ready_view,
@@ -350,7 +349,6 @@ def handle_summarize_command(
             payload.channel_id,
             since=_parse_since(parsed_args.get("--since")),
             limit=_parse_limit(parsed_args.get("--limit")),
-            instructions=SLACK_FORMAT_INSTRUCTIONS,
         )
     )
 

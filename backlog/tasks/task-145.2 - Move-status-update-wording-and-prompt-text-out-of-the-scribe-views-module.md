@@ -1,10 +1,11 @@
 ---
 id: TASK-145.2
 title: Move status-update wording and prompt text out of the scribe views module
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 18:23'
+updated_date: '2026-10-09 18:53'
 labels:
   - incident
   - features
@@ -32,11 +33,11 @@ THIS SLICE
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No module under scribe/entrypoints/ holds a dict keyed by locale or language; the status-update locale test asserts it
-- [ ] #2 Every status-update view renders the same text as before (existing view tests pass unchanged apart from import paths)
-- [ ] #3 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #4 SLACK_FORMAT_INSTRUCTIONS lives in scribe/service.py, the summarize service applies it, and no entry-point module imports or passes it
-- [ ] #5 The umbrella imports infrastructure.i18n only from core/adapters/i18n.py; views call translate from core.api; the import-linter ignore list has the same number of entries
+- [x] #1 No module under scribe/entrypoints/ holds a dict keyed by locale or language; the status-update locale test asserts it
+- [x] #2 Every status-update view renders the same text as before (existing view tests pass unchanged apart from import paths)
+- [x] #3 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #4 SLACK_FORMAT_INSTRUCTIONS lives in scribe/service.py, the summarize service applies it, and no entry-point module imports or passes it
+- [x] #5 The umbrella imports infrastructure.i18n only from core/adapters/i18n.py; views call translate from core.api; the import-linter ignore list has the same number of entries
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -80,3 +81,35 @@ About 75 production lines removed and 35 added across slack_views.py, slack.py, 
 ## Blast radius and rollback
 A missing catalogue key now shows a key instead of English; the parity test guards both catalogues. Single `git revert`.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## What changed
+- `core/adapters/i18n.py` (new) wraps `infrastructure.i18n.t` as `translate(key, locale, fallback="", **variables)`; `core/api.py` exports it. `entrypoints/slack_views.py` imports `translate as t` from `core.api`, so its 57 other `t(...)`/`status_t(...)` calls are untouched. pyproject ignore entry renamed from `...scribe.entrypoints.slack_views -> infrastructure.i18n` to `...core.adapters.i18n -> infrastructure.i18n`: 70 entries before and after.
+- The six EN/FR tables (`_GENERATE_NOTICES_*`, `_SAVE_NOTICES_*`, `_ORIGIN_TEMPLATES_*`) are deleted. `generate_notice` and `save_notice` call `status_t(key, locale, key)`; `origin_line` calls `status_t("origin.<value|unknown>", locale, key, author=..., time=...)` and the translator substitutes the variables (it accepts `{var}` and `{{var}}`); `status_t` gained `**variables`. `StatusUpdateOrigin` is no longer imported by the views module.
+- `SLACK_FORMAT_INSTRUCTIONS` left the views module and is `_SUMMARY_FORMAT_INSTRUCTIONS` in `scribe/service.py` beside the content prompt; `summarize_transcript` always sends content prompt + mrkdwn rules, and a caller's `instructions` is appended after both. `handle_summarize_command` no longer passes `instructions=`. The scribe README line about the i18n import is updated.
+- Tests. The view tests pin literal EN/FR wording and used to get it from the deleted in-code tables because unit tests never loaded the scribe catalogue. `tests/factories/i18n.py` gained `load_plugin_catalogues(*hookimpls)` and `reset_translation_service()`; new autouse conftests under `tests/unit/features/incident/scribe/` and `tests/integration/features/incident/scribe/` load the scribe catalogues the way the lifespan does and clear the `t` and service caches afterwards. The three view test files changed only their docstrings (wording now comes from the catalogue); their assertions are unchanged and green, which is the proof of AC 2.
+- New: `test_incident_core_translate.py` (delegation, default fallback, re-export), `test_entrypoint_modules_hold_no_language_keyed_tables` in the status-update locales test (AST scan of every `entrypoints/*.py`: no module-level `*_EN`/`*_FR` name, no dict literal keyed by en/fr/en-US/fr-FR), two summary service tests (mrkdwn rules once, after the content prompt; extra guidance after both). Changed: the summarize handler test now asserts no `instructions` kwarg; the core api surface test lists `translate`.
+
+## Evidence (from app/)
+- `uv run ruff check .`: All checks passed! `uv run ruff format --check .`: 869 files already formatted.
+- `uv run lint-imports`: Contracts: 10 kept, 0 broken.
+- `uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'`: Found 48 errors in 19 files, the same pre-existing set as before this layer; 0 in touched files.
+- `uv run pytest tests --ignore=tests/smoke`: 4552 passed, 2375 warnings in 98.63s.
+- `rg -l 'infrastructure\.i18n' features/incident --glob '*.py'`: only `features/incident/core/adapters/i18n.py`. `rg 'SLACK_FORMAT_INSTRUCTIONS' features/incident`: nothing.
+- Diff: 14 modified, 4 new files; about 75 production lines removed, 40 added.
+
+## For the human
+- Runtime behaviour is unchanged while both catalogues hold every key; a missing key now renders as the key rather than English (plan decision: key-as-fallback). The EN/FR parity test and the three catalogue tests guard the keys.
+- The Slack mrkdwn rules are now part of every summary prompt, not only the Slack handler's; there is no other summary caller today.
+<!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-09 18:42
+---
+Plan approved
+---
+<!-- COMMENTS:END -->

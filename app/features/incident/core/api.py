@@ -14,6 +14,7 @@ from functools import lru_cache
 from typing import Protocol, runtime_checkable
 
 from contracts.operations.result import OperationResult
+from features.incident.core.adapters.i18n import translate
 from features.incident.core.adapters.legacy_incidents import (
     build_legacy_incident_lookup,
     build_legacy_incident_security_reader,
@@ -47,6 +48,7 @@ __all__ = [
     "get_incident_security_reader",
     "get_incident_transcript_reader",
     "get_status_update_store",
+    "translate",
 ]
 
 

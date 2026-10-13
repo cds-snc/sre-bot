@@ -5,9 +5,9 @@ redrafted with instructions, carried forward) with its creation time through
 ``format_profile_time``; a record from before origins existed names only its
 author. ``build_overview_view`` shows the line in a context block just above
 the pending draft, and never when nothing is pending. The builders are pure and
-called directly. The scribe catalogue is not loaded in unit tests, so wording is
-the in-code EN or FR fallback, pinned literally; the catalogue test reads both
-YAML files and requires the same templates, so they cannot drift apart.
+called directly. The scribe catalogues are loaded by the directory's conftest,
+so wording is the catalogue's EN or FR template, pinned literally; the
+catalogue test reads both YAML files and requires the same templates.
 """
 
 import json
@@ -107,7 +107,7 @@ class TestOriginLine:
 
     @pytest.mark.parametrize(("locale", "templates"), [("en-US", _EN_TEMPLATES), ("fr-FR", _FR_TEMPLATES)])
     def test_catalogue_holds_the_origin_templates(self, locale: str, templates: dict[str, str]) -> None:
-        """Each template is in the catalogue exactly as the in-code fallback renders it."""
+        """Each template is in the catalogue exactly as ``origin_line`` renders it."""
         data = yaml.safe_load((_LOCALES_DIR / f"incident_status_update.{locale}.yml").read_text(encoding="utf-8"))
         catalogue: dict[str, str] = data["incident_status_update"]
 
