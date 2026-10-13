@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:58'
-updated_date: '2026-10-13 13:40'
+updated_date: '2026-10-13 17:59'
 labels:
   - plugin-architecture
   - contracts
@@ -26,9 +26,9 @@ ordinal: 250000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-decisions/plugin-architecture.md: the core-service Protocols (records, queue, coordination, secrets, scheduler, translator, current user) live in app/contracts/, and their implementations in app/infrastructure/. Contracts expose no provider concept, so the DynamoDB-shaped query(key_condition: str) must be gone first. TASK-27.1 replaces it, which is why this move waits for it and does not move a leaky Protocol only to rewrite it.
+decisions/plugin-architecture.md: the core-service Protocols (records, queue, coordination, secrets, scheduler, translator, current user) live in app/contracts/, and their implementations in app/infrastructure/. Contracts expose no provider concept, so the Protocol had to be vendor-neutral first. TASK-27.1 made it so (every method takes a RecordTable; reads take a typed RecordQuery), which is why this move waits for it and does not move a leaky Protocol only to rewrite it.
 
-Mechanical: the Protocol and its value types move to app/contracts/records/; the DynamoDB implementation and the in-memory fake stay in app/infrastructure/records/. Every importer is rewritten with no re-export. The coordination Protocol moves with its rename (TASK-58), and the queue Protocol is born in contracts (TASK-34).
+Mechanical, a pure move of app/infrastructure/records/protocol.py: the RecordStore Protocol and its value types (KeyValue, KeySchema, RecordIndex, RecordTable, SortOperator, SortOrder, SortCondition, RecordQuery) plus the resolve_query_key helper move to app/contracts/records/ with no signature change; the DynamoDB implementation and the in-memory fake stay in app/infrastructure/records/. Every importer is rewritten with no re-export. The coordination Protocol moves with its rename (TASK-58), and the queue Protocol is born in contracts (TASK-34).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

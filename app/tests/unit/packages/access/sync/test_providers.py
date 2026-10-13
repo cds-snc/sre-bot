@@ -151,7 +151,7 @@ def test_get_access_sync_job_status_store_returns_singleton(monkeypatch: pytest.
     monkeypatch.setattr(providers, "get_record_store", lambda: sentinel_storage)
     monkeypatch.setattr(
         "packages.access.sync.providers.JobStatusStore",
-        lambda storage: (built.pop(0), storage)[0],
+        lambda storage, table_name: (built.pop(0), storage)[0],
     )
 
     first = get_job_status_store()

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-16 13:58'
-updated_date: '2026-10-13 13:41'
+updated_date: '2026-10-13 17:59'
 labels:
   - infrastructure
   - phase-4
@@ -41,6 +41,8 @@ What moved out of this slice:
 Remaining scope:
 - wire the CI fake-coverage check. It fails the build when a Protocol in app/contracts/ that has an app/infrastructure/ implementation, or an externally facing capability api.py Protocol, has no in-memory fake exercised by tests. It reads the package tree, not app/tests/, and names its excluded in-process mechanisms explicitly.
 - Follow the app/bin guardrail shape: a script, a make target, a listed exclusion set.
+
+Reference shape from TASK-27.1: the records fake is app/infrastructure/records/in_memory.py (InMemoryRecordStore, alongside infrastructure/idempotency/in_memory.py), and tests/integration/infrastructure/records/test_records_store_query_conformance.py runs one set of cases parametrized over the fake and the moto-backed DynamoDB store. The check should recognise an in_memory.py module in the implementation package plus a conformance suite parametrized over fake and real implementations as satisfying the contract.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

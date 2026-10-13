@@ -4,7 +4,7 @@ title: 'Webhooks slice 1: Webhook domain model + RecordStore-backed store'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:39'
-updated_date: '2026-10-13 13:42'
+updated_date: '2026-10-13 18:59'
 labels:
   - migration
   - webhooks
@@ -39,7 +39,7 @@ Goal: stand up the durable data layer of the new package and route all webhook p
 Scope:
 1. Create the app/capabilities/webhooks/ skeleton: __init__.py (empty hookimpl surface, no registration yet), providers.py (feature-local DI), settings.py with a partitioned WebhookSettings (per decisions/configuration.md; add a default-rate-ceiling placeholder field). Do NOT move TASK-7's WEBHOOK_MAX_BODY_BYTES in this slice.
 2. domain.py: a frozen dataclass Webhook (id, name, channel, source: WebhookSource, hook_type, active, created_at, user_id, invocation_count, acknowledged_count). Add a WebhookSource enum (AWS_SNS, ACCESS_REQUEST, SIMPLE_TEXT, GENERIC) used as data only this slice; default existing records to GENERIC. Do NOT add auth_mode/secret here (TASK-47 owns those).
-3. store.py: a WebhookStore over the records contract (RecordStore in app/contracts/records/, TASK-108) resolved from the service registry (TASK-109) (mirror app/packages/access/sync/store.py::SyncRunRepository). Implement create/get/list/update/delete/toggle/revoke/increment_invocation/increment_acknowledged mapping the frozen model to/from records, replacing modules/slack/webhooks.py's hand-built dynamodb.* calls. Reuse the existing 'webhooks' table; no schema/terraform change.
+3. store.py: a WebhookStore over the records contract (RecordStore in app/contracts/records/, TASK-108) resolved from the service registry (TASK-109) (mirror app/packages/access/sync/store.py::SyncRunRepository). Implement create/get/list/update/delete/toggle/revoke/increment_invocation/increment_acknowledged mapping the frozen model to/from records, replacing modules/slack/webhooks.py's hand-built dynamodb.* calls. Reuse the existing 'webhooks' table; no schema/terraform change. The store builds its RecordTable once: the key layout in code (terraform/dynamodb.tf: partition key id, no sort key, no index) and the table name from the webhooks package settings, defaulting to 'webhooks' and passes it to every RecordStore call, reading single items with get and any keyed read with a RecordQuery. increment_invocation/increment_acknowledged and the full-table list_all/lookup reads need TASK-27.2's atomic increment and bounded list, which is why this slice depends on it.
 4. Repoint callers: app/api/v1/routes/webhooks.py and the /sre webhook admin command read/write via a provider-resolved WebhookStore + frozen model, so no caller handles {'S':..}/{'BOOL':..} shapes. Route otherwise unchanged (still calls the legacy handle_webhook_payload for now).
 5. Leave modules/webhooks/* and the legacy select_best_model path intact this slice (deleted in TASK-37.3 / TASK-37.4).
 

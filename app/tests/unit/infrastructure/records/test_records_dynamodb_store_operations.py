@@ -11,7 +11,22 @@ import pytest
 from botocore.exceptions import ClientError
 
 import infrastructure.records.service as service_module
+from infrastructure.records.protocol import (
+    KeySchema,
+    RecordIndex,
+    RecordQuery,
+    RecordTable,
+    SortCondition,
+    SortOperator,
+    SortOrder,
+)
 from infrastructure.records.service import DynamoDBRecordStore
+
+TABLE = RecordTable(
+    name="my_table",
+    key=KeySchema(partition="pk", sort="sk"),
+    indexes={"by_user": RecordIndex(physical_name="user-timestamp-index", key=KeySchema(partition="user", sort="timestamp"))},
+)
 
 
 def _make_service() -> tuple[DynamoDBRecordStore, MagicMock]:
@@ -27,7 +42,7 @@ class TestDynamoDBRecordStorePut:
         service, dynamo = _make_service()
         dynamo.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
-        result = service.put("my_table", {"pk": "abc", "name": "test"})
+        result = service.put(TABLE, {"pk": "abc", "name": "test"})
 
         assert result.is_success
         assert dynamo.put_item.called
@@ -37,7 +52,7 @@ class TestDynamoDBRecordStorePut:
         service, dynamo = _make_service()
         dynamo.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
-        service.put("my_table", {"pk": "abc", "count": 5, "active": True})
+        service.put(TABLE, {"pk": "abc", "count": 5, "active": True})
 
         kwargs = dynamo.put_item.call_args[1]
         item = kwargs["Item"]
@@ -50,7 +65,7 @@ class TestDynamoDBRecordStorePut:
         service, dynamo = _make_service()
         dynamo.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
-        service.put("my_table", {"pk": "abc", "optional_field": None})
+        service.put(TABLE, {"pk": "abc", "optional_field": None})
 
         item = dynamo.put_item.call_args[1]["Item"]
         assert "optional_field" not in item
@@ -63,7 +78,7 @@ class TestDynamoDBRecordStorePut:
             operation_name="PutItem",
         )
 
-        result = service.put("my_table", {"pk": "abc"})
+        result = service.put(TABLE, {"pk": "abc"})
 
         assert not result.is_success
         assert result.error_code == "ResourceNotFoundException"
@@ -77,7 +92,7 @@ class TestDynamoDBRecordStorePutIfNotExists:
         service, dynamo = _make_service()
         dynamo.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
-        result = service.put_if_not_exists("my_table", {"pk": "abc"}, pk_attribute="pk")
+        result = service.put_if_not_exists(TABLE, {"pk": "abc"})
 
         assert result.is_success
         assert result.data is True
@@ -94,7 +109,7 @@ class TestDynamoDBRecordStorePutIfNotExists:
             operation_name="PutItem",
         )
 
-        result = service.put_if_not_exists("my_table", {"pk": "abc"}, pk_attribute="pk")
+        result = service.put_if_not_exists(TABLE, {"pk": "abc"})
 
         assert result.is_success
         assert result.data is False
@@ -103,10 +118,11 @@ class TestDynamoDBRecordStorePutIfNotExists:
         service, dynamo = _make_service()
         dynamo.put_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
-        service.put_if_not_exists("my_table", {"pk": "abc"}, pk_attribute="pk")
+        service.put_if_not_exists(TABLE, {"pk": "abc"})
 
         kwargs = dynamo.put_item.call_args[1]
-        assert kwargs.get("ConditionExpression") == "attribute_not_exists(pk)"
+        assert kwargs.get("ConditionExpression") == "attribute_not_exists(#pk)"
+        assert kwargs.get("ExpressionAttributeNames") == {"#pk": "pk"}
 
     def test_other_errors_propagate(self):
         service, dynamo = _make_service()
@@ -115,7 +131,7 @@ class TestDynamoDBRecordStorePutIfNotExists:
             operation_name="PutItem",
         )
 
-        result = service.put_if_not_exists("my_table", {"pk": "abc"}, pk_attribute="pk")
+        result = service.put_if_not_exists(TABLE, {"pk": "abc"})
 
         assert not result.is_success
         assert result.error_code == "AccessDeniedException"
@@ -129,7 +145,7 @@ class TestDynamoDBRecordStoreGet:
         service, dynamo = _make_service()
         dynamo.get_item.return_value = {"Item": {"pk": {"S": "abc"}, "count": {"N": "5"}}}
 
-        result = service.get("my_table", {"pk": "abc"})
+        result = service.get(TABLE, {"pk": "abc"})
 
         assert result.is_success
         assert result.data["pk"] == "abc"
@@ -140,7 +156,7 @@ class TestDynamoDBRecordStoreGet:
         # DynamoDB returns empty dict (no "Item" key) when not found
         dynamo.get_item.return_value = {}
 
-        result = service.get("my_table", {"pk": "missing"})
+        result = service.get(TABLE, {"pk": "missing"})
 
         assert not result.is_success
         assert "not_found" in result.status.value
@@ -149,7 +165,7 @@ class TestDynamoDBRecordStoreGet:
         service, dynamo = _make_service()
         dynamo.get_item.return_value = {"Item": {"pk": {"S": "abc"}}}
 
-        service.get("my_table", {"pk": "abc"})
+        service.get(TABLE, {"pk": "abc"})
 
         key = dynamo.get_item.call_args[1]["Key"]
         assert key == {"pk": {"S": "abc"}}
@@ -161,105 +177,116 @@ class TestDynamoDBRecordStoreGet:
             operation_name="GetItem",
         )
 
-        result = service.get("my_table", {"pk": "abc"})
+        result = service.get(TABLE, {"pk": "abc"})
 
         assert not result.is_success
 
 
 @pytest.mark.unit
 class TestDynamoDBRecordStoreQuery:
-    """Tests for DynamoDBRecordStore.query."""
+    """Tests for DynamoDBRecordStore.query mapping a RecordQuery onto the SDK."""
 
-    def test_query_returns_deserialized_items(self):
-        service, dynamo = _make_service()
+    @staticmethod
+    def _paginator(dynamo: MagicMock, pages: list[dict]) -> MagicMock:
         paginator = MagicMock()
-        paginator.paginate.return_value = [
-            {
-                "Items": [
-                    {"pk": {"S": "abc"}, "action": {"S": "created"}},
-                    {"pk": {"S": "abc"}, "action": {"S": "updated"}},
-                ]
-            }
-        ]
+        paginator.paginate.return_value = pages
         dynamo.get_paginator.return_value = paginator
+        return paginator
 
-        result = service.query(
-            "my_table",
-            key_condition="pk = :pk",
-            expression_values={":pk": "abc"},
-        )
-
-        assert result.is_success
-        assert len(result.data) == 2
-        assert result.data[0]["pk"] == "abc"
-        assert result.data[0]["action"] == "created"
-
-    def test_query_serializes_expression_values(self):
+    def test_partition_only_uses_name_and_value_placeholders(self):
         service, dynamo = _make_service()
-        paginator = MagicMock()
-        paginator.paginate.return_value = [{"Items": []}]
-        dynamo.get_paginator.return_value = paginator
+        paginator = self._paginator(dynamo, [{"Items": []}])
+
+        service.query(TABLE, RecordQuery(partition="abc"))
+
+        kwargs = paginator.paginate.call_args[1]
+        assert kwargs["TableName"] == "my_table"
+        assert kwargs["KeyConditionExpression"] == "#pk = :pk"
+        assert kwargs["ExpressionAttributeNames"] == {"#pk": "pk"}
+        assert kwargs["ExpressionAttributeValues"] == {":pk": {"S": "abc"}}
+        assert kwargs["ScanIndexForward"] is True
+        assert "IndexName" not in kwargs
+        assert "PaginationConfig" not in kwargs
+
+    @pytest.mark.parametrize(
+        ("operator", "expression"),
+        [
+            (SortOperator.EQ, "#pk = :pk AND #sk = :sk"),
+            (SortOperator.LT, "#pk = :pk AND #sk < :sk"),
+            (SortOperator.BEGINS_WITH, "#pk = :pk AND begins_with(#sk, :sk)"),
+        ],
+    )
+    def test_sort_condition_expression(self, operator: SortOperator, expression: str):
+        service, dynamo = _make_service()
+        paginator = self._paginator(dynamo, [{"Items": []}])
+
+        service.query(TABLE, RecordQuery(partition="abc", sort=SortCondition(operator, "x")))
+
+        kwargs = paginator.paginate.call_args[1]
+        assert kwargs["KeyConditionExpression"] == expression
+        assert kwargs["ExpressionAttributeNames"] == {"#pk": "pk", "#sk": "sk"}
+        assert kwargs["ExpressionAttributeValues"] == {":pk": {"S": "abc"}, ":sk": {"S": "x"}}
+
+    def test_index_maps_logical_name_to_physical_index_and_its_key(self):
+        service, dynamo = _make_service()
+        paginator = self._paginator(dynamo, [{"Items": []}])
 
         service.query(
-            "my_table",
-            key_condition="pk = :pk",
-            expression_values={":pk": "abc"},
+            TABLE,
+            RecordQuery(partition="alice", index="by_user", sort=SortCondition(SortOperator.LT, "2026")),
         )
 
         kwargs = paginator.paginate.call_args[1]
-        assert kwargs["ExpressionAttributeValues"][":pk"] == {"S": "abc"}
+        assert kwargs["IndexName"] == "user-timestamp-index"
+        assert kwargs["ExpressionAttributeNames"] == {"#pk": "user", "#sk": "timestamp"}
 
-    def test_query_uses_paginator_and_aggregates_items(self):
+    def test_descending_order_and_limit(self):
         service, dynamo = _make_service()
-        paginator = MagicMock()
-        paginator.paginate.return_value = [
-            {
-                "Items": [
-                    {"pk": {"S": "abc"}, "action": {"S": "created"}},
-                ]
-            },
-            {
-                "Items": [
-                    {"pk": {"S": "abc"}, "action": {"S": "updated"}},
-                ]
-            },
-        ]
-        dynamo.get_paginator.return_value = paginator
+        paginator = self._paginator(dynamo, [{"Items": []}])
 
-        result = service.query(
-            "my_table",
-            key_condition="pk = :pk",
-            expression_values={":pk": "abc"},
+        service.query(TABLE, RecordQuery(partition="abc", order=SortOrder.DESC, limit=10))
+
+        kwargs = paginator.paginate.call_args[1]
+        assert kwargs["ScanIndexForward"] is False
+        assert kwargs["PaginationConfig"] == {"MaxItems": 10, "PageSize": 10}
+
+    def test_aggregates_and_deserializes_pages(self):
+        service, dynamo = _make_service()
+        self._paginator(
+            dynamo,
+            [
+                {"Items": [{"pk": {"S": "abc"}, "action": {"S": "created"}}]},
+                {"Items": [{"pk": {"S": "abc"}, "action": {"S": "updated"}}]},
+            ],
         )
 
+        result = service.query(TABLE, RecordQuery(partition="abc"))
+
         dynamo.get_paginator.assert_called_once_with("query")
-        assert paginator.paginate.called
         assert result.is_success
         assert result.data == [
             {"pk": "abc", "action": "created"},
             {"pk": "abc", "action": "updated"},
         ]
 
-    def test_query_passes_through_extra_kwargs(self):
-        """IndexName, Limit, ScanIndexForward, etc. pass through to paginator kwargs."""
+    def test_limit_truncates_items_beyond_the_cap(self):
         service, dynamo = _make_service()
-        paginator = MagicMock()
-        paginator.paginate.return_value = [{"Items": []}]
-        dynamo.get_paginator.return_value = paginator
-
-        service.query(
-            "my_table",
-            key_condition="pk = :pk",
-            expression_values={":pk": "abc"},
-            IndexName="my-gsi",
-            Limit=10,
-            ScanIndexForward=False,
+        self._paginator(
+            dynamo,
+            [{"Items": [{"pk": {"S": "abc"}, "sk": {"S": str(i)}} for i in range(3)]}],
         )
 
-        kwargs = paginator.paginate.call_args[1]
-        assert kwargs.get("IndexName") == "my-gsi"
-        assert kwargs.get("Limit") == 10
-        assert kwargs.get("ScanIndexForward") is False
+        result = service.query(TABLE, RecordQuery(partition="abc", limit=2))
+
+        assert [item["sk"] for item in result.data] == ["0", "1"]
+
+    def test_unknown_index_raises_before_any_sdk_call(self):
+        service, dynamo = _make_service()
+
+        with pytest.raises(ValueError, match="by_nothing"):
+            service.query(TABLE, RecordQuery(partition="abc", index="by_nothing"))
+
+        dynamo.get_paginator.assert_not_called()
 
     def test_query_error_propagates(self):
         service, dynamo = _make_service()
@@ -268,13 +295,10 @@ class TestDynamoDBRecordStoreQuery:
             operation_name="Query",
         )
 
-        result = service.query(
-            "my_table",
-            key_condition="pk = :pk",
-            expression_values={":pk": "abc"},
-        )
+        result = service.query(TABLE, RecordQuery(partition="abc"))
 
         assert not result.is_success
+        assert result.error_code == "AccessDeniedException"
 
 
 @pytest.mark.unit
@@ -285,7 +309,7 @@ class TestDynamoDBRecordStoreDelete:
         service, dynamo = _make_service()
         dynamo.delete_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
-        result = service.delete("my_table", {"pk": "abc"})
+        result = service.delete(TABLE, {"pk": "abc"})
 
         assert result.is_success
 
@@ -293,7 +317,7 @@ class TestDynamoDBRecordStoreDelete:
         service, dynamo = _make_service()
         dynamo.delete_item.return_value = {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
-        service.delete("my_table", {"pk": "abc"})
+        service.delete(TABLE, {"pk": "abc"})
 
         key = dynamo.delete_item.call_args[1]["Key"]
         assert key == {"pk": {"S": "abc"}}
@@ -305,7 +329,7 @@ class TestDynamoDBRecordStoreDelete:
             operation_name="DeleteItem",
         )
 
-        result = service.delete("my_table", {"pk": "abc"})
+        result = service.delete(TABLE, {"pk": "abc"})
 
         assert not result.is_success
 
@@ -341,7 +365,7 @@ class TestDynamoDBRecordStoreProviderAndSdkExceptions:
             operation_name="PutItem",
         )
 
-        result = service.put_if_not_exists("my_table", {"pk": "abc"}, pk_attribute="pk")
+        result = service.put_if_not_exists(TABLE, {"pk": "abc"})
 
         assert result.is_success
         assert result.data is False

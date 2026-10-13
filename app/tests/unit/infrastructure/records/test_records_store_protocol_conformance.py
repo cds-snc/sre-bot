@@ -7,9 +7,11 @@ from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
 from infrastructure.records import get_record_store
-from infrastructure.records.protocol import RecordStore
+from infrastructure.records.in_memory import InMemoryRecordStore
+from infrastructure.records.protocol import KeySchema, RecordStore, RecordTable
 from infrastructure.records.service import DynamoDBRecordStore
-from tests.unit.infrastructure.records.in_memory_record_store import InMemoryRecordStore
+
+TABLE = RecordTable(name="test_table", key=KeySchema(partition="PK", sort="SK"))
 
 
 @pytest.mark.unit
@@ -41,7 +43,7 @@ def test_record_store_dep_override_with_fake() -> None:
     def probe(
         store: RecordStore = Depends(get_record_store),
     ) -> dict[str, bool]:
-        result = store.put("test_table", {"PK": "A", "SK": "1"})
+        result = store.put(TABLE, {"PK": "A", "SK": "1"})
         return {"ok": result.is_success}
 
     app.dependency_overrides[get_record_store] = lambda: fake
@@ -51,7 +53,7 @@ def test_record_store_dep_override_with_fake() -> None:
         assert response.status_code == 200
         assert response.json() == {"ok": True}
 
-        stored = fake.get("test_table", {"PK": "A", "SK": "1"})
+        stored = fake.get(TABLE, {"PK": "A", "SK": "1"})
         assert stored.is_success
     finally:
         app.dependency_overrides.clear()

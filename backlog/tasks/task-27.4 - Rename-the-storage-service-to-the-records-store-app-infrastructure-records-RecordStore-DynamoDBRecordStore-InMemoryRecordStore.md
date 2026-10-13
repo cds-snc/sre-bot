@@ -3,11 +3,11 @@ id: TASK-27.4
 title: >-
   Rename the storage service to the records store: app/infrastructure/records/,
   RecordStore, DynamoDBRecordStore, InMemoryRecordStore
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-10-13 13:34'
-updated_date: '2026-10-13 16:56'
+updated_date: '2026-10-13 17:30'
 labels:
   - infrastructure
   - phase-4

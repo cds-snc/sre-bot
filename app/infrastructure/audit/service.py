@@ -6,21 +6,48 @@ Delegates all I/O to ``RecordStore`` — no direct boto3 calls.
 
 from datetime import UTC, datetime, timedelta
 from functools import cache
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import structlog
 
 from contracts.operations.result import OperationResult
 from infrastructure.audit.models import AuditEvent
-from infrastructure.audit.protocol import AuditTrailService
+from infrastructure.audit.protocol import MAX_QUERY_LIMIT, AuditTrailService
+from infrastructure.audit.settings import get_audit_settings
 from infrastructure.records import get_record_store
-
-if TYPE_CHECKING:
-    from infrastructure.records.protocol import RecordStore
+from infrastructure.records.protocol import (
+    KeySchema,
+    RecordIndex,
+    RecordQuery,
+    RecordStore,
+    RecordTable,
+    SortCondition,
+    SortOperator,
+    SortOrder,
+)
 
 logger = structlog.get_logger(__name__)
 
-TABLE_NAME = "sre_bot_audit_trail"
+AUDIT_KEY = KeySchema(partition="resource_id", sort="timestamp_correlation_id")
+AUDIT_INDEXES = {
+    "by_user": RecordIndex(
+        physical_name="user_email-timestamp-index",
+        key=KeySchema(partition="user_email", sort="timestamp"),
+    ),
+    "by_correlation": RecordIndex(
+        physical_name="correlation_id-index",
+        key=KeySchema(partition="correlation_id"),
+    ),
+}
+
+
+def audit_table(name: str) -> RecordTable:
+    """Return the audit trail's key layout bound to the configured table name."""
+    return RecordTable(name=name, key=AUDIT_KEY, indexes=AUDIT_INDEXES)
+
+
+def _before(start_time: datetime | None) -> SortCondition | None:
+    return SortCondition(SortOperator.LT, start_time.isoformat()) if start_time else None
 
 
 def _compute_ttl_timestamp(retention_days: int) -> int:
@@ -45,8 +72,9 @@ class DynamoDBAuditTrailService:
 
     """
 
-    def __init__(self, storage: RecordStore) -> None:
+    def __init__(self, storage: RecordStore, table_name: str) -> None:
         self._storage = storage
+        self._table = audit_table(table_name)
         logger.info("initialized_audit_trail_service")
 
     # ------------------------------------------------------------------
@@ -100,7 +128,7 @@ class DynamoDBAuditTrailService:
             if key.startswith("audit_meta_") and value is not None:
                 item[key] = str(value)
 
-        result: OperationResult = self._storage.put(TABLE_NAME, item)
+        result: OperationResult = self._storage.put(self._table, item)
         if result.is_success:
             logger.debug(
                 "audit_event_written",
@@ -128,32 +156,28 @@ class DynamoDBAuditTrailService:
         resource_id: str,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
-        limit: int = 100,
+        limit: int = MAX_QUERY_LIMIT,
     ) -> list[dict[str, Any]]:
         """Get audit trail for a resource.
 
         Args:
             resource_id: Partition key (e.g. group email or resource GUID).
-            start_time: Optional lower bound (exclusive) on the sort key timestamp.
+            start_time: Optional exclusive upper bound: only events strictly
+                before this timestamp are returned (pages backwards in time).
             end_time: Unused — included for API symmetry; not yet supported.
-            limit: Maximum results capped at 100.
+            limit: Maximum results, capped at ``MAX_QUERY_LIMIT`` (100).
 
         Returns:
             List of deserialized event dicts, newest first.
         """
-        key_condition = "resource_id = :rid"
-        expression_values: dict[str, Any] = {":rid": resource_id}
-
-        if start_time:
-            key_condition += " AND timestamp_correlation_id < :ts"
-            expression_values[":ts"] = start_time.isoformat()
-
         result = self._storage.query(
-            TABLE_NAME,
-            key_condition=key_condition,
-            expression_values=expression_values,
-            Limit=min(limit, 100),
-            ScanIndexForward=False,
+            self._table,
+            RecordQuery(
+                partition=resource_id,
+                sort=_before(start_time),
+                limit=min(limit, MAX_QUERY_LIMIT),
+                order=SortOrder.DESC,
+            ),
         )
         if result.is_success:
             return result.data or []
@@ -169,33 +193,29 @@ class DynamoDBAuditTrailService:
         user_email: str,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
-        limit: int = 100,
+        limit: int = MAX_QUERY_LIMIT,
     ) -> list[dict[str, Any]]:
         """Get audit trail for a user via GSI1 (user_email-timestamp-index).
 
         Args:
             user_email: User email to query.
-            start_time: Optional lower bound on timestamp.
+            start_time: Optional exclusive upper bound: only events strictly
+                before this timestamp are returned.
             end_time: Unused — included for API symmetry; not yet supported.
-            limit: Maximum results capped at 100.
+            limit: Maximum results, capped at ``MAX_QUERY_LIMIT`` (100).
 
         Returns:
             List of deserialized event dicts, newest first.
         """
-        key_condition = "user_email = :ue"
-        expression_values: dict[str, Any] = {":ue": user_email}
-
-        if start_time:
-            key_condition += " AND timestamp < :ts"
-            expression_values[":ts"] = start_time.isoformat()
-
         result = self._storage.query(
-            TABLE_NAME,
-            key_condition=key_condition,
-            expression_values=expression_values,
-            IndexName="user_email-timestamp-index",
-            Limit=min(limit, 100),
-            ScanIndexForward=False,
+            self._table,
+            RecordQuery(
+                partition=user_email,
+                index="by_user",
+                sort=_before(start_time),
+                limit=min(limit, MAX_QUERY_LIMIT),
+                order=SortOrder.DESC,
+            ),
         )
         if result.is_success:
             return result.data or []
@@ -219,11 +239,8 @@ class DynamoDBAuditTrailService:
             Deserialized event dict if found, None otherwise.
         """
         result = self._storage.query(
-            TABLE_NAME,
-            key_condition="correlation_id = :cid",
-            expression_values={":cid": correlation_id},
-            IndexName="correlation_id-index",
-            Limit=1,
+            self._table,
+            RecordQuery(partition=correlation_id, index="by_correlation", limit=1),
         )
         if result.is_success:
             items = result.data or []
@@ -243,5 +260,4 @@ def get_audit_trail_service() -> AuditTrailService:
     events. The implementation uses DynamoDB, but can be swapped for alternative
     audit backends that satisfy the Protocol.
     """
-    storage = get_record_store()
-    return DynamoDBAuditTrailService(storage)
+    return DynamoDBAuditTrailService(get_record_store(), table_name=get_audit_settings().AUDIT_TABLE_NAME)

@@ -47,13 +47,13 @@ def get_access_sync_adapters() -> dict[str, AccessSyncAdapter]:
 @functools.lru_cache(maxsize=1)
 def get_sync_run_repository() -> SyncRunRepository:
     """Return the singleton SyncRunRepository instance."""
-    return SyncRunRepository(storage=get_record_store())
+    return SyncRunRepository(storage=get_record_store(), table_name=get_access_sync_settings().table_name)
 
 
 @functools.lru_cache(maxsize=1)
 def get_access_sync_job_status_store() -> JobStatusStore:
     """Return the singleton JobStatusStore instance."""
-    return JobStatusStore(storage=get_record_store())
+    return JobStatusStore(storage=get_record_store(), table_name=get_access_sync_settings().job_status_table_name)
 
 
 @functools.lru_cache(maxsize=1)

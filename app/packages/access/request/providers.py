@@ -29,7 +29,7 @@ def get_access_request_settings() -> AccessRequestsSettings:
 @lru_cache(maxsize=1)
 def get_access_request_repository() -> AccessRequestRepository:
     """Return the singleton AccessRequestRepository instance."""
-    return AccessRequestRepository(storage=get_record_store())
+    return AccessRequestRepository(storage=get_record_store(), table_name=get_access_request_settings().table_name)
 
 
 @lru_cache(maxsize=1)

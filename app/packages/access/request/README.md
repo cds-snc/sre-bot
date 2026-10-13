@@ -96,7 +96,7 @@ ACCESS_REQUESTS='{"enabled": true, "min_approver_count": 2}'
 | `schemas.py` | Pydantic HTTP boundary models (request bodies / responses) |
 | `service.py` | Lifecycle orchestration — the canonical place to understand the flow |
 | `policies.py` | Pure policy functions: auto-approval, self-approval guard, approver resolution |
-| `store.py` | DynamoDB repository (`sre_bot_access_requests` table) |
+| `store.py` | Record repository; table named by `ACCESS_REQUESTS_TABLE_NAME` (default `sre_bot_access_requests`) |
 | `providers.py` | `get_access_request_settings()` — thin slice provider returning `AccessRequestsSettings` |
 | `providers.py` | `@lru_cache` singletons — object graph wiring |
 | `events.py` | Event name constants for this package |
@@ -104,7 +104,9 @@ ACCESS_REQUESTS='{"enabled": true, "min_approver_count": 2}'
 
 ---
 
-## DynamoDB table: `sre_bot_access_requests`
+## Record table: `sre_bot_access_requests`
+
+The name is the default of `ACCESS_REQUESTS_TABLE_NAME`.
 
 | Key | Pattern | Used for |
 |---|---|---|
