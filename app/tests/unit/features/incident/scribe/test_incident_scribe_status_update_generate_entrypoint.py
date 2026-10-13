@@ -45,13 +45,13 @@ from features.incident.core.api import (
     StatusUpdateText,
     TranscriptMessage,
 )
+from features.incident.scribe import status_update_form
 from features.incident.scribe.domain import (
     NoNewInformationWording,
     StatusUpdateDraftOutcome,
     StatusUpdateEdit,
     StatusUpdateOutcomeKind,
 )
-from features.incident.scribe.entrypoints import slack as slack_entrypoints
 from features.incident.scribe.entrypoints.slack import (
     handle_generate_action,
     handle_history_action,
@@ -223,8 +223,8 @@ def events() -> list[str]:
 @pytest.fixture
 def services(monkeypatch: pytest.MonkeyPatch, events: list[str]) -> _Services:
     fakes = _Services(events=events)
-    monkeypatch.setattr(slack_entrypoints, "generate_status_update_draft", fakes.generate_status_update_draft)
-    monkeypatch.setattr(slack_entrypoints, "get_draft_for_review", fakes.get_draft_for_review)
+    monkeypatch.setattr(status_update_form, "generate_status_update_draft", fakes.generate_status_update_draft)
+    monkeypatch.setattr(status_update_form, "get_draft_for_review", fakes.get_draft_for_review)
     return fakes
 
 
@@ -693,8 +693,8 @@ def _bind(monkeypatch: pytest.MonkeyPatch, *, messages: Sequence[TranscriptMessa
         security_reader=world.security_reader,
         now=_NOW,
     )
-    monkeypatch.setattr(slack_entrypoints, "generate_status_update_draft", service)
-    monkeypatch.setattr(slack_entrypoints, "get_draft_for_review", partial(get_draft_for_review, store=world.store))
+    monkeypatch.setattr(status_update_form, "generate_status_update_draft", service)
+    monkeypatch.setattr(status_update_form, "get_draft_for_review", partial(get_draft_for_review, store=world.store))
     return world
 
 

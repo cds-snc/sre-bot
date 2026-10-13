@@ -28,6 +28,8 @@ from features.incident.scribe.domain import (
     DraftedDocument,
     NoNewInformationWording,
     StatusUpdateEdit,
+    StatusUpdateFormState,
+    StatusUpdateOutcomeKind,
     StatusUpdateOverview,
 )
 from features.incident.scribe.service import (
@@ -54,6 +56,15 @@ SAVE_ACTION_ID = "incident.scribe.status_update.save"
 _APPROVED_ROW_CAP = 50
 _SECURITY_CONFIRMED = "confirmed"
 _TEXT_FIELDS = ("affected_service", "impact", "current_action", "workaround")
+# Draft with AI refusals and failures with their own notice; any other code is ``generate_failed``.
+_GENERATE_FAILURE_KEYS = MappingProxyType(
+    {
+        ErrorCode.SECURITY_CONFIRMATION_REQUIRED: "generate_security",
+        ErrorCode.TEXT_GENERATION_UNAVAILABLE: "generate_unavailable",
+        ErrorCode.EMPTY_HISTORY: "generate_empty_history",
+        DRAFT_UNPARSEABLE_CODE: "generate_unparseable",
+    }
+)
 
 
 def notify_working(
@@ -616,7 +627,7 @@ def parse_review_submission(view: dict[str, Any]) -> StatusUpdateEdit | None:
     """Read the submitted stage and fields back into an edit; ``None`` when the stage is missing or unknown.
 
     Text is not trimmed and a cleared field (Slack sends null) reads as ``""``,
-    so ``validate_approval_edit`` is the single blank-handling path.
+    so ``StatusUpdateEdit.blank_fields`` is the single blank-handling path.
     """
     values: dict[str, Any] = (view.get("state") or {}).get("values") or {}
     selected = ((values.get("stage") or {}).get("stage") or {}).get("selected_option") or {}
@@ -671,6 +682,38 @@ def generate_notice(key: str, locale: str) -> str:
 def save_notice(key: str, locale: str) -> str:
     """Return the localized Save draft notice for ``key``: ``saved_note`` or ``save_failed``."""
     return status_t(key, locale, key)
+
+
+def build_saved_form_view(state: StatusUpdateFormState, locale: str, private_metadata: str) -> dict[str, Any]:
+    """Build the review form after Save draft: the saved draft, or the kept draft with the typed values, with a notice."""
+    notice = save_notice("save_failed" if state.kept else "saved_note", locale)
+    return build_review_view(state.update, locale, private_metadata, notice=notice, with_ai=state.ai_available)
+
+
+def build_filled_form_view(
+    state: StatusUpdateFormState, locale: str, private_metadata: str, *, instructions: str
+) -> dict[str, Any]:
+    """Build the review form after Draft with AI.
+
+    A fill or carry forward shows the new draft with its notice. A kept draft
+    shows the typed values with the refusal or failure notice, the
+    responder's instructions, and the confirmation checkbox after a security
+    refusal.
+    """
+    if not state.kept:
+        key = "generate_carried_forward" if state.kind is StatusUpdateOutcomeKind.CARRIED_FORWARD else "generated_note"
+        return build_review_view(
+            state.update, locale, private_metadata, notice=generate_notice(key, locale), with_ai=state.ai_available
+        )
+    return build_review_view(
+        state.update,
+        locale,
+        private_metadata,
+        notice=generate_notice(_GENERATE_FAILURE_KEYS.get(state.failure_code or "", "generate_failed"), locale),
+        instructions=instructions,
+        security_confirm=state.failure_code == ErrorCode.SECURITY_CONFIRMATION_REQUIRED,
+        with_ai=state.ai_available,
+    )
 
 
 def build_review_field_errors(block_ids: tuple[str, ...], locale: str) -> dict[str, str]:

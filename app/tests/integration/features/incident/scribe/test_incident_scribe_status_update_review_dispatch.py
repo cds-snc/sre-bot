@@ -23,10 +23,9 @@ import pytest
 import features.incident.scribe as scribe_module
 from contracts.operations import OperationResult
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
-from features.incident.scribe import providers
+from features.incident.scribe import providers, status_update_approval, status_update_form
 from features.incident.scribe.comms_profile import ProfileLabels
 from features.incident.scribe.domain import CopyReadyText, StatusUpdateEdit
-from features.incident.scribe.entrypoints import slack as slack_entrypoints
 from features.incident.scribe.entrypoints.slack_views import (
     REVIEW_ACTION_ID,
     REVIEW_CALLBACK_ID,
@@ -104,10 +103,10 @@ class ServiceFakes:
 @pytest.fixture
 def fakes(monkeypatch: pytest.MonkeyPatch) -> ServiceFakes:
     service_fakes = ServiceFakes()
-    monkeypatch.setattr(slack_entrypoints, "get_draft_for_review", service_fakes.get_draft_for_review)
-    monkeypatch.setattr(slack_entrypoints, "approve_status_update", service_fakes.approve_status_update)
+    monkeypatch.setattr(status_update_form, "get_draft_for_review", service_fakes.get_draft_for_review)
+    monkeypatch.setattr(status_update_approval, "approve_status_update", service_fakes.approve_status_update)
     monkeypatch.setattr(providers, "get_status_page_publisher", lambda: service_fakes)
-    monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: True)
+    monkeypatch.setattr(status_update_form, "text_generation_available", lambda: True)
     return service_fakes
 
 

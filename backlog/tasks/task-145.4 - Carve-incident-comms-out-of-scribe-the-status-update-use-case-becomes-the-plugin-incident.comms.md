@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 18:23'
+updated_date: '2026-10-09 19:33'
 labels:
   - incident
   - features
@@ -82,3 +82,18 @@ About 20 files moved, 45 test files moved; new code: comms/__init__.py (~45 line
 ## Blast radius and rollback
 A missed registration leaves a button unhandled; the registration and lifespan tests cover it. Single `git revert`; open modals break either way across the deploy.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Re-ground at pickup (from TASK-145.3): scribe/status_update_form.py is new (start/open/save/fill_status_update_form) and moves with the status-update code (proposed name comms/form.py). The 145.3 form types are StatusUpdateFormState and PublishedRecord in domain.py; StatusUpdateEdit gained blank_fields() and validate_approval_edit is gone; _GENERATE_FAILURE_KEYS, build_saved_form_view and build_filled_form_view are in slack_views.py. The entrypoint and dispatch tests stub on status_update_form, status_update_approval and status_update_history; their monkeypatch targets follow the renamed modules. New tests to move: test_incident_scribe_status_update_{form_save,form_fill,form_view,approval_publish,history_render}.py.
+<!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-09 19:17
+---
+Plan approved
+---
+<!-- COMMENTS:END -->

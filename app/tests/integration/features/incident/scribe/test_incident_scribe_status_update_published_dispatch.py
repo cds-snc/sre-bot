@@ -25,9 +25,8 @@ import pytest
 import features.incident.scribe as scribe_module
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
-from features.incident.scribe import providers
+from features.incident.scribe import providers, status_update_history
 from features.incident.scribe.adapters.copy_ready import CopyReadyPublisher
-from features.incident.scribe.entrypoints import slack as slack_entrypoints
 from features.incident.scribe.entrypoints.slack_views import (
     PUBLISHED_ACTION_ID,
     build_copy_ready_view,
@@ -82,7 +81,7 @@ def _published() -> StatusUpdate:
 @pytest.fixture
 def store(monkeypatch: pytest.MonkeyPatch) -> InMemoryStatusUpdateStore:
     status_updates = InMemoryStatusUpdateStore()
-    monkeypatch.setattr(slack_entrypoints, "set_published", partial(set_published, now=_NOW, store=status_updates))
+    monkeypatch.setattr(status_update_history, "set_published", partial(set_published, now=_NOW, store=status_updates))
     monkeypatch.setattr(providers, "get_status_page_publisher", CopyReadyPublisher)
     return status_updates
 

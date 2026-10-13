@@ -26,8 +26,8 @@ import pytest
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from features.incident.scribe import status_update_form
 from features.incident.scribe.domain import StatusUpdateEdit
-from features.incident.scribe.entrypoints import slack as slack_entrypoints
 from features.incident.scribe.entrypoints.slack import handle_save_action, register
 from features.incident.scribe.entrypoints.slack_views import (
     REVIEW_CALLBACK_ID,
@@ -129,9 +129,9 @@ class _Services:
 
 def _install(monkeypatch: pytest.MonkeyPatch, saved: OperationResult[StatusUpdate]) -> _Services:
     services = _Services(saved=saved, stored=OperationResult.success(data=_DRAFT))
-    monkeypatch.setattr(slack_entrypoints, "save_status_update_draft", services.save)
-    monkeypatch.setattr(slack_entrypoints, "get_draft_for_review", services.read)
-    monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: True)
+    monkeypatch.setattr(status_update_form, "save_status_update_draft", services.save)
+    monkeypatch.setattr(status_update_form, "get_draft_for_review", services.read)
+    monkeypatch.setattr(status_update_form, "text_generation_available", lambda: True)
     return services
 
 
@@ -174,7 +174,7 @@ class TestSaved:
     def test_without_text_generation_the_saved_form_has_no_ai_section(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """With the generator unconfigured the re-rendered form leaves the AI section out."""
         services = _install(monkeypatch, OperationResult.success(data=_SAVED))
-        monkeypatch.setattr(slack_entrypoints, "text_generation_available", lambda: False)
+        monkeypatch.setattr(status_update_form, "text_generation_available", lambda: False)
         client = _client(services)
 
         handle_save_action(MagicMock(), _body(), client)
