@@ -4,7 +4,7 @@ title: Add an atomic conditional write across several items to the records contr
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
-updated_date: '2026-10-13 13:42'
+updated_date: '2026-10-13 18:00'
 labels:
   - identity
   - records
@@ -27,7 +27,7 @@ decisions/people-and-accounts.md (Draft) requires each account to be claimed by 
 
 RecordStore (app/infrastructure/records/protocol.py) offers only put, put_if_not_exists, get, query and delete. No package can write several items atomically today.
 
-This is a records primitive with no identity vocabulary. It builds on the capability-shaped redesign in TASK-27.
+This is a records primitive with no identity vocabulary. It builds on the capability-shaped redesign in TASK-27: since TASK-27.1 every RecordStore method takes a RecordTable declared once per repository, so each item in the atomic write names its own RecordTable (items may span tables), and the not-exists condition guards the full table.key the way put_if_not_exists does.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

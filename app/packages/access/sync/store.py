@@ -2,24 +2,26 @@
 
 Wraps ``RecordStore`` to persist and retrieve ``SyncRunRecord`` objects.
 Access Sync owns its key scheme and serialization; all DynamoDB I/O is
-delegated to the infrastructure storage service.
+delegated to the infrastructure record store.
 
 Key scheme in ``sre_bot_access``:
     PK = ``SYNC_RUN#{platform}#{user_email}``
     SK = ``{created_at_iso}#{run_id}``
 
 This allows efficient per-user, per-platform pagination (newest first via
-``ScanIndexForward=False``).
+descending sort order).
 """
 
 from datetime import UTC, datetime
 
 import structlog
 
-from infrastructure.records.protocol import RecordStore
+from infrastructure.records.protocol import KeySchema, RecordQuery, RecordStore, RecordTable, SortOrder
 from packages.access.sync.domain import SyncRunRecord
 
 logger = structlog.get_logger()
+
+SYNC_RUNS_TABLE = RecordTable(name="sre_bot_access", key=KeySchema(partition="PK", sort="SK"))
 
 
 class SyncRunRepository:
@@ -31,8 +33,6 @@ class SyncRunRepository:
     Args:
         storage: Configured ``RecordStore`` instance injected by provider.
     """
-
-    TABLE = "sre_bot_access"
 
     def __init__(self, storage: RecordStore) -> None:
         self._storage = storage
@@ -53,7 +53,7 @@ class SyncRunRepository:
             "error_message": record.error_message,
             "created_at": record.created_at.isoformat(),
         }
-        result = self._storage.put(self.TABLE, item)
+        result = self._storage.put(SYNC_RUNS_TABLE, item)
         if not result.is_success:
             logger.error(
                 "sync_run_save_failed",
@@ -70,11 +70,8 @@ class SyncRunRepository:
         """Return recent runs for the given platform + user, newest first."""
         pk = f"SYNC_RUN#{platform}#{user_email}"
         result = self._storage.query(
-            self.TABLE,
-            key_condition="PK = :pk",
-            expression_values={":pk": pk},
-            ScanIndexForward=False,
-            Limit=limit,
+            SYNC_RUNS_TABLE,
+            RecordQuery(partition=pk, order=SortOrder.DESC, limit=limit),
         )
         if not result.is_success:
             logger.error(

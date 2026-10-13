@@ -14,15 +14,16 @@ from typing import Any
 
 import structlog
 
-from infrastructure.records import RecordStore
+from infrastructure.records import KeySchema, RecordStore, RecordTable
 
 logger = structlog.get_logger()
+
+# Shares the table with infrastructure/idempotency; only the key attribute is declared here.
+JOB_STATUS_TABLE = RecordTable(name="sre_bot_idempotency", key=KeySchema(partition="idempotency_key"))
 
 
 class JobStatusStore:
     """DynamoDB-backed status store for access-sync job and holder records."""
-
-    TABLE = "sre_bot_idempotency"
 
     def __init__(self, storage: RecordStore) -> None:
         self._storage = storage
@@ -34,13 +35,13 @@ class JobStatusStore:
             "record_json": json.dumps(record),
             "ttl": int(time.time()) + ttl_seconds,
         }
-        result = self._storage.put(self.TABLE, item)
+        result = self._storage.put(JOB_STATUS_TABLE, item)
         if not result.is_success:
             logger.error("job_status_store_put_failed", key=key, error=result.message)
 
     def get(self, key: str) -> dict[str, Any] | None:
         """Fetch and deserialize a record. Returns None for misses or malformed data."""
-        result = self._storage.get(self.TABLE, {"idempotency_key": key})
+        result = self._storage.get(JOB_STATUS_TABLE, {"idempotency_key": key})
         if not result.is_success:
             return None
 

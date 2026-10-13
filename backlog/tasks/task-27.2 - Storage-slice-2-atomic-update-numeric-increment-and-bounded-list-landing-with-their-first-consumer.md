@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-16 13:58'
-updated_date: '2026-10-13 16:07'
+updated_date: '2026-10-13 17:59'
 labels:
   - infrastructure
   - phase-4
@@ -26,7 +26,7 @@ ordinal: 220000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Slice 2 of TASK-27 (see the coordinator plan). Adds the write and read operations the records contract is missing, and lands them WITH their first real consumer rather than ahead of it (decisions/layers.md: Path A capabilities are never built speculatively).
+Slice 2 of TASK-27 (see the coordinator plan). Adds the write and read operations the records contract is missing, and lands them WITH their first real consumer rather than ahead of it (decisions/plugin-architecture.md: Path A capabilities are never built speculatively).
 
 WHY. The Protocol today is put, put_if_not_exists, get, query and delete. TASK-37.1 has to give the WebhookStore increment_invocation and increment_acknowledged, and decisions/webhooks.md forbids doing that as a read-modify-write; it also has to serve list_all_webhooks and lookup_webhooks, which are full-table DynamoDB scans today. None of those has a vendor-neutral operation to sit on. This slice is therefore the actual blocker on TASK-37.1, and is why TASK-37.1 depends on it.
 
@@ -39,7 +39,7 @@ SEQUENCING. Merge this immediately before TASK-37.1, or in the same PR if the si
 
 NOT IN SCOPE. Appending to a list attribute (modules/incident/db_operations.py log_activity uses DynamoDB list_append on an incident logs attribute). That is not a capability-shaped operation, it is a data-model problem: activity log entries almost certainly want to be their own items under the incident partition rather than an unbounded list attribute on one item. The decision belongs to TASK-145 planning, not to the records Protocol. Also out of scope: the atomic multi-item conditional write TASK-83.2 owns.
 
-CONDITIONS FROM SLICE 1. gt and between sort-key conditions are still gated on a real consumer; if TASK-37.1 or a co-landing consumer needs one, add it here with that justification recorded.
+CONDITIONS FROM SLICE 1. Every new operation takes table: RecordTable like the existing ones, and key and index attribute names come from that declaration: the atomic update and increment take the item key and need no extra key-name arguments, and the bounded list reuses slice 1's limit semantics (a total cap on returned items). gt and between sort-key conditions are still gated on a real consumer; if TASK-37.1 or a co-landing consumer needs one, add it here with that justification recorded.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -64,5 +64,10 @@ CONDITIONS FROM SLICE 1. gt and between sort-key conditions are still gated on a
 created: 2026-09-24 20:11
 ---
 2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md).
+---
+
+created: 2026-10-13 17:59
+---
+2026-10-13 (TASK-27.1 implemented): AC wording proposals, not applied because the CLI cannot edit an AC in place. AC3: replace 'required by decisions/layers.md' with 'required by decisions/plugin-architecture.md'. AC5: replace 'pointing the incident activity log at TASK-38' with 'pointing the incident activity log at TASK-145' (TASK-145 replaces TASK-38 and its slices; its timeline entries are their own records).
 ---
 <!-- COMMENTS:END -->

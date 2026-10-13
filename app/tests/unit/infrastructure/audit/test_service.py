@@ -1,7 +1,8 @@
 """Unit tests for AuditTrailService.
 
-Tests write and query operations on AuditTrailService using a mocked
-RecordStore — no DynamoDB calls are made.
+Write paths use a MagicMock RecordStore to inspect the stored item; query
+paths seed the in-memory record store and assert on returned events, so
+ordering, caps and index selection are checked as behaviour.
 """
 
 from datetime import UTC, datetime
@@ -13,7 +14,8 @@ import pytest
 from contracts.operations.result import OperationResult
 from infrastructure.audit.models import AuditEvent
 from infrastructure.audit.protocol import AuditTrailService
-from infrastructure.audit.service import DynamoDBAuditTrailService
+from infrastructure.audit.service import AUDIT_TABLE, DynamoDBAuditTrailService
+from infrastructure.records.in_memory import InMemoryRecordStore
 
 
 def _make_event(**kwargs) -> AuditEvent:
@@ -28,7 +30,7 @@ def _make_event(**kwargs) -> AuditEvent:
     return AuditEvent(**defaults)
 
 
-def _make_service(storage: MagicMock) -> AuditTrailService:
+def _make_service(storage: MagicMock | InMemoryRecordStore) -> AuditTrailService:
     return DynamoDBAuditTrailService(storage=storage)
 
 
@@ -54,7 +56,7 @@ class TestWriteAuditEvent:
         service.write_audit_event(_make_event())
 
         table, item = storage.put.call_args[0]
-        assert table == "sre_bot_audit_trail"
+        assert table is AUDIT_TABLE
 
     def test_write_item_contains_required_fields(self):
         storage = MagicMock()
@@ -143,63 +145,69 @@ class TestWriteAuditEvent:
         assert "error_message" not in item
 
 
+def _seed(store: InMemoryRecordStore, resource_id: str, user: str, timestamp: str, correlation_id: str) -> None:
+    store.put(
+        AUDIT_TABLE,
+        {
+            "resource_id": resource_id,
+            "timestamp_correlation_id": f"{timestamp}#{correlation_id}",
+            "timestamp": timestamp,
+            "correlation_id": correlation_id,
+            "user_email": user,
+            "action": "group_member_added",
+        },
+    )
+
+
+def _error_storage() -> MagicMock:
+    storage = MagicMock()
+    storage.query.return_value = OperationResult.permanent_error(message="Error", error_code="InternalServerError")
+    return storage
+
+
 @pytest.mark.unit
 class TestGetAuditTrail:
     """Tests for AuditTrailService.get_audit_trail."""
 
-    def test_returns_items_on_success(self):
-        storage = MagicMock()
-        items = [
-            {"resource_id": "eng@example.com", "action": "group_member_added"},
-            {"resource_id": "eng@example.com", "action": "group_member_removed"},
-        ]
-        storage.query.return_value = OperationResult.success(data=items)
-        service = _make_service(storage)
+    def test_returns_resource_events_newest_first(self):
+        store = InMemoryRecordStore()
+        _seed(store, "eng@example.com", "alice@example.com", "2026-01-01T00:00:00", "c1")
+        _seed(store, "eng@example.com", "alice@example.com", "2026-01-03T00:00:00", "c3")
+        _seed(store, "ops@example.com", "alice@example.com", "2026-01-02T00:00:00", "c2")
 
-        result = service.get_audit_trail("eng@example.com")
+        result = _make_service(store).get_audit_trail("eng@example.com")
 
-        assert result == items
-
-    def test_uses_resource_id_as_partition_key(self):
-        storage = MagicMock()
-        storage.query.return_value = OperationResult.success(data=[])
-        service = _make_service(storage)
-
-        service.get_audit_trail("eng@example.com")
-
-        _, kwargs = storage.query.call_args[0], storage.query.call_args[1]
-        # table is first positional arg
-        assert storage.query.call_args[0][0] == "sre_bot_audit_trail"
-        assert kwargs["expression_values"][":rid"] == "eng@example.com"
+        assert [event["correlation_id"] for event in result] == ["c3", "c1"]
 
     def test_limit_is_capped_at_100(self):
-        storage = MagicMock()
-        storage.query.return_value = OperationResult.success(data=[])
-        service = _make_service(storage)
+        store = InMemoryRecordStore()
+        for i in range(105):
+            _seed(store, "eng@example.com", "alice@example.com", f"2026-01-01T00:00:{i:03d}", f"c{i}")
 
-        service.get_audit_trail("eng@example.com", limit=500)
+        result = _make_service(store).get_audit_trail("eng@example.com", limit=500)
 
-        _, kwargs = storage.query.call_args[0], storage.query.call_args[1]
-        assert kwargs["Limit"] == 100
+        assert len(result) == 100
 
-    def test_start_time_adds_sort_key_condition(self):
-        storage = MagicMock()
-        storage.query.return_value = OperationResult.success(data=[])
-        service = _make_service(storage)
-        start = datetime(2026, 1, 1, tzinfo=UTC)
+    def test_limit_returns_at_most_n_newest_events(self):
+        store = InMemoryRecordStore()
+        for day in (1, 2, 3):
+            _seed(store, "eng@example.com", "alice@example.com", f"2026-01-0{day}T00:00:00", f"c{day}")
 
-        service.get_audit_trail("eng@example.com", start_time=start)
+        result = _make_service(store).get_audit_trail("eng@example.com", limit=2)
 
-        _, kwargs = storage.query.call_args[0], storage.query.call_args[1]
-        assert ":ts" in kwargs["expression_values"]
-        assert kwargs["expression_values"][":ts"] == start.isoformat()
+        assert [event["correlation_id"] for event in result] == ["c3", "c2"]
+
+    def test_start_time_returns_only_events_before_it(self):
+        store = InMemoryRecordStore()
+        _seed(store, "eng@example.com", "alice@example.com", "2025-12-31T00:00:00+00:00", "old")
+        _seed(store, "eng@example.com", "alice@example.com", "2026-01-02T00:00:00+00:00", "new")
+
+        result = _make_service(store).get_audit_trail("eng@example.com", start_time=datetime(2026, 1, 1, tzinfo=UTC))
+
+        assert [event["correlation_id"] for event in result] == ["old"]
 
     def test_query_error_returns_empty_list(self):
-        storage = MagicMock()
-        storage.query.return_value = OperationResult.permanent_error(message="Error", error_code="InternalServerError")
-        service = _make_service(storage)
-
-        result = service.get_audit_trail("eng@example.com")
+        result = _make_service(_error_storage()).get_audit_trail("eng@example.com")
 
         assert result == []
 
@@ -208,33 +216,27 @@ class TestGetAuditTrail:
 class TestGetUserAuditTrail:
     """Tests for AuditTrailService.get_user_audit_trail."""
 
-    def test_returns_items_on_success(self):
-        storage = MagicMock()
-        items = [{"user_email": "alice@example.com", "action": "group_member_added"}]
-        storage.query.return_value = OperationResult.success(data=items)
-        service = _make_service(storage)
+    def test_returns_user_events_across_resources_newest_first(self):
+        store = InMemoryRecordStore()
+        _seed(store, "eng@example.com", "alice@example.com", "2026-01-01T00:00:00", "c1")
+        _seed(store, "ops@example.com", "alice@example.com", "2026-01-03T00:00:00", "c3")
+        _seed(store, "ops@example.com", "bob@example.com", "2026-01-02T00:00:00", "c2")
 
-        result = service.get_user_audit_trail("alice@example.com")
+        result = _make_service(store).get_user_audit_trail("alice@example.com")
 
-        assert result == items
+        assert [event["correlation_id"] for event in result] == ["c3", "c1"]
 
-    def test_uses_gsi1(self):
-        storage = MagicMock()
-        storage.query.return_value = OperationResult.success(data=[])
-        service = _make_service(storage)
+    def test_start_time_returns_only_events_before_it(self):
+        store = InMemoryRecordStore()
+        _seed(store, "eng@example.com", "alice@example.com", "2025-12-31T00:00:00+00:00", "old")
+        _seed(store, "eng@example.com", "alice@example.com", "2026-01-02T00:00:00+00:00", "new")
 
-        service.get_user_audit_trail("alice@example.com")
+        result = _make_service(store).get_user_audit_trail("alice@example.com", start_time=datetime(2026, 1, 1, tzinfo=UTC))
 
-        _, kwargs = storage.query.call_args[0], storage.query.call_args[1]
-        assert kwargs.get("IndexName") == "user_email-timestamp-index"
-        assert kwargs["expression_values"][":ue"] == "alice@example.com"
+        assert [event["correlation_id"] for event in result] == ["old"]
 
     def test_query_error_returns_empty_list(self):
-        storage = MagicMock()
-        storage.query.return_value = OperationResult.permanent_error(message="Error", error_code="InternalServerError")
-        service = _make_service(storage)
-
-        result = service.get_user_audit_trail("alice@example.com")
+        result = _make_service(_error_storage()).get_user_audit_trail("alice@example.com")
 
         assert result == []
 
@@ -243,41 +245,22 @@ class TestGetUserAuditTrail:
 class TestGetByCorrelationId:
     """Tests for AuditTrailService.get_by_correlation_id."""
 
-    def test_returns_first_item_when_found(self):
-        storage = MagicMock()
-        event = {"correlation_id": "req-abc", "action": "group_member_added"}
-        storage.query.return_value = OperationResult.success(data=[event])
-        service = _make_service(storage)
+    def test_returns_event_when_found(self):
+        store = InMemoryRecordStore()
+        _seed(store, "eng@example.com", "alice@example.com", "2026-01-01T00:00:00", "req-abc")
+        _seed(store, "eng@example.com", "alice@example.com", "2026-01-02T00:00:00", "req-other")
 
-        result = service.get_by_correlation_id("req-abc")
+        result = _make_service(store).get_by_correlation_id("req-abc")
 
-        assert result == event
+        assert result is not None
+        assert result["correlation_id"] == "req-abc"
 
     def test_returns_none_when_not_found(self):
-        storage = MagicMock()
-        storage.query.return_value = OperationResult.success(data=[])
-        service = _make_service(storage)
-
-        result = service.get_by_correlation_id("nonexistent")
+        result = _make_service(InMemoryRecordStore()).get_by_correlation_id("nonexistent")
 
         assert result is None
 
-    def test_uses_gsi2(self):
-        storage = MagicMock()
-        storage.query.return_value = OperationResult.success(data=[])
-        service = _make_service(storage)
-
-        service.get_by_correlation_id("req-abc")
-
-        _, kwargs = storage.query.call_args[0], storage.query.call_args[1]
-        assert kwargs.get("IndexName") == "correlation_id-index"
-        assert kwargs["expression_values"][":cid"] == "req-abc"
-
     def test_query_error_returns_none(self):
-        storage = MagicMock()
-        storage.query.return_value = OperationResult.permanent_error(message="Error", error_code="InternalServerError")
-        service = _make_service(storage)
-
-        result = service.get_by_correlation_id("req-abc")
+        result = _make_service(_error_storage()).get_by_correlation_id("req-abc")
 
         assert result is None

@@ -3,9 +3,9 @@
 Wraps ``RecordStore`` to persist and retrieve ``AccessRequest``,
 ``ApprovalDecision``, and ``RequestAuditEvent`` objects.  Access Requests
 owns its key scheme and serialisation; all DynamoDB I/O is delegated to the
-infrastructure storage service.
+infrastructure record store.
 
-Key scheme in ``sre_bot_access``:
+Key scheme in ``sre_bot_access_requests``:
     AccessRequest:
         PK = ``ACCESS_REQUEST#{request_id}``
         SK = ``REQUEST``
@@ -27,7 +27,14 @@ from datetime import UTC, datetime
 
 import structlog
 
-from infrastructure.records.protocol import RecordStore
+from infrastructure.records.protocol import (
+    KeySchema,
+    RecordQuery,
+    RecordStore,
+    RecordTable,
+    SortCondition,
+    SortOperator,
+)
 from packages.access.request.domain import (
     AccessRequest,
     ApprovalDecision,
@@ -35,6 +42,8 @@ from packages.access.request.domain import (
 )
 
 logger = structlog.get_logger()
+
+ACCESS_REQUESTS_TABLE = RecordTable(name="sre_bot_access_requests", key=KeySchema(partition="PK", sort="SK"))
 
 
 class AccessRequestRepository:
@@ -46,8 +55,6 @@ class AccessRequestRepository:
     Args:
         storage: Configured ``RecordStore`` instance injected by provider.
     """
-
-    TABLE = "sre_bot_access_requests"
 
     def __init__(self, storage: RecordStore) -> None:
         self._storage = storage
@@ -83,7 +90,7 @@ class AccessRequestRepository:
             "requested_at": (request.requested_at.isoformat() if request.requested_at else None),
             "updated_at": (request.updated_at.isoformat() if request.updated_at else None),
         }
-        result = self._storage.put(self.TABLE, item)
+        result = self._storage.put(ACCESS_REQUESTS_TABLE, item)
         if not result.is_success:
             logger.error(
                 "access_request_save_failed",
@@ -94,7 +101,7 @@ class AccessRequestRepository:
     def get_request(self, request_id: str) -> AccessRequest | None:
         """Return the AccessRequest for the given request ID, or None."""
         result = self._storage.get(
-            self.TABLE,
+            ACCESS_REQUESTS_TABLE,
             key={
                 "PK": f"ACCESS_REQUEST#{request_id}",
                 "SK": "REQUEST",
@@ -120,7 +127,7 @@ class AccessRequestRepository:
             "comment": decision.comment,
             "decided_at": decision.decided_at.isoformat(),
         }
-        result = self._storage.put(self.TABLE, item)
+        result = self._storage.put(ACCESS_REQUESTS_TABLE, item)
         if not result.is_success:
             logger.error(
                 "access_decision_save_failed",
@@ -131,12 +138,11 @@ class AccessRequestRepository:
     def get_decisions(self, request_id: str) -> list[ApprovalDecision]:
         """Return all decisions for the given request, ordered by SK."""
         result = self._storage.query(
-            self.TABLE,
-            key_condition="PK = :pk AND begins_with(SK, :prefix)",
-            expression_values={
-                ":pk": f"ACCESS_REQUEST#{request_id}",
-                ":prefix": "DECISION#",
-            },
+            ACCESS_REQUESTS_TABLE,
+            RecordQuery(
+                partition=f"ACCESS_REQUEST#{request_id}",
+                sort=SortCondition(SortOperator.BEGINS_WITH, "DECISION#"),
+            ),
         )
         if not result.is_success or result.data is None:
             return []
@@ -158,7 +164,7 @@ class AccessRequestRepository:
             "timestamp": event.timestamp.isoformat(),
             "metadata": event.metadata,
         }
-        result = self._storage.put(self.TABLE, item)
+        result = self._storage.put(ACCESS_REQUESTS_TABLE, item)
         if not result.is_success:
             logger.error(
                 "access_audit_event_save_failed",
@@ -174,16 +180,15 @@ class AccessRequestRepository:
     def get_request_with_decisions(self, request_id: str) -> tuple[AccessRequest | None, list[ApprovalDecision]]:
         """Return the access request and all its recorded decisions.
 
-        Uses a single DynamoDB query on the PK prefix to retrieve both
+        Uses a single query on the request partition to retrieve both
         the REQUEST record and all DECISION records atomically.
 
         Returns:
             ``(AccessRequest | None, List[ApprovalDecision])``
         """
         result = self._storage.query(
-            self.TABLE,
-            key_condition="PK = :pk",
-            expression_values={":pk": f"ACCESS_REQUEST#{request_id}"},
+            ACCESS_REQUESTS_TABLE,
+            RecordQuery(partition=f"ACCESS_REQUEST#{request_id}"),
         )
         if not result.is_success or result.data is None:
             return None, []

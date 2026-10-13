@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-10-13 13:42'
+updated_date: '2026-10-13 17:59'
 labels:
   - infrastructure
   - phase-4
@@ -28,7 +28,9 @@ ordinal: 27000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 COORDINATOR. Decomposed 2026-09-16 under the single-PR size gate into TASK-27.1, TASK-27.2 and TASK-27.3; this task's acceptance criteria are satisfied by its children. TASK-27.4, the mechanical rename to RecordStore, lands before TASK-27.1. As a single unit it was redesign plus consumer migration plus three fakes plus conformance suites plus a CI check, across infrastructure/records, infrastructure/audit, infrastructure/directory, packages/access and the test tree - well past the gate. The numbered steps below are kept as the original statement of intent; the slice-to-step mapping is in the plan.
 
-Aligns with decisions/cloud-portability.md contract 4. Today RecordStore.query(table, key_condition: str, ...) in app/infrastructure/records/protocol.py takes DynamoDB KeyConditionExpression strings - vendor query syntax leaking through the Protocol, the exact trap the decisions name. A Protocol that cannot be faithfully faked fails the contract.
+Aligns with decisions/cloud-portability.md contract 4. Before TASK-27.1, RecordStore.query(table, key_condition: str, ...) in app/infrastructure/records/protocol.py took DynamoDB KeyConditionExpression strings - vendor query syntax leaking through the Protocol, the exact trap the decisions name. A Protocol that cannot be faithfully faked fails the contract.
+
+Shape after TASK-27.1: every RecordStore method takes a RecordTable (table name, KeySchema, logical indexes) declared once per repository, and reads take a typed RecordQuery (partition, optional SortCondition eq/lt/begins_with, logical index, total-cap limit, ASC/DESC). InMemoryRecordStore lives at app/infrastructure/records/in_memory.py, and tests/integration/infrastructure/records/test_records_store_query_conformance.py runs the same cases on the fake and moto-backed DynamoDB. TASK-27.2 adds operations on that shape.
 
 Steps:
 1. Redesign the RecordStore surface in capability terms (typed key/attribute conditions or purpose-named methods like get_items_by_partition) such that an in-memory fake and a future Cosmos/Postgres backend can honor it without consumer changes. Design sketch reviewed before implementation (paste in the task notes).
@@ -100,5 +102,10 @@ created: 2026-09-16 13:59
 created: 2026-09-24 20:09
 ---
 2026-09-24 alignment with decisions/plugin-architecture.md: the StorageService Protocol moves to app/contracts/ after TASK-27.1 (TASK-108). The fake contract now covers hosting contracts and capability api.py Protocols. Former AC#5 (storage package shape with a cached factory.py provider) is dropped, because the service registry (TASK-109) replaces cached provider functions. decisions/layers.md references in the children read as decisions/plugin-architecture.md.
+---
+
+created: 2026-10-13 17:59
+---
+2026-10-13 (TASK-27.1 implemented): the coordinator plan needs a refresh by its owner. It cites decisions/layers.md (now decisions/plugin-architecture.md), names TASK-38 as a TASK-27.2 consumer and owner of the list-append question (replaced by TASK-145; TASK-145.8 is a candidate first consumer per TASK-27.2 notes), and gives TASK-27.3 the directory/audit fakes and a records factory.py that were moved to TASK-119/TASK-122 or dropped in the 2026-09-24 rescope.
 ---
 <!-- COMMENTS:END -->

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from contracts.operations import OperationResult, OperationStatus
-from packages.access.sync.job_status_store import JobStatusStore
+from packages.access.sync.job_status_store import JOB_STATUS_TABLE, JobStatusStore
 
 
 @pytest.mark.unit
@@ -25,7 +25,7 @@ def test_put_serializes_record_as_json_with_ttl() -> None:
 
     storage.put.assert_called_once()
     args, _ = storage.put.call_args
-    assert args[0] == "sre_bot_idempotency"
+    assert args[0] is JOB_STATUS_TABLE
     item = args[1]
     assert item["idempotency_key"] == "job-123"
     assert item["ttl"] == 1_090
@@ -47,7 +47,7 @@ def test_get_returns_deserialized_record() -> None:
     result = store.get("job-124")
 
     assert result == {"job_id": "job-124", "status": "completed"}
-    storage.get.assert_called_once_with("sre_bot_idempotency", {"idempotency_key": "job-124"})
+    storage.get.assert_called_once_with(JOB_STATUS_TABLE, {"idempotency_key": "job-124"})
 
 
 @pytest.mark.unit

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-13 14:05'
+updated_date: '2026-10-13 18:00'
 labels:
   - incident
   - features
@@ -29,6 +29,7 @@ THIS SLICE
 - core/domain.py: Incident (title, product, severity, security flag, declarer, status, declared, detection, impact start, impact end, the five roles as person references: incident commander, operations lead, communications lead, policy lead, postmortem owner), the typed references (conversation, report, video call, postmortem meeting, external case, source alert) each carrying system, tenant and vendor id plus the vendor link, TimelineEntry as its own record. Frozen dataclasses. The existing IncidentSecurityFlag stays and becomes a field of the record.
 - common/vocabulary.py: IncidentStatus (Open, In Progress, Ready to be Reviewed, Reviewed, Closed), Severity (levels 0 to 4, wide because teams use different scales; narrowed only if the organisation standardises), the role names, StatusUpdateStage moved from core/domain.py, and the action ids one subdomain renders and another handles. common/settings.py: the incident settings tree (response, comms, postmortem slices; the new-incident system policy setting defaulting to the only configured tenant). No I/O in common/.
 - core/store.py: IncidentStore (create, get, find by conversation reference, update one field atomically, list for a window, append a timeline entry as its own record) and its implementation in core/store.py over RecordStore (the records contract), reading today's incidents-table items and mapping bare ids to references for the configured tenant; an in-memory fake. No vendor adapter, no read-modify-write and no list-append.
+- Records contract shape (TASK-27.1): the store declares the incidents table once as a module-level RecordTable and passes it to every RecordStore call; keyed reads use RecordQuery (partition equality, optional eq/lt/begins_with on the sort key, logical index, total-cap limit, order). terraform/dynamodb.tf declares incidents with partition key id only, no sort key and no index: find by conversation (a full scan on channel_id in today's legacy_incidents adapter) needs an index declared in RecordTable.indexes, which means a GSI, or else TASK-27.2's bounded list; and timeline entries as their own records need a sort key for begins_with to apply. Both are decisions for this slice's plan.
 - core/api.py: the domain types, IncidentStore, its provider, find_incident_for_conversation and the security flag read served by the store, and conversation_is_writable. core/adapters/legacy_incidents.py and the separate IncidentLookup and IncidentSecurityReader Protocols are deleted once the store answers both.
 - No legacy module change; the legacy_surface suite is unchanged.
 <!-- SECTION:DESCRIPTION:END -->
@@ -89,3 +90,12 @@ Read-only over the existing table; no new consumer except the existing lookup ca
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-13 re-plan before pickup: IncidentStore is built over RecordStore (the records contract: TASK-27.4, TASK-27.1, TASK-108), not an interim adapter over get_aws_client; the plan's step 4 and AC #5 are rewritten at re-plan. The incident record also carries the postmortem facts that TASK-147.2 builds on.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-13 18:00
+---
+2026-10-13 (TASK-27.1 implemented): the plan still builds DynamoDbIncidentStore over get_aws_client with a channel_id scan (steps 3, 4, 6 and the Stubber tests); the re-plan already recorded in notes should target RecordStore with a module-level RecordTable for incidents, RecordQuery reads, InMemoryRecordStore-backed fake tests, and decide find-by-conversation (GSI declared in RecordTable.indexes vs TASK-27.2 bounded list).
+---
+<!-- COMMENTS:END -->

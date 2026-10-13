@@ -6,7 +6,8 @@ type conversion via boto3's built-in ``TypeSerializer`` / ``TypeDeserializer``.
 
 Feature packages MUST NOT call boto3 clients directly. Instead, define a thin
 repository class that takes ``infrastructure.records.protocol.RecordStore``
-as a constructor argument and delegates all DynamoDB I/O here.
+as a constructor argument, declares its ``RecordTable`` once, and delegates
+all DynamoDB I/O here.
 """
 
 from functools import cache
@@ -18,7 +19,16 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
-from infrastructure.records.protocol import RecordStore
+from infrastructure.records.protocol import (
+    KeySchema,
+    RecordQuery,
+    RecordStore,
+    RecordTable,
+    SortCondition,
+    SortOperator,
+    SortOrder,
+    resolve_query_key,
+)
 from integrations.aws.client import classify_aws_error, get_aws_client
 
 if TYPE_CHECKING:
@@ -46,6 +56,28 @@ def _deserialize_item(item: dict[str, Any]) -> dict[str, Any]:
     Callers that expect ``int``/``float`` should cast as needed.
     """
     return {k: _deserializer.deserialize(v) for k, v in item.items()}
+
+
+def _key_condition(key: KeySchema, spec: RecordQuery) -> tuple[str, dict[str, str], dict[str, Any]]:
+    """Build the key condition, attribute names and serialized values for a query."""
+    names = {"#pk": key.partition}
+    values: dict[str, Any] = {":pk": _serializer.serialize(spec.partition)}
+    expression = "#pk = :pk"
+    if spec.sort is not None and key.sort is not None:
+        names["#sk"] = key.sort
+        values[":sk"] = _serializer.serialize(spec.sort.value)
+        expression += f" AND {_sort_expression(spec.sort)}"
+    return expression, names, values
+
+
+def _sort_expression(condition: SortCondition) -> str:
+    match condition.operator:
+        case SortOperator.EQ:
+            return "#sk = :sk"
+        case SortOperator.LT:
+            return "#sk < :sk"
+        case SortOperator.BEGINS_WITH:
+            return "begins_with(#sk, :sk)"
 
 
 class DynamoDBRecordStore:
@@ -81,13 +113,13 @@ class DynamoDBRecordStore:
 
     def put(
         self,
-        table: str,
+        table: RecordTable,
         item: dict[str, Any],
     ) -> OperationResult:
         """Write (or overwrite) an item.
 
         Args:
-            table: DynamoDB table name.
+            table: Table declaration.
             item: Plain Python dict.  Keys must include the table's primary key.
 
         Returns:
@@ -96,16 +128,16 @@ class DynamoDBRecordStore:
         serialized = _serialize_item(item)
         result: OperationResult[Any]
         try:
-            self._dynamodb.put_item(TableName=table, Item=serialized)
+            self._dynamodb.put_item(TableName=table.name, Item=serialized)
             result = OperationResult.success(data=None)
         except (ClientError, BotoCoreError) as exc:
             result = self._map_sdk_exception(exc)
         if result.is_success:
-            logger.debug("records_put_ok", table=table)
+            logger.debug("records_put_ok", table=table.name)
         else:
             logger.error(
                 "records_put_error",
-                table=table,
+                table=table.name,
                 error=result.message,
                 error_code=result.error_code,
             )
@@ -113,9 +145,8 @@ class DynamoDBRecordStore:
 
     def put_if_not_exists(
         self,
-        table: str,
+        table: RecordTable,
         item: dict[str, Any],
-        pk_attribute: str,
     ) -> OperationResult:
         """Write an item only if no item with the same primary key exists.
 
@@ -124,10 +155,10 @@ class DynamoDBRecordStore:
         ``OperationResult.success(data=False)`` if it already existed.
 
         Args:
-            table: DynamoDB table name.
+            table: Table declaration; its partition attribute drives the
+                ``attribute_not_exists`` condition, which DynamoDB evaluates
+                against the item with the same full primary key.
             item: Plain Python dict.
-            pk_attribute: Name of the partition key attribute (used in
-                ``attribute_not_exists`` condition).
 
         Returns:
             ``OperationResult[bool]``
@@ -136,22 +167,23 @@ class DynamoDBRecordStore:
         result: OperationResult[Any]
         try:
             self._dynamodb.put_item(
-                TableName=table,
+                TableName=table.name,
                 Item=serialized,
-                ConditionExpression=f"attribute_not_exists({pk_attribute})",
+                ConditionExpression="attribute_not_exists(#pk)",
+                ExpressionAttributeNames={"#pk": table.key.partition},
             )
             result = OperationResult.success(data=None)
         except (ClientError, BotoCoreError) as exc:
             result = self._map_sdk_exception(exc)
         if result.is_success:
-            logger.debug("records_put_if_not_exists_created", table=table)
+            logger.debug("records_put_if_not_exists_created", table=table.name)
             return OperationResult.success(data=True, message="Item created")
         if result.error_code == "ConditionalCheckFailedException":
-            logger.debug("records_put_if_not_exists_already_exists", table=table)
+            logger.debug("records_put_if_not_exists_already_exists", table=table.name)
             return OperationResult.success(data=False, message="Item already exists")
         logger.error(
             "records_put_if_not_exists_error",
-            table=table,
+            table=table.name,
             error=result.message,
             error_code=result.error_code,
         )
@@ -159,13 +191,13 @@ class DynamoDBRecordStore:
 
     def delete(
         self,
-        table: str,
+        table: RecordTable,
         key: dict[str, Any],
     ) -> OperationResult:
         """Delete an item by primary key.
 
         Args:
-            table: DynamoDB table name.
+            table: Table declaration.
             key: Plain Python dict identifying the item (partition + sort key).
 
         Returns:
@@ -174,16 +206,16 @@ class DynamoDBRecordStore:
         serialized_key = _serialize_item(key)
         result: OperationResult[Any]
         try:
-            self._dynamodb.delete_item(TableName=table, Key=serialized_key)
+            self._dynamodb.delete_item(TableName=table.name, Key=serialized_key)
             result = OperationResult.success(data=None)
         except (ClientError, BotoCoreError) as exc:
             result = self._map_sdk_exception(exc)
         if result.is_success:
-            logger.debug("records_delete_ok", table=table)
+            logger.debug("records_delete_ok", table=table.name)
         else:
             logger.error(
                 "records_delete_error",
-                table=table,
+                table=table.name,
                 error=result.message,
                 error_code=result.error_code,
             )
@@ -195,13 +227,13 @@ class DynamoDBRecordStore:
 
     def get(
         self,
-        table: str,
+        table: RecordTable,
         key: dict[str, Any],
     ) -> OperationResult:
         """Get a single item by primary key.
 
         Args:
-            table: DynamoDB table name.
+            table: Table declaration.
             key: Plain Python dict with the item's primary key attributes.
 
         Returns:
@@ -210,14 +242,14 @@ class DynamoDBRecordStore:
         """
         serialized_key = _serialize_item(key)
         try:
-            response = self._dynamodb.get_item(TableName=table, Key=serialized_key)
+            response = self._dynamodb.get_item(TableName=table.name, Key=serialized_key)
             result: OperationResult[Any] = OperationResult.success(data=response)
         except (ClientError, BotoCoreError) as exc:
             result = self._map_sdk_exception(exc)
         if not result.is_success:
             logger.error(
                 "records_get_error",
-                table=table,
+                table=table.name,
                 error=result.message,
                 error_code=result.error_code,
             )
@@ -226,43 +258,43 @@ class DynamoDBRecordStore:
         if raw_item is None:
             return OperationResult.error(
                 OperationStatus.NOT_FOUND,
-                message=f"Item not found in {table}",
+                message=f"Item not found in {table.name}",
             )
         return OperationResult.success(data=_deserialize_item(raw_item))
 
     def query(
         self,
-        table: str,
-        key_condition: str,
-        expression_values: dict[str, Any],
-        **kwargs: Any,
+        table: RecordTable,
+        spec: RecordQuery,
     ) -> OperationResult:
-        """Query items using a key condition.
+        """Query items matching a key condition.
 
-        Automatically paginates and returns all matching items.
+        Follows DynamoDB's continuation keys until every match is read or
+        ``spec.limit`` items are collected.
 
         Args:
-            table: DynamoDB table name.
-            key_condition: DynamoDB ``KeyConditionExpression`` string
-                (e.g. ``"pk = :id AND sk > :ts"``).
-            expression_values: Placeholder → Python value mapping
-                (e.g. ``{":id": "eng@example.com", ":ts": "2026-01-01T00:00:00"}``).
-                Values are serialized automatically — do NOT pre-format as
-                DynamoDB type dicts.
-            **kwargs: Additional DynamoDB query parameters passed through
-                verbatim (``IndexName``, ``Limit``, ``ScanIndexForward``,
-                ``FilterExpression``, ``ExpressionAttributeNames``, etc.).
+            table: Table declaration; ``spec.index`` resolves through its indexes.
+            spec: Partition value, optional sort condition, index, limit and order.
 
         Returns:
             ``OperationResult[list[dict]]`` with deserialized items, or error.
+
+        Raises:
+            ValueError: ``spec`` does not fit the table's declared key layout.
         """
-        serialized_values = {k: _serializer.serialize(v) for k, v in expression_values.items()}
+        key = resolve_query_key(table, spec)
+        expression, names, values = _key_condition(key, spec)
         query_args: dict[str, Any] = {
-            "TableName": table,
-            "KeyConditionExpression": key_condition,
-            "ExpressionAttributeValues": serialized_values,
-            **kwargs,
+            "TableName": table.name,
+            "KeyConditionExpression": expression,
+            "ExpressionAttributeNames": names,
+            "ExpressionAttributeValues": values,
+            "ScanIndexForward": spec.order is SortOrder.ASC,
         }
+        if spec.index is not None:
+            query_args["IndexName"] = table.indexes[spec.index].physical_name
+        if spec.limit is not None:
+            query_args["PaginationConfig"] = {"MaxItems": spec.limit, "PageSize": spec.limit}
         try:
             paginator = self._dynamodb.get_paginator("query")
             raw_items: list[dict[str, Any]] = []
@@ -270,13 +302,13 @@ class DynamoDBRecordStore:
                 page_items = page.get("Items", [])
                 if isinstance(page_items, list):
                     raw_items.extend(page_items)
-            result = OperationResult.success(data=raw_items)
+            result = OperationResult.success(data=raw_items[: spec.limit])
         except (ClientError, BotoCoreError) as exc:
             result = self._map_sdk_exception(exc)
         if not result.is_success:
             logger.error(
                 "records_query_error",
-                table=table,
+                table=table.name,
                 error=result.message,
                 error_code=result.error_code,
             )

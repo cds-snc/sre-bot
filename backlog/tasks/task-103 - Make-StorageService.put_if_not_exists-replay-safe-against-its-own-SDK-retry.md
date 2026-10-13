@@ -4,7 +4,7 @@ title: Make RecordStore.put_if_not_exists replay-safe against its own SDK retry
 status: To Do
 assignee: []
 created_date: '2026-09-17 20:40'
-updated_date: '2026-10-13 13:39'
+updated_date: '2026-10-13 18:00'
 labels:
   - infrastructure
   - reliability
@@ -29,7 +29,9 @@ TASK-25.2.5's implementation notes park this hazard: put_if_not_exists in infras
 
 THE HAZARD, identical in shape to the one TASK-25.2.5.4 fixes for the idempotency claim: put_if_not_exists issues a conditional PutItem on a retrying client. If the first attempt lands but its response is lost, botocore resends the identical serialized body, the condition now fails, and the caller is told the key already existed when in fact it had just created it.
 
-STILL TRUE AS OF 2026-09-17: no production caller. That is why this is filed rather than fixed. It becomes live the moment a caller appears - TASK-37.1's WebhookStore and TASK-83.2's multi-item conditional write are the nearest candidates - so the fix should land with the first real consumer, not speculatively (decisions/layers.md: Path A capabilities are not built ahead of a consumer).
+STILL TRUE AS OF 2026-09-17: no production caller. That is why this is filed rather than fixed. It becomes live the moment a caller appears - TASK-37.1's WebhookStore and TASK-83.2's multi-item conditional write are the nearest candidates - so the fix should land with the first real consumer, not speculatively (decisions/plugin-architecture.md: Path A capabilities are not built ahead of a consumer).
+
+SIGNATURE (TASK-27.1): put_if_not_exists(table, item) no longer takes pk_attribute; the condition is derived from table.key and guards the full key (partition and sort), in DynamoDBRecordStore and InMemoryRecordStore alike. The re-read on a failed condition therefore uses get(table, key) with that full key.
 
 FIX SHAPE: whatever TASK-25.2.5.4 settles on for the idempotency claim, applied here - an opaque per-call owner token written into the item and compared on the re-read. Portability was reviewed 2026-09-17 and the pattern carries to Redis, Postgres and Cosmos unchanged. Read that task's implementation before re-deriving anything.
 <!-- SECTION:DESCRIPTION:END -->
