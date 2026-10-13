@@ -4,7 +4,7 @@ title: 'Webhooks slice 1: Webhook domain model + RecordStore-backed store'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:39'
-updated_date: '2026-10-13 18:59'
+updated_date: '2026-10-13 19:59'
 labels:
   - migration
   - webhooks
@@ -14,6 +14,7 @@ dependencies:
   - TASK-7
   - TASK-36.2
   - TASK-27.2
+  - TASK-27.5
   - TASK-108
   - TASK-109
   - TASK-114
@@ -70,5 +71,10 @@ author: @claude
 created: 2026-09-16 13:59
 ---
 2026-09-16: dependency retargeted from TASK-27 to TASK-27.2 now that TASK-27 is decomposed. TASK-27.2 is the slice that adds the atomic update, the atomic numeric increment and the bounded full-table list this store needs, and it is scoped to land with this task as its first consumer - merge it immediately before this slice, or in the same PR if the size gate allows. TASK-27.1 (the typed key-condition read) is a prerequisite of TASK-27.2 and so is transitively required.
+---
+
+created: 2026-10-13 19:59
+---
+2026-10-13 records/incidents layout decision: TASK-27.2 narrowed to the update operation: counters use update with an increment change (missing counter counts as 0; not idempotent under SDK retry, acceptable for counters), the item must exist so create writes the zeroed counters. list_all and lookup use the full-table read shaped by TASK-27.5 (dependency added), not a bounded list from TASK-27.2. Plan refresh needed when this is picked up.
 ---
 <!-- COMMENTS:END -->

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-13 16:07'
+updated_date: '2026-10-13 19:59'
 labels:
   - incident
   - features
@@ -82,3 +82,12 @@ The nudge job and the reactions are low-traffic; the aws_platform deletion is th
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-13 re-ground: with the TASK-147 postmortem-records flag off, capture and removal behave exactly as today, including the report's timeline section and who may react. The timeline records are written regardless of the flag, but nothing user-facing reads them until it is on. The capture-permission rule is decided by TASK-147.1 and announced by TASK-147.8; this slice does not change it.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-13 19:59
+---
+2026-10-13 records/incidents layout decision: the timeline table (partition incident_id, sort 'ts#entry_id') is declared with its Terraform by TASK-145.5, which owns the store layout; this task writes and deletes entries through IncidentStore. Stale-channel detection queries the sparse open index (open_bucket = OPEN, sort opened_at) instead of scanning; a closed incident drops out of the index. Plan refresh needed when this is picked up.
+---
+<!-- COMMENTS:END -->

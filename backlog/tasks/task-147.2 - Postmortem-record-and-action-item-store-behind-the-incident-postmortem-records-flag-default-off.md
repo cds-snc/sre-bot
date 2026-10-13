@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-13 14:00'
+updated_date: '2026-10-13 19:59'
 labels:
   - incident
   - features
@@ -30,3 +31,12 @@ postmortem/ gains its domain (Postmortem with facts, the action items and the na
 - [ ] #2 The postmortem store runs over RecordStore with an in-memory fake exercising the same cases
 - [ ] #3 The postmortem-records flag exists in the incident settings, default off, and gates every surface added by TASK-147
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-13 19:59
+---
+2026-10-13 records/incidents layout decision: action items are their own records keyed (incident_id, item_id) with a sparse GSI due (partition due_bucket, sort due_at), set only while an item is open and removed when it is done, declared as RecordTable.indexes. Edits and assignment use RecordStore.update set changes (TASK-27.2). Terraform for the table and index belongs to this task. Queried with RecordQuery(index='due') and a lt sort condition.
+---
+<!-- COMMENTS:END -->

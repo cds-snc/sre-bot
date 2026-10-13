@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:58'
-updated_date: '2026-10-13 17:59'
+updated_date: '2026-10-13 19:59'
 labels:
   - plugin-architecture
   - contracts
@@ -44,3 +44,12 @@ Mechanical, a pure move of app/infrastructure/records/protocol.py: the RecordSto
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-07 (TASK-140.4): packages.incident.core.adapters.status_updates is a second interim direct-boto3 store (after TASK-140.3's legacy lookup) waiting on this Protocol; its migration is tracked on TASK-38.1. It needs conditional put with ReturnValuesOnConditionCheckFailure=ALL_OLD semantics and a descending, limited key query from the vendor-neutral surface.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-13 19:59
+---
+2026-10-13 records/incidents layout decision: TASK-27.2 adds the change-set types (frozen dataclasses) and the shared update validation helper to protocol.py before this move; it stays a pure move with no signature change, and the new types move with the rest. No vendor expression in the contract.
+---
+<!-- COMMENTS:END -->

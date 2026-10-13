@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-10-13 18:59'
+updated_date: '2026-10-13 19:59'
 labels:
   - infrastructure
   - phase-4
@@ -107,5 +107,10 @@ created: 2026-09-24 20:09
 created: 2026-10-13 17:59
 ---
 2026-10-13 (TASK-27.1 implemented): the coordinator plan needs a refresh by its owner. It cites decisions/layers.md (now decisions/plugin-architecture.md), names TASK-38 as a TASK-27.2 consumer and owner of the list-append question (replaced by TASK-145; TASK-145.8 is a candidate first consumer per TASK-27.2 notes), and gives TASK-27.3 the directory/audit fakes and a records factory.py that were moved to TASK-119/TASK-122 or dropped in the 2026-09-24 rescope.
+---
+
+created: 2026-10-13 19:59
+---
+2026-10-13 records/incidents layout decision: slice list: 27.4 rename (done), 27.1 key-condition read (done), 27.2 atomic change-set update with an expected guard (set, remove, increment), 27.3 fakes and CI fake-coverage check, 27.5 bounded or paginated full-table read shaped with its first consumer. AC2 wording: read 'atomic single-attribute update, numeric increment and bounded list' as the single update operation (27.2) plus the full-table read (27.5).
 ---
 <!-- COMMENTS:END -->

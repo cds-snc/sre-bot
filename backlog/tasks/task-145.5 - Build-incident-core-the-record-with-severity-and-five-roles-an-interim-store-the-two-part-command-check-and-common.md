@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-13 18:59'
+updated_date: '2026-10-13 19:59'
 labels:
   - incident
   - features
@@ -102,5 +102,10 @@ created: 2026-10-13 18:00
 created: 2026-10-13 18:59
 ---
 2026-10-13: supersedes the earlier comment's 'module-level RecordTable': after the TASK-27.1 review, table names come from the owning package's settings with the provisioned table as default (see access request/sync stores and infrastructure/audit/settings.py). This also applies to the status-updates and legacy incidents adapters' hardcoded table names when they move onto RecordStore.
+---
+
+created: 2026-10-13 19:59
+---
+2026-10-13 records/incidents layout decision: incidents table keeps partition key id and gains two GSIs declared as RecordTable.indexes: by_channel (partition channel_id) for find_by_conversation, and a sparse open index (partition open_bucket, constant OPEN; sort opened_at) set only while an incident is open and removed on close. Never a GSI on status. find_by_conversation queries by_channel with RecordQuery(index=...) and handles zero, one or several results (index reads may be eventually consistent and are not unique); no bounded-list fallback. This task owns Terraform for the GSIs and for a new timeline table keyed (incident_id, 'ts#entry_id'), declared as its RecordTable with the store (the description already puts append of a timeline entry in IncidentStore); TASK-145.9 wires the writes. It also owns a one-shot backfill of open_bucket and opened_at for existing open incidents (idempotent, dry run first). Index queries need no Protocol change (TASK-27.1). A plan refresh is needed to fold this in; AC5 (write operations absent) still holds for update, which arrives with TASK-27.2 and TASK-145.8.
 ---
 <!-- COMMENTS:END -->
