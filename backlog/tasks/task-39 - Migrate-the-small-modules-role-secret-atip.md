@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-28 14:36'
+updated_date: '2026-10-13 13:44'
 labels:
   - migration
   - phase-5
@@ -44,7 +44,7 @@ Per module:
 3. Cut over: remove the module from _register_legacy_handlers(), delete app/modules/<name>/, keep smoke green before and after.
 
 Targets:
-- role -> features/talent/ (moved there first by TASK-124.4). decisions/workplace-systems.md makes talent-role records a record of truth in app storage, not a Google Sheet or Doc, so the rebuilt role surface stores its records through the storage contract. Any surviving sheet or doc is a collaboration space or a write-only projection.
+- role -> features/talent/ (moved there first by TASK-124.4). decisions/workplace-systems.md makes talent-role records a record of truth owned by the app, not a Google Sheet or Doc, so the rebuilt role surface stores its records through the records contract. Any surviving sheet or doc is a collaboration space or a write-only projection.
 - secret -> features/secret/.
 - atip -> features/atip/. Its Trello card operations arrive in its adapters/ from TASK-25.9.
 <!-- SECTION:DESCRIPTION:END -->
@@ -55,7 +55,7 @@ Targets:
 - [ ] #2 Smoke tests pass pre/post for each module independently
 - [ ] #3 Baselines only shrank
 - [ ] #4 features/talent/adapters/google_drive.py returns frozen domain dataclasses instead of {id, name} dicts (decisions/sdk-typing.md item 3)
-- [ ] #5 Talent-role records are stored through the storage contract; no Google Sheet or Doc is read back as their record of truth (decisions/workplace-systems.md rule 5)
+- [ ] #5 Talent-role records are stored through the records contract; no Google Sheet or Doc is read back as their record of truth (decisions/workplace-systems.md rule 5)
 - [ ] #6 No python-i18n import remains in the rebuilt surfaces, and their app/infrastructure/configuration/features/ slices are deleted
 <!-- AC:END -->
 

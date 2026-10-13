@@ -1,18 +1,19 @@
 ---
 id: TASK-145.5
 title: >-
-  Build incident/core: the record with severity and five roles, an interim
-  store, the two-part command check and common/
+  Build incident/core: the record with severity and five roles, its store over
+  the records contract, the two-part command check and common/
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 18:23'
+updated_date: '2026-10-13 14:05'
 labels:
   - incident
   - features
   - slack
 dependencies:
   - TASK-145.1
+  - TASK-108
 parent_task_id: TASK-145
 priority: medium
 type: task
@@ -27,7 +28,7 @@ Layer B1 of TASK-145. Builds the record and its store in features/incident/core 
 THIS SLICE
 - core/domain.py: Incident (title, product, severity, security flag, declarer, status, declared, detection, impact start, impact end, the five roles as person references: incident commander, operations lead, communications lead, policy lead, postmortem owner), the typed references (conversation, report, video call, postmortem meeting, external case, source alert) each carrying system, tenant and vendor id plus the vendor link, TimelineEntry as its own record. Frozen dataclasses. The existing IncidentSecurityFlag stays and becomes a field of the record.
 - common/vocabulary.py: IncidentStatus (Open, In Progress, Ready to be Reviewed, Reviewed, Closed), Severity (levels 0 to 3; confirm the scale before merging), the role names, StatusUpdateStage moved from core/domain.py, and the action ids one subdomain renders and another handles. common/settings.py: the incident settings tree (response, comms, postmortem slices; the new-incident system policy setting defaulting to the only configured tenant). No I/O in common/.
-- core/store.py: IncidentStore (create, get, find by conversation reference, update one field atomically, list for a window, append a timeline entry as its own record) and an interim adapter in core/adapters/ over the existing DynamoDB incidents table that reads today's items and maps bare ids to references for the configured tenant; an in-memory fake. No read-modify-write and no list-append. TASK-108 and TASK-109 later swap the inside.
+- core/store.py: IncidentStore (create, get, find by conversation reference, update one field atomically, list for a window, append a timeline entry as its own record) and its implementation in core/store.py over RecordStore (the records contract), reading today's incidents-table items and mapping bare ids to references for the configured tenant; an in-memory fake. No vendor adapter, no read-modify-write and no list-append.
 - core/api.py: the domain types, IncidentStore, its provider, find_incident_for_conversation and the security flag read served by the store, and conversation_is_writable. core/adapters/legacy_incidents.py and the separate IncidentLookup and IncidentSecurityReader Protocols are deleted once the store answers both.
 - No legacy module change; the legacy_surface suite is unchanged.
 <!-- SECTION:DESCRIPTION:END -->
@@ -38,7 +39,7 @@ THIS SLICE
 - [ ] #2 common/vocabulary.py defines IncidentStatus, Severity and the role names; common/ imports no adapter, store or provider module
 - [ ] #3 find_incident_for_conversation resolves through IncidentStore and core/adapters/legacy_incidents.py is deleted
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #5 IncidentStore has an interim DynamoDB adapter reading the existing items (get, find by conversation, list, security flag) and an in-memory fake with the same cases; write operations are absent and listed for the slices that add them
+- [ ] #5 IncidentStore is implemented over RecordStore, reading the existing items (get, find by conversation, list, security flag), with an in-memory fake covering the same cases; no module in core/ imports an AWS client; write operations are absent and listed for the slices that add them
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -82,3 +83,9 @@ domain +130, vocabulary +45, settings +25, store +45, adapter +170, fake +60, ap
 ## Blast radius and rollback
 Read-only over the existing table; no new consumer except the existing lookup callers, which keep their contract. Single `git revert`.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-13 re-plan before pickup: IncidentStore is built over RecordStore (the records contract: TASK-27.4, TASK-27.1, TASK-108), not an interim adapter over get_aws_client; the plan's step 4 and AC #5 are rewritten at re-plan. The incident record also carries the postmortem facts that TASK-147.2 builds on.
+<!-- SECTION:NOTES:END -->

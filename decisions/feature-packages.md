@@ -34,7 +34,7 @@ app/features/<feature>/
 ├── service.py         # business logic; the only orchestrator
 ├── domain.py          # frozen dataclasses, enums, invariants (optional)
 ├── schemas.py         # Pydantic models at trust boundaries (optional)
-├── store.py           # persistence through the storage contract (optional)
+├── store.py           # persistence through the records contract (optional)
 ├── providers.py       # local wiring: builds services from registry-provided contracts (optional)
 ├── adapters/          # Path B adapters: the ONLY files importing app.integrations
 ├── entrypoints/       # inbound handlers: slack.py, teams.py, http.py for the package's API
@@ -129,3 +129,4 @@ Tolerated until then:
 - 2026-10-02: `incident_draft` and `incident_summary` are now the `scribe` subdomain of `packages/incident/`, reading the transcript through `core/` (TASK-135); Context and the tolerated list no longer name them as separate packages.
 - 2026-10-09: `incident/scribe` Slack handlers merged into `entrypoints/` (TASK-144.1); Context no longer lists it among the packages with `platforms/`.
 - 2026-10-09: rule 2 becomes the purpose test (audience or outcome, the domain's word, never a mechanism); TASK-135 had merged two packages by mechanism and this rule would have caught it (TASK-145).
+- 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).

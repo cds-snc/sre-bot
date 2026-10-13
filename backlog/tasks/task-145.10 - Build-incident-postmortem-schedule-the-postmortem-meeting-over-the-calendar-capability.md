@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 18:22'
+updated_date: '2026-10-13 14:01'
 labels:
   - incident
   - features
@@ -73,3 +73,9 @@ About 300 production lines. Under the gate.
 ## Blast radius and rollback
 One modal flow; revert restores the legacy registration.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-13 re-ground: postmortem/ is shared with TASK-147 (postmortem as records: action items, narrative document, built dark behind a flag); this slice keeps scheduling only and adds nothing gated by that flag.
+<!-- SECTION:NOTES:END -->

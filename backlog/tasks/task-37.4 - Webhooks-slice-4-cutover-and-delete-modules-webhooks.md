@@ -4,7 +4,7 @@ title: 'Webhooks slice 4: cutover and delete modules/webhooks'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:40'
-updated_date: '2026-09-24 20:03'
+updated_date: '2026-10-13 13:42'
 labels:
   - migration
   - webhooks
@@ -28,7 +28,7 @@ ordinal: 99000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Rescoped 2026-09-24: webhooks is a capability at app/capabilities/webhooks/ (decisions/webhooks.md, decisions/plugin-architecture.md), not a feature package. It reaches storage, coordination, the queue and the Slack reply surface only through contracts resolved from the service registry, and imports no infrastructure/ or server/ module, so no slice adds an import-linter ignore entry. There is no in-process event bus: features react through the capability's extension point.
+Rescoped 2026-09-24: webhooks is a capability at app/capabilities/webhooks/ (decisions/webhooks.md, decisions/plugin-architecture.md), not a feature package. It reaches records, coordination, the queue and the Slack reply surface only through contracts resolved from the service registry, and imports no infrastructure/ or server/ module, so no slice adds an import-linter ignore entry. There is no in-process event bus: features react through the capability's extension point.
 
 Slice 4 of the webhooks rearchitecture (decisions/webhooks.md; coordinator TASK-37). The strangler cut: the new package serves the routes and the legacy module is deleted. No zombie halves (decisions/migration.md).
 

@@ -37,7 +37,7 @@ app/capabilities/webhooks/
 ├── verification.py    # tiered authenticity (SNS signature | HMAC | hardened secret-URL) per security.md
 ├── router.py          # source → typed parser → intent (declarative table; no runtime import strings)
 ├── dispatch.py        # intent → transport render OR registered handler OR durable enqueue
-├── store.py           # persistence via StorageService Protocol (frozen model in/out)
+├── store.py           # persistence via the RecordStore Protocol (frozen model in/out)
 ├── settings.py        # partitioned WebhookSettings (body cap, default rate, tier flags)
 ├── providers.py       # capability-local DI wiring
 ├── entrypoints/
@@ -66,7 +66,7 @@ The set of supported sources and their parsers is a **declarative table** in `ro
 
 ### Lifecycle — secure by default
 
-`service.py` owns webhook CRUD over the `Webhook` frozen domain model behind the storage contract ([plugin-architecture.md](plugin-architecture.md)); no code above the store handles raw DynamoDB item shapes. The admin surface (the `/sre` slash-command in `entrypoints/slack.py`, and/or authenticated HTTP admin routes) calls the service, never the store or the vendor client directly. Authenticity tiers, secret issuance, rotation/revocation, and per-`webhook_id` rate limits are governed by [security.md](security.md) §Webhooks (secure-by-default HMAC issuance; the hardened secret-URL tier is a tracked, time-boxed exception). Webhook configuration — body-size cap, default and per-webhook rate ceilings, tier flags — lives in a **partitioned `WebhookSettings`** owned by the capability ([configuration.md](configuration.md)), never in a central settings aggregator. Invocation/acknowledgement counters are an idempotent metric update or structured observability, never a read-modify-write race.
+`service.py` owns webhook CRUD over the `Webhook` frozen domain model behind the records contract ([plugin-architecture.md](plugin-architecture.md)); no code above the store handles raw DynamoDB item shapes. The admin surface (the `/sre` slash-command in `entrypoints/slack.py`, and/or authenticated HTTP admin routes) calls the service, never the store or the vendor client directly. Authenticity tiers, secret issuance, rotation/revocation, and per-`webhook_id` rate limits are governed by [security.md](security.md) §Webhooks (secure-by-default HMAC issuance; the hardened secret-URL tier is a tracked, time-boxed exception). Webhook configuration — body-size cap, default and per-webhook rate ceilings, tier flags — lives in a **partitioned `WebhookSettings`** owned by the capability ([configuration.md](configuration.md)), never in a central settings aggregator. Invocation/acknowledgement counters are an idempotent metric update or structured observability, never a read-modify-write race.
 
 ## Consequences
 
@@ -96,3 +96,4 @@ Tolerated until the slices close: the legacy `modules/webhooks` guessers, walk r
 
 **Changes:**
 - 2026-09-24: Migration names epic tickets only, and the pipeline is a capability whose extension point replaces domain events; handler folder renamed `entrypoints/`.
+- 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).

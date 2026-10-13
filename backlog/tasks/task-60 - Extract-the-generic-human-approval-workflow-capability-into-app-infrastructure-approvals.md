@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-28 14:33'
-updated_date: '2026-09-24 20:07'
+updated_date: '2026-10-13 13:42'
 labels:
   - infrastructure
   - phase-4
@@ -33,12 +33,12 @@ ordinal: 90000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-ON HOLD, rescoped 2026-09-24 (decisions/plugin-architecture.md Migration: 'hold TASK-60 and rescope it to capabilities/approvals/'). The approval engine is a capability at app/capabilities/approvals/, not app/infrastructure/approvals/. It is a domain-agnostic engine that features extend, not hosting code (decisions/approvals.md). The hold is encoded as dependencies: contracts (TASK-106), the storage contract (TASK-108), the service registry (TASK-109), entry-point loading (TASK-110), the extension-point phase (TASK-113, which lands in this series as its first consumer), the package generator (TASK-114), the coordination contract (TASK-58) and the storage redesign (TASK-27).
+ON HOLD, rescoped 2026-09-24 (decisions/plugin-architecture.md Migration: 'hold TASK-60 and rescope it to capabilities/approvals/'). The approval engine is a capability at app/capabilities/approvals/, not app/infrastructure/approvals/. It is a domain-agnostic engine that features extend, not hosting code (decisions/approvals.md). The hold is encoded as dependencies: contracts (TASK-106), the records contract (TASK-108), the service registry (TASK-109), entry-point loading (TASK-110), the extension-point phase (TASK-113, which lands in this series as its first consumer), the package generator (TASK-114), the coordination contract (TASK-58) and the records redesign (TASK-27).
 
 Target shape (decisions/approvals.md):
 - api.py exposes start, submit_decision, get_state and cancel, plus their domain types; everything else is private.
 - hookspecs.py is the extension point. Each workflow type registers one ApprovalPolicy (pure, deterministic, no I/O) and one EffectHandler (idempotent, keyed by request id), collected once at startup.
-- The engine persists through the storage contract resolved from the registry and never imports infrastructure. Once-only transitions go through the coordination contract. Cross-package continuation arrives over the queue contract (TASK-34), never an in-process event.
+- The engine persists through the records contract resolved from the registry and never imports infrastructure. Once-only transitions go through the coordination contract. Cross-package continuation arrives over the queue contract (TASK-34), never an in-process event.
 
 The original description follows for context; where it names app/infrastructure/approvals/ or an ApprovalWorkflowService provider import, the target above wins.
 
@@ -46,7 +46,7 @@ Aligns with decisions/approvals.md. Extract the domain-agnostic human-approval w
 
 Desired end state:
 1. app/infrastructure/approvals/ owns the generic engine: the state machine (pending_approval -> approved -> completed, plus rejected / cancelled / expired / failed and failed -> retry), N-of-M approval thresholds, separation-of-duties enforcement, immutable audit trail, and TTL/expiry.
-2. ApprovalWorkflowService Protocol is capability-shaped (submit / approve / reject / cancel / advance / query), with an in-memory fake exercised by the test suite and a DynamoDB-backed implementation via StorageService (TASK-27).
+2. ApprovalWorkflowService Protocol is capability-shaped (submit / approve / reject / cancel / advance / query), with an in-memory fake exercised by the test suite and a DynamoDB-backed implementation via RecordStore (TASK-27).
 3. Automatic once-only transitions ride the conditional-write / ConditionalWriteStore primitive (TASK-58) so parallel replicas (desired_count=2) never double-advance.
 4. Cross-package effect steps are handed off over the outbox / QueueService (TASK-34), never executed inline.
 5. Features inject their own ApprovalPolicy (who must approve, thresholds, SoD) and EffectHandler (what to do once approved) strategies; the engine holds no domain logic.
@@ -58,7 +58,7 @@ Behavior-preserving for the existing access-request flow. The task-planner agent
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 app/capabilities/approvals/ owns the generic engine (state machine, N-of-M thresholds, separation of duties, per-transition audit, expiry) with no access-specific logic; its README states the classification and feature consumers
-- [ ] #2 api.py exposes start, submit_decision, get_state and cancel with their domain types; an in-memory fake of the approval store is exercised by tests, and the store persists through the storage contract resolved from the registry
+- [ ] #2 api.py exposes start, submit_decision, get_state and cancel with their domain types; an in-memory fake of the approval store is exercised by tests, and the store persists through the records contract resolved from the registry
 - [ ] #3 Once-only automatic transitions use the coordination contract (ConditionalWriteStore), so parallel replicas never double-advance (test: two concurrent threshold-meeting approvals produce one effect)
 - [ ] #4 Cross-package effect continuations are handed off over the queue contract, never executed inline and never through an in-process event
 - [ ] #5 Features register ApprovalPolicy and EffectHandler strategies through app/capabilities/approvals/hookspecs.py, collected once at startup; a boot test fails when a workflow type lacks either

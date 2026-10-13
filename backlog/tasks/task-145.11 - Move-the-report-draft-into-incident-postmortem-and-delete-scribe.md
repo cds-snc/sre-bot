@@ -4,7 +4,7 @@ title: Move the report draft into incident/postmortem and delete scribe
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 18:22'
+updated_date: '2026-10-13 14:01'
 labels:
   - incident
   - features
@@ -69,3 +69,9 @@ A move of about 1,000 lines with no new code; pyproject and README edits.
 ## Blast radius and rollback
 A missed import breaks the draft command at boot; the lifespan test catches it. Single `git revert`.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-13 re-ground: the draft move keeps today's behaviour (fills the report document). Under the TASK-147 flag the draft writes proposals to the record instead (TASK-147.7), so the moved draft keeps its fill step behind a seam that slice can redirect.
+<!-- SECTION:NOTES:END -->

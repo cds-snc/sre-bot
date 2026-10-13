@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-28 14:36'
+updated_date: '2026-10-13 13:41'
 labels:
   - migration
   - webhooks
@@ -28,16 +28,16 @@ ordinal: 37000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Rescoped 2026-09-24: webhooks is a capability at app/capabilities/webhooks/ (decisions/webhooks.md, decisions/plugin-architecture.md), not a feature package. It reaches storage, coordination, the queue and the Slack reply surface only through contracts resolved from the service registry, and imports no infrastructure/ or server/ module, so no slice adds an import-linter ignore entry. There is no in-process event bus: features react through the capability's extension point.
+Rescoped 2026-09-24: webhooks is a capability at app/capabilities/webhooks/ (decisions/webhooks.md, decisions/plugin-architecture.md), not a feature package. It reaches records, coordination, the queue and the Slack reply surface only through contracts resolved from the service registry, and imports no infrastructure/ or server/ module, so no slice adds an import-linter ignore entry. There is no in-process event bus: features react through the capability's extension point.
 
 Rearchitect app/modules/webhooks into the app/capabilities/webhooks capability per decisions/webhooks.md. This is the first strangler target (decisions/migration.md) but is a REARCHITECTURE, not a lift-and-shift, and is pulled forward into m-4 (ahead of the general m-5 strangler) so the Phase-4 HMAC hardening (TASK-47) is built on the target design instead of on legacy CRUD and rewritten later.
 
 Coordinator only. This task is implemented by slices TASK-37.1..TASK-37.5 and closes when all slices are Done and the acceptance criteria below hold end-to-end. Do NOT write production code directly against this task; pick up the specific slice.
 
-Target end state (decisions/webhooks.md): a verify -> interpret (by declared source) -> dispatch (multi-sink) pipeline; source-declared typed parsing replacing the probabilistic select_best_model / validate_string_payload_type guessers; a transport-neutral domain intent replacing the Slack-Block-Kit terminal shape; multi-sink dispatch (transport render | handler registered through the capability extension point | durable enqueue) enabling non-Slack transports and cross-feature triggering without feature-to-feature imports; a frozen Webhook domain model over StorageService; idempotent ingest; and a secure-by-default lifecycle.
+Target end state (decisions/webhooks.md): a verify -> interpret (by declared source) -> dispatch (multi-sink) pipeline; source-declared typed parsing replacing the probabilistic select_best_model / validate_string_payload_type guessers; a transport-neutral domain intent replacing the Slack-Block-Kit terminal shape; multi-sink dispatch (transport render | handler registered through the capability extension point | durable enqueue) enabling non-Slack transports and cross-feature triggering without feature-to-feature imports; a frozen Webhook domain model over RecordStore; idempotent ingest; and a secure-by-default lifecycle.
 
 Slices (single-PR each, sequential):
-- TASK-37.1 Domain model + StorageService-backed store (behaviour-preserving).
+- TASK-37.1 Domain model + RecordStore-backed store (behaviour-preserving).
 - TASK-37.2 Source-declared typed parsing + idempotent ingest (delete the guessers).
 - TASK-37.3 Transport-neutral intent + Slack renderer (delete the filesystem-walk registries).
 - TASK-37.4 Cutover: package serves the routes; delete app/modules/webhooks.

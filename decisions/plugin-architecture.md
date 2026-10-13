@@ -10,7 +10,7 @@ scope: The app's layers (host, contracts, features, capabilities, infrastructure
 ## Context
 
 The former three-tier model (`packages/`, `infrastructure/`, `integrations/`) sorted code by one question: how close is it to a vendor? That put three different kinds of code in `app/infrastructure/`:
-- hosting adapters: `storage`, `idempotency`, `resilience`, logging setup;
+- hosting adapters: `records`, `idempotency`, `resilience`, logging setup;
 - framework services that features plug into: `plugins`, `i18n`, `security`, `events`, `audit`, and the planned `approvals` engine ([approvals.md](approvals.md));
 - workplace systems: `directory`, `drive`, `spreadsheets` ([workplace-systems.md](workplace-systems.md)).
 
@@ -43,7 +43,7 @@ Current state:
 
 **`contracts/` is the public plugin API.** It holds:
 - hookspecs, including the host's extension points;
-- the core-service Protocols: storage, queue, coordination, secrets, scheduler, translator and current user;
+- the core-service Protocols: records, queue, coordination, secrets, scheduler, translator and current user;
 - shared types: `OperationResult`, `OperationStatus`, identifiers and an actor reference.
 
 It contains no implementation and imports nothing else from the app, so it could ship as a separate distribution without moving. Changes to it follow [hookspec-deprecation.md](hookspec-deprecation.md)'s lifecycle.
@@ -69,7 +69,7 @@ It contains no implementation and imports nothing else from the app, so it could
 
 **One package shape, enforced by tooling.** Every feature, capability and subdomain follows the [feature-packages.md](feature-packages.md) layout. A generator creates new packages in that shape, and a CI check rejects top-level names outside the layout table.
 
-**Legacy modules are rebuilt by surface, not moved.** Each user-facing surface of `modules/` (slash command, interaction, webhook route, scheduled job) is assigned to a target feature or capability and rebuilt there in the standard shape, behind smoke tests that pin its external behaviour. Vendor-specific concepts leave features on the way: an incident works with documents and a chat channel through capability contracts, not with Google Drive folders. A legacy module is deleted when its last surface has moved. Features already in `packages/` move to `features/` one per PR, with every importer rewritten, legacy ones included.
+**Legacy modules are rebuilt by surface, not moved.** Each user-facing surface of `modules/` (slash command, interaction, webhook route, scheduled job) is assigned to a target feature or capability and rebuilt there in the standard shape, behind smoke tests that pin its external behaviour. Vendor-specific concepts leave a feature's domain on the way: the domain works with documents and a conversation through Protocols it owns or capability contracts, and vendor code sits in adapters ([workplace-systems.md](workplace-systems.md) rule 2). A legacy module is deleted when its last surface has moved. Features already in `packages/` move to `features/` one per PR, with every importer rewritten, legacy ones included.
 
 **A capability** qualifies only when all three hold:
 1. at least one feature needs it now;
@@ -138,3 +138,5 @@ Tolerated until then:
 - 2026-10-01: text generation is a capability; needs shared by one feature's subdomains go to that feature's `core/`, per feature-packages.md.
 - 2026-10-01: `contracts/` may import the third-party types a hookspec parameter names (FastAPI, structlog); pluggy evaluates hookspec annotations at registration, so they cannot be deferred (TASK-107).
 - 2026-10-09: on-call is a capability ([oncall.md](oncall.md), TASK-146).
+- 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).
+- 2026-10-13: wording aligned with workplace-systems.md rule 2: vendor concepts leave a feature's domain, vendor code sits in adapters.

@@ -4,7 +4,7 @@ title: 'Webhooks slice 2: source-declared typed parsing + idempotent ingest'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:39'
-updated_date: '2026-09-24 20:03'
+updated_date: '2026-10-13 13:42'
 labels:
   - migration
   - webhooks
@@ -29,7 +29,7 @@ ordinal: 97000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Rescoped 2026-09-24: webhooks is a capability at app/capabilities/webhooks/ (decisions/webhooks.md, decisions/plugin-architecture.md), not a feature package. It reaches storage, coordination, the queue and the Slack reply surface only through contracts resolved from the service registry, and imports no infrastructure/ or server/ module, so no slice adds an import-linter ignore entry. There is no in-process event bus: features react through the capability's extension point.
+Rescoped 2026-09-24: webhooks is a capability at app/capabilities/webhooks/ (decisions/webhooks.md, decisions/plugin-architecture.md), not a feature package. It reaches records, coordination, the queue and the Slack reply surface only through contracts resolved from the service registry, and imports no infrastructure/ or server/ module, so no slice adds an import-linter ignore entry. There is no in-process event bus: features react through the capability's extension point.
 
 Slice 2 of the webhooks rearchitecture (decisions/webhooks.md; coordinator TASK-37). Deletes the probabilistic payload-typing antipattern and adds ingest idempotency. Behaviour-preserving for known senders (TASK-36 smoke green); a generic/simple-text fallback source preserves acceptance for unclassified senders.
 

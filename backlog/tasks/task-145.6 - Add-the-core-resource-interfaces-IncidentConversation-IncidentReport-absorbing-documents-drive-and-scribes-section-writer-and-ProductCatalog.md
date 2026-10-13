@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 18:22'
+updated_date: '2026-10-13 14:00'
 labels:
   - incident
   - features
@@ -87,3 +87,9 @@ Report: create from template (Drive copy), placeholders, status text, timeline a
 ## Blast radius and rollback
 Behaviour-preserving behind the legacy module; a bad merge of the Docs adapter breaks draft and report edits, caught by the moved tests and the legacy suite. Each sub-layer reverts alone.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-13 re-ground: IncidentReport stays one feature-owned Google Docs adapter; no documents capability until a second suite or consumer exists (decisions/workplace-systems.md rule 2). Under the TASK-147 flag the report becomes the narrative document only (TASK-147.7); with the flag off its behaviour is today's. ProductCatalog over Drive folders is interim: products are a record of truth that belongs in the app's records (DRAFT-2).
+<!-- SECTION:NOTES:END -->

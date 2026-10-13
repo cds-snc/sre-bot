@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-24 15:02'
-updated_date: '2026-09-24 20:03'
+updated_date: '2026-10-13 13:42'
 labels:
   - security
   - phase-4
@@ -28,7 +28,7 @@ ordinal: 73000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Rescoped 2026-09-24: webhooks is a capability at app/capabilities/webhooks/ (decisions/webhooks.md, decisions/plugin-architecture.md), not a feature package. It reaches storage, coordination, the queue and the Slack reply surface only through contracts resolved from the service registry, and imports no infrastructure/ or server/ module, so no slice adds an import-linter ignore entry. There is no in-process event bus: features react through the capability's extension point.
+Rescoped 2026-09-24: webhooks is a capability at app/capabilities/webhooks/ (decisions/webhooks.md, decisions/plugin-architecture.md), not a feature package. It reaches records, coordination, the queue and the Slack reply surface only through contracts resolved from the service registry, and imports no infrastructure/ or server/ module, so no slice adds an import-linter ignore entry. There is no in-process event bus: features react through the capability's extension point.
 
 Aligns with decisions/security.md (Webhooks, amended 2026-07-24): 'rate limits are keyed per webhook_id' ... 'default limits apply to all routes' but nothing implements this yet. Today POST /hook/{webhook_id} in app/api/v1/routes/webhooks.py is rate-limited via the global Limiter key_func (get_remote_address, per-IP once TASK-3 lands) at a flat 30/minute - every webhook_id sharing one source IP shares one bucket; there is no per-webhook_id key and no way to grant a specific known sender a higher ceiling without a header-based exemption (the pattern TASK-3 removes).
 

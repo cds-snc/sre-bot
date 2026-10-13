@@ -4,7 +4,7 @@ title: Generic webhook HMAC verification and secure-by-default secret issuance
 status: To Do
 assignee: []
 created_date: '2026-07-24 13:59'
-updated_date: '2026-09-24 20:03'
+updated_date: '2026-10-13 13:42'
 labels:
   - security
   - webhooks
@@ -25,7 +25,7 @@ ordinal: 71000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Rescoped 2026-09-24: webhooks is a capability at app/capabilities/webhooks/ (decisions/webhooks.md, decisions/plugin-architecture.md), not a feature package. It reaches storage, coordination, the queue and the Slack reply surface only through contracts resolved from the service registry, and imports no infrastructure/ or server/ module, so no slice adds an import-linter ignore entry. There is no in-process event bus: features react through the capability's extension point.
+Rescoped 2026-09-24: webhooks is a capability at app/capabilities/webhooks/ (decisions/webhooks.md, decisions/plugin-architecture.md), not a feature package. It reaches records, coordination, the queue and the Slack reply surface only through contracts resolved from the service registry, and imports no infrastructure/ or server/ module, so no slice adds an import-linter ignore entry. There is no in-process event bus: features react through the capability's extension point.
 
 Slice 5 of the webhooks rearchitecture sequence (decisions/webhooks.md), built ON the new app/capabilities/webhooks package - NOT on the legacy modules/slack CRUD - and following coordinator TASK-37's extraction slices. Introduces the Shared-secret HMAC tier and secure-by-default issuance from decisions/security.md (Webhooks, amended 2026-07-24).
 

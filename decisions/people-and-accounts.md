@@ -2,7 +2,7 @@
 status: Accepted
 date: 2026-09-25
 applies: target
-scope: How the app identifies people across identity providers and chat platforms: person records, linked identities and accounts, how callers are resolved, storage, and where a conversation is handled.
+scope: How the app identifies people across identity providers and chat platforms: person records, linked identities and accounts, how callers are resolved, where records are kept, and where a conversation is handled.
 ---
 
 # People and Accounts
@@ -19,7 +19,7 @@ What each entry point receives:
 - **Backstage:** `sub` is a catalog entity ref (`user:default/jane`), not the IdP subject. Email and IdP subject appear only if the sign-in resolver adds them as claims ([identity resolver](https://backstage.io/docs/auth/identity-resolver)).
 
 Current state:
-- **No person record, people table or `app/capabilities/people/` exists.** DynamoDB is used through `StorageService` (`infrastructure/storage/`), which has single-item `put_if_not_exists` but no atomic multi-item write.
+- **No person record, people table or `app/capabilities/people/` exists.** DynamoDB is used through `RecordStore` (`infrastructure/records/`), which has single-item `put_if_not_exists` but no atomic multi-item write.
 - **Every human is keyed by email.** Directory lookups use `users().get(userKey=email)`. The Directory user `id` is read into `provider_user_id`, but only `modules/dev/google.py` uses it. `infrastructure/security/current_user.py` identifies Backstage callers by the `email` claim. Access stores `actor_email` and `approver_email` (`packages/access/request/`), the audit table indexes `user_email`, and retro attendees come from Slack profile emails (`modules/incident/schedule_retro.py`).
 - **The bot never receives a Google OIDC `sub`.** No Google page says it equals the Directory `id`, so the two are treated as different values.
 - **The Slack runtime lives in `integrations/slack/`,** so callers can't yet be resolved at an entry point ([platform-entrypoints.md](platform-entrypoints.md)). Directory access is Google-only; there is no Microsoft Graph client.
@@ -73,7 +73,7 @@ Deferred: whether the Backstage resolver adds the IdP subject as a claim or the 
 
 **Home.** People and accounts is a capability at `app/capabilities/people/` ([plugin-architecture.md](plugin-architecture.md)). Its public surface is `api.py` (the Protocol, `Person`, `Identity` and `Account` types, and a provider function) plus its hookspecs; everything else in it is private. Each IdP is read through a directory adapter behind the capability, per [workplace-systems.md](workplace-systems.md) rule 2.
 
-**Storage.** People, identities, accounts and links live in a dedicated table owned by the people capability, written through the storage contract in `contracts/`. Each identity and each account is claimed by exactly one person: the claim and the link go in one atomic conditional write, so two people can never hold the same identity or account. IdPs and platforms are only read; the people table is the only place the app writes identity data.
+**Records.** People, identities, accounts and links live in a dedicated table owned by the people capability, written through the records contract in `contracts/`. Each identity and each account is claimed by exactly one person: the claim and the link go in one atomic conditional write, so two people can never hold the same identity or account. IdPs and platforms are only read; the people table is the only place the app writes identity data.
 
 **Homes.** A person has a home account per service kind: chat, calendar and mail, files.
 - A home defaults to the account the person actually uses; for chat, that is the platform their requests come from.
@@ -95,7 +95,7 @@ Deferred: whether the Backstage resolver adds the IdP subject as a claim or the 
 - Until they join, a human with identities in two IdPs appears as two people in audit, approvals and on-call.
 - Cost: the self-service join adds the bot's first browser sign-in flow, an OIDC relying-party registration per IdP and its callback endpoint. It is built only when a second IdP is trusted.
 - Slack resolution rests on SSO enforcement. If a workspace stops enforcing SSO, its `sso_email` links lose their basis and must be re-reviewed.
-- Cost: the storage contract needs a new atomic multi-item write before the people store can be built.
+- Cost: the records contract needs a new atomic multi-item write before the people store can be built.
 - A wrong link routes messages or access to the wrong human. Provenance, audit logging, atomic claims, deprovisioning on IdP deletion and the no-join-on-email rule are the mitigation.
 - Person records are personal data: [observability.md](observability.md) redaction rules and [security.md](security.md) least privilege apply.
 
@@ -127,3 +127,4 @@ Tolerated until then:
 - 2026-09-24: Migration names epic tickets only, and the capability's home is `app/capabilities/people/` per plugin-architecture.md.
 - 2026-09-25: Accepted. The IdP decides who exists, accounts link only through what the IdP asserted, and person kind and permissions move to per-feature access policies (TASK-129).
 - 2026-09-25: A person is offered a join across IdPs, proved by signing in to both, and merges leave a tombstone that resolves to the survivor.
+- 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:41'
-updated_date: '2026-10-09 17:14'
+updated_date: '2026-10-13 14:01'
 labels:
   - incident
   - features
@@ -33,7 +33,7 @@ STARTING POINT (2026-10-09): main is at f5aa2ca5 with TASK-144.1 to TASK-144.3 m
 
 ASSUMPTIONS IN FORCE (change them here before the slice that depends on them starts):
 - the umbrella moves to app/features/incident/ in the first slice, as it stands and with no runtime change, so every later slice builds in its final home; the package-shape check, enablement and TOML settings arrive with TASK-114, TASK-112 and TASK-111 on their own;
-- the incident record store is an interim adapter in core/adapters/ over the existing DynamoDB table, behind an IncidentStore interface and an in-memory fake, as the status-update store already is; TASK-108 and TASK-109 later swap its inside for the storage contract;
+- the incident record store is an interim adapter in core/adapters/ over the existing DynamoDB table, behind an IncidentStore interface and an in-memory fake, as the status-update store already is; TASK-108 and TASK-109 later swap its inside for the records contract;
 - the comms carve-out moves the scribe-local TextGenerator interface, its OpenAI binding and the availability predicate whole; draft and summarize keep calling the Summarizer directly until TASK-25.10 replaces both with the capability, so nothing is duplicated;
 - each legacy surface is pinned (TASK-36.1 for commands and interactions, TASK-36.3 for jobs) before the slice that rebuilds it; command names, modal fields, replies and i18n keys do not change during the rebuild, apart from three added role pickers;
 - the alert buttons register into the webhooks capability's extension point when it exists, otherwise through the Slack registrar with a later move;
@@ -54,3 +54,9 @@ TASK-146.3 (declare invites the on-call person through the on-call capability) j
 <!-- AC:BEGIN -->
 - [ ] #1 Every subtask is done
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-13: the postmortem as records (action items with GitHub issues, the timeline and the narrative document, built dark behind a flag with a UX session and a rollout) is TASK-147, separate from this rebuild because it is new behaviour. TASK-145.5 now waits for the records contract (TASK-108).
+<!-- SECTION:NOTES:END -->

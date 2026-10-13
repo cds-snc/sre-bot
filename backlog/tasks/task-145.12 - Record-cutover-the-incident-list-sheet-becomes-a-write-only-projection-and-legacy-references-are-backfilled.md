@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 18:22'
+updated_date: '2026-10-13 13:41'
 labels:
   - incident
   - features
@@ -22,7 +22,7 @@ ordinal: 362000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Layer E1 of TASK-145. decisions/workplace-systems.md rule 5 and decisions/incident-management.md: no record of truth in a spreadsheet; a surviving sheet is a write-only projection rebuilt from storage.
+Layer E1 of TASK-145. decisions/workplace-systems.md rule 5 and decisions/incident-management.md: no record of truth in a spreadsheet; a surviving sheet is a write-only projection rebuilt from the records.
 
 THIS SLICE
 - Every remaining read of the incident list sheet (uniqueness check before declare, listings, postmortem inputs) reads IncidentStore instead; the sheet readers are deleted.

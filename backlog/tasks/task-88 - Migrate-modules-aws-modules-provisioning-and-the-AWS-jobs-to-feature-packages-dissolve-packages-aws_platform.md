@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:36'
-updated_date: '2026-10-09 17:14'
+updated_date: '2026-10-13 13:42'
 labels:
   - phase-5
 dependencies:
@@ -37,7 +37,7 @@ Updated 2026-09-24 to decisions/plugin-architecture.md (which replaced the delet
 - modules/aws and modules/provisioning are rebuilt by surface (TASK-36 inventory: target, smoke pin, rebuild, cutover), not migrated as modules.
 - Each business feature lands in app/features/<feature>/ with its Path B adapters in its own adapters/.
 - A shared Identity Center adapter goes to a capability in app/capabilities/ only when a second feature needs it (people-and-accounts, TASK-83, is the likely home).
-- DynamoDB callers move onto the storage contract resolved from the service registry.
+- DynamoDB callers move onto the records contract resolved from the service registry.
 - No new app/infrastructure/<service>/ Protocol is created.
 - packages/aws_platform can only be dissolved once incident persistence leaves the seam, which happens in the incident rebuild (TASK-145, after TASK-97).
 
@@ -50,14 +50,14 @@ This task decides the feature boundaries per decisions/feature-packages.md and d
 EVENTUAL HOMES (recorded 2026-09-11 so the Google-series pattern of vendor-neutral infrastructure services for workplace concerns, see decisions/workplace-systems.md, is not repeated):
 - Identity Center holds people's AWS accounts. A shared Identity Center adapter goes to a capability package (decisions/plugin-architecture.md; likely the people-and-accounts capability, decisions/people-and-accounts.md), promoted only when the second feature actually needs it. Never infrastructure/.
 - Organizations, SSO-Admin, Config, Cost Explorer, GuardDuty, Security Hub and Lambda are Path B adapters (decisions/plugin-architecture.md): the feature exists to act on AWS, so each adapter lives inside its feature. Promote to a capability package only if a second feature needs the same operation, with the justification recorded.
-- DynamoDB is a hosting service. The thin adapter TASK-25.2.5 builds is a seam; its callers move onto the storage contract resolved from the service registry (with the TASK-27 storage redesign), and the seam is deleted.
+- DynamoDB is a hosting service. The thin adapter TASK-25.2.5 builds is a seam; its callers move onto the records contract resolved from the service registry (with the TASK-27 records redesign), and the seam is deleted.
 - No new app/infrastructure/<service>/ Protocol is created for any of these.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Feature boundaries for the former modules/aws, modules/provisioning and AWS jobs are decided and recorded against the TASK-36 inventory, with one subtask per feature, each rebuilt in app/features/<feature>/
-- [ ] #2 Every adapter under packages/aws_platform/adapters/ lives in its eventual home (the owning feature's adapters/, a capability with a recorded second-feature justification, or the storage contract for DynamoDB callers) and returns typed domain values; no new infrastructure/<service> Protocol was introduced
+- [ ] #2 Every adapter under packages/aws_platform/adapters/ lives in its eventual home (the owning feature's adapters/, a capability with a recorded second-feature justification, or the records contract for DynamoDB callers) and returns typed domain values; no new infrastructure/<service> Protocol was introduced
 - [ ] #3 packages/aws_platform, modules/aws, modules/provisioning and the migrated jobs are deleted
 - [ ] #4 Feature-level AWS settings (permission sets, role ARNs, SSO instance, SERVICE_ROLE_MAP) move from integrations/aws/settings.py into the owning features' settings slices (values in the TOML files); integrations/aws/settings.py keeps only the transport fields the client itself needs
 - [ ] #5 The packages/aws_platform seam guard retires with the package: app/bin/check_aws_platform_seam.py, app/bin/baselines/aws_platform_seam_consumers.txt and the make check-aws-platform-seam target are deleted once the baseline is empty (TASK-25.2.5.5 created them)

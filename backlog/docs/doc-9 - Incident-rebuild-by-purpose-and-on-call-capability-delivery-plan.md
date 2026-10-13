@@ -3,6 +3,7 @@ id: doc-9
 title: 'Incident rebuild by purpose and on-call capability: delivery plan'
 type: guide
 created_date: '2026-10-09 16:50'
+updated_date: '2026-10-13 14:04'
 ---
 
 # Incident rebuild by purpose and on-call capability: delivery plan
@@ -43,14 +44,14 @@ app/features/incident/                   # moved as it stands in TASK-145.1, the
 ├── core/          api.py, domain.py, store.py, adapters/{slack,google_docs,google_drive,google_meet,status_updates,in_memory}.py
 ├── response/      declare, status, severity, roles, show/update, archive, recreate, timeline, nudge, alert buttons, summary.py
 ├── comms/         service, approval, history, prompt, comms_profile, domain, ports, providers, adapters/copy_ready.py
-└── postmortem/    meeting scheduling over the calendar capability, report.py (draft), prompt.py
+└── postmortem/    meeting scheduling over the calendar capability, report.py (draft), prompt.py; TASK-147 adds the record, the action-item store and adapters/github.py
 ```
 
 Each subdomain keeps two flat entry-point modules, `entrypoints/slack.py` and `entrypoints/slack_views.py`; a views split waits for TASK-118. Tests mirror the tree under `tests/unit/features/incident/{core,response,comms,postmortem}/`.
 
 ## The chain
 
-Two coordinators, created 2026-10-09, each child a single PR under the size gate, merged bottom-up. A gh stack is acceptable inside a group.
+Three coordinators, each child a single PR under the size gate, merged bottom-up. A gh stack is acceptable inside a group.
 
 ### TASK-145: incident feature by purpose (supersedes TASK-38, TASK-38.1 to TASK-38.8, TASK-124.5)
 
@@ -60,7 +61,7 @@ Two coordinators, created 2026-10-09, each child a single PR under the size gate
 | A | TASK-145.2 | Status-update wording and prompt text leave the views module; i18n literal-table check | 145.1 |
 | A | TASK-145.3 | Every status-update handler calls one service method; results carry what failure renders | 145.2 |
 | A | TASK-145.4 | `comms` carved out of scribe as plugin `incident.comms`; ids `incident.comms.status_update.*`; the scribe-local TextGenerator moves whole | 145.3 |
-| B, core | TASK-145.5 | Record with severity and five roles, interim DynamoDB `IncidentStore`, two-part command check, `common/` | 145.1 |
+| B, core | TASK-145.5 | Record with severity and five roles, `IncidentStore` over the records contract with a fake and no interim vendor adapter, two-part command check, `common/` | 145.1, TASK-108 (after TASK-27.4 -> TASK-27.1) |
 | B | TASK-145.6 | `IncidentConversation`, `IncidentReport` (absorbs `documents/`, `drive/`, scribe's section writer), `ProductCatalog`; transcript reader takes the reference | 145.5 |
 | C, response | TASK-145.7 | Declare and the alert buttons; `meet/` folds into core | 145.6, TASK-36.1 |
 | C | TASK-145.8 | Status, severity, show and update, five roles, archive, recreate | 145.7 |
@@ -70,7 +71,7 @@ Two coordinators, created 2026-10-09, each child a single PR under the size gate
 | E, cutover | TASK-145.12 | List sheet becomes a write-only projection; references backfilled | 145.9 |
 | E | TASK-145.13 | Delete `app/modules/incident`, legacy registration and catalogues; inventory closed | 145.11, 145.12, TASK-118 |
 
-Group A can start as soon as the TASK-144 stack is merged; TASK-145.1 goes first because the open TASK-144 PRs edit scribe files and every later slice then builds in the final home. Group B needs only TASK-145.1. Groups C and D wait for pinning (TASK-36.1, TASK-36.3) and D for the calendar capability (TASK-138). The package-shape check (TASK-114), per-environment enablement (TASK-112) and TOML settings (TASK-111) are not in the chain and apply to `features/incident` when they land. TASK-25.10 and TASK-134 are not in the chain either: when they land, they replace the `comms` TextGenerator and the direct Summarizer calls in `response/summary.py` and `postmortem/report.py`, wherever those files are at the time.
+Group A can start as soon as the TASK-144 stack is merged; TASK-145.1 goes first because the open TASK-144 PRs edit scribe files and every later slice then builds in the final home. Group B needs TASK-145.1 and the records contract: Stack K (TASK-145.5 -> TASK-145.6) does not start from main now; TASK-145.5 waits for TASK-108, which follows TASK-27.1, which follows TASK-27.4. Groups C and D wait for pinning (TASK-36.1, TASK-36.3) and D for the calendar capability (TASK-138). The package-shape check (TASK-114), per-environment enablement (TASK-112) and TOML settings (TASK-111) are not in the chain and apply to `features/incident` when they land. TASK-25.10 and TASK-134 are not in the chain either: when they land, they replace the `comms` TextGenerator and the direct Summarizer calls in `response/summary.py` and `postmortem/report.py`, wherever those files are at the time.
 
 ### TASK-146: on-call capability (supersedes TASK-123, TASK-124.2)
 
@@ -80,6 +81,24 @@ Group A can start as soon as the TASK-144 stack is merged; TASK-145.1 goes first
 | TASK-146.2 | `oncall_sync` consumes the capability, loses its Opsgenie adapter and `ports.py`, moves to `features/` | 146.1 |
 | TASK-146.3 | Incident declare invites through the capability; no Opsgenie vocabulary in the umbrella | 146.1, TASK-145.7 |
 
+### TASK-147: postmortem as records, dark behind a flag (new behaviour, separate from TASK-145)
+
+Action items (DRAFT-9) move from the optional list into `postmortem/`. The postmortem's facts and action items are records; the report document narrows to the narrative, with a snapshot stored in the record at review completion; GitHub Issues is the first tracker through a feature-owned adapter. Every surface is gated by one incident settings flag, default off, so users see today's behaviour until the flip.
+
+| Task | Content | Depends on |
+| --- | --- | --- |
+| TASK-147.1 | UX design session, run in parallel with the backend: action-item flow, timeline capture permission, the narrative document's role | none (human-led) |
+| TASK-147.2 | Postmortem record and action-item store, the flag (default off) | TASK-145.5, TASK-108 |
+| TASK-147.3 | Action items from Slack: add, confirm, edit, assign, list | 147.1, 147.2 |
+| TASK-147.4 | GitHub Issues adapter: create the tracking issue | 147.3 |
+| TASK-147.5 | Issue status sync through the webhooks capability | 147.4, TASK-37 |
+| TASK-147.6 | Due action-item reminders as a scheduled job | 147.3 |
+| TASK-147.7 | Narrative document mode and the snapshot at review completion | 147.2, TASK-145.6, TASK-145.11 |
+| TASK-147.8 | Rollout: internal comms package, permission policy, the flag flip | 147.1, 147.3, 147.7 |
+| TASK-147.9 | Contract: remove the flag and the document-only paths | 147.8 |
+
+TASK-147 is planned after Stack K, which builds the `core/` record it stores against.
+
 ### Optional enhancements (drafts, not scheduled)
 
 | Draft | Content | Waits for |
@@ -88,14 +107,16 @@ Group A can start as soon as the TASK-144 stack is merged; TASK-145.1 goes first
 | DRAFT-13 | Internal and senior-management updates as comms audience profiles | the communications and policy roles |
 | DRAFT-14 | Privacy flag on the record; policy lead invited | the policy role |
 | DRAFT-15 | Participant roster, in-incident tasks, postmortem feedback (reference only) | a request from the process owners |
-| DRAFT-9, DRAFT-10 | Action items as records with reminders; status-page adapter | the postmortem owners; the communications role |
+| DRAFT-10 | Status-page adapter | the communications role |
 
 ## Assumptions in force
 
 Stated on the coordinators; change them there before the slice that depends on them starts.
 
 - The umbrella moves to `app/features/incident/` in the first slice, as it stands and with no runtime change; the shape check, enablement and TOML settings arrive with TASK-114, TASK-112 and TASK-111 on their own.
-- The incident record store is an interim adapter over the existing DynamoDB table behind `IncidentStore` and a fake, as the status-update store already is; TASK-108 and TASK-109 swap its inside later.
+- The incident record store is built over the records contract (TASK-108) with a fake and no interim vendor adapter; TASK-145.5 waits for TASK-27.4 -> TASK-27.1 -> TASK-108.
+- TASK-147 is built dark behind one incident settings flag, default off; with it off users see today's behaviour exactly.
+- The report document is one feature-owned Google Docs adapter; no documents capability until a second suite or consumer exists.
 - The comms carve-out moves the scribe-local `TextGenerator`, its OpenAI binding and the availability predicate whole; draft and summarize keep calling the Summarizer directly until TASK-25.10, so nothing is duplicated.
 - Each legacy surface is pinned before the slice that rebuilds it; names, fields, replies and i18n keys do not change during the rebuild, apart from three added role pickers.
 - Alert buttons register into the webhooks capability's extension point when it exists, otherwise through the Slack registrar with a later move.
@@ -111,6 +132,7 @@ Stated on the coordinators; change them there before the slice that depends on t
 | TASK-124.5, TASK-123, TASK-124.2 | Archived with pointers to TASK-145.1, TASK-146.1, TASK-146.2 |
 | TASK-124 | Children list and dependencies updated: oncall_sync and the incident umbrella move through TASK-146.2 and TASK-145.1 |
 | TASK-140.11, TASK-140.12 | Still deferred; their text says they belong to `comms` |
+| DRAFT-9 | Action items with reminders move into TASK-147 |
 | TASK-112 | Acceptance criterion added: enablement keys grouped by product area |
 | TASK-144 | Unchanged; main is at f5aa2ca5 with TASK-144.1 to 144.3 merged, and TASK-144.4 and 144.5 merge from the stack-i branches before group A starts |
 | decisions/incident-management.md | Rewritten in place: vocabulary, record fields, the three subdomains, communications by audience, postmortem, detection and on-call pointers, optional expansions, rejects, checks, migration |
@@ -126,6 +148,6 @@ Stated on the coordinators; change them there before the slice that depends on t
 1. Severity scale: levels 0 to 3 as recorded, or 1 to 3? Confirm with the incident process owners before TASK-145.5 merges.
 2. "Postmortem" is the code and record word; user-facing labels still say "retro". Rename the labels in the catalogues with TASK-145.10, or leave them?
 3. Pinning (TASK-36.1, TASK-36.3) is kept as a gate before groups C and D. Hold the gate, or allow an incident-only pinning slice?
-4. Interim DynamoDB `IncidentStore` adapter (recorded assumption) versus waiting for TASK-108 and TASK-109: confirm.
+4. Interim `IncidentStore` adapter versus waiting for the records contract: decided 2026-10-13, wait for TASK-108 and build no interim adapter.
 5. The alert buttons' registration path if the webhooks capability's extension point (TASK-37) is not built when TASK-145.7 starts: registrar now and move later (recorded assumption), or wait?
 6. Should DRAFT-7 (internal updates as timeline records) be folded into DRAFT-13 (internal audience profile) or kept as a separate idea?

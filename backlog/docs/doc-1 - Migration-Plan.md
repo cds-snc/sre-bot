@@ -3,7 +3,7 @@ id: doc-1
 title: Migration Plan
 type: specification
 created_date: '2026-07-07 20:00'
-updated_date: '2026-09-24 20:12'
+updated_date: '2026-10-13 13:37'
 ---
 # Migration Plan
 
@@ -60,7 +60,7 @@ Toolchain per decisions/toolchain.md: Python 3.14 everywhere, uv lockfile end to
 
 Enforcement first, then the layers, in dependency order:
 1. **Contract and rules:** CLAUDE.md, the Copilot instructions and the skills restate the six layers (TASK-104). import-linter lands with the six-layer contracts and a shrink-only ignore list (TASK-18).
-2. **contracts/:** OperationResult envelope fix (TASK-105), then `app/contracts/` with OperationResult/OperationStatus (TASK-106). The Slack handler contract (TASK-26.1), then all hookspecs, the hookimpl marker and the scheduler Protocol (TASK-107). The storage Protocol after its redesign (TASK-27.1 -> TASK-108). The coordination Protocol with its rename (TASK-58).
+2. **contracts/:** OperationResult envelope fix (TASK-105), then `app/contracts/` with OperationResult/OperationStatus (TASK-106). The Slack handler contract (TASK-26.1), then all hookspecs, the hookimpl marker and the scheduler Protocol (TASK-107). The records Protocol after its redesign (TASK-27.1 -> TASK-108). The coordination Protocol with its rename (TASK-58).
 3. **Host:** svcs service registry with eager boot validation (TASK-109, replaces the retired TASK-29), entry-point plugin loading (TASK-110), TOML configuration (TASK-111), per-environment enablement (TASK-112), the extension-point phase (TASK-113), the package generator and shape check (TASK-114).
 4. **Framework services to server/:** Slack runtime (TASK-26.2, then async Bolt TASK-33), logging (TASK-115), security plus the current-user contract (TASK-116), i18n library decision and translator contract (TASK-117 -> TASK-118), scheduler runtime (TASK-64 -> TASK-52).
 5. **Capabilities:** directory, drive and spreadsheets (TASK-119, TASK-120, TASK-121), audit (TASK-122), rotations, which removes the oncall_sync -> user_rotations import (TASK-123), notifications with its first consumer (TASK-125), approvals (TASK-60, on hold behind 1-3).
@@ -76,7 +76,7 @@ One client generation per decisions/outbound-clients.md and sdk-typing.md. Done:
 
 ## Phase 4 — Infrastructure hardening (m-4)
 
-Hosting contracts made real: capability-shaped storage (TASK-27 series), the coordination rename and lease hardening (TASK-58, TASK-99 to TASK-103), the queue contract and outbox when its first consumer exists (TASK-34), the RetryStore consolidation (TASK-59), the middleware trio and logging pipeline (TASK-28 series), distributed rate limiting (TASK-31), the service health model (TASK-92), the event-bus deletion with no replacement (TASK-30, after TASK-61), the webhooks capability (TASK-37 series, then TASK-47 to TASK-49 for HMAC and rate limits). The approvals consumers follow: access (TASK-61), SaaS subscriptions (TASK-62), AI keys (TASK-63).
+Hosting contracts made real: the capability-shaped records contract (TASK-27 series), the coordination rename and lease hardening (TASK-58, TASK-99 to TASK-103), the queue contract and outbox when its first consumer exists (TASK-34), the RetryStore consolidation (TASK-59), the middleware trio and logging pipeline (TASK-28 series), distributed rate limiting (TASK-31), the service health model (TASK-92), the event-bus deletion with no replacement (TASK-30, after TASK-61), the webhooks capability (TASK-37 series, then TASK-47 to TASK-49 for HMAC and rate limits). The approvals consumers follow: access (TASK-61), SaaS subscriptions (TASK-62), AI keys (TASK-63).
 
 **Exit:** the security and operations records' Checks pass; records flip `applies: target` -> `now`.
 
