@@ -3,10 +3,11 @@ id: TASK-27.2
 title: >-
   Records slice 2: atomic change-set update with an optional expected guard
   (set, remove, increment)
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@me'
 created_date: '2026-09-16 13:58'
-updated_date: '2026-10-13 20:00'
+updated_date: '2026-10-13 20:24'
 labels:
   - infrastructure
   - phase-4
@@ -47,16 +48,16 @@ NOT IN SCOPE. The atomic multi-item conditional write (TASK-83.2); idempotent re
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 RecordStore exposes update(table, key, changes, *, expected=None); changes is a typed non-empty set of set, remove and integer-increment changes defined as frozen dataclasses next to the other value types in infrastructure/records/protocol.py, and no vendor expression, projection or condition string appears in any Protocol signature
-- [ ] #2 update requires the item to exist: a missing item returns NOT_FOUND and is never created, in the DynamoDB store (attribute_exists on the table's partition attribute) and in the fake; a missing attribute counts as 0 for increment, remove of an absent attribute succeeds, and every change in one call applies atomically with the updated item returned
-- [ ] #3 expected is an equality-only guard on non-key attributes evaluated atomically with the change; when it does not hold nothing is written and the result is a successful, distinct non-error result (no new OperationStatus member) that callers can tell apart from an applied update and from NOT_FOUND
-- [ ] #4 One shared validation helper in protocol.py, used by both stores, raises ValueError (programming error) for a key that does not match table.key exactly, a change or expected entry on a key attribute, an empty change set, an attribute named by more than one change, or a non-integer increment delta
-- [ ] #5 InMemoryRecordStore guards every mutation with a threading.Lock, and DynamoDBRecordStore maps the change set to a single UpdateExpression (SET, if_not_exists plus delta for increments, REMOVE) with ExpressionAttributeNames placeholders for every attribute name; neither is a read-modify-write
-- [ ] #6 The conformance suite runs every update case against the fake and the moto-backed DynamoDB store: set, remove, increment, mixed changes, missing item, absent-attribute increment and remove, guard pass and fail, key-attribute rejection, and a concurrent-increment case with threads whose final value equals the total of all deltas
-- [ ] #7 The Protocol documentation states that items missing an index's key attributes are excluded from index queries (sparse indexes), that index reads may be eventually consistent and are not unique, and that an increment is not idempotent under SDK retry (acceptable for counters)
-- [ ] #8 Appending to a list attribute is explicitly NOT added to the Protocol; a note records that incident timeline entries are their own records in a separate timeline table (declared by TASK-145.5, written by TASK-145.9), and the bounded full-table list is explicitly deferred to its own task with its consumers named
-- [ ] #9 Notes name each first consumer (TASK-145.8, TASK-147.3, TASK-37.1) and record the two-plausible-provider justification required by decisions/plugin-architecture.md
-- [ ] #10 ruff, lint-imports, mypy (no errors in touched files) and pytest tests --ignore=tests/smoke pass, with the commands and their output recorded in notes
+- [x] #1 RecordStore exposes update(table, key, changes, *, expected=None); changes is a typed non-empty set of set, remove and integer-increment changes defined as frozen dataclasses next to the other value types in infrastructure/records/protocol.py, and no vendor expression, projection or condition string appears in any Protocol signature
+- [x] #2 update requires the item to exist: a missing item returns NOT_FOUND and is never created, in the DynamoDB store (attribute_exists on the table's partition attribute) and in the fake; a missing attribute counts as 0 for increment, remove of an absent attribute succeeds, and every change in one call applies atomically with the updated item returned
+- [x] #3 expected is an equality-only guard on non-key attributes evaluated atomically with the change; when it does not hold nothing is written and the result is a successful, distinct non-error result (no new OperationStatus member) that callers can tell apart from an applied update and from NOT_FOUND
+- [x] #4 One shared validation helper in protocol.py, used by both stores, raises ValueError (programming error) for a key that does not match table.key exactly, a change or expected entry on a key attribute, an empty change set, an attribute named by more than one change, or a non-integer increment delta
+- [x] #5 InMemoryRecordStore guards every mutation with a threading.Lock, and DynamoDBRecordStore maps the change set to a single UpdateExpression (SET, if_not_exists plus delta for increments, REMOVE) with ExpressionAttributeNames placeholders for every attribute name; neither is a read-modify-write
+- [x] #6 The Protocol documentation states that items missing an index's key attributes are excluded from index queries (sparse indexes), that index reads may be eventually consistent and are not unique, and that an increment is not idempotent under SDK retry (acceptable for counters)
+- [x] #7 Appending to a list attribute is explicitly NOT added to the Protocol; a note records that incident timeline entries are their own records in a separate timeline table (declared by TASK-145.5, written by TASK-145.9), and the bounded full-table list is explicitly deferred to its own task with its consumers named
+- [x] #8 Notes name each first consumer (TASK-145.8, TASK-147.3, TASK-37.1) and record the two-plausible-provider justification required by decisions/plugin-architecture.md
+- [x] #9 ruff, lint-imports, mypy (no errors in touched files) and pytest tests --ignore=tests/smoke pass, with the commands and their output recorded in notes
+- [x] #10 The conformance suite runs every update case against the fake and the moto-backed DynamoDB store: set, remove, increment, mixed changes, missing item, absent-attribute increment and remove, guard pass and fail, key-attribute rejection, and a sequential repeated-increment case whose final value equals the total of all deltas; a concurrent-increment case with threads runs on the fake only (moto's DynamoDB backend is an unlocked read-modify-write), and a unit test asserts DynamoDB sends a single UpdateItem with no read
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -110,6 +111,46 @@ uv run ruff check . ; uv run lint-imports ; uv run mypy . --exclude '(?:^|/)\.ve
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-13: scope revised after research. No current code can move onto an update, increment or list operation (access save_request is a whole-item put; the retry store and the status-update adapter use conditional writes; the legacy incident lookup is a filtered scan of an unbounded table), so the operation lands with named consumers: TASK-145.8 (update_field with expected, close as set plus remove), TASK-147.3 (set), TASK-37.1 (increment). Bounded list split to TASK-27.5. Dependents: TASK-145.8 and TASK-37.1 depend on this task; TASK-147.3 now does too.
+
+2026-10-13: implemented.
+
+## What changed
+- infrastructure/records/protocol.py: SetAttribute, RemoveAttribute, IncrementAttribute (frozen slotted dataclasses), type RecordChange and type ExpectedValue; validate_record_update(table, key, changes, expected) shared by both stores; RecordStore.update(table, key, changes, *, expected=None). The Protocol docstring documents sparse indexes, eventually consistent and non-unique index reads, update result semantics, and that an increment is not idempotent under SDK retry (acceptable for counters).
+- infrastructure/records/in_memory.py: one threading.Lock around shared-state access in put, put_if_not_exists, get, query, delete and update; update validates, checks existence and guard, applies the changes to a copy and swaps it in under the lock.
+- infrastructure/records/service.py: update sends one UpdateItem: SET (if_not_exists(#c, :zero) + :v for increments) and REMOVE clauses, placeholders for every attribute name, ConditionExpression attribute_exists(#pk) plus the guard, ReturnValues=ALL_NEW and ReturnValuesOnConditionCheckFailure=ALL_OLD. A condition failure with Item in the response is an unmet guard (success, data=None); without Item it is NOT_FOUND. No read before the write. A guard value of None means the attribute is absent (attribute_not_exists OR = NULL), the same as in the fake.
+- infrastructure/records/__init__.py exports the new types.
+- Result contract: applied -> success(data=updated item); unmet guard -> success(data=None, message="Guard not satisfied"), nothing written; missing item -> NOT_FOUND, never created. No new OperationStatus member.
+- No other RecordStore implementer exists (only MagicMock(spec=RecordStore) in the audit tests), so no call sites or doubles changed.
+
+## Not added (AC7)
+- Appending to a list attribute: incident timeline entries are their own records in a separate timeline table (declared by TASK-145.5, written by TASK-145.9).
+- Bounded full-table list: deferred to TASK-27.5, shaped with its consumers TASK-37.1 (webhook list and lookup) and TASK-145.12 (incident list sheet rebuild).
+
+## First consumers (AC8)
+- update with expected: TASK-145.8, IncidentStore.update_field.
+- set and remove in one call: TASK-145.8, closing an incident sets the status and removes the sparse open-index attributes atomically.
+- set: TASK-147.3, editing and assigning action items.
+- increment: TASK-37.1, webhook invocation and acknowledgement counters (decisions/webhooks.md forbids read-modify-write).
+
+## Two-plausible-provider justification (decisions/plugin-architecture.md)
+DynamoDB UpdateItem with ConditionExpression; Cosmos DB patch with a filter predicate and incr; Postgres UPDATE ... WHERE ... RETURNING with COALESCE; Firestore update inside a transaction for the guard. The change set and guard carry no vendor syntax.
+
+## Moto verification and the AC6 change
+moto 5.2.2 supports the full UpdateExpression, ConditionExpression, ALL_NEW and ALL_OLD on condition failure (Item present only when the item exists). It is not thread-safe: its DynamoDB backend applies UpdateItem as an unlocked read-modify-write. The threaded case passed alone 10/10 but lost increments in the full suite (761 of 900). With user approval, AC6 was replaced (now #10): threaded increments run on the fake only, the same increments run sequentially on both stores, and test_records_store_update_expression asserts a single UpdateItem with no get_item.
+
+## Tests
+- tests/unit/infrastructure/records/test_records_store_update_validation.py (14)
+- tests/unit/infrastructure/records/test_records_store_update_expression.py (7)
+- tests/integration/infrastructure/records/test_records_store_update_conformance.py (fake + moto)
+
+## Gates (from app/)
+- uv run ruff check . -> All checks passed!
+- uv run lint-imports -> Contracts: 10 kept, 0 broken.
+- uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 48 errors in 19 files (checked 397 source files); 0 in touched files, all pre-existing in legacy modules/.
+- uv run pytest tests --ignore=tests/smoke -> 4753 passed, 2627 warnings in 96.63s
+
+## For the human
+Code review of the PR. No deployment, settings or Terraform changes.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -123,5 +164,10 @@ created: 2026-09-24 20:11
 created: 2026-10-13 17:59
 ---
 2026-10-13 (TASK-27.1 implemented): AC wording proposals, not applied because the CLI cannot edit an AC in place. AC3: replace 'required by decisions/layers.md' with 'required by decisions/plugin-architecture.md'. AC5: replace 'pointing the incident activity log at TASK-38' with 'pointing the incident activity log at TASK-145' (TASK-145 replaces TASK-38 and its slices; its timeline entries are their own records).
+---
+
+created: 2026-10-13 20:15
+---
+2026-10-13: moto 5.2.2 verified for UpdateItem SET/if_not_exists/REMOVE, ConditionExpression, ALL_NEW and ALL_OLD-on-condition-failure (Item present only when the item exists). Thread safety does not hold: moto's DynamoDB backend has no lock, so update_item is a read-modify-write inside moto. The concurrent-increment case passes in isolation (10/10) but lost increments in the full suite (761 of 900). AC6 wording change pending a decision.
 ---
 <!-- COMMENTS:END -->

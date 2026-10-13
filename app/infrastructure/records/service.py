@@ -10,6 +10,7 @@ as a constructor argument, declares its ``RecordTable`` once, and delegates
 all DynamoDB I/O here.
 """
 
+from collections.abc import Mapping, Sequence
 from functools import cache
 from typing import TYPE_CHECKING, Any
 
@@ -20,14 +21,20 @@ from botocore.exceptions import BotoCoreError, ClientError
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from infrastructure.records.protocol import (
+    ExpectedValue,
+    IncrementAttribute,
     KeySchema,
+    RecordChange,
     RecordQuery,
     RecordStore,
     RecordTable,
+    RemoveAttribute,
+    SetAttribute,
     SortCondition,
     SortOperator,
     SortOrder,
     resolve_query_key,
+    validate_record_update,
 )
 from integrations.aws.client import classify_aws_error, get_aws_client
 
@@ -78,6 +85,58 @@ def _sort_expression(condition: SortCondition) -> str:
             return "#sk < :sk"
         case SortOperator.BEGINS_WITH:
             return "begins_with(#sk, :sk)"
+
+
+def _update_request(
+    table: RecordTable,
+    changes: Sequence[RecordChange],
+    expected: Mapping[str, ExpectedValue] | None,
+) -> dict[str, Any]:
+    """Build one UpdateItem expression set: SET and REMOVE clauses plus the existence and guard condition.
+
+    Every attribute name goes through a placeholder, so reserved words and
+    special characters never reach the expression.
+    """
+    names = {"#pk": table.key.partition}
+    values: dict[str, Any] = {}
+    set_clauses: list[str] = []
+    remove_clauses: list[str] = []
+    for index, change in enumerate(changes):
+        name = f"#c{index}"
+        names[name] = change.attribute
+        match change:
+            case SetAttribute(value=value):
+                values[f":v{index}"] = _serializer.serialize(value)
+                set_clauses.append(f"{name} = :v{index}")
+            case IncrementAttribute(delta=delta):
+                values[f":v{index}"] = _serializer.serialize(delta)
+                values[":zero"] = _serializer.serialize(0)
+                set_clauses.append(f"{name} = if_not_exists({name}, :zero) + :v{index}")
+            case RemoveAttribute():
+                remove_clauses.append(name)
+    conditions = ["attribute_exists(#pk)"]
+    for index, (attribute, value) in enumerate((expected or {}).items()):
+        name = f"#e{index}"
+        names[name] = attribute
+        if value is None:
+            values[":null"] = _serializer.serialize(None)
+            conditions.append(f"(attribute_not_exists({name}) OR {name} = :null)")
+        else:
+            values[f":e{index}"] = _serializer.serialize(value)
+            conditions.append(f"{name} = :e{index}")
+    clauses = []
+    if set_clauses:
+        clauses.append("SET " + ", ".join(set_clauses))
+    if remove_clauses:
+        clauses.append("REMOVE " + ", ".join(remove_clauses))
+    request: dict[str, Any] = {
+        "UpdateExpression": " ".join(clauses),
+        "ConditionExpression": " AND ".join(conditions),
+        "ExpressionAttributeNames": names,
+    }
+    if values:
+        request["ExpressionAttributeValues"] = values
+    return request
 
 
 class DynamoDBRecordStore:
@@ -219,6 +278,65 @@ class DynamoDBRecordStore:
                 error=result.message,
                 error_code=result.error_code,
             )
+        return result
+
+    def update(
+        self,
+        table: RecordTable,
+        key: dict[str, Any],
+        changes: Sequence[RecordChange],
+        *,
+        expected: Mapping[str, ExpectedValue] | None = None,
+    ) -> OperationResult:
+        """Apply a change set to an existing item in one conditional UpdateItem.
+
+        ``attribute_exists`` on the partition attribute stops the write from
+        creating an item. On a condition failure, ``ALL_OLD`` returns the
+        item only when it exists, which tells a missing item from an unmet
+        guard without a second read.
+
+        Args:
+            table: Table declaration.
+            key: Plain Python dict with exactly the table's key attributes.
+            changes: Non-empty set, remove and increment changes.
+            expected: Optional equality guard on non-key attributes; ``None``
+                means the attribute is absent.
+
+        Returns:
+            ``OperationResult[dict]`` with the updated item; ``success`` with
+            ``data=None`` when the guard does not hold; ``NOT_FOUND`` when
+            the item does not exist; or error.
+
+        Raises:
+            ValueError: The key, changes or guard break the update rules.
+        """
+        validate_record_update(table, key, changes, expected)
+        try:
+            response = self._dynamodb.update_item(
+                TableName=table.name,
+                Key=_serialize_item(key),
+                ReturnValues="ALL_NEW",
+                ReturnValuesOnConditionCheckFailure="ALL_OLD",
+                **_update_request(table, changes, expected),
+            )
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                if "Item" in exc.response:
+                    logger.debug("records_update_guard_not_satisfied", table=table.name)
+                    return OperationResult.success(data=None, message="Guard not satisfied")
+                return OperationResult.error(OperationStatus.NOT_FOUND, message=f"Item not found in {table.name}")
+            result: OperationResult[Any] = self._map_sdk_exception(exc)
+        except BotoCoreError as exc:
+            result = self._map_sdk_exception(exc)
+        else:
+            logger.debug("records_update_ok", table=table.name)
+            return OperationResult.success(data=_deserialize_item(response.get("Attributes", {})))
+        logger.error(
+            "records_update_error",
+            table=table.name,
+            error=result.message,
+            error_code=result.error_code,
+        )
         return result
 
     # ------------------------------------------------------------------

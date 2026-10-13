@@ -4,10 +4,12 @@ Defines the runtime-checkable interface consumed by feature packages and
 infrastructure services, and the vendor-neutral value types it speaks:
 a table declares its key layout once (``RecordTable``) and reads describe
 what they want (``RecordQuery``), never how a backend expresses it.
+Writes to an existing item describe their changes (``RecordChange``) and
+an optional equality guard, never a backend update expression.
 Concrete implementations can vary by backing store.
 """
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from types import MappingProxyType
@@ -124,9 +126,93 @@ def resolve_query_key(table: RecordTable, spec: RecordQuery) -> KeySchema:
     return key
 
 
+@dataclass(frozen=True, slots=True)
+class SetAttribute:
+    """Set a non-key attribute to a value, adding it when absent."""
+
+    attribute: str
+    value: Any
+
+
+@dataclass(frozen=True, slots=True)
+class RemoveAttribute:
+    """Remove a non-key attribute; removing an absent attribute is a no-op."""
+
+    attribute: str
+
+
+@dataclass(frozen=True, slots=True)
+class IncrementAttribute:
+    """Add an integer delta to a numeric attribute; an absent attribute counts as 0."""
+
+    attribute: str
+    delta: int
+
+
+type RecordChange = SetAttribute | RemoveAttribute | IncrementAttribute
+
+type ExpectedValue = KeyValue | bool | None
+
+
+def validate_record_update(
+    table: RecordTable,
+    key: Mapping[str, Any],
+    changes: Sequence[RecordChange],
+    expected: Mapping[str, ExpectedValue] | None,
+) -> None:
+    """Check an update's inputs against the table's key layout.
+
+    Raises:
+        ValueError: The key does not name exactly the table's key attributes,
+            a change or guard entry targets a key attribute, the change set is
+            empty, one attribute is named by more than one change, or an
+            increment delta is not an ``int``. All are caller programming
+            errors, not runtime backend failures.
+    """
+    key_attributes = {table.key.partition} if table.key.sort is None else {table.key.partition, table.key.sort}
+    if set(key) != key_attributes or any(key[attribute] is None for attribute in key_attributes):
+        raise ValueError(f"key must name exactly the key attributes of {table.name!r}: {sorted(key_attributes)}")
+    if not changes:
+        raise ValueError("update requires at least one change")
+    seen: set[str] = set()
+    for change in changes:
+        if change.attribute in key_attributes:
+            raise ValueError(f"change on key attribute {change.attribute!r}")
+        if change.attribute in seen:
+            raise ValueError(f"attribute {change.attribute!r} is named by more than one change")
+        seen.add(change.attribute)
+        if isinstance(change, IncrementAttribute) and type(change.delta) is not int:
+            raise ValueError(f"increment delta for {change.attribute!r} must be an integer")
+    for attribute in expected or {}:
+        if attribute in key_attributes:
+            raise ValueError(f"guard on key attribute {attribute!r}")
+
+
 @runtime_checkable
 class RecordStore(Protocol):
-    """Record operations abstracted over the backing store."""
+    """Record operations abstracted over the backing store.
+
+    Index semantics: an item missing any of an index's key attributes is
+    excluded from that index's queries (sparse indexes), so removing an
+    attribute takes the item out of the index. Index reads may be eventually
+    consistent and index keys are not unique.
+
+    ``update`` changes one existing item atomically and never creates one:
+
+    - every change in the call applies together, or none does;
+    - ``expected`` is an equality guard on non-key attributes, checked in the
+      same atomic step; a ``None`` value means the attribute is absent;
+    - an applied update returns ``success`` with the full updated item, a
+      missing item returns ``NOT_FOUND``, and an unmet guard returns
+      ``success`` with ``data=None`` and nothing written;
+    - an increment is not idempotent: an SDK retry after a lost response may
+      apply it twice, which is acceptable for counters.
+
+    Appending to a list attribute is deliberately not offered: a growing
+    sequence, such as incident timeline entries, is stored as its own records
+    in a separate table. A bounded full-table read is a separate operation,
+    added with its first consumer.
+    """
 
     def put(self, table: RecordTable, item: dict[str, Any]) -> OperationResult: ...
 
@@ -137,3 +223,12 @@ class RecordStore(Protocol):
     def query(self, table: RecordTable, spec: RecordQuery) -> OperationResult: ...
 
     def delete(self, table: RecordTable, key: dict[str, Any]) -> OperationResult: ...
+
+    def update(
+        self,
+        table: RecordTable,
+        key: dict[str, Any],
+        changes: Sequence[RecordChange],
+        *,
+        expected: Mapping[str, ExpectedValue] | None = None,
+    ) -> OperationResult: ...
