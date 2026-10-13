@@ -1,10 +1,10 @@
 ---
 id: TASK-145.3
 title: Make every status-update handler call one service method and render its result
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 19:33'
+updated_date: '2026-10-13 16:02'
 labels:
   - incident
   - features
