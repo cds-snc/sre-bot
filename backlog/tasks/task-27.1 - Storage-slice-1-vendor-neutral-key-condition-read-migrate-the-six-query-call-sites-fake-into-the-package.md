@@ -3,11 +3,11 @@ id: TASK-27.1
 title: >-
   Records slice 1: vendor-neutral key-condition read, migrate the six query call
   sites, fake into the package
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-16 13:57'
-updated_date: '2026-10-13 17:58'
+updated_date: '2026-10-13 18:14'
 labels:
   - infrastructure
   - phase-4
