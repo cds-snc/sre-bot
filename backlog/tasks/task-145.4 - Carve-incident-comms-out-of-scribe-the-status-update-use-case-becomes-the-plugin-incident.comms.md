@@ -3,10 +3,10 @@ id: TASK-145.4
 title: >-
   Carve incident/comms out of scribe: the status-update use case becomes the
   plugin incident.comms
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 19:52'
+updated_date: '2026-10-13 16:02'
 labels:
   - incident
   - features

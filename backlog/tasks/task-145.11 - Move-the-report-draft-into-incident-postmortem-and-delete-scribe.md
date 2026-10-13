@@ -4,7 +4,7 @@ title: Move the report draft into incident/postmortem and delete scribe
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-13 14:01'
+updated_date: '2026-10-13 16:07'
 labels:
   - incident
   - features
@@ -12,6 +12,7 @@ labels:
 dependencies:
   - TASK-145.10
   - TASK-145.9
+  - TASK-134
 parent_task_id: TASK-145
 priority: medium
 type: task

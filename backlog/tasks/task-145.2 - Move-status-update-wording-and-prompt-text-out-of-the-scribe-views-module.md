@@ -1,11 +1,11 @@
 ---
 id: TASK-145.2
 title: Move status-update wording and prompt text out of the scribe views module
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 18:53'
+updated_date: '2026-10-13 16:16'
 labels:
   - incident
   - features

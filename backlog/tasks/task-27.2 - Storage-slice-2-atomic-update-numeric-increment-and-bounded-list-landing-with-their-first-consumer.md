@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-16 13:58'
-updated_date: '2026-10-13 13:41'
+updated_date: '2026-10-13 16:07'
 labels:
   - infrastructure
   - phase-4
@@ -51,6 +51,12 @@ CONDITIONS FROM SLICE 1. gt and between sort-key conditions are still gated on a
 - [ ] #5 Appending to a list attribute is explicitly NOT added to the Protocol; the note recording why, and pointing the incident activity log at TASK-38, is on this task
 - [ ] #6 ruff, mypy (no new errors) and pytest tests --ignore=tests/smoke pass, with the commands and their output recorded in notes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-13: first consumer is whichever lands first of TASK-145.8 (IncidentStore update of one field) and TASK-37.1; TASK-145.8 depends on this task.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
