@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:58'
-updated_date: '2026-09-25 15:00'
+updated_date: '2026-10-13 13:41'
 labels:
   - plugin-architecture
   - dependency-injection
@@ -31,7 +31,7 @@ ordinal: 251000
 decisions/dependency-injection.md replaces cached module-level provider functions with a type-keyed svcs registry. This is the "separate ticket, still to create" its Migration names. It supersedes TASK-29 (an lru_cache @provider registry with a global cache-clearing fixture), which built the pattern the record now replaces.
 
 Decision points implemented here:
-- At startup app/server/ registers one factory per contracts Protocol (storage, coordination to start). The Protocol is the key; the concrete class appears only in the host's registration code.
+- At startup app/server/ registers one factory per contracts Protocol (records, coordination to start). The Protocol is the key; the concrete class appears only in the host's registration code.
 - Eager validation: lifespan resolves every registered service once from a startup container. The boot check is construction plus static validation of the settings slice, with no network I/O (decisions/dependency-injection.md, lifecycle.md phase 2). A missing setting or a failing constructor aborts boot before yield. A factory may register an svcs ping for diagnostics; pings never run at boot or behind the platform health checks.
 - HTTP routes use the svcs FastAPI integration (DepContainer, await services.aget(Protocol)).
 - Slack handlers, webhook consumers and jobs open a container per invocation and close it when the invocation ends.

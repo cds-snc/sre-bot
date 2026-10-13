@@ -1,10 +1,10 @@
 ---
 id: TASK-103
-title: Make StorageService.put_if_not_exists replay-safe against its own SDK retry
+title: Make RecordStore.put_if_not_exists replay-safe against its own SDK retry
 status: To Do
 assignee: []
 created_date: '2026-09-17 20:40'
-updated_date: '2026-09-24 20:11'
+updated_date: '2026-10-13 13:39'
 labels:
   - infrastructure
   - reliability
@@ -12,8 +12,9 @@ labels:
 milestone: m-4
 dependencies:
   - TASK-25.2.5.4
+  - TASK-27.4
 references:
-  - app/infrastructure/storage/service.py
+  - app/infrastructure/records/service.py
   - decisions/plugin-architecture.md
 priority: low
 ordinal: 231000
@@ -24,7 +25,7 @@ ordinal: 231000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Repoints a dangling pointer found while planning TASK-25.2.5.4 on 2026-09-17.
 
-TASK-25.2.5's implementation notes park this hazard with the words "infrastructure/storage/service.py:138 put_if_not_exists has the same self-replay hazard, but it has no production caller today, so no action; it will be relevant to TASK-27." Verified 2026-09-17 that neither TASK-27 nor any of TASK-27.1/27.2/27.3 mentions put_if_not_exists as a replay hazard - TASK-27.2 names the method only as an existing Protocol operation. The pointer goes nowhere, so the finding lives in one task's notes and would be lost when that task closes.
+TASK-25.2.5's implementation notes park this hazard: put_if_not_exists in infrastructure/records/service.py "has the same self-replay hazard, but it has no production caller today, so no action; it will be relevant to TASK-27." Verified 2026-09-17 that neither TASK-27 nor any of TASK-27.1/27.2/27.3 mentions put_if_not_exists as a replay hazard - TASK-27.2 names the method only as an existing Protocol operation. The pointer goes nowhere, so the finding lives in one task's notes and would be lost when that task closes.
 
 THE HAZARD, identical in shape to the one TASK-25.2.5.4 fixes for the idempotency claim: put_if_not_exists issues a conditional PutItem on a retrying client. If the first attempt lands but its response is lost, botocore resends the identical serialized body, the condition now fails, and the caller is told the key already existed when in fact it had just created it.
 

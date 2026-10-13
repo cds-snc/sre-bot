@@ -4,7 +4,7 @@ title: 'People and accounts: identity foundation and first adoption'
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
-updated_date: '2026-09-25 17:05'
+updated_date: '2026-10-13 13:42'
 labels:
   - identity
 dependencies: []
@@ -32,7 +32,7 @@ Emails change and are reassigned, and a second IdP would give one human two addr
 
 CURRENT GAPS (2026-09-25):
 - There is no people table and no person record.
-- StorageService has no atomic write across several items (TASK-83.2), which an identity or account claim plus its link needs.
+- RecordStore has no atomic write across several items (TASK-83.2), which an identity or account claim plus its link needs.
 - The Slack runtime still lives in integrations/slack/. Resolving callers at the entry point needs TASK-26.
 - No Microsoft Graph client exists. It is needed only once Entra becomes a trusted IdP or Teams ships.
 - Who may do what is decided separately, by per-feature access policies and IdP groups (TASK-129).

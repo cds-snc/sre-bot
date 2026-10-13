@@ -16,7 +16,7 @@ That package holds two things at once:
 - access-specific policy and effect: approver resolution from IDP groups, entitlement rules, the Google Workspace membership write, the Access Sync propagation.
 
 Current code:
-- `access/request/store.py` persists the request aggregate through `infrastructure.storage.StorageService`, obtained from `get_storage_service()` in the feature's `providers.py`. Writes are plain puts, so two replicas can both advance the same request.
+- `access/request/store.py` persists the request aggregate through `infrastructure.records.RecordStore`, obtained from `get_record_store()` in the feature's `providers.py`. Writes are plain puts, so two replicas can both advance the same request.
 - `access/request/service.py` emits lifecycle events with `dispatch_background` on the blinker-backed in-process dispatcher. `access/sync` subscribes to `REQUEST_APPROVED`, and `access/request` subscribes to `SYNC_COMPLETED` and `SYNC_FAILED`, each by calling `register_handler` inside its `startup_warmup` hookimpl. A sync result raised on one replica reaches only that replica.
 - No `ApprovalPolicy` or `EffectHandler` type exists yet.
 
@@ -36,7 +36,7 @@ Copying that package per workflow would triplicate the engine and its multi-repl
 
 The host calls the approvals hookspecs once at startup, before the capability initializes, and collects one policy and one effect handler per workflow type. At runtime the engine awaits their async methods; it never calls a pluggy hook per request.
 
-**Storage.** The engine persists through the storage contract, resolved from the registry ([dependency-injection.md](dependency-injection.md)). It never imports `StorageService` or any `infrastructure` module. The single-partition aggregate (request, decisions and audit read in one query) moves from `access/request` into the engine unchanged.
+**Records.** The engine persists through the records contract, resolved from the registry ([dependency-injection.md](dependency-injection.md)). It never imports `RecordStore` or any `infrastructure` module. The single-partition aggregate (request, decisions and audit read in one query) moves from `access/request` into the engine unchanged.
 
 **Once-only transitions.** Every automatic transition (threshold met → `approved`, effect result → `completed` or `failed`) is a conditional write through the coordination contract: it advances only from the expected prior state ([reliability.md](reliability.md)). Together with idempotent effects, this stops two replicas from provisioning twice.
 
@@ -50,7 +50,7 @@ The host calls the approvals hookspecs once at startup, before the capability in
 
 - One approval engine, tested once. A new workflow is a policy, an effect handler and one hookimpl, not a copied package.
 - The access package shrinks to its domain: policy plus the IDP and sync effect.
-- Features test against a fake storage contract and pure policies, without DynamoDB.
+- Features test against a fake records contract and pure policies, without DynamoDB.
 - Cost: extracting the engine refactors shipped code and must preserve `access/request`'s HTTP surface and audit semantics. It lands as a behaviour-preserving change before the new features build on it.
 - Cost: continuation through a queue adds latency and an outbox relay compared with an in-process call.
 
@@ -69,9 +69,10 @@ Tickets: TASK-60 to TASK-63 (engine extraction and the three consumers), TASK-58
 
 Tolerated until closed:
 - the approval engine inside `packages/access/request` (`service.py`, `store.py`, `policies.py`);
-- `access/request/store.py` taking `StorageService` from `infrastructure.storage` through `get_storage_service()`;
+- `access/request/store.py` taking `RecordStore` from `infrastructure.records` through `get_record_store()`;
 - plain puts instead of conditional writes on state transitions;
 - request and sync continuation over `dispatch_background` and `register_handler` on the in-process dispatcher.
 
 **Changes:**
 - 2026-09-24: Migration names epic tickets only; the engine becomes a capability with strategies collected at startup, storage and coordination contracts, and queue-based continuation.
+- 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).

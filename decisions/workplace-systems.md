@@ -23,7 +23,7 @@ Current state:
 
 **Two kinds of external system.**
 
-- **Hosting services:** storage, queue, coordination, secrets and similar backing services. One provider serves the whole deployment, chosen by configuration. Their Protocols live in `app/contracts/` and their implementations in `app/infrastructure/`, which is hosting only ([plugin-architecture.md](plugin-architecture.md)). [cloud-portability.md](cloud-portability.md) governs them.
+- **Hosting services:** records, queue, coordination, secrets and similar backing services. One provider serves the whole deployment, chosen by configuration. Their Protocols live in `app/contracts/` and their implementations in `app/infrastructure/`, which is hosting only ([plugin-architecture.md](plugin-architecture.md)). [cloud-portability.md](cloud-portability.md) governs them.
 - **Workplace systems:** Google Workspace, Microsoft 365, Slack, Teams, and any suite the organization adds. They hold people, their accounts and their artifacts. Several are live at once. Which one applies to an operation is **data**, not configuration:
   - the person's linked account ([people-and-accounts.md](people-and-accounts.md));
   - the artifact's stored reference;
@@ -40,9 +40,9 @@ Current state:
    - Every adapter is a Gateway ([Fowler](https://martinfowler.com/articles/gateway-pattern.html)) governed by [outbound-clients.md](outbound-clients.md) and [sdk-typing.md](sdk-typing.md).
 3. **One instance, several tenants.** Configuration names each workplace tenant the instance works with (a Google Workspace domain, a Microsoft 365 tenant, a Slack workspace, a Teams tenant), each with its own least-privilege credentials. Configuration never selects "the" provider for a workplace concern.
 4. **References carry their system.** Every stored reference to a workplace artifact, account or conversation records the system and tenant alongside the vendor's id. Never store a bare vendor id.
-5. **Records of truth live in app storage.** Workplace documents and spreadsheets are one of two things:
+5. **Records of truth live in the app**, behind the records contract. Workplace documents and spreadsheets are one of two things:
    - **Collaboration spaces:** people work in them, and the app stores a reference.
-   - **Projections:** the app writes derived views of stored records, such as an incident metrics sheet. A projection is never read back as a source of truth and can be rebuilt from storage.
+   - **Projections:** the app writes derived views of stored records, such as an incident metrics sheet. A projection is never read back as a source of truth and can be rebuilt from the stored records.
 
 ## Consequences
 
@@ -61,7 +61,7 @@ Current state:
 
 ## Migration
 
-Tickets: TASK-145 (incident records into storage, decomposed in [incident-management.md](incident-management.md); replaces TASK-38) and TASK-39 (talent-role records, with the role surface rebuild); TASK-119, TASK-120 and TASK-121 (`directory`, `drive` and `spreadsheets` to `app/capabilities/`).
+Tickets: TASK-145 (incident records owned by the app, decomposed in [incident-management.md](incident-management.md); replaces TASK-38) and TASK-39 (talent-role records, with the role surface rebuild); TASK-119, TASK-120 and TASK-121 (`directory`, `drive` and `spreadsheets` to `app/capabilities/`).
 
 Tolerated until then:
 - the three workplace providers in `infrastructure/directory/`, `infrastructure/drive/` and `infrastructure/spreadsheets/`;
@@ -73,3 +73,4 @@ Tolerated until then:
 - 2026-09-24: workplace systems are capabilities and infrastructure is hosting only, per plugin-architecture.md.
 - 2026-09-25: Accepted; Migration names its tickets.
 - 2026-10-02: the incident record, its references and its projection are specified in [incident-management.md](incident-management.md) (TASK-97).
+- 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).

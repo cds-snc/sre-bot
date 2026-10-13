@@ -15,7 +15,7 @@ Everything else is reference: read it when the topic comes up.
 
 ## The vision in three sentences
 
-The app is the organisation's internal operations platform, with incident response as its first-class area ([product-scope.md](product-scope.md)), that other teams extend: a host (`app/server/`) loads feature and capability plugins at startup, and plugins build only against a small public API (`app/contracts/`). **Features** (`app/features/`) hold business logic, **capabilities** (`app/capabilities/`) hold engines and shared business services such as approvals, notifications, people and workplace systems, and neither ever imports the host or the hosting code. **Infrastructure** (`app/infrastructure/`) implements the hosting contracts (storage, queue, coordination, secrets) so the app can move between clouds, and **integrations** (`app/integrations/`) are thin clients for third-party services.
+The app is the organisation's internal operations platform, with incident response as its first-class area ([product-scope.md](product-scope.md)), that other teams extend: a host (`app/server/`) loads feature and capability plugins at startup, and plugins build only against a small public API (`app/contracts/`). **Features** (`app/features/`) hold business logic, **capabilities** (`app/capabilities/`) hold engines and shared business services such as approvals, notifications, people and workplace systems, and neither ever imports the host or the hosting code. **Infrastructure** (`app/infrastructure/`) implements the hosting contracts (records, queue, coordination, secrets) so the app can move between clouds, and **integrations** (`app/integrations/`) are thin clients for third-party services.
 
 ## Record index
 
@@ -24,7 +24,7 @@ The app is the organisation's internal operations platform, with incident respon
 | [governance.md](governance.md) | How decisions are written and changed | now |
 | [product-scope.md](product-scope.md) | What the bot is for, its four product areas, and when an area would leave for its own app | now |
 | [plugin-architecture.md](plugin-architecture.md) | The six layers, their import rules, the service registry, extension points and plugin enablement | target |
-| [workplace-systems.md](workplace-systems.md) | Hosting services vs workplace systems, records of truth in storage | target |
+| [workplace-systems.md](workplace-systems.md) | Hosting services vs workplace systems, records of truth owned by the app | target |
 | [people-and-accounts.md](people-and-accounts.md) | People, IdP identities and linked platform accounts, caller resolution, conversation origin | target |
 | [authorization.md](authorization.md) | Declared permissions, IdP groups mapped to roles, decision lifetime, membership requests written to the IdP | target |
 | [platform-entrypoints.md](platform-entrypoints.md) | Chat platforms split into server entry points, handler contracts and outbound messaging | target |

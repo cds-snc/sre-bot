@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 18:22'
+updated_date: '2026-10-13 14:01'
 labels:
   - incident
   - features
@@ -75,3 +75,9 @@ Capture: reaction on a message in an incident channel -> record and report entry
 ## Blast radius and rollback
 The nudge job and the reactions are low-traffic; the aws_platform deletion is the riskiest step and reverts with the PR.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-13 re-ground: with the TASK-147 postmortem-records flag off, capture and removal behave exactly as today, including the report's timeline section and who may react. The timeline records are written regardless of the flag, but nothing user-facing reads them until it is on. The capture-permission rule is decided by TASK-147.1 and announced by TASK-147.8; this slice does not change it.
+<!-- SECTION:NOTES:END -->
