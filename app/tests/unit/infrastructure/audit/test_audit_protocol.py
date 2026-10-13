@@ -15,7 +15,7 @@ from contracts.operations.result import OperationResult
 from infrastructure.audit.models import AuditEvent
 from infrastructure.audit.protocol import AuditTrailService
 from infrastructure.audit.service import DynamoDBAuditTrailService
-from infrastructure.storage.protocol import StorageService
+from infrastructure.records.protocol import RecordStore
 
 
 class FakeAuditTrailService:
@@ -74,7 +74,7 @@ def test_protocol_is_runtime_checkable() -> None:
 
 def test_dynamodb_audit_satisfies_protocol() -> None:
     """DynamoDBAuditTrailService satisfies AuditTrailService Protocol."""
-    mock_storage = MagicMock(spec=StorageService)
+    mock_storage = MagicMock(spec=RecordStore)
     mock_storage.put.return_value = OperationResult.success(data=None)
 
     impl = DynamoDBAuditTrailService(storage=mock_storage)

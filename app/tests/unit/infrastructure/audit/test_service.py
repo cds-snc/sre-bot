@@ -1,7 +1,7 @@
 """Unit tests for AuditTrailService.
 
 Tests write and query operations on AuditTrailService using a mocked
-StorageService — no DynamoDB calls are made.
+RecordStore — no DynamoDB calls are made.
 """
 
 from datetime import UTC, datetime

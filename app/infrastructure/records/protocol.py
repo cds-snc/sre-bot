@@ -1,4 +1,4 @@
-"""Protocol contract for storage services.
+"""Protocol contract for the record store.
 
 Defines the runtime-checkable interface consumed by feature packages and
 infrastructure services. Concrete implementations can vary by backing store.
@@ -10,8 +10,8 @@ from contracts.operations.result import OperationResult
 
 
 @runtime_checkable
-class StorageService(Protocol):
-    """Storage operations abstracted over the backing store."""
+class RecordStore(Protocol):
+    """Record operations abstracted over the backing store."""
 
     def put(self, table: str, item: dict[str, Any]) -> OperationResult: ...
 

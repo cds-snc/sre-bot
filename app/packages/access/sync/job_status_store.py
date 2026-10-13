@@ -1,6 +1,6 @@
 """Access Sync job and holder status storage.
 
-Wraps ``StorageService`` for job-status polling and lock-holder metadata used by
+Wraps ``RecordStore`` for job-status polling and lock-holder metadata used by
 the access-sync package. Access Sync owns the record serialization and key
 scheme while infrastructure owns DynamoDB transport concerns.
 
@@ -8,15 +8,13 @@ Records are stored as JSON strings in the shared ``sre_bot_idempotency`` table
 to preserve exact primitive types on round-trip.
 """
 
-from __future__ import annotations
-
 import json
 import time
 from typing import Any
 
 import structlog
 
-from infrastructure.storage import StorageService
+from infrastructure.records import RecordStore
 
 logger = structlog.get_logger()
 
@@ -26,7 +24,7 @@ class JobStatusStore:
 
     TABLE = "sre_bot_idempotency"
 
-    def __init__(self, storage: StorageService) -> None:
+    def __init__(self, storage: RecordStore) -> None:
         self._storage = storage
 
     def put(self, key: str, record: dict[str, Any], ttl_seconds: int) -> None:

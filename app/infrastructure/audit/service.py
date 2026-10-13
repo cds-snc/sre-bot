@@ -1,7 +1,7 @@
 """Audit trail service for dependency injection.
 
 Wraps the DynamoDB audit storage operations with a service interface.
-Delegates all I/O to ``StorageService`` — no direct boto3 calls.
+Delegates all I/O to ``RecordStore`` — no direct boto3 calls.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -13,10 +13,10 @@ import structlog
 from contracts.operations.result import OperationResult
 from infrastructure.audit.models import AuditEvent
 from infrastructure.audit.protocol import AuditTrailService
-from infrastructure.storage import get_storage_service
+from infrastructure.records import get_record_store
 
 if TYPE_CHECKING:
-    from infrastructure.storage.protocol import StorageService
+    from infrastructure.records.protocol import RecordStore
 
 logger = structlog.get_logger(__name__)
 
@@ -31,7 +31,7 @@ def _compute_ttl_timestamp(retention_days: int) -> int:
 class DynamoDBAuditTrailService:
     """DynamoDB implementation of audit trail service for structured event storage and retrieval.
 
-    Uses ``StorageService`` for all DynamoDB I/O so serialization,
+    Uses ``RecordStore`` for all DynamoDB I/O so serialization,
     pagination, and error normalisation are handled consistently.
 
     Usage::
@@ -45,7 +45,7 @@ class DynamoDBAuditTrailService:
 
     """
 
-    def __init__(self, storage: StorageService) -> None:
+    def __init__(self, storage: RecordStore) -> None:
         self._storage = storage
         logger.info("initialized_audit_trail_service")
 
@@ -243,5 +243,5 @@ def get_audit_trail_service() -> AuditTrailService:
     events. The implementation uses DynamoDB, but can be swapped for alternative
     audit backends that satisfy the Protocol.
     """
-    storage = get_storage_service()
+    storage = get_record_store()
     return DynamoDBAuditTrailService(storage)

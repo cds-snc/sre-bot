@@ -3,7 +3,7 @@ import functools
 from infrastructure.directory import get_directory_provider
 from infrastructure.events import get_event_dispatcher
 from infrastructure.idempotency import IdempotencyStore, build_idempotency_store
-from infrastructure.storage import get_storage_service
+from infrastructure.records import get_record_store
 from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.common.providers import get_access_runtime_config
 from packages.access.common.settings import AccessSyncSettings, get_access_settings
@@ -47,13 +47,13 @@ def get_access_sync_adapters() -> dict[str, AccessSyncAdapter]:
 @functools.lru_cache(maxsize=1)
 def get_sync_run_repository() -> SyncRunRepository:
     """Return the singleton SyncRunRepository instance."""
-    return SyncRunRepository(storage=get_storage_service())
+    return SyncRunRepository(storage=get_record_store())
 
 
 @functools.lru_cache(maxsize=1)
 def get_access_sync_job_status_store() -> JobStatusStore:
     """Return the singleton JobStatusStore instance."""
-    return JobStatusStore(storage=get_storage_service())
+    return JobStatusStore(storage=get_record_store())
 
 
 @functools.lru_cache(maxsize=1)
