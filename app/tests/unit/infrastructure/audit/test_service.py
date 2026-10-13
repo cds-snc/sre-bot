@@ -14,8 +14,10 @@ import pytest
 from contracts.operations.result import OperationResult
 from infrastructure.audit.models import AuditEvent
 from infrastructure.audit.protocol import AuditTrailService
-from infrastructure.audit.service import AUDIT_TABLE, DynamoDBAuditTrailService
+from infrastructure.audit.service import DynamoDBAuditTrailService, audit_table
 from infrastructure.records.in_memory import InMemoryRecordStore
+
+TABLE_NAME = "audit_events"
 
 
 def _make_event(**kwargs) -> AuditEvent:
@@ -31,7 +33,7 @@ def _make_event(**kwargs) -> AuditEvent:
 
 
 def _make_service(storage: MagicMock | InMemoryRecordStore) -> AuditTrailService:
-    return DynamoDBAuditTrailService(storage=storage)
+    return DynamoDBAuditTrailService(storage=storage, table_name=TABLE_NAME)
 
 
 @pytest.mark.unit
@@ -56,7 +58,7 @@ class TestWriteAuditEvent:
         service.write_audit_event(_make_event())
 
         table, item = storage.put.call_args[0]
-        assert table is AUDIT_TABLE
+        assert table == audit_table(TABLE_NAME)
 
     def test_write_item_contains_required_fields(self):
         storage = MagicMock()
@@ -147,7 +149,7 @@ class TestWriteAuditEvent:
 
 def _seed(store: InMemoryRecordStore, resource_id: str, user: str, timestamp: str, correlation_id: str) -> None:
     store.put(
-        AUDIT_TABLE,
+        audit_table(TABLE_NAME),
         {
             "resource_id": resource_id,
             "timestamp_correlation_id": f"{timestamp}#{correlation_id}",

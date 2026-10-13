@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-10-13 17:59'
+updated_date: '2026-10-13 18:59'
 labels:
   - infrastructure
   - phase-4
@@ -30,7 +30,7 @@ COORDINATOR. Decomposed 2026-09-16 under the single-PR size gate into TASK-27.1,
 
 Aligns with decisions/cloud-portability.md contract 4. Before TASK-27.1, RecordStore.query(table, key_condition: str, ...) in app/infrastructure/records/protocol.py took DynamoDB KeyConditionExpression strings - vendor query syntax leaking through the Protocol, the exact trap the decisions name. A Protocol that cannot be faithfully faked fails the contract.
 
-Shape after TASK-27.1: every RecordStore method takes a RecordTable (table name, KeySchema, logical indexes) declared once per repository, and reads take a typed RecordQuery (partition, optional SortCondition eq/lt/begins_with, logical index, total-cap limit, ASC/DESC). InMemoryRecordStore lives at app/infrastructure/records/in_memory.py, and tests/integration/infrastructure/records/test_records_store_query_conformance.py runs the same cases on the fake and moto-backed DynamoDB. TASK-27.2 adds operations on that shape.
+Shape after TASK-27.1: every RecordStore method takes a RecordTable (table name, KeySchema, logical indexes) declared once per repository (key layout in code, table name from the owning package's settings with the provisioned table as default), and reads take a typed RecordQuery (partition, optional SortCondition eq/lt/begins_with, logical index, total-cap limit, ASC/DESC). InMemoryRecordStore lives at app/infrastructure/records/in_memory.py, and tests/integration/infrastructure/records/test_records_store_query_conformance.py runs the same cases on the fake and moto-backed DynamoDB. TASK-27.2 adds operations on that shape.
 
 Steps:
 1. Redesign the RecordStore surface in capability terms (typed key/attribute conditions or purpose-named methods like get_items_by_partition) such that an in-memory fake and a future Cosmos/Postgres backend can honor it without consumer changes. Design sketch reviewed before implementation (paste in the task notes).

@@ -4,7 +4,7 @@ Wraps ``RecordStore`` to persist and retrieve ``SyncRunRecord`` objects.
 Access Sync owns its key scheme and serialization; all DynamoDB I/O is
 delegated to the infrastructure record store.
 
-Key scheme in ``sre_bot_access``:
+Key scheme (table named by ``ACCESS_SYNC_TABLE_NAME``):
     PK = ``SYNC_RUN#{platform}#{user_email}``
     SK = ``{created_at_iso}#{run_id}``
 
@@ -21,7 +21,12 @@ from packages.access.sync.domain import SyncRunRecord
 
 logger = structlog.get_logger()
 
-SYNC_RUNS_TABLE = RecordTable(name="sre_bot_access", key=KeySchema(partition="PK", sort="SK"))
+SYNC_RUNS_KEY = KeySchema(partition="PK", sort="SK")
+
+
+def sync_runs_table(name: str) -> RecordTable:
+    """Return the sync run key layout bound to the configured table name."""
+    return RecordTable(name=name, key=SYNC_RUNS_KEY)
 
 
 class SyncRunRepository:
@@ -32,10 +37,12 @@ class SyncRunRepository:
 
     Args:
         storage: Configured ``RecordStore`` instance injected by provider.
+        table_name: Record table name from the access sync settings.
     """
 
-    def __init__(self, storage: RecordStore) -> None:
+    def __init__(self, storage: RecordStore, table_name: str) -> None:
         self._storage = storage
+        self._table = sync_runs_table(table_name)
 
     def save(self, record: SyncRunRecord) -> None:
         """Persist a sync run record.  Failure is logged but not propagated."""
@@ -53,7 +60,7 @@ class SyncRunRepository:
             "error_message": record.error_message,
             "created_at": record.created_at.isoformat(),
         }
-        result = self._storage.put(SYNC_RUNS_TABLE, item)
+        result = self._storage.put(self._table, item)
         if not result.is_success:
             logger.error(
                 "sync_run_save_failed",
@@ -70,7 +77,7 @@ class SyncRunRepository:
         """Return recent runs for the given platform + user, newest first."""
         pk = f"SYNC_RUN#{platform}#{user_email}"
         result = self._storage.query(
-            SYNC_RUNS_TABLE,
+            self._table,
             RecordQuery(partition=pk, order=SortOrder.DESC, limit=limit),
         )
         if not result.is_success:

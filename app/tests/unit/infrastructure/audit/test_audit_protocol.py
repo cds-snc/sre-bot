@@ -77,7 +77,7 @@ def test_dynamodb_audit_satisfies_protocol() -> None:
     mock_storage = MagicMock(spec=RecordStore)
     mock_storage.put.return_value = OperationResult.success(data=None)
 
-    impl = DynamoDBAuditTrailService(storage=mock_storage)
+    impl = DynamoDBAuditTrailService(storage=mock_storage, table_name="audit_events")
     assert isinstance(impl, AuditTrailService)
 
 

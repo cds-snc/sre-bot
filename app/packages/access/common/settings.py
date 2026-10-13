@@ -59,6 +59,9 @@ class AccessSyncSettings(BaseModel):
         ACCESS_SYNC_RECONCILIATION_SCHEDULE  — daily sync run time HH:MM (UTC)
         ACCESS_SYNC_JOB_TTL_SECONDS          — retention for completed/failed job records
         ACCESS_SYNC_LOCK_STALE_SECONDS       — running lock older than this is considered stale
+        ACCESS_SYNC_TABLE_NAME               — record table holding sync runs
+        ACCESS_SYNC_JOB_STATUS_TABLE_NAME    — record table holding job and lock-holder status
+                                               (shared with the idempotency store)
     """
 
     enabled: bool = False
@@ -66,6 +69,8 @@ class AccessSyncSettings(BaseModel):
     reconciliation_schedule: str = "03:00"
     job_ttl_seconds: int = 86400
     lock_stale_seconds: int = 14400
+    table_name: str = "sre_bot_access"
+    job_status_table_name: str = "sre_bot_idempotency"
 
 
 class AccessRequestsSettings(BaseModel):
@@ -77,12 +82,14 @@ class AccessRequestsSettings(BaseModel):
                                                   required whenever enabled, no default
         ACCESS_REQUESTS_MIN_APPROVER_COUNT      — minimum affirmative decisions to approve
         ACCESS_REQUESTS_REQUEST_TTL_HOURS       — hours before a pending request expires
+        ACCESS_REQUESTS_TABLE_NAME              — record table holding requests, decisions and audit entries
     """
 
     enabled: bool = False
     fallback_approver_slug: str = ""
     min_approver_count: int = 1
     request_ttl_hours: int = 72
+    table_name: str = "sre_bot_access_requests"
 
     @model_validator(mode="after")
     def _validate_fallback_approver_slug(self) -> AccessRequestsSettings:

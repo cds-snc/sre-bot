@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@me'
 created_date: '2026-09-16 13:57'
-updated_date: '2026-10-13 18:14'
+updated_date: '2026-10-13 18:59'
 labels:
   - infrastructure
   - phase-4
@@ -49,7 +49,7 @@ FAKE. Move the InMemoryRecordStore test fake (TASK-27.4) out of app/tests/unit/i
 
 SIZE. About 165 production LOC: protocol.py ~35, service.py query ~40 changed, the six call sites ~50, the fake ~40 changed. Three directories (infrastructure/records, infrastructure/audit, packages/access), which is at the edge of the two-subsystem rule; if review wants it tighter, split expand/migrate/contract, remembering the TASK-27 decision that no compat overload is retained in the end state.
 
-LANDED SHAPE (app/infrastructure/records/protocol.py). Each repository declares its table once as a module-level RecordTable(name, key: KeySchema(partition, sort), indexes: logical name -> RecordIndex(physical_name, key)). Every RecordStore method takes that table: put, put_if_not_exists (no pk_attribute; the guard covers the full table.key), get, query(table, RecordQuery(partition, sort: SortCondition, index, limit, order)) and delete; limit is a total cap and None returns every match.
+LANDED SHAPE (app/infrastructure/records/protocol.py). Each repository builds its RecordTable once: the key layout (KeySchema, indexes) is declared in code next to the item layout, and the table name comes from the owning package's settings with the provisioned table as default. RecordTable(name, key: KeySchema(partition, sort), indexes: logical name -> RecordIndex(physical_name, key)). Every RecordStore method takes that table: put, put_if_not_exists (no pk_attribute; the guard covers the full table.key), get, query(table, RecordQuery(partition, sort: SortCondition, index, limit, order)) and delete; limit is a total cap and None returns every match.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -81,7 +81,7 @@ TYPES (all in app/infrastructure/records/protocol.py; frozen dataclasses with sl
 - resolve_query_key(table: RecordTable, spec: RecordQuery) -> KeySchema, a pure helper in protocol.py shared by both implementations. It returns the effective KeySchema (table.key, or table.indexes[spec.index].key) and raises ValueError when spec.index is not in table.indexes or when spec.sort is set and the effective key has no sort attribute. ValueError, not OperationResult: the schema and query are static caller code, so a mismatch is a programming error that must fail in every test, while OperationResult errors are reserved for runtime backend failures. One helper means the fake and DynamoDB cannot disagree.
 - RecordStore (every method takes table: RecordTable): put(table, item), put_if_not_exists(table, item) with no pk_attribute (guard derived from table.key), get(table, key), query(table, spec: RecordQuery), delete(table, key).
 
-TABLE SOURCING: every table name is a hardcoded constant today (class TABLE or module TABLE_NAME), not a setting, so each repository declares its RecordTable once as a module-level constant next to the code that owns the item layout, with no settings change. audit/service.py: AUDIT_TABLE = RecordTable("sre_bot_audit_trail", KeySchema("resource_id", "timestamp_correlation_id"), {"by_user": RecordIndex("user_email-timestamp-index", KeySchema("user_email", "timestamp")), "by_correlation": RecordIndex("correlation_id-index", KeySchema("correlation_id"))}). access/request/store.py: RecordTable("sre_bot_access_requests", KeySchema("PK", "SK")). access/sync/store.py: RecordTable("sre_bot_access", KeySchema("PK", "SK")). access/sync/job_status_store.py: RecordTable("sre_bot_idempotency", KeySchema("idempotency_key")). Layouts verified against terraform/dynamodb.tf. The class attribute TABLE is replaced by the constant.
+TABLE SOURCING (amended after review, reviewer decision): hardcoding table names in code is an anti-pattern, so each repository keeps its key layout in code and takes its table name from settings with today's table as the default: AuditSettings.AUDIT_TABLE_NAME (new infrastructure/audit/settings.py), ACCESS_REQUESTS_TABLE_NAME, ACCESS_SYNC_TABLE_NAME and ACCESS_SYNC_JOB_STATUS_TABLE_NAME (access settings slices). Each module exposes <name>_table(name) -> RecordTable and the provider passes the configured name. The layouts below were the original constants; names now default to the same values. audit/service.py: AUDIT_TABLE = RecordTable("sre_bot_audit_trail", KeySchema("resource_id", "timestamp_correlation_id"), {"by_user": RecordIndex("user_email-timestamp-index", KeySchema("user_email", "timestamp")), "by_correlation": RecordIndex("correlation_id-index", KeySchema("correlation_id"))}). access/request/store.py: RecordTable("sre_bot_access_requests", KeySchema("PK", "SK")). access/sync/store.py: RecordTable("sre_bot_access", KeySchema("PK", "SK")). access/sync/job_status_store.py: RecordTable("sre_bot_idempotency", KeySchema("idempotency_key")). Layouts verified against terraform/dynamodb.tf. The class attribute TABLE is replaced by the constant.
 
 STEPS (TDD: tests first, red, then production)
 1. Tests first:
@@ -134,6 +134,14 @@ Evidence (from app/)
 - AC4: rg KeyConditionExpression|ExpressionAttributeValues|key_condition|expression_values|pk_attribute over the records package, audit, access and their tests -> only infrastructure/records/service.py, its unit tests and the vocabulary assertion in test_records_query_spec.py.
 
 Left for the human: code review. Behaviour changes to call out in the PR: limit is a total cap; the fake is keyed by the full key. Table names, Terraform and settings are unchanged.
+
+Review follow-up (PR #1584)
+- MAX_QUERY_LIMIT (100) moved from infrastructure/audit/service.py to infrastructure/audit/protocol.py: it is a documented contract bound of the audit reads, now owned by the Protocol (defaults and docstrings reference it).
+- decisions/cloud-portability.md: the line naming RecordStore.query(key_condition: str) as the counterexample now describes the landed RecordQuery/RecordTable shape; changelog entry added.
+- Table names moved from code to settings (reviewer decision: hardcoded table names are an anti-pattern). New infrastructure/audit/settings.py (AUDIT_TABLE_NAME); access settings gain requests.table_name (ACCESS_REQUESTS_TABLE_NAME), sync.table_name (ACCESS_SYNC_TABLE_NAME) and sync.job_status_table_name (ACCESS_SYNC_JOB_STATUS_TABLE_NAME). Defaults are today's tables, so no Terraform or SSM change. Repositories take table_name; each module exposes <name>_table(name) -> RecordTable with the key layout in code; providers pass the configured name. Access request README notes the setting.
+- Tests: new tests/unit/infrastructure/audit/test_audit_settings_table_name.py and tests/unit/packages/access/common/test_access_settings_table_names.py (defaults, env overrides, provider-built repositories write to the configured table over the in-memory store); existing constructor call sites updated.
+- Still hardcoded, outside this PR: infrastructure/idempotency/dynamodb.py IDEMPOTENCY_TABLE, features/incident/core/adapters/{legacy_incidents,status_updates}.py (direct boto3; move with TASK-145.5), bin/unlock-sync-job.sh, frozen modules/.
+- Gates after the follow-up (from app/): ruff check . -> All checks passed!; lint-imports -> 10 kept, 0 broken; mypy -> 48 errors in 19 files, 0 in touched files; pytest tests --ignore=tests/smoke -> 4685 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

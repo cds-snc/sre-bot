@@ -9,6 +9,9 @@ from typing import Any, Protocol, runtime_checkable
 
 from infrastructure.audit.models import AuditEvent
 
+# Contract bound: a single audit read never returns more than this many events.
+MAX_QUERY_LIMIT = 100
+
 
 @runtime_checkable
 class AuditTrailService(Protocol):
@@ -35,7 +38,7 @@ class AuditTrailService(Protocol):
         resource_id: str,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
-        limit: int = 100,
+        limit: int = MAX_QUERY_LIMIT,
     ) -> list[dict[str, Any]]:
         """Get audit trail for a resource.
 
@@ -43,7 +46,7 @@ class AuditTrailService(Protocol):
             resource_id: Partition key (e.g. group email or resource GUID).
             start_time: Optional lower bound on sort key.
             end_time: Unused — included for API symmetry.
-            limit: Maximum results capped at 100.
+            limit: Maximum results, capped at ``MAX_QUERY_LIMIT`` (100).
 
         Returns:
             List of deserialized event dicts, newest first.
@@ -55,7 +58,7 @@ class AuditTrailService(Protocol):
         user_email: str,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
-        limit: int = 100,
+        limit: int = MAX_QUERY_LIMIT,
     ) -> list[dict[str, Any]]:
         """Get audit trail for a user via GSI (user_email-timestamp-index).
 
@@ -63,7 +66,7 @@ class AuditTrailService(Protocol):
             user_email: User email to query.
             start_time: Optional lower bound on timestamp.
             end_time: Unused — included for API symmetry.
-            limit: Maximum results capped at 100.
+            limit: Maximum results, capped at ``MAX_QUERY_LIMIT`` (100).
 
         Returns:
             List of deserialized event dicts, newest first.

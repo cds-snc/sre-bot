@@ -47,7 +47,7 @@ def _decision(request_id: str, day: int, actor: str) -> ApprovalDecision:
 
 @pytest.fixture
 def repository() -> AccessRequestRepository:
-    repo = AccessRequestRepository(storage=InMemoryRecordStore())
+    repo = AccessRequestRepository(storage=InMemoryRecordStore(), table_name="access_requests")
     repo.save_request(_request("r1"))
     repo.save_decision(_decision("r1", 3, "carol@example.com"))
     repo.save_decision(_decision("r1", 2, "bob@example.com"))

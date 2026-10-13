@@ -29,7 +29,7 @@ def _run(run_id: str, day: int, platform: str = "aws", user: str = "alice@exampl
 
 @pytest.fixture
 def repository() -> SyncRunRepository:
-    repo = SyncRunRepository(storage=InMemoryRecordStore())
+    repo = SyncRunRepository(storage=InMemoryRecordStore(), table_name="sync_runs")
     for run_id, day in (("r1", 1), ("r3", 3), ("r2", 2)):
         repo.save(_run(run_id, day))
     repo.save(_run("other-platform", 4, platform="gcp"))
