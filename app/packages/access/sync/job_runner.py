@@ -24,7 +24,7 @@ from datetime import UTC, datetime
 
 import structlog
 
-from contracts.coordination import ConditionalWriteStore
+from contracts.coordination import LeaseStore
 from packages.access.sync.application import AccessSynchronizer
 from packages.access.sync.domain import ReconciliationOutcome, SyncOutcome
 from packages.access.sync.job_models import (
@@ -55,7 +55,7 @@ logger = structlog.get_logger()
 def run_user_sync_job(
     coordinator: AccessSynchronizer,
     job_status_store: JobStatusStore,
-    lock_store: ConditionalWriteStore,
+    lock_store: LeaseStore,
     claim_token: str,
     job_id: str,
     user_email: str,
@@ -138,7 +138,7 @@ def run_user_sync_job(
 def run_platform_sync_job(
     coordinator: AccessSynchronizer,
     job_status_store: JobStatusStore,
-    lock_store: ConditionalWriteStore,
+    lock_store: LeaseStore,
     claim_token: str,
     job_id: str,
     platform: str,
@@ -249,7 +249,7 @@ def run_platform_sync_job(
 def spawn_user_sync_thread(
     coordinator: AccessSynchronizer,
     job_status_store: JobStatusStore,
-    lock_store: ConditionalWriteStore,
+    lock_store: LeaseStore,
     claim_token: str,
     job_id: str,
     user_email: str,
@@ -297,7 +297,7 @@ def spawn_user_sync_thread(
 def spawn_platform_sync_thread(
     coordinator: AccessSynchronizer,
     job_status_store: JobStatusStore,
-    lock_store: ConditionalWriteStore,
+    lock_store: LeaseStore,
     claim_token: str,
     job_id: str,
     platform: str,

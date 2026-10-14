@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from contracts.coordination import LeaseStore, ReadFailurePolicy
 from infrastructure.coordination import ConditionalWriteSettings, InMemoryConditionalWriteStore
 from packages.access.sync.interactions.ingress import enqueue_platform_sync, enqueue_user_sync
 from packages.access.sync.platform_lock import platform_lock_key, user_lock_key
@@ -23,9 +24,9 @@ class _Settings:
     job_ttl_seconds: int = 14400
 
 
-def _lock_store() -> InMemoryConditionalWriteStore:
+def _lock_store() -> LeaseStore:
     settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
-    return InMemoryConditionalWriteStore(settings=settings)
+    return LeaseStore(InMemoryConditionalWriteStore(settings=settings), read_failure_policy=ReadFailurePolicy.FAIL_CLOSED)
 
 
 def test_enqueue_user_sync_hands_the_lock_owner_token_to_the_job() -> None:

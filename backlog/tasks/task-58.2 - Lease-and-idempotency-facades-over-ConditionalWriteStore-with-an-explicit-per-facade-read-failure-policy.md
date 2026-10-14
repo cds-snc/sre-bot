@@ -3,10 +3,10 @@ id: TASK-58.2
 title: >-
   Lease and idempotency facades over ConditionalWriteStore with an explicit
   per-facade read-failure policy
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-14 17:45'
-updated_date: '2026-10-14 18:31'
+updated_date: '2026-10-14 19:07'
 labels:
   - infrastructure
   - reliability
@@ -37,11 +37,11 @@ Decided 2026-10-14 (human):
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 LeaseStore (lease) and IdempotencyStore (idempotency) facades in app/contracts/coordination/ wrap ConditionalWriteStore; each is constructed with a required read-failure policy, and both are fail-closed
-- [ ] #2 The primitive carries no read-failure policy: a failed contended re-read is reported as ClaimResult.INDETERMINATE with no claim token, and the facades map it to IN_PROGRESS
-- [ ] #3 No second implementation of the conditional-write logic remains, and the DynamoDB own-replay branch is not on the Protocol
-- [ ] #4 Access Sync and the scheduler use LeaseStore; the platform_lock import-linter ignore entry is removed; get_conditional_write_store and reset_conditional_write_store are deleted
-- [ ] #5 decisions/reliability.md describes the facades and the per-facade policy, with a dated change entry
+- [x] #1 LeaseStore (lease) and IdempotencyStore (idempotency) facades in app/contracts/coordination/ wrap ConditionalWriteStore; each is constructed with a required read-failure policy, and both are fail-closed
+- [x] #2 The primitive carries no read-failure policy: a failed contended re-read is reported as ClaimResult.INDETERMINATE with no claim token, and the facades map it to IN_PROGRESS
+- [x] #3 No second implementation of the conditional-write logic remains, and the DynamoDB own-replay branch is not on the Protocol
+- [x] #4 Access Sync and the scheduler use LeaseStore; the platform_lock import-linter ignore entry is removed; get_conditional_write_store and reset_conditional_write_store are deleted
+- [x] #5 decisions/reliability.md describes the facades and the per-facade policy, with a dated change entry
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -135,6 +135,35 @@ uv run ruff check . ; uv run ruff format --check . ; uv run mypy . --exclude '(?
 BLAST RADIUS AND ROLLBACK
 Touches the Access Sync lock path and the three Tier-2 scheduler leases, plus the primitive's claim() return set. A wrong import or signature fails at import time or in the existing Access Sync and scheduler tests, not silently. Runtime behaviour on the failed-re-read path is the only semantic hop (IN_PROGRESS to INDETERMINATE to IN_PROGRESS through the facade) and is pinned by tests on both sides; any direct caller of ConditionalWriteStore.claim added later must handle INDETERMINATE (docstring says so; the facades are the sanctioned callers). No data, schema, terraform or env change. One git revert restores everything. Ordering: TASK-58.1 committed first; TASK-100 later edits only the LeaseStore policy and ReadFailurePolicy; TASK-109 registers ConditionalWriteStore and later the facades; TASK-64 moves run_if_leased from contracts/coordination/lease.py; TASK-37.2 constructs IdempotencyStore with FAIL_CLOSED.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented per the approved plan (TDD: new tests red on ImportError first, then green).
+
+What changed
+- contracts/coordination: ClaimResult.INDETERMINATE (no token, no outcome); policy.py (ReadFailurePolicy.FAIL_CLOSED, resolve_indeterminate with assert_never); lease.py (LeaseStore: acquire, release); idempotency.py (IdempotencyStore: claim, complete, release). Both @final, policy keyword-only and required, no logging, stdlib/contracts imports only. __init__ exports the six names.
+- infrastructure/coordination: DynamoDB claim() returns INDETERMINATE only on a classified re-read failure; item-None stays IN_PROGRESS; unclassified still raises; own-replay branch unchanged. factory.py: get/reset_conditional_write_store and the module singleton deleted; build_lease_store (FAIL_CLOSED) and @cache get_lease_store added. lease.py holds only run_if_leased(lease_store, ...). acquire_lease/release_lease deleted.
+- Consumers: Access Sync platform_lock (contracts only), providers (build_lease_store), job_runner and ingress annotations use LeaseStore; jobs/scheduled_tasks unchanged (get_lease_store now returns LeaseStore).
+- pyproject: platform_lock -> infrastructure.coordination ignore entry removed, shrink-only comment updated.
+- decisions/reliability.md: facade and per-facade policy statement, lease paragraph, new Checks line, Migration, 2026-10-14 Changes entry.
+
+Tests
+- New: tests/unit/contracts/coordination/{conftest.py (ScriptedConditionalWriteStore stub + in-memory fixtures), test_coordination_policy.py, test_coordination_lease_store.py, test_coordination_idempotency_store.py}; tests/unit/infrastructure/coordination/test_coordination_run_if_leased.py (incl. INDETERMINATE: no job, no release).
+- Edited: contracts imports (__all__), store protocol (ClaimResult has four members), DynamoDB operations (INDETERMINATE case + new vanished-record IN_PROGRESS case), store factory (singleton tests dropped; build_lease_store TTL and FAIL_CLOSED, get_lease_store per-TTL cache), legacy path removed (removed helpers and singleton), Access Sync platform_lock/routes/ingress-lock-token/providers, jobs scheduled_tasks.
+- Deleted: test_coordination_lease_helpers.py (cases split into lease store and run_if_leased tests).
+- Plan doubt resolved: test_settings_delegation.py and test_coordination_settings.py never referenced the store singleton; no edit.
+
+Gates (2026-10-14, from app/)
+- uv run ruff check . : All checks passed. ruff format --check: 917 files already formatted.
+- uv run pytest tests --ignore=tests/smoke : 4868 passed.
+- uv run mypy . : 48 errors in 19 files, 0 in touched files (all in modules/, i18n, resilience, configuration docs_generator, incident adapters, integrations; same count as layer 2).
+- make check-fake-coverage : OK, 6 baselined gaps, no baseline edit.
+- uv run lint-imports : 10 kept, 0 broken, no unmatched-ignore error after removing the entry.
+- Sweep: rg acquire_lease|release_lease|get_conditional_write_store|reset_conditional_write_store over app, decisions, bin hits only the legacy-path-removed test; no ConditionalWriteStore in packages/ or jobs/.
+
+PR description must say IdempotencyStore returns with a new meaning (dedup facade) one layer after TASK-58.1 renamed the primitive away from it.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

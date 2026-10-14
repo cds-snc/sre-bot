@@ -49,6 +49,7 @@ class DynamoDBConditionalWriteStore(ConditionalWriteStore):
         - COMPLETED when prior completed outcome exists
         - IN_PROGRESS when another worker currently owns the claim
         - NEW when the contended record is this call's own replayed write
+        - INDETERMINATE when the contended record cannot be read
 
         Claim token. Every call stamps a fresh uuid4 hex into the item. When a response is
         lost (a timeout or a 5xx), botocore resends the identical serialized body, so the
@@ -62,14 +63,12 @@ class DynamoDBConditionalWriteStore(ConditionalWriteStore):
         returns the token on ClaimOutcome, because complete() and release() are conditional
         on it: that ownership rule is part of the Protocol.
 
-        Fail-closed re-read. A classified failure of the ConsistentRead returns IN_PROGRESS:
-        our own put definitively did not land, and an unreadable store is indistinguishable
-        from a real contender. An unclassified error is not downgraded - classify_aws_error
-        re-raises it, because an unknown fault is not evidence of contention. This downgrade
-        is provisional and lease-scoped: decisions/reliability.md treats a Tier-2 lease as a
-        duplication optimization over idempotent job bodies, which argues for failing open,
-        but those bodies are not duplicate-safe yet (TASK-99). Skipping one periodic run
-        stays the safer default until TASK-100 flips the policy.
+        Failed re-read. A classified failure of the ConsistentRead returns INDETERMINATE
+        with no token: our own put definitively did not land, and an unreadable record could
+        be a live claim, a completed one or our own replay. The store carries no policy for
+        it; the LeaseStore and IdempotencyStore facades each resolve it with their own
+        read-failure policy. An unclassified error is not downgraded - classify_aws_error
+        re-raises it, because an unknown fault is not evidence of contention.
         """
         now = int(time.time())
         expires_at = now + self.in_progress_ttl_seconds
@@ -119,7 +118,7 @@ class DynamoDBConditionalWriteStore(ConditionalWriteStore):
                 status=classified_status,
                 error_code=error_code,
             )
-            return ClaimOutcome(result=ClaimResult.IN_PROGRESS)
+            return ClaimOutcome(result=ClaimResult.INDETERMINATE)
 
         if item is None:
             return ClaimOutcome(result=ClaimResult.IN_PROGRESS)

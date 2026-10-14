@@ -10,11 +10,18 @@ from typing import Any, Protocol, runtime_checkable
 
 
 class ClaimResult(Enum):
-    """Result of attempting to claim a key."""
+    """Result of attempting to claim a key.
+
+    INDETERMINATE means the store could not tell whether another claimant holds
+    the key: the conditional write lost, and the consistent re-read that would say
+    whose record it is failed. The store carries no policy for it; the caller's
+    read-failure policy decides (see contracts.coordination.policy).
+    """
 
     NEW = "new"
     COMPLETED = "completed"
     IN_PROGRESS = "in_progress"
+    INDETERMINATE = "indeterminate"
 
 
 @dataclass(frozen=True)
@@ -23,7 +30,8 @@ class ClaimOutcome:
 
     claim_token is set exactly when result is NEW. It is an opaque string that
     proves ownership of the claim: the caller hands it back to complete() or
-    release(), and only the current holder's token is accepted.
+    release(), and only the current holder's token is accepted. An
+    INDETERMINATE result carries no token and no outcome.
     """
 
     result: ClaimResult
@@ -47,7 +55,12 @@ class ConditionalWriteStore(Protocol):
     """
 
     def claim(self, key: str) -> ClaimOutcome:
-        """Attempt to claim a key for execution."""
+        """Attempt to claim a key for execution.
+
+        May return INDETERMINATE when a contended claim cannot be resolved; the
+        caller owns the policy for it. Production callers go through the
+        LeaseStore and IdempotencyStore facades, which resolve it.
+        """
         ...
 
     def complete(self, key: str, outcome: dict[str, Any], claim_token: str) -> bool:

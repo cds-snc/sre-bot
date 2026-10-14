@@ -29,7 +29,10 @@ def test_legacy_modules_are_not_discoverable(module_name: str) -> None:
     assert importlib.util.find_spec(f"infrastructure.coordination.{module_name}") is None
 
 
-@pytest.mark.parametrize("symbol_name", ["ConditionalWriteStore", "ClaimResult", "ClaimOutcome"])
+@pytest.mark.parametrize(
+    "symbol_name",
+    ["ConditionalWriteStore", "ClaimResult", "ClaimOutcome", "LeaseStore", "IdempotencyStore", "ReadFailurePolicy"],
+)
 def test_package_does_not_reexport_contract_names(symbol_name: str) -> None:
     """Contract types are imported from contracts.coordination, never from infrastructure."""
     assert not hasattr(coordination, symbol_name)
@@ -63,3 +66,18 @@ def test_factory_module_no_longer_provides_legacy_cache_builders() -> None:
 def test_dynamodb_module_no_longer_exposes_legacy_cache_class() -> None:
     """DynamoDB adapter keeps only the conditional-write store implementation."""
     assert not hasattr(dynamodb, "".join(("DynamoDB", "Cache")))
+
+
+@pytest.mark.parametrize(
+    "symbol_name",
+    ["acquire_lease", "release_lease", "get_conditional_write_store", "reset_conditional_write_store"],
+)
+def test_package_no_longer_exports_free_lease_helpers_or_store_singleton(symbol_name: str) -> None:
+    """Leases go through the LeaseStore facade, and the unused store singleton is gone."""
+    assert not hasattr(coordination, symbol_name)
+    assert symbol_name not in coordination.__all__
+
+
+@pytest.mark.parametrize("symbol_name", ["get_conditional_write_store", "reset_conditional_write_store"])
+def test_factory_module_no_longer_provides_the_store_singleton(symbol_name: str) -> None:
+    assert not hasattr(factory, symbol_name)

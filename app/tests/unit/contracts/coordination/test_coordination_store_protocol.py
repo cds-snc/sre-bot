@@ -96,13 +96,14 @@ class TestConditionalWriteStoreProtocolShape:
 
 
 class TestClaimResult:
-    """ClaimResult must expose exactly the three documented outcomes."""
+    """ClaimResult must expose exactly the four documented outcomes."""
 
-    def test_has_exactly_three_members(self):
+    def test_has_exactly_four_members(self):
         assert {member.name for member in ClaimResult} == {
             "NEW",
             "COMPLETED",
             "IN_PROGRESS",
+            "INDETERMINATE",
         }
 
 

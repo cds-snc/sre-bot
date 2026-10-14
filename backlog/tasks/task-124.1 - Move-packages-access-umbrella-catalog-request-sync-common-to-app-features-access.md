@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:01'
-updated_date: '2026-10-02 00:47'
+updated_date: '2026-10-14 18:57'
 labels:
   - plugin-architecture
   - features
@@ -22,6 +22,7 @@ dependencies:
   - TASK-122
   - TASK-30
   - TASK-61
+  - TASK-148
 references:
   - decisions/feature-packages.md
   - decisions/plugin-architecture.md
