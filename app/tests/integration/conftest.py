@@ -138,7 +138,7 @@ def mock_settings(make_mock_settings):
 
 
 @pytest.fixture
-def app_with_lifespan(monkeypatch):
+def app_with_lifespan(monkeypatch, static_aws_credentials):
     """Provide a real FastAPI app instance with lifespan context.
 
     This fixture exercises the full app initialization lifecycle including:

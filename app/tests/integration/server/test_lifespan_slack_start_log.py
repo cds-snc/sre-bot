@@ -33,6 +33,7 @@ def provider() -> MagicMock:
 def stubbed_startup(logger: MagicMock, provider: MagicMock) -> Iterator[None]:
     with ExitStack() as stack:
         stack.enter_context(patch("server.lifespan._get_logger_from_app", return_value=logger))
+        stack.enter_context(patch("server.lifespan.initialize_core_services"))
         stack.enter_context(patch("server.lifespan._initialize_security_services"))
         stack.enter_context(patch("server.lifespan._initialize_directory_provider"))
         stack.enter_context(patch("server.lifespan.get_plugin_manager"))

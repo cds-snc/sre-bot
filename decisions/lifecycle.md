@@ -73,7 +73,8 @@ Nothing else calls out before traffic: no connectivity probes, no warmups. Clien
 Tickets: TASK-58 (coordination contract and leases), TASK-109 (service registry), TASK-110 (plugin loading), TASK-98 (lazy AssumeRole), TASK-126 (credential checks and feature isolation), TASK-128 (directory check).
 
 Tolerated until closed:
-- services built lazily or in `startup_warmup` hookimpls instead of an eager registry phase;
+- services not yet registered built lazily or in `startup_warmup` hookimpls; phase 2 resolves the registered records and coordination contracts (TASK-109);
+- phase 2 builds AWS clients, and with only ambient credentials that contacts the instance metadata endpoint before `yield` (TASK-149);
 - network I/O before `yield` that aborts boot on failure: the opt-in directory warmup, and `access/sync`'s AssumeRole during client construction;
 - a feature whose settings fail validation aborts boot instead of being skipped;
 - in-process event subscriptions registered in `startup_warmup` by `access/request` and `access/sync`;
@@ -84,3 +85,4 @@ Tolerated until closed:
 - 2026-09-24: phases aligned with plugin-architecture (config-file enablement, registry validation, extension-point collection, multi-replica); `applies` corrected to `target`.
 - 2026-09-25: only deploy-coupled defects abort boot; a feature with invalid settings is skipped; boot credential checks alert but never abort; readiness is lifespan completion.
 - 2026-10-06: TASK-110 loads plugins from entry points; the filesystem-walk tolerance is closed.
+- 2026-10-14: phase 2 runs in the lifespan for the records and coordination contracts, before plugin loading (TASK-109).

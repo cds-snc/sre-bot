@@ -33,6 +33,7 @@ dependencies = [
     "trello>=0.9.7.3",
     "uvicorn>=0.41.0",
     "email-validator>=2.3.0",
+    "svcs>=26.2",
 ]
 
 # One line per feature plugin (decisions/plugins.md); the group is PLUGIN_NAMESPACE.
@@ -263,8 +264,7 @@ unmatched_ignore_imports_alerting = "error"
 ignore_imports = [
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/plugin-architecture.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one, except an entry approved on a task
-    # that names the task removing it (TASK-145.5's get_record_store wiring, removed by TASK-109;
-    # TASK-58.1's providers -> infrastructure.coordination, removed by TASK-124.1).
+    # that names the task removing it (TASK-58.1's providers -> infrastructure.coordination, removed by TASK-124.1).
     "packages.access.catalog.interactions.http -> infrastructure.security",
     "packages.access.catalog.interactions.http -> infrastructure.security.models",
     "packages.access.catalog.providers -> infrastructure.directory",
@@ -413,3 +413,25 @@ protected_modules = ["slack_bolt"]
 # listener arguments (decisions/platform-entrypoints.md rule 3, transport-slack.md
 # Checks). Direct imports only: chains through integrations are tracked by (e).
 allowed_importers = ["server", "integrations", "modules", "packages.**.entrypoints.slack"]
+
+[[tool.importlinter.contracts]]
+id = "no-provider-imports"
+name = "(k) Nothing outside server imports provider modules or infrastructure implementations"
+type = "forbidden"
+# decisions/dependency-injection.md: the host registers each contract's implementation
+# in the svcs registry (server/services.py) and entry points resolve the Protocol.
+# A service family joins forbidden_modules when its contract is registered. The
+# infrastructure siblings are listed one by one: "infrastructure" as a source would
+# flag a family importing its own modules. Direct imports only.
+source_modules = ["packages", "features", "api", "jobs", "models", "utils", "modules", "integrations", "contracts", "infrastructure.audit", "infrastructure.configuration", "infrastructure.directory", "infrastructure.drive", "infrastructure.events", "infrastructure.i18n", "infrastructure.logging", "infrastructure.resilience", "infrastructure.security", "infrastructure.slack", "infrastructure.spreadsheets"]
+forbidden_modules = ["infrastructure.records", "infrastructure.coordination"]
+allow_indirect_imports = true
+unmatched_ignore_imports_alerting = "error"
+ignore_imports = [
+    # Seeded 2026-10-14 by TASK-109. Shrink-only: each entry names the task that removes it.
+    "packages.access.request.providers -> infrastructure.records",  # TASK-124.1
+    "packages.access.sync.providers -> infrastructure.records",  # TASK-124.1
+    "packages.access.sync.providers -> infrastructure.coordination",  # TASK-124.1
+    "jobs.scheduled_tasks -> infrastructure.coordination",  # TASK-64
+    "infrastructure.audit.service -> infrastructure.records",  # TASK-122
+]

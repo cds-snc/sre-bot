@@ -2363,6 +2363,7 @@ dependencies = [
     { name = "slack-bolt" },
     { name = "slowapi" },
     { name = "structlog" },
+    { name = "svcs" },
     { name = "trello" },
     { name = "uvicorn" },
 ]
@@ -2416,6 +2417,7 @@ requires-dist = [
     { name = "slack-bolt", specifier = ">=1.27.0" },
     { name = "slowapi", specifier = ">=0.1.9" },
     { name = "structlog", specifier = ">=25.5.0" },
+    { name = "svcs", specifier = ">=26.2" },
     { name = "trello", specifier = ">=0.9.7.3" },
     { name = "uvicorn", specifier = ">=0.41.0" },
 ]
@@ -2458,6 +2460,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/ef/52/9ba0f43b686e7f3ddfeaa78ac3af750292662284b3661e91ad5494f21dbc/structlog-25.5.0.tar.gz", hash = "sha256:098522a3bebed9153d4570c6d0288abf80a031dfdb2048d59a49e9dc2190fc98", size = 1460830, upload-time = "2025-10-27T08:28:23.028Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a8/45/a132b9074aa18e799b891b91ad72133c98d8042c70f6240e4c5f9dabee2f/structlog-25.5.0-py3-none-any.whl", hash = "sha256:a8453e9b9e636ec59bd9e79bbd4a72f025981b3ba0f5837aebf48f02f37a7f9f", size = 72510, upload-time = "2025-10-27T08:28:21.535Z" },
+]
+
+[[package]]
+name = "svcs"
+version = "26.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "attrs" },
+    { name = "typing-extensions", marker = "python_full_version < '3.15'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9b/5e/89463bf7613fe723801b8f7000f37c4c36486adcda0d115ca417e513c7cc/svcs-26.2.0.tar.gz", hash = "sha256:129efb89586c2c52295ee00b00562af7d85d5535dad149534993e25fccbd76a6", size = 915193, upload-time = "2026-08-24T12:54:16.474Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/30/75/57ff9e594ee14d0948d3a77546894c5eb89616eeb7d8989962d6bcd1557b/svcs-26.2.0-py3-none-any.whl", hash = "sha256:a1f074f345195b961fbf29af07f6ce181f7598813793773db20cf43870949c81", size = 22319, upload-time = "2026-08-24T12:54:14.953Z" },
 ]
 
 [[package]]

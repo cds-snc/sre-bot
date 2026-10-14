@@ -37,6 +37,7 @@ async def test_lifespan_registers_legacy_slack_commands_before_the_slack_app_is_
     provider.app = None
 
     with (
+        patch("server.lifespan.initialize_core_services"),
         patch("server.lifespan._initialize_security_services"),
         patch("server.lifespan._initialize_directory_provider"),
         patch("server.lifespan._initialize_translation_service"),

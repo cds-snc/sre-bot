@@ -1,8 +1,8 @@
 """Integration tests for how the lifespan loads feature plugins at boot.
 
 The real lifespan runs on a freshly built plugin manager (the singleton cache
-is cleared around each test). Security, directory, Slack provider and feature
-registration are stubbed so only plugin loading is observed. Failure cases
+is cleared around each test). Core services, security, directory, Slack provider
+and feature registration are stubbed so only plugin loading is observed. Failure cases
 swap ``importlib.metadata.distributions`` for a throwaway dist-info
 (``tests.fixtures.plugin_dists``): startup must raise before the lifespan
 yields, because a feature that cannot load must stop the process instead of
@@ -58,6 +58,7 @@ def _fresh_plugin_manager() -> Iterator[None]:
 def _stub_startup(stack: ExitStack, *, stub_translation: bool) -> None:
     provider = MagicMock()
     provider.app = None
+    stack.enter_context(patch("server.lifespan.initialize_core_services"))
     stack.enter_context(patch("server.lifespan._initialize_security_services"))
     stack.enter_context(patch("server.lifespan._initialize_directory_provider"))
     stack.enter_context(patch("server.lifespan.get_slack_provider", return_value=provider))

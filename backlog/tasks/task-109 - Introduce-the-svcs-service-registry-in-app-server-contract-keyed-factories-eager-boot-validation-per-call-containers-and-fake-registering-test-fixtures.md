@@ -3,10 +3,10 @@ id: TASK-109
 title: >-
   Introduce the svcs service registry in app/server/: contract-keyed factories,
   eager boot validation, per-call containers and fake-registering test fixtures
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-24 19:58'
-updated_date: '2026-10-14 18:58'
+updated_date: '2026-10-14 19:25'
 labels:
   - plugin-architecture
   - dependency-injection
@@ -45,14 +45,14 @@ Out of scope: moving each consumer off its infrastructure get_* provider. Each p
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 svcs is a runtime dependency (app/pyproject.toml and uv.lock); app/server/services.py registers a factory for RecordStore and ConditionalWriteStore, and concrete class names appear only there (AST test)
-- [ ] #2 A registered factory that raises aborts lifespan before yield, and lifespan phase 2 runs before plugin loading (boot tests)
-- [ ] #3 A route on a test app resolves a service through svcs.fastapi.DepContainer, and a Slack-style handler and a job-style function each resolve through a per-invocation container that is closed afterwards, including when they raise; no production caller resolves from the registry in this task
-- [ ] #4 tests/fixtures/service_registry.py registers the in-memory fakes under the contracts Protocol keys; no new test clears a cache for a registry-resolved service
-- [ ] #5 Import-linter contract (k) forbids infrastructure.records and infrastructure.coordination outside server/, seeds the current violations as ignore entries that each name their removing task, and has unmatched_ignore_imports_alerting = error
-- [ ] #6 dependency-injection.md Migration and Changes record the registry for records and coordination; testing.md (Substitution and the provider-clearing tolerance) and lifecycle.md Migration match; ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #7 Boot test: with static AWS credentials and the instance metadata endpoint disabled, resolving every registered service opens no outbound connection (socket.connect spy); the ambient-credential case is TASK-149
-- [ ] #8 Contract (b)'s shrink-only comment names no TASK-145.5/TASK-109 exception; if TASK-145.5 landed first with a get_record_store ignore entry, that wiring resolves RecordStore from the registry and the entry is removed
+- [x] #1 svcs is a runtime dependency (app/pyproject.toml and uv.lock); app/server/services.py registers a factory for RecordStore and ConditionalWriteStore, and concrete class names appear only there (AST test)
+- [x] #2 A registered factory that raises aborts lifespan before yield, and lifespan phase 2 runs before plugin loading (boot tests)
+- [x] #3 A route on a test app resolves a service through svcs.fastapi.DepContainer, and a Slack-style handler and a job-style function each resolve through a per-invocation container that is closed afterwards, including when they raise; no production caller resolves from the registry in this task
+- [x] #4 tests/fixtures/service_registry.py registers the in-memory fakes under the contracts Protocol keys; no new test clears a cache for a registry-resolved service
+- [x] #5 Import-linter contract (k) forbids infrastructure.records and infrastructure.coordination outside server/, seeds the current violations as ignore entries that each name their removing task, and has unmatched_ignore_imports_alerting = error
+- [x] #6 dependency-injection.md Migration and Changes record the registry for records and coordination; testing.md (Substitution and the provider-clearing tolerance) and lifecycle.md Migration match; ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #7 Boot test: with static AWS credentials and the instance metadata endpoint disabled, resolving every registered service opens no outbound connection (socket.connect spy); the ambient-credential case is TASK-149
+- [x] #8 Contract (b)'s shrink-only comment names no TASK-145.5/TASK-109 exception; if TASK-145.5 landed first with a get_record_store ignore entry, that wiring resolves RecordStore from the registry and the entry is removed
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -250,11 +250,42 @@ BLAST RADIUS AND ROLLBACK
 - One git revert restores everything.
 <!-- SECTION:PLAN:END -->
 
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented per the approved plan (TDD: the new tests were red on ModuleNotFoundError server.services first).
+
+What changed
+- app/pyproject.toml + uv.lock: svcs>=26.2 (26.2.0 installed).
+- server/services.py (new): CoreService (frozen dataclass: contract, build); CORE_SERVICES for RecordStore and ConditionalWriteStore (DynamoDB stores, default in-progress TTL); _once gives each registration a lock-guarded build-once factory, so each registry builds its own instances; register_core_services(registry); async initialize_core_services(registry, logger) registers, resolves each contract through a container, logs phase=core_services. The functions read CORE_SERVICES at call time.
+- server/lifespan.py: @svcs.fastapi.lifespan, signature (app, registry) -> AsyncGenerator[None]; phase 2 runs after config listing and before security, directory, Slack and plugin loading. The name lifespan is kept, so server.py and existing tests are unchanged.
+- pyproject contract (k) no-provider-imports: forbidden infrastructure.records and infrastructure.coordination; sources = every root package except server, plus the infrastructure subpackages other than records and coordination (notifications and operations are leftover directories, not packages, so they are left out). 5 seeds, each naming its remover: access request/sync providers (TASK-124.1, x3), jobs.scheduled_tasks (TASK-64), infrastructure.audit.service (TASK-122). Contract (b)'s comment no longer names the TASK-145.5/109 exception (145.5 has not landed, so no entry existed).
+- decisions: dependency-injection.md (In place paragraph, tolerances incl. TASK-148/149, Changes), testing.md (Substitution, tolerance, Changes), lifecycle.md (tolerances, Changes). plugin-architecture.md:122 already states the target check; no edit.
+
+Tests
+- New: tests/fixtures/service_registry.py (build_fake_service_registry), service_registry and static_aws_credentials fixtures in tests/conftest.py; tests/unit/server/test_server_services_registration.py (resolution, singleton per registry, new registry new instances, late fake overrides, AST scan for concrete names outside infrastructure/), test_server_services_fixture.py, test_server_services_entry_points.py (route via DepContainer on a test app; Slack-style and job-style per-invocation containers with a generator-cleanup spy, incl. raising; unregistered contract raises ServiceNotFoundError); tests/integration/server/test_lifespan_core_services.py (raising factory aborts before yield; phase 2 before plugin loading; socket.connect spy sees zero connects).
+- Edited: the three lifespan stub tests patch server.lifespan.initialize_core_services; tests/api/conftest.py autouses static_aws_credentials; tests/integration/conftest.py app_with_lifespan requests it.
+- Finding: with no credential files (as in CI), phase 2's boto3 clients make 2 connects to 169.254.169.254. A temporary connect-spy plugin (scratchpad, not committed) showed 6 test files newly reaching it; after the fixes only tests/integration/jobs/test_scheduled_tasks_integration.py does, and it did so before this change (left alone). Recorded on TASK-149. Locally ~/.aws credentials hide this.
+
+Gates (2026-10-14, from app/)
+- uv run ruff check . : All checks passed. ruff format --check: clean after formatting one new test.
+- uv run pytest tests --ignore=tests/smoke : 4885 passed.
+- uv run mypy . : 48 errors in 19 files, 0 in touched files (same set as layer 3).
+- uv run lint-imports : 11 kept, 0 broken; (k) KEPT (5 ignored imports), no unmatched-ignore error.
+- make check-runtime-imports : OK. make check-fake-coverage : OK, 6 baselined gaps. make lock-check : Resolved 191 packages.
+- Sweep: svcs appears only in server/services.py, server/lifespan.py and pyproject.toml outside tests; the concrete store names appear in server/ only in services.py.
+<!-- SECTION:NOTES:END -->
+
 ## Comments
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-10-14 18:02
 ---
 2026-10-14 (human): TASK-109 is the last layer of Stack C (TASK-102 -> TASK-58.1 -> TASK-58.2 -> TASK-109), after the coordination facades. It registers both contracts it names: records (RecordStore) and coordination (ConditionalWriteStore, the primitive TASK-58.1 moves to app/contracts/coordination/). Consumers still move off their get_* providers when their package moves (out of scope here). Note for planning: TASK-58.1 re-points the providers import-linter ignore entry to infrastructure.coordination, removed by TASK-124.1, not by this task.
+---
+
+created: 2026-10-14 19:08
+---
+2026-10-14 (human): plan approved as one PR.
 ---
 <!-- COMMENTS:END -->
