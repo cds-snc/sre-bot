@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-13 16:06'
+updated_date: '2026-10-14 23:11'
 labels:
   - incident
   - features
@@ -77,3 +77,9 @@ Over the gate as one task (~700 lines); each proposed half about 350.
 ## Blast radius and rollback
 Declare is the most-used surface; the legacy path is removed in the same PR, so a revert restores it. Deploy in a quiet window.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-14 (TASK-145.5 split): create sets open_bucket OPEN and opened_at (fixed-width ISO-8601 UTC, microseconds, +00:00) in the same write, and every reference takes its tenant from the event payload (Slack team_id), not from settings.
+<!-- SECTION:NOTES:END -->

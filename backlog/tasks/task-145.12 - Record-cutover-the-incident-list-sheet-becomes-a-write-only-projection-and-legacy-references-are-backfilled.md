@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-13 19:59'
+updated_date: '2026-10-14 23:11'
 labels:
   - incident
   - features
@@ -72,6 +72,12 @@ About 350 production lines plus the backfill job.
 ## Blast radius and rollback
 Sheet consumers see the same rows; a wrong backfill is rerunnable (idempotent) and the previous item fields are kept, not deleted. Revert restores the sheet reads.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-14 (TASK-145.5 split): references carry the vendor's own tenant id: the Slack team_id and the Google Workspace customer id from the platform settings added in TASK-145.5.3, never an invented label. The open-index reconcile in TASK-145.5.7 is the pattern to reuse for this backfill (runner options and references recorded there), with TASK-27.5's full-table read.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

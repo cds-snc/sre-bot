@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-13 14:00'
+updated_date: '2026-10-14 23:11'
 labels:
   - incident
   - features
@@ -92,4 +92,6 @@ Behaviour-preserving behind the legacy module; a bad merge of the Docs adapter b
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-13 re-ground: IncidentReport stays one feature-owned Google Docs adapter; no documents capability until a second suite or consumer exists (decisions/workplace-systems.md rule 2). Under the TASK-147 flag the report becomes the narrative document only (TASK-147.7); with the flag off its behaviour is today's. ProductCatalog over Drive folders is interim: products are a record of truth that belongs in the app's records (DRAFT-2).
+
+2026-10-14 (TASK-145.5 split): conversation_is_writable (the second part of the command check, incident-management.md:44) moved here from TASK-145.5 and is served by IncidentConversation. The 2026-10-09 plan predates the split and the svcs registry; re-plan after TASK-145.5.5 is implemented. Stack K layer 10.
 <!-- SECTION:NOTES:END -->

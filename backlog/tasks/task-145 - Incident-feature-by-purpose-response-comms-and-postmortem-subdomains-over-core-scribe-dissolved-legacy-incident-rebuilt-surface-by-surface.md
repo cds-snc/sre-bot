@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:41'
-updated_date: '2026-10-13 14:01'
+updated_date: '2026-10-14 23:11'
 labels:
   - incident
   - features
@@ -33,7 +33,7 @@ STARTING POINT (2026-10-09): main is at f5aa2ca5 with TASK-144.1 to TASK-144.3 m
 
 ASSUMPTIONS IN FORCE (change them here before the slice that depends on them starts):
 - the umbrella moves to app/features/incident/ in the first slice, as it stands and with no runtime change, so every later slice builds in its final home; the package-shape check, enablement and TOML settings arrive with TASK-114, TASK-112 and TASK-111 on their own;
-- the incident record store is an interim adapter in core/adapters/ over the existing DynamoDB table, behind an IncidentStore interface and an in-memory fake, as the status-update store already is; TASK-108 and TASK-109 later swap its inside for the records contract;
+- the incident record store is built over the records contract (RecordStore) behind an IncidentStore interface and an in-memory fake, obtained through the svcs registry; the status-update store moves onto the records contract in TASK-145.5.6 (updated 2026-10-14);
 - the comms carve-out moves the scribe-local TextGenerator interface, its OpenAI binding and the availability predicate whole; draft and summarize keep calling the Summarizer directly until TASK-25.10 replaces both with the capability, so nothing is duplicated;
 - each legacy surface is pinned (TASK-36.1 for commands and interactions, TASK-36.3 for jobs) before the slice that rebuilds it; command names, modal fields, replies and i18n keys do not change during the rebuild, apart from three added role pickers and the SEV0 option in the severity pickers;
 - the alert buttons register into the webhooks capability's extension point when it exists, otherwise through the Slack registrar with a later move;
@@ -43,7 +43,7 @@ ASSUMPTIONS IN FORCE (change them here before the slice that depends on them sta
 
 LAYERS, each a single PR under the size gate, merged bottom-up (a gh stack is acceptable within a group):
 A. In place, after TASK-144: TASK-145.1 (the umbrella moves to features/incident with the first-mover wiring) -> TASK-145.2 (status-update wording and prompt text out of the views module) -> TASK-145.3 (status-update handlers call one service method each) -> TASK-145.4 (comms carved out of scribe as plugin incident.comms).
-B. Core, after TASK-145.1: TASK-145.5 (record, interim store, severity, five roles, two-part command check, common/) -> TASK-145.6 (resource interfaces: conversation, report absorbing documents/, drive/ and scribe's section writer, product catalog; transcript reader takes the reference).
+B. Core, after TASK-145.1: TASK-145.5 (record, store over the records contract, severity, five roles, the conversation lookup, common/; split into TASK-145.5.1 to TASK-145.5.7 with TASK-152 and TASK-27.5, Stack K) -> TASK-145.6 (resource interfaces, with conversation_is_writable: conversation, report absorbing documents/, drive/ and scribe's section writer, product catalog; transcript reader takes the reference).
 C. Response, after pinning: TASK-145.7 (declare and the alert buttons; meet/ folds into core) -> TASK-145.8 (status, severity, show and update, roles, archive, recreate) -> TASK-145.9 (timeline capture, nudge job; summarize moves in; incident leaves aws_platform).
 D. Postmortem, after TASK-138: TASK-145.10 (meeting scheduling over the calendar capability) -> TASK-145.11 (draft moves in; scribe deleted).
 E. Cutover: TASK-145.12 (list sheet becomes a write-only projection; references backfilled) -> TASK-145.13 (delete app/modules/incident; layers contract response | comms | postmortem exhaustive).

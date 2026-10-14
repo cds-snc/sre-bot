@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-13 19:59'
+updated_date: '2026-10-14 23:11'
 labels:
   - incident
   - features
@@ -15,6 +15,7 @@ dependencies:
   - TASK-145.8
   - TASK-36.3
   - TASK-25.10
+  - TASK-145.5.7
 parent_task_id: TASK-145
 priority: medium
 type: feature
@@ -81,6 +82,8 @@ The nudge job and the reactions are low-traffic; the aws_platform deletion is th
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-13 re-ground: with the TASK-147 postmortem-records flag off, capture and removal behave exactly as today, including the report's timeline section and who may react. The timeline records are written regardless of the flag, but nothing user-facing reads them until it is on. The capture-permission rule is decided by TASK-147.1 and announced by TASK-147.8; this slice does not change it.
+
+2026-10-14 (TASK-145.5 split): precondition before this task merges: the TASK-145.5.7 open-index reconcile has run (dry run, then apply) in each environment after TASK-145.8 deployed and reported pending=0; this task (or TASK-145.5.7's contract step) removes the reconcile. Timeline key format supersedes 'ts#entry_id': partition incident_id, sort entry_key '<posted_at ISO-8601 UTC, microseconds, +00:00>#<entry_id>', where entry_id is a uuid5 over system, tenant, conversation and message id for captured messages (a re-capture writes the same key, so put_if_not_exists dedupes) and a uuid4 for manual entries; the Slack ts stays in the source_message reference. The GSIs use projection ALL. IAM index access comes from TASK-152.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
