@@ -3,10 +3,10 @@ id: TASK-152
 title: >-
   Grant DynamoDB index access in the task role: /index/* for the audit trail,
   retry records and incidents tables
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-14 23:08'
-updated_date: '2026-10-14 23:25'
+updated_date: '2026-10-14 23:39'
 labels:
   - terraform
   - infrastructure
@@ -42,7 +42,7 @@ Bottom layer of Stack K (handoff doc-13).
 <!-- AC:BEGIN -->
 - [x] #1 terraform/iam.tf has a separate statement allowing only dynamodb:Query on <table arn>/index/* for sre_bot_audit_trail, sre_bot_retry_records and incidents; the table statement and every other table's indexes are unchanged
 - [ ] #2 After the apply, aws iam simulate-principal-policy for the sre-bot-ecs-role returns allowed for dynamodb:Query on an audit trail index ARN and implicitDeny for an index ARN of a table not in the list; the output is recorded in the notes
-- [ ] #3 terraform fmt -check passes and tflint reports no finding in iam.tf (baseline on main 2026-10-14: 7 pre-existing warnings, none in iam.tf), and the tf_plan comment on the PR shows only the change to the sre-botSecretsManagerKeyRetrieval policy document
+- [x] #3 terraform fmt -check passes and tflint reports no finding in iam.tf (baseline on main 2026-10-14: 7 pre-existing warnings, none in iam.tf), and the tf_plan comment on the PR shows only the change to the sre-botSecretsManagerKeyRetrieval policy document
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -92,6 +92,8 @@ Python gates (no app change, from app/):
 - pytest tests --ignore=tests/smoke: 4884 passed, 1 failed. The failure is test_old_idempotency_package_is_not_discoverable, a local leftover: an ignored app/infrastructure/idempotency/__pycache__ directory makes find_spec return a namespace package. It is not caused by this change and passes on a clean checkout.
 
 AC 2 waits for the post-apply simulate-principal-policy run (plan step 4).
+
+tf_plan on PR #1595 (2026-10-14): Plan 0 to add, 1 to change, 0 to destroy; the only change is aws_iam_policy.sre-bot_secrets_manager, which gains one statement allowing dynamodb:Query on table/{sre_bot_retry_records,sre_bot_audit_trail,incidents}/index/*. Init, validate, fmt, plan and conftest all succeeded. The plan's deprecation warnings (hash_key) and conftest Missing Common Tags warnings were already there and don't involve iam.tf.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
