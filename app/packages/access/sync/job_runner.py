@@ -56,6 +56,7 @@ def run_user_sync_job(
     coordinator: AccessSynchronizer,
     job_status_store: JobStatusStore,
     lock_store: IdempotencyStore,
+    claim_token: str,
     job_id: str,
     user_email: str,
     platform: str,
@@ -131,13 +132,14 @@ def run_user_sync_job(
 
     payload = record.to_dict()
     job_status_store.put(job_id, payload, ttl_seconds=job_ttl_seconds)
-    release_lock(user_lock_key(platform, user_email), lock_store)
+    release_lock(user_lock_key(platform, user_email), lock_store, claim_token)
 
 
 def run_platform_sync_job(
     coordinator: AccessSynchronizer,
     job_status_store: JobStatusStore,
     lock_store: IdempotencyStore,
+    claim_token: str,
     job_id: str,
     platform: str,
     dry_run: bool,
@@ -236,7 +238,7 @@ def run_platform_sync_job(
 
     payload = record.to_dict()
     job_status_store.put(job_id, payload, ttl_seconds=job_ttl_seconds)
-    release_lock(platform_lock_key(platform), lock_store)
+    release_lock(platform_lock_key(platform), lock_store, claim_token)
 
 
 # ---------------------------------------------------------------------------
@@ -248,6 +250,7 @@ def spawn_user_sync_thread(
     coordinator: AccessSynchronizer,
     job_status_store: JobStatusStore,
     lock_store: IdempotencyStore,
+    claim_token: str,
     job_id: str,
     user_email: str,
     platform: str,
@@ -276,6 +279,7 @@ def spawn_user_sync_thread(
             "coordinator": coordinator,
             "job_status_store": job_status_store,
             "lock_store": lock_store,
+            "claim_token": claim_token,
             "job_id": job_id,
             "user_email": user_email,
             "platform": platform,
@@ -294,6 +298,7 @@ def spawn_platform_sync_thread(
     coordinator: AccessSynchronizer,
     job_status_store: JobStatusStore,
     lock_store: IdempotencyStore,
+    claim_token: str,
     job_id: str,
     platform: str,
     dry_run: bool,
@@ -316,6 +321,7 @@ def spawn_platform_sync_thread(
             "coordinator": coordinator,
             "job_status_store": job_status_store,
             "lock_store": lock_store,
+            "claim_token": claim_token,
             "job_id": job_id,
             "platform": platform,
             "dry_run": dry_run,

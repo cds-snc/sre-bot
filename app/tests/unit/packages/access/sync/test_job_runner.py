@@ -48,6 +48,7 @@ def test_run_user_sync_job_writes_completed_record_with_action_lists():
         coordinator=coordinator,
         job_status_store=job_status_store,
         lock_store=lock_store,
+        claim_token="claim-token-1",
         job_id="job-completed-1",
         user_email="alice@example.com",
         platform="aws",
@@ -64,7 +65,7 @@ def test_run_user_sync_job_writes_completed_record_with_action_lists():
     assert record["actions_planned"] == ["provision_user", "apply_entitlement"]
     assert record["actions_applied"] == ["provision_user", "apply_entitlement"]
     assert record["requires_manual_action"] is False
-    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:alice@example.com")
+    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:alice@example.com", "claim-token-1")
 
 
 @pytest.mark.unit
@@ -84,6 +85,7 @@ def test_run_user_sync_job_writes_failed_record_on_coordinator_failure():
         coordinator=coordinator,
         job_status_store=job_status_store,
         lock_store=lock_store,
+        claim_token="claim-token-1",
         job_id="job-fail-1",
         user_email="bob@example.com",
         platform="aws",
@@ -97,7 +99,7 @@ def test_run_user_sync_job_writes_failed_record_on_coordinator_failure():
     record = job_args[1]
     assert record["status"] == JobStatus.FAILED
     assert "error" in record
-    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:bob@example.com")
+    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:bob@example.com", "claim-token-1")
 
 
 @pytest.mark.unit
@@ -112,6 +114,7 @@ def test_run_user_sync_job_sanitizes_exception_to_sync_failed():
         coordinator=coordinator,
         job_status_store=job_status_store,
         lock_store=lock_store,
+        claim_token="claim-token-1",
         job_id="job-exc-1",
         user_email="carol@example.com",
         platform="aws",
@@ -126,7 +129,7 @@ def test_run_user_sync_job_sanitizes_exception_to_sync_failed():
     assert record["status"] == JobStatus.FAILED
     assert record["error"] == SyncJobError.SYNC_FAILED
     assert "credential" not in record.get("error", "")
-    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:carol@example.com")
+    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:carol@example.com", "claim-token-1")
 
 
 @pytest.mark.unit
@@ -148,6 +151,7 @@ def test_run_user_sync_job_releases_lock_after_completion():
         coordinator=coordinator,
         job_status_store=job_status_store,
         lock_store=lock_store,
+        claim_token="claim-token-1",
         job_id="job-lock-1",
         user_email="dave@example.com",
         platform="aws",
@@ -157,7 +161,7 @@ def test_run_user_sync_job_releases_lock_after_completion():
         job_ttl_seconds=86400,
     )
 
-    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:dave@example.com")
+    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:dave@example.com", "claim-token-1")
 
 
 # ---------------------------------------------------------------------------
@@ -195,6 +199,7 @@ def test_run_platform_sync_job_writes_in_progress_sentinel_then_completed():
         coordinator=coordinator,
         job_status_store=job_status_store,
         lock_store=lock_store,
+        claim_token="claim-token-1",
         job_id="plat-job-1",
         platform="aws",
         dry_run=False,
@@ -220,7 +225,7 @@ def test_run_platform_sync_job_writes_in_progress_sentinel_then_completed():
     assert final["action_counts"]["apply_entitlement"] == 2
     assert final["lifecycle_actions"]["remove_user"] == ["carol@example.com"]
     assert final["entitlements_by_action"]["apply_entitlement"]["sg-aws-admin"] == ["alice@example.com"]
-    lock_store.release.assert_called_once_with("access_sync:platform_lock:aws")
+    lock_store.release.assert_called_once_with("access_sync:platform_lock:aws", "claim-token-1")
 
 
 @pytest.mark.unit
@@ -240,6 +245,7 @@ def test_run_platform_sync_job_releases_platform_lock_on_failure():
         coordinator=coordinator,
         job_status_store=job_status_store,
         lock_store=lock_store,
+        claim_token="claim-token-1",
         job_id="plat-fail-1",
         platform="aws",
         dry_run=False,
@@ -250,7 +256,7 @@ def test_run_platform_sync_job_releases_platform_lock_on_failure():
 
     final_args, _ = job_status_store.put.call_args_list[-1]
     assert final_args[1]["status"] == JobStatus.FAILED
-    lock_store.release.assert_called_once_with("access_sync:platform_lock:aws")
+    lock_store.release.assert_called_once_with("access_sync:platform_lock:aws", "claim-token-1")
 
 
 @pytest.mark.unit
@@ -265,6 +271,7 @@ def test_run_platform_sync_job_sanitizes_exception_to_sync_failed():
         coordinator=coordinator,
         job_status_store=job_status_store,
         lock_store=lock_store,
+        claim_token="claim-token-1",
         job_id="plat-exc-1",
         platform="aws",
         dry_run=False,
@@ -279,7 +286,7 @@ def test_run_platform_sync_job_sanitizes_exception_to_sync_failed():
     assert record["status"] == JobStatus.FAILED
     assert record["error"] == SyncJobError.SYNC_FAILED
     assert "network down" not in record.get("error", "")
-    lock_store.release.assert_called_once_with("access_sync:platform_lock:aws")
+    lock_store.release.assert_called_once_with("access_sync:platform_lock:aws", "claim-token-1")
 
 
 @pytest.mark.unit
@@ -301,6 +308,7 @@ def test_run_user_sync_job_releases_via_lock_store_not_idempotency_set():
         coordinator=coordinator,
         job_status_store=job_status_store,
         lock_store=lock_store,
+        claim_token="claim-token-1",
         job_id="job-lock-store-user-1",
         user_email="eve@example.com",
         platform="aws",
@@ -311,7 +319,7 @@ def test_run_user_sync_job_releases_via_lock_store_not_idempotency_set():
     )
 
     assert job_status_store.put.call_count == 1
-    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:eve@example.com")
+    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:eve@example.com", "claim-token-1")
 
 
 @pytest.mark.unit
@@ -340,6 +348,7 @@ def test_run_platform_sync_job_releases_via_lock_store_not_idempotency_set():
         coordinator=coordinator,
         job_status_store=job_status_store,
         lock_store=lock_store,
+        claim_token="claim-token-1",
         job_id="job-lock-store-platform-1",
         platform="aws",
         dry_run=False,
@@ -349,4 +358,4 @@ def test_run_platform_sync_job_releases_via_lock_store_not_idempotency_set():
     )
 
     assert job_status_store.put.call_count == 2
-    lock_store.release.assert_called_once_with("access_sync:platform_lock:aws")
+    lock_store.release.assert_called_once_with("access_sync:platform_lock:aws", "claim-token-1")

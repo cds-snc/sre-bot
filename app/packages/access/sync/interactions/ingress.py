@@ -88,13 +88,14 @@ def enqueue_user_sync(
     lock_payload["job_id"] = job_id
     lock_payload["started_at"] = started_at
 
-    if not acquire_lock(
+    claim_token = acquire_lock(
         lock_key=lock_key,
         payload=lock_payload,
         lock_store=lock_store,
         job_status_store=job_status_store,
         ttl_seconds=settings.job_ttl_seconds,
-    ):
+    )
+    if claim_token is None:
         running = current_holder(lock_key, job_status_store) or {}
         existing_job_id = running.get("job_id", "")
         logger.bind(platform=platform, user_email=user_email).info("user_sync_already_running", existing_job_id=existing_job_id)
@@ -113,6 +114,7 @@ def enqueue_user_sync(
         coordinator=coordinator,
         job_status_store=job_status_store,
         lock_store=lock_store,
+        claim_token=claim_token,
         job_id=job_id,
         user_email=user_email,
         platform=platform,
@@ -169,13 +171,14 @@ def enqueue_platform_sync(
     lock_payload["job_id"] = job_id
     lock_payload["started_at"] = started_at
 
-    if not acquire_lock(
+    claim_token = acquire_lock(
         lock_key=lock_key,
         payload=lock_payload,
         lock_store=lock_store,
         job_status_store=job_status_store,
         ttl_seconds=settings.job_ttl_seconds,
-    ):
+    )
+    if claim_token is None:
         running = current_holder(lock_key, job_status_store) or {}
         existing_job_id = running.get("job_id", "")
         logger.bind(platform=platform).info("platform_sync_already_running", existing_job_id=existing_job_id)
@@ -194,6 +197,7 @@ def enqueue_platform_sync(
         coordinator=coordinator,
         job_status_store=job_status_store,
         lock_store=lock_store,
+        claim_token=claim_token,
         job_id=job_id,
         platform=platform,
         dry_run=dry_run,

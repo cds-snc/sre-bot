@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:58'
-updated_date: '2026-10-14 15:54'
+updated_date: '2026-10-14 18:02'
 labels:
   - plugin-architecture
   - dependency-injection
@@ -14,6 +14,7 @@ milestone: m-7
 dependencies:
   - TASK-108
   - TASK-58
+  - TASK-58.2
   - TASK-92
 references:
   - decisions/dependency-injection.md
@@ -53,3 +54,12 @@ Out of scope: moving each consumer off its infrastructure get_* provider. Each p
 - [ ] #7 Boot test: resolving every registered service opens no outbound connection (socket.connect spy)
 - [ ] #8 The import-linter ignore entry TASK-145.5 adds for its get_record_store wiring is removed, and the named-exception wording in contract (b)'s shrink-only comment is dropped when no exception remains
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-14 18:02
+---
+2026-10-14 (human): TASK-109 is the last layer of Stack C (TASK-102 -> TASK-58.1 -> TASK-58.2 -> TASK-109), after the coordination facades. It registers both contracts it names: records (RecordStore) and coordination (ConditionalWriteStore, the primitive TASK-58.1 moves to app/contracts/coordination/). Consumers still move off their get_* providers when their package moves (out of scope here). Note for planning: TASK-58.1 re-points the providers import-linter ignore entry to infrastructure.coordination, removed by TASK-124.1, not by this task.
+---
+<!-- COMMENTS:END -->

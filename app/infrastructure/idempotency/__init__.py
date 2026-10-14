@@ -20,7 +20,7 @@ Usage:
         raise RuntimeError("request is already being processed")
 
     result = execute_operation(...)
-    store.complete(idempotency_key, result)
+    store.complete(idempotency_key, result, outcome.claim_token)
     return result
 """
 

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-17 20:39'
-updated_date: '2026-09-18 15:27'
+updated_date: '2026-10-14 17:46'
 labels:
   - infrastructure
   - reliability
@@ -17,6 +17,7 @@ dependencies:
   - TASK-99
   - TASK-102
   - TASK-58
+  - TASK-58.2
 references:
   - decisions/reliability.md
   - app/infrastructure/idempotency/dynamodb.py

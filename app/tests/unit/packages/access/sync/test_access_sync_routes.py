@@ -160,7 +160,7 @@ def test_sync_endpoint_user_sync_returns_existing_job_when_lock_held():
         ),
         patch(
             "packages.access.sync.interactions.ingress.acquire_lock",
-            return_value=False,
+            return_value=None,
         ),
         patch(
             "packages.access.sync.interactions.ingress.current_holder",
@@ -282,6 +282,7 @@ def test_run_user_sync_job_stores_completed_outcome():
         coordinator=coordinator,
         job_status_store=fake_job_status_store,
         lock_store=lock_store,
+        claim_token="claim-token-1",
         job_id="job-1",
         user_email="user@example.com",
         platform="aws",
@@ -301,7 +302,7 @@ def test_run_user_sync_job_stores_completed_outcome():
     assert stored["actions_applied"] == ["provision_user"]
     assert stored["user_email"] == "user@example.com"
 
-    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:user@example.com")
+    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:user@example.com", "claim-token-1")
 
 
 @pytest.mark.unit
@@ -321,6 +322,7 @@ def test_run_user_sync_job_stores_failed_outcome_on_coordinator_error():
         coordinator=coordinator,
         job_status_store=fake_job_status_store,
         lock_store=lock_store,
+        claim_token="claim-token-1",
         job_id="job-2",
         user_email="user@example.com",
         platform="aws",
@@ -338,7 +340,7 @@ def test_run_user_sync_job_stores_failed_outcome_on_coordinator_error():
     assert stored["status"] == "failed"
     assert "error" in stored
 
-    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:user@example.com")
+    lock_store.release.assert_called_once_with("access_sync:user_lock:aws:user@example.com", "claim-token-1")
 
 
 @pytest.mark.unit
@@ -393,6 +395,7 @@ def test_run_user_sync_job_stores_failed_outcome_on_exception():
         coordinator=coordinator,
         job_status_store=fake_job_status_store,
         lock_store=lock_store,
+        claim_token="claim-token-1",
         job_id="job-3",
         user_email="user@example.com",
         platform="aws",
@@ -421,6 +424,7 @@ def test_run_user_sync_job_sanitizes_error_to_sync_failed_on_exception():
         coordinator=coordinator,
         job_status_store=fake_job_status_store,
         lock_store=lock_store,
+        claim_token="claim-token-1",
         job_id="job-4",
         user_email="user@example.com",
         platform="aws",

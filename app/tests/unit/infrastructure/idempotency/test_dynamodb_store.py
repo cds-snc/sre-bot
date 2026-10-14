@@ -57,6 +57,7 @@ class TestDynamoDBIdempotencyStoreClaimNewKey:
         outcome = store.claim("feature:intent:new-key")
 
         assert outcome.result is ClaimResult.NEW
+        assert outcome.claim_token == dynamodb_client.put_item.call_args.kwargs["Item"]["claim_token"]["S"]
         assert dynamodb_client.put_item.call_count == 1
         call_kwargs = dynamodb_client.put_item.call_args.kwargs
         assert call_kwargs["TableName"] == "test_idempotency_store"
@@ -114,6 +115,7 @@ class TestDynamoDBIdempotencyStoreClaimConflict:
         outcome = store.claim("feature:intent:replayed-key")
 
         assert outcome.result is ClaimResult.NEW
+        assert outcome.claim_token == dynamodb_client.put_item.call_args.kwargs["Item"]["claim_token"]["S"]
 
     def test_claim_on_in_progress_record_with_another_token_returns_in_progress(self, dynamodb_client, store):
         """A token that is not ours is a real contender, not our own replay."""
@@ -181,8 +183,9 @@ class TestDynamoDBIdempotencyStoreComplete:
     def test_complete_writes_completed_status_outcome_json_and_ttl(self, dynamodb_client, store):
         dynamodb_client.put_item.return_value = {}
 
-        store.complete("feature:intent:key", {"status": "ok"})
+        completed = store.complete("feature:intent:key", {"status": "ok"}, FOREIGN_CLAIM_TOKEN)
 
+        assert completed is True
         call_kwargs = dynamodb_client.put_item.call_args.kwargs
         assert call_kwargs["TableName"] == "test_idempotency_store"
         item = call_kwargs["Item"]
@@ -192,12 +195,12 @@ class TestDynamoDBIdempotencyStoreComplete:
 
 
 class TestDynamoDBIdempotencyStoreRelease:
-    def test_release_deletes_the_record(self, dynamodb_client, store):
+    def test_release_deletes_the_record_by_key(self, dynamodb_client, store):
         dynamodb_client.delete_item.return_value = {}
 
-        store.release("feature:intent:key")
+        released = store.release("feature:intent:key", FOREIGN_CLAIM_TOKEN)
 
-        dynamodb_client.delete_item.assert_called_once_with(
-            TableName="test_idempotency_store",
-            Key={"idempotency_key": {"S": "feature:intent:key"}},
-        )
+        assert released is True
+        call_kwargs = dynamodb_client.delete_item.call_args.kwargs
+        assert call_kwargs["TableName"] == "test_idempotency_store"
+        assert call_kwargs["Key"] == {"idempotency_key": {"S": "feature:intent:key"}}
