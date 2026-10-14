@@ -7,7 +7,7 @@ from typing import Any
 
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
-from infrastructure.records.protocol import (
+from contracts.records import (
     ExpectedValue,
     IncrementAttribute,
     KeySchema,

@@ -8,8 +8,8 @@ missing key attributes, copy isolation and sparse-index exclusion.
 import pytest
 
 from contracts.operations.status import OperationStatus
+from contracts.records import KeySchema, RecordIndex, RecordQuery, RecordTable
 from infrastructure.records.in_memory import InMemoryRecordStore
-from infrastructure.records.protocol import KeySchema, RecordIndex, RecordQuery, RecordTable
 
 pytestmark = pytest.mark.unit
 

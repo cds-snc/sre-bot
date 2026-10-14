@@ -12,8 +12,8 @@ from typing import Any
 
 import pytest
 
+from contracts.records import KeySchema, RecordIndex, RecordStore, RecordTable
 from infrastructure.records.in_memory import InMemoryRecordStore
-from infrastructure.records.protocol import KeySchema, RecordIndex, RecordStore, RecordTable
 from infrastructure.records.service import DynamoDBRecordStore
 from integrations.aws import client as aws_client
 from integrations.aws.settings import get_aws_settings

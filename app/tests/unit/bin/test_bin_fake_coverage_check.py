@@ -326,5 +326,5 @@ def test_real_tree_has_no_net_new_gaps():
     current = checker.find_current_violations()
 
     assert current - checker.load_baseline_entries() == set()
-    assert "infrastructure/records/protocol.py:RecordStore" not in current
+    assert "contracts/records/store.py:RecordStore" not in current
     assert "infrastructure/idempotency/protocol.py:IdempotencyStore" not in current

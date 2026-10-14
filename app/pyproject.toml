@@ -262,7 +262,8 @@ allow_indirect_imports = true
 unmatched_ignore_imports_alerting = "error"
 ignore_imports = [
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/plugin-architecture.md Migration).
-    # Shrink-only: remove an entry when its import is fixed; never add one.
+    # Shrink-only: remove an entry when its import is fixed; never add one, except an entry approved on a task
+    # that names the task removing it (TASK-145.5's get_record_store wiring, removed by TASK-109).
     "packages.access.catalog.interactions.http -> infrastructure.security",
     "packages.access.catalog.interactions.http -> infrastructure.security.models",
     "packages.access.catalog.providers -> infrastructure.directory",
@@ -279,7 +280,6 @@ ignore_imports = [
     "packages.access.request.service -> infrastructure.directory.models",
     "packages.access.request.service -> infrastructure.directory.provider",
     "packages.access.request.service -> infrastructure.events",
-    "packages.access.request.store -> infrastructure.records.protocol",
     "packages.access.sync -> infrastructure.events",
     "packages.access.sync.application -> infrastructure.events",
     "packages.access.sync.desired_state -> infrastructure.directory.provider",
@@ -288,14 +288,12 @@ ignore_imports = [
     "packages.access.sync.interactions.ingress -> infrastructure.idempotency",
     "packages.access.sync.interactions.slack -> infrastructure.i18n",
     "packages.access.sync.job_runner -> infrastructure.idempotency",
-    "packages.access.sync.job_status_store -> infrastructure.records",
     "packages.access.sync.platform_lock -> infrastructure.idempotency",
     "packages.access.sync.presenters -> infrastructure.i18n",
     "packages.access.sync.providers -> infrastructure.directory",
     "packages.access.sync.providers -> infrastructure.events",
     "packages.access.sync.providers -> infrastructure.idempotency",
     "packages.access.sync.providers -> infrastructure.records",
-    "packages.access.sync.store -> infrastructure.records.protocol",
     "packages.geolocate.platforms.slack -> infrastructure.i18n",
     "features.incident.core.adapters.i18n -> infrastructure.i18n",
     "features.incident.drive.adapters.google_drive -> infrastructure.configuration.integrations.google",

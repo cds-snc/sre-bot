@@ -27,7 +27,7 @@ from datetime import UTC, datetime
 
 import structlog
 
-from infrastructure.records.protocol import (
+from contracts.records import (
     KeySchema,
     RecordQuery,
     RecordStore,

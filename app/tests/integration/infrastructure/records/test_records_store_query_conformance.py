@@ -9,7 +9,7 @@ order, total-cap limits and logical index queries.
 import pytest
 
 from contracts.operations.status import OperationStatus
-from infrastructure.records.protocol import RecordQuery, RecordStore, SortCondition, SortOperator, SortOrder
+from contracts.records import RecordQuery, RecordStore, SortCondition, SortOperator, SortOrder
 
 from .conftest import RECORDS_TEST_TABLE as TABLE
 

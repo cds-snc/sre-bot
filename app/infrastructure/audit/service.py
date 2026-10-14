@@ -11,11 +11,7 @@ from typing import Any
 import structlog
 
 from contracts.operations.result import OperationResult
-from infrastructure.audit.models import AuditEvent
-from infrastructure.audit.protocol import MAX_QUERY_LIMIT, AuditTrailService
-from infrastructure.audit.settings import get_audit_settings
-from infrastructure.records import get_record_store
-from infrastructure.records.protocol import (
+from contracts.records import (
     KeySchema,
     RecordIndex,
     RecordQuery,
@@ -25,6 +21,10 @@ from infrastructure.records.protocol import (
     SortOperator,
     SortOrder,
 )
+from infrastructure.audit.models import AuditEvent
+from infrastructure.audit.protocol import MAX_QUERY_LIMIT, AuditTrailService
+from infrastructure.audit.settings import get_audit_settings
+from infrastructure.records import get_record_store
 
 logger = structlog.get_logger(__name__)
 

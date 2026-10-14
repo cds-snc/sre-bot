@@ -11,7 +11,7 @@ import pytest
 from botocore.exceptions import ClientError
 
 import infrastructure.records.service as service_module
-from infrastructure.records.protocol import (
+from contracts.records import (
     KeySchema,
     RecordIndex,
     RecordQuery,

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-13 19:59'
+updated_date: '2026-10-14 15:21'
 labels:
   - incident
   - features
@@ -89,6 +89,8 @@ Read-only over the existing table; no new consumer except the existing lookup ca
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-13 re-plan before pickup: IncidentStore is built over RecordStore (the records contract: TASK-27.4, TASK-27.1, TASK-108), not an interim adapter over get_aws_client; the plan's step 4 and AC #5 are rewritten at re-plan. The incident record also carries the postmortem facts that TASK-147.2 builds on.
+
+2026-10-14 wiring: this task does not wait for TASK-109. IncidentStore obtains its RecordStore through the get_record_store provider that decisions/dependency-injection.md tolerates until TASK-109 closes it, with exactly one import-linter ignore entry for that import; TASK-109's migration to the svcs registry removes the entry.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

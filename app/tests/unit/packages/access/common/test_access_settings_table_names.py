@@ -11,8 +11,8 @@ from datetime import UTC, datetime
 
 import pytest
 
+from contracts.records import RecordQuery
 from infrastructure.records.in_memory import InMemoryRecordStore
-from infrastructure.records.protocol import RecordQuery
 from packages.access.common import settings as access_settings
 from packages.access.common.settings import AccessSettings
 from packages.access.request import providers as request_providers

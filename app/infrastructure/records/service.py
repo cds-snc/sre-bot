@@ -5,7 +5,7 @@ Provides a clean interface over a typed boto3 DynamoDB client from
 type conversion via boto3's built-in ``TypeSerializer`` / ``TypeDeserializer``.
 
 Feature packages MUST NOT call boto3 clients directly. Instead, define a thin
-repository class that takes ``infrastructure.records.protocol.RecordStore``
+repository class that takes ``contracts.records.RecordStore``
 as a constructor argument, declares its ``RecordTable`` once, and delegates
 all DynamoDB I/O here.
 """
@@ -20,7 +20,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
-from infrastructure.records.protocol import (
+from contracts.records import (
     ExpectedValue,
     IncrementAttribute,
     KeySchema,

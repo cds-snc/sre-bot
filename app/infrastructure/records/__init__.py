@@ -1,41 +1,10 @@
-"""Records contract: the RecordStore protocol, its value types and DynamoDB provider.
+"""DynamoDB-backed records provider.
 
-Provides an infrastructure-level abstraction over DynamoDB with automatic
-Python ↔ DynamoDB type conversion via boto3's TypeSerializer/TypeDeserializer.
+The RecordStore Protocol and its value types live in ``contracts.records``;
+this package holds the DynamoDB implementation, the in-memory fake and the
+``get_record_store`` provider.
 """
 
-from infrastructure.records.protocol import (
-    ExpectedValue,
-    IncrementAttribute,
-    KeySchema,
-    KeyValue,
-    RecordChange,
-    RecordIndex,
-    RecordQuery,
-    RecordStore,
-    RecordTable,
-    RemoveAttribute,
-    SetAttribute,
-    SortCondition,
-    SortOperator,
-    SortOrder,
-)
 from infrastructure.records.service import get_record_store
 
-__all__ = [
-    "ExpectedValue",
-    "IncrementAttribute",
-    "KeySchema",
-    "KeyValue",
-    "RecordChange",
-    "RecordIndex",
-    "RecordQuery",
-    "RecordStore",
-    "RecordTable",
-    "RemoveAttribute",
-    "SetAttribute",
-    "SortCondition",
-    "SortOperator",
-    "SortOrder",
-    "get_record_store",
-]
+__all__ = ["get_record_store"]

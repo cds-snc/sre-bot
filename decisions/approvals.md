@@ -16,7 +16,7 @@ That package holds two things at once:
 - access-specific policy and effect: approver resolution from IDP groups, entitlement rules, the Google Workspace membership write, the Access Sync propagation.
 
 Current code:
-- `access/request/store.py` persists the request aggregate through `infrastructure.records.RecordStore`, obtained from `get_record_store()` in the feature's `providers.py`. Writes are plain puts, so two replicas can both advance the same request.
+- `access/request/store.py` persists the request aggregate through `contracts.records.RecordStore`, obtained from `get_record_store()` in the feature's `providers.py`. Writes are plain puts, so two replicas can both advance the same request.
 - `access/request/service.py` emits lifecycle events with `dispatch_background` on the blinker-backed in-process dispatcher. `access/sync` subscribes to `REQUEST_APPROVED`, and `access/request` subscribes to `SYNC_COMPLETED` and `SYNC_FAILED`, each by calling `register_handler` inside its `startup_warmup` hookimpl. A sync result raised on one replica reaches only that replica.
 - No `ApprovalPolicy` or `EffectHandler` type exists yet.
 
