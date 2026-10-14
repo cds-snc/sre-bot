@@ -60,6 +60,20 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
     ]
 
   }
+
+  statement {
+    effect = "Allow"
+
+    actions = [
+      "dynamodb:Query"
+    ]
+
+    resources = [
+      "${aws_dynamodb_table.incidents_table.arn}/index/*",
+      "${aws_dynamodb_table.sre_bot_audit_trail.arn}/index/*",
+      "${aws_dynamodb_table.sre_bot_retry_records.arn}/index/*"
+    ]
+  }
 }
 
 resource "aws_iam_policy" "sre-bot_secrets_manager" {

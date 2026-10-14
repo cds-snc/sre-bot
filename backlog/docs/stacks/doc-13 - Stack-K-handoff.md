@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: '2026-10-14 22:27'
-updated_date: '2026-10-14 23:20'
+updated_date: '2026-10-14 23:25'
 ---
 # Stack K handoff
 
@@ -19,8 +19,8 @@ updated_date: '2026-10-14 23:20'
 
 | # | Task | Branch | PR | State | Notes |
 | --- | --- | --- | --- | --- | --- |
-| 0 | Planning edits (tasks and docs below) | `stack-k/plan` | - | ready | Uncommitted. Docs and task files only. |
-| 1 | TASK-152 IAM `/index/*` grants (audit trail, retry records, incidents) | `stack-k/task-152-iam-index-grants` | - | plan approved | Plan approved 2026-10-14 (task comment). |
+| 0 | Planning edits (tasks and docs) | `stack-k/plan` | - | ready | Committed 64e442d. Docs and task files only. |
+| 1 | TASK-152 IAM `/index/*` grants (audit trail, retry records, incidents) | `stack-k/task-152-iam-index-grants` | - | ready (uncommitted) | Implemented; AC 1 checked. AC 3 waits on the tf_plan PR comment, AC 2 on the post-apply simulation. |
 | 2 | TASK-145.5.1 incidents GSIs (ALL), timeline table, devcontainer script run locally | - | - | planned | |
 | 3 | TASK-145.5.2 ServiceScopeOpener for Slack and job registrars; dependency-injection.md | - | - | planned | Bolt middleware alternative recorded in the task. |
 | 4 | TASK-145.5.3 vocabulary, record, references, core settings, platform tenant ids | - | - | planned | Plan settles how the Google customer id is validated (no Google enabled flag today). |
@@ -33,27 +33,28 @@ updated_date: '2026-10-14 23:20'
 
 ## Position
 
-- Checked out: `main` at d2a61f13, no stack branch yet.
-- Uncommitted, all for layer 0 (`stack-k/plan`):
-  - `backlog/docs/doc-2*`, `backlog/docs/stacks/doc-13*` (this doc);
-  - `backlog/drafts/draft-3 -*`, `backlog/drafts/draft-4 -*` (tenant rename);
-  - tasks 27.5, 58, 140.11, 145, 145.5, 145.6, 145.7, 145.9, 145.12 (modified) and 145.5.1 to 145.5.7, 152 (new).
-- Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-11*` (updated this session, still a working file), `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`.
+- Checked out: `stack-k/task-152-iam-index-grants`, on top of `stack-k/plan` (64e442d).
+- Uncommitted, all for layer 1: `terraform/iam.tf`, `backlog/tasks/task-152 -*` (In Progress, AC 1 checked, notes).
+- Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-11*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`.
+- Local only: an ignored `app/infrastructure/idempotency/__pycache__` directory makes `test_old_idempotency_package_is_not_discoverable` fail; `rm -rf app/infrastructure/idempotency` clears it (cache files only).
 - No background agents.
 
 ## Next actions
 
-1. **human**: create the stack with the planning layer and layer 1, commit layer 0, and switch to layer 1:
+1. **human**: commit layer 1, submit layers 0 and 1, and request review of both together:
    ```
-   gh stack init stack-k/plan stack-k/task-152-iam-index-grants
-   gh stack checkout stack-k/plan
-   git add "backlog/docs/doc-2 - Delivery-Sequence-and-Stacked-Pull-Requests.md" backlog/docs/stacks/doc-13* backlog/drafts/draft-3\ -* backlog/drafts/draft-4\ -* backlog/tasks/task-27.5\ -* backlog/tasks/task-58\ -* backlog/tasks/task-140.11\ -* backlog/tasks/task-145\ -* backlog/tasks/task-145.5\ -* backlog/tasks/task-145.5.*\ -* backlog/tasks/task-145.6\ -* backlog/tasks/task-145.7\ -* backlog/tasks/task-145.9\ -* backlog/tasks/task-145.12\ -* backlog/tasks/task-152\ -*
-   git commit -m "plan: split TASK-145.5 into Stack K layers"
-   gh stack rebase
-   gh stack checkout stack-k/task-152-iam-index-grants
+   git add terraform/iam.tf backlog/tasks/task-152\ -* backlog/docs/stacks/doc-13*
+   git commit -m "TASK-152 grant DynamoDB index Query"
+   gh stack submit
    ```
-2. **agent**: implement layer 1 (TASK-152), run the gates, check ACs 1 and 3, write notes; AC 2 waits for the post-apply simulation.
-3. **human**: `gh stack submit`, then request review of layers 0 and 1 together.
+2. **agent**: read the tf_plan comment on the layer 1 PR; check AC 3 if the plan shows only the sre-botSecretsManagerKeyRetrieval policy document change (the three index ARNs).
+3. **agent**: plan layer 2 (TASK-145.5.1) with `/plan-task task-145.5.1`; the human approves it in a task comment.
+4. **human**: once the plan is approved, create layer 2: `gh stack add stack-k/task-145.5.1-incidents-gsis`.
+5. **human**: after layers 0 and 1 are approved, merge them bottom-up (layer 1 is a standalone Terraform merge; merging runs tf_apply against production). Then run the simulation from TASK-152 plan step 4 and paste the output:
+   ```
+   aws iam simulate-principal-policy --policy-source-arn <sre-bot-ecs-role ARN> --action-names dynamodb:Query --resource-arns <audit trail table ARN>/index/correlation_id-index <webhooks table ARN>/index/x
+   ```
+6. **agent**: record the simulation output in the TASK-152 notes and check AC 2 (expect allowed, then implicitDeny).
 
 ## Open decisions
 
@@ -61,4 +62,4 @@ updated_date: '2026-10-14 23:20'
 
 ## Planning queue
 
-- TASK-145.5.1 to TASK-145.5.7, TASK-27.5, TASK-145.6: each planned in turn after the layer below is implemented.
+- TASK-145.5.1 (next, item 3), then TASK-145.5.2 to TASK-145.5.7, TASK-27.5, TASK-145.6: each planned in turn after the layer below is implemented.
