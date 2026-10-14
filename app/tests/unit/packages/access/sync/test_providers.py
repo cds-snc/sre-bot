@@ -91,7 +91,7 @@ def test_get_access_sync_lock_store_is_singleton(monkeypatch: pytest.MonkeyPatch
 
     monkeypatch.setattr(providers, "get_access_sync_settings", lambda: _Settings())
     monkeypatch.setattr(
-        "packages.access.sync.providers.build_idempotency_store",
+        "packages.access.sync.providers.build_conditional_write_store",
         lambda in_progress_ttl_seconds: built.pop(0),
     )
 
@@ -124,7 +124,7 @@ def test_get_access_sync_lock_store_uses_lock_stale_seconds(monkeypatch: pytest.
 
     monkeypatch.setattr(providers, "get_access_sync_settings", lambda: _Settings())
     monkeypatch.setattr(
-        "packages.access.sync.providers.build_idempotency_store",
+        "packages.access.sync.providers.build_conditional_write_store",
         _build_store,
     )
 

@@ -3,7 +3,7 @@ id: doc-2
 title: Delivery Sequence and Stacked Pull Requests
 type: guide
 created_date: '2026-09-24 20:23'
-updated_date: '2026-10-13 14:04'
+updated_date: '2026-10-14 18:02'
 ---
 # Delivery Sequence and Stacked Pull Requests
 
@@ -56,7 +56,7 @@ These are git write operations and are run by the developer; agents do not run t
 
 TASK-18, TASK-105 -> TASK-105.1 -> TASK-105.2 -> TASK-105.3 -> TASK-106 -> TASK-26.1 (as TASK-26.1.1 -> TASK-26.1.2 -> TASK-26.1.3; also after TASK-25.4, and TASK-35 -> TASK-36) -> TASK-107 (as TASK-107.1 -> TASK-107.2 -> TASK-107.3 -> TASK-107.4) -> TASK-110 -> TASK-112 (with TASK-111) -> TASK-114.
 
-TASK-109 (the service registry) is also required before the capability and feature moves. It follows TASK-108, TASK-58 and the TASK-92 decision. Almost every later task depends on TASK-114 and TASK-109.
+TASK-109 (the service registry) is also required before the capability and feature moves. It is the last layer of Stack C, after TASK-108, TASK-58.1 and TASK-58.2 and the TASK-92 decision. Almost every later task depends on TASK-114 and TASK-109.
 
 ## Sequence
 
@@ -88,7 +88,7 @@ Single PRs: TASK-28.1; TASK-94 (alarm filters, Terraform) after TASK-28.2; TASK-
 
 | Stack or PR | Content | Form |
 | --- | --- | --- |
-| C: registry | TASK-108 (records Protocol to contracts/) -> TASK-102 (ownership-checked release) -> TASK-58 (coordination rename) -> TASK-109 (svcs registry) | stack; starts once Stack A's TASK-106 and TASK-27.1 have merged (TASK-106 has; TASK-27.1 is open as of 2026-10-02); TASK-109 also needs the TASK-92 decision |
+| C: registry | TASK-102 (ownership-checked release) -> TASK-58.1 (coordination contract move) -> TASK-58.2 (LeaseStore and IdempotencyStore facades) -> TASK-109 (svcs registry for the records and coordination contracts) | stack, started 2026-10-14; TASK-108 merged before it as its own PR (#1587) and TASK-92 is decided |
 | TASK-100 | lease re-read fail-open | single PR, after TASK-99 and TASK-58 |
 | TASK-110 | as TASK-110.1 (modules.sre and modules.dev onto explicit legacy registration, behaviour-preserving) -> TASK-110.2 (entry-point plugin loading; plugin load failures become fatal); split on 2026-10-06 for the single-PR gate | two single PRs in order, not a stack; TASK-110.2 is deployed and observed on its own |
 | TASK-111 | TOML configuration files | single PR, coordinated with the Terraform and SSM changes |

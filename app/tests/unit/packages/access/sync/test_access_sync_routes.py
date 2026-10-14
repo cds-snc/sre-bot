@@ -8,7 +8,7 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from contracts.operations import OperationResult, OperationStatus
-from infrastructure.idempotency import IdempotencySettings, InMemoryIdempotencyStore
+from infrastructure.coordination import ConditionalWriteSettings, InMemoryConditionalWriteStore
 from infrastructure.security import get_current_user
 from infrastructure.security.models import AuthPrincipalSource, User
 from packages.access.sync.domain import SyncOutcome
@@ -62,9 +62,9 @@ class _Settings:
         self.lock_stale_seconds = 14400
 
 
-def _lock_store() -> InMemoryIdempotencyStore:
-    return InMemoryIdempotencyStore(
-        idempotency_settings=IdempotencySettings(
+def _lock_store() -> InMemoryConditionalWriteStore:
+    return InMemoryConditionalWriteStore(
+        settings=ConditionalWriteSettings(
             IDEMPOTENCY_TTL_SECONDS=86400,
             IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=14400,
         )

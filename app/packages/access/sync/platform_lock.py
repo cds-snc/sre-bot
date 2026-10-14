@@ -2,7 +2,8 @@
 
 from typing import Any
 
-from infrastructure.idempotency import IdempotencyStore, acquire_lease, release_lease
+from contracts.coordination import ConditionalWriteStore
+from infrastructure.coordination import acquire_lease, release_lease
 from packages.access.sync.job_status_store import JobStatusStore
 
 
@@ -17,7 +18,7 @@ def user_lock_key(platform: str, user_email: str) -> str:
 def acquire_lock(
     lock_key: str,
     payload: dict[str, Any],
-    lock_store: IdempotencyStore,
+    lock_store: ConditionalWriteStore,
     job_status_store: JobStatusStore,
     ttl_seconds: int,
 ) -> str | None:
@@ -39,7 +40,7 @@ def current_holder(lock_key: str, job_status_store: JobStatusStore) -> dict[str,
 
 def release_lock(
     lock_key: str,
-    lock_store: IdempotencyStore,
+    lock_store: ConditionalWriteStore,
     claim_token: str,
 ) -> None:
     """Release the lock claim for future runs, unless another job has taken it over."""

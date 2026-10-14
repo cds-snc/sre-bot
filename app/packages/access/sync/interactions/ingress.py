@@ -14,8 +14,8 @@ from typing import Protocol
 
 import structlog
 
+from contracts.coordination import ConditionalWriteStore
 from contracts.operations import OperationResult, OperationStatus
-from infrastructure.idempotency import IdempotencyStore
 from packages.access.sync.application import AccessSynchronizer
 from packages.access.sync.job_runner import (
     spawn_platform_sync_thread,
@@ -54,7 +54,7 @@ class EnqueuedJob:
 def enqueue_user_sync(
     coordinator: AccessSynchronizer,
     job_status_store: JobStatusStore,
-    lock_store: IdempotencyStore,
+    lock_store: ConditionalWriteStore,
     settings: _IngressSettings,
     user_email: str,
     platform: str,
@@ -138,7 +138,7 @@ def enqueue_user_sync(
 def enqueue_platform_sync(
     coordinator: AccessSynchronizer,
     job_status_store: JobStatusStore,
-    lock_store: IdempotencyStore,
+    lock_store: ConditionalWriteStore,
     settings: _IngressSettings,
     platform: str,
     dry_run: bool = False,

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, create_autospec, patch
 
 import pytest
 
-from infrastructure.idempotency import IdempotencySettings, InMemoryIdempotencyStore
+from infrastructure.coordination import ConditionalWriteSettings, InMemoryConditionalWriteStore
 from jobs.scheduled_tasks import (
     _ScheduleBackgroundJobRegistry,
     _tier2,
@@ -234,8 +234,8 @@ class TestTier2Wrapper:
     def test_tier2_wrapper_executes_job_on_first_call(self, mock_get_lease_store) -> None:
         """_tier2(...)() executes the wrapped job on the first invocation."""
         # Provide a real in-memory store via the mock
-        settings = IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
-        real_store = InMemoryIdempotencyStore(idempotency_settings=settings)
+        settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
+        real_store = InMemoryConditionalWriteStore(settings=settings)
         mock_get_lease_store.return_value = real_store
 
         job = MagicMock()
@@ -249,8 +249,8 @@ class TestTier2Wrapper:
     @patch("jobs.scheduled_tasks.get_lease_store")
     def test_tier2_wrapper_skips_job_when_lease_already_held(self, mock_get_lease_store) -> None:
         """_tier2(...)() skips execution when another runner already holds the lease."""
-        settings = IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
-        real_store = InMemoryIdempotencyStore(idempotency_settings=settings)
+        settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
+        real_store = InMemoryConditionalWriteStore(settings=settings)
         mock_get_lease_store.return_value = real_store
 
         # Simulate another replica already holding the lease.
@@ -268,8 +268,8 @@ class TestTier2Wrapper:
     def test_tier2_wrapper_retries_after_lease_expires(self, mock_get_lease_store) -> None:
         """_tier2(...)() re-executes the job after the lease expires."""
         # Build a store with zero TTL so the lease expires immediately
-        settings = IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=0)
-        real_store = InMemoryIdempotencyStore(idempotency_settings=settings)
+        settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=0)
+        real_store = InMemoryConditionalWriteStore(settings=settings)
         mock_get_lease_store.return_value = real_store
 
         job = MagicMock()
@@ -388,8 +388,8 @@ class TestInitJobRegistration:
         """
         # Arrange
         mock_get_settings.return_value.DEFAULT_TIER2_LEASE_TTL_SECONDS = 1800
-        settings = IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
-        mock_get_lease_store.return_value = InMemoryIdempotencyStore(idempotency_settings=settings)
+        settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
+        mock_get_lease_store.return_value = InMemoryConditionalWriteStore(settings=settings)
         mock_spending.generate_spending_data = create_autospec(spending.generate_spending_data)
         mock_spending.execute_spending_data_update_job = create_autospec(spending.execute_spending_data_update_job)
 

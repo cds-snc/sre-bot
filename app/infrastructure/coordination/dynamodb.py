@@ -1,4 +1,4 @@
-"""DynamoDB idempotency store implementation."""
+"""DynamoDB conditional-write store implementation."""
 
 import json
 import time
@@ -8,37 +8,37 @@ from typing import TYPE_CHECKING, Any
 import structlog
 from botocore.exceptions import BotoCoreError, ClientError
 
-from infrastructure.idempotency.protocol import (
+from contracts.coordination import (
     ClaimOutcome,
     ClaimResult,
-    IdempotencyStore,
+    ConditionalWriteStore,
 )
-from infrastructure.idempotency.settings import IdempotencySettings
+from infrastructure.coordination.settings import ConditionalWriteSettings
 from integrations.aws.client import classify_aws_error
 
 if TYPE_CHECKING:
     from types_boto3_dynamodb.client import DynamoDBClient
 
-logger = structlog.get_logger().bind(component="idempotency.dynamodb")
+logger = structlog.get_logger().bind(component="coordination.dynamodb")
 
 # DynamoDB table configuration
 IDEMPOTENCY_TABLE = "sre_bot_idempotency"
 PARTITION_KEY = "idempotency_key"
 
 
-class DynamoDBIdempotencyStore(IdempotencyStore):
-    """DynamoDB-backed atomic idempotency claim/complete/release primitive."""
+class DynamoDBConditionalWriteStore(ConditionalWriteStore):
+    """DynamoDB-backed atomic conditional-write claim/complete/release primitive."""
 
     def __init__(
         self,
         dynamodb: DynamoDBClient,
-        idempotency_settings: IdempotencySettings,
+        settings: ConditionalWriteSettings,
         table_name: str = IDEMPOTENCY_TABLE,
     ) -> None:
         self._dynamodb = dynamodb
         self.table_name = table_name
-        self.record_ttl_seconds = idempotency_settings.IDEMPOTENCY_TTL_SECONDS
-        self.in_progress_ttl_seconds = idempotency_settings.IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS
+        self.record_ttl_seconds = settings.IDEMPOTENCY_TTL_SECONDS
+        self.in_progress_ttl_seconds = settings.IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS
         self.log = logger.bind(table_name=table_name)
 
     def claim(self, key: str) -> ClaimOutcome:
@@ -114,6 +114,8 @@ class DynamoDBIdempotencyStore(IdempotencyStore):
             classified_status, error_code, _ = classify_aws_error(exc)
             self.log.warning(
                 "failed_to_read_idempotency_key",
+                key=key,
+                operation="claim",
                 status=classified_status,
                 error_code=error_code,
             )

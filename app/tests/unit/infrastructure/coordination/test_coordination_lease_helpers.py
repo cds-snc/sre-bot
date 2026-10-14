@@ -1,4 +1,4 @@
-"""Unit tests for shared lease helpers over IdempotencyStore.
+"""Unit tests for shared lease helpers over ConditionalWriteStore.
 
 These tests assert reusable lease semantics for singleton execution paths.
 """
@@ -9,10 +9,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from infrastructure import idempotency
-from infrastructure.idempotency import (
-    IdempotencySettings,
-    InMemoryIdempotencyStore,
+from infrastructure import coordination
+from infrastructure.coordination import (
+    ConditionalWriteSettings,
+    InMemoryConditionalWriteStore,
     acquire_lease,
     get_lease_store,
     run_if_leased,
@@ -22,17 +22,17 @@ pytestmark = pytest.mark.unit
 
 
 def _lease_api() -> tuple[Callable[[object, str], str | None], Callable[[object, str, str], bool]]:
-    acquire = getattr(idempotency, "acquire_lease", None)
-    release = getattr(idempotency, "release_lease", None)
+    acquire = getattr(coordination, "acquire_lease", None)
+    release = getattr(coordination, "release_lease", None)
 
-    assert callable(acquire), "infrastructure.idempotency.acquire_lease must be exported"
-    assert callable(release), "infrastructure.idempotency.release_lease must be exported"
+    assert callable(acquire), "infrastructure.coordination.acquire_lease must be exported"
+    assert callable(release), "infrastructure.coordination.release_lease must be exported"
     return acquire, release
 
 
-def _store() -> InMemoryIdempotencyStore:
-    settings = IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
-    return InMemoryIdempotencyStore(idempotency_settings=settings)
+def _store() -> InMemoryConditionalWriteStore:
+    settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
+    return InMemoryConditionalWriteStore(settings=settings)
 
 
 def test_acquire_lease_returns_a_token_once_for_same_name() -> None:
@@ -92,7 +92,7 @@ class TestGetLeaseStore:
     def test_get_lease_store_returns_singleton_per_ttl(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """get_lease_store(ttl) called twice with the same ttl returns the same instance."""
         monkeypatch.setattr(
-            "infrastructure.idempotency.factory.get_aws_client",
+            "infrastructure.coordination.factory.get_aws_client",
             MagicMock(return_value=MagicMock(spec=["put_item", "get_item", "delete_item"])),
             raising=False,
         )
@@ -109,7 +109,7 @@ class TestGetLeaseStore:
     def test_get_lease_store_returns_distinct_instance_for_different_ttl(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """get_lease_store(ttl) called with different ttls returns different instances."""
         monkeypatch.setattr(
-            "infrastructure.idempotency.factory.get_aws_client",
+            "infrastructure.coordination.factory.get_aws_client",
             MagicMock(return_value=MagicMock(spec=["put_item", "get_item", "delete_item"])),
             raising=False,
         )
@@ -174,11 +174,11 @@ class TestRunIfLeased:
     def test_run_if_leased_takes_over_expired_lease(self) -> None:
         """run_if_leased takes over an expired lease and executes the job."""
         # Build a store with a negative TTL so the lease expires immediately
-        settings = IdempotencySettings(
+        settings = ConditionalWriteSettings(
             IDEMPOTENCY_TTL_SECONDS=3600,
             IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=0,  # Expires immediately
         )
-        expired_store = InMemoryIdempotencyStore(idempotency_settings=settings)
+        expired_store = InMemoryConditionalWriteStore(settings=settings)
 
         # First call: acquire and hold the lease (expires immediately after)
         first_job = MagicMock()
@@ -198,8 +198,8 @@ class TestRunIfLeased:
 
         The second holder's own release succeeding afterwards proves the record survived.
         """
-        settings = IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=-1)
-        expired_store = InMemoryIdempotencyStore(idempotency_settings=settings)
+        settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=-1)
+        expired_store = InMemoryConditionalWriteStore(settings=settings)
         name = "scheduler:test_job"
         takeover_tokens: list[str | None] = []
 

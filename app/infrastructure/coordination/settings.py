@@ -1,4 +1,4 @@
-"""Idempotency infrastructure settings owned by the idempotency package."""
+"""Conditional-write store settings owned by the coordination package."""
 
 from functools import lru_cache
 
@@ -7,8 +7,11 @@ from pydantic import Field
 from infrastructure.configuration.base import InfrastructureSettings
 
 
-class IdempotencySettings(InfrastructureSettings):
-    """Configuration for idempotency record lifecycle.
+class ConditionalWriteSettings(InfrastructureSettings):
+    """Configuration for conditional-write record lifecycle.
+
+    The environment variable names keep the IDEMPOTENCY_ prefix: they are a
+    deploy interface.
 
     Environment Variables:
         IDEMPOTENCY_TTL_SECONDS: TTL for completed records (default: 3600)
@@ -23,6 +26,6 @@ class IdempotencySettings(InfrastructureSettings):
 
 
 @lru_cache(maxsize=1)
-def get_idempotency_settings() -> IdempotencySettings:
-    """Singleton provider for idempotency settings."""
-    return IdempotencySettings()
+def get_conditional_write_settings() -> ConditionalWriteSettings:
+    """Singleton provider for conditional-write settings."""
+    return ConditionalWriteSettings()

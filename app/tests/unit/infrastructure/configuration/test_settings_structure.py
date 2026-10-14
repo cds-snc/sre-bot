@@ -43,7 +43,7 @@ from infrastructure.configuration.integrations import (
 from infrastructure.configuration.integrations.google import (
     get_google_workspace_settings,
 )
-from infrastructure.idempotency.settings import IdempotencySettings
+from infrastructure.coordination.settings import ConditionalWriteSettings
 from infrastructure.logging.settings import LoggingSettings
 
 
@@ -170,7 +170,7 @@ class TestSettingsStructure:
         """Verify all infrastructure settings classes can be instantiated."""
         # Test that all infrastructure settings classes are functional
         instances = [
-            IdempotencySettings(),
+            ConditionalWriteSettings(),
             RetrySettings(),
             ServerSettings(),
             DevSettings(),

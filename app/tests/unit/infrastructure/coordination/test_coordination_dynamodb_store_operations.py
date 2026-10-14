@@ -1,4 +1,4 @@
-"""Unit tests for DynamoDBIdempotencyStore's direct DynamoDB calls."""
+"""Unit tests for DynamoDBConditionalWriteStore's direct DynamoDB calls."""
 
 import json
 from unittest.mock import MagicMock
@@ -6,9 +6,9 @@ from unittest.mock import MagicMock
 import pytest
 from botocore.exceptions import ClientError
 
-from infrastructure.idempotency.dynamodb import DynamoDBIdempotencyStore
-from infrastructure.idempotency.protocol import ClaimResult
-from infrastructure.idempotency.settings import IdempotencySettings
+from contracts.coordination import ClaimResult
+from infrastructure.coordination.dynamodb import DynamoDBConditionalWriteStore
+from infrastructure.coordination.settings import ConditionalWriteSettings
 
 pytestmark = pytest.mark.unit
 
@@ -30,7 +30,7 @@ def conditional_check_failed() -> ClientError:
 
 @pytest.fixture
 def store_settings():
-    settings = MagicMock(spec=IdempotencySettings)
+    settings = MagicMock(spec=ConditionalWriteSettings)
     settings.IDEMPOTENCY_TTL_SECONDS = 3600
     settings.IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS = 300
     return settings
@@ -43,14 +43,14 @@ def dynamodb_client():
 
 @pytest.fixture
 def store(dynamodb_client, store_settings):
-    return DynamoDBIdempotencyStore(
+    return DynamoDBConditionalWriteStore(
         dynamodb_client,
-        idempotency_settings=store_settings,
+        settings=store_settings,
         table_name="test_idempotency_store",
     )
 
 
-class TestDynamoDBIdempotencyStoreClaimNewKey:
+class TestDynamoDBConditionalWriteStoreClaimNewKey:
     def test_claim_new_key_issues_single_conditional_put(self, dynamodb_client, store):
         dynamodb_client.put_item.return_value = {}
 
@@ -77,7 +77,7 @@ class TestDynamoDBIdempotencyStoreClaimNewKey:
         assert tokens[0] != tokens[1]
 
 
-class TestDynamoDBIdempotencyStoreClaimConflict:
+class TestDynamoDBConditionalWriteStoreClaimConflict:
     def test_claim_on_completed_record_returns_completed_with_outcome(self, dynamodb_client, store):
         dynamodb_client.put_item.side_effect = conditional_check_failed()
         recorded_outcome = {"status": "ok", "id": 42}
@@ -179,7 +179,7 @@ class TestDynamoDBIdempotencyStoreClaimConflict:
         assert exc_info.value is put_error
 
 
-class TestDynamoDBIdempotencyStoreComplete:
+class TestDynamoDBConditionalWriteStoreComplete:
     def test_complete_writes_completed_status_outcome_json_and_ttl(self, dynamodb_client, store):
         dynamodb_client.put_item.return_value = {}
 
@@ -194,7 +194,7 @@ class TestDynamoDBIdempotencyStoreComplete:
         assert "ttl" in item
 
 
-class TestDynamoDBIdempotencyStoreRelease:
+class TestDynamoDBConditionalWriteStoreRelease:
     def test_release_deletes_the_record_by_key(self, dynamodb_client, store):
         dynamodb_client.delete_item.return_value = {}
 

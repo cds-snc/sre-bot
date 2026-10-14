@@ -29,8 +29,8 @@ from infrastructure.configuration.integrations import (
     get_slack_settings,
     get_trello_settings,
 )
+from infrastructure.coordination.settings import get_conditional_write_settings
 from infrastructure.directory.settings import get_directory_settings
-from infrastructure.idempotency.settings import get_idempotency_settings
 
 
 @pytest.fixture(autouse=True)
@@ -51,7 +51,7 @@ def clear_all_caches():
     get_sre_ops_settings.cache_clear()
     get_server_settings.cache_clear()
     get_dev_settings.cache_clear()
-    get_idempotency_settings.cache_clear()
+    get_conditional_write_settings.cache_clear()
     get_retry_settings.cache_clear()
     get_platforms_settings.cache_clear()
     get_directory_settings.cache_clear()
@@ -71,7 +71,7 @@ def clear_all_caches():
     get_sre_ops_settings.cache_clear()
     get_server_settings.cache_clear()
     get_dev_settings.cache_clear()
-    get_idempotency_settings.cache_clear()
+    get_conditional_write_settings.cache_clear()
     get_retry_settings.cache_clear()
     get_platforms_settings.cache_clear()
     get_directory_settings.cache_clear()

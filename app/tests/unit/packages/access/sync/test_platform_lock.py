@@ -8,15 +8,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from infrastructure.idempotency import IdempotencySettings, InMemoryIdempotencyStore
+from infrastructure.coordination import ConditionalWriteSettings, InMemoryConditionalWriteStore
 from packages.access.sync import platform_lock
 
 pytestmark = pytest.mark.unit
 
 
-def _store() -> InMemoryIdempotencyStore:
-    settings = IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
-    return InMemoryIdempotencyStore(idempotency_settings=settings)
+def _store() -> InMemoryConditionalWriteStore:
+    settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
+    return InMemoryConditionalWriteStore(settings=settings)
 
 
 def test_acquire_lock_succeeds_once_and_persists_holder_payload() -> None:

@@ -10,7 +10,7 @@ scope: The app's layers (host, contracts, features, capabilities, infrastructure
 ## Context
 
 The former three-tier model (`packages/`, `infrastructure/`, `integrations/`) sorted code by one question: how close is it to a vendor? That put three different kinds of code in `app/infrastructure/`:
-- hosting adapters: `records`, `idempotency`, `resilience`, logging setup;
+- hosting adapters: `records`, `coordination`, `resilience`, logging setup;
 - framework services that features plug into: `plugins`, `i18n`, `security`, `events`, `audit`, and the planned `approvals` engine ([approvals.md](approvals.md));
 - workplace systems: `directory`, `drive`, `spreadsheets` ([workplace-systems.md](workplace-systems.md)).
 
@@ -46,7 +46,14 @@ Current state:
 - the core-service Protocols: records, queue, coordination, secrets, scheduler, translator and current user;
 - shared types: `OperationResult`, `OperationStatus`, identifiers and an actor reference.
 
-It contains no implementation and imports nothing else from the app, so it could ship as a separate distribution without moving. Changes to it follow [hookspec-deprecation.md](hookspec-deprecation.md)'s lifecycle.
+It contains no implementation of a hosting or framework service and imports nothing else from the app, so it could ship as a separate distribution without moving. It may hold a small concrete helper over its own Protocols, such as a facade or a default policy (as .NET's `*.Abstractions` packages and client-go's `resourcelock` do), when all of these hold:
+- it does no I/O of its own and reaches the outside world only through a `contracts` Protocol passed to it;
+- it imports only the standard library, `typing` and other `contracts` modules, and reads no settings or environment;
+- it encodes semantics every consumer must share, so leaving it out would make plugins reimplement them;
+- it is tested against the in-memory fake and the conformance suite of the Protocol it wraps;
+- it is `@final` and versioned as public API.
+
+Runtime orchestration (loops, schedulers, error boundaries) stays in `server/`. Changes to it follow [hookspec-deprecation.md](hookspec-deprecation.md)'s lifecycle.
 
 **Features and capabilities never import `infrastructure/` or `server/`.** The host constructs the core services and hands them to plugins.
 
@@ -98,7 +105,7 @@ This record replaces the former three-tier layers record, the capability-package
 - Hosting can change per cloud without any feature changing.
 - An engine can move to a managed workflow product behind the same `api.py`.
 - Cost: most of `infrastructure/` moves, and the host takes on the wiring that features do themselves today.
-- Risk: `contracts/` becomes a grab-bag. Mitigation: it only holds Protocols and types used across layers, and every change is reviewed as public API.
+- Risk: `contracts/` becomes a grab-bag. Mitigation: it only holds hookspecs, Protocols, types used across layers and pure facades over its own Protocols that meet the criteria above, and every change is reviewed as public API.
 - Risk: `server/` becomes a god package. Mitigation: each framework service is its own subpackage with a contract.
 
 ## Checks
@@ -106,6 +113,7 @@ This record replaces the former three-tier layers record, the capability-package
 - import-linter `layers` contract over `app/` matching the table; its ignore list only shrinks.
 - import-linter `forbidden`: `features` and `capabilities` never import `infrastructure` or `server`; `contracts` imports nothing from the app.
 - import-linter `independence` across the packages in `features/`.
+- Review: every concrete helper in `contracts/` meets the facade criteria in the Decision.
 - Review: each capability's README states its classification and names at least one feature consumer; features import a capability only through `api.py`.
 - Boot test: every plugin loads, and every extension point is filled before its capability initializes.
 - CI shape check: every package under `features/` and `capabilities/` uses only names from the layout table.
@@ -140,3 +148,4 @@ Tolerated until then:
 - 2026-10-09: on-call is a capability ([oncall.md](oncall.md), TASK-146).
 - 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).
 - 2026-10-13: wording aligned with workplace-systems.md rule 2: vendor concepts leave a feature's domain, vendor code sits in adapters.
+- 2026-10-14: `contracts/` may hold pure, I/O-free facades over its own Protocols, under the criteria in the Decision; the first are the coordination contract's `LeaseStore` and `IdempotencyStore` (TASK-58.2). Lease enforcement (`run_if_leased`) is orchestration and stays out of `contracts/`.

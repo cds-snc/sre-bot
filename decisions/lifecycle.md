@@ -17,7 +17,7 @@ Current code (`app/server/lifespan.py`):
 - Loads plugins from the `pyproject.toml` entry points (`load_plugins`); a plugin that fails to import aborts boot.
 - Collects i18n resources through `register_i18n_resources`, then initializes the translator strictly; failure aborts boot.
 - Calls `register_slack_commands`, `register_routes` and `startup_warmup`; features construct their services lazily or inside `startup_warmup`. `access/request` and `access/sync` subscribe to in-process events there.
-- Registers legacy `modules/` handlers by hand, starts scheduled tasks only when `ENVIRONMENT == "production"` (Tier-2 jobs take a lease from the idempotency store), then starts Socket Mode.
+- Registers legacy `modules/` handlers by hand, starts scheduled tasks only when `ENVIRONMENT == "production"` (Tier-2 jobs take a lease from the coordination contract), then starts Socket Mode.
 - On shutdown, stops scheduled tasks, then the Slack provider.
 
 Phases are logged with a `phase` field, but there is no single ordered sequence, no eager service validation, and plugin load errors are not fatal.
@@ -77,7 +77,7 @@ Tolerated until closed:
 - network I/O before `yield` that aborts boot on failure: the opt-in directory warmup, and `access/sync`'s AssumeRole during client construction;
 - a feature whose settings fail validation aborts boot instead of being skipped;
 - in-process event subscriptions registered in `startup_warmup` by `access/request` and `access/sync`;
-- scheduled tasks gated on `ENVIRONMENT == "production"` and started from `jobs/scheduled_tasks.py`, with leases from the idempotency store;
+- scheduled tasks gated on `ENVIRONMENT == "production"` and started from `jobs/scheduled_tasks.py`, with leases from the coordination contract;
 - legacy `modules/` handlers registered by hand after feature registration.
 
 **Changes:**
