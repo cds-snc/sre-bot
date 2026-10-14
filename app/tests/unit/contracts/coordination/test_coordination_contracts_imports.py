@@ -1,7 +1,7 @@
 """Unit tests for the import surface of the coordination contract.
 
 The package root is the stable import path for the conditional-write store
-types, so its ``__all__`` is compared with the full public name set. An AST
+types and the lease and idempotency facades, so its ``__all__`` is compared with the full public name set. An AST
 scan of the package source proves the contract imports only the standard
 library and other ``contracts`` modules, so it can ship without the DynamoDB
 backend.
@@ -17,7 +17,14 @@ import contracts.coordination
 
 pytestmark = pytest.mark.unit
 
-PUBLIC_NAMES = {"ConditionalWriteStore", "ClaimResult", "ClaimOutcome"}
+PUBLIC_NAMES = {
+    "ConditionalWriteStore",
+    "ClaimResult",
+    "ClaimOutcome",
+    "ReadFailurePolicy",
+    "LeaseStore",
+    "IdempotencyStore",
+}
 
 
 def test_package_root_exports_the_whole_coordination_surface() -> None:

@@ -1,22 +1,23 @@
 """Unit tests for access sync platform_lock wrappers.
 
 These tests validate feature-specific key naming and holder reporting while
-lock correctness is delegated to shared infrastructure lease helpers.
+lock correctness is delegated to the coordination LeaseStore facade.
 """
 
 from unittest.mock import MagicMock
 
 import pytest
 
+from contracts.coordination import LeaseStore, ReadFailurePolicy
 from infrastructure.coordination import ConditionalWriteSettings, InMemoryConditionalWriteStore
 from packages.access.sync import platform_lock
 
 pytestmark = pytest.mark.unit
 
 
-def _store() -> InMemoryConditionalWriteStore:
+def _store() -> LeaseStore:
     settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
-    return InMemoryConditionalWriteStore(settings=settings)
+    return LeaseStore(InMemoryConditionalWriteStore(settings=settings), read_failure_policy=ReadFailurePolicy.FAIL_CLOSED)
 
 
 def test_acquire_lock_succeeds_once_and_persists_holder_payload() -> None:

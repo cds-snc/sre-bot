@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-28 16:29'
-updated_date: '2026-09-25 15:00'
+updated_date: '2026-10-14 18:57'
 labels:
   - architecture
   - reliability
@@ -14,6 +14,7 @@ labels:
 milestone: m-4
 dependencies:
   - TASK-127
+  - TASK-148
 references:
   - decisions/reliability.md
   - decisions/plugins.md

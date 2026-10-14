@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 from botocore.exceptions import ClientError
 
-from contracts.coordination import ClaimResult
+from contracts.coordination import ClaimOutcome, ClaimResult
 from infrastructure.coordination.dynamodb import DynamoDBConditionalWriteStore
 from infrastructure.coordination.settings import ConditionalWriteSettings
 
@@ -139,21 +139,30 @@ class TestDynamoDBConditionalWriteStoreClaimConflict:
 
         assert outcome.result is ClaimResult.IN_PROGRESS
 
-    def test_claim_returns_in_progress_when_the_contended_re_read_fails(self, dynamodb_client, store):
-        """A classified read failure fails closed: an unreadable store is treated as still held.
+    def test_claim_returns_indeterminate_when_the_contended_re_read_fails(self, dynamodb_client, store):
+        """A classified read failure is reported as INDETERMINATE, with no token and no outcome.
 
-        Our conditional put has already failed, so some record exists; being unable to
-        read it is not grounds to claim the key.
+        Our conditional put has already failed, so some record exists, but the store
+        cannot say whose. The read-failure policy belongs to the facade, not the store.
         """
         dynamodb_client.put_item.side_effect = conditional_check_failed()
         dynamodb_client.get_item.side_effect = client_error("ProvisionedThroughputExceededException", "GetItem")
 
         outcome = store.claim("feature:intent:unreadable-key")
 
-        assert outcome.result is ClaimResult.IN_PROGRESS
+        assert outcome == ClaimOutcome(result=ClaimResult.INDETERMINATE)
+
+    def test_claim_returns_in_progress_when_the_contended_record_vanished(self, dynamodb_client, store):
+        """A record gone between the put and the re-read is not a read failure: it stays IN_PROGRESS."""
+        dynamodb_client.put_item.side_effect = conditional_check_failed()
+        dynamodb_client.get_item.return_value = {}
+
+        outcome = store.claim("feature:intent:vanished-key")
+
+        assert outcome == ClaimOutcome(result=ClaimResult.IN_PROGRESS)
 
     def test_claim_propagates_an_unclassified_re_read_error(self, dynamodb_client, store):
-        """Only classified failures fail closed; an unknown code is not evidence of contention."""
+        """Only classified failures are INDETERMINATE; an unknown code is not evidence of contention."""
         dynamodb_client.put_item.side_effect = conditional_check_failed()
         read_error = client_error("ValidationException", "GetItem")
         dynamodb_client.get_item.side_effect = read_error

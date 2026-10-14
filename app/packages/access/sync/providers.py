@@ -1,7 +1,7 @@
 import functools
 
-from contracts.coordination import ConditionalWriteStore
-from infrastructure.coordination import build_conditional_write_store
+from contracts.coordination import LeaseStore
+from infrastructure.coordination import build_lease_store
 from infrastructure.directory import get_directory_provider
 from infrastructure.events import get_event_dispatcher
 from infrastructure.records import get_record_store
@@ -23,9 +23,9 @@ def get_access_sync_settings() -> AccessSyncSettings:
 
 
 @functools.lru_cache(maxsize=1)
-def get_access_sync_lock_store() -> ConditionalWriteStore:
+def get_access_sync_lock_store() -> LeaseStore:
     """Return a singleton lock store with access-sync-specific claim TTL."""
-    return build_conditional_write_store(in_progress_ttl_seconds=get_access_sync_settings().lock_stale_seconds)
+    return build_lease_store(in_progress_ttl_seconds=get_access_sync_settings().lock_stale_seconds)
 
 
 @functools.lru_cache(maxsize=1)

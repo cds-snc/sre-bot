@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-17 20:39'
-updated_date: '2026-10-14 18:12'
+updated_date: '2026-10-14 18:59'
 labels:
   - infrastructure
   - reliability
@@ -37,7 +37,7 @@ WHY FLIP. decisions/reliability.md holds that a Tier-2 lease is a duplication op
 
 WHY IT IS NOT A ONE-LINE CHANGE. Three things have to be handled together:
 1. We reach the re-read only because our conditional put definitively FAILED, so someone else's record exists. Returning NEW tells the caller it holds a lease it provably does not hold. run_if_leased (app/infrastructure/coordination/lease.py) then releases in a finally via an unconditional delete_item, deleting the real holder's claim and potentially cascading to a third holder. Either land the ownership-checked release task created alongside this one first, or make the fail-open path skip the release. Resolved by TASK-102: release and complete are now ownership-checked against the claim token, so a non-holder release is refused.
-2. Fail-open is correct for a LEASE and wrong for DEDUP. If the existing record is COMPLETED and the re-read fails, fail-open re-executes a completed operation and complete() then overwrites the recorded outcome. There is no dedup consumer in production today (the store getter, get_conditional_write_store since TASK-58.1, has no production caller, verified 2026-09-17) but TASK-37.2 adds one. The policy must therefore be an explicit per-use choice, not one implicit default - see the comment left on TASK-58, which builds the idempotency and lease facades over the one primitive and is where that choice naturally lives.
+2. Fail-open is correct for a LEASE and wrong for DEDUP. If the existing record is COMPLETED and the re-read fails, fail-open re-executes a completed operation and complete() then overwrites the recorded outcome. There is no dedup consumer in production today (the store getter had no production caller, verified 2026-09-17, and TASK-58.2 deleted it) but TASK-37.2 adds one. The policy must therefore be an explicit per-use choice, not one implicit default - see the comment left on TASK-58, which builds the idempotency and lease facades over the one primitive and is where that choice naturally lives.
 3. TASK-25.2.5.4's AC#1 and its unit test pin the current fail-closed behaviour. Both are reworded and inverted here, not deleted quietly.
 
 The unclassified-error path is NOT part of this flip: classify_aws_error re-raises an unknown error code, and an unknown fault is not evidence of anything. It stays a raise.

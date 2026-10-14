@@ -1,31 +1,15 @@
-"""Conditional-write store factory."""
+"""Conditional-write store and lease store providers."""
+
+from functools import cache
 
 import structlog
 
-from contracts.coordination import ConditionalWriteStore
+from contracts.coordination import ConditionalWriteStore, LeaseStore, ReadFailurePolicy
 from infrastructure.coordination.dynamodb import DynamoDBConditionalWriteStore
 from infrastructure.coordination.settings import get_conditional_write_settings
 from integrations.aws.client import get_aws_client
 
 logger = structlog.get_logger().bind(component="coordination.factory")
-
-_conditional_write_store_instance: ConditionalWriteStore | None = None
-
-
-def get_conditional_write_store() -> ConditionalWriteStore:
-    """Get application-scoped conditional-write store singleton."""
-    global _conditional_write_store_instance
-
-    if _conditional_write_store_instance is not None:
-        return _conditional_write_store_instance
-
-    dynamodb = get_aws_client("dynamodb")
-    _conditional_write_store_instance = DynamoDBConditionalWriteStore(
-        dynamodb,
-        settings=get_conditional_write_settings(),
-    )
-    logger.info("initialized_conditional_write_store", backend="dynamodb")
-    return _conditional_write_store_instance
 
 
 def build_conditional_write_store(in_progress_ttl_seconds: int) -> ConditionalWriteStore:
@@ -38,8 +22,15 @@ def build_conditional_write_store(in_progress_ttl_seconds: int) -> ConditionalWr
     return DynamoDBConditionalWriteStore(dynamodb, settings=settings)
 
 
-def reset_conditional_write_store() -> None:
-    """Reset the conditional-write store singleton (for tests)."""
-    global _conditional_write_store_instance
-    _conditional_write_store_instance = None
-    logger.debug("reset_conditional_write_store_singleton")
+def build_lease_store(in_progress_ttl_seconds: int) -> LeaseStore:
+    """Build a fail-closed lease store whose lease TTL is in_progress_ttl_seconds."""
+    return LeaseStore(
+        build_conditional_write_store(in_progress_ttl_seconds=in_progress_ttl_seconds),
+        read_failure_policy=ReadFailurePolicy.FAIL_CLOSED,
+    )
+
+
+@cache
+def get_lease_store(ttl_seconds: int) -> LeaseStore:
+    """Return a lease store singleton for the provided lease TTL."""
+    return build_lease_store(in_progress_ttl_seconds=ttl_seconds)

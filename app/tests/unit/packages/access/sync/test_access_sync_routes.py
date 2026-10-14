@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
+from contracts.coordination import LeaseStore, ReadFailurePolicy
 from contracts.operations import OperationResult, OperationStatus
 from infrastructure.coordination import ConditionalWriteSettings, InMemoryConditionalWriteStore
 from infrastructure.security import get_current_user
@@ -62,13 +63,14 @@ class _Settings:
         self.lock_stale_seconds = 14400
 
 
-def _lock_store() -> InMemoryConditionalWriteStore:
-    return InMemoryConditionalWriteStore(
+def _lock_store() -> LeaseStore:
+    store = InMemoryConditionalWriteStore(
         settings=ConditionalWriteSettings(
             IDEMPOTENCY_TTL_SECONDS=86400,
             IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=14400,
         )
     )
+    return LeaseStore(store, read_failure_policy=ReadFailurePolicy.FAIL_CLOSED)
 
 
 def _make_request() -> UserSyncRequest:
