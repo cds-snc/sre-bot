@@ -32,16 +32,17 @@ Deployment machinery (ECS circuit breaker, CloudWatch) may be AWS-native, but th
 
 ## Checks
 
-- **CI-enforced:** every hosting contract and every externally-facing capability `api.py` Protocol has an in-memory fake exercised by tests (a CI check fails the build on such a Protocol with no fake); feature Path B adapters and in-process mechanisms (logging, plugins) are out of scope. Current gaps: `infrastructure/directory/` (no shared `InMemoryDirectoryProvider` — tests hand-roll one) and `infrastructure/audit/` (rides `RecordStore`, blocked on the `query()` redesign) — both closed by TASK-27.
+- **CI-enforced** (`make check-fake-coverage`, `app/bin/check_fake_coverage.py`): every hosting contract and every externally-facing capability `api.py` Protocol has an in-memory fake exercised by tests. Coverage follows the driven-port line by rule, not by list: a `contracts/` Protocol is covered when an `infrastructure/` class explicitly subclasses it, a capability `api.py` Protocol when its own `adapters/` explicitly subclass it, and a Protocol still defined in `infrastructure/` until it moves. Registrars and extension points the host implements, feature Path B adapters and in-process mechanisms (logging, plugins) fall outside it. Real adapters and fakes **explicitly subclass** their Protocol, so mypy proves conformance and the check can see them; the fake is a class in an `in_memory.py` module, and each Protocol's conformance suite has an enrollment test that fails when a concrete subclass is missing from its fixture. Current gaps live in `app/bin/baselines/fake_coverage.txt`, each with the task that closes it.
 - grep: no `boto3`/`botocore` imports outside `app/integrations/` and `app/infrastructure/` implementations.
 - Readiness-probe-based deploy validation in the pipeline definition.
 
 ## Migration
 
-Tickets: records-Protocol redesign + portable-Protocol fakes + the CI fake-coverage check (TASK-27); `QueueService` fake (TASK-34); pipeline validation switch. Tolerated until closed: single (AWS) implementation per Protocol; the `directory/` and `audit/` fake gaps named in Checks; CloudWatch-based deploy check.
+Tickets: records-Protocol redesign + portable-Protocol fakes + the CI fake-coverage check (TASK-27); `QueueService` fake (TASK-34); pipeline validation switch. Tolerated until closed: single (AWS) implementation per Protocol; the fake gaps in the Checks baseline; CloudWatch-based deploy check.
 
 **Changes:**
 - 2026-09-24: the fake contract covers hosting contracts and capability `api.py` Protocols; feature Path B adapters are not portable.
 - 2026-09-25: the readiness probe is the static health endpoint, answering after lifespan startup.
 - 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).
 - 2026-10-13: `RecordStore` reads take a typed `RecordQuery` over a declared `RecordTable`; the key-condition string is gone (TASK-27.1).
+- 2026-10-14: the fake-coverage check enforces contract 4 by the driven-port rule; adapters and fakes explicitly subclass their Protocol (TASK-27.3).

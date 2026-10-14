@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-28 13:20'
-updated_date: '2026-09-15 20:06'
+updated_date: '2026-10-14 14:41'
 labels:
   - infrastructure
   - phase-4
@@ -42,6 +42,7 @@ Depends on TASK-34 (QueueService must exist before retry can fold onto it). Step
 - [ ] #2 The retry/redelivery mechanism routes through QueueService (at-least-once + DLQ) for every consumer SQS-native semantics cover; no bespoke second durable-queue implementation runs beside QueueService
 - [ ] #3 Any retained DynamoDB store is scoped strictly to the SQS-inexpressible residue (scheduled/delayed retries beyond 15-min DelaySeconds); if none survives triage, app/infrastructure/resilience/retry/ is deleted entirely
 - [ ] #4 All RetryProcessor consumers migrated; old retry-store paths and transitional shims deleted; the circuit breaker is left untouched
+- [ ] #5 The RetryStore and RetryProcessor lines are removed from app/bin/baselines/fake_coverage.txt and make check-fake-coverage passes
 <!-- AC:END -->
 
 ## Definition of Done

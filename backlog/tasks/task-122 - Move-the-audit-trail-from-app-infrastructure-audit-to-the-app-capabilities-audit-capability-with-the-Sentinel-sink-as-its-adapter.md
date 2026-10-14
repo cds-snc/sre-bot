@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:00'
-updated_date: '2026-10-13 13:41'
+updated_date: '2026-10-14 14:41'
 labels:
   - plugin-architecture
   - capabilities
@@ -44,4 +44,5 @@ The Sentinel sink moves out of integrations/sentinel into this capability's adap
 - [ ] #2 An in-memory fake of the audit Protocol lives in the package and is exercised by tests; the write_audit_event monkeypatch doubles are replaced by it
 - [ ] #3 app/infrastructure/audit/ is deleted with no re-export; grep finds no import of the old path
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #5 The adapter and the in_memory.py fake explicitly subclass the api.py Protocol; the AuditTrailService line is removed from app/bin/baselines/fake_coverage.txt and make check-fake-coverage passes
 <!-- AC:END -->

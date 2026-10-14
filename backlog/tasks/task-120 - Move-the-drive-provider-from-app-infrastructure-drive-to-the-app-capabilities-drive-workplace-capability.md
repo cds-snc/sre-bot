@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:00'
+updated_date: '2026-10-14 14:41'
 labels:
   - plugin-architecture
   - capabilities
@@ -46,4 +47,5 @@ Behaviour-preserving. migration.md rule 6: the capability is not widened to repr
 - [ ] #3 An in-memory fake of the api.py Protocol lives in the package and is exercised by tests, as the cloud-portability.md fake contract requires for externally facing capability Protocols
 - [ ] #4 app/infrastructure/drive/ is deleted with no re-export; grep finds no import of the old path, including mock patch strings
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #6 The adapter and the in_memory.py fake explicitly subclass the api.py Protocol; the DriveProvider line is removed from app/bin/baselines/fake_coverage.txt and make check-fake-coverage passes
 <!-- AC:END -->

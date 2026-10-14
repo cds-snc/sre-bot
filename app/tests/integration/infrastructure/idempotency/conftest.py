@@ -8,6 +8,7 @@ import pytest
 
 from infrastructure.idempotency.dynamodb import DynamoDBIdempotencyStore
 from infrastructure.idempotency.in_memory import InMemoryIdempotencyStore
+from infrastructure.idempotency.protocol import IdempotencyStore
 from infrastructure.idempotency.settings import IdempotencySettings
 from integrations.aws import client as aws_client
 from integrations.aws.client import get_aws_client
@@ -108,17 +109,27 @@ def expiring_dynamodb_idempotency_store(
         )
 
 
-@pytest.fixture(params=["in_memory", "dynamodb_moto"])
+# Implementation -> (fixture, expiring-TTL fixture) the conformance fixtures resolve.
+IDEMPOTENCY_STORE_FIXTURES: dict[type[IdempotencyStore], tuple[str, str]] = {
+    InMemoryIdempotencyStore: ("in_memory_idempotency_store", "expiring_in_memory_idempotency_store"),
+    DynamoDBIdempotencyStore: ("dynamodb_idempotency_store", "expiring_dynamodb_idempotency_store"),
+}
+IDEMPOTENCY_STORE_IDS = ["in_memory", "dynamodb_moto"]
+
+
+@pytest.fixture
+def idempotency_store_implementations() -> frozenset[type[IdempotencyStore]]:
+    """The implementations the conformance fixtures run against, for the enrollment test."""
+    return frozenset(IDEMPOTENCY_STORE_FIXTURES)
+
+
+@pytest.fixture(params=list(IDEMPOTENCY_STORE_FIXTURES), ids=IDEMPOTENCY_STORE_IDS)
 def idempotency_store(request: pytest.FixtureRequest) -> Any:
     """Parametrized IdempotencyStore: runs conformance tests against every implementation."""
-    if request.param == "in_memory":
-        return request.getfixturevalue("in_memory_idempotency_store")
-    return request.getfixturevalue("dynamodb_idempotency_store")
+    return request.getfixturevalue(IDEMPOTENCY_STORE_FIXTURES[request.param][0])
 
 
-@pytest.fixture(params=["in_memory", "dynamodb_moto"])
+@pytest.fixture(params=list(IDEMPOTENCY_STORE_FIXTURES), ids=IDEMPOTENCY_STORE_IDS)
 def expiring_idempotency_store(request: pytest.FixtureRequest) -> Any:
     """Parametrized IdempotencyStore whose in-progress TTL has already elapsed."""
-    if request.param == "in_memory":
-        return request.getfixturevalue("expiring_in_memory_idempotency_store")
-    return request.getfixturevalue("expiring_dynamodb_idempotency_store")
+    return request.getfixturevalue(IDEMPOTENCY_STORE_FIXTURES[request.param][1])

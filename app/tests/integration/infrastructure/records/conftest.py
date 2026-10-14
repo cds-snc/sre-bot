@@ -1,8 +1,10 @@
 """Fixtures for the records store conformance suites.
 
 The ``record_store`` fixture yields the moto-backed DynamoDB store; the
-``any_record_store`` fixture is parametrized over the in-memory fake and
-the moto-backed store so one suite runs identical cases against both.
+``any_record_store`` fixture is parametrized over ``RECORD_STORE_FIXTURES``
+(the in-memory fake and the moto-backed store) so one suite runs identical
+cases against both; the enrollment test checks that mapping lists every
+concrete RecordStore implementation.
 """
 
 from collections.abc import Iterator
@@ -79,9 +81,24 @@ def record_store(monkeypatch: pytest.MonkeyPatch) -> Iterator[DynamoDBRecordStor
         yield DynamoDBRecordStore(dynamodb=client)
 
 
-@pytest.fixture(params=["in_memory", "dynamodb"])
+RECORD_STORE_FIXTURES: dict[type[RecordStore], str] = {
+    InMemoryRecordStore: "in_memory_record_store",
+    DynamoDBRecordStore: "record_store",
+}
+
+
+@pytest.fixture
+def in_memory_record_store() -> InMemoryRecordStore:
+    return InMemoryRecordStore()
+
+
+@pytest.fixture
+def record_store_implementations() -> frozenset[type[RecordStore]]:
+    """The implementations ``any_record_store`` runs against, for the enrollment test."""
+    return frozenset(RECORD_STORE_FIXTURES)
+
+
+@pytest.fixture(params=list(RECORD_STORE_FIXTURES), ids=["in_memory", "dynamodb"])
 def any_record_store(request: pytest.FixtureRequest) -> RecordStore:
-    if request.param == "in_memory":
-        return InMemoryRecordStore()
-    store: RecordStore = request.getfixturevalue("record_store")
+    store: RecordStore = request.getfixturevalue(RECORD_STORE_FIXTURES[request.param])
     return store

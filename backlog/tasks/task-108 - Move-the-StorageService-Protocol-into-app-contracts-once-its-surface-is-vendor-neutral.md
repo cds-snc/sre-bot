@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:58'
-updated_date: '2026-10-13 19:59'
+updated_date: '2026-10-14 14:41'
 labels:
   - plugin-architecture
   - contracts
@@ -37,6 +37,7 @@ Mechanical, a pure move of app/infrastructure/records/protocol.py: the RecordSto
 - [ ] #2 No vendor type or DynamoDB expression string appears in the contracts module
 - [ ] #3 grep finds no import of the Protocol at its old path and no re-export
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #5 InMemoryRecordStore and DynamoDBRecordStore explicitly subclass the moved contracts RecordStore, so make check-fake-coverage covers it by the contracts rule and the records conformance enrollment test stays green
 <!-- AC:END -->
 
 ## Implementation Notes
