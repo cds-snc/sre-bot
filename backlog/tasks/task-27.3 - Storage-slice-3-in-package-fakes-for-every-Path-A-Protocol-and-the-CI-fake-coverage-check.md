@@ -3,11 +3,11 @@ id: TASK-27.3
 title: >-
   Records slice 3: the CI fake-coverage check over hosting contracts and
   capability api.py Protocols
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-09-16 13:58'
-updated_date: '2026-10-14 14:41'
+updated_date: '2026-10-14 14:44'
 labels:
   - infrastructure
   - phase-4
