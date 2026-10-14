@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-28 13:19'
-updated_date: '2026-10-13 13:42'
+updated_date: '2026-10-14 17:54'
 labels:
   - infrastructure
   - phase-4
@@ -38,18 +38,16 @@ End state (full prune, no back-compat shim - per the refactor mandate):
 4. Preserve the reliability.md guard: a job-STATUS poll store (Access Sync JobStatusStore) is NOT this primitive and stays a separate RecordStore-backed keyed-record capability; do not fold it in during the rename.
 5. Update decisions/reliability.md's lease.py path reference and any other decisions/ cross-references to the new module path in the same PR (governance.md cascade rule).
 
-Ordering: coordinate with TASK-6 (the scheduler Tier-2 lease consumer, which adds helpers to lease.py). Land this AFTER TASK-6 so the rename migrates TASK-6's call sites too rather than racing them; if TASK-6 slips, this task still migrates whatever consumers exist at the time with no shim.
-
-This is a rename + facade split with no wire-behavior change; a planner agent should confirm it fits one reviewable PR or decompose it (e.g. primitive-rename slice, then facade + consumer-migration slice, then old-path deletion) per the single-PR size gate.
+Delivery (decided 2026-10-14): split into two stacked layers after TASK-102. TASK-58.1 is the mechanical move to app/contracts/coordination/ and app/infrastructure/coordination/; TASK-58.2 builds the lease and idempotency facades with an explicit per-facade read-failure policy. The decisions are recorded on each subtask. TASK-6 has landed, so its lease call sites move with TASK-58.1.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The single atomic conditional-write primitive is exposed as one coordination-shaped Protocol (e.g. ConditionalWriteStore) with claim/complete/release in app/contracts/; the DynamoDB and in-memory implementations live in app/infrastructure/coordination/ and behave identically to today
-- [ ] #2 IdempotencyStore and the lease helpers exist only as thin facades over that primitive; no second implementation of the conditional-write logic remains
-- [ ] #3 All consumers import the new coordination paths; the old app/infrastructure/idempotency/ path and every transitional alias/shim are deleted (grep finds no idempotency-module import path)
+- [ ] #1 ConditionalWriteStore, ClaimResult and ClaimOutcome live in app/contracts/coordination/; the DynamoDB and in-memory implementations live in app/infrastructure/coordination/, explicitly subclass it, and behave as after TASK-102; the table sre_bot_idempotency is not renamed (TASK-58.1)
+- [ ] #2 A lease facade and an idempotency facade over that primitive, each constructed with an explicit required read-failure policy, both fail-closed; the primitive carries none; no second implementation of the conditional-write logic remains; the own-replay branch is not on the Protocol (TASK-58.2)
+- [ ] #3 No infrastructure.idempotency import path remains (find_spec assertion) and no shim is left; make check-fake-coverage and lint-imports stay green with the conformance fixture mapping and enrollment test moved to tests/integration/infrastructure/coordination/ (TASK-58.1)
 - [ ] #4 The Access Sync job-status store remains a separate RecordStore-backed keyed-record capability, not folded into the primitive
-- [ ] #5 decisions/reliability.md lease.py path reference and any other decisions/ cross-references are updated to the new module path in the same PR
+- [ ] #5 decisions/ cross-references are updated in the PR that changes them: reliability.md (lease.py path, Migration line, facade wording), lifecycle.md, plugin-architecture.md, feature-packages.md
 <!-- AC:END -->
 
 ## Definition of Done
@@ -83,5 +81,15 @@ created: 2026-09-18 15:27
 created: 2026-09-24 20:09
 ---
 2026-09-24 alignment with decisions/plugin-architecture.md: the coordination contract is a core-service Protocol in app/contracts/, implemented in app/infrastructure/coordination/. AC#1 now names both homes, and this task depends on TASK-106 (contracts created). Consumers switch from the facades' module paths to registry resolution when the service registry lands (TASK-109, which depends on this task).
+---
+
+created: 2026-10-14 17:46
+---
+2026-10-14 (human): size gate tripped; split approved into TASK-58.1 (move, Stack C layer 2) and TASK-58.2 (facades, layer 3). Decisions: re-pointed import-linter entries approved (platform_lock removed by 58.2, providers by TASK-124.1); read-failure policy as ClaimResult.INDETERMINATE mapped per facade; policy enum FAIL_CLOSED only (TASK-100 adds FAIL_OPEN); idempotency facade built in 58.2; settings class ConditionalWriteSettings with IDEMPOTENCY_* env names kept; unused get/reset_idempotency_store renamed in 58.1, deleted in 58.2; 58.1 accepted as one PR. Facade names pending. ACs rewritten and assigned to the slices; the TASK-6 ordering note is dropped (TASK-6 is Done).
+---
+
+created: 2026-10-14 17:54
+---
+2026-10-14 (human): facade names decided: LeaseStore and IdempotencyStore (recorded on TASK-58.2). TASK-58.1 plan approved.
 ---
 <!-- COMMENTS:END -->

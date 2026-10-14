@@ -3,8 +3,6 @@
 These tests assert reusable lease semantics for singleton execution paths.
 """
 
-from __future__ import annotations
-
 import threading
 from collections.abc import Callable
 from unittest.mock import MagicMock
@@ -23,7 +21,7 @@ from infrastructure.idempotency import (
 pytestmark = pytest.mark.unit
 
 
-def _lease_api() -> tuple[Callable[[object, str], bool], Callable[[object, str], None]]:
+def _lease_api() -> tuple[Callable[[object, str], str | None], Callable[[object, str, str], bool]]:
     acquire = getattr(idempotency, "acquire_lease", None)
     release = getattr(idempotency, "release_lease", None)
 
@@ -37,12 +35,12 @@ def _store() -> InMemoryIdempotencyStore:
     return InMemoryIdempotencyStore(idempotency_settings=settings)
 
 
-def test_acquire_lease_returns_true_once_for_same_name() -> None:
+def test_acquire_lease_returns_a_token_once_for_same_name() -> None:
     acquire_lease, _ = _lease_api()
     store = _store()
 
-    assert acquire_lease(store, "leases:access-sync:platform:aws") is True
-    assert acquire_lease(store, "leases:access-sync:platform:aws") is False
+    assert acquire_lease(store, "leases:access-sync:platform:aws")
+    assert acquire_lease(store, "leases:access-sync:platform:aws") is None
 
 
 def test_release_lease_allows_name_to_be_claimed_again() -> None:
@@ -50,16 +48,27 @@ def test_release_lease_allows_name_to_be_claimed_again() -> None:
     store = _store()
     name = "leases:access-sync:user:aws:alice@example.com"
 
-    assert acquire_lease(store, name) is True
-    release_lease(store, name)
-    assert acquire_lease(store, name) is True
+    claim_token = acquire_lease(store, name)
+    assert claim_token is not None
+    assert release_lease(store, name, claim_token) is True
+    assert acquire_lease(store, name) is not None
+
+
+def test_release_lease_with_a_foreign_token_keeps_the_lease() -> None:
+    acquire_lease, release_lease = _lease_api()
+    store = _store()
+    name = "leases:access-sync:platform:aws"
+    acquire_lease(store, name)
+
+    assert release_lease(store, name, "0" * 32) is False
+    assert acquire_lease(store, name) is None
 
 
 def test_acquire_lease_concurrent_calls_yield_exactly_one_winner() -> None:
     acquire_lease, _ = _lease_api()
     store = _store()
     barrier = threading.Barrier(2)
-    results: list[bool] = []
+    results: list[str | None] = []
 
     def _worker() -> None:
         barrier.wait()
@@ -72,8 +81,8 @@ def test_acquire_lease_concurrent_calls_yield_exactly_one_winner() -> None:
     t1.join()
     t2.join()
 
-    assert results.count(True) == 1
-    assert results.count(False) == 1
+    assert results.count(None) == 1
+    assert len([token for token in results if token]) == 1
 
 
 class TestGetLeaseStore:
@@ -134,7 +143,7 @@ class TestRunIfLeased:
         job = MagicMock()
 
         # Acquire the lease first
-        assert acquire_lease(store, "scheduler:test_job") is True
+        assert acquire_lease(store, "scheduler:test_job") is not None
 
         # Second call to run_if_leased should not execute the job
         run_if_leased(store, "scheduler:test_job", job)
@@ -182,3 +191,23 @@ class TestRunIfLeased:
         run_if_leased(expired_store, "scheduler:test_job", second_job)
 
         second_job.assert_called_once()
+
+    @pytest.mark.unit
+    def test_run_if_leased_does_not_release_a_lease_taken_over_mid_run(self) -> None:
+        """A job that outlives its TTL must not free the lease a second holder took over.
+
+        The second holder's own release succeeding afterwards proves the record survived.
+        """
+        settings = IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=-1)
+        expired_store = InMemoryIdempotencyStore(idempotency_settings=settings)
+        name = "scheduler:test_job"
+        takeover_tokens: list[str | None] = []
+
+        def job_overtaken_mid_run() -> None:
+            takeover_tokens.append(acquire_lease(expired_store, name))
+
+        run_if_leased(expired_store, name, job_overtaken_mid_run)
+
+        [takeover_token] = takeover_tokens
+        assert takeover_token is not None
+        assert expired_store.release(name, takeover_token) is True

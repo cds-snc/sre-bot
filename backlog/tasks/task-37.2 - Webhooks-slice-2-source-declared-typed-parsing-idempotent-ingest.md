@@ -4,7 +4,7 @@ title: 'Webhooks slice 2: source-declared typed parsing + idempotent ingest'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:39'
-updated_date: '2026-10-13 13:42'
+updated_date: '2026-10-14 17:46'
 labels:
   - migration
   - webhooks
@@ -14,6 +14,7 @@ dependencies:
   - TASK-37.1
   - TASK-46
   - TASK-58
+  - TASK-58.2
   - TASK-109
 references:
   - decisions/webhooks.md

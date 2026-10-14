@@ -55,12 +55,12 @@ class DynamoDBIdempotencyStore(IdempotencyStore):
         replayed conditional put fails against the record the first attempt already wrote
         and the re-read finds our own claim. A matching token proves the claim is ours, so
         the outcome is NEW rather than an IN_PROGRESS nobody holds and nobody will release.
-        The token is written but never matched on by the condition expression; it is only
-        read back here, and it stays off the IdempotencyStore Protocol because it defends
-        against botocore's retry rather than expressing anything about the coordination
-        contract. This matters for leases, where a phantom IN_PROGRESS strands the key
-        until its in-progress TTL expires; a dedup caller treats its own replay and a real
-        duplicate alike, which is why the Powertools pattern needs no token.
+        The claim condition never matches on the token; this re-read branch is a defence
+        against botocore's retry and stays an implementation detail. This matters for leases,
+        where a phantom IN_PROGRESS strands the key until its in-progress TTL expires; a dedup
+        caller treats its own replay and a real duplicate alike. Separately, every NEW outcome
+        returns the token on ClaimOutcome, because complete() and release() are conditional
+        on it: that ownership rule is part of the Protocol.
 
         Fail-closed re-read. A classified failure of the ConsistentRead returns IN_PROGRESS:
         our own put definitively did not land, and an unreadable store is indistinguishable
@@ -97,7 +97,7 @@ class DynamoDBIdempotencyStore(IdempotencyStore):
                     ":now": {"N": str(now)},
                 },
             )
-            return ClaimOutcome(result=ClaimResult.NEW)
+            return ClaimOutcome(result=ClaimResult.NEW, claim_token=claim_token)
         except (ClientError, BotoCoreError) as exc:
             _, error_code, _ = classify_aws_error(exc)
             if error_code != "ConditionalCheckFailedException":
@@ -131,12 +131,18 @@ class DynamoDBIdempotencyStore(IdempotencyStore):
             return ClaimOutcome(result=ClaimResult.COMPLETED, outcome=json.loads(outcome_json))
 
         if status == ClaimResult.IN_PROGRESS.name and item.get("claim_token", {}).get("S") == claim_token:
-            return ClaimOutcome(result=ClaimResult.NEW)
+            return ClaimOutcome(result=ClaimResult.NEW, claim_token=claim_token)
 
         return ClaimOutcome(result=ClaimResult.IN_PROGRESS)
 
-    def complete(self, key: str, outcome: dict[str, Any]) -> None:
-        """Write completed outcome for idempotency key."""
+    def complete(self, key: str, outcome: dict[str, Any], claim_token: str) -> bool:
+        """Write the completed outcome if claim_token still holds the key.
+
+        The put is conditional on the stored token only, not on the status, and the
+        COMPLETED item keeps the token: a botocore replay of a complete whose first attempt
+        landed still matches and stays True. A record taken over by another claimant, or
+        purged by the TTL sweeper, fails the condition and returns False.
+        """
         now = int(time.time())
         ttl_timestamp = now + self.record_ttl_seconds
         outcome_json = json.dumps(outcome)
@@ -147,22 +153,44 @@ class DynamoDBIdempotencyStore(IdempotencyStore):
                 Item={
                     PARTITION_KEY: {"S": key},
                     "status": {"S": ClaimResult.COMPLETED.name},
+                    "claim_token": {"S": claim_token},
                     "outcome_json": {"S": outcome_json},
                     "completed_at": {"N": str(now)},
                     "ttl": {"N": str(ttl_timestamp)},
                 },
+                ConditionExpression="#claim_token = :claim_token",
+                ExpressionAttributeNames={"#claim_token": "claim_token"},
+                ExpressionAttributeValues={":claim_token": {"S": claim_token}},
             )
+            return True
         except (ClientError, BotoCoreError) as exc:
-            classify_aws_error(exc)
+            _, error_code, _ = classify_aws_error(exc)
+            if error_code == "ConditionalCheckFailedException":
+                self.log.warning("claim_ownership_lost", key=key, operation="complete")
+                return False
             raise RuntimeError(f"Failed to complete idempotency key: {exc}") from exc
 
-    def release(self, key: str) -> None:
-        """Delete key so failed processing can be retried via redelivery."""
+    def release(self, key: str, claim_token: str) -> bool:
+        """Delete the key if claim_token still holds it in progress, so redelivery can retry.
+
+        A COMPLETED record is never deleted. A replayed release whose first attempt landed
+        finds nothing and returns False; the release still happened.
+        """
         try:
             self._dynamodb.delete_item(
                 TableName=self.table_name,
                 Key={PARTITION_KEY: {"S": key}},
+                ConditionExpression="#claim_token = :claim_token AND #status = :in_progress",
+                ExpressionAttributeNames={"#claim_token": "claim_token", "#status": "status"},
+                ExpressionAttributeValues={
+                    ":claim_token": {"S": claim_token},
+                    ":in_progress": {"S": ClaimResult.IN_PROGRESS.name},
+                },
             )
+            return True
         except (ClientError, BotoCoreError) as exc:
-            classify_aws_error(exc)
+            _, error_code, _ = classify_aws_error(exc)
+            if error_code == "ConditionalCheckFailedException":
+                self.log.warning("claim_ownership_lost", key=key, operation="release")
+                return False
             raise RuntimeError(f"Failed to release idempotency key: {exc}") from exc

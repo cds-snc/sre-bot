@@ -7,6 +7,7 @@ leaks into the Protocol surface.
 
 import dataclasses
 import inspect
+import uuid
 from typing import Any
 
 import pytest
@@ -30,17 +31,25 @@ class FakeIdempotencyStore:
     def claim(self, key: str):
         record = self._records.get(key)
         if record is None:
-            self._records[key] = {"status": "IN_PROGRESS", "outcome": None}
-            return ClaimOutcome(result=ClaimResult.NEW)
+            token = uuid.uuid4().hex
+            self._records[key] = {"status": "IN_PROGRESS", "outcome": None, "token": token}
+            return ClaimOutcome(result=ClaimResult.NEW, claim_token=token)
         if record["status"] == "COMPLETED":
             return ClaimOutcome(result=ClaimResult.COMPLETED, outcome=record["outcome"])
         return ClaimOutcome(result=ClaimResult.IN_PROGRESS)
 
-    def complete(self, key: str, outcome: dict[str, Any]) -> None:
-        self._records[key] = {"status": "COMPLETED", "outcome": outcome}
+    def complete(self, key: str, outcome: dict[str, Any], claim_token: str) -> bool:
+        if self._records.get(key, {}).get("token") != claim_token:
+            return False
+        self._records[key] = {"status": "COMPLETED", "outcome": outcome, "token": claim_token}
+        return True
 
-    def release(self, key: str) -> None:
-        self._records.pop(key, None)
+    def release(self, key: str, claim_token: str) -> bool:
+        record = self._records.get(key, {})
+        if record.get("token") != claim_token or record.get("status") != "IN_PROGRESS":
+            return False
+        del self._records[key]
+        return True
 
 
 class TestIdempotencyStoreProtocolShape:
@@ -53,13 +62,23 @@ class TestIdempotencyStoreProtocolShape:
         params = list(inspect.signature(IdempotencyStore.claim).parameters)
         assert params == ["self", "key"]
 
-    def test_complete_method_has_no_vendor_parameters(self):
+    def test_complete_method_takes_the_claim_token_and_no_vendor_parameters(self):
         params = list(inspect.signature(IdempotencyStore.complete).parameters)
-        assert params == ["self", "key", "outcome"]
+        assert params == ["self", "key", "outcome", "claim_token"]
 
-    def test_release_method_has_no_vendor_parameters(self):
+    def test_release_method_takes_the_claim_token_and_no_vendor_parameters(self):
         params = list(inspect.signature(IdempotencyStore.release).parameters)
-        assert params == ["self", "key"]
+        assert params == ["self", "key", "claim_token"]
+
+    @pytest.mark.parametrize("method", ["complete", "release"])
+    def test_claim_token_is_required(self, method):
+        """No default, so no caller can skip the ownership check by omission."""
+        parameter = inspect.signature(getattr(IdempotencyStore, method)).parameters["claim_token"]
+        assert parameter.default is inspect.Parameter.empty
+
+    @pytest.mark.parametrize("method", ["complete", "release"])
+    def test_ownership_checked_methods_report_whether_they_applied(self, method):
+        assert inspect.signature(getattr(IdempotencyStore, method)).return_annotation is bool
 
     @pytest.mark.parametrize(
         "forbidden_term",
@@ -99,6 +118,14 @@ class TestClaimOutcome:
     def test_outcome_payload_defaults_to_none(self):
         outcome = ClaimOutcome(result=ClaimResult.NEW)
         assert outcome.outcome is None
+
+    def test_claim_token_defaults_to_none(self):
+        outcome = ClaimOutcome(result=ClaimResult.IN_PROGRESS)
+        assert outcome.claim_token is None
+
+    def test_claim_token_round_trips_for_new_claims(self):
+        outcome = ClaimOutcome(result=ClaimResult.NEW, claim_token="a" * 32)
+        assert outcome.claim_token == "a" * 32
 
     def test_outcome_payload_round_trips_for_completed_claims(self):
         payload = {"status": "ok", "id": 42}

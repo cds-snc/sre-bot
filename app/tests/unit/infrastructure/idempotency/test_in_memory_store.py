@@ -40,8 +40,8 @@ class TestInMemoryIdempotencyStoreClaim:
 
     def test_claim_on_completed_key_returns_completed_with_outcome(self, store):
         key = "feature:intent:done"
-        store.claim(key)
-        store.complete(key, {"status": "ok"})
+        claimed = store.claim(key)
+        store.complete(key, {"status": "ok"}, claimed.claim_token)
 
         outcome = store.claim(key)
 
@@ -63,8 +63,8 @@ class TestInMemoryIdempotencyStoreCompleteAndRelease:
     def test_complete_records_exact_outcome_dict(self, store):
         key = "feature:intent:record"
         outcome_payload = {"a": 1, "nested": {"b": 2}}
-        store.claim(key)
-        store.complete(key, outcome_payload)
+        claimed = store.claim(key)
+        store.complete(key, outcome_payload, claimed.claim_token)
 
         result = store.claim(key)
 
@@ -72,22 +72,22 @@ class TestInMemoryIdempotencyStoreCompleteAndRelease:
 
     def test_release_after_claim_allows_redelivery_to_claim_new_again(self, store):
         key = "feature:intent:redelivered"
-        store.claim(key)
+        claimed = store.claim(key)
 
-        store.release(key)
+        store.release(key, claimed.claim_token)
         outcome = store.claim(key)
 
         assert outcome.result is ClaimResult.NEW
 
-    def test_release_on_unknown_key_does_not_raise(self, store):
-        store.release("feature:intent:never-claimed")
+    def test_release_on_unknown_key_returns_false(self, store):
+        assert store.release("feature:intent:never-claimed", "0" * 32) is False
 
 
 class TestInMemoryIdempotencyStoreKeyFormat:
     def test_claim_preserves_exact_key_no_hash_no_truncation(self, store):
         key = "groups_notifications:send_notification:eng-team:add_member:" + "x" * 200
-        store.claim(key)
-        store.complete(key, {"marker": "exact"})
+        claimed = store.claim(key)
+        store.complete(key, {"marker": "exact"}, claimed.claim_token)
 
         replay = store.claim(key)
 
