@@ -3,10 +3,10 @@ id: TASK-58.2
 title: >-
   Lease and idempotency facades over ConditionalWriteStore with an explicit
   per-facade read-failure policy
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-14 17:45'
-updated_date: '2026-10-14 18:41'
+updated_date: '2026-10-14 19:07'
 labels:
   - infrastructure
   - reliability
