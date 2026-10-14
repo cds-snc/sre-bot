@@ -6,9 +6,9 @@ import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 
+from contracts.records import KeySchema, RecordStore, RecordTable
 from infrastructure.records import get_record_store
 from infrastructure.records.in_memory import InMemoryRecordStore
-from infrastructure.records.protocol import KeySchema, RecordStore, RecordTable
 from infrastructure.records.service import DynamoDBRecordStore
 
 TABLE = RecordTable(name="test_table", key=KeySchema(partition="PK", sort="SK"))

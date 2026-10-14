@@ -8,11 +8,11 @@ in the configured table.
 
 import pytest
 
+from contracts.records import RecordQuery
 from infrastructure.audit import service as audit_service
 from infrastructure.audit.models import AuditEvent
 from infrastructure.audit.settings import AuditSettings, get_audit_settings
 from infrastructure.records.in_memory import InMemoryRecordStore
-from infrastructure.records.protocol import RecordQuery
 
 pytestmark = pytest.mark.unit
 

@@ -7,7 +7,7 @@ mistake. Each case builds the smallest input that triggers one rule.
 
 import pytest
 
-from infrastructure.records.protocol import (
+from contracts.records import (
     IncrementAttribute,
     KeySchema,
     RecordChange,

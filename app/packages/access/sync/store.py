@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 
 import structlog
 
-from infrastructure.records.protocol import KeySchema, RecordQuery, RecordStore, RecordTable, SortOrder
+from contracts.records import KeySchema, RecordQuery, RecordStore, RecordTable, SortOrder
 from packages.access.sync.domain import SyncRunRecord
 
 logger = structlog.get_logger()

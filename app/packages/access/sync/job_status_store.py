@@ -14,7 +14,7 @@ from typing import Any
 
 import structlog
 
-from infrastructure.records import KeySchema, RecordStore, RecordTable
+from contracts.records import KeySchema, RecordStore, RecordTable
 
 logger = structlog.get_logger()
 

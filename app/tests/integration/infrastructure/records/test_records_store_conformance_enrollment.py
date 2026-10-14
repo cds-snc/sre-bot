@@ -7,7 +7,7 @@ adapter or fake that is not added to the fixture fails here rather than
 silently skipping the conformance cases.
 """
 
-from infrastructure.records.protocol import RecordStore
+from contracts.records import RecordStore
 from tests.fixtures.conformance import concrete_production_subclasses
 
 

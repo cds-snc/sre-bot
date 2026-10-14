@@ -16,14 +16,14 @@ from typing import Any
 import pytest
 
 from contracts.operations.status import OperationStatus
-from infrastructure.records.in_memory import InMemoryRecordStore
-from infrastructure.records.protocol import (
+from contracts.records import (
     IncrementAttribute,
     RecordQuery,
     RecordStore,
     RemoveAttribute,
     SetAttribute,
 )
+from infrastructure.records.in_memory import InMemoryRecordStore
 
 from .conftest import RECORDS_TEST_TABLE as TABLE
 

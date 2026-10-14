@@ -9,8 +9,7 @@ import inspect
 
 import pytest
 
-from infrastructure.records import protocol
-from infrastructure.records.protocol import (
+from contracts.records import (
     KeySchema,
     RecordIndex,
     RecordQuery,
@@ -20,6 +19,7 @@ from infrastructure.records.protocol import (
     SortOperator,
     SortOrder,
     resolve_query_key,
+    store,
 )
 
 pytestmark = pytest.mark.unit
@@ -121,7 +121,16 @@ class TestProtocolSurface:
         assert signature.parameters["table"].annotation is RecordTable
 
     def test_protocol_module_has_no_vendor_vocabulary(self) -> None:
-        source = inspect.getsource(protocol)
+        source = inspect.getsource(store)
 
-        for term in ("KeyConditionExpression", "ExpressionAttribute", "ScanIndexForward", "boto", "dynamodb"):
+        for term in (
+            "KeyConditionExpression",
+            "ExpressionAttribute",
+            "ScanIndexForward",
+            "UpdateExpression",
+            "ConditionExpression",
+            "attribute_not_exists",
+            "boto",
+            "dynamodb",
+        ):
             assert term not in source

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:58'
-updated_date: '2026-10-13 13:41'
+updated_date: '2026-10-14 15:54'
 labels:
   - plugin-architecture
   - dependency-injection
@@ -51,4 +51,5 @@ Out of scope: moving each consumer off its infrastructure get_* provider. Each p
 - [ ] #5 The import-linter forbidden contract for provider modules exists, with current violations as ignore entries and unmatched alerting on
 - [ ] #6 decisions/dependency-injection.md Migration names this ticket; ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #7 Boot test: resolving every registered service opens no outbound connection (socket.connect spy)
+- [ ] #8 The import-linter ignore entry TASK-145.5 adds for its get_record_store wiring is removed, and the named-exception wording in contract (b)'s shrink-only comment is dropped when no exception remains
 <!-- AC:END -->

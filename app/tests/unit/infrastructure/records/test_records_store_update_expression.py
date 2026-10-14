@@ -14,7 +14,7 @@ import pytest
 from botocore.exceptions import ClientError
 
 from contracts.operations.status import OperationStatus
-from infrastructure.records.protocol import (
+from contracts.records import (
     IncrementAttribute,
     KeySchema,
     RecordTable,

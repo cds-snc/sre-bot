@@ -19,7 +19,7 @@ What each entry point receives:
 - **Backstage:** `sub` is a catalog entity ref (`user:default/jane`), not the IdP subject. Email and IdP subject appear only if the sign-in resolver adds them as claims ([identity resolver](https://backstage.io/docs/auth/identity-resolver)).
 
 Current state:
-- **No person record, people table or `app/capabilities/people/` exists.** DynamoDB is used through `RecordStore` (`infrastructure/records/`), which has single-item `put_if_not_exists` but no atomic multi-item write.
+- **No person record, people table or `app/capabilities/people/` exists.** DynamoDB is used through `RecordStore` (`contracts/records/`, implemented in `infrastructure/records/`), which has single-item `put_if_not_exists` but no atomic multi-item write.
 - **Every human is keyed by email.** Directory lookups use `users().get(userKey=email)`. The Directory user `id` is read into `provider_user_id`, but only `modules/dev/google.py` uses it. `infrastructure/security/current_user.py` identifies Backstage callers by the `email` claim. Access stores `actor_email` and `approver_email` (`packages/access/request/`), the audit table indexes `user_email`, and retro attendees come from Slack profile emails (`modules/incident/schedule_retro.py`).
 - **The bot never receives a Google OIDC `sub`.** No Google page says it equals the Directory `id`, so the two are treated as different values.
 - **The Slack runtime lives in `integrations/slack/`,** so callers can't yet be resolved at an entry point ([platform-entrypoints.md](platform-entrypoints.md)). Directory access is Google-only; there is no Microsoft Graph client.
