@@ -5,12 +5,17 @@ Python ↔ DynamoDB type conversion via boto3's TypeSerializer/TypeDeserializer.
 """
 
 from infrastructure.records.protocol import (
+    ExpectedValue,
+    IncrementAttribute,
     KeySchema,
     KeyValue,
+    RecordChange,
     RecordIndex,
     RecordQuery,
     RecordStore,
     RecordTable,
+    RemoveAttribute,
+    SetAttribute,
     SortCondition,
     SortOperator,
     SortOrder,
@@ -18,12 +23,17 @@ from infrastructure.records.protocol import (
 from infrastructure.records.service import get_record_store
 
 __all__ = [
+    "ExpectedValue",
+    "IncrementAttribute",
     "KeySchema",
     "KeyValue",
+    "RecordChange",
     "RecordIndex",
     "RecordQuery",
     "RecordStore",
     "RecordTable",
+    "RemoveAttribute",
+    "SetAttribute",
     "SortCondition",
     "SortOperator",
     "SortOrder",

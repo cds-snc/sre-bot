@@ -4,7 +4,7 @@ title: Add an atomic conditional write across several items to the records contr
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
-updated_date: '2026-10-13 18:00'
+updated_date: '2026-10-13 19:59'
 labels:
   - identity
   - records
@@ -51,5 +51,10 @@ This is a records primitive with no identity vocabulary. It builds on the capabi
 created: 2026-09-24 20:08
 ---
 2026-09-24: the storage Protocol moves to app/contracts/ (TASK-108, decisions/plugin-architecture.md). This ticket adds the atomic multi-item write to it there, after the move, so the Protocol is not changed in two homes.
+---
+
+created: 2026-10-13 19:59
+---
+2026-10-13 records/incidents layout decision: note only: the multi-item conditional write can reuse the change-set types and the equality guard shape added to protocol.py by TASK-27.2 for its per-item conditions, so the two conditional vocabularies stay one.
 ---
 <!-- COMMENTS:END -->

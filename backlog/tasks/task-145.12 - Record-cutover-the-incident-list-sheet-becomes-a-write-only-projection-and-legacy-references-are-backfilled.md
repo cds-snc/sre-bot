@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-13 16:07'
+updated_date: '2026-10-13 19:59'
 labels:
   - incident
   - features
@@ -14,6 +14,7 @@ labels:
 dependencies:
   - TASK-145.9
   - TASK-121
+  - TASK-27.5
 parent_task_id: TASK-145
 priority: medium
 type: task
@@ -71,3 +72,12 @@ About 350 production lines plus the backfill job.
 ## Blast radius and rollback
 Sheet consumers see the same rows; a wrong backfill is rerunnable (idempotent) and the previous item fields are kept, not deleted. Revert restores the sheet reads.
 <!-- SECTION:PLAN:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-13 19:59
+---
+2026-10-13 records/incidents layout decision: the full read of the incidents table for the sheet rebuild uses the full-table read shaped by TASK-27.5 (capped or paginated; a rebuild of an unbounded table may need pagination), not a bounded list assumed in advance. Dependency on TASK-27.5 added.
+---
+<!-- COMMENTS:END -->
