@@ -4,7 +4,7 @@ title: Build AWS clients without ambient credential resolution at construction
 status: To Do
 assignee: []
 created_date: '2026-10-14 18:57'
-updated_date: '2026-10-14 18:57'
+updated_date: '2026-10-14 19:23'
 labels:
   - infrastructure
   - reliability
@@ -38,3 +38,12 @@ Target: client construction defers credential resolution to the first API call f
 - [ ] #3 A credential failure surfaces on the first API call, never at boot
 - [ ] #4 TASK-109's boot test no longer needs static credentials or AWS_EC2_METADATA_DISABLED; tests/api's workaround is removed
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-14 19:23
+---
+2026-10-14 (agent, during TASK-109): measured with no credential files and no AWS_* keys: phase 2 building the two DynamoDB clients makes 2 connects to 169.254.169.254:80. Before TASK-109, six test files that boot the real lifespan made none; they now use the static_aws_credentials fixture (tests/conftest.py). tests/integration/jobs/test_scheduled_tasks_integration.py already made one such connect before TASK-109. ECS container-credential behaviour at construction was not verified (no ECS access in the session).
+---
+<!-- COMMENTS:END -->

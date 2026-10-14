@@ -1,9 +1,11 @@
 import logging
 import sys
+from collections.abc import AsyncIterator
 from unittest.mock import MagicMock
 
 import pytest
 import slack_bolt
+import svcs
 
 # Ensure project root is on path BEFORE importing test factories.
 project_root = "/workspace/app"
@@ -23,6 +25,7 @@ from tests.factories.google import (  # noqa: E402
     make_google_members,
     make_google_users,
 )
+from tests.fixtures.service_registry import build_fake_service_registry  # noqa: E402
 
 # Ensure the application package root is on sys.path so importing application
 # modules (e.g. `core.config`) works during pytest collection. Pytest may
@@ -70,6 +73,26 @@ def fresh_slack_provider():
     get_slack_provider.cache_clear()
     yield
     get_slack_provider.cache_clear()
+
+
+@pytest.fixture
+def static_aws_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Static AWS credentials with the instance metadata endpoint disabled.
+
+    Booting the real lifespan builds AWS clients for the core services, and the
+    ambient credential chain contacts the metadata endpoint when no credentials
+    are configured (as in CI). TASK-149 makes construction network-free.
+    """
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
+    monkeypatch.setenv("AWS_EC2_METADATA_DISABLED", "true")
+
+
+@pytest.fixture
+async def service_registry() -> AsyncIterator[svcs.Registry]:
+    """svcs registry with in-memory fakes under the core contracts, closed after the test."""
+    async with build_fake_service_registry() as registry:
+        yield registry
 
 
 @pytest.fixture(autouse=True)

@@ -1,10 +1,10 @@
 import sys
 import threading
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import cast
 
+import svcs
 from fastapi import FastAPI
 from slack_bolt import App
 from structlog.stdlib import BoundLogger
@@ -53,6 +53,7 @@ from server.plugins.manager import (
     register_background_jobs,
     register_feature_integrations,
 )
+from server.services import initialize_core_services
 
 
 def _is_test_environment() -> bool:
@@ -232,8 +233,8 @@ def _initialize_translation_service(pm: FeaturePluginManager, logger: BoundLogge
     return translation_service
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+@svcs.fastapi.lifespan
+async def lifespan(app: FastAPI, registry: svcs.Registry) -> AsyncGenerator[None]:
     app_settings = get_app_settings()
     server_settings = get_server_settings()
     directory_settings = get_directory_settings()
@@ -252,6 +253,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         sre_ops_settings,
         logger,
     )
+    # Phase 2: build every core service once; a failing factory stops startup here.
+    await initialize_core_services(registry, logger)
 
     _initialize_security_services(app, server_settings, logger)
     _initialize_directory_provider(app, directory_settings, logger)

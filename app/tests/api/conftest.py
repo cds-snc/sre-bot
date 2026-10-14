@@ -3,6 +3,8 @@
 These tests boot the real FastAPI lifespan through ``TestClient``. Any feature
 warmup that builds an AWS client with a role ARN would otherwise perform a live
 STS ``AssumeRole`` call, so the seam is stubbed for every test in this tree.
+The lifespan also builds the core services' AWS clients, so every test here runs
+with static AWS credentials and the instance metadata endpoint disabled.
 """
 
 from collections.abc import Iterator
@@ -14,6 +16,11 @@ _FAKE_ASSUMED_CREDENTIALS = {
     "SecretAccessKey": "test-assumed-secret",
     "SessionToken": "test-assumed-session-token",
 }
+
+
+@pytest.fixture(autouse=True)
+def _autouse_static_aws_credentials(static_aws_credentials: None) -> None:
+    """Apply static AWS credentials to every API test (see the module docstring)."""
 
 
 @pytest.fixture(autouse=True)

@@ -56,12 +56,16 @@ Current code:
 
 ## Migration
 
-Tickets: TASK-18 (contracts and import boundaries), TASK-109 (the registry in `server/`).
+Tickets: TASK-18 (contracts and import boundaries), TASK-109 (the registry in `server/`), TASK-148 (lease duration on the claim call), TASK-149 (no credential lookup at client construction).
+
+In place (TASK-109): `server/services.py` registers the records contract (`RecordStore`) and the coordination contract (`ConditionalWriteStore`), each built once per registry; lifespan phase 2 resolves both before plugin loading; routes take `svcs.fastapi.DepContainer`, and Slack handlers and jobs open a container per invocation; tests register fakes with `tests/fixtures/service_registry.py`; import-linter contract (k) keeps `infrastructure.records` and `infrastructure.coordination` out of every module outside `server/`. The registered store carries the default in-progress TTL, and consumers build `LeaseStore` and `IdempotencyStore` over it with their own read-failure policy.
 
 Tolerated until closed:
-- features importing `infrastructure` provider functions (`get_record_store`, `get_event_dispatcher` and the other `get_*` functions);
+- features importing `infrastructure` provider functions (`get_record_store`, `get_event_dispatcher` and the other `get_*` functions), and contracts not yet registered; for records and coordination each remaining import is an ignore entry in contract (k) naming its removing task;
+- non-default lease TTLs built through `build_lease_store`/`get_lease_store` (removed by TASK-148);
+- building an AWS client with only ambient credentials contacts the instance metadata endpoint, so phase 2 is network-free only with configured credentials (TASK-149);
 - `@lru_cache` providers in feature `providers.py` files, and the global cache resets tests need for them;
-- lazy first-call construction, with warmup done piecemeal in lifespan and `startup_warmup` hookimpls, two of which call the network while building a service (removed by TASK-98 and TASK-128);
+- lazy first-call construction for services not yet registered, with warmup done piecemeal in lifespan and `startup_warmup` hookimpls, two of which call the network while building a service (removed by TASK-98 and TASK-128);
 - routes calling provider functions inline instead of taking a container.
 
 **Changes:**
@@ -69,3 +73,4 @@ Tolerated until closed:
 - 2026-09-25: the boot check is construction and static validation with no network I/O; svcs pings are diagnostics; credential checks alert and never abort.
 - 2026-10-01: an umbrella's shared services are wired through its `core/api.py`.
 - 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).
+- 2026-10-14: the registry exists for records and coordination, with phase 2, the entry-point convention, the test fixture and contract (k); the coordination registration is the primitive, and consumers build the lease and idempotency facades (TASK-109).

@@ -23,7 +23,7 @@ The suite lives at `app/tests/` (~320 files) with `unit/`, `integration/`, `smok
 
 **Doubles, in preference order:** Protocol-conformant fake → stub → `MagicMock` (last resort, never for the subject under test). Mock at the Protocol seam, not the SDK — the SDK is reached only through the concrete adapter, unit-tested separately with `moto` (`boto3`) or `respx`/`pytest-httpx` (`httpx`) at that adapter's seam when a Protocol fake can't stand in.
 
-**Substitution:** plugins get core services from the service registry, so tests register fakes against the same `contracts/` Protocols there ([plugin-architecture.md](plugin-architecture.md)). Until code resolves through the registry: routes → `app.dependency_overrides`; direct-call consumers of provider functions → the clear-all autouse fixture + monkeypatch ([dependency-injection.md](dependency-injection.md)). Global env comes from per-test `monkeypatch.setenv`, not a pyproject env block that silently configures everything.
+**Substitution:** plugins get core services from the service registry, so tests register fakes against the same `contracts/` Protocols there ([plugin-architecture.md](plugin-architecture.md)). For registry-resolved services (records, coordination) the `service_registry` fixture builds a registry with the in-memory fakes (`tests/fixtures/service_registry.py`), and an HTTP-level test registers its fake after startup. Until the rest of the code resolves through the registry: routes → `app.dependency_overrides`; direct-call consumers of provider functions → the clear-all autouse fixture + monkeypatch ([dependency-injection.md](dependency-injection.md)). Global env comes from per-test `monkeypatch.setenv`, not a pyproject env block that silently configures everything.
 
 **Determinism:** no real time (freezegun is the blessed tool), no network, no ordering dependence. A flaky test is a bug with a ticket, not a retry.
 
@@ -42,7 +42,8 @@ The suite lives at `app/tests/` (~320 files) with `unit/`, `integration/`, `smok
 
 ## Migration
 
-Ticket: toolchain convergence (gates land with [toolchain.md](toolchain.md)'s CI work). Tolerated until closed: the root-level `tests/architecture/` tree, unregistered `slow` marker, no `--strict-markers`, no `fail_under`, no provider-clearing fixture (blocked on [dependency-injection.md](dependency-injection.md)'s registry), `moto`/`respx` named above but not yet added as dependencies (tracked by TASK-50).
+Ticket: toolchain convergence (gates land with [toolchain.md](toolchain.md)'s CI work). Tolerated until closed: the root-level `tests/architecture/` tree, unregistered `slow` marker, no `--strict-markers`, no `fail_under`, cache clearing for providers not yet on [dependency-injection.md](dependency-injection.md)'s registry, static AWS credentials (`static_aws_credentials`) for tests that boot the real lifespan until TASK-149, `moto`/`respx` named above but not yet added as dependencies (tracked by TASK-50).
 
 **Changes:**
 - 2026-09-24: tests substitute core services by registering fakes against `contracts/` Protocols in the service registry.
+- 2026-10-14: the `service_registry` fixture registers the in-memory records and coordination fakes (TASK-109).
