@@ -3,10 +3,10 @@ id: TASK-140.8
 title: >-
   Browse an incident's approved status updates in the status-updates modal and
   reopen their copy-ready text
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-07 15:17'
-updated_date: '2026-10-08 15:56'
+updated_date: '2026-10-14 19:37'
 labels:
   - incident
 dependencies:

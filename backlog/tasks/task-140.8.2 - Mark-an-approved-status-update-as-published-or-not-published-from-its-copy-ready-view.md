@@ -3,10 +3,10 @@ id: TASK-140.8.2
 title: >-
   Mark an approved status update as published or not published from its
   copy-ready view
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-07 22:57'
-updated_date: '2026-10-08 15:36'
+updated_date: '2026-10-14 19:37'
 labels:
   - incident
 dependencies:

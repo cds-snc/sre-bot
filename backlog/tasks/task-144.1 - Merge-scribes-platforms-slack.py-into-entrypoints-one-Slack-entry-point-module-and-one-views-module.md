@@ -3,11 +3,11 @@ id: TASK-144.1
 title: >-
   Merge scribe's platforms/slack.py into entrypoints/: one Slack entry-point
   module and one views module
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-10-09 12:53'
-updated_date: '2026-10-09 13:53'
+updated_date: '2026-10-14 19:35'
 labels:
   - incident
   - features

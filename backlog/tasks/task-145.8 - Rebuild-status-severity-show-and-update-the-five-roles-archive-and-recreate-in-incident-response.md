@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-13 19:59'
+updated_date: '2026-10-14 19:31'
 labels:
   - incident
   - features
@@ -81,5 +81,10 @@ Each subcommand's legacy registration is removed with its rebuild; a revert rest
 created: 2026-10-13 19:59
 ---
 2026-10-13 records/incidents layout decision: IncidentStore.update_field maps to RecordStore.update (TASK-27.2) with a set change and the optional expected guard (a guard that does not hold is a distinct non-error result, a missing incident is NOT_FOUND). Status change to Closed sets the status and removes open_bucket and opened_at in one update call (set plus remove changes), so the sparse open index drops the incident atomically; reopening sets them again. Plan refresh needed when this is picked up (update_field step 1).
+---
+
+created: 2026-10-14 19:31
+---
+2026-10-14 (agent): TASK-151 covers writes to a Slack view or message that no longer exists (e.g. views.update not_found when the user closed the show modal before the status update finished). The rebuilt show/update flow should treat a gone surface as an expected outcome, not a listener error; plan it against TASK-151's classification.
 ---
 <!-- COMMENTS:END -->

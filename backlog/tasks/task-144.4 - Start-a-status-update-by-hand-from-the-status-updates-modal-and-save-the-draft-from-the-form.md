@@ -3,10 +3,10 @@ id: TASK-144.4
 title: >-
   Start a status update by hand from the status-updates modal and save the draft
   from the form
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-09 12:53'
-updated_date: '2026-10-09 15:14'
+updated_date: '2026-10-14 19:36'
 labels:
   - incident
   - features

@@ -3,10 +3,10 @@ id: TASK-144
 title: >-
   Human-first incident status updates: a responder writes the update and AI
   assists inside the form
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-09 12:51'
-updated_date: '2026-10-13 13:41'
+updated_date: '2026-10-14 19:36'
 labels:
   - incident
   - features
@@ -48,5 +48,5 @@ LAYERS, each a single PR under the size gate, merged and deployed bottom-up (a g
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every subtask is done
+- [x] #1 Every subtask is done
 <!-- AC:END -->

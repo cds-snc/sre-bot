@@ -1,10 +1,10 @@
 ---
 id: TASK-102
 title: Make release and complete ownership-checked on the conditional-write primitive
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-17 20:40'
-updated_date: '2026-10-14 16:53'
+updated_date: '2026-10-14 19:36'
 labels:
   - infrastructure
   - reliability
