@@ -1,0 +1,10 @@
+# In-memory fake coverage baseline — only ratchets down (see decisions/cloud-portability.md, contract 4).
+# Entries are "<app-relative module>:<Protocol>  # TASK-<id>", the task that closes the gap:
+# shipping an explicitly subclassing in_memory.py fake, or moving or deleting the Protocol.
+# Removing an entry is always safe. Do NOT add new entries; net-new gaps fail CI.
+infrastructure/audit/protocol.py:AuditTrailService  # TASK-122 moves audit to capabilities/audit/ with its fake
+infrastructure/directory/provider.py:DirectoryProvider  # TASK-119 moves directory to capabilities/directory/ with its fake
+infrastructure/drive/provider.py:DriveProvider  # TASK-120 moves drive to capabilities/drive/ with its fake
+infrastructure/spreadsheets/provider.py:SpreadsheetProvider  # TASK-121 moves spreadsheets to capabilities/spreadsheets/ with its fake
+infrastructure/resilience/retry/store.py:RetryStore  # TASK-59 consolidates the retry store onto QueueService
+infrastructure/resilience/retry/worker.py:RetryProcessor  # TASK-59 retires the retry worker (a driving port, needs no fake)

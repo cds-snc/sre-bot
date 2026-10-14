@@ -139,7 +139,7 @@ def _update_request(
     return request
 
 
-class DynamoDBRecordStore:
+class DynamoDBRecordStore(RecordStore):
     """Generic DynamoDB record store.
 
     Intended as the single infrastructure-level abstraction over DynamoDB for
