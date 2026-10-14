@@ -3,10 +3,10 @@ id: TASK-140.7
 title: >-
   Retire the legacy /sre incident updates command and the incident_updates
   attribute
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-08 15:28'
+updated_date: '2026-10-14 19:36'
 labels:
   - incident
 dependencies:

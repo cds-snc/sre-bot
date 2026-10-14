@@ -3,10 +3,10 @@ id: TASK-144.5
 title: >-
   Draft with AI from the status-update form only when text generation is
   configured; Draft leaves the overview
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-09 12:53'
-updated_date: '2026-10-09 15:34'
+updated_date: '2026-10-14 19:36'
 labels:
   - incident
   - features

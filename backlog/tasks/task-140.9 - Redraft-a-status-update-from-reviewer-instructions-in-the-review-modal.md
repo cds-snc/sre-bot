@@ -1,10 +1,10 @@
 ---
 id: TASK-140.9
 title: Redraft a status update from reviewer instructions in the review modal
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-07 15:17'
-updated_date: '2026-10-08 15:39'
+updated_date: '2026-10-14 19:37'
 labels:
   - incident
 dependencies:

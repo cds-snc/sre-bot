@@ -3,10 +3,10 @@ id: TASK-144.3
 title: >-
   Start, save and AI-fill a status update draft in the scribe service, with the
   draft's origin and the AI availability predicate
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-09 12:53'
-updated_date: '2026-10-09 14:32'
+updated_date: '2026-10-14 19:35'
 labels:
   - incident
   - features
