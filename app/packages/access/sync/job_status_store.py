@@ -18,7 +18,7 @@ from contracts.records import KeySchema, RecordStore, RecordTable
 
 logger = structlog.get_logger()
 
-# Shares the table with infrastructure/idempotency; only the key attribute is declared here.
+# Shares the table with infrastructure/coordination; only the key attribute is declared here.
 JOB_STATUS_KEY = KeySchema(partition="idempotency_key")
 
 

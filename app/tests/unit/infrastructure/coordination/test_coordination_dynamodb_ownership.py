@@ -1,4 +1,4 @@
-"""Ownership checks on DynamoDBIdempotencyStore.complete() and release().
+"""Ownership checks on DynamoDBConditionalWriteStore.complete() and release().
 
 A real boto3 DynamoDB client built with static dummy credentials is wrapped in
 botocore.stub.Stubber, which validates each request against the service model
@@ -14,9 +14,9 @@ import pytest
 from botocore.exceptions import ClientError, EndpointConnectionError
 from botocore.stub import ANY, Stubber
 
-from infrastructure.idempotency.dynamodb import DynamoDBIdempotencyStore
-from infrastructure.idempotency.protocol import ClaimResult
-from infrastructure.idempotency.settings import IdempotencySettings
+from contracts.coordination import ClaimResult
+from infrastructure.coordination.dynamodb import DynamoDBConditionalWriteStore
+from infrastructure.coordination.settings import ConditionalWriteSettings
 
 pytestmark = pytest.mark.unit
 
@@ -41,9 +41,9 @@ def client() -> Any:
 
 
 @pytest.fixture
-def store(client: Any) -> DynamoDBIdempotencyStore:
-    settings = IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
-    return DynamoDBIdempotencyStore(client, idempotency_settings=settings, table_name=TABLE_NAME)
+def store(client: Any) -> DynamoDBConditionalWriteStore:
+    settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
+    return DynamoDBConditionalWriteStore(client, settings=settings, table_name=TABLE_NAME)
 
 
 def _complete_params() -> dict[str, Any]:

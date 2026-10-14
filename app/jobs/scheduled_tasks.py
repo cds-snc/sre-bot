@@ -9,7 +9,7 @@ from structlog import get_logger
 
 from contracts.scheduler.registry import BackgroundJobRegistry
 from features.incident.drive.adapters import google_drive as incident_drive
-from infrastructure.idempotency import get_lease_store, run_if_leased
+from infrastructure.coordination import get_lease_store, run_if_leased
 from integrations import maxmind, opsgenie
 from jobs.settings import get_scheduler_settings
 from modules.aws import identity_center, spending

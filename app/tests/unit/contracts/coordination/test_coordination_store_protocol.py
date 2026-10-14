@@ -1,4 +1,4 @@
-"""Tests for the IdempotencyStore Protocol contract.
+"""Tests for the ConditionalWriteStore Protocol contract.
 
 Validates the claim/complete/release Protocol shape, the ClaimResult enum,
 the ClaimOutcome value object, and that no vendor (DynamoDB) vocabulary
@@ -12,17 +12,17 @@ from typing import Any
 
 import pytest
 
-from infrastructure.idempotency import protocol
-from infrastructure.idempotency.protocol import (
+from contracts.coordination import (
     ClaimOutcome,
     ClaimResult,
-    IdempotencyStore,
+    ConditionalWriteStore,
 )
+from contracts.coordination import store as store_module
 
 pytestmark = pytest.mark.unit
 
 
-class FakeIdempotencyStore:
+class FakeConditionalWriteStore:
     """Minimal hand-written fake used only to probe Protocol conformance."""
 
     def __init__(self) -> None:
@@ -52,33 +52,33 @@ class FakeIdempotencyStore:
         return True
 
 
-class TestIdempotencyStoreProtocolShape:
+class TestConditionalWriteStoreProtocolShape:
     """The Protocol must be runtime-checkable and free of vendor vocabulary."""
 
     def test_protocol_is_runtime_checkable(self):
-        assert isinstance(FakeIdempotencyStore(), IdempotencyStore)
+        assert isinstance(FakeConditionalWriteStore(), ConditionalWriteStore)
 
     def test_claim_method_has_no_vendor_parameters(self):
-        params = list(inspect.signature(IdempotencyStore.claim).parameters)
+        params = list(inspect.signature(ConditionalWriteStore.claim).parameters)
         assert params == ["self", "key"]
 
     def test_complete_method_takes_the_claim_token_and_no_vendor_parameters(self):
-        params = list(inspect.signature(IdempotencyStore.complete).parameters)
+        params = list(inspect.signature(ConditionalWriteStore.complete).parameters)
         assert params == ["self", "key", "outcome", "claim_token"]
 
     def test_release_method_takes_the_claim_token_and_no_vendor_parameters(self):
-        params = list(inspect.signature(IdempotencyStore.release).parameters)
+        params = list(inspect.signature(ConditionalWriteStore.release).parameters)
         assert params == ["self", "key", "claim_token"]
 
     @pytest.mark.parametrize("method", ["complete", "release"])
     def test_claim_token_is_required(self, method):
         """No default, so no caller can skip the ownership check by omission."""
-        parameter = inspect.signature(getattr(IdempotencyStore, method)).parameters["claim_token"]
+        parameter = inspect.signature(getattr(ConditionalWriteStore, method)).parameters["claim_token"]
         assert parameter.default is inspect.Parameter.empty
 
     @pytest.mark.parametrize("method", ["complete", "release"])
     def test_ownership_checked_methods_report_whether_they_applied(self, method):
-        assert inspect.signature(getattr(IdempotencyStore, method)).return_annotation is bool
+        assert inspect.signature(getattr(ConditionalWriteStore, method)).return_annotation is bool
 
     @pytest.mark.parametrize(
         "forbidden_term",
@@ -91,7 +91,7 @@ class TestIdempotencyStoreProtocolShape:
         ],
     )
     def test_protocol_source_has_no_vendor_query_syntax(self, forbidden_term):
-        source = inspect.getsource(protocol)
+        source = inspect.getsource(store_module)
         assert forbidden_term not in source
 
 

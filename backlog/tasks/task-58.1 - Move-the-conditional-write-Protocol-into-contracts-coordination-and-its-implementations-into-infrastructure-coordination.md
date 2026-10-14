@@ -3,10 +3,10 @@ id: TASK-58.1
 title: >-
   Move the conditional-write Protocol into contracts/coordination and its
   implementations into infrastructure/coordination
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-14 17:45'
-updated_date: '2026-10-14 17:54'
+updated_date: '2026-10-14 18:31'
 labels:
   - infrastructure
   - reliability
@@ -37,11 +37,11 @@ Decided 2026-10-14 (human, TASK-58 split approval):
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ConditionalWriteStore, ClaimResult and ClaimOutcome live in app/contracts/coordination/ and import only the standard library and contracts; the DynamoDB and in-memory classes live in app/infrastructure/coordination/, explicitly subclass it, and behave exactly as after TASK-102 (the conformance suite passes unchanged on both)
-- [ ] #2 No infrastructure.idempotency import path remains (a test asserts importlib.util.find_spec('infrastructure.idempotency') is None); no alias or shim is left behind
-- [ ] #3 The conformance fixture mapping and enrollment test live in tests/integration/infrastructure/coordination/; make check-fake-coverage and lint-imports pass, with the ingress and job_runner ignore entries removed and the platform_lock and providers entries naming the task that removes them
-- [ ] #4 The table sre_bot_idempotency, its key and the IDEMPOTENCY_* environment variable names are unchanged
-- [ ] #5 decisions/ cross-references to the old module path are updated in the same PR: reliability.md (the lease.py path and the Migration line), lifecycle.md, plugin-architecture.md and feature-packages.md
+- [x] #1 ConditionalWriteStore, ClaimResult and ClaimOutcome live in app/contracts/coordination/ and import only the standard library and contracts; the DynamoDB and in-memory classes live in app/infrastructure/coordination/, explicitly subclass it, and behave exactly as after TASK-102 (the conformance suite passes unchanged on both)
+- [x] #2 No infrastructure.idempotency import path remains (a test asserts importlib.util.find_spec('infrastructure.idempotency') is None); no alias or shim is left behind
+- [x] #3 The conformance fixture mapping and enrollment test live in tests/integration/infrastructure/coordination/; make check-fake-coverage and lint-imports pass, with the ingress and job_runner ignore entries removed and the platform_lock and providers entries naming the task that removes them
+- [x] #4 The table sre_bot_idempotency, its key and the IDEMPOTENCY_* environment variable names are unchanged
+- [x] #5 decisions/ cross-references to the old module path are updated in the same PR: reliability.md (the lease.py path and the Migration line), lifecycle.md, plugin-architecture.md and feature-packages.md
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -142,6 +142,19 @@ uv run ruff check . ; uv run ruff format --check . ; uv run mypy . --exclude '(?
 BLAST RADIUS AND ROLLBACK
 Touches the Access Sync lock path and the three Tier-2 scheduler leases (import paths only). A wrong import fails at import time and is caught by app startup and tests, not silently at runtime. No data, schema, terraform or env change. One git revert restores everything. Ordering: TASK-102 first; TASK-58.2 and TASK-124.1 depend on the renamed paths and are the named removers of the re-pointed ignore entries. Open TASK-64 and TASK-65 work only needs their import line adjusted.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented per the approved plan; no deviations in behaviour or scope.
+Created: app/contracts/coordination/{__init__,store}.py; app/infrastructure/coordination/{__init__,dynamodb,in_memory,factory,settings,lease}.py; tests under tests/unit/contracts/coordination (imports + protocol), tests/unit/infrastructure/coordination (dynamodb ops, ownership, in-memory, lease, factory, settings, legacy_path_removed), tests/integration/infrastructure/coordination (conftest, conformance, enrollment). Deleted app/infrastructure/idempotency/ and both old test dirs entirely (incl. __pycache__).
+Edited: job_runner, ingress, platform_lock, providers, job_status_store (comment), jobs/scheduled_tasks, app/pyproject.toml (ingress and job_runner ignores removed; platform_lock and providers re-pointed to infrastructure.coordination; shrink-only comment names TASK-58.2 and TASK-124.1), the consumer tests, test_bin_fake_coverage_check.py, decisions/{reliability,lifecycle,plugin-architecture,feature-packages}.md.
+Small additions: the failed_to_read_idempotency_key warning now carries key and operation; factory build logs a debug event with in_progress_ttl_seconds. Log event names and error-message strings unchanged. Structlog components now coordination.dynamodb and coordination.factory (rg of repo found no dashboard or alert filter on the old values; external log queries unverified).
+Test notes: legacy-path test checks find_spec('infrastructure.idempotency') is None and cache/service absent under infrastructure.coordination only (find_spec on an old-path submodule raises ModuleNotFoundError because the parent is gone). Fake-coverage test: the old idempotency synthetic test was replaced by an infrastructure-defined (AuditTrailService) case plus two contracts/coordination cases (passes with subclassing fake, violation without).
+Gates (from app/): ruff check: All checks passed! | ruff format --check: 910 files already formatted | pytest tests --ignore=tests/smoke: 4838 passed, 2627 warnings in 100.71s (no SNS/google-directory order failures seen) | make check-fake-coverage: OK: every covered Protocol has an in-memory fake (6 baselined gap(s) remain) | lint-imports: Contracts: 10 kept, 0 broken (no unmatched-ignore error) | mypy: Found 48 errors in 19 files, all pre-existing under modules/ (webhooks, incident, role); 0 errors in touched files. Final rg sweep for old names returned nothing.
+
+Layer discovery (2026-10-14, human-approved): decisions/plugin-architecture.md amended in this PR. contracts/ may hold pure, I/O-free @final facades over its own Protocols under five criteria (no I/O, stdlib/typing/contracts imports only, shared semantics, tested against the fake and conformance suite, public API); orchestration stays in server/. The risk mitigation, a review check and a 2026-10-14 change entry were added. First users: LeaseStore and IdempotencyStore in TASK-58.2. TASK-100 descriptions and references re-pointed to infrastructure/coordination.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

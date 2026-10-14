@@ -1,34 +1,34 @@
-"""Unit tests for InMemoryIdempotencyStore.
+"""Unit tests for InMemoryConditionalWriteStore.
 
 Isolated, no I/O. Exercises the same claim/complete/release semantics
-required of every IdempotencyStore implementation.
+required of every ConditionalWriteStore implementation.
 """
 
 import pytest
 
-from infrastructure.idempotency.in_memory import InMemoryIdempotencyStore
-from infrastructure.idempotency.protocol import ClaimResult
-from infrastructure.idempotency.settings import IdempotencySettings
+from contracts.coordination import ClaimResult
+from infrastructure.coordination.in_memory import InMemoryConditionalWriteStore
+from infrastructure.coordination.settings import ConditionalWriteSettings
 
 pytestmark = pytest.mark.unit
 
 
 @pytest.fixture
 def settings():
-    return IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
+    return ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
 
 
 @pytest.fixture
 def expiring_settings():
-    return IdempotencySettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=-1)
+    return ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=-1)
 
 
 @pytest.fixture
 def store(settings):
-    return InMemoryIdempotencyStore(idempotency_settings=settings)
+    return InMemoryConditionalWriteStore(settings=settings)
 
 
-class TestInMemoryIdempotencyStoreClaim:
+class TestInMemoryConditionalWriteStoreClaim:
     def test_claim_on_unseen_key_returns_new(self, store):
         outcome = store.claim("feature:intent:unseen")
         assert outcome.result is ClaimResult.NEW
@@ -49,7 +49,7 @@ class TestInMemoryIdempotencyStoreClaim:
         assert outcome.outcome == {"status": "ok"}
 
     def test_claim_on_expired_in_progress_key_returns_new(self, expiring_settings):
-        store = InMemoryIdempotencyStore(idempotency_settings=expiring_settings)
+        store = InMemoryConditionalWriteStore(settings=expiring_settings)
         key = "feature:intent:crashed-claimant"
 
         first = store.claim(key)
@@ -59,7 +59,7 @@ class TestInMemoryIdempotencyStoreClaim:
         assert second.result is ClaimResult.NEW
 
 
-class TestInMemoryIdempotencyStoreCompleteAndRelease:
+class TestInMemoryConditionalWriteStoreCompleteAndRelease:
     def test_complete_records_exact_outcome_dict(self, store):
         key = "feature:intent:record"
         outcome_payload = {"a": 1, "nested": {"b": 2}}
@@ -83,7 +83,7 @@ class TestInMemoryIdempotencyStoreCompleteAndRelease:
         assert store.release("feature:intent:never-claimed", "0" * 32) is False
 
 
-class TestInMemoryIdempotencyStoreKeyFormat:
+class TestInMemoryConditionalWriteStoreKeyFormat:
     def test_claim_preserves_exact_key_no_hash_no_truncation(self, store):
         key = "groups_notifications:send_notification:eng-team:add_member:" + "x" * 200
         claimed = store.claim(key)

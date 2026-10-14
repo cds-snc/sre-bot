@@ -1,4 +1,4 @@
-"""Protocol contract for idempotency services.
+"""Protocol contract for the conditional-write store.
 
 Defines the runtime-checkable interface consumed by features and
 infrastructure. Concrete implementations can vary by backing store.
@@ -10,7 +10,7 @@ from typing import Any, Protocol, runtime_checkable
 
 
 class ClaimResult(Enum):
-    """Result of attempting to claim an idempotency key."""
+    """Result of attempting to claim a key."""
 
     NEW = "new"
     COMPLETED = "completed"
@@ -19,7 +19,7 @@ class ClaimResult(Enum):
 
 @dataclass(frozen=True)
 class ClaimOutcome:
-    """Domain outcome returned by IdempotencyStore.claim().
+    """Domain outcome returned by ConditionalWriteStore.claim().
 
     claim_token is set exactly when result is NEW. It is an opaque string that
     proves ownership of the claim: the caller hands it back to complete() or
@@ -32,11 +32,12 @@ class ClaimOutcome:
 
 
 @runtime_checkable
-class IdempotencyStore(Protocol):
-    """Atomic idempotency store primitive.
+class ConditionalWriteStore(Protocol):
+    """Atomic conditional-write store primitive.
 
     Implementations provide a claim/complete/release lifecycle that allows
-    callers to deduplicate retries without exposing vendor details.
+    callers to deduplicate retries or hold a lease without exposing vendor
+    details.
 
     Ownership: complete() and release() apply only for the caller holding the
     claim token of the current claim. A claimant whose in-progress TTL elapsed

@@ -1,8 +1,9 @@
 import functools
 
+from contracts.coordination import ConditionalWriteStore
+from infrastructure.coordination import build_conditional_write_store
 from infrastructure.directory import get_directory_provider
 from infrastructure.events import get_event_dispatcher
-from infrastructure.idempotency import IdempotencyStore, build_idempotency_store
 from infrastructure.records import get_record_store
 from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.common.providers import get_access_runtime_config
@@ -22,9 +23,9 @@ def get_access_sync_settings() -> AccessSyncSettings:
 
 
 @functools.lru_cache(maxsize=1)
-def get_access_sync_lock_store() -> IdempotencyStore:
+def get_access_sync_lock_store() -> ConditionalWriteStore:
     """Return a singleton lock store with access-sync-specific claim TTL."""
-    return build_idempotency_store(in_progress_ttl_seconds=get_access_sync_settings().lock_stale_seconds)
+    return build_conditional_write_store(in_progress_ttl_seconds=get_access_sync_settings().lock_stale_seconds)
 
 
 @functools.lru_cache(maxsize=1)

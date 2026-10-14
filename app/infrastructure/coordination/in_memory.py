@@ -1,30 +1,30 @@
-"""In-memory IdempotencyStore implementation."""
+"""In-memory ConditionalWriteStore implementation."""
 
 import threading
 import time
 import uuid
 from typing import Any
 
-from infrastructure.idempotency.protocol import (
+from contracts.coordination import (
     ClaimOutcome,
     ClaimResult,
-    IdempotencyStore,
+    ConditionalWriteStore,
 )
-from infrastructure.idempotency.settings import IdempotencySettings
+from infrastructure.coordination.settings import ConditionalWriteSettings
 
 
-class InMemoryIdempotencyStore(IdempotencyStore):
-    """Thread-safe in-memory idempotency store.
+class InMemoryConditionalWriteStore(ConditionalWriteStore):
+    """Thread-safe in-memory conditional-write store.
 
     This provider mirrors the DynamoDB-backed protocol semantics while keeping
     data local to process memory for deterministic tests and development.
     """
 
-    def __init__(self, idempotency_settings: IdempotencySettings) -> None:
+    def __init__(self, settings: ConditionalWriteSettings) -> None:
         self._store: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
-        self._record_ttl_seconds = idempotency_settings.IDEMPOTENCY_TTL_SECONDS
-        self._in_progress_ttl_seconds = idempotency_settings.IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS
+        self._record_ttl_seconds = settings.IDEMPOTENCY_TTL_SECONDS
+        self._in_progress_ttl_seconds = settings.IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS
 
     def claim(self, key: str) -> ClaimOutcome:
         """Atomically claim key unless it is already in progress or completed."""

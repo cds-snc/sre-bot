@@ -1,6 +1,6 @@
 """Unit tests for the infrastructure.logging settings slice (TASK-8).
 
-Mirrors app/tests/unit/infrastructure/idempotency/test_idempotency_settings.py.
+Mirrors app/tests/unit/infrastructure/coordination/test_coordination_settings.py.
 """
 
 import pytest

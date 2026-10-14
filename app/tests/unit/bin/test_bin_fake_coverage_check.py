@@ -203,15 +203,52 @@ def test_protocol_defined_in_infrastructure_passes_with_fake(tmp_path, monkeypat
         tmp_path,
         monkeypatch,
         {
-            "infrastructure/idempotency/protocol.py": PROTOCOL_SOURCE.format(name="IdempotencyStore"),
-            "infrastructure/idempotency/in_memory.py": (
-                "from infrastructure.idempotency.protocol import IdempotencyStore\n\n\n"
-                "class InMemoryIdempotencyStore(IdempotencyStore):\n    pass\n"
+            "infrastructure/audit/protocol.py": PROTOCOL_SOURCE.format(name="AuditTrailService"),
+            "infrastructure/audit/in_memory.py": (
+                "from infrastructure.audit.protocol import AuditTrailService\n\n\n"
+                "class InMemoryAuditTrailService(AuditTrailService):\n    pass\n"
             ),
         },
     )
 
     assert checker.find_current_violations() == set()
+
+
+def test_contracts_protocol_with_subclassing_implementation_and_fake_passes(tmp_path, monkeypatch):
+    """A contracts/ Protocol hosted by an infrastructure class needs the in_memory.py fake that subclasses it."""
+    _use_tree(
+        tmp_path,
+        monkeypatch,
+        {
+            "contracts/coordination/store.py": PROTOCOL_SOURCE.format(name="ConditionalWriteStore"),
+            "infrastructure/coordination/dynamodb.py": (
+                "from contracts.coordination.store import ConditionalWriteStore\n\n\n"
+                "class DynamoDBConditionalWriteStore(ConditionalWriteStore):\n    pass\n"
+            ),
+            "infrastructure/coordination/in_memory.py": (
+                "from contracts.coordination.store import ConditionalWriteStore\n\n\n"
+                "class InMemoryConditionalWriteStore(ConditionalWriteStore):\n    pass\n"
+            ),
+        },
+    )
+
+    assert checker.find_current_violations() == set()
+
+
+def test_contracts_protocol_without_subclassing_fake_is_a_violation(tmp_path, monkeypatch):
+    _use_tree(
+        tmp_path,
+        monkeypatch,
+        {
+            "contracts/coordination/store.py": PROTOCOL_SOURCE.format(name="ConditionalWriteStore"),
+            "infrastructure/coordination/dynamodb.py": (
+                "from contracts.coordination.store import ConditionalWriteStore\n\n\n"
+                "class DynamoDBConditionalWriteStore(ConditionalWriteStore):\n    pass\n"
+            ),
+        },
+    )
+
+    assert checker.find_current_violations() == {"contracts/coordination/store.py:ConditionalWriteStore"}
 
 
 def test_feature_package_and_capability_adapter_protocols_are_never_scanned(tmp_path, monkeypatch):
@@ -322,9 +359,9 @@ def test_real_baseline_entries_each_name_the_task_that_retires_them():
 
 
 def test_real_tree_has_no_net_new_gaps():
-    """The committed tree passes: RecordStore and IdempotencyStore have fakes, every other gap is baselined."""
+    """The committed tree passes: RecordStore and ConditionalWriteStore have fakes, every other gap is baselined."""
     current = checker.find_current_violations()
 
     assert current - checker.load_baseline_entries() == set()
     assert "contracts/records/store.py:RecordStore" not in current
-    assert "infrastructure/idempotency/protocol.py:IdempotencyStore" not in current
+    assert "contracts/coordination/store.py:ConditionalWriteStore" not in current
