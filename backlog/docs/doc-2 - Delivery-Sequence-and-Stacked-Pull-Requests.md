@@ -3,7 +3,7 @@ id: doc-2
 title: Delivery Sequence and Stacked Pull Requests
 type: guide
 created_date: '2026-09-24 20:23'
-updated_date: '2026-10-14 23:12'
+updated_date: '2026-10-14 23:37'
 ---
 # Delivery Sequence and Stacked Pull Requests
 
@@ -26,6 +26,7 @@ GitHub stacked pull requests are available in our organization (feature in publi
 - Auto-merge is not supported for stacked PRs.
 - Every layer must meet `main`'s branch protection on its own: approvals, required checks and a linear stack history. Each layer therefore leaves `main` releasable.
 - Whole-stack merges fail here. `main` requires approval of the most recent reviewable push, so merging a stack in one step merges only the bottom layer: GitHub rebases the remaining layers onto `main` and force-pushes them, which makes their approvals stale. Merge layers manually, bottom-up, one at a time, and get a re-approval for each rebased layer. Don't push to stack branches while waiting on re-approvals. Expect one re-approval round per layer, so keep stacks short.
+- A stack closes once every layer in it has merged. `gh stack` can't add a layer to a closed stack; a branch created afterwards becomes an independent PR.
 
 **Commands** (the `gh stack` extension)
 
@@ -50,7 +51,8 @@ These are git write operations and are run by the developer; agents do not run t
 - Never mix a mechanical move with a behaviour change in one layer.
 - A mechanical move rewrites every importer in the same PR. A split that needs a re-export shim is not allowed.
 - Each stack has a handoff doc under `backlog/docs/stacks/` that records its current state. Sessions start and end with the `stacked-pr-session` skill, which ends every session with a resume prompt.
-- When a stack's next layer is blocked on work outside the stack, pause the stack rather than build around the blocker. The handoff doc then records the resume conditions, and the submitted layers go through review and merge on their own.
+- A stack is never completed before all its planned layers are stacked. Build each new layer on the layers below it while they are still in review, assuming they will be approved; changes asked for in review are made on that layer's branch, followed by `gh stack rebase`. A layer, standalone merges included, merges only when a higher layer is already submitted, so the top submitted layer stays open until the last planned layer is on the stack.
+- When a stack's next layer is blocked on work outside the stack, pause the stack rather than build around the blocker. The handoff doc then records the resume conditions. The submitted layers go through review, and all but the top one may merge; the top layer stays open until the stack resumes.
 
 ## Critical path
 
