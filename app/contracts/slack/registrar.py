@@ -11,6 +11,7 @@ See: decisions/platform-entrypoints.md, decisions/transport-slack.md
 from collections.abc import Callable
 from typing import Any, Protocol
 
+from contracts.services import ServiceScopeOpener
 from contracts.slack.models import Argument, CommandPayload, CommandResponse
 from contracts.slack.reply import SlackReplySender
 
@@ -21,6 +22,11 @@ class SlackCommandRegistrar(Protocol):
     @property
     def reply(self) -> SlackReplySender:
         """Interface handlers use to post messages and open views."""
+        ...
+
+    @property
+    def service_scopes(self) -> ServiceScopeOpener:
+        """Opens a per-invocation service scope for a handler to resolve contracts in."""
         ...
 
     def register_command(

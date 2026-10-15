@@ -195,7 +195,7 @@ class TestScheduleBackgroundJobRegistry:
     @pytest.mark.unit
     @patch("jobs.scheduled_tasks.schedule_lib")
     def test_register_daily_binds_hh_mm(self, mock_schedule_lib) -> None:
-        registry = _ScheduleBackgroundJobRegistry()
+        registry = _ScheduleBackgroundJobRegistry(service_scopes=MagicMock(name="scope_opener"))
         job = MagicMock()
 
         registry.register_daily(job_name="daily_job", schedule="03:30", job=job)
@@ -207,7 +207,7 @@ class TestScheduleBackgroundJobRegistry:
     @pytest.mark.unit
     @patch("jobs.scheduled_tasks.schedule_lib")
     def test_register_interval_with_minutes(self, mock_schedule_lib) -> None:
-        registry = _ScheduleBackgroundJobRegistry()
+        registry = _ScheduleBackgroundJobRegistry(service_scopes=MagicMock(name="scope_opener"))
         job = MagicMock()
 
         registry.register_interval(job_name="minute_job", every=timedelta(minutes=5), job=job)
@@ -218,13 +218,29 @@ class TestScheduleBackgroundJobRegistry:
     @pytest.mark.unit
     @patch("jobs.scheduled_tasks.schedule_lib")
     def test_register_interval_with_hours(self, mock_schedule_lib) -> None:
-        registry = _ScheduleBackgroundJobRegistry()
+        registry = _ScheduleBackgroundJobRegistry(service_scopes=MagicMock(name="scope_opener"))
         job = MagicMock()
 
         registry.register_interval(job_name="hourly_job", every=timedelta(hours=2), job=job)
 
         mock_schedule_lib.every.assert_called_once_with(7200)
         mock_schedule_lib.every.return_value.seconds.do.assert_called_once()
+
+    @pytest.mark.unit
+    def test_registry_exposes_the_opener_it_was_built_with(self) -> None:
+        """registry.service_scopes returns the opener passed at construction, by identity.
+
+        Stub strategy: the opener is a bare MagicMock because the registry only
+        stores and returns it; the schedule library is not touched.
+        Assertion rationale: identity shows the registry adds no wrapper, so a
+        scheduled job opens its scope from the same host opener as the Slack
+        registrar.
+        """
+        opener = MagicMock(name="scope_opener")
+
+        registry = _ScheduleBackgroundJobRegistry(service_scopes=opener)
+
+        assert registry.service_scopes is opener
 
 
 class TestTier2Wrapper:
@@ -315,7 +331,8 @@ class TestInitJobRegistration:
         # Mock bot
         mock_bot = MagicMock()
 
-        init(mock_bot, register_plugin_jobs)
+        service_scopes = MagicMock(name="scope_opener")
+        init(mock_bot, register_plugin_jobs, service_scopes)
 
         # Only the 3 Tier-2 jobs go through the lease wrapper; the 2 Tier-1 jobs
         # (scheduler_heartbeat, integration_healthchecks) must be scheduled directly.
@@ -323,6 +340,7 @@ class TestInitJobRegistration:
         register_plugin_jobs.assert_called_once()
         (registry,) = register_plugin_jobs.call_args.args
         assert isinstance(registry, _ScheduleBackgroundJobRegistry)
+        assert registry.service_scopes is service_scopes
 
     @pytest.mark.unit
     @patch("jobs.scheduled_tasks.schedule.every")
@@ -348,7 +366,7 @@ class TestInitJobRegistration:
         # Mock bot
         mock_bot = MagicMock()
 
-        init(mock_bot, register_plugin_jobs)
+        init(mock_bot, register_plugin_jobs, MagicMock())
 
         # Each Tier-2 job goes through _tier2 with its own lease key. The TTL is
         # NOT passed per call: _tier2 reads the single shared default internally,
@@ -402,7 +420,7 @@ class TestInitJobRegistration:
         mock_spending.generate_spending_data = create_autospec(spending.generate_spending_data)
         mock_spending.execute_spending_data_update_job = create_autospec(spending.execute_spending_data_update_job)
 
-        init(MagicMock(), MagicMock())
+        init(MagicMock(), MagicMock(), MagicMock())
 
         # Act
         daily_registrations = mock_schedule_every.return_value.day.at.return_value.do.call_args_list
