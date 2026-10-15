@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 13:48'
+updated_date: '2026-10-15 17:50'
 labels:
   - i18n
   - cleanup
@@ -16,6 +17,7 @@ references:
   - app/infrastructure/i18n/resolvers.py
   - app/infrastructure/i18n/factory.py
   - app/tests/unit/infrastructure/i18n/test_service_startup.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1680'
 priority: low
 ordinal: 301000
 ---

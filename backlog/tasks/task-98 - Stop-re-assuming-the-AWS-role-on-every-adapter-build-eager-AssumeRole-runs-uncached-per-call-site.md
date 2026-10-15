@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-17 19:06'
-updated_date: '2026-09-25 15:53'
+updated_date: '2026-10-15 17:48'
 labels:
   - clients
   - architecture
@@ -15,6 +15,7 @@ dependencies:
 references:
   - decisions/outbound-clients.md
   - decisions/lifecycle.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1648'
 priority: high
 ordinal: 226000
 ---

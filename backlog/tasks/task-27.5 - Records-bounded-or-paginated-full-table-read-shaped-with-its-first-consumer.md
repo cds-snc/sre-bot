@@ -4,7 +4,7 @@ title: 'Records: bounded or paginated full-table read, shaped with its first con
 status: To Do
 assignee: []
 created_date: '2026-10-13 19:59'
-updated_date: '2026-10-14 23:11'
+updated_date: '2026-10-15 17:45'
 labels:
   - infrastructure
   - phase-4
@@ -15,6 +15,7 @@ dependencies:
 references:
   - decisions/plugin-architecture.md
   - decisions/webhooks.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1607'
 parent_task_id: TASK-27
 priority: medium
 ordinal: 379000

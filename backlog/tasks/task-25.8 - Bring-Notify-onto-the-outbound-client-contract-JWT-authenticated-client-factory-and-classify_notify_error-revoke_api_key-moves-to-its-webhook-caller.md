@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 16:51'
-updated_date: '2026-09-24 20:11'
+updated_date: '2026-10-15 17:45'
 labels:
   - clients
   - phase-3
@@ -18,6 +18,7 @@ references:
   - app/integrations/notify/client.py
   - app/modules/webhooks/patterns/aws_sns_notification/api_key_detected.py
   - decisions/plugin-architecture.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1604'
 parent_task_id: TASK-25
 priority: medium
 ordinal: 241000

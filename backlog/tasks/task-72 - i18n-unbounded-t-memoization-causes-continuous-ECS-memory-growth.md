@@ -4,7 +4,7 @@ title: 'i18n: unbounded t() memoization causes continuous ECS memory growth'
 status: To Do
 assignee: []
 created_date: '2026-08-05 19:48'
-updated_date: '2026-08-05 21:00'
+updated_date: '2026-10-15 17:45'
 labels:
   - i18n
   - reliability
@@ -14,6 +14,7 @@ dependencies: []
 references:
   - decisions/i18n.md
   - app/infrastructure/i18n/factory.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1615'
 priority: high
 ordinal: 123000
 ---

@@ -15,6 +15,8 @@ dependencies:
   - TASK-145.7
   - TASK-27.2
   - TASK-36.1.2
+references:
+  - 'https://github.com/cds-snc/sre-bot/issues/1699'
 parent_task_id: TASK-145
 priority: medium
 type: feature

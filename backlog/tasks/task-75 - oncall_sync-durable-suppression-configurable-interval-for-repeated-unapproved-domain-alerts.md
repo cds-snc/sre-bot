@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-02 20:25'
-updated_date: '2026-10-13 13:42'
+updated_date: '2026-10-15 17:46'
 labels:
   - oncall-sync
   - slack
@@ -22,6 +22,7 @@ references:
   - app/packages/oncall_sync/adapters/slack.py
   - app/packages/oncall_sync/settings.py
   - app/packages/oncall_sync/providers.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1617'
 ordinal: 144000
 ---
 

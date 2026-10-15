@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-15 19:39'
+updated_date: '2026-10-15 17:48'
 labels:
   - webhooks
   - slack
@@ -16,6 +17,7 @@ references:
   - app/modules/webhooks/slack.py
   - app/models/webhooks.py
   - app/integrations/slack/blocks.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1647'
 priority: high
 ordinal: 213000
 ---

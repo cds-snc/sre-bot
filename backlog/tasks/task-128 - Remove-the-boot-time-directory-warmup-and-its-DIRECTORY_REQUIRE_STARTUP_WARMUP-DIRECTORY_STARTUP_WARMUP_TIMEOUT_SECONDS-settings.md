@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-25 14:58'
-updated_date: '2026-09-25 15:54'
+updated_date: '2026-10-15 17:50'
 labels:
   - lifecycle
   - clients
@@ -18,6 +18,7 @@ references:
   - app/server/lifespan.py
   - app/infrastructure/directory/settings.py
   - decisions/lifecycle.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1674'
 priority: medium
 ordinal: 276000
 ---

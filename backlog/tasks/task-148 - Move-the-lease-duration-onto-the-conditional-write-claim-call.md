@@ -4,6 +4,7 @@ title: Move the lease duration onto the conditional-write claim call
 status: To Do
 assignee: []
 created_date: '2026-10-14 18:57'
+updated_date: '2026-10-15 17:53'
 labels:
   - infrastructure
   - reliability
@@ -14,6 +15,7 @@ dependencies:
 references:
   - decisions/reliability.md
   - decisions/dependency-injection.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1715'
 priority: medium
 ordinal: 382000
 ---

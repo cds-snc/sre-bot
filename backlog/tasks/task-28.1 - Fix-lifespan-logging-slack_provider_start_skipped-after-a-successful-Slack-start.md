@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-15 14:08'
+updated_date: '2026-10-15 17:45'
 labels:
   - infrastructure
   - phase-4
@@ -15,6 +16,7 @@ dependencies: []
 references:
   - app/server/lifespan.py
   - app/tests/integration/server/test_lifespan.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1608'
 parent_task_id: TASK-28
 priority: medium
 ordinal: 207000

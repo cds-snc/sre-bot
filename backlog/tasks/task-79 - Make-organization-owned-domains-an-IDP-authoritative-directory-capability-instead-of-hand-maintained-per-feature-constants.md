@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-04 14:19'
-updated_date: '2026-09-25 17:06'
+updated_date: '2026-10-15 17:46'
 labels:
   - layering
 milestone: m-3
@@ -14,6 +14,7 @@ dependencies:
   - TASK-76.4
 references:
   - decisions/plugin-architecture.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1618'
 priority: medium
 ordinal: 152000
 ---

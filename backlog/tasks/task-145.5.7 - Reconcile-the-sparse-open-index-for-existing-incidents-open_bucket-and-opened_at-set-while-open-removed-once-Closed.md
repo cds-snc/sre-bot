@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-14 23:10'
-updated_date: '2026-10-14 23:10'
+updated_date: '2026-10-15 17:51'
 labels:
   - incident
   - features
@@ -22,6 +22,7 @@ references:
   - 'https://12factor.net/admin-processes'
   - >-
     https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-indexes-general-sparse-indexes.html
+  - 'https://github.com/cds-snc/sre-bot/issues/1696'
 parent_task_id: TASK-145.5
 priority: medium
 type: task

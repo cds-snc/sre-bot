@@ -4,7 +4,7 @@ title: Log payload-shape diagnostics when a webhook post to Slack fails
 status: To Do
 assignee: []
 created_date: '2026-09-15 19:39'
-updated_date: '2026-09-15 19:39'
+updated_date: '2026-10-15 17:48'
 labels:
   - observability
   - webhooks
@@ -14,6 +14,7 @@ references:
   - app/modules/webhooks/slack.py
   - decisions/observability.md
   - app/api/v1/routes/webhooks.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1646'
 priority: high
 ordinal: 212000
 ---

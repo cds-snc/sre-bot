@@ -20,6 +20,7 @@ references:
   - app/contracts/records/store.py
   - app/infrastructure/records/in_memory.py
   - app/infrastructure/coordination/dynamodb.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1652'
 priority: low
 ordinal: 231000
 ---

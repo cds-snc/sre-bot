@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
+updated_date: '2026-10-15 17:46'
 labels:
   - identity
   - clients
@@ -14,6 +15,7 @@ dependencies:
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1622'
 parent_task_id: TASK-83
 priority: medium
 ordinal: 179000

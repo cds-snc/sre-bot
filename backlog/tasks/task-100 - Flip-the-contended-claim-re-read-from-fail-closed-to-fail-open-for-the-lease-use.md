@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-17 20:39'
-updated_date: '2026-10-14 18:59'
+updated_date: '2026-10-15 17:48'
 labels:
   - infrastructure
   - reliability
@@ -22,6 +22,7 @@ references:
   - decisions/reliability.md
   - app/infrastructure/coordination/dynamodb.py
   - app/infrastructure/coordination/lease.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1650'
 priority: high
 ordinal: 228000
 ---
