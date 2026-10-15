@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 19:05'
+updated_date: '2026-10-15 17:50'
 labels:
   - slack
   - architecture
@@ -14,6 +15,7 @@ dependencies:
 references:
   - decisions/platform-entrypoints.md
   - decisions/transport-slack.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1685'
 priority: low
 type: docs
 ordinal: 327000

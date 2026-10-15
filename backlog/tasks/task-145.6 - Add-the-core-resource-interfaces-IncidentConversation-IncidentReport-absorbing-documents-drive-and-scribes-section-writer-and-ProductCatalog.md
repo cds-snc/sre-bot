@@ -6,13 +6,16 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-14 23:11'
+updated_date: '2026-10-15 18:20'
 labels:
   - incident
   - features
   - slack
 dependencies:
   - TASK-145.5
+  - TASK-145.5.8
+references:
+  - 'https://github.com/cds-snc/sre-bot/issues/1697'
 parent_task_id: TASK-145
 priority: medium
 type: task
@@ -94,4 +97,6 @@ Behaviour-preserving behind the legacy module; a bad merge of the Docs adapter b
 2026-10-13 re-ground: IncidentReport stays one feature-owned Google Docs adapter; no documents capability until a second suite or consumer exists (decisions/workplace-systems.md rule 2). Under the TASK-147 flag the report becomes the narrative document only (TASK-147.7); with the flag off its behaviour is today's. ProductCatalog over Drive folders is interim: products are a record of truth that belongs in the app's records (DRAFT-2).
 
 2026-10-14 (TASK-145.5 split): conversation_is_writable (the second part of the command check, incident-management.md:44) moved here from TASK-145.5 and is served by IncidentConversation. The 2026-10-09 plan predates the split and the svcs registry; re-plan after TASK-145.5.5 is implemented. Stack K layer 10.
+
+2026-10-15: Stack K layer 11 after the legacy item bridge (TASK-145.5.8) was inserted as layer 6; depends on it because the report and conversation references come from the record, legacy items included.
 <!-- SECTION:NOTES:END -->

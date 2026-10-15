@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-14 23:11'
+updated_date: '2026-10-15 18:20'
 labels:
   - incident
   - features
@@ -16,6 +16,8 @@ dependencies:
   - TASK-36.3
   - TASK-25.10
   - TASK-145.5.7
+references:
+  - 'https://github.com/cds-snc/sre-bot/issues/1700'
 parent_task_id: TASK-145
 priority: medium
 type: feature
@@ -29,6 +31,7 @@ Layer C3 of TASK-145. Rebuilds the floppy-disk reaction handlers (message captur
 
 THIS SLICE
 - Timeline capture through IncidentReport and IncidentStore; entries are their own records.
+- Timeline layout in core/store.py (moved out of TASK-145.5.4, human 2026-10-15): timeline_table(name), partition incident_id and sort entry_key, with the table name from the incident core settings; an entry_key helper building <posted_at>#<entry_id> with posted_at as fixed-width ISO-8601 UTC (isoformat(timespec="microseconds"), +00:00, the core/store.py formatter); captured_entry_id, a uuid5 over system, tenant, conversation and message id, so a re-capture writes the same key and put_if_not_exists dedupes; a uuid4 id for manual entries. The vendor message id stays in the entry's source_message reference.
 - The nudge job is registered by response through the background-job hookimpl with its schedule and lease from the response settings slice; the hand import in app/jobs/scheduled_tasks.py is deleted. Stale detection reads the store, not a channel-name pattern; the nudge carries the archive action id and the schedule-postmortem action id from common/vocabulary.
 - summarize: scribe/service.py's summary path becomes response/summary.py with its settings slice, catalogue (incident_summary) and tests renamed test_incident_response_summary_*; the command registers under incident.response. It calls the Summarizer directly until TASK-25.10.
 - After this slice no module under app/modules/incident imports db_operations or packages.aws_platform; the incident seam baseline entries are removed, which is what TASK-88 needs.
@@ -41,7 +44,8 @@ THIS SLICE
 - [ ] #2 The stale-channel job is registered by response through the hookimpl and reads the store; app/jobs/scheduled_tasks.py no longer imports it
 - [ ] #3 /sre incident summarize is handled by response/summary.py and scribe no longer holds a summary path, catalogue or test
 - [ ] #4 No module imports modules.incident.db_operations or packages.aws_platform for incident data; the incident seam baseline entries are removed
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #5 core/store.py has timeline_table(name) (incident_id, entry_key), the entry_key helper '<posted_at>#<entry_id>' with fixed-width ISO-8601 UTC posted_at, captured_entry_id (uuid5 over system, tenant, conversation and message id; a re-capture yields the same key) and a uuid4 manual entry id, each tested
+- [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -62,7 +66,7 @@ TASK-145.9.2
 4. `git mv` the summary path into response/summary.py (service), its settings class into response/settings.py, the catalogue into response/locales, tests renamed test_incident_response_summary_*; the command registers under incident.response; scribe keeps draft only. The Summarizer import moves with it (ignore entry renamed, not added) until TASK-25.10.
 
 ## AC traceability
-AC1: steps 1-2 -> capture tests. AC2: step 2 -> job registration test; `rg notify_stale jobs/` empty. AC3: step 4 -> summary tests under response; `rg summar features/incident/scribe` empty. AC4: step 3 -> `rg 'aws_platform|db_operations' app/modules/incident` empty; baseline diff. AC5: gates.
+AC1: steps 1-2 -> capture tests. AC2: step 2 -> job registration test; `rg notify_stale jobs/` empty. AC3: step 4 -> summary tests under response; `rg summar features/incident/scribe` empty. AC4: step 3 -> `rg 'aws_platform|db_operations' app/modules/incident` empty; baseline diff. AC5: timeline layout helper tests. AC6: gates.
 
 ## Test matrix
 Capture: reaction on a message in an incident channel -> record and report entry; removal deletes both; reaction in a non-incident channel ignored; report failure leaves the record entry and reports. Nudge: stale detection window; safe to run twice; buttons carry the shared ids. Summarize: unchanged behaviour under new paths.
@@ -83,7 +87,7 @@ The nudge job and the reactions are low-traffic; the aws_platform deletion is th
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-13 re-ground: with the TASK-147 postmortem-records flag off, capture and removal behave exactly as today, including the report's timeline section and who may react. The timeline records are written regardless of the flag, but nothing user-facing reads them until it is on. The capture-permission rule is decided by TASK-147.1 and announced by TASK-147.8; this slice does not change it.
 
-2026-10-14 (TASK-145.5 split): precondition before this task merges: the TASK-145.5.7 open-index reconcile has run (dry run, then apply) in each environment after TASK-145.8 deployed and reported pending=0; this task (or TASK-145.5.7's contract step) removes the reconcile. Timeline key format supersedes 'ts#entry_id': partition incident_id, sort entry_key '<posted_at ISO-8601 UTC, microseconds, +00:00>#<entry_id>', where entry_id is a uuid5 over system, tenant, conversation and message id for captured messages (a re-capture writes the same key, so put_if_not_exists dedupes) and a uuid4 for manual entries; the Slack ts stays in the source_message reference. The GSIs use projection ALL. IAM index access comes from TASK-152.
+2026-10-14 (TASK-145.5 split): precondition before this task merges: the TASK-145.5.7 incident legacy upgrade job (which also fills the open index) has run (dry run, then apply) in each environment after TASK-145.8 deployed and reported pending=0; TASK-145.13 removes the job (updated 2026-10-15). Timeline key format supersedes 'ts#entry_id': partition incident_id, sort entry_key '<posted_at ISO-8601 UTC, microseconds, +00:00>#<entry_id>', where entry_id is a uuid5 over system, tenant, conversation and message id for captured messages (a re-capture writes the same key, so put_if_not_exists dedupes) and a uuid4 for manual entries; the Slack ts stays in the source_message reference. The GSIs use projection ALL. IAM index access comes from TASK-152.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

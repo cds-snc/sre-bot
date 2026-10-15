@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:57'
-updated_date: '2026-09-28 15:03'
+updated_date: '2026-10-15 17:48'
 labels:
   - plugin-architecture
   - docs
@@ -17,6 +17,7 @@ references:
   - decisions/dependency-injection.md
   - decisions/plugins.md
   - CLAUDE.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1653'
 priority: high
 type: docs
 ordinal: 244000

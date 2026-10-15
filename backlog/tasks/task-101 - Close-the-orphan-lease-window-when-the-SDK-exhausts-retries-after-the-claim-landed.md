@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-17 20:39'
+updated_date: '2026-10-15 17:48'
 labels:
   - infrastructure
   - reliability
@@ -17,6 +18,7 @@ references:
   - app/infrastructure/idempotency/dynamodb.py
   - app/integrations/aws/settings.py
   - app/bin/unlock-sync-job.sh
+  - 'https://github.com/cds-snc/sre-bot/issues/1651'
 priority: medium
 ordinal: 229000
 ---

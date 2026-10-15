@@ -4,7 +4,7 @@ title: 'People and accounts: identity foundation and first adoption'
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
-updated_date: '2026-10-13 13:42'
+updated_date: '2026-10-15 17:46'
 labels:
   - identity
 dependencies: []
@@ -13,6 +13,7 @@ references:
   - decisions/workplace-systems.md
   - decisions/platform-entrypoints.md
   - decisions/plugin-architecture.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1619'
 priority: medium
 ordinal: 167000
 ---

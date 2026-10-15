@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:44'
-updated_date: '2026-10-09 17:14'
+updated_date: '2026-10-15 17:52'
 labels:
   - oncall
   - capabilities
@@ -15,6 +15,7 @@ dependencies: []
 references:
   - decisions/oncall.md
   - decisions/plugin-architecture.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1701'
 priority: medium
 type: feature
 ordinal: 364000

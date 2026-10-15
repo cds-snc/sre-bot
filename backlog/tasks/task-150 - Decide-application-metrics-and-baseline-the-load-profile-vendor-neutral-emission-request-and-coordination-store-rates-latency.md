@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-14 19:03'
+updated_date: '2026-10-15 17:53'
 labels:
   - architecture
   - observability
@@ -14,6 +15,7 @@ references:
   - decisions/observability.md
   - decisions/reliability.md
   - decisions/cloud-portability.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1717'
 priority: medium
 ordinal: 384000
 ---

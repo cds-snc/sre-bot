@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:58'
-updated_date: '2026-09-29 19:20'
+updated_date: '2026-10-15 17:45'
 labels:
   - plugin-architecture
   - slack
@@ -18,6 +18,7 @@ references:
   - decisions/platform-entrypoints.md
   - decisions/platform-transports.md
   - decisions/transport-slack.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1606'
 parent_task_id: TASK-26
 priority: high
 type: task

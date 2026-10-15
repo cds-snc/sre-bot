@@ -4,7 +4,7 @@ title: Make RecordStore.put_if_not_exists replay-safe against its own SDK retry
 status: To Do
 assignee: []
 created_date: '2026-09-17 20:40'
-updated_date: '2026-10-13 18:00'
+updated_date: '2026-10-15 17:48'
 labels:
   - infrastructure
   - reliability
@@ -16,6 +16,7 @@ dependencies:
 references:
   - app/infrastructure/records/service.py
   - decisions/plugin-architecture.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1652'
 priority: low
 ordinal: 231000
 ---

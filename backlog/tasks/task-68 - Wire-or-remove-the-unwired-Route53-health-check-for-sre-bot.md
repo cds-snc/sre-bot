@@ -4,7 +4,7 @@ title: Wire or remove the unwired Route53 health check for sre-bot
 status: To Do
 assignee: []
 created_date: '2026-07-29 20:03'
-updated_date: '2026-09-25 15:00'
+updated_date: '2026-10-15 17:45'
 labels:
   - infrastructure
   - phase-4
@@ -16,6 +16,7 @@ references:
   - decisions/health-checks.md
   - terraform/route53.tf
   - terraform/alb.tf
+  - 'https://github.com/cds-snc/sre-bot/issues/1614'
 priority: medium
 ordinal: 103000
 ---

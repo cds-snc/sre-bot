@@ -4,6 +4,7 @@ title: Design periodic access reviews (recertification) of standing group member
 status: To Do
 assignee: []
 created_date: '2026-09-25 18:06'
+updated_date: '2026-10-15 17:50'
 labels:
   - architecture
   - identity
@@ -15,6 +16,7 @@ dependencies:
 references:
   - decisions/people-and-accounts.md
   - 'https://csf.tools/reference/nist-sp-800-53/r5/ac/ac-2/'
+  - 'https://github.com/cds-snc/sre-bot/issues/1675'
 priority: low
 ordinal: 278000
 ---

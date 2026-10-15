@@ -4,7 +4,7 @@ title: 'Action items from Slack: add, confirm, edit, assign and list, behind the
 status: To Do
 assignee: []
 created_date: '2026-10-13 14:00'
-updated_date: '2026-10-13 19:59'
+updated_date: '2026-10-15 17:52'
 labels:
   - incident
   - features
@@ -12,6 +12,8 @@ dependencies:
   - TASK-147.1
   - TASK-147.2
   - TASK-27.2
+references:
+  - 'https://github.com/cds-snc/sre-bot/issues/1708'
 parent_task_id: TASK-147
 priority: medium
 type: feature

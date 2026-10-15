@@ -4,12 +4,14 @@ title: Due action-item reminders as a scheduled job behind the flag
 status: To Do
 assignee: []
 created_date: '2026-10-13 14:00'
-updated_date: '2026-10-13 19:59'
+updated_date: '2026-10-15 17:52'
 labels:
   - incident
   - features
 dependencies:
   - TASK-147.3
+references:
+  - 'https://github.com/cds-snc/sre-bot/issues/1711'
 parent_task_id: TASK-147
 priority: low
 type: feature

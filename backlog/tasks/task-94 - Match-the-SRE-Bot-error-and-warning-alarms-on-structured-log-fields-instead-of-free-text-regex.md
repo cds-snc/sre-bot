@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-15 19:39'
+updated_date: '2026-10-15 17:48'
 labels:
   - infrastructure
   - observability
@@ -17,6 +18,7 @@ references:
   - terraform/local.tf
   - terraform/alarms.tf
   - decisions/observability.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1645'
 priority: high
 ordinal: 211000
 ---

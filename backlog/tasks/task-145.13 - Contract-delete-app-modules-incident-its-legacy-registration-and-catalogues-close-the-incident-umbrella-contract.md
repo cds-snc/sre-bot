@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 18:23'
+updated_date: '2026-10-15 18:20'
 labels:
   - incident
   - features
@@ -14,7 +14,10 @@ labels:
 dependencies:
   - TASK-145.11
   - TASK-145.12
+  - TASK-145.5.7
   - TASK-118
+references:
+  - 'https://github.com/cds-snc/sre-bot/issues/1691'
 parent_task_id: TASK-145
 priority: medium
 type: task
@@ -31,6 +34,7 @@ THIS SLICE
 - Remove every freeze-baseline entry naming app/modules/incident; no baseline grows.
 - app/tests/integration/legacy_surface/INVENTORY.md: every incident row points at its response, comms or postmortem handler and its pinning test; surfaces found outside the original inventory are listed with their disposition.
 - modules/dev/incident.py and the /sre incident dispatcher in modules/sre are repointed or deleted.
+- The legacy item bridge (TASK-145.5.8) and the upgrade job (TASK-145.5.7) are deleted once a production run reports nothing pending. Legacy attributes stay on stored items: no strip pass (human default, 2026-10-15).
 - decisions/incident-management.md Migration: remove the closed tolerances and add a dated Changes line; decisions/migration.md and feature-packages.md Context lines naming modules/incident are updated.
 <!-- SECTION:DESCRIPTION:END -->
 
@@ -40,7 +44,8 @@ THIS SLICE
 - [ ] #2 No freeze baseline names app/modules/incident; the import-linter ignore list has not grown
 - [ ] #3 The legacy_surface inventory maps every incident surface to its new handler and pinning test
 - [ ] #4 decisions/incident-management.md Migration lists no closed tolerance and carries a dated Changes line
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #5 Once a production run of the TASK-145.5.7 upgrade job reports nothing pending, features/incident/core/adapters/legacy_items.py (the read bridge), the upgrade job and their tests are deleted, and decisions/incident-management.md Migration tolerances are updated to match
+- [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -59,7 +64,7 @@ Outline plan grounded at main d2d973ae (2026-10-09); re-ground at pickup (after 
 5. decisions/incident-management.md: remove the closed tolerances, dated Changes line; decisions/migration.md and feature-packages.md Context lines naming modules/incident updated.
 
 ## AC traceability
-AC1: step 1 -> `ls app/modules/incident` fails; `rg 'modules\.incident' app` empty. AC2: step 3 -> baseline diff shrink-only. AC3: step 4 -> review. AC4: step 5 -> review. AC5: gates.
+AC1: step 1 -> `ls app/modules/incident` fails; `rg 'modules\.incident' app` empty. AC2: step 3 -> baseline diff shrink-only. AC3: step 4 -> review. AC4: step 5 -> review. AC5: legacy_items.py (TASK-145.5.8) and the TASK-145.5.7 job deleted after a production run reports nothing pending; `rg legacy_items app` empty. AC6: gates.
 
 ## Test matrix
 Boot: lifespan test loads every plugin; the legacy registration list has no incident entry; the full suite passes without the legacy tests.
@@ -73,3 +78,11 @@ Deletions mostly; about 100 lines of edits.
 ## Blast radius and rollback
 Deleting the legacy module is final for the surfaces already cut over; a revert restores dead code only.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-15: also owns removing the legacy upgrade bridge and job (legacy_items.py, TASK-145.5.7) once a production run reports nothing pending.
+
+2026-10-15 (human default): legacy attributes are left on stored items; there is no strip pass, since nothing reads them once the bridge (TASK-145.5.8) and the TASK-145.5.7 job are deleted.
+<!-- SECTION:NOTES:END -->

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:00'
+updated_date: '2026-10-15 17:49'
 labels:
   - plugin-architecture
   - i18n
@@ -15,6 +16,7 @@ dependencies: []
 references:
   - decisions/i18n.md
   - decisions/governance.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1660'
 priority: medium
 type: spike
 ordinal: 259000

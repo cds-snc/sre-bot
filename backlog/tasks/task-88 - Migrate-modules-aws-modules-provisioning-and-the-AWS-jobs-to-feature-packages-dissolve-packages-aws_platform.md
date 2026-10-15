@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:36'
-updated_date: '2026-10-13 13:42'
+updated_date: '2026-10-15 17:47'
 labels:
   - phase-5
 dependencies:
@@ -26,6 +26,7 @@ references:
   - decisions/plugin-architecture.md
   - decisions/migration.md
   - decisions/authorization.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1641'
 priority: medium
 ordinal: 189000
 ---

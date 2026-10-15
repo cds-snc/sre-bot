@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-25 19:43'
-updated_date: '2026-09-25 19:58'
+updated_date: '2026-10-15 17:50'
 labels:
   - architecture
   - security
@@ -21,6 +21,7 @@ references:
   - decisions/authorization.md
   - decisions/security.md
   - decisions/people-and-accounts.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1676'
 priority: high
 ordinal: 279000
 ---

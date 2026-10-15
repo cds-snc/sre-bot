@@ -4,7 +4,7 @@ title: Cut retro attendee resolution over to people with an explicit fallback
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
-updated_date: '2026-10-09 17:01'
+updated_date: '2026-10-15 17:46'
 labels:
   - identity
 dependencies:
@@ -12,6 +12,7 @@ dependencies:
   - TASK-145
 references:
   - app/modules/incident/schedule_retro.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1620'
 parent_task_id: TASK-83
 priority: medium
 ordinal: 177000
