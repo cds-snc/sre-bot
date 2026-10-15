@@ -227,11 +227,12 @@ class Incident:
         id: The incident's id (the legacy incidents table UUID).
         title: Short name of the incident.
         status: Internal lifecycle status.
-        declarer: Platform user id of the person who declared it.
+        declared_by: Platform user id of the person who declared it.
         declared_at: When it was declared.
-        product: The affected product, when known.
-        severity: Severity level; ``None`` while unset.
-        security_flag: Whether it was declared as a security incident.
+        security_incident: Whether it was declared as a security incident;
+            always answered, never a third state.
+        product: The affected product, ``None`` while not recorded.
+        severity: Severity level; ``None`` while not rated.
         detected_at: When the problem was detected.
         impact_started_at: When user impact started.
         impact_ended_at: When user impact ended.
@@ -254,11 +255,11 @@ class Incident:
     id: str
     title: str
     status: IncidentStatus
-    declarer: str
+    declared_by: str
     declared_at: datetime
+    security_incident: bool
     product: str | None = None
     severity: Severity | None = None
-    security_flag: IncidentSecurityFlag = IncidentSecurityFlag.UNKNOWN
     detected_at: datetime | None = None
     impact_started_at: datetime | None = None
     impact_ended_at: datetime | None = None
@@ -280,6 +281,8 @@ class Incident:
             raise ValueError(f"status must be an IncidentStatus member, got {self.status!r}")
         if self.severity is not None and not isinstance(self.severity, Severity):
             raise ValueError(f"severity must be a Severity member or None, got {self.severity!r}")
+        if not isinstance(self.security_incident, bool):
+            raise ValueError(f"security_incident must be a bool, got {self.security_incident!r}")
         _require_aware(self, *(field.name for field in fields(self) if field.name.endswith("_at")))
 
 

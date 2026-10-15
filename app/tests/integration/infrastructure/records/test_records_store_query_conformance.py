@@ -197,6 +197,15 @@ class TestIndexQueries:
         assert result.is_success
         assert [item["pk"] for item in result.data] == ["r1"]
 
+    def test_index_query_returns_full_items(self, any_record_store: RecordStore) -> None:
+        """An index read carries non-key attributes, so a caller never needs a second get by key."""
+        any_record_store.put(TABLE, {"pk": "r1", "sk": "1", "user": "alice", "timestamp": "2026-01-01", "value": "full"})
+
+        result = any_record_store.query(TABLE, RecordQuery(partition="alice", index="by_user"))
+
+        assert result.is_success
+        assert [item["value"] for item in result.data] == ["full"]
+
     def test_unknown_index_raises(self, any_record_store: RecordStore) -> None:
         with pytest.raises(ValueError, match="by_nothing"):
             any_record_store.query(TABLE, RecordQuery(partition="alice", index="by_nothing"))
