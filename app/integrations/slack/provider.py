@@ -17,6 +17,7 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 from contracts.operations import ErrorCode, OperationResult, OperationStatus
+from contracts.services import ServiceScopeOpener
 from contracts.slack.models import ArgumentParsingError, CommandPayload, CommandResponse
 from infrastructure.i18n import Locale, TranslationKey, Translator
 from infrastructure.slack.settings import get_slack_transport_settings
@@ -223,6 +224,7 @@ class SlackPlatformProvider:
         self._view_submissions: dict[str, Callable[..., object]] = {}
         self._listeners_attached = False
         self._translator: Translator | None = None
+        self._scope_opener: ServiceScopeOpener | None = None
         if translation_service:
             self.set_translator(translation_service)
 
@@ -352,6 +354,25 @@ class SlackPlatformProvider:
             translator: Translator instance for message translation
         """
         self._translator = translator
+
+    def set_scope_opener(self, service_scopes: ServiceScopeOpener) -> None:
+        """Set the opener features use to open a per-invocation service scope.
+
+        Args:
+            service_scopes: Host-built opener over the service registry.
+        """
+        self._scope_opener = service_scopes
+
+    @property
+    def service_scopes(self) -> ServiceScopeOpener:
+        """The service scope opener the host injected.
+
+        Raises:
+            RuntimeError: The host has not called ``set_scope_opener``.
+        """
+        if self._scope_opener is None:
+            raise RuntimeError("SlackPlatformProvider has no ServiceScopeOpener; the host must call set_scope_opener first")
+        return self._scope_opener
 
     def _translate_or_fallback(
         self,
@@ -893,7 +914,7 @@ class SlackPlatformProvider:
             )
 
             # With argument parsing
-            from integrations.slack.parser Argument, ArgumentType
+            from integrations.slack.parser import Argument, ArgumentType
 
             provider.register_command(
                 command="list",

@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Any
 
 from contracts.operations import OperationResult
+from contracts.services import ServiceScopeOpener
 from contracts.slack.models import Argument, CommandPayload, CommandResponse
 from contracts.slack.reply import SlackReplySender
 
@@ -73,8 +74,9 @@ class FakeSlackReply:
 class FakeSlackRegistrar:
     """Records each registered command, block action and view submission, and exposes a fake reply interface."""
 
-    def __init__(self, reply: FakeSlackReply | None = None) -> None:
+    def __init__(self, reply: FakeSlackReply | None = None, service_scopes: ServiceScopeOpener | None = None) -> None:
         self._reply = reply or FakeSlackReply()
+        self._service_scopes = service_scopes
         self.commands: list[dict[str, Any]] = []
         self.block_actions: dict[str, Callable[..., object]] = {}
         self.view_submissions: dict[str, Callable[..., object]] = {}
@@ -82,6 +84,13 @@ class FakeSlackRegistrar:
     @property
     def reply(self) -> SlackReplySender:
         return self._reply
+
+    @property
+    def service_scopes(self) -> ServiceScopeOpener:
+        """The service scope opener the test supplied; raises when none was given, as the provider does."""
+        if self._service_scopes is None:
+            raise RuntimeError("no ServiceScopeOpener was supplied to this FakeSlackRegistrar")
+        return self._service_scopes
 
     def register_command(
         self,

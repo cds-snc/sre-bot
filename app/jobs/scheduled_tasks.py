@@ -8,6 +8,7 @@ import schedule
 from structlog import get_logger
 
 from contracts.scheduler.registry import BackgroundJobRegistry
+from contracts.services import ServiceScopeOpener
 from features.incident.drive.adapters import google_drive as incident_drive
 from infrastructure.coordination import get_lease_store, run_if_leased
 from integrations import maxmind, opsgenie
@@ -28,6 +29,14 @@ schedule_lib = schedule
 
 class _ScheduleBackgroundJobRegistry(BackgroundJobRegistry):
     """Adapter that binds feature jobs to the schedule library."""
+
+    def __init__(self, service_scopes: ServiceScopeOpener) -> None:
+        self._service_scopes = service_scopes
+
+    @property
+    def service_scopes(self) -> ServiceScopeOpener:
+        """The service scope opener jobs use to resolve contracts per run."""
+        return self._service_scopes
 
     def register_daily(
         self,
@@ -89,13 +98,14 @@ def _tier2(name: str, job: Callable[..., None]) -> Callable[..., None]:
     return wrapped
 
 
-def init(bot, register_plugin_jobs: Callable[[BackgroundJobRegistry], None]):
+def init(bot, register_plugin_jobs: Callable[[BackgroundJobRegistry], None], service_scopes: ServiceScopeOpener):
     """Initialize the scheduled tasks.
 
     Args:
         bot: Slack Bolt app whose client the legacy jobs use.
         register_plugin_jobs: Called once with the scheduler registry so feature
             plugins register their recurring jobs.
+        service_scopes: Opener the registry exposes so jobs open a service scope per run.
     """
     logger.info("initializing_scheduled_tasks", module="scheduled_tasks", function="init")
 
@@ -114,7 +124,7 @@ def init(bot, register_plugin_jobs: Callable[[BackgroundJobRegistry], None]):
         safe_run(_tier2("scheduler:spending_generate_spending_data", spending.execute_spending_data_update_job)),
     )
 
-    registry = _ScheduleBackgroundJobRegistry()
+    registry = _ScheduleBackgroundJobRegistry(service_scopes)
     register_plugin_jobs(registry)
 
 

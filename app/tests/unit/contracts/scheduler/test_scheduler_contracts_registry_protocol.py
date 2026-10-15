@@ -4,7 +4,7 @@ A Protocol-conformant fake registry stands in for the scheduler runtime: the
 tests assign it to the Protocol type (checked statically by mypy) and register
 jobs through it, so a feature written against the contract works with any
 implementation. An AST scan of the package source proves the contract imports
-only the standard library.
+only the standard library and other contracts modules.
 """
 
 import ast
@@ -18,12 +18,13 @@ import pytest
 
 import contracts.scheduler
 from contracts.scheduler.registry import BackgroundJobRegistry
+from contracts.services import ServiceScopeOpener
 
 pytestmark = pytest.mark.unit
 
 
 class _FakeRegistry:
-    """Records every registration it receives."""
+    """Records every registration it receives and has no scope opener."""
 
     def __init__(self) -> None:
         self.daily: list[tuple[str, str, Callable[[], None]]] = []
@@ -34,6 +35,10 @@ class _FakeRegistry:
 
     def register_interval(self, *, job_name: str, every: timedelta, job: Callable[[], None]) -> None:
         self.interval.append((job_name, every, job))
+
+    @property
+    def service_scopes(self) -> ServiceScopeOpener:
+        raise RuntimeError("no scope opener in this fake")
 
 
 def _job() -> None:
@@ -65,7 +70,7 @@ def test_registry_methods_take_keyword_only_arguments(method: str, expected: lis
     assert all(param.kind is inspect.Parameter.KEYWORD_ONLY for name, param in params.items() if name != "self")
 
 
-def test_contracts_scheduler_imports_only_the_standard_library() -> None:
+def test_contracts_scheduler_imports_only_the_standard_library_and_contracts() -> None:
     package_dir = Path(contracts.scheduler.__file__).parent
     offenders: list[str] = []
     for source in sorted(package_dir.glob("*.py")):
@@ -78,7 +83,9 @@ def test_contracts_scheduler_imports_only_the_standard_library() -> None:
             else:
                 continue
             offenders.extend(
-                f"{source.name}: {module}" for module in modules if module.split(".")[0] not in sys.stdlib_module_names
+                f"{source.name}: {module}"
+                for module in modules
+                if module.split(".")[0] not in sys.stdlib_module_names | {"contracts"}
             )
 
     assert offenders == []

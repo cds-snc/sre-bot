@@ -99,6 +99,10 @@ disallow_untyped_defs = false
 check_untyped_defs = true
 exclude = ["^tests/"]
 explicit_package_bases = true
+# mypy rejects a Protocol class passed where type[T] is expected, which is how an
+# entry point resolves a contract (resolver.get(RecordStore)); svcs.Container.get
+# has no such error, so the contract Protocols are checked the same way.
+disable_error_code = ["type-abstract"]
 
 [[tool.mypy.overrides]]
 module = ["google.oauth2.service_account", "googleapiclient.*", "google_auth_httplib2"]
@@ -435,3 +439,12 @@ ignore_imports = [
     "jobs.scheduled_tasks -> infrastructure.coordination",  # TASK-64
     "infrastructure.audit.service -> infrastructure.records",  # TASK-122
 ]
+
+[[tool.importlinter.contracts]]
+id = "contracts-no-svcs"
+name = "(l) contracts imports no svcs"
+type = "forbidden"
+# decisions/plugin-architecture.md: contracts/ stays free of container libraries; the
+# host implements ServiceScopeOpener over svcs in server/services.py.
+source_modules = ["contracts"]
+forbidden_modules = ["svcs"]

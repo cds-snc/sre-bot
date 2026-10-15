@@ -174,15 +174,16 @@ def test_lifespan_start_scheduled_tasks_runs_when_environment_is_prod(mock_setti
     init_mock = MagicMock()
     stop_event = threading.Event()
     run_mock = MagicMock(return_value=stop_event)
+    service_scopes = MagicMock(name="scope_opener")
     monkeypatch.setattr("server.lifespan.scheduled_tasks.init", init_mock)
     monkeypatch.setattr("server.lifespan.scheduled_tasks.run_continuously", run_mock)
 
     # Act
-    result = _start_scheduled_tasks(mock_bot, mock_settings, mock_logger)
+    result = _start_scheduled_tasks(mock_bot, mock_settings, mock_logger, service_scopes)
 
     # Assert
     assert result is stop_event
-    init_mock.assert_called_once_with(mock_bot, lifespan_module.register_background_jobs)
+    init_mock.assert_called_once_with(mock_bot, lifespan_module.register_background_jobs, service_scopes)
     run_mock.assert_called_once()
     mock_logger.info.assert_called_with("scheduled_tasks_started")
 
@@ -199,7 +200,7 @@ def test_lifespan_start_scheduled_tasks_skips_when_environment_is_not_production
     monkeypatch.setattr("server.lifespan.scheduled_tasks.run_continuously", run_mock)
 
     # Act
-    result = _start_scheduled_tasks(mock_bot, mock_settings, mock_logger)
+    result = _start_scheduled_tasks(mock_bot, mock_settings, mock_logger, MagicMock(name="scope_opener"))
 
     # Assert
     assert result is None

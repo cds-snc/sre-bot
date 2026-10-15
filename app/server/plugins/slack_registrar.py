@@ -12,6 +12,7 @@ decisions/platform-entrypoints.md rule 2
 from collections.abc import Callable
 from typing import Any
 
+from contracts.services import ServiceScopeOpener
 from contracts.slack.models import Argument, CommandPayload, CommandResponse
 from contracts.slack.registrar import SlackCommandRegistrar
 from contracts.slack.reply import SlackReplySender
@@ -28,6 +29,11 @@ class PluginSlackRegistrar:
     def reply(self) -> SlackReplySender:
         """The host registrar's reply interface."""
         return self._registrar.reply
+
+    @property
+    def service_scopes(self) -> ServiceScopeOpener:
+        """The host registrar's service scope opener."""
+        return self._registrar.service_scopes
 
     def register_command(
         self,

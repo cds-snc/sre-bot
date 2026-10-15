@@ -44,6 +44,7 @@ Current state:
 **`contracts/` is the public plugin API.** It holds:
 - hookspecs, including the host's extension points;
 - the core-service Protocols: records, queue, coordination, secrets, scheduler, translator and current user;
+- the service-scope Protocols (`contracts/services`: `ServiceScopeOpener` and `ServiceResolver`), which let a non-HTTP entry point resolve contracts without importing the container library; `contracts/` imports no svcs;
 - shared types: `OperationResult`, `OperationStatus`, identifiers and an actor reference.
 
 It contains no implementation of a hosting or framework service and imports nothing else from the app, so it could ship as a separate distribution without moving. It may hold a small concrete helper over its own Protocols, such as a facade or a default policy (as .NET's `*.Abstractions` packages and client-go's `resourcelock` do), when all of these hold:
@@ -149,3 +150,4 @@ Tolerated until then:
 - 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).
 - 2026-10-13: wording aligned with workplace-systems.md rule 2: vendor concepts leave a feature's domain, vendor code sits in adapters.
 - 2026-10-14: `contracts/` may hold pure, I/O-free facades over its own Protocols, under the criteria in the Decision; the first are the coordination contract's `LeaseStore` and `IdempotencyStore` (TASK-58.2). Lease enforcement (`run_if_leased`) is orchestration and stays out of `contracts/`.
+- 2026-10-15: `contracts/services` holds `ServiceScopeOpener` and `ServiceResolver`, the per-invocation scope a Slack handler or job opens; import-linter contract (l) keeps svcs out of `contracts/` (TASK-145.5.2).

@@ -8,6 +8,7 @@ dependencies through their constructors.
 
 import threading
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 
 import svcs
@@ -15,6 +16,7 @@ from structlog.stdlib import BoundLogger
 
 from contracts.coordination import ConditionalWriteStore
 from contracts.records import RecordStore
+from contracts.services import ServiceResolver
 from infrastructure.coordination import DynamoDBConditionalWriteStore, get_conditional_write_settings
 from infrastructure.records.service import DynamoDBRecordStore
 from integrations.aws.client import get_aws_client
@@ -78,3 +80,19 @@ async def initialize_core_services(registry: svcs.Registry, logger: BoundLogger)
             await container.aget(service.contract)
             log.info("core_service_resolved", contract=service.contract.__name__)
     log.info("core_services_initialized", count=len(CORE_SERVICES))
+
+
+class SvcsServiceScopeOpener:
+    """Opens one svcs container per invocation for non-HTTP entry points.
+
+    The only place a container is opened for Slack handlers and jobs. Each
+    create_scope() builds its own container, so worker threads never share one, and the
+    container is closed on exit, including when the body raises.
+    """
+
+    def __init__(self, registry: svcs.Registry) -> None:
+        self._registry = registry
+
+    def create_scope(self) -> AbstractContextManager[ServiceResolver]:
+        """Return a fresh container; it is its own resolver and closes itself on exit."""
+        return svcs.Container(self._registry)

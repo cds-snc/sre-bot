@@ -10,6 +10,7 @@ from slack_bolt import App
 from structlog.stdlib import BoundLogger
 
 from contracts.i18n.resources import I18nResourceSpec
+from contracts.services import ServiceScopeOpener
 from contracts.slack.registrar import SlackCommandRegistrar
 from infrastructure.configuration.app import AppSettings, get_app_settings
 from infrastructure.configuration.features.sre_ops import (
@@ -53,7 +54,7 @@ from server.plugins.manager import (
     register_background_jobs,
     register_feature_integrations,
 )
-from server.services import initialize_core_services
+from server.services import SvcsServiceScopeOpener, initialize_core_services
 
 
 def _is_test_environment() -> bool:
@@ -118,6 +119,7 @@ def _start_scheduled_tasks(
     bot: App,
     app_settings: AppSettings,
     logger: BoundLogger,
+    service_scopes: ServiceScopeOpener,
 ) -> threading.Event | None:
     # This gate suppresses side-effecting jobs outside production; Tier-2 leases
     # are the duplicate-prevention mechanism across production replicas.
@@ -125,7 +127,7 @@ def _start_scheduled_tasks(
         logger.info("scheduled_tasks_skipped", reason="environment_is_not_production")
         return None
 
-    scheduled_tasks.init(bot, register_background_jobs)
+    scheduled_tasks.init(bot, register_background_jobs, service_scopes)
     stop_event = cast(threading.Event | None, scheduled_tasks.run_continuously())
     logger.info("scheduled_tasks_started")
     return stop_event
@@ -255,6 +257,7 @@ async def lifespan(app: FastAPI, registry: svcs.Registry) -> AsyncGenerator[None
     )
     # Phase 2: build every core service once; a failing factory stops startup here.
     await initialize_core_services(registry, logger)
+    service_scopes = SvcsServiceScopeOpener(registry)
 
     _initialize_security_services(app, server_settings, logger)
     _initialize_directory_provider(app, directory_settings, logger)
@@ -269,6 +272,7 @@ async def lifespan(app: FastAPI, registry: svcs.Registry) -> AsyncGenerator[None
     # Inject translation service into all platform providers and their formatters
     # before command registration so help-text translations work at startup.
     app.state.slack_provider.set_translator(translation_service.translator)
+    app.state.slack_provider.set_scope_opener(service_scopes)
     # Phase 3: Register feature commands, routes, and run startup warmup.
     # Providers now have the translator set, so description_key translations
     # resolve correctly at registration time.
@@ -305,6 +309,7 @@ async def lifespan(app: FastAPI, registry: svcs.Registry) -> AsyncGenerator[None
                 slack_app,
                 app_settings,
                 logger,
+                service_scopes,
             )
             if not _is_test_environment()
             else None
