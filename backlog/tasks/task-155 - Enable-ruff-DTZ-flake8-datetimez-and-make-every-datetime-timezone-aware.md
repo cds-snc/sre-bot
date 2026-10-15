@@ -4,10 +4,13 @@ title: Enable ruff DTZ (flake8-datetimez) and make every datetime timezone-aware
 status: To Do
 assignee: []
 created_date: '2026-10-15 19:39'
+updated_date: '2026-10-15 19:50'
 labels:
   - quality
   - lint
 dependencies: []
+references:
+  - 'https://github.com/cds-snc/sre-bot/issues/1724'
 priority: low
 ordinal: 397000
 ---

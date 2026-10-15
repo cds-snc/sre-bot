@@ -3,10 +3,10 @@ id: TASK-145.5.8
 title: >-
   Legacy incident item bridge: one pure upgrade function from legacy items to
   the end-state shape, applied by IncidentStore to items without record_version
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-15 18:17'
-updated_date: '2026-10-15 19:47'
+updated_date: '2026-10-15 19:51'
 labels:
   - incident
   - features
