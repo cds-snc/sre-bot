@@ -145,8 +145,9 @@ class TestSettingsStructure:
             assert isinstance(instance, IntegrationSettings)
 
     def test_google_workspace_settings_defaults_customer_id(self, monkeypatch):
-        """Verify Google Workspace customer ID defaults to the stable alias."""
+        """Verify the customer ID defaults to the alias while Google is not in use (no service-account key)."""
         monkeypatch.delenv("GOOGLE_WORKSPACE_CUSTOMER_ID", raising=False)
+        monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "")
 
         settings = GoogleWorkspaceSettings.model_validate({})
 

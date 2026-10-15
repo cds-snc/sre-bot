@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-14 23:10'
+updated_date: '2026-10-15 16:13'
 labels:
   - incident
   - features
@@ -46,13 +46,13 @@ Out of this task:
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-Coordinator plan. Each layer is planned in its own session, after the layer below is implemented. Decisions (human, 2026-10-14) are recorded in the subtask descriptions.
+Coordinator plan. Each layer is planned in its own session, after the layer below is implemented. Decisions (human, 2026-10-14 and 2026-10-15) are recorded in the subtask descriptions.
 
 Stack K layers, bottom first:
 1. TASK-152: IAM /index/* grants for the audit trail, retry records and incidents tables. Terraform. Standalone merge, tf_apply.
 2. TASK-145.5.1: the incidents by_channel and open GSIs (projection ALL), the timeline table, and the devcontainer script, run locally. Terraform. Standalone merge, tf_apply before layer 6.
 3. TASK-145.5.2: ServiceScopeOpener for the Slack and background-job registrars, and the dependency-injection.md update (Bolt middleware alternative recorded).
-4. TASK-145.5.3: vocabulary, record, references, incident core settings, platform tenant ids (SLACK_TEAM_ID validated at boot when Slack is enabled).
+4. TASK-153 then TASK-145.5.3, one layer: TASK-153 amends the ADRs for vendor enablement (a configured tenant entry enables a vendor client; the new-incident policy names a system) in an earlier commit, then TASK-145.5.3: vocabulary, record, references, incident core settings, platform tenant ids (SLACK_TEAM_ID required when Slack is enabled; the Google customer id is not the my_customer alias when Google is configured).
 5. TASK-145.5.4: IncidentStore over RecordStore (reads only), its in-memory fake, ISO-8601 key formats, and index reads returning full items in the records contract.
 6. TASK-145.5.5: cutover of the lookup and security flag; narrow Protocols and legacy_incidents deleted. Standalone merge and deploy.
 7. TASK-145.5.6: StatusUpdateStore onto RecordStore through the registry.

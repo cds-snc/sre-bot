@@ -1,6 +1,6 @@
 ---
 status: Accepted
-date: 2026-09-25
+date: 2026-10-15
 applies: target
 scope: Which external systems are hosting services chosen per deployment, which are workplace systems chosen per person or artifact, and where records of truth live.
 ---
@@ -38,8 +38,11 @@ Current state:
    - Behavior whose value is the vendor itself (e.g. Drive `appProperties`) stays in a feature's Path B adapter.
    - An operation several features need across suites lives in a workplace capability, with one adapter per system in its `adapters/`.
    - Every adapter is a Gateway ([Fowler](https://martinfowler.com/articles/gateway-pattern.html)) governed by [outbound-clients.md](outbound-clients.md) and [sdk-typing.md](sdk-typing.md).
-3. **One instance, several tenants.** Configuration names each workplace tenant the instance works with (a Google Workspace domain, a Microsoft 365 tenant, a Slack workspace, a Teams tenant), each with its own least-privilege credentials. Configuration never selects "the" provider for a workplace concern.
-4. **References carry their system.** Every stored reference to a workplace artifact, account or conversation records the system and tenant alongside the vendor's id. Never store a bare vendor id.
+3. **One instance, several tenants.** Configuration names each workplace tenant the instance works with (a Google Workspace domain, a Microsoft 365 tenant, a Slack workspace, a Teams tenant), each with its own least-privilege credentials. Configuration never selects "the" provider for a workplace concern. A tenant entry in a vendor's settings slice is what makes the instance work with that tenant ([configuration.md](configuration.md)); there is no separate enabled flag.
+   - **The entry carries the vendor's real tenant id, never an API alias** (Google `my_customer`; Microsoft `common`, `organizations`, `consumers`, domain names).
+   - **Format checks follow vendor documentation only.** Slack and Google document no id format, so their ids are opaque non-blank strings and aliases are rejected; Microsoft documents a GUID. Sources, read on 2026-10-15: [Slack ids are opaque](https://docs.slack.dev/changelog/2016/08/11/user-id-format-changes), [Google customer id](https://knowledge.workspace.google.com/admin/getting-started/find-your-customer-id), [Entra `tid`](https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference).
+   - **Features learn the configured systems through a read API** (a small configured-systems read provided where the store or capability is built), never by importing another slice.
+4. **References carry their system.** Every stored reference to a workplace artifact, account or conversation records the system and tenant alongside the vendor's id. Never store a bare vendor id. The system is a closed enum validated strictly where it is chosen; stored records are read tolerantly ([cloud-portability.md](cloud-portability.md) contract 4). The enum is `WorkplaceSystem` in `app/contracts/workplace/`, platform vocabulary every feature and the configured-systems read share.
 5. **Records of truth live in the app**, behind the records contract. Workplace documents and spreadsheets are one of two things:
    - **Collaboration spaces:** people work in them, and the app stores a reference.
    - **Projections:** the app writes derived views of stored records, such as an incident metrics sheet. A projection is never read back as a source of truth and can be rebuilt from the stored records.
@@ -74,3 +77,5 @@ Tolerated until then:
 - 2026-09-25: Accepted; Migration names its tickets.
 - 2026-10-02: the incident record, its references and its projection are specified in [incident-management.md](incident-management.md) (TASK-97).
 - 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).
+- 2026-10-15: a tenant entry carries the vendor's real tenant id, never an alias, with format checks from vendor documentation only; features read the configured systems through a read API (TASK-153).
+- 2026-10-15: `WorkplaceSystem` lives in `app/contracts/workplace/` (TASK-145.5.3).

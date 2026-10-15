@@ -2,6 +2,14 @@
 
 Exposes `SlackSettings` and the cached `get_slack_settings()` provider.
 
+`SLACK_ENABLED` is the interim switch for the Slack transport and
+`SLACK_TEAM_ID` the interim Slack tenant entry, until both move to the
+configuration files (TASK-112; decisions/configuration.md):
+- The transport switched on fails boot without a non-blank `SLACK_TEAM_ID`.
+- With the transport off the id is optional; an empty value counts as absent
+    and a present one must be non-blank. The id is opaque (Slack documents no
+    format), so no pattern is checked and no network call is made.
+
 Validation behavior mirrors Slack delivery mode requirements:
 - HTTP Events mode (`SLACK_SOCKET_MODE=false`) fails fast at boot when
     `SLACK_SIGNING_SECRET` is missing.
@@ -17,7 +25,7 @@ configuration (channel IDs, user-group IDs) lives with the consuming feature.
 from functools import lru_cache
 
 import structlog
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = structlog.get_logger(__name__)
@@ -34,6 +42,11 @@ class SlackSettings(BaseSettings):
 
     ENABLED: bool = Field(default=False, alias="SLACK_ENABLED")
     SOCKET_MODE: bool = Field(default=True, alias="SLACK_SOCKET_MODE")
+    TEAM_ID: str | None = Field(
+        default=None,
+        alias="SLACK_TEAM_ID",
+        description="Slack workspace (team) id this instance works with, as auth.test returns it; required when SLACK_ENABLED is true.",
+    )
 
     BOT_TOKEN: str = Field(default="", alias="SLACK_BOT_TOKEN")
     USER_TOKEN: str = Field(default="", alias="SLACK_USER_TOKEN", repr=False)
@@ -77,10 +90,19 @@ class SlackSettings(BaseSettings):
         description="Slack Web API error codes classified as TRANSIENT_ERROR.",
     )
 
+    @field_validator("TEAM_ID", mode="before")
+    @classmethod
+    def _empty_team_id_is_absent(cls, value: object) -> object:
+        return None if value == "" else value
+
     @model_validator(mode="after")
     def _validate_transport_credentials(self) -> SlackSettings:
+        if self.TEAM_ID is not None and not self.TEAM_ID.strip():
+            raise ValueError("SLACK_TEAM_ID must not be blank when set")
         if not self.ENABLED:
             return self
+        if self.TEAM_ID is None:
+            raise ValueError("SLACK_TEAM_ID is required when SLACK_ENABLED=true")
         if self.SOCKET_MODE and not self.APP_TOKEN:
             raise ValueError("SLACK_APP_TOKEN is required when SLACK_SOCKET_MODE=true and SLACK_ENABLED=true")
         if not self.SOCKET_MODE and not self.SIGNING_SECRET:

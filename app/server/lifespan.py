@@ -21,6 +21,7 @@ from infrastructure.configuration.infrastructure.server import (
     ServerSettings,
     get_server_settings,
 )
+from infrastructure.configuration.integrations.google import get_google_workspace_settings
 from infrastructure.directory import (
     DirectorySettings,
     get_directory_provider,
@@ -35,6 +36,7 @@ from infrastructure.logging.settings import LoggingSettings, get_logging_setting
 from infrastructure.logging.setup import configure_logging
 from infrastructure.security import get_jwks_manager
 from integrations.slack.provider import get_slack_provider
+from integrations.slack.settings import get_slack_settings
 from jobs import scheduled_tasks
 from modules import (
     atip,
@@ -242,6 +244,9 @@ async def lifespan(app: FastAPI, registry: svcs.Registry) -> AsyncGenerator[None
     directory_settings = get_directory_settings()
     sre_ops_settings = get_sre_ops_settings()
     logging_settings = get_logging_settings()
+    # Vendor slices validate with the host slices: an invalid tenant entry fails boot here.
+    get_slack_settings()
+    get_google_workspace_settings()
     logger = _get_logger_from_app(app_settings, logging_settings)
 
     app.state.settings = app_settings

@@ -14,6 +14,7 @@ from functools import lru_cache
 from typing import Protocol, runtime_checkable
 
 from contracts.operations.result import OperationResult
+from features.incident.common.vocabulary import StatusUpdateStage
 from features.incident.core.adapters.i18n import translate
 from features.incident.core.adapters.legacy_incidents import (
     build_legacy_incident_lookup,
@@ -22,27 +23,44 @@ from features.incident.core.adapters.legacy_incidents import (
 from features.incident.core.adapters.slack import build_incident_transcript_reader
 from features.incident.core.adapters.status_updates import build_status_update_store
 from features.incident.core.domain import (
+    ConversationReference,
+    ExternalCaseReference,
+    Incident,
     IncidentSecurityFlag,
+    MessageReference,
+    PostmortemMeetingReference,
+    ReportReference,
+    SourceAlertReference,
     StatusUpdate,
     StatusUpdateOrigin,
-    StatusUpdateStage,
     StatusUpdateState,
     StatusUpdateText,
+    TimelineEntry,
     TranscriptMessage,
+    VideoCallReference,
 )
 
 __all__ = [
+    "ConversationReference",
+    "ExternalCaseReference",
+    "Incident",
     "IncidentLookup",
     "IncidentSecurityFlag",
     "IncidentSecurityReader",
     "IncidentTranscriptReader",
+    "MessageReference",
+    "PostmortemMeetingReference",
+    "ReportReference",
+    "SourceAlertReference",
     "StatusUpdate",
     "StatusUpdateOrigin",
     "StatusUpdateStage",
     "StatusUpdateState",
     "StatusUpdateStore",
     "StatusUpdateText",
+    "TimelineEntry",
     "TranscriptMessage",
+    "VideoCallReference",
     "find_incident_for_conversation",
     "get_incident_lookup",
     "get_incident_security_reader",

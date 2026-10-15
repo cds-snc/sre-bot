@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-10-09 16:48'
+updated_date: '2026-10-15 16:15'
 labels:
   - plugin-architecture
   - plugins
@@ -30,6 +30,8 @@ ordinal: 254000
 decisions/plugins.md and configuration.md: every entry point has an enablement key in the base configuration file, and an environment file may override it. The host skips a disabled plugin before registering it (pm.set_blocked, or by filtering the entry-point list). A disabled plugin registers nothing: no routes, no OpenAPI entries, no strategies, no settings reads.
 
 Today which features and jobs run is decided by environment variables and ENVIRONMENT checks in code (for example, scheduled tasks gated on ENVIRONMENT == "production"). This ticket moves plugin switches into the files and deletes the corresponding environment-variable switches and ENVIRONMENT checks for plugins. Runtime flags (OpenFeature with flagd) are out of scope and added only when a feature needs one.
+
+Vendor tenant entries (decisions/configuration.md, workplace-systems.md): a vendor client is available when its slice holds a tenant entry carrying the vendor's real tenant id, validated at boot with no network call. The entries move from environment variables into the configuration files here, and the Slack transport gets its enablement key in the files, replacing the interim SLACK_ENABLED (and SLACK_TEAM_ID as its tenant entry). There is no <VENDOR>_ENABLED key.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

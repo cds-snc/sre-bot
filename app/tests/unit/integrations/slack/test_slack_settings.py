@@ -5,8 +5,6 @@ env-var resolution, fail-fast validation for delivery-mode credentials,
 the `@lru_cache` singleton contract, and the absence of domain fields.
 """
 
-from __future__ import annotations
-
 import pytest
 from structlog.testing import capture_logs
 
@@ -64,6 +62,7 @@ class TestSlackSettingsDeliveryMode:
 
     def test_enabled_reads_from_env(self, monkeypatch):
         monkeypatch.setenv("SLACK_ENABLED", "true")
+        monkeypatch.setenv("SLACK_TEAM_ID", "T0TEST")
         monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-token")
 
         assert SlackSettings().ENABLED is True
@@ -71,6 +70,7 @@ class TestSlackSettingsDeliveryMode:
     def test_socket_mode_false_reads_from_env(self, monkeypatch):
         monkeypatch.setenv("SLACK_SOCKET_MODE", "false")
         monkeypatch.setenv("SLACK_ENABLED", "true")
+        monkeypatch.setenv("SLACK_TEAM_ID", "T0TEST")
         monkeypatch.setenv("SLACK_SIGNING_SECRET", "secret")
 
         assert SlackSettings().SOCKET_MODE is False
@@ -125,6 +125,7 @@ class TestSlackSettingsFailFast:
 
     def test_socket_mode_enabled_without_app_token_raises(self, monkeypatch):
         monkeypatch.setenv("SLACK_ENABLED", "true")
+        monkeypatch.setenv("SLACK_TEAM_ID", "T0TEST")
         monkeypatch.setenv("SLACK_SOCKET_MODE", "true")
 
         with pytest.raises(Exception, match="SLACK_APP_TOKEN"):
@@ -132,6 +133,7 @@ class TestSlackSettingsFailFast:
 
     def test_http_events_enabled_without_signing_secret_raises(self, monkeypatch):
         monkeypatch.setenv("SLACK_ENABLED", "true")
+        monkeypatch.setenv("SLACK_TEAM_ID", "T0TEST")
         monkeypatch.setenv("SLACK_SOCKET_MODE", "false")
         monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-x")
 
@@ -146,6 +148,7 @@ class TestSlackSettingsFailFast:
 
     def test_socket_mode_enabled_with_app_token_is_valid(self, monkeypatch):
         monkeypatch.setenv("SLACK_ENABLED", "true")
+        monkeypatch.setenv("SLACK_TEAM_ID", "T0TEST")
         monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-token")
 
         settings = SlackSettings()
@@ -155,6 +158,7 @@ class TestSlackSettingsFailFast:
 
     def test_http_events_enabled_with_signing_secret_is_valid(self, monkeypatch):
         monkeypatch.setenv("SLACK_ENABLED", "true")
+        monkeypatch.setenv("SLACK_TEAM_ID", "T0TEST")
         monkeypatch.setenv("SLACK_SOCKET_MODE", "false")
         monkeypatch.setenv("SLACK_SIGNING_SECRET", "hex-secret")
 
@@ -168,6 +172,7 @@ class TestSlackSettingsSocketModeSigningSecretNotice:
 
     def test_enabled_socket_mode_without_signing_secret_logs_info_notice(self, monkeypatch):
         monkeypatch.setenv("SLACK_ENABLED", "true")
+        monkeypatch.setenv("SLACK_TEAM_ID", "T0TEST")
         monkeypatch.setenv("SLACK_SOCKET_MODE", "true")
         monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-token")
 
@@ -182,6 +187,7 @@ class TestSlackSettingsSocketModeSigningSecretNotice:
 
     def test_enabled_socket_mode_with_signing_secret_logs_no_notice(self, monkeypatch):
         monkeypatch.setenv("SLACK_ENABLED", "true")
+        monkeypatch.setenv("SLACK_TEAM_ID", "T0TEST")
         monkeypatch.setenv("SLACK_SOCKET_MODE", "true")
         monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-token")
         monkeypatch.setenv("SLACK_SIGNING_SECRET", "secret")
