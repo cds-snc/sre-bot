@@ -3,10 +3,10 @@ id: TASK-145.5.2
 title: >-
   Per-invocation service scopes for non-HTTP entry points: a ServiceScopeOpener
   on the Slack and background-job registrars
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-14 23:08'
-updated_date: '2026-10-15 14:38'
+updated_date: '2026-10-15 17:13'
 labels:
   - plugin-architecture
   - dependency-injection

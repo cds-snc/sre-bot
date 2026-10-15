@@ -3,10 +3,10 @@ id: TASK-145.5.3
 title: >-
   Incident vocabulary, record and references in common/ and core/domain.py, with
   the incident core settings and the platform tenant ids
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-14 23:09'
-updated_date: '2026-10-15 17:06'
+updated_date: '2026-10-15 17:14'
 labels:
   - incident
   - features
