@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:57'
-updated_date: '2026-10-09 13:01'
+updated_date: '2026-10-15 17:50'
 labels:
   - incident
   - features
@@ -17,6 +17,7 @@ references:
   - decisions/interaction-toolkits.md
   - decisions/platform-entrypoints.md
   - decisions/transport-slack.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1682'
 priority: high
 type: feature
 ordinal: 319000

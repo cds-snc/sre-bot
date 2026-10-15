@@ -4,6 +4,7 @@ title: Pin the legacy webhook route through the ASGI boundary
 status: To Do
 assignee: []
 created_date: '2026-09-28 14:36'
+updated_date: '2026-10-15 17:45'
 labels:
   - migration
   - testing
@@ -14,6 +15,7 @@ references:
   - decisions/testing.md
   - decisions/migration.md
   - decisions/webhooks.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1612'
 parent_task_id: TASK-36
 priority: high
 ordinal: 286000

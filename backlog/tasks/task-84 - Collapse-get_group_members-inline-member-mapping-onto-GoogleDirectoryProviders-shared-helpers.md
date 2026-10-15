@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-10 17:25'
-updated_date: '2026-09-24 20:11'
+updated_date: '2026-10-15 17:47'
 labels:
   - clients
   - cleanup
@@ -15,6 +15,7 @@ dependencies: []
 references:
   - app/infrastructure/directory/google.py
   - decisions/plugin-architecture.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1634'
 priority: low
 ordinal: 182000
 ---

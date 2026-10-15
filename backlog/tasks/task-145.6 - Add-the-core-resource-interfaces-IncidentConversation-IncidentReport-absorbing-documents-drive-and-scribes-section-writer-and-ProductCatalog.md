@@ -6,13 +6,15 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-14 23:11'
+updated_date: '2026-10-15 17:51'
 labels:
   - incident
   - features
   - slack
 dependencies:
   - TASK-145.5
+references:
+  - 'https://github.com/cds-snc/sre-bot/issues/1697'
 parent_task_id: TASK-145
 priority: medium
 type: task

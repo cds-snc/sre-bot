@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-28 14:55'
+updated_date: '2026-10-15 17:50'
 labels:
   - operation-result
   - clients
@@ -15,6 +16,7 @@ dependencies:
 references:
   - decisions/operation-result.md
   - decisions/outbound-clients.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1678'
 priority: medium
 ordinal: 288000
 ---

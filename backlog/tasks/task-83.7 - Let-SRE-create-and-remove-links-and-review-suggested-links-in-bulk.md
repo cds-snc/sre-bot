@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
-updated_date: '2026-09-25 19:43'
+updated_date: '2026-10-15 17:47'
 labels:
   - identity
 dependencies:
@@ -16,6 +16,7 @@ dependencies:
 references:
   - decisions/people-and-accounts.md
   - decisions/security.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1631'
 parent_task_id: TASK-83
 priority: medium
 ordinal: 174000

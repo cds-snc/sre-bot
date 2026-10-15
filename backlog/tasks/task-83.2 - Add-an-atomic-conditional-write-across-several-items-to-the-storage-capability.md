@@ -4,7 +4,7 @@ title: Add an atomic conditional write across several items to the records contr
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
-updated_date: '2026-10-13 19:59'
+updated_date: '2026-10-15 17:46'
 labels:
   - identity
   - records
@@ -15,6 +15,7 @@ references:
   - decisions/reliability.md
   - decisions/cloud-portability.md
   - app/infrastructure/records/protocol.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1626'
 parent_task_id: TASK-83
 priority: medium
 ordinal: 169000

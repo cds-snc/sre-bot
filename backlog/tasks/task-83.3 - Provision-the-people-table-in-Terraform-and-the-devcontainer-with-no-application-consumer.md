@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-10 16:18'
+updated_date: '2026-10-15 17:46'
 labels:
   - identity
   - storage
@@ -15,6 +16,7 @@ references:
   - terraform/dynamodb.tf
   - terraform/iam.tf
   - .devcontainer/dynamodb-create.sh
+  - 'https://github.com/cds-snc/sre-bot/issues/1627'
 parent_task_id: TASK-83
 priority: medium
 ordinal: 170000

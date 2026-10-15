@@ -4,7 +4,7 @@ title: Pin the legacy scheduled-job entry points
 status: To Do
 assignee: []
 created_date: '2026-09-28 14:36'
-updated_date: '2026-10-09 17:01'
+updated_date: '2026-10-15 17:45'
 labels:
   - migration
   - testing
@@ -14,6 +14,7 @@ dependencies:
 references:
   - decisions/testing.md
   - decisions/migration.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1613'
 parent_task_id: TASK-36
 priority: high
 ordinal: 287000

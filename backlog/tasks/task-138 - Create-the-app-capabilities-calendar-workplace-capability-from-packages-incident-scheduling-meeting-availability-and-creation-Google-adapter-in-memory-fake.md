@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-02 16:59'
-updated_date: '2026-10-09 17:01'
+updated_date: '2026-10-15 17:50'
 labels:
   - plugin-architecture
   - capabilities
@@ -21,6 +21,7 @@ references:
   - decisions/incident-management.md
   - decisions/plugin-architecture.md
   - decisions/outbound-clients.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1681'
 priority: medium
 ordinal: 314000
 ---

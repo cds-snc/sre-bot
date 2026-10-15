@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-14 23:09'
+updated_date: '2026-10-15 17:51'
 labels:
   - incident
   - features
@@ -16,6 +17,7 @@ references:
   - app/features/incident/core/adapters/status_updates.py
   - decisions/cloud-portability.md
   - decisions/dependency-injection.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1695'
 parent_task_id: TASK-145.5
 priority: medium
 type: task

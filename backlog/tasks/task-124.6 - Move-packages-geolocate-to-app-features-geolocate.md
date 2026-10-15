@@ -4,7 +4,7 @@ title: Move packages/geolocate to app/features/geolocate/
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:01'
-updated_date: '2026-09-24 20:17'
+updated_date: '2026-10-15 17:49'
 labels:
   - plugin-architecture
   - features
@@ -18,6 +18,7 @@ dependencies:
 references:
   - decisions/feature-packages.md
   - decisions/plugin-architecture.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1670'
 parent_task_id: TASK-124
 priority: medium
 type: task

@@ -4,13 +4,15 @@ title: Incident declare invites the on-call people through the on-call capabilit
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:44'
-updated_date: '2026-10-09 17:14'
+updated_date: '2026-10-15 17:52'
 labels:
   - oncall
   - capabilities
 dependencies:
   - TASK-146.1
   - TASK-145.7
+references:
+  - 'https://github.com/cds-snc/sre-bot/issues/1704'
 parent_task_id: TASK-146
 priority: medium
 type: feature

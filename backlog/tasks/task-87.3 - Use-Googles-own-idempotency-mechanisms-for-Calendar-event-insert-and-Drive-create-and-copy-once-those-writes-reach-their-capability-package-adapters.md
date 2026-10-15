@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 15:43'
-updated_date: '2026-09-24 20:11'
+updated_date: '2026-10-15 17:47'
 labels:
   - clients
   - reliability
@@ -17,6 +17,7 @@ references:
   - decisions/workplace-systems.md
   - app/infrastructure/drive/google.py
   - decisions/plugin-architecture.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1640'
 parent_task_id: TASK-87
 priority: low
 ordinal: 237000

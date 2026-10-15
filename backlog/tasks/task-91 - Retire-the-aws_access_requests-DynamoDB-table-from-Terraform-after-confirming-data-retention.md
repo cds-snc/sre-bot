@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-14 14:08'
+updated_date: '2026-10-15 17:47'
 labels:
   - infrastructure
   - cleanup
@@ -15,6 +16,7 @@ dependencies:
 references:
   - terraform/dynamodb.tf
   - terraform/iam.tf
+  - 'https://github.com/cds-snc/sre-bot/issues/1643'
 priority: medium
 ordinal: 198000
 ---

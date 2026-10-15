@@ -4,6 +4,7 @@ title: Handle gone Slack views and messages gracefully when the bot updates them
 status: To Do
 assignee: []
 created_date: '2026-10-14 19:31'
+updated_date: '2026-10-15 17:53'
 labels:
   - slack
   - reliability
@@ -13,6 +14,7 @@ references:
   - decisions/outbound-clients.md
   - app/contracts/slack/reply.py
   - app/integrations/slack/settings.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1718'
 priority: medium
 ordinal: 385000
 ---

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-25 19:59'
+updated_date: '2026-10-15 17:46'
 labels:
   - identity
 milestone: m-4
@@ -15,6 +16,7 @@ dependencies:
 references:
   - decisions/people-and-accounts.md
   - decisions/authorization.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1625'
 parent_task_id: TASK-83
 priority: low
 ordinal: 282000

@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-14 23:09'
-updated_date: '2026-10-15 16:53'
+updated_date: '2026-10-15 17:51'
 labels:
   - incident
   - features
@@ -20,6 +20,7 @@ dependencies:
 references:
   - decisions/dependency-injection.md
   - decisions/incident-management.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1694'
 parent_task_id: TASK-145.5
 priority: medium
 type: task

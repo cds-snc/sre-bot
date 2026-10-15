@@ -6,12 +6,15 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:44'
+updated_date: '2026-10-15 17:52'
 labels:
   - oncall
   - capabilities
 dependencies:
   - TASK-25.6
   - TASK-114
+references:
+  - 'https://github.com/cds-snc/sre-bot/issues/1702'
 parent_task_id: TASK-146
 priority: medium
 type: feature

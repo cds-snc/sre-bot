@@ -4,7 +4,7 @@ title: Make the three Tier-2 scheduled job bodies safe to run twice
 status: To Do
 assignee: []
 created_date: '2026-09-17 20:39'
-updated_date: '2026-09-17 20:47'
+updated_date: '2026-10-15 17:48'
 labels:
   - infrastructure
   - reliability
@@ -15,6 +15,7 @@ references:
   - decisions/reliability.md
   - app/jobs/scheduled_tasks.py
   - app/modules/incident/notify_stale_incident_channels.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1649'
 priority: high
 ordinal: 227000
 ---

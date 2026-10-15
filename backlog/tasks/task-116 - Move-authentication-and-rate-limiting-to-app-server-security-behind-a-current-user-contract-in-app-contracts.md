@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:00'
+updated_date: '2026-10-15 17:49'
 labels:
   - plugin-architecture
   - security
@@ -18,6 +19,7 @@ references:
   - decisions/plugin-architecture.md
   - decisions/security.md
   - decisions/configuration.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1659'
 priority: medium
 type: task
 ordinal: 258000

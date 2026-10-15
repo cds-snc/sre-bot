@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-15 19:39'
+updated_date: '2026-10-15 17:45'
 labels:
   - infrastructure
   - phase-4
@@ -16,6 +17,7 @@ references:
   - decisions/observability.md
   - app/infrastructure/logging/context.py
   - app/server/server.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1610'
 parent_task_id: TASK-28
 priority: high
 ordinal: 210000
