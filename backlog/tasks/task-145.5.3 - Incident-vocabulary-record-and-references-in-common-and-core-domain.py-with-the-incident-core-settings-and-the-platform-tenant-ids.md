@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-14 23:09'
-updated_date: '2026-10-15 17:14'
+updated_date: '2026-10-15 17:30'
 labels:
   - incident
   - features
@@ -157,5 +157,10 @@ Deploy prerequisite: sre-bot-config SSM needs SLACK_TEAM_ID (SLACK_ENABLED=true)
 created: 2026-10-15 16:56
 ---
 2026-10-15 (human): revised plan approved in chat, including the review against TASK-153 (WorkplaceSystem in contracts/workplace/, configured-systems read in TASK-145.5.5, SLACK_TEAM_ID shape-checked with the transport off) and AC 9 kept in this layer despite the borderline file count.
+---
+
+created: 2026-10-15 17:30
+---
+2026-10-15 (human): prod SSM checked before deploy. sre-bot-config has SLACK_ENABLED=true and a real GOOGLE_WORKSPACE_CUSTOMER_ID (not my_customer); SLACK_TEAM_ID lives in sre-bot-config-infrastructure, which app/bin/entry.sh appends to the same .env, so both new boot checks are satisfied. The deploy prerequisite in the plan and notes covers both parameters.
 ---
 <!-- COMMENTS:END -->

@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: '2026-10-14 22:27'
-updated_date: '2026-10-15 17:06'
+updated_date: '2026-10-15 17:31'
 ---
 # Stack K handoff
 
@@ -22,8 +22,8 @@ updated_date: '2026-10-15 17:06'
 | 0 | Planning edits (tasks and docs) | `stack-k/plan` | #1594 | merged | Merged 2026-10-15 13:09 UTC; stack synced. |
 | 1 | TASK-152 IAM `/index/*` grants (audit trail, retry records, incidents) | `stack-k/task-152-iam-index-grants` | #1595 | merged | Merged and task Done. AC 2 still unchecked: the post-apply simulation output was never recorded (next action 4). |
 | 2 | TASK-145.5.1 incidents GSIs (ALL), timeline table, devcontainer script run locally | `stack-k/task-145.5.1-incidents-gsis` | #1597 | merged | Merged 2026-10-15 16:32 UTC (tf_apply ran). All 5 ACs checked. Post-apply evidence pending (next action 4); task not Done yet. |
-| 3 | TASK-145.5.2 ServiceScopeOpener for Slack and job registrars; dependency-injection.md | `stack-k/task-145.5.2-service-scope-opener` | #1598 | in review | Rebased as 42c6e34 after #1597 merged; submitted. All 6 ACs checked, gates green (4901 passed). |
-| 4 | TASK-153 vendor enablement ADRs (earlier commit), then TASK-145.5.3 vocabulary, record, references, core settings, platform tenant ids | `stack-k/task-145.5.3-incident-record` | #1599 | in progress | 03f00e9 (TASK-153 + plan) and f88a231 (TASK-153 Done) submitted. TASK-145.5.3 implemented 2026-10-15 (uncommitted): all 9 ACs checked, gates green (ruff clean, lint-imports 12 kept, mypy 0 in touched files, 4998 passed); In Progress. Deploy needs SLACK_TEAM_ID and the real GOOGLE_WORKSPACE_CUSTOMER_ID in sre-bot-config SSM first (next action 5). |
+| 3 | TASK-145.5.2 ServiceScopeOpener for Slack and job registrars; dependency-injection.md | `stack-k/task-145.5.2-service-scope-opener` | #1598 | in review | Rebased as 42c6e34 after #1597 merged; submitted. Task set Done by the human (5c1f6c7). All 6 ACs checked, gates green (4901 passed). |
+| 4 | TASK-153 vendor enablement ADRs (earlier commit), then TASK-145.5.3 vocabulary, record, references, core settings, platform tenant ids | `stack-k/task-145.5.3-incident-record` | #1599 | in review | Commits 03f00e9 (TASK-153 + plan), f88a231, 60568f8 (implementation: 9 ACs, gates green, 4998 passed), 5c1f6c7 (TASK-145.5.3 and TASK-145.5.2 set Done by the human). Prod SSM checked 2026-10-15: SLACK_ENABLED true, GOOGLE_WORKSPACE_CUSTOMER_ID real (sre-bot-config), SLACK_TEAM_ID set (sre-bot-config-infrastructure), each once. |
 | 5 | TASK-145.5.4 IncidentStore over RecordStore (reads), fake, index reads return full items | `stack-k/task-145.5.4-incident-store` | - | planned | Tolerant WorkplaceSystem read of stored values (synced by TASK-153). Tenant ids passed in at construction. |
 | 6 | TASK-145.5.5 configured-systems read; cutover; narrow Protocols and legacy_incidents deleted | - | - | planned | Standalone merge and deploy after layers 1 and 2 are applied. Builds the configured-systems read and checks the new-incident policy against it; size gate to re-check at planning. |
 | 7 | TASK-145.5.6 StatusUpdateStore onto RecordStore | - | - | planned | |
@@ -35,18 +35,18 @@ A planning-only refinement (ADR text, no code) is not its own layer: it is an ea
 
 ## Position
 
-- Checked out: `stack-k/task-145.5.3-incident-record` at f88a231, submitted as #1599 (base #1598's branch). #1595 and #1597 merged; #1598 and #1599 open, review required.
-- Uncommitted, layer 4: the TASK-145.5.3 implementation under app/ (contracts/workplace/, features/incident/common/, core/domain.py and api.py, Slack and Google settings, server/lifespan.py, pyproject.toml, README, tests), decisions/workplace-systems.md, TASK-145.5.3/145.5.4/145.5.5 task files, this doc.
+- Checked out: `stack-k/task-145.5.3-incident-record` at 5c1f6c7, pushed; #1599 (base #1598's branch). #1595 and #1597 merged; #1598 and #1599 open, review required.
+- Uncommitted, layer 4: this doc and a TASK-145.5.3 comment (prod SSM check).
 - Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-11*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`.
-- Local DynamoDB has the incidents GSIs and the timeline table. A local .env with Slack on or the Google key set needs SLACK_TEAM_ID and a real GOOGLE_WORKSPACE_CUSTOMER_ID, or the app no longer boots.
+- Local DynamoDB has the incidents GSIs and the timeline table. A local .env with Slack on or the Google key set needs SLACK_TEAM_ID and a real GOOGLE_WORKSPACE_CUSTOMER_ID.
 - No background agents.
 
 ## Next actions
 
-1. **human**: commit the TASK-145.5.3 implementation on layer 4, submit, request review of #1599 together with #1598, then create layer 5:
+1. **human**: commit the handoff doc and the TASK-145.5.3 comment on layer 4, submit, request review of #1598 and #1599, then create layer 5:
    ```
-   git add app decisions/workplace-systems.md backlog/tasks "backlog/docs/stacks/doc-13 - Stack-K-handoff.md"
-   git commit -m "TASK-145.5.3 incident record and tenant ids"
+   git add backlog/tasks "backlog/docs/stacks/doc-13 - Stack-K-handoff.md"
+   git commit -m "Stack K handoff after TASK-145.5.3"
    gh stack submit
    gh stack add stack-k/task-145.5.4-incident-store
    ```
@@ -57,7 +57,7 @@ A planning-only refinement (ADR text, no code) is not its own layer: it is an ea
    ```
    **agent**: record it in the TASK-152 notes and check AC 2 (expect allowed, then implicitDeny).
 4. **human**: confirm the #1597 tf_apply log shows the two GSI creations in sequence and `aws dynamodb describe-table --table-name incidents` shows both indexes ACTIVE; paste for the TASK-145.5.1 notes. **agent**: record the evidence; human: `backlog task edit 145.5.1 --status Done` (committed with the next layer).
-5. **human**: before #1599 merges, add SLACK_TEAM_ID (Slack auth.test team_id) and the real GOOGLE_WORKSPACE_CUSTOMER_ID (Admin console, Account settings > Profile) to the sre-bot-config SSM parameter in every account that runs the bot; ECS injects GCP_SRE_SERVICE_ACCOUNT_KEY_FILE, so Google counts as in use there.
+5. Done 2026-10-15 (prod): the combined grep of `sre-bot-config` and `sre-bot-config-infrastructure` shows SLACK_ENABLED="true", GOOGLE_WORKSPACE_CUSTOMER_ID a real id and SLACK_TEAM_ID set, each once. Repeat the check for any other account that runs the bot.
 
 ## Open decisions
 
