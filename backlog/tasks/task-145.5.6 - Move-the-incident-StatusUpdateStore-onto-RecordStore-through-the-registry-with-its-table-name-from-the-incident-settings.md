@@ -27,7 +27,7 @@ ordinal: 392000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Layer 7 of Stack K (handoff doc-13). Behaviour-preserving. After TASK-145.5.5 the status-update store is the last incident adapter on get_aws_client: core/adapters/status_updates.py:35,44,248, with the table name hard-coded as sre_bot_incident_status_updates. TASK-145's assumption that TASK-108 and TASK-109 would swap its inside for the records contract was never owned by a task (found 2026-10-14).
+Layer 8 of Stack K (handoff doc-13). Behaviour-preserving. After TASK-145.5.5 the status-update store is the last incident adapter on get_aws_client: core/adapters/status_updates.py:35,44,248, with the table name hard-coded as sre_bot_incident_status_updates. TASK-145's assumption that TASK-108 and TASK-109 would swap its inside for the records contract was never owned by a task (found 2026-10-14).
 
 THIS SLICE
 - The DynamoDB status-update store is rebuilt over RecordStore: a status_updates RecordTable (partition and sort keys as provisioned), the conditional put through put_if_not_exists, and replace_draft guarded on state DRAFT through the expected-guard update (TASK-27.2). Item layout and behaviour unchanged.

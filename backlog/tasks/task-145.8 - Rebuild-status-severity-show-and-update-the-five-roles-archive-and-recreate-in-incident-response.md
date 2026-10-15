@@ -33,7 +33,11 @@ RULES
 - Status change fans out from the record: atomic field update, then the report's status text, then the list projection (write-only), then the channel message when writable.
 - Severity is set at declare and changed from the update modal (none and SEV0 to SEV4, SEV0 new); it is a record field, never read from a document.
 - The five roles (incident commander, operations lead, communications lead, policy lead, postmortem owner) are stored on the record and shown in the show modal; the report's Drive properties are no longer written. The roles command offers all five; only IC and OL are required.
-- The show modal renders every link from the record's references through the owning adapter.
+- The show modal renders every link from the record's references through the owning adapter, with the stored url as a hint only.
+- The recreate path replaces a missing resource's reference map whole (never patched), guarded on the old channel_id scalar, so a concurrent change wins.
+- Writers set record_version = RECORD_VERSION, imported from core/store.py (TASK-145.5.4), on every item they write in the end-state shape (recreate, reopen); reopen sets open_bucket = OPEN_BUCKET and opened_at through the core/store.py formatter. How an update treats an item still without record_version (before the TASK-145.5.7 job has run) is decided at planning; it never stamps record_version on a partly upgraded item.
+- security_incident (bool) is editable by the coordinator from the update modal. Whether a flip triggers actions (true at declare invites the security group) is decided at planning.
+- Parity rebuild: close keeps today's behaviour (closes all resources and archives the channel). The status lifecycle and close redesign is a separate task, TASK-154.
 - Legacy registrations removed in the same PR; names, fields and replies unchanged apart from the three added role pickers, pinned by TASK-36.1.
 <!-- SECTION:DESCRIPTION:END -->
 
@@ -43,7 +47,10 @@ RULES
 - [ ] #2 Severity and the five roles are read from and written to the record; no code path writes Drive properties for roles
 - [ ] #3 Status change updates the record, the report text, the projection and the channel in that order, each failure logged and the rest continuing
 - [ ] #4 The pinned behaviour of status, show, update, roles and archive passes unchanged
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #5 Recreate replaces a reference map whole, guarded on the old channel_id scalar; show renders links through the owning adapter with the stored url as a hint
+- [ ] #6 security_incident is editable from the update modal; the flip-action decision is recorded in the plan
+- [ ] #7 Writes in the end-state shape set record_version = RECORD_VERSION from core/store.py; reopen sets open_bucket and opened_at and Closed removes them in one update; an item without record_version is never stamped by a partial update (tested)
+- [ ] #8 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -62,7 +69,7 @@ Outline plan grounded at main d2d973ae (2026-10-09) against the legacy module; r
 4. Legacy: the matching subcommands and registrations removed from incident_helper.py, incident_status.py, information_display.py, information_update.py, incident_roles.py in the same PR; pinned by TASK-36.1. modules/sre keeps routing only what remains.
 
 ## AC traceability
-AC1: step 2 -> service tests with an archived conversation (write skipped and reported). AC2: steps 1-2 -> store update_field test; roles tests assert no Drive metadata call. AC3: step 2 -> fan-out order test with failing report/projection/channel stubs. AC4: pinned surfaces. AC5: gates.
+AC1: step 2 -> service tests with an archived conversation (write skipped and reported). AC2: steps 1-2 -> store update_field test; roles tests assert no Drive metadata call. AC3: step 2 -> fan-out order test with failing report/projection/channel stubs. AC4: pinned surfaces. AC8: gates.
 
 ## Test matrix
 Status change: each fan-out step failing independently; archived channel. Severity set and shown. Roles: five set, IC/OL required, metadata adapter never called. Archive: not writable -> refusal; success. Recreate: each missing reference recreated once. List: active and stale.
