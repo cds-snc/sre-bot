@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-14 23:08'
-updated_date: '2026-10-15 13:02'
+updated_date: '2026-10-15 13:25'
 labels:
   - incident
   - terraform
@@ -44,7 +44,7 @@ THIS SLICE
 <!-- AC:BEGIN -->
 - [x] #1 terraform/dynamodb.tf declares the by_channel and sparse open GSIs on incidents with projection ALL and their own capacity, and the sre_bot_incident_timeline table keyed (incident_id, entry_key)
 - [x] #2 The timeline table is in the backup selection and in the task role's table ARNs
-- [ ] #3 tf_plan shows only these changes, and the apply sequence (one or two steps) is recorded in the notes
+- [x] #3 tf_plan shows only these changes, and the apply sequence (one or two steps) is recorded in the notes
 - [x] #4 .devcontainer/dynamodb-create.sh creates both GSIs and the timeline table on a fresh run and adds the GSIs to an existing local incidents table; it was run locally and describe-table shows both indexes ACTIVE
 - [x] #5 Every DynamoDB table is in the backup selection and the task role's table statement through one shared list of table ARNs, which adds sre_bot_access_requests and sre_bot_incident_status_updates to the backups
 <!-- AC:END -->
@@ -134,6 +134,11 @@ The plan warned 'hash_key is deprecated. Use key_schema instead' (19 occurrences
 Plan-neutrality checked against DynamoDB Local with provider 6.56.0 (scratch config, deleted after): a table with a hash-only and a hash+range GSI created with hash_key/range_key, then the config switched to key_schema: terraform plan 'No changes'; switched back: 'No changes'. So existing audit trail and retry records indexes are not recreated. terraform validate: Success, no warnings. tflint: 7 warnings (baseline), none in dynamodb.tf or iam.tf. terraform fmt -check: exit 0.
 AC 3 re-check pending on the new tf_plan: expected identical to the above, with no change on sre_bot_audit_trail or sre_bot_retry_records and no deprecation warning.
 Apply sequence: one apply (provider creates the two GSIs one UpdateTable call at a time and waits for each ACTIVE; re-run tf_apply if the second create fails).
+
+tf_plan re-check on PR #1597 (commit 6e67e67 after the stack sync, run 38740903494, comment 2026-10-15 13:14 UTC): Plan: 2 to add, 2 to change, 1 to destroy; same change set as the first plan: add sre_bot_incident_timeline; update incidents_table (+3 attributes, +2 GSIs by_channel and open, ALL, 1/2, now as key_schema blocks with hash_key shown as known after apply); update aws_iam_policy.sre-bot_secrets_manager (+1 table ARN); recreate aws_backup_selection.sre_bot_backup_selection. sre_bot_audit_trail and sre_bot_retry_records appear only as ARNs in the policy and backup lists; neither table resource changes, so the key_schema move is plan-neutral in production.
+No hash_key deprecation warning. The only warning is 'Argument is deprecated' in module sre_bot_bucket (server_side_encryption_configuration) 'and 2 more similar warnings'. Terraform groups warnings by summary, so the module's other two deprecated arguments were checked against the provider 6.56.0 schema: the module sets exactly three deprecated aws_s3_bucket arguments (acl default 'private', versioning, server_side_encryption_configuration), which accounts for all three. Pre-existing upstream module (cds-snc/terraform-modules S3 v11.3.3), out of scope.
+The stack sync pushed #1595 and #1597 at the same time; #1595's tf_plan (run 38740902073, attempt 1) lost the shared production state lock to the run above and failed, and its re-run passed. Not a config failure.
+AC 3 met: plan shows only this layer's changes; apply sequence is one apply (recorded above).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
