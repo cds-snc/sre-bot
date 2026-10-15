@@ -5,7 +5,8 @@ Subdomains of the incident feature import this module and nothing else from
 provider functions that resolve the default implementations, and
 ``find_incident_for_conversation``, the command check every incident command
 applies first. ``StatusUpdateStore`` keeps each public status update as its own
-record under the incident id.
+record under the incident id. ``IncidentStore`` reads the incident record; no
+provider builds it until TASK-145.5.5.
 """
 
 from collections.abc import Sequence
@@ -39,6 +40,7 @@ from features.incident.core.domain import (
     TranscriptMessage,
     VideoCallReference,
 )
+from features.incident.core.store import IncidentStore
 
 __all__ = [
     "ConversationReference",
@@ -47,6 +49,7 @@ __all__ = [
     "IncidentLookup",
     "IncidentSecurityFlag",
     "IncidentSecurityReader",
+    "IncidentStore",
     "IncidentTranscriptReader",
     "MessageReference",
     "PostmortemMeetingReference",

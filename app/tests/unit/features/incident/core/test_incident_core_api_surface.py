@@ -45,6 +45,7 @@ def test_api_exports_exactly_the_public_names() -> None:
         "IncidentLookup",
         "IncidentSecurityFlag",
         "IncidentSecurityReader",
+        "IncidentStore",
         "IncidentTranscriptReader",
         "MessageReference",
         "PostmortemMeetingReference",
@@ -209,6 +210,29 @@ def test_status_update_store_provider_returns_one_cached_store_built_by_the_dyna
     assert store is built
     assert api.get_status_update_store() is built
     builder.assert_called_once_with()
+
+
+def test_incident_store_signatures_carry_only_domain_types_and_operation_results() -> None:
+    """No table, item or SDK shape crosses the store interface, and it has no write operation in this slice."""
+    store = api.IncidentStore
+
+    def params(method: object) -> dict[str, object]:
+        return {name: p.annotation for name, p in inspect.signature(method).parameters.items() if name != "self"}  # type: ignore[arg-type]
+
+    assert params(store.get) == {"incident_id": str}
+    assert params(store.find_by_conversation) == {"conversation": api.ConversationReference}
+    assert params(store.list_open) == {}
+    assert params(store.read_security_flag) == {"incident_id": str}
+    assert inspect.signature(store.get).return_annotation == OperationResult[api.Incident]
+    assert inspect.signature(store.find_by_conversation).return_annotation == OperationResult[api.Incident]
+    assert inspect.signature(store.list_open).return_annotation == OperationResult[Sequence[api.Incident]]
+    assert inspect.signature(store.read_security_flag).return_annotation == OperationResult[bool]
+    assert sorted(name for name in vars(store) if not name.startswith("_")) == [
+        "find_by_conversation",
+        "get",
+        "list_open",
+        "read_security_flag",
+    ]
 
 
 def test_core_is_not_a_plugin() -> None:

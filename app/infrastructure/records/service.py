@@ -388,7 +388,8 @@ class DynamoDBRecordStore(RecordStore):
         """Query items matching a key condition.
 
         Follows DynamoDB's continuation keys until every match is read or
-        ``spec.limit`` items are collected.
+        ``spec.limit`` items are collected. An index query returns full items,
+        like a table query: the contract's indexes project every attribute.
 
         Args:
             table: Table declaration; ``spec.index`` resolves through its indexes.

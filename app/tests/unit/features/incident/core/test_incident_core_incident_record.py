@@ -2,8 +2,8 @@
 
 Plain value tests: no store or stub is involved. They pin the record's
 invariants: a named, titled incident; enum members (never plain strings) for
-status and severity; timezone-aware times; immutability; and None defaults for
-everything a legacy item may lack.
+status and severity; a required security bool; timezone-aware times;
+immutability; and None defaults for everything not recorded at declaration.
 """
 
 import dataclasses
@@ -13,7 +13,7 @@ import pytest
 
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.vocabulary import IncidentStatus, Severity
-from features.incident.core.api import ConversationReference, Incident, IncidentSecurityFlag
+from features.incident.core.api import ConversationReference, Incident
 
 pytestmark = pytest.mark.unit
 
@@ -25,8 +25,9 @@ def _incident(**overrides: object) -> Incident:
         "id": "7f0c3a52-3d0e-4d55-9a4e-6f1f2b9c0a11",
         "title": "Notify emails delayed",
         "status": IncidentStatus.OPEN,
-        "declarer": "U0DECLARER",
+        "declared_by": "U0DECLARER",
         "declared_at": AT,
+        "security_incident": False,
     }
     fields.update(overrides)
     return Incident(**fields)  # type: ignore[arg-type]
@@ -38,7 +39,7 @@ def test_a_new_incident_holds_only_what_was_declared() -> None:
 
     assert incident.product is None
     assert incident.severity is None
-    assert incident.security_flag is IncidentSecurityFlag.UNKNOWN
+    assert incident.security_incident is False
     assert (incident.detected_at, incident.impact_started_at, incident.impact_ended_at) == (None, None, None)
     assert (
         incident.incident_commander,
@@ -64,7 +65,7 @@ def test_a_full_incident_keeps_every_field() -> None:
     incident = _incident(
         product="GC Notify",
         severity=Severity.SEV1,
-        security_flag=IncidentSecurityFlag.NO,
+        security_incident=True,
         detected_at=AT,
         impact_started_at=datetime(2026, 10, 15, 9, 0, tzinfo=eastern),
         impact_ended_at=AT,
@@ -73,6 +74,7 @@ def test_a_full_incident_keeps_every_field() -> None:
     )
 
     assert incident.severity is Severity.SEV1
+    assert incident.security_incident is True
     assert incident.incident_commander == "U0IC"
     assert incident.conversation is conversation
 
@@ -109,3 +111,18 @@ def test_a_severity_must_be_a_severity_member_or_unset() -> None:
     """A bare number is never accepted where a severity is chosen."""
     with pytest.raises(ValueError, match="severity"):
         _incident(severity=1)
+
+
+@pytest.mark.parametrize("value", [None, "yes", 1])
+def test_the_security_flag_must_be_a_bool(value: object) -> None:
+    """There is no third state: the record answers yes or no, and a stored value is mapped by the store."""
+    with pytest.raises(ValueError, match="security_incident"):
+        _incident(security_incident=value)
+
+
+def test_the_security_flag_is_required() -> None:
+    """A record never defaults the security answer; whoever builds it states it."""
+    fields = {"id": "x", "title": "t", "status": IncidentStatus.OPEN, "declared_by": "U0", "declared_at": AT}
+
+    with pytest.raises(TypeError, match="security_incident"):
+        Incident(**fields)  # type: ignore[arg-type]

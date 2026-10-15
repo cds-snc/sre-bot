@@ -1,7 +1,9 @@
-"""In-memory ``StatusUpdateStore`` with the DynamoDB adapter's observable rules.
+"""In-memory incident core stores with the real stores' observable rules.
 
-For tests and local runs: appends only where nothing is stored, an identical
-replay is success, state changes only from the expected state, newest first.
+For tests and local runs. ``InMemoryStatusUpdateStore``: appends only where
+nothing is stored, an identical replay is success, state changes only from the
+expected state, newest first. ``InMemoryIncidentStore``: the incident reads
+with the same classifications as ``RecordIncidentStore``.
 """
 
 from collections.abc import Sequence
@@ -9,7 +11,8 @@ from collections.abc import Sequence
 from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
-from features.incident.core.domain import StatusUpdate, StatusUpdateState
+from features.incident.core.domain import ConversationReference, Incident, StatusUpdate, StatusUpdateState
+from features.incident.core.store import IncidentStore, ambiguous_conversation, no_such_incident, not_an_incident
 
 
 class InMemoryStatusUpdateStore:
@@ -62,3 +65,53 @@ def _conflict[T]() -> OperationResult[T]:
         message="The status update was changed or taken by another writer.",
         error_code=ErrorCode.STATUS_UPDATE_CONFLICT,
     )
+
+
+class InMemoryIncidentStore(IncidentStore):
+    """Hold seeded incidents in a dict keyed by id; every seeded incident is readable.
+
+    Open incidents are listed by ``declared_at``, a stand-in for the
+    ``opened_at`` time the real store orders by and this fake does not hold.
+    """
+
+    def __init__(self) -> None:
+        self._incidents: dict[str, Incident] = {}
+        self._open: set[str] = set()
+
+    def seed(self, incident: Incident, *, open: bool | None = None) -> None:
+        """Store ``incident``; ``open`` puts it in the open list and defaults to whether its status is open."""
+        self._incidents[incident.id] = incident
+        if incident.status.is_open if open is None else open:
+            self._open.add(incident.id)
+        else:
+            self._open.discard(incident.id)
+
+    def get(self, incident_id: str) -> OperationResult[Incident]:
+        """Return the seeded incident with this id."""
+        incident = self._incidents.get(incident_id)
+        return OperationResult.success(data=incident) if incident is not None else no_such_incident()
+
+    def find_by_conversation(self, conversation: ConversationReference) -> OperationResult[Incident]:
+        """Return the one seeded incident with the same conversation system, tenant and id."""
+        matches = [
+            incident
+            for incident in self._incidents.values()
+            if incident.conversation is not None
+            and (incident.conversation.system, incident.conversation.tenant, incident.conversation.vendor_id)
+            == (conversation.system, conversation.tenant, conversation.vendor_id)
+        ]
+        if not conversation.vendor_id.strip() or not matches:
+            return not_an_incident()
+        if len(matches) > 1:
+            return ambiguous_conversation(conversation, match_count=len(matches))
+        return OperationResult.success(data=matches[0])
+
+    def list_open(self) -> OperationResult[Sequence[Incident]]:
+        """Return the incidents seeded open, oldest declaration first."""
+        incidents = (self._incidents[incident_id] for incident_id in self._open)
+        return OperationResult.success(data=sorted(incidents, key=lambda incident: incident.declared_at))
+
+    def read_security_flag(self, incident_id: str) -> OperationResult[bool]:
+        """Return the seeded incident's security flag."""
+        incident = self._incidents.get(incident_id)
+        return OperationResult.success(data=incident.security_incident) if incident is not None else no_such_incident()
