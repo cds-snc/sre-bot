@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-14 23:09'
+updated_date: '2026-10-15 16:15'
 labels:
   - incident
   - features
@@ -31,7 +32,7 @@ Layer 5 of Stack K (handoff doc-13). The store exists but production does not us
 THIS SLICE
 - core/store.py: the IncidentStore Protocol (one Protocol for the record, exported from core/api.py) and its implementation over RecordStore. incidents_table(name) declares partition key id with the by_channel and open indexes; timeline_table(name) declares (incident_id, entry_key). Table names come from the incident core settings (TASK-145.5.3).
 - Read operations: get, find_by_conversation (RecordQuery on by_channel; zero results is not an incident, one is the incident, several is ambiguous; index reads may be eventually consistent and are not unique; no bounded-list fallback), list_open (RecordQuery on open, partition OPEN, ordered by opened_at), read_security_flag.
-- Mapping legacy items: Unknown or blank times become None and epoch strings become aware UTC; sev-1..sev-4 become SEV1..SEV4, none and blank become None, other values None and logged with the incident id and field; teams[0] is the product; bare ids become references with the platform tenant ids (TASK-145.5.3).
+- Mapping legacy items: Unknown or blank times become None and epoch strings become aware UTC; sev-1..sev-4 become SEV1..SEV4, none and blank become None, other values None and logged with the incident id and field; teams[0] is the product; bare ids become references with the tenant ids from the configured entries and platform settings (TASK-145.5.3). A stored WorkplaceSystem value is read tolerantly: an unknown value is kept and logged with the incident id and field, never a crash (decisions/cloud-portability.md).
 - Key formats (human, 2026-10-14): opened_at and timeline posted_at are fixed-width ISO-8601 UTC strings (isoformat(timespec=microseconds), +00:00), matching the repo's other stores; entry_key is '<posted_at>#<entry_id>', where entry_id is a uuid5 over system, tenant, conversation and message id for captured messages (a re-capture produces the same key) and a uuid4 for manual entries. The vendor message id stays in the entry's source_message reference.
 - core/adapters/in_memory.py: an in-memory IncidentStore fake for consumer tests (structural, like InMemoryStatusUpdateStore; feature Protocols need no explicit subclass).
 - Records contract: the RecordStore docstring states that an index query returns full items, like a table query, and the conformance suite gains a case asserting a non-key attribute from an index query on both stores.

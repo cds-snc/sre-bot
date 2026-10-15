@@ -1,6 +1,6 @@
 ---
 status: Accepted
-date: 2026-10-09
+date: 2026-10-15
 applies: target
 scope: What the SRE bot owns and what it coordinates for incident management, where the incident record of truth lives, the vocabulary and the subdomains of the incident feature umbrella, and the optional seam for an external case-management platform.
 ---
@@ -70,7 +70,7 @@ The bot's first post in an incident conversation becomes the incident's primary 
 
 ### System selection and the optional external platform
 
-For a **new** incident, the system that creates its report and video call is an incident-feature policy setting in `common/settings.py` naming one configured workplace tenant, defaulting to the only one. An existing incident's resources are reached through the system in each stored reference. **`ExternalCaseRecorder`** in `core/api.py` (open, update, add an entry, close a case) has one feature-owned adapter per system in `core/adapters/` over an `integrations/<system>/` client, never an `app/infrastructure/` package; configuration lists zero or more case-system instances; with none configured the provider returns a no-op recorder and nothing else changes, which is the shipped state. Inbound case events arrive later through the webhooks capability as re-read hints (DRAFT-3 to DRAFT-5).
+For a **new** incident, the system that creates its report and video call is an incident-feature policy setting in `common/settings.py` naming a workplace system, unset by default. It is resolved against the configured-systems read API when the store is built ([workplace-systems.md](workplace-systems.md) rule 3): a set policy resolves to that system's single configured tenant; an unset policy resolves to the only configured system. The incident feature is skipped, with an event naming the key, when the named system is not configured, when no system is configured, or when the policy is unset and several systems are configured. A (system, tenant) pair waits for an instance with several tenants of one system. An existing incident's resources are reached through the system in each stored reference. **`ExternalCaseRecorder`** in `core/api.py` (open, update, add an entry, close a case) has one feature-owned adapter per system in `core/adapters/` over an `integrations/<system>/` client, never an `app/infrastructure/` package; configuration lists zero or more case-system instances; with none configured the provider returns a no-op recorder and nothing else changes, which is the shipped state. Inbound case events arrive later through the webhooks capability as re-read hints (DRAFT-3 to DRAFT-5).
 
 ### Expansions, all optional
 
@@ -128,3 +128,4 @@ Tolerated until then, each closing in a TASK-145 slice:
 - 2026-10-09: severity widened to levels 0 to 4 because teams use different scales; revisited if the organisation standardises (TASK-145.5).
 - 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).
 - 2026-10-13: the postmortem is a record the app owns: facts and action items (with GitHub Issues as the first tracker and reminders as a scheduled job) move from the expansions into `postmortem/`; the report document narrows to the narrative; built dark behind one flag; `IncidentStore` has no interim vendor adapter (TASK-147, TASK-145.5).
+- 2026-10-15: the new-incident policy names a system, unset by default and then resolving to the only configured system; the feature is skipped when the resolution fails (TASK-153).

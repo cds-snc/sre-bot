@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: '2026-10-14 22:27'
-updated_date: '2026-10-15 14:03'
+updated_date: '2026-10-15 16:32'
 ---
 # Stack K handoff
 
@@ -20,47 +20,52 @@ updated_date: '2026-10-15 14:03'
 | # | Task | Branch | PR | State | Notes |
 | --- | --- | --- | --- | --- | --- |
 | 0 | Planning edits (tasks and docs) | `stack-k/plan` | #1594 | merged | Merged 2026-10-15 13:09 UTC; stack synced. |
-| 1 | TASK-152 IAM `/index/*` grants (audit trail, retry records, incidents) | `stack-k/task-152-iam-index-grants` | #1595 | in review | ACs 1 and 3 checked; tf_plan re-run 2026-10-15 passed (policy update only). AC 2 waits on the post-apply simulation. |
-| 2 | TASK-145.5.1 incidents GSIs (ALL), timeline table, devcontainer script run locally | `stack-k/task-145.5.1-incidents-gsis` | #1597 | in review | All 5 ACs checked. tf_plan on 6e67e67 (key_schema GSIs) matches the first plan, no hash_key warning, audit trail and retry records untouched. One apply; post-apply check in next action 6. |
-| 3 | TASK-145.5.2 ServiceScopeOpener for Slack and job registrars; dependency-injection.md | `stack-k/task-145.5.2-service-scope-opener` | #1598 | ready | Plan commit d8a8cbe submitted. Implemented 2026-10-15, all 6 ACs checked, gates green (4901 passed). mypy type-abstract off repo-wide (no hidden errors); contract (l). |
-| 4 | TASK-145.5.3 vocabulary, record, references, core settings, platform tenant ids | - | - | planned | Plan settles how the Google customer id is validated (no Google enabled flag today). |
-| 5 | TASK-145.5.4 IncidentStore over RecordStore (reads), fake, index reads return full items | - | - | planned | |
-| 6 | TASK-145.5.5 cutover; narrow Protocols and legacy_incidents deleted | - | - | planned | Standalone merge and deploy after layers 1 and 2 are applied. |
+| 1 | TASK-152 IAM `/index/*` grants (audit trail, retry records, incidents) | `stack-k/task-152-iam-index-grants` | #1595 | merged | Merged and task Done. AC 2 still unchecked: the post-apply simulation output was never recorded (next action 4). |
+| 2 | TASK-145.5.1 incidents GSIs (ALL), timeline table, devcontainer script run locally | `stack-k/task-145.5.1-incidents-gsis` | #1597 | in review | All 5 ACs checked. tf_plan on 6e67e67 (key_schema GSIs) matches the first plan. One apply; post-apply check in next action 5. |
+| 3 | TASK-145.5.2 ServiceScopeOpener for Slack and job registrars; dependency-injection.md | `stack-k/task-145.5.2-service-scope-opener` | #1598 | in review | Committed 2f0a3cf and submitted. All 6 ACs checked, gates green (4901 passed). |
+| 4 | TASK-153 vendor enablement ADRs (earlier commit), then TASK-145.5.3 vocabulary, record, references, core settings, platform tenant ids | `stack-k/task-145.5.3-incident-record` | - | planned | TASK-153 implemented 2026-10-15: 7 ADRs amended, TASK-24/112/145.5.4/145.5.5 descriptions synced, all 6 ACs checked, gates green (ruff clean, 4901 passed); In Progress. Follow-up the same day: a transport switched on without its vendor entry fails boot; an absent vendor is never a failure; the new-incident policy is unset by default and resolves to the only configured system. TASK-145.5.3 plan revised with the human's decisions (opaque tenant ids, my_customer rejected, closed WorkplaceSystem, policy unset by default, Severity unset is None, named roles, api exports); awaiting explicit approval. Deploy needs SLACK_TEAM_ID and the real GOOGLE_WORKSPACE_CUSTOMER_ID in sre-bot-config SSM first. |
+| 5 | TASK-145.5.4 IncidentStore over RecordStore (reads), fake, index reads return full items | - | - | planned | Tolerant WorkplaceSystem read of stored values (synced by TASK-153). |
+| 6 | TASK-145.5.5 cutover; narrow Protocols and legacy_incidents deleted | - | - | planned | Standalone merge and deploy after layers 1 and 2 are applied. Checks the new-incident policy against the configured systems. |
 | 7 | TASK-145.5.6 StatusUpdateStore onto RecordStore | - | - | planned | |
 | 8 | TASK-27.5 bounded full-table read | - | - | planned | Pulled forward; first consumer is layer 9. |
 | 9 | TASK-145.5.7 open-index reconcile, off by default | - | - | planned | Runner tentative (in-app leased job); options and references in the task, re-assessed at planning. |
 | 10 | TASK-145.6 core resource interfaces | - | - | planned | 2026-10-09 plan stale; re-plan after layer 6 is implemented. |
 
+A planning-only refinement (ADR text, no code) is not its own layer: it is an earlier commit on the layer it refines (human, 2026-10-15).
+
 ## Position
 
-- Checked out: `stack-k/task-145.5.2-service-scope-opener` (d8a8cbe plan commit, PR #1598, top of stack #1596). #1595 (base `main`), #1597 and #1598 open.
-- Uncommitted, layer 3: the TASK-145.5.2 implementation (app/contracts/services/, contracts slack and scheduler registrars, integrations/slack/provider.py, jobs/scheduled_tasks.py, server/services.py, server/lifespan.py, server/plugins/slack_registrar.py, pyproject.toml, decisions/dependency-injection.md, decisions/plugin-architecture.md, tests), the task file and this doc.
+- Checked out: `stack-k/task-145.5.3-incident-record` (at 2f0a3cf, no commit of its own yet). #1595 merged; #1597 (base `main`) and #1598 open, review required.
+- Uncommitted, layer 4: decisions/ (7 ADRs, TASK-153), the new TASK-153 task file, TASK-24 and TASK-112 descriptions (TASK-153 sync), TASK-145.5 coordinator plan, TASK-145.5.3 (plan, ACs, description, dependency on TASK-153), TASK-145.5.4 and TASK-145.5.5 descriptions, this doc. TASK-145.5.6, TASK-145.5.7 and TASK-27.5 differ only by updated_date and are restored before the commit.
 - Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-11*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`.
 - Local DynamoDB has the incidents GSIs and the timeline table.
 - No background agents.
 
 ## Next actions
 
-1. **human**: commit layer 3 and push:
+1. **human**: commit TASK-153 and the revised TASK-145.5.3 plan as one commit on layer 4, and push (the layer 4 PR carries the implementation next; review is requested then):
    ```
-   git add app decisions/dependency-injection.md decisions/plugin-architecture.md "backlog/tasks/task-145.5.2 - Per-invocation-service-scopes-for-non-HTTP-entry-points-a-ServiceScopeOpener-on-the-Slack-and-background-job-registrars.md" "backlog/docs/stacks/doc-13 - Stack-K-handoff.md"
-   git commit -m "TASK-145.5.2 service scope opener"
+   git restore -- 'backlog/tasks/task-145.5.6 - *' 'backlog/tasks/task-145.5.7 - *' 'backlog/tasks/task-27.5 - *'
+   git add decisions backlog/tasks "backlog/docs/stacks/doc-13 - Stack-K-handoff.md"
+   git commit -m "TASK-153 vendor enablement; TASK-145.5.3 plan"
    gh stack submit
    ```
-2. **human**: request review of #1595, #1597 and #1598. Merge layer 1 (#1595, standalone Terraform; tf_apply against production) once approved. Then `gh stack sync`, `gh stack submit`, and run the simulation from TASK-152 plan step 4, pasting the output:
+2. **human**: approve the revised TASK-145.5.3 plan in chat. **agent**: record the approval as a task comment, set TASK-145.5.3 In Progress, then implement it with TDD (failing tests first) and run the gates.
+3. **human**: commit the TASK-145.5.3 implementation on the same branch and `gh stack submit`; request review of layer 4 together with #1597 and #1598.
+4. **human**: run the TASK-152 post-apply simulation and paste the output:
    ```
    aws iam simulate-principal-policy --policy-source-arn <sre-bot-ecs-role ARN> --action-names dynamodb:Query --resource-arns <audit trail table ARN>/index/correlation_id-index <webhooks table ARN>/index/x
    ```
-3. **agent**: record the simulation output in the TASK-152 notes and check AC 2 (expect allowed, then implicitDeny). Human: `backlog task edit 152 --status Done` (committed with the next layer).
-4. **human**: once #1597 is re-approved after the rebase, merge layer 2 (standalone Terraform; tf_apply against production; layer 3 is already submitted above it). Confirm the tf_apply log shows the two GSI creations in sequence and `aws dynamodb describe-table --table-name incidents` shows both indexes ACTIVE; paste for the TASK-145.5.1 notes.
-5. **agent**: record the apply evidence in the TASK-145.5.1 notes. Human: `backlog task edit 145.5.1 --status Done` (committed with the next layer).
-6. **human**: create layer 4: `gh stack add stack-k/task-145.5.3-incident-record`.
-7. **agent**: plan layer 4 with `/plan-task TASK-145.5.3`; the human approves it in chat, the plan commit opens layer 4's PR (`gh stack submit`).
+   **agent**: record it in the TASK-152 notes and check AC 2 (expect allowed, then implicitDeny).
+5. **human**: once #1597 is approved, merge it (standalone Terraform; tf_apply against production; layers above are submitted). Then `gh stack sync`, `gh stack submit`. Confirm the tf_apply log shows the two GSI creations in sequence and `aws dynamodb describe-table --table-name incidents` shows both indexes ACTIVE; paste for the TASK-145.5.1 notes. **agent**: record the evidence; human: `backlog task edit 145.5.1 --status Done` (committed with the next layer).
+6. **human**: before layer 4 deploys, add SLACK_TEAM_ID (Slack auth.test team_id) and the real GOOGLE_WORKSPACE_CUSTOMER_ID (Admin console, Account settings > Profile) to sre-bot-config SSM for every environment.
 
 ## Open decisions
 
-- None. (`aws_access_requests` is unused today but kept for the access feature enhancements; revisit when that work starts.)
+- Persisted-enum rule lives only in cloud-portability.md (contract 4); workplace-systems.md rule 4 points to it. Move it if preferred.
+- None else. (`aws_access_requests` is unused today but kept for the access feature enhancements; revisit when that work starts.)
 
 ## Planning queue
 
-- TASK-145.5.3 to TASK-145.5.7, TASK-27.5, TASK-145.6: each planned in turn after the layer below is implemented.
+- TASK-145.5.3: revised plan waiting on approval.
+- TASK-145.5.4 to TASK-145.5.7, TASK-27.5, TASK-145.6: each planned in turn after the layer below is implemented.

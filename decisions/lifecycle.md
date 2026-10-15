@@ -1,6 +1,6 @@
 ---
 status: Accepted
-date: 2026-07-06
+date: 2026-10-15
 applies: target
 scope: Application startup phases, readiness, and shutdown.
 ---
@@ -26,7 +26,7 @@ Phases are logged with a `phase` field, but there is no single ordered sequence,
 
 One ASGI lifespan with ordered phases, each logged with its name:
 
-1. **Configuration.** Load the base configuration file and the one for `ENVIRONMENT`, plus secrets, and validate every settings slice ([configuration.md](configuration.md)). Invalid or missing configuration fails boot here.
+1. **Configuration.** Load the base configuration file and the one for `ENVIRONMENT`, plus secrets, and validate every settings slice ([configuration.md](configuration.md)), vendor slices with the host slices: a present tenant entry with a missing secret or a bad shape fails boot here, and so does a transport switched on without its vendor's tenant entry, with no network call. An absent entry with its transport off is a vendor left unconfigured, never a failure. Invalid or missing configuration fails boot here.
 2. **Core services.** Register a factory per `contracts` Protocol in the svcs registry, then resolve each once from a startup container ([dependency-injection.md](dependency-injection.md)). Construction and static validation only, never a network call.
 3. **Plugin loading.** Read the entry points declared in `pyproject.toml` ([plugins.md](plugins.md)). Skip, before registration, every plugin that the environment's configuration file disables. Register the rest, then run the credential checks the enabled plugins declare (below). What a plugin's boot failure does depends on its layer and the kind of failure ([plugins.md](plugins.md)).
 4. **Extension points.** For each capability, in its declared order, call its hookspecs once to collect strategy objects (an `ApprovalPolicy`, an alert-action handler), then initialize the capability with them. A capability never initializes with an extension point still unfilled.
@@ -79,10 +79,12 @@ Tolerated until closed:
 - a feature whose settings fail validation aborts boot instead of being skipped;
 - in-process event subscriptions registered in `startup_warmup` by `access/request` and `access/sync`;
 - scheduled tasks gated on `ENVIRONMENT == "production"` and started from `jobs/scheduled_tasks.py`, with leases from the coordination contract;
-- legacy `modules/` handlers registered by hand after feature registration.
+- legacy `modules/` handlers registered by hand after feature registration;
+- `SLACK_ENABLED` as the interim Slack transport switch (phase 6) until the configuration files exist (TASK-112).
 
 **Changes:**
 - 2026-09-24: phases aligned with plugin-architecture (config-file enablement, registry validation, extension-point collection, multi-replica); `applies` corrected to `target`.
 - 2026-09-25: only deploy-coupled defects abort boot; a feature with invalid settings is skipped; boot credential checks alert but never abort; readiness is lifespan completion.
 - 2026-10-06: TASK-110 loads plugins from entry points; the filesystem-walk tolerance is closed.
 - 2026-10-14: phase 2 runs in the lifespan for the records and coordination contracts, before plugin loading (TASK-109).
+- 2026-10-15: the configuration phase validates vendor slices with the host slices; the transport has an enablement key in the configuration files, `SLACK_ENABLED` being its interim form (TASK-153).

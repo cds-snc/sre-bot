@@ -1,6 +1,6 @@
 ---
 status: Accepted
-date: 2026-07-21
+date: 2026-10-15
 applies: target
 scope: The Slack transport — delivery mode, verification, handler mechanics, errors, parsing/help.
 ---
@@ -26,7 +26,7 @@ Current state: sync Bolt (`App` + `SocketModeHandler` + threads) in `integration
 
 Same builder, same classifier, different credential. The rule: *opens a connection and receives* → runtime, lifespan-managed; *only makes outbound calls* → a cached `AsyncWebClient` from `integrations/slack/`, starts nothing.
 
-**Delivery mode.** Socket Mode by default (no inbound exposure; right for current deployments). HTTP Events mode is selectable with `SLACK__SOCKET_MODE=false`. Settings fail fast at boot if the selected mode's credentials are missing.
+**Delivery mode.** Socket Mode by default (no inbound exposure; right for current deployments). HTTP Events mode is selectable with `SLACK__SOCKET_MODE=false`. Settings fail fast at boot if the selected mode's credentials are missing. Running the transport is an enablement key in the configuration files ([plugins.md](plugins.md)), and switching it on requires the Slack tenant entry (boot fails naming the key otherwise); switched off, no Slack entry is needed. Until then `SLACK_ENABLED` is the interim switch and `SLACK_TEAM_ID` is required when it is on ([configuration.md](configuration.md)).
 
 **Verification.** In HTTP mode every request is verified before its body is used: `v0=` HMAC-SHA256 with the signing secret, constant-time compare, and `X-Slack-Request-Timestamp` rejected beyond 5 minutes. In Socket Mode the connection handshake carries this; the signing secret is still configured and validated so mode switches are safe. Verification lives in the runtime, never in handlers.
 

@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-14 23:09'
+updated_date: '2026-10-15 16:32'
 labels:
   - incident
   - features
@@ -31,7 +32,7 @@ ordinal: 391000
 Layer 6 of Stack K (handoff doc-13). The behaviour change of TASK-145.5: incident lookups move from a full-table scan to the by_channel index. Standalone merge and deploy, only after TASK-152 and TASK-145.5.1 are applied.
 
 THIS SLICE
-- core/api.py: a provider that builds the IncidentStore from a resolved RecordStore and the incident core settings; find_incident_for_conversation takes the store. get_incident_lookup, get_incident_security_reader (lru_cache providers, which dependency-injection.md:37 forbids across layers) and the IncidentLookup and IncidentSecurityReader Protocols are deleted (human, 2026-10-14: one Protocol per core resource, as TASK-145.6 does for the report).
+- core/api.py: a provider that builds the IncidentStore from a resolved RecordStore and the incident core settings; the new-incident policy (a system, unset by default) is resolved against the configured systems where the store is built: a set policy resolves to that system's single configured tenant, an unset one to the only configured system; the incident feature is skipped with an event naming the key when the named system is unconfigured, when none is configured, or when the policy is unset and several are (decisions/incident-management.md); find_incident_for_conversation takes the store. get_incident_lookup, get_incident_security_reader (lru_cache providers, which dependency-injection.md:37 forbids across layers) and the IncidentLookup and IncidentSecurityReader Protocols are deleted (human, 2026-10-14: one Protocol per core resource, as TASK-145.6 does for the report).
 - comms/service.py: the lookup and security-reader fallbacks that resolve a service mid-method (service.py:106,178,257,361,498) go; the service takes IncidentStore as a required parameter.
 - comms entry points: each handler opens a scope through the ServiceScopeOpener (TASK-145.5.2), resolves RecordStore, builds the IncidentStore and passes it to the service. No get_record_store import and no import-linter ignore entry (contract (k)).
 - Comms tests move from their local lookup fakes to the in-memory IncidentStore fake (TASK-145.5.4).

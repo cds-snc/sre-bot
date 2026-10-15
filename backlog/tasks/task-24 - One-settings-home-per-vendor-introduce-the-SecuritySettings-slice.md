@@ -4,7 +4,7 @@ title: One settings home per vendor; introduce the SecuritySettings slice
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-09-25 15:54'
+updated_date: '2026-10-15 16:15'
 labels:
   - clients
   - phase-3
@@ -25,7 +25,7 @@ ordinal: 24000
 Aligns with decisions/configuration.md (Ownership). Today each vendor has two settings homes - integrations/<vendor>/settings.py (new) and infrastructure/configuration/integrations/<vendor>.py (old) - and app/infrastructure/security/settings.py exists but is wired to nothing; security config is borrowed from ServerSettings.
 
 Steps:
-1. Per vendor: keep app/integrations/<vendor>/settings.py as the single home (credentials live with the client); migrate any fields only present in the old file; delete infrastructure/configuration/integrations/<vendor>.py; update consumers.
+1. Per vendor: keep app/integrations/<vendor>/settings.py as the single home (credentials live with the client); migrate any fields only present in the old file; delete infrastructure/configuration/integrations/<vendor>.py; update consumers. Slack gets one slice: SLACK_ENABLED is defined once (it is the interim transport switch until TASK-112; SLACK_TEAM_ID is required when it is on) and the vendor-workspace meaning moves to the tenant entry. Google's customer id keeps no default: GOOGLE_WORKSPACE_CUSTOMER_ID no longer defaults to the my_customer alias, and a present tenant entry carries the real id (decisions/configuration.md, workplace-systems.md rule 3). No new <VENDOR>_ENABLED key.
 2. Wire app/infrastructure/security/settings.py as the real SecuritySettings slice (allowed issuers/JWKS, CORS allow-list, rate-limit storage backend, dev-bypass flag) and move those fields off ServerSettings - or delete the file if tasks 2/4 already created the slice elsewhere; one home either way.
 3. Namespaced env names (SLACK__..., AWS__...) via env_nested_delimiter; one env var has exactly one owning class.
 4. Fail fast: settings validate in lifespan's configuration phase (decisions/configuration.md, lifecycle.md phase 1), statically: presence and shape only, never a call to test a credential. A missing credential fails validation naming the variable; decisions/plugins.md decides the effect (a feature's slice skips that feature, a host or capability slice aborts boot).
