@@ -1,10 +1,10 @@
 ---
 id: TASK-103
 title: Make RecordStore.put_if_not_exists replay-safe against its own SDK retry
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-09-17 20:40'
-updated_date: '2026-10-15 20:14'
+updated_date: '2026-10-15 20:46'
 labels:
   - infrastructure
   - reliability
