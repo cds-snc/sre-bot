@@ -13,6 +13,7 @@ from slack_sdk import WebClient
 import features.incident.core as core
 from contracts.operations.result import OperationResult
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
+from features.incident.common import vocabulary
 from features.incident.core import api
 from features.incident.core.adapters import legacy_incidents as legacy_incidents_adapter
 from features.incident.core.adapters import slack as slack_adapter
@@ -38,17 +39,26 @@ def _clear_provider_cache() -> Iterator[None]:
 def test_api_exports_exactly_the_public_names() -> None:
     """Subdomains reach core through these names only; a new export is a deliberate change."""
     assert sorted(api.__all__) == [
+        "ConversationReference",
+        "ExternalCaseReference",
+        "Incident",
         "IncidentLookup",
         "IncidentSecurityFlag",
         "IncidentSecurityReader",
         "IncidentTranscriptReader",
+        "MessageReference",
+        "PostmortemMeetingReference",
+        "ReportReference",
+        "SourceAlertReference",
         "StatusUpdate",
         "StatusUpdateOrigin",
         "StatusUpdateStage",
         "StatusUpdateState",
         "StatusUpdateStore",
         "StatusUpdateText",
+        "TimelineEntry",
         "TranscriptMessage",
+        "VideoCallReference",
         "find_incident_for_conversation",
         "get_incident_lookup",
         "get_incident_security_reader",
@@ -57,6 +67,11 @@ def test_api_exports_exactly_the_public_names() -> None:
         "translate",
     ]
     assert all(hasattr(api, name) for name in api.__all__)
+
+
+def test_status_update_stage_is_the_common_vocabulary_type() -> None:
+    """The stage is defined once, in common/; core re-exports that same class."""
+    assert api.StatusUpdateStage is vocabulary.StatusUpdateStage
 
 
 def test_transcript_message_is_frozen_with_an_optional_time() -> None:

@@ -159,6 +159,7 @@ env = [
     "TRELLO_TOKEN=TRELLO_TOKEN",
     "TRELLO_ATIP_BOARD=TRELLO_ATIP_BOARD",
     "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE=GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+    "GOOGLE_WORKSPACE_CUSTOMER_ID=C0test0id",
     "SLACK__SLACK_TOKEN=xoxb-test-token-for-tests",
     "SLACK__APP_TOKEN=xapp-test-token",
     "AWS__AWS_REGION=us-east-1",
@@ -404,6 +405,7 @@ containers = ["features.incident"]
 layers = [
     "comms | documents | drive | meet | scheduling | scribe",
     "core",
+    "common",
 ]
 exhaustive = true
 

@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-14 23:09'
-updated_date: '2026-10-15 16:32'
+updated_date: '2026-10-15 16:53'
 labels:
   - incident
   - features
@@ -32,6 +32,7 @@ ordinal: 391000
 Layer 6 of Stack K (handoff doc-13). The behaviour change of TASK-145.5: incident lookups move from a full-table scan to the by_channel index. Standalone merge and deploy, only after TASK-152 and TASK-145.5.1 are applied.
 
 THIS SLICE
+- Configured-systems read (decisions/workplace-systems.md rule 3, human 2026-10-15): a small platform read that returns each configured WorkplaceSystem (contracts/workplace/, TASK-145.5.3) with its tenant id. Its Protocol lives in contracts/workplace/ and its provider in app/infrastructure/, built from the vendor slices (Slack: SLACK_TEAM_ID when present; Google: the customer id when the service-account key file is set) and registered as a core service. The incident provider reads it; no feature imports a vendor settings slice.
 - core/api.py: a provider that builds the IncidentStore from a resolved RecordStore and the incident core settings; the new-incident policy (a system, unset by default) is resolved against the configured systems where the store is built: a set policy resolves to that system's single configured tenant, an unset one to the only configured system; the incident feature is skipped with an event naming the key when the named system is unconfigured, when none is configured, or when the policy is unset and several are (decisions/incident-management.md); find_incident_for_conversation takes the store. get_incident_lookup, get_incident_security_reader (lru_cache providers, which dependency-injection.md:37 forbids across layers) and the IncidentLookup and IncidentSecurityReader Protocols are deleted (human, 2026-10-14: one Protocol per core resource, as TASK-145.6 does for the report).
 - comms/service.py: the lookup and security-reader fallbacks that resolve a service mid-method (service.py:106,178,257,361,498) go; the service takes IncidentStore as a required parameter.
 - comms entry points: each handler opens a scope through the ServiceScopeOpener (TASK-145.5.2), resolves RecordStore, builds the IncidentStore and passes it to the service. No get_record_store import and no import-linter ignore entry (contract (k)).
@@ -47,4 +48,5 @@ THIS SLICE
 - [ ] #3 core/adapters/legacy_incidents.py, IncidentLookup, IncidentSecurityReader and their providers are deleted; rg finds no reference in app/
 - [ ] #4 No get_record_store import and no new import-linter ignore entry; lint-imports passes
 - [ ] #5 Entry-point tests cover success and the not-an-incident, ambiguous and store-failure error mappings
+- [ ] #6 The configured-systems read returns each configured system with its tenant id from the vendor slices; the new-incident policy resolves through it (set, unset with one system) and the feature is skipped with an event naming the key when the named system is unconfigured, none is configured, or the policy is unset with several; no feature module imports a vendor settings slice
 <!-- AC:END -->

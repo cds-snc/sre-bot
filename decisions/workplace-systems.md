@@ -42,7 +42,7 @@ Current state:
    - **The entry carries the vendor's real tenant id, never an API alias** (Google `my_customer`; Microsoft `common`, `organizations`, `consumers`, domain names).
    - **Format checks follow vendor documentation only.** Slack and Google document no id format, so their ids are opaque non-blank strings and aliases are rejected; Microsoft documents a GUID. Sources, read on 2026-10-15: [Slack ids are opaque](https://docs.slack.dev/changelog/2016/08/11/user-id-format-changes), [Google customer id](https://knowledge.workspace.google.com/admin/getting-started/find-your-customer-id), [Entra `tid`](https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference).
    - **Features learn the configured systems through a read API** (a small configured-systems read provided where the store or capability is built), never by importing another slice.
-4. **References carry their system.** Every stored reference to a workplace artifact, account or conversation records the system and tenant alongside the vendor's id. Never store a bare vendor id. The system is a closed enum validated strictly where it is chosen; stored records are read tolerantly ([cloud-portability.md](cloud-portability.md) contract 4).
+4. **References carry their system.** Every stored reference to a workplace artifact, account or conversation records the system and tenant alongside the vendor's id. Never store a bare vendor id. The system is a closed enum validated strictly where it is chosen; stored records are read tolerantly ([cloud-portability.md](cloud-portability.md) contract 4). The enum is `WorkplaceSystem` in `app/contracts/workplace/`, platform vocabulary every feature and the configured-systems read share.
 5. **Records of truth live in the app**, behind the records contract. Workplace documents and spreadsheets are one of two things:
    - **Collaboration spaces:** people work in them, and the app stores a reference.
    - **Projections:** the app writes derived views of stored records, such as an incident metrics sheet. A projection is never read back as a source of truth and can be rebuilt from the stored records.
@@ -78,3 +78,4 @@ Tolerated until then:
 - 2026-10-02: the incident record, its references and its projection are specified in [incident-management.md](incident-management.md) (TASK-97).
 - 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).
 - 2026-10-15: a tenant entry carries the vendor's real tenant id, never an alias, with format checks from vendor documentation only; features read the configured systems through a read API (TASK-153).
+- 2026-10-15: `WorkplaceSystem` lives in `app/contracts/workplace/` (TASK-145.5.3).
