@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: '2026-10-14 22:27'
-updated_date: '2026-10-14 23:20'
+updated_date: '2026-10-14 23:38'
 ---
 # Stack K handoff
 
@@ -12,15 +12,15 @@ updated_date: '2026-10-14 23:20'
 - Name: Stack K, incident core: the IAM and table layout, the service scope opener, the incident record and its store over the records contract, the cutover, the status-update store move, the full-table read and the open-index reconcile, then the core resource interfaces. Trunk: `main`.
 - doc-2 line: "Legacy rebuild by surface": Stack K, started 2026-10-14 from `main` after TASK-109 (#1593). TASK-145.5 is the coordinator of TASK-145.5.1 to TASK-145.5.7; its plan lists the layer order and the subtask descriptions hold the decisions.
 - Branch names: `stack-k/<task-id>-<slug>`; the planning layer is `stack-k/plan`.
-- Merges: squash, bottom-up, a re-approval per layer after its rebase (approve-latest-push rule). Review is requested once two layers are stacked, and at least two PRs stay open before any closes (human, 2026-10-14); a lone PR is not a stack.
+- Merges: squash, bottom-up, a re-approval per layer after its rebase (approve-latest-push rule). Review is requested once two layers are stacked, and at least two PRs stay open before any closes (human, 2026-10-14); a lone PR is not a stack. gh stack closes the stack once every layer has merged (later branches become independent PRs), so new layers are built on lower layers still in review, and a layer merges only when a higher layer is already submitted (human, 2026-10-14). Review changes to a lower layer are made on its branch, then `gh stack rebase`.
 - Standalone merges inside the stack: TASK-152 and TASK-145.5.1 (Terraform; merging to `main` runs tf_apply against production), TASK-145.5.5 (behaviour change, deployed on its own after both Terraform layers are applied). TASK-145.5.7 ships switched off and is run only after TASK-145.8 deploys, before TASK-145.9 merges.
 
 ## Layers
 
 | # | Task | Branch | PR | State | Notes |
 | --- | --- | --- | --- | --- | --- |
-| 0 | Planning edits (tasks and docs below) | `stack-k/plan` | - | ready | Uncommitted. Docs and task files only. |
-| 1 | TASK-152 IAM `/index/*` grants (audit trail, retry records, incidents) | `stack-k/task-152-iam-index-grants` | - | plan approved | Plan approved 2026-10-14 (task comment). |
+| 0 | Planning edits (tasks and docs) | `stack-k/plan` | #1594 | in review | Docs and task files only. doc-2 rule edit (stack never completed before all layers are stacked) to commit here. |
+| 1 | TASK-152 IAM `/index/*` grants (audit trail, retry records, incidents) | `stack-k/task-152-iam-index-grants` | #1595 | in review | ACs 1 and 3 checked (tf_plan shows only the policy statement). AC 2 waits on the post-apply simulation. |
 | 2 | TASK-145.5.1 incidents GSIs (ALL), timeline table, devcontainer script run locally | - | - | planned | |
 | 3 | TASK-145.5.2 ServiceScopeOpener for Slack and job registrars; dependency-injection.md | - | - | planned | Bolt middleware alternative recorded in the task. |
 | 4 | TASK-145.5.3 vocabulary, record, references, core settings, platform tenant ids | - | - | planned | Plan settles how the Google customer id is validated (no Google enabled flag today). |
@@ -33,27 +33,35 @@ updated_date: '2026-10-14 23:20'
 
 ## Position
 
-- Checked out: `main` at d2a61f13, no stack branch yet.
-- Uncommitted, all for layer 0 (`stack-k/plan`):
-  - `backlog/docs/doc-2*`, `backlog/docs/stacks/doc-13*` (this doc);
-  - `backlog/drafts/draft-3 -*`, `backlog/drafts/draft-4 -*` (tenant rename);
-  - tasks 27.5, 58, 140.11, 145, 145.5, 145.6, 145.7, 145.9, 145.12 (modified) and 145.5.1 to 145.5.7, 152 (new).
-- Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-11*` (updated this session, still a working file), `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`.
+- Checked out: `stack-k/task-152-iam-index-grants` (3feded3), stack #1596 submitted (PRs #1594, #1595), review not yet requested.
+- Uncommitted:
+  - `backlog/docs/doc-2*`: layer 0 (new stack rule);
+  - `backlog/docs/stacks/doc-13*` (this doc) and `backlog/tasks/task-152 -*` (AC 3, notes): layer 1.
+- Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-11*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`.
+- Local only: an ignored `app/infrastructure/idempotency/__pycache__` directory makes `test_old_idempotency_package_is_not_discoverable` fail; `rm -rf app/infrastructure/idempotency` clears it (cache files only).
 - No background agents.
 
 ## Next actions
 
-1. **human**: create the stack with the planning layer and layer 1, commit layer 0, and switch to layer 1:
+1. **human**: commit the layer 1 files, put the doc-2 rule on layer 0, rebase and resubmit, then request review of #1594 and #1595 together:
    ```
-   gh stack init stack-k/plan stack-k/task-152-iam-index-grants
+   git add backlog/docs/stacks/doc-13* backlog/tasks/task-152\ -*
+   git commit -m "TASK-152 record tf_plan check"
    gh stack checkout stack-k/plan
-   git add "backlog/docs/doc-2 - Delivery-Sequence-and-Stacked-Pull-Requests.md" backlog/docs/stacks/doc-13* backlog/drafts/draft-3\ -* backlog/drafts/draft-4\ -* backlog/tasks/task-27.5\ -* backlog/tasks/task-58\ -* backlog/tasks/task-140.11\ -* backlog/tasks/task-145\ -* backlog/tasks/task-145.5\ -* backlog/tasks/task-145.5.*\ -* backlog/tasks/task-145.6\ -* backlog/tasks/task-145.7\ -* backlog/tasks/task-145.9\ -* backlog/tasks/task-145.12\ -* backlog/tasks/task-152\ -*
-   git commit -m "plan: split TASK-145.5 into Stack K layers"
+   git add "backlog/docs/doc-2 - Delivery-Sequence-and-Stacked-Pull-Requests.md"
+   git commit -m "plan: keep stacks open until all layers stack"
    gh stack rebase
    gh stack checkout stack-k/task-152-iam-index-grants
+   gh stack submit
    ```
-2. **agent**: implement layer 1 (TASK-152), run the gates, check ACs 1 and 3, write notes; AC 2 waits for the post-apply simulation.
-3. **human**: `gh stack submit`, then request review of layers 0 and 1 together.
+2. **agent**: plan layer 2 (TASK-145.5.1) with `/plan-task task-145.5.1` without waiting for review of layers 0 and 1; the human approves the plan in a task comment.
+3. **human**: once the plan is approved, create layer 2: `gh stack add stack-k/task-145.5.1-incidents-gsis`.
+4. **agent**: implement layer 2 and run its gates; the human commits it and runs `gh stack submit`.
+5. **human**: only after layer 2 is submitted, merge layers 0 and 1 bottom-up (layer 1 is a standalone Terraform merge; merging runs tf_apply against production). Then run the simulation from TASK-152 plan step 4 and paste the output:
+   ```
+   aws iam simulate-principal-policy --policy-source-arn <sre-bot-ecs-role ARN> --action-names dynamodb:Query --resource-arns <audit trail table ARN>/index/correlation_id-index <webhooks table ARN>/index/x
+   ```
+6. **agent**: record the simulation output in the TASK-152 notes and check AC 2 (expect allowed, then implicitDeny).
 
 ## Open decisions
 
@@ -61,4 +69,4 @@ updated_date: '2026-10-14 23:20'
 
 ## Planning queue
 
-- TASK-145.5.1 to TASK-145.5.7, TASK-27.5, TASK-145.6: each planned in turn after the layer below is implemented.
+- TASK-145.5.1 (next, item 3), then TASK-145.5.2 to TASK-145.5.7, TASK-27.5, TASK-145.6: each planned in turn after the layer below is implemented.
