@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-14 23:11'
+updated_date: '2026-10-15 20:07'
 labels:
   - incident
   - features
@@ -83,3 +83,12 @@ Declare is the most-used surface; the legacy path is removed in the same PR, so 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-14 (TASK-145.5 split): create sets open_bucket OPEN and opened_at (fixed-width ISO-8601 UTC, microseconds, +00:00) in the same write, and every reference takes its tenant from the event payload (Slack team_id), not from settings.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-15 20:07
+---
+TASK-103 (2026-10-15): IncidentStore.create can rely on put_if_not_exists reporting created for its own SDK-retried write; every incident item written through it carries a hidden _rs_write_token attribute that reads strip. Attribute names starting with _rs_ are reserved and rejected.
+---
+<!-- COMMENTS:END -->
