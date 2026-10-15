@@ -2,18 +2,19 @@
 id: TASK-145.5
 title: >-
   Build incident/core: the record with severity and five roles, its store over
-  the records contract, the two-part command check and common/
+  the records contract, and common/
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-14 15:21'
+updated_date: '2026-10-14 23:10'
 labels:
   - incident
   - features
   - slack
 dependencies:
-  - TASK-145.1
   - TASK-108
+  - TASK-145.1
+  - TASK-109
 parent_task_id: TASK-145
 priority: medium
 type: task
@@ -23,66 +24,43 @@ ordinal: 355000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Layer B1 of TASK-145. Builds the record and its store in features/incident/core with no new consumer yet; the legacy module keeps working on the same table.
+Layer B1 of TASK-145, delivered as Stack K (handoff doc-13). Coordinator: the work is in subtasks TASK-145.5.1 to TASK-145.5.7, with TASK-152 and TASK-27.5 as layers of the same stack. It builds the incident record and its store in features/incident/core over the records contract, moves the incident lookup and security flag onto it, and moves the status-update store onto the records contract. The legacy module keeps working on the same table.
 
-THIS SLICE
-- core/domain.py: Incident (title, product, severity, security flag, declarer, status, declared, detection, impact start, impact end, the five roles as person references: incident commander, operations lead, communications lead, policy lead, postmortem owner), the typed references (conversation, report, video call, postmortem meeting, external case, source alert) each carrying system, tenant and vendor id plus the vendor link, TimelineEntry as its own record. Frozen dataclasses. The existing IncidentSecurityFlag stays and becomes a field of the record.
-- common/vocabulary.py: IncidentStatus (Open, In Progress, Ready to be Reviewed, Reviewed, Closed), Severity (levels 0 to 4, wide because teams use different scales; narrowed only if the organisation standardises), the role names, StatusUpdateStage moved from core/domain.py, and the action ids one subdomain renders and another handles. common/settings.py: the incident settings tree (response, comms, postmortem slices; the new-incident system policy setting defaulting to the only configured tenant). No I/O in common/.
-- core/store.py: IncidentStore (create, get, find by conversation reference, update one field atomically, list for a window, append a timeline entry as its own record) and its implementation in core/store.py over RecordStore (the records contract), reading today's incidents-table items and mapping bare ids to references for the configured tenant; an in-memory fake. No vendor adapter, no read-modify-write and no list-append.
-- Records contract shape (TASK-27.1): the store builds the incidents RecordTable once (the key layout (KeySchema, indexes) is declared in code next to the item layout, and the table name comes from the owning package's settings with the provisioned table as default) and passes it to every RecordStore call; keyed reads use RecordQuery (partition equality, optional eq/lt/begins_with on the sort key, logical index, total-cap limit, order). terraform/dynamodb.tf declares incidents with partition key id only, no sort key and no index: find by conversation (a full scan on channel_id in today's legacy_incidents adapter) needs an index declared in RecordTable.indexes, which means a GSI, or else TASK-27.2's bounded list; and timeline entries as their own records need a sort key for begins_with to apply. Both are decisions for this slice's plan.
-- core/api.py: the domain types, IncidentStore, its provider, find_incident_for_conversation and the security flag read served by the store, and conversation_is_writable. core/adapters/legacy_incidents.py and the separate IncidentLookup and IncidentSecurityReader Protocols are deleted once the store answers both.
-- No legacy module change; the legacy_surface suite is unchanged.
+Split on 2026-10-14 for the single-PR gate (about 950 production lines across about 20 files, spanning app, server/contracts and Terraform, mixing additive work with a cutover).
+
+Out of this task:
+- Write operations: create (TASK-145.7, sets open_bucket and opened_at), update (TASK-145.8, removes them on Closed), timeline append (TASK-145.9).
+- conversation_is_writable, the second part of the command check (incident-management.md:44), comes with IncidentConversation in TASK-145.6.
+- List for a window needs the full-table read and is served with TASK-145.12, not by this store.
+- The settings slices for response, comms and postmortem arrive with the layers that consume them.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 core/domain.py defines Incident with severity, the five roles and the four timing fields, and every reference type carries system and tenant
-- [ ] #2 common/vocabulary.py defines IncidentStatus, Severity and the role names; common/ imports no adapter, store or provider module
-- [ ] #3 find_incident_for_conversation resolves through IncidentStore and core/adapters/legacy_incidents.py is deleted
-- [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #5 IncidentStore is implemented over RecordStore, reading the existing items (get, find by conversation, list, security flag), with an in-memory fake covering the same cases; no module in core/ imports an AWS client; write operations are absent and listed for the slices that add them
+- [ ] #1 TASK-152 and TASK-145.5.1 to TASK-145.5.6 are done (TASK-145.5.7 and TASK-27.5 may close after this task; they gate TASK-145.9)
+- [ ] #2 The incident record, its typed references with system and tenant, and the vocabulary exist in core/domain.py and common/ (TASK-145.5.3)
+- [ ] #3 find_incident_for_conversation and the security flag resolve through IncidentStore over RecordStore, obtained through the ServiceScopeOpener; legacy_incidents.py and the narrow lookup Protocols are gone (TASK-145.5.4, TASK-145.5.5)
+- [ ] #4 No incident adapter in core/ imports an AWS client (TASK-145.5.6)
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-Grounded at main d2d973ae (2026-10-09); paths assume TASK-145.1 merged. Read path and types only: the write operations arrive with their first consumer (create in TASK-145.7, atomic field update in TASK-145.8, timeline append in TASK-145.9), which keeps this slice under the size gate and avoids speculative code. The description's bullets are read with that split.
+Coordinator plan. Each layer is planned in its own session, after the layer below is implemented. Decisions (human, 2026-10-14) are recorded in the subtask descriptions.
 
-## Discovered state
-- core/domain.py (164 lines): TranscriptMessage, IncidentSecurityFlag, StatusUpdateStage, StatusUpdateState, StatusUpdateOrigin, StatusUpdateText, StatusUpdate. core/api.py (195): Protocols IncidentLookup (find_incident_for_conversation), IncidentSecurityReader (read flag), IncidentTranscriptReader, StatusUpdateStore; providers get_incident_lookup, get_incident_security_reader, get_incident_transcript_reader, get_status_update_store; find_incident_for_conversation. core/adapters/legacy_incidents.py (145): LegacyIncidentTableLookup scans the "incidents" table by channel_id (no index, paginator at 100-105), reads security_incident by Key id (85-94), over integrations.aws.client.get_aws_client with classify_aws_error; built by build_legacy_incident_lookup / build_legacy_incident_security_reader. core/adapters/status_updates.py (248) shows the adapter style to copy (client, _to_item/_from_item, classified failures, conditional put).
-- Legacy item shape (app/models/incidents.py): id (uuid), channel_id, channel_name, name, user_id, teams, report_url, status ("Open"), created_at (epoch string), start_impact_time, end_impact_time, detection_time ("Unknown" or a value), environment, logs (list), meet_url, incident_commander, operations_lead, severity (str|None), retrospective_url, security_incident (bool|None). Written by modules/incident/db_operations.py (create_incident 53, update_incident_field 121 with list_append, log_activity 164, get_incident_by_channel_id 201, lookup_incident 216).
-- Consumers of the lookup today: scribe status_update.py, status_update_approval.py and status_update_history.py take lookup=/security_reader= defaults from core.api; comms inherits them after TASK-145.4.
+Stack K layers, bottom first:
+1. TASK-152: IAM /index/* grants for the audit trail, retry records and incidents tables. Terraform. Standalone merge, tf_apply.
+2. TASK-145.5.1: the incidents by_channel and open GSIs (projection ALL), the timeline table, and the devcontainer script, run locally. Terraform. Standalone merge, tf_apply before layer 6.
+3. TASK-145.5.2: ServiceScopeOpener for the Slack and background-job registrars, and the dependency-injection.md update (Bolt middleware alternative recorded).
+4. TASK-145.5.3: vocabulary, record, references, incident core settings, platform tenant ids (SLACK_TEAM_ID validated at boot when Slack is enabled).
+5. TASK-145.5.4: IncidentStore over RecordStore (reads only), its in-memory fake, ISO-8601 key formats, and index reads returning full items in the records contract.
+6. TASK-145.5.5: cutover of the lookup and security flag; narrow Protocols and legacy_incidents deleted. Standalone merge and deploy.
+7. TASK-145.5.6: StatusUpdateStore onto RecordStore through the registry.
+8. TASK-27.5: bounded full-table read (pulled forward; first consumer TASK-145.5.7).
+9. TASK-145.5.7: open-index reconcile, off by default (runner tentatively an in-app leased job; options kept for re-assessment). Run after TASK-145.8 deploys, before TASK-145.9 merges.
+10. TASK-145.6: core resource interfaces, re-planned after layer 6.
 
-## Steps
-1. common/: features/incident/common/__init__.py (empty), vocabulary.py (IncidentStatus StrEnum with the five values; Severity StrEnum SEV0..SEV4 with a docstring that 0 is an event spanning several products and that the set is wide because teams use different scales; IncidentRole StrEnum incident_commander, operations_lead, communications_lead, policy_lead, postmortem_owner; StatusUpdateStage moved here from core/domain.py with a re-export in core.api so no importer changes), settings.py (IncidentCoreSettings: legacy table name "incidents", new-incident tenant policy defaulting to the configured Google tenant; no I/O).
-2. core/domain.py: frozen dataclasses ConversationReference(system, tenant, channel_id), ReportReference(system, tenant, document_id, link), VideoCallReference, PostmortemMeetingReference, ExternalCaseReference, SourceAlertReference (system, tenant, channel, message id); Incident(id, title, product, severity: Severity | None, security_flag: IncidentSecurityFlag, declarer, status: IncidentStatus, declared_at, detection_at | None, impact_start_at | None, impact_end_at | None, roles: Mapping[IncidentRole, str], conversation, report | None, video_call | None, postmortem_meeting | None, external_case | None, source_alert | None, environment); TimelineEntry(incident_id, posted_at, author, text, source_message) as its own record type. __post_init__ validates timezone-aware times as StatusUpdate does.
-3. core/store.py: IncidentStore Protocol, read operations only: get(incident_id) -> OperationResult[Incident]; find_by_conversation(channel_id) -> OperationResult[str] (NOT_AN_INCIDENT / AMBIGUOUS_INCIDENT_CONVERSATION / classified failure, the legacy adapter's contract); list_active(window) -> OperationResult[Sequence[Incident]]; read_security_flag(incident_id). Write operations are added by the slices that need them, each with its own tests.
-4. core/adapters/incidents.py: DynamoDbIncidentStore over get_aws_client, moving the scan and the flag read from legacy_incidents.py and adding _from_item: "Unknown" and blank times -> None, epoch strings -> aware datetimes, severity string -> Severity when it parses else None (logged), report_url -> ReportReference(system "google_docs", configured tenant, document id parsed with a local regex, link kept), meet_url -> VideoCallReference link-only, retrospective_url -> PostmortemMeetingReference link-only, channel_id -> ConversationReference(slack, configured tenant), incident_commander/operations_lead -> roles. Legacy ids stay the record ids. core/adapters/in_memory.py gains InMemoryIncidentStore (same file, same style as InMemoryStatusUpdateStore).
-5. core/api.py: export the new types and IncidentStore; get_incident_store() provider (lru_cache, as the others); get_incident_lookup and get_incident_security_reader return the store (it satisfies both Protocols structurally, so scribe and comms call sites do not change); find_incident_for_conversation delegates to the store. Delete core/adapters/legacy_incidents.py and its two builders.
-6. Tests under tests/unit/features/incident/core/: test_incident_core_record.py (invariants), test_incident_core_vocabulary.py (enums), test_incident_core_incident_store.py (Stubber-driven: get, find by conversation incl. ambiguous and missing, list, legacy item mapping edge values), test_incident_core_incident_store_fake.py, test_incident_core_api_surface.py extended (exports; lookup and security reader are the store); test_incident_core_incident_find.py and test_incident_core_incident_security_flag.py retargeted from the legacy adapter to the store.
-
-## AC traceability
-| AC | Steps | Tests |
-| --- | --- | --- |
-| 1 (record with severity, five roles, timing fields; references with system and tenant) | 1, 2 | test_incident_core_record.py |
-| 2 (vocabulary in common/, no I/O imports) | 1 | test_incident_core_vocabulary.py plus an import assertion (common imports nothing from adapters, store or providers) |
-| 3 (interim adapter reads existing items; fake; read path) | 3, 4 | test_incident_core_incident_store.py, ..._fake.py; the timeline-record assertion moves to TASK-145.9 where append lands |
-| 4 (find_incident_for_conversation through the store; legacy adapter deleted) | 5 | test_incident_core_incident_find.py; `rg legacy_incidents app` empty |
-| 5 | all | gates |
-
-## Test matrix
-Store get: item present; missing (NOT_FOUND); unreadable item (classified); client error classified. find_by_conversation: blank id, none, one, several (ambiguous), scan pagination over two pages, ClientError. Mapping: "Unknown" times -> None; epoch string -> aware UTC datetime; severity "sev-1" to "sev-4" -> SEV1 to SEV4, "none" and blank -> None, garbage -> None (logged); security_incident True/False/absent -> flag; report_url with and without a parsable document id; roles absent. Fake: parity with the Stubber cases. api: lookup and security reader are the same object as the store.
-
-## Assumptions and doubts
-- The legacy table name is fixed ("incidents", legacy_incidents.py:31) and the AWS settings carry the region/credentials; the terraform table has no channel_id index, so the scan stays until the store owns its layout (TASK-108/109).
-- Legacy severity values are none and sev-1 to sev-4 (declare modal in modules/incident/incident.py, update modal FIELD_SCHEMA in information_update.py): sev-N maps to SEVN, none and blank to None. SEV0 has no legacy value; the pickers offer it once TASK-145.7 and TASK-145.8 rebuild them.
-- Moving StatusUpdateStage to common/ with a core.api re-export keeps comms imports stable; if the reviewer prefers it to stay in core/domain.py the step is dropped.
-
-## Size
-domain +130, vocabulary +45, settings +25, store +45, adapter +170, fake +60, api +25, deletion -145. About 350 production lines across 8 files. Under the gate; the writes are deferred for this reason.
-
-## Blast radius and rollback
-Read-only over the existing table; no new consumer except the existing lookup callers, which keep their contract. Single `git revert`.
+Review cadence: review is requested once two layers are stacked, and at least two PRs stay open before any closes.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -90,7 +68,7 @@ Read-only over the existing table; no new consumer except the existing lookup ca
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-13 re-plan before pickup: IncidentStore is built over RecordStore (the records contract: TASK-27.4, TASK-27.1, TASK-108), not an interim adapter over get_aws_client; the plan's step 4 and AC #5 are rewritten at re-plan. The incident record also carries the postmortem facts that TASK-147.2 builds on.
 
-2026-10-14 wiring: this task does not wait for TASK-109. IncidentStore obtains its RecordStore through the get_record_store provider that decisions/dependency-injection.md tolerates until TASK-109 closes it, with exactly one import-linter ignore entry for that import; TASK-109's migration to the svcs registry removes the entry.
+2026-10-14 wiring (rewritten after TASK-109 merged): IncidentStore gets its RecordStore through the svcs registry (app/server/services.py, TASK-109) under import-linter contract (k); it does not import get_record_store and adds no import-linter ignore entry. TASK-109 is a dependency.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

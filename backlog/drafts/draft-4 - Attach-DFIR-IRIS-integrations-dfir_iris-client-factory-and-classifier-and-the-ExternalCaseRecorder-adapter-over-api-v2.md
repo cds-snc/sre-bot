@@ -6,6 +6,7 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-10-02 16:44'
+updated_date: '2026-10-14 23:11'
 labels:
   - incident
   - later-wave
@@ -29,7 +30,7 @@ PREREQUISITES, outside this task: a hosting decision for the IRIS instance itsel
 
 THIS TASK
 - app/integrations/dfir_iris/: build_dfir_iris_client (httpx with explicit timeout and retry policy set once; no retry on non-idempotent POSTs), classify_dfir_iris_error returning the standard tuple, settings (base URL, secret reference). Raw /api/v2 HTTP; the stale v1-shaped dfir-iris-client package is not used.
-- features/incident/core/adapters/dfir_iris.py implementing ExternalCaseRecorder: POST /api/v2/cases (case_name, case_description, case_customer, case_soc_id, severity_id, status_id), PUT /api/v2/cases/{id} for updates and close (state_id/status_id), POST /api/v2/cases/{id}/notes and /events for entries. The ExternalCaseReference stores system, instance, the integer case_id and case_uuid; the link comes from the instance base URL pattern recorded at configuration time.
+- features/incident/core/adapters/dfir_iris.py implementing ExternalCaseRecorder: POST /api/v2/cases (case_name, case_description, case_customer, case_soc_id, severity_id, status_id), PUT /api/v2/cases/{id} for updates and close (state_id/status_id), POST /api/v2/cases/{id}/notes and /events for entries. The ExternalCaseReference stores system, tenant (the configured case-system instance name, per decisions/workplace-systems.md rule 4 and DRAFT-3's instance settings), the integer case_id and case_uuid; the link comes from the instance base URL pattern recorded at configuration time.
 - A key-swap path: a new key is configured and the old one revoked without downtime.
 <!-- SECTION:DESCRIPTION:END -->
 
@@ -37,6 +38,6 @@ THIS TASK
 <!-- AC:BEGIN -->
 - [ ] #1 integrations/dfir_iris exports exactly a client factory, classify_dfir_iris_error and settings; factory tests prove explicit timeout and retry and no network I/O at construction
 - [ ] #2 The adapter implements ExternalCaseRecorder over /api/v2 only, classifies errors and returns OperationResult; tests cover open, update, add entry, close and each mapped error family
-- [ ] #3 An ExternalCaseReference holds system, instance, case_id and case_uuid; the show modal renders the case link from the owning adapter
+- [ ] #3 An ExternalCaseReference holds system, tenant (the case-system instance name), case_id and case_uuid; the show modal renders the case link from the owning adapter
 - [ ] #4 With the instance removed from configuration the no-op recorder takes over without a code change
 <!-- AC:END -->

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-07 18:52'
-updated_date: '2026-10-09 19:52'
+updated_date: '2026-10-14 23:11'
 labels:
   - incident
 dependencies:
@@ -91,6 +91,8 @@ Over the single-PR size gate: decompose before implementation, for example (1) t
 TASK-144.5 (2026-10-09) changed the services this task builds on; read the description's Draft/Redraft and draft_status_update mentions through this note. draft_status_update and the overview Draft and Redraft buttons are gone. A responder now starts a draft with start_status_update_draft (no model call) and fills it with the form's Draft with AI, generate_status_update_draft(conversation_id, sequence, current=<base fields>, author, wording, instructions='', security_confirmed=False), which needs the pending draft at sequence, carries forward without a model call when nothing is new, and refuses security or unknown-flag incidents. A periodic run would start then generate (or get its own entry beside them); decide when planning.
 
 Re-ground at pickup (TASK-145.4): the status-update code is the comms subdomain, features/incident/comms/ (plugin incident.comms). scribe/status_update.py is comms/service.py; the form, approval, history and prompt modules are comms/{form,approval,history,prompt}.py; action ids are incident.comms.status_update.*.
+
+2026-10-14: TASK-152 grants <table arn>/index/* only for the audit trail, retry records and incidents tables; the GSI this task adds to sre_bot_incident_status_updates adds that table's index ARN to terraform/iam.tf in the same change. The store is on RecordStore after TASK-145.5.6, so the GSI is declared in its RecordTable.indexes with projection ALL (index reads return full items, TASK-145.5.4).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -6,7 +6,7 @@ title: >-
 status: Draft
 assignee: []
 created_date: '2026-10-02 16:44'
-updated_date: '2026-10-09 17:14'
+updated_date: '2026-10-14 23:11'
 labels:
   - incident
   - later-wave
@@ -25,7 +25,7 @@ priority: low
 EXPANSION (after doc-2). decisions/incident-management.md, "The optional external platform". This task builds the seam only:
 - ExternalCaseRecorder in core/api.py: open a case for an incident and return an ExternalCaseReference; update it (status, severity, title); add an entry (timeline, note, report link); close it. All return OperationResult.
 - A no-op recorder returned by the provider when no case-system instance is configured; the record's external-case reference stays empty and nothing is rendered.
-- Settings: common/settings.py lists zero or more case-system instances (system, instance name, base URL, secret reference) and the new-incident policy names which instance new incidents use (default: the only one).
+- Settings: common/settings.py lists zero or more case-system instances (system, instance name, base URL, secret reference; the instance name is the tenant stored on each external-case reference, decisions/workplace-systems.md rule 4) and the new-incident policy names which instance new incidents use (default: the only one).
 - lifecycle calls the recorder at declare, on status change and on close; retrospective adds an entry when a retro is scheduled. With the no-op recorder every call succeeds without I/O.
 No vendor client, no adapter, no inbound path. Those are the next drafts.
 <!-- SECTION:DESCRIPTION:END -->

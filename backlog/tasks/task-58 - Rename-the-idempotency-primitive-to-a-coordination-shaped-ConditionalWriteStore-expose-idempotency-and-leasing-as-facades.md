@@ -3,10 +3,10 @@ id: TASK-58
 title: >-
   Rename the idempotency primitive to a coordination-shaped
   ConditionalWriteStore; expose idempotency and leasing as facades
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-28 13:19'
-updated_date: '2026-10-14 19:26'
+updated_date: '2026-10-14 22:27'
 labels:
   - infrastructure
   - phase-4
@@ -47,14 +47,20 @@ Delivery (decided 2026-10-14): split into two stacked layers after TASK-102. TAS
 - [x] #2 A lease facade and an idempotency facade over that primitive, each constructed with an explicit required read-failure policy, both fail-closed; the primitive carries none; no second implementation of the conditional-write logic remains; the own-replay branch is not on the Protocol (TASK-58.2)
 - [x] #3 No infrastructure.idempotency import path remains (find_spec assertion) and no shim is left; make check-fake-coverage and lint-imports stay green with the conformance fixture mapping and enrollment test moved to tests/integration/infrastructure/coordination/ (TASK-58.1)
 - [x] #4 The Access Sync job-status store remains a separate RecordStore-backed keyed-record capability, not folded into the primitive
-- [ ] #5 decisions/ cross-references are updated in the PR that changes them: reliability.md (lease.py path, Migration line, facade wording), lifecycle.md, plugin-architecture.md, feature-packages.md
+- [x] #5 decisions/ cross-references are updated in the PR that changes them: reliability.md (lease.py path, Migration line, facade wording), lifecycle.md, plugin-architecture.md, feature-packages.md
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [x] #1 All consumers migrated; tests green; no back-compat shim remains
-- [ ] #2 PR references decisions/reliability.md and decisions/cloud-portability.md
+- [x] #2 PR references decisions/reliability.md and decisions/cloud-portability.md
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-14: AC5 verified: decisions/ cross-references were updated in #1589 (TASK-58.1) and #1591 (TASK-58.2); the old infrastructure.idempotency names remain only in dated Changes entries.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
