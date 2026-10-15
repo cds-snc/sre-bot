@@ -4,7 +4,7 @@ title: 'Records: bounded or paginated full-table read, shaped with its first con
 status: To Do
 assignee: []
 created_date: '2026-10-13 19:59'
-updated_date: '2026-10-15 17:45'
+updated_date: '2026-10-15 18:18'
 labels:
   - infrastructure
   - phase-4
@@ -26,7 +26,7 @@ ordinal: 379000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Split out of TASK-27.2 so the full-table read is shaped with a real consumer instead of ahead of it (decisions/plugin-architecture.md: capabilities are never built speculatively).
 
-CONSUMERS. TASK-145.5.7 (first, 2026-10-14): the open-index reconcile reads every incidents item once; Stack K layer 8, directly below it. TASK-37.1: the webhook store's list and lookup, today full-table DynamoDB scans over a small configuration-sized table. TASK-145.12: rebuilding the incident list sheet from the incidents table, which is unbounded and may want a paginated read rather than a capped list.
+CONSUMERS. TASK-145.5.7 (first, 2026-10-14): the incident legacy upgrade job reads every incidents item once; Stack K layer 9, directly below it. TASK-37.1: the webhook store's list and lookup, today full-table DynamoDB scans over a small configuration-sized table. TASK-145.12: rebuilding the incident list sheet from the incidents table, which is unbounded and may want a paginated read rather than a capped list.
 
 OPEN SHAPE, decided when the first consumer is planned: a capped list(table, limit) versus a paginated or iterating read. If capped, exceeding the cap is an error result, never a silent truncation (a lookup that silently misses a row is a correctness and security bug), and the cap is a documented setting with a default, not a hardcoded constant.
 

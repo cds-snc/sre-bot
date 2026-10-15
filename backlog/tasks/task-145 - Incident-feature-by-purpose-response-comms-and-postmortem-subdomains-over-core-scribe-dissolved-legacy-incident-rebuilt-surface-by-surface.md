@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:41'
-updated_date: '2026-10-15 17:51'
+updated_date: '2026-10-15 18:18'
 labels:
   - incident
   - features
@@ -44,10 +44,10 @@ ASSUMPTIONS IN FORCE (change them here before the slice that depends on them sta
 
 LAYERS, each a single PR under the size gate, merged bottom-up (a gh stack is acceptable within a group):
 A. In place, after TASK-144: TASK-145.1 (the umbrella moves to features/incident with the first-mover wiring) -> TASK-145.2 (status-update wording and prompt text out of the views module) -> TASK-145.3 (status-update handlers call one service method each) -> TASK-145.4 (comms carved out of scribe as plugin incident.comms).
-B. Core, after TASK-145.1: TASK-145.5 (record, store over the records contract, severity, five roles, the conversation lookup, common/; split into TASK-145.5.1 to TASK-145.5.7 with TASK-152 and TASK-27.5, Stack K) -> TASK-145.6 (resource interfaces, with conversation_is_writable: conversation, report absorbing documents/, drive/ and scribe's section writer, product catalog; transcript reader takes the reference).
+B. Core, after TASK-145.1: TASK-145.5 (record, store over the records contract, severity, five roles, the conversation lookup, common/; split into TASK-145.5.1 to TASK-145.5.8 with TASK-152 and TASK-27.5, Stack K) -> TASK-145.6 (resource interfaces, with conversation_is_writable: conversation, report absorbing documents/, drive/ and scribe's section writer, product catalog; transcript reader takes the reference).
 C. Response, after pinning: TASK-145.7 (declare and the alert buttons; meet/ folds into core) -> TASK-145.8 (status, severity, show and update, roles, archive, recreate) -> TASK-145.9 (timeline capture, nudge job; summarize moves in; incident leaves aws_platform).
 D. Postmortem, after TASK-138: TASK-145.10 (meeting scheduling over the calendar capability) -> TASK-145.11 (draft moves in; scribe deleted).
-E. Cutover: TASK-145.12 (list sheet becomes a write-only projection; references backfilled) -> TASK-145.13 (delete app/modules/incident; layers contract response | comms | postmortem exhaustive).
+E. Cutover: TASK-145.12 (list sheet becomes a write-only projection; the sheet import is removed and the TASK-145.5.7 upgrade job reruns) -> TASK-145.13 (delete app/modules/incident; layers contract response | comms | postmortem exhaustive).
 TASK-146.3 (declare invites the on-call person through the on-call capability) joins group C once TASK-146.1 exists.
 <!-- SECTION:DESCRIPTION:END -->
 

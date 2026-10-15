@@ -6,13 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-13 14:00'
-updated_date: '2026-10-15 17:52'
+updated_date: '2026-10-15 18:17'
 labels:
   - incident
   - features
 dependencies:
   - TASK-145.5
-  - TASK-108
 references:
   - 'https://github.com/cds-snc/sre-bot/issues/1707'
 parent_task_id: TASK-147

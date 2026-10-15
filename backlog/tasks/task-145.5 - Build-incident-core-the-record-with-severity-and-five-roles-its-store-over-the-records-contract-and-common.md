@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-15 17:51'
+updated_date: '2026-10-15 18:18'
 labels:
   - incident
   - features
@@ -26,7 +26,7 @@ ordinal: 355000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Layer B1 of TASK-145, delivered as Stack K (handoff doc-13). Coordinator: the work is in subtasks TASK-145.5.1 to TASK-145.5.7, with TASK-152 and TASK-27.5 as layers of the same stack. It builds the incident record and its store in features/incident/core over the records contract, moves the incident lookup and security flag onto it, and moves the status-update store onto the records contract. The legacy module keeps working on the same table.
+Layer B1 of TASK-145, delivered as Stack K (handoff doc-13). Coordinator: the work is in subtasks TASK-145.5.1 to TASK-145.5.8, with TASK-152 and TASK-27.5 as layers of the same stack. It builds the incident record and its store in features/incident/core over the records contract, moves the incident lookup and security flag onto it, and moves the status-update store onto the records contract. The legacy module keeps working on the same table.
 
 Split on 2026-10-14 for the single-PR gate (about 950 production lines across about 20 files, spanning app, server/contracts and Terraform, mixing additive work with a cutover).
 
@@ -39,7 +39,7 @@ Out of this task:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 TASK-152 and TASK-145.5.1 to TASK-145.5.6 are done (TASK-145.5.7 and TASK-27.5 may close after this task; they gate TASK-145.9)
+- [ ] #1 TASK-152, TASK-145.5.1 to TASK-145.5.6 and TASK-145.5.8 are done (TASK-145.5.7 and TASK-27.5 may close after this task; they gate TASK-145.9)
 - [ ] #2 The incident record, its typed references with system and tenant, and the vocabulary exist in core/domain.py and common/ (TASK-145.5.3)
 - [ ] #3 find_incident_for_conversation and the security flag resolve through IncidentStore over RecordStore, obtained through the ServiceScopeOpener; legacy_incidents.py and the narrow lookup Protocols are gone (TASK-145.5.4, TASK-145.5.5)
 - [ ] #4 No incident adapter in core/ imports an AWS client (TASK-145.5.6)
@@ -52,15 +52,16 @@ Coordinator plan. Each layer is planned in its own session, after the layer belo
 
 Stack K layers, bottom first:
 1. TASK-152: IAM /index/* grants for the audit trail, retry records and incidents tables. Terraform. Standalone merge, tf_apply.
-2. TASK-145.5.1: the incidents by_channel and open GSIs (projection ALL), the timeline table, and the devcontainer script, run locally. Terraform. Standalone merge, tf_apply before layer 6.
+2. TASK-145.5.1: the incidents by_channel and open GSIs (projection ALL), the timeline table, and the devcontainer script, run locally. Terraform. Standalone merge, tf_apply before layer 7.
 3. TASK-145.5.2: ServiceScopeOpener for the Slack and background-job registrars, and the dependency-injection.md update (Bolt middleware alternative recorded).
 4. TASK-153 then TASK-145.5.3, one layer: TASK-153 amends the ADRs for vendor enablement (a configured tenant entry enables a vendor client; the new-incident policy names a system) in an earlier commit, then TASK-145.5.3: vocabulary, record, references, incident core settings, platform tenant ids (SLACK_TEAM_ID required when Slack is enabled; the Google customer id is not the my_customer alias when Google is configured).
-5. TASK-145.5.4: IncidentStore over RecordStore (reads only), its in-memory fake, ISO-8601 key formats, and index reads returning full items in the records contract.
-6. TASK-145.5.5: cutover of the lookup and security flag; narrow Protocols and legacy_incidents deleted. Standalone merge and deploy.
-7. TASK-145.5.6: StatusUpdateStore onto RecordStore through the registry.
-8. TASK-27.5: bounded full-table read (pulled forward; first consumer TASK-145.5.7).
-9. TASK-145.5.7: open-index reconcile, off by default (runner tentatively an in-app leased job; options kept for re-assessment). Run after TASK-145.8 deploys, before TASK-145.9 merges.
-10. TASK-145.6: core resource interfaces, re-planned after layer 6.
+5. TASK-145.5.4: IncidentStore over RecordStore (end-state reads only; an item without record_version is INCIDENT_RECORD_UNREADABLE), its in-memory fake, the key-format decision, and index reads returning full items in the records contract.
+6. TASK-145.5.8: the legacy item bridge: legacy_items.py, one pure upgrade function, applied by the store to items without record_version (split out of TASK-145.5.4, human 2026-10-15).
+7. TASK-145.5.5: cutover of the lookup and security flag; narrow Protocols and legacy_incidents deleted. Standalone merge and deploy.
+8. TASK-145.5.6: StatusUpdateStore onto RecordStore through the registry.
+9. TASK-27.5: bounded full-table read (pulled forward; first consumer TASK-145.5.7).
+10. TASK-145.5.7: the incident legacy upgrade job (legacy_items.py from TASK-145.5.8 over every item without record_version: end-state attributes, reference maps, security_incident, the open index, record_version), an in-app leased job, off by default. Run after TASK-145.8 deploys, before TASK-145.9 merges, and again after TASK-145.12. Re-planned at pickup.
+11. TASK-145.6: core resource interfaces, re-planned after layer 7.
 
 Review cadence: review is requested once two layers are stacked, and at least two PRs stay open before any closes.
 <!-- SECTION:PLAN:END -->
@@ -88,6 +89,6 @@ created: 2026-10-13 18:59
 
 created: 2026-10-13 19:59
 ---
-2026-10-13 records/incidents layout decision: incidents table keeps partition key id and gains two GSIs declared as RecordTable.indexes: by_channel (partition channel_id) for find_by_conversation, and a sparse open index (partition open_bucket, constant OPEN; sort opened_at) set only while an incident is open and removed on close. Never a GSI on status. find_by_conversation queries by_channel with RecordQuery(index=...) and handles zero, one or several results (index reads may be eventually consistent and are not unique); no bounded-list fallback. This task owns Terraform for the GSIs and for a new timeline table keyed (incident_id, 'ts#entry_id'), declared as its RecordTable with the store (the description already puts append of a timeline entry in IncidentStore); TASK-145.9 wires the writes. It also owns a one-shot backfill of open_bucket and opened_at for existing open incidents (idempotent, dry run first). Index queries need no Protocol change (TASK-27.1). A plan refresh is needed to fold this in; AC5 (write operations absent) still holds for update, which arrives with TASK-27.2 and TASK-145.8.
+2026-10-13 records/incidents layout decision: incidents table keeps partition key id and gains two GSIs declared as RecordTable.indexes: by_channel (partition channel_id) for find_by_conversation, and a sparse open index (partition open_bucket, constant OPEN; sort opened_at) set only while an incident is open and removed on close. Never a GSI on status. find_by_conversation queries by_channel with RecordQuery(index=...) and handles zero, one or several results (index reads may be eventually consistent and are not unique); no bounded-list fallback. This task owns Terraform for the GSIs and for a new timeline table keyed (incident_id, 'ts#entry_id'), declared as its RecordTable with the store (the description already puts append of a timeline entry in IncidentStore); TASK-145.9 wires the writes. It also owns a one-shot backfill of open_bucket and opened_at for existing open incidents (idempotent, dry run first) (superseded 2026-10-15: TASK-145.5.7 is the incident legacy upgrade job). Index queries need no Protocol change (TASK-27.1). A plan refresh is needed to fold this in; AC5 (write operations absent) still holds for update, which arrives with TASK-27.2 and TASK-145.8.
 ---
 <!-- COMMENTS:END -->
