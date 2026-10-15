@@ -17,6 +17,7 @@ import contracts.records
 pytestmark = pytest.mark.unit
 
 PUBLIC_NAMES = {
+    "RESERVED_ATTRIBUTE_PREFIX",
     "ExpectedValue",
     "IncrementAttribute",
     "KeySchema",
@@ -32,6 +33,7 @@ PUBLIC_NAMES = {
     "SortOperator",
     "SortOrder",
     "resolve_query_key",
+    "validate_record_item",
     "validate_record_update",
 }
 

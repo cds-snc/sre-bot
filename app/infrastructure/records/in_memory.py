@@ -21,6 +21,7 @@ from contracts.records import (
     SortOperator,
     SortOrder,
     resolve_query_key,
+    validate_record_item,
     validate_record_update,
 )
 
@@ -89,6 +90,7 @@ class InMemoryRecordStore(RecordStore):
         return OperationResult.error(status=OperationStatus.NOT_FOUND, message=f"Item not found in {table.name}")
 
     def put(self, table: RecordTable, item: dict[str, Any]) -> OperationResult:
+        validate_record_item(item)
         full_key = self._full_key(table, item)
         if full_key is None:
             return self._missing_key(table)
@@ -97,6 +99,7 @@ class InMemoryRecordStore(RecordStore):
         return OperationResult.success(data=None)
 
     def put_if_not_exists(self, table: RecordTable, item: dict[str, Any]) -> OperationResult:
+        validate_record_item(item)
         full_key = self._full_key(table, item)
         if full_key is None:
             return self._missing_key(table)

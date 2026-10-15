@@ -16,6 +16,7 @@ from contracts.records import (
     RecordIndex,
     RecordQuery,
     RecordTable,
+    SetAttribute,
     SortCondition,
     SortOperator,
     SortOrder,
@@ -123,6 +124,8 @@ class TestDynamoDBRecordStorePutIfNotExists:
         kwargs = dynamo.put_item.call_args[1]
         assert kwargs.get("ConditionExpression") == "attribute_not_exists(#pk)"
         assert kwargs.get("ExpressionAttributeNames") == {"#pk": "pk"}
+        assert kwargs.get("ReturnValuesOnConditionCheckFailure") == "ALL_OLD"
+        assert "_rs_write_token" in kwargs["Item"]
 
     def test_other_errors_propagate(self):
         service, dynamo = _make_service()
@@ -369,3 +372,47 @@ class TestDynamoDBRecordStoreProviderAndSdkExceptions:
 
         assert result.is_success
         assert result.data is False
+
+
+@pytest.mark.unit
+class TestDynamoDBRecordStoreWriteToken:
+    """The write token of put_if_not_exists is the store's own: no read returns it and no caller may write it."""
+
+    TOKEN = {"_rs_write_token": {"S": "a" * 32}}
+
+    def test_get_returns_the_item_without_the_token(self):
+        service, dynamo = _make_service()
+        dynamo.get_item.return_value = {"Item": {"pk": {"S": "abc"}, "sk": {"S": "1"}, **self.TOKEN}}
+
+        result = service.get(TABLE, {"pk": "abc", "sk": "1"})
+
+        assert result.data == {"pk": "abc", "sk": "1"}
+
+    def test_query_returns_items_without_the_token(self):
+        service, dynamo = _make_service()
+        dynamo.get_paginator.return_value.paginate.return_value = [
+            {"Items": [{"pk": {"S": "abc"}, "sk": {"S": "1"}, **self.TOKEN}]}
+        ]
+
+        result = service.query(TABLE, RecordQuery(partition="abc"))
+
+        assert result.data == [{"pk": "abc", "sk": "1"}]
+
+    def test_update_returns_the_item_without_the_token(self):
+        service, dynamo = _make_service()
+        dynamo.update_item.return_value = {
+            "Attributes": {"pk": {"S": "abc"}, "sk": {"S": "1"}, "value": {"N": "2"}, **self.TOKEN}
+        }
+
+        result = service.update(TABLE, {"pk": "abc", "sk": "1"}, [SetAttribute("value", 2)])
+
+        assert result.data == {"pk": "abc", "sk": "1", "value": Decimal(2)}
+
+    @pytest.mark.parametrize("operation", ["put", "put_if_not_exists"])
+    def test_a_reserved_attribute_is_refused_before_any_call(self, operation: str):
+        service, dynamo = _make_service()
+
+        with pytest.raises(ValueError, match="_rs_write_token"):
+            getattr(service, operation)(TABLE, {"pk": "abc", "sk": "1", "_rs_write_token": "forged"})
+
+        dynamo.put_item.assert_not_called()

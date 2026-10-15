@@ -12,7 +12,8 @@ all DynamoDB I/O here.
 
 from collections.abc import Mapping, Sequence
 from functools import cache
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
+from uuid import uuid4
 
 import structlog
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
@@ -34,6 +35,7 @@ from contracts.records import (
     SortOperator,
     SortOrder,
     resolve_query_key,
+    validate_record_item,
     validate_record_update,
 )
 from integrations.aws.client import classify_aws_error, get_aws_client
@@ -45,6 +47,28 @@ logger = structlog.get_logger(__name__)
 
 _serializer = TypeSerializer()
 _deserializer = TypeDeserializer()
+
+# Per-call owner of a put_if_not_exists write (decisions/reliability.md); never returned by a read.
+_WRITER_ATTRIBUTE = "_rs_write_token"
+
+
+def _new_write_token() -> str:
+    """Return an opaque token for one put_if_not_exists call."""
+    return uuid4().hex
+
+
+def _stored_writer(exc: ClientError) -> str | None:
+    """Return the write token of the item a failed condition returned (``ALL_OLD``), if any."""
+    # ClientError's typed response does not declare the modeled Item member.
+    response = cast(Mapping[str, Any], exc.response)
+    writer = (response.get("Item") or {}).get(_WRITER_ATTRIBUTE) or {}
+    return writer.get("S")
+
+
+def _item_key(table: RecordTable, item: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the item's key attributes, for log context; never the payload."""
+    attributes = [table.key.partition] if table.key.sort is None else [table.key.partition, table.key.sort]
+    return {attribute: item.get(attribute) for attribute in attributes}
 
 
 def _serialize_item(item: dict[str, Any]) -> dict[str, Any]:
@@ -60,9 +84,10 @@ def _deserialize_item(item: dict[str, Any]) -> dict[str, Any]:
     """Deserialize a DynamoDB attribute dict to a plain Python dict.
 
     Numeric values are returned as ``Decimal`` by the boto3 deserializer.
-    Callers that expect ``int``/``float`` should cast as needed.
+    Callers that expect ``int``/``float`` should cast as needed. The write
+    token is the store's own and is dropped.
     """
-    return {k: _deserializer.deserialize(v) for k, v in item.items()}
+    return {k: _deserializer.deserialize(v) for k, v in item.items() if k != _WRITER_ATTRIBUTE}
 
 
 def _key_condition(key: KeySchema, spec: RecordQuery) -> tuple[str, dict[str, str], dict[str, Any]]:
@@ -183,7 +208,11 @@ class DynamoDBRecordStore(RecordStore):
 
         Returns:
             ``OperationResult[None]`` — success with no data payload, or error.
+
+        Raises:
+            ValueError: The item names a reserved attribute.
         """
+        validate_record_item(item)
         serialized = _serialize_item(item)
         result: OperationResult[Any]
         try:
@@ -197,6 +226,8 @@ class DynamoDBRecordStore(RecordStore):
             logger.error(
                 "records_put_error",
                 table=table.name,
+                operation="put",
+                key=_item_key(table, item),
                 error=result.message,
                 error_code=result.error_code,
             )
@@ -209,9 +240,12 @@ class DynamoDBRecordStore(RecordStore):
     ) -> OperationResult:
         """Write an item only if no item with the same primary key exists.
 
-        Uses a DynamoDB ``ConditionExpression`` to make the write atomic.
-        Returns ``OperationResult.success(data=True)`` if the item was created,
-        ``OperationResult.success(data=False)`` if it already existed.
+        One conditional PutItem makes the write atomic. The item carries a
+        fresh write token, and a failed condition returns the stored item
+        (``ALL_OLD``): when that item carries this call's token, the SDK
+        retried a request whose first attempt landed, so the item was created
+        by this call. A replay that meets an item another writer replaced or
+        deleted in between cannot be recognised and reports that it existed.
 
         Args:
             table: Table declaration; its partition attribute drives the
@@ -220,32 +254,37 @@ class DynamoDBRecordStore(RecordStore):
             item: Plain Python dict.
 
         Returns:
-            ``OperationResult[bool]``
+            ``OperationResult[bool]``: ``data=True`` when this call created
+            the item, ``data=False`` when it already existed, or error.
+
+        Raises:
+            ValueError: The item names a reserved attribute.
         """
-        serialized = _serialize_item(item)
-        result: OperationResult[Any]
+        validate_record_item(item)
+        token = _new_write_token()
+        log = logger.bind(table=table.name, operation="put_if_not_exists", key=_item_key(table, item))
         try:
             self._dynamodb.put_item(
                 TableName=table.name,
-                Item=serialized,
+                Item=_serialize_item({**item, _WRITER_ATTRIBUTE: token}),
                 ConditionExpression="attribute_not_exists(#pk)",
                 ExpressionAttributeNames={"#pk": table.key.partition},
+                ReturnValuesOnConditionCheckFailure="ALL_OLD",
             )
-            result = OperationResult.success(data=None)
-        except (ClientError, BotoCoreError) as exc:
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                if _stored_writer(exc) == token:
+                    log.info("records_put_if_not_exists_replay_resolved")
+                    return OperationResult.success(data=True, message="Item created")
+                log.debug("records_put_if_not_exists_already_exists")
+                return OperationResult.success(data=False, message="Item already exists")
+            result: OperationResult[Any] = self._map_sdk_exception(exc)
+        except BotoCoreError as exc:
             result = self._map_sdk_exception(exc)
-        if result.is_success:
-            logger.debug("records_put_if_not_exists_created", table=table.name)
+        else:
+            log.debug("records_put_if_not_exists_created")
             return OperationResult.success(data=True, message="Item created")
-        if result.error_code == "ConditionalCheckFailedException":
-            logger.debug("records_put_if_not_exists_already_exists", table=table.name)
-            return OperationResult.success(data=False, message="Item already exists")
-        logger.error(
-            "records_put_if_not_exists_error",
-            table=table.name,
-            error=result.message,
-            error_code=result.error_code,
-        )
+        log.error("records_put_if_not_exists_error", error=result.message, error_code=result.error_code)
         return result
 
     def delete(

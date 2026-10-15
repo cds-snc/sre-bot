@@ -1,6 +1,7 @@
 """Records contract: the RecordStore Protocol and its vendor-neutral value types."""
 
 from contracts.records.store import (
+    RESERVED_ATTRIBUTE_PREFIX,
     ExpectedValue,
     IncrementAttribute,
     KeySchema,
@@ -16,10 +17,12 @@ from contracts.records.store import (
     SortOperator,
     SortOrder,
     resolve_query_key,
+    validate_record_item,
     validate_record_update,
 )
 
 __all__ = [
+    "RESERVED_ATTRIBUTE_PREFIX",
     "ExpectedValue",
     "IncrementAttribute",
     "KeySchema",
@@ -35,5 +38,6 @@ __all__ = [
     "SortOperator",
     "SortOrder",
     "resolve_query_key",
+    "validate_record_item",
     "validate_record_update",
 ]

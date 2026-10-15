@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-14 23:09'
+updated_date: '2026-10-15 20:07'
 labels:
   - incident
   - features
@@ -42,3 +43,12 @@ THIS SLICE
 - [ ] #3 Comms entry points build the store from a RecordStore resolved through the ServiceScopeOpener; no cached provider remains
 - [ ] #4 The existing status-update behaviour tests pass unchanged against the new store, plus conditional-create and guard-lost cases
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-15 20:07
+---
+TASK-103 (2026-10-15): put_if_not_exists stamps a hidden _rs_write_token attribute (~45 bytes) on every item it writes and strips it from every read; read 'item layout unchanged' as the caller-visible attributes. Two concurrent writers of identical content now get one created and one conflict (today's equality check reports both as success); the replay of one caller's own write still reports created.
+---
+<!-- COMMENTS:END -->

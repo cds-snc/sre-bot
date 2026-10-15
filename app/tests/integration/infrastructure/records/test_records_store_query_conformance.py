@@ -90,6 +90,21 @@ class TestPutIfNotExists:
         assert result.is_success
         assert result.data is True
 
+    def test_a_created_item_reads_back_exactly_as_written(self, any_record_store: RecordStore) -> None:
+        """The store's own bookkeeping attributes never reach a reader."""
+        item = {"pk": "a", "sk": "1", "value": "first"}
+        any_record_store.put_if_not_exists(TABLE, item)
+
+        assert any_record_store.get(TABLE, {"pk": "a", "sk": "1"}).data == item
+        assert any_record_store.query(TABLE, RecordQuery(partition="a")).data == [item]
+
+    @pytest.mark.parametrize("operation", ["put", "put_if_not_exists"])
+    def test_a_reserved_attribute_name_is_refused(self, any_record_store: RecordStore, operation: str) -> None:
+        with pytest.raises(ValueError, match="reserved"):
+            getattr(any_record_store, operation)(TABLE, {"pk": "a", "sk": "1", "_rs_write_token": "forged"})
+
+        assert any_record_store.get(TABLE, {"pk": "a", "sk": "1"}).status == OperationStatus.NOT_FOUND
+
 
 class TestKeyConditions:
     """Partition equality plus an optional eq, lt or begins_with sort condition."""

@@ -153,6 +153,25 @@ type RecordChange = SetAttribute | RemoveAttribute | IncrementAttribute
 
 type ExpectedValue = KeyValue | bool | None
 
+# Attribute names under this prefix belong to the record stores, never to callers.
+RESERVED_ATTRIBUTE_PREFIX = "_rs_"
+
+
+def _check_attribute_name(attribute: str) -> None:
+    if attribute.startswith(RESERVED_ATTRIBUTE_PREFIX):
+        raise ValueError(f"attribute {attribute!r} uses the reserved prefix {RESERVED_ATTRIBUTE_PREFIX!r}")
+
+
+def validate_record_item(item: Mapping[str, Any]) -> None:
+    """Check that an item written by a caller names no reserved attribute.
+
+    Raises:
+        ValueError: An attribute name starts with ``RESERVED_ATTRIBUTE_PREFIX``,
+            a caller programming error.
+    """
+    for attribute in item:
+        _check_attribute_name(attribute)
+
 
 def validate_record_update(
     table: RecordTable,
@@ -166,8 +185,9 @@ def validate_record_update(
         ValueError: The key does not name exactly the table's key attributes,
             a change or guard entry targets a key attribute, the change set is
             empty, one attribute is named by more than one change, or an
-            increment delta is not an ``int``. All are caller programming
-            errors, not runtime backend failures.
+            increment delta is not an ``int``, or a change or guard names a
+            reserved attribute. All are caller programming errors, not
+            runtime backend failures.
     """
     key_attributes = {table.key.partition} if table.key.sort is None else {table.key.partition, table.key.sort}
     if set(key) != key_attributes or any(key[attribute] is None for attribute in key_attributes):
@@ -176,6 +196,7 @@ def validate_record_update(
         raise ValueError("update requires at least one change")
     seen: set[str] = set()
     for change in changes:
+        _check_attribute_name(change.attribute)
         if change.attribute in key_attributes:
             raise ValueError(f"change on key attribute {change.attribute!r}")
         if change.attribute in seen:
@@ -184,6 +205,7 @@ def validate_record_update(
         if isinstance(change, IncrementAttribute) and type(change.delta) is not int:
             raise ValueError(f"increment delta for {change.attribute!r} must be an integer")
     for attribute in expected or {}:
+        _check_attribute_name(attribute)
         if attribute in key_attributes:
             raise ValueError(f"guard on key attribute {attribute!r}")
 
@@ -207,6 +229,13 @@ class RecordStore(Protocol):
       ``success`` with ``data=None`` and nothing written;
     - an increment is not idempotent: an SDK retry after a lost response may
       apply it twice, which is acceptable for counters.
+
+    ``put_if_not_exists`` returns ``data=True`` only to the call that created
+    the item, including when the SDK retried that call after a lost response,
+    and ``data=False`` when the item already existed. A store may keep its own
+    bookkeeping on items under ``RESERVED_ATTRIBUTE_PREFIX``; reads never
+    return it, and an item, change or guard naming such an attribute raises
+    ``ValueError``.
 
     Appending to a list attribute is deliberately not offered: a growing
     sequence, such as incident timeline entries, is stored as its own records
