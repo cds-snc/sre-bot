@@ -31,6 +31,10 @@ The feature uses the organisation's incident words, and code, catalogues and rec
 
 The record is keyed by an **app-generated, opaque incident id**; the conversation is a resource, never the key. The legacy table's UUID is that id, so existing records survive the move to the store. The record holds the title, the product, the severity, the security flag and the declarer; the status; the timing fields declared, detection, impact start and impact end, from which time to detect and time to recover derive; the five roles as person references (an email or platform account today; a person id with [people-and-accounts.md](people-and-accounts.md), TASK-83); and **typed references** to its resources, each a frozen dataclass carrying the **system, the tenant and the vendor id** plus the vendor-provided link (never built by formatting a URL): conversation, report, video call, postmortem meeting, external case and source alert. Timeline entries and status updates are **their own records under the incident**, never a list attribute, so nothing is written with a read-modify-write or a vendor list-append.
 
+The security flag is a yes or no answer, required at declare and editable by the coordinator; there is no third state. The status is always one of the five values; a stored value outside them makes the record unreadable, never a guessed status. Optional fields that were never captured are absent (not recorded, not rated, not assigned), never a placeholder string.
+
+**Stored form.** Attribute names are the record's own names, with no legacy names. Each reference is one map attribute named for its kind (`conversation`, `report`, `video_call`, `postmortem_meeting`, `external_case`, `source_alert`) holding `system`, `tenant`, `vendor_id` and an optional `url` hint the owning adapter can re-render; a map is replaced whole, never patched, and a replaced resource (a recreated channel) is a new map, its history kept in the audit trail, not on the item. The conversation's vendor id is also stored top-level as `channel_id`, because an index key must be a top-level attribute: the `by_channel` index serves the lookup by conversation for every chat system, and the store keeps only results whose system and tenant match before applying the zero, one or ambiguous rule. Writers stamp `record_version`; an item without it is a legacy item.
+
 ### The feature umbrella
 
 `features/incident/` follows [feature-packages.md](feature-packages.md): subdomains above `core/` above `common/`, imports one way, `core/` reached only through `core/api.py`. **Subdomains are the stages and audiences of the incident process, named in the domain's words. Capabilities are the mechanisms they use; a subdomain is never named for a mechanism.** The test for where a surface goes: who is it for, and when in the incident does it happen? One command joins the subdomain whose users need it at that point.
@@ -102,7 +106,7 @@ Each waits for the people it depends on and is not scheduled. Backed by the orga
 - Review: the store writes timeline entries and status updates as records; no `list_append` and no get-then-put in `core/`.
 - Test: with the postmortem-records flag off, no TASK-147 surface is registered and the doc timeline, doc action-items table and current draft behave as before; with it on, no action item is stored only in a document, and `draft` writes nothing into the report document.
 - Review: action items carry an issue reference with system and vendor id, never a bare URL; the narrative snapshot is stored in the record at review completion.
-- Test: with no new human messages since the latest approved update, drafting makes no model call; a security or unknown-flag incident makes no model call until the responder confirms; the form has no AI section when text generation is unconfigured and saving and approving still work; no status-update use case posts to the incident conversation.
+- Test: with no new human messages since the latest approved update, drafting makes no model call; a security incident makes no model call until the responder confirms; the form has no AI section when text generation is unconfigured and saving and approving still work; no status-update use case posts to the incident conversation.
 
 ## Migration
 
@@ -118,6 +122,17 @@ Tolerated until then, each closing in a TASK-145 slice:
 - draft and summarize calling the OpenAI `Summarizer` directly, and `comms`' local `TextGenerator` interface, until TASK-25.10;
 - the single Google tenant as the implied system for every new incident.
 
+**Legacy data upgrade.** Every migration of stored legacy data, in this feature and others, follows one rule set:
+1. Expand, backfill, switch reads, contract: writers produce the end-state shape and readers accept both before any backfill runs.
+2. One pure upgrade function per record type, shared by the read bridge and the backfill, so the legacy mapping exists once. For incidents it lives in `core/adapters/` and the end-state reader never contains a legacy branch.
+3. One runner: an in-app job holding a lease, reached through the service scope opener, with a mode setting `off` (the default, not registered), `dry_run` or `apply`; every write is a guarded records update, each run emits one structured report with its counts, and it runs per environment, dry run first. No one-off script: nothing can run one in production.
+4. A version marker: the backfill only touches items without it and stamps it, so reruns change nothing; the read bridge applies only to items without it.
+5. Legacy attributes stay on the item until the contract step.
+6. The backfill is final only once no legacy writer remains, so it is rerun after the last legacy writer is removed.
+7. A value the upgrade cannot map with confidence fails the run with the list of records to fix by hand; it is never guessed. The bridge and the job are deleted once a production run reports nothing pending.
+
+For incidents (TASK-145.5.8 builds the function, TASK-145.5.7 the job, TASK-145.13 deletes both): the legacy status matches the five values ignoring case and surrounding spaces; a missing security flag is no, because it was only stored from 2026-10-07; `none` and a missing severity are unset; `"Unknown"` and blank times and products are not recorded; the bare channel id, report URL and Meet URL become references for the configured Slack and Google tenants.
+
 **Changes:**
 - 2026-10-02: Accepted (TASK-97). Option A with the external-platform seam kept optional; calendar consumed as a workplace capability (TASK-138).
 - 2026-10-06 to 2026-10-08: external status updates as records in `core/`, shown in modals only, security confirmation before drafting, legacy `updates` command retired (TASK-140).
@@ -129,3 +144,4 @@ Tolerated until then, each closing in a TASK-145 slice:
 - 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).
 - 2026-10-13: the postmortem is a record the app owns: facts and action items (with GitHub Issues as the first tracker and reminders as a scheduled job) move from the expansions into `postmortem/`; the report document narrows to the narrative; built dark behind one flag; `IncidentStore` has no interim vendor adapter (TASK-147, TASK-145.5).
 - 2026-10-15: the new-incident policy names a system, unset by default and then resolving to the only configured system; the feature is skipped when the resolution fails (TASK-153).
+- 2026-10-15: the stored form (record names, one reference map per kind, `channel_id` as the lookup copy filtered by system and tenant, `record_version`), the yes or no security flag, the strict status and the legacy data upgrade rule set (TASK-145.5.4).
