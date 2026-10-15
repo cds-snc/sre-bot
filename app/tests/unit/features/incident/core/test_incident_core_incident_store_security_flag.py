@@ -14,12 +14,14 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.records import RecordStore
+from contracts.workplace import WorkplaceSystem
 from features.incident.core.store import RecordIncidentStore, incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
 
 pytestmark = pytest.mark.unit
 
 TABLE = incidents_table("incidents")
+TENANTS = {WorkplaceSystem.SLACK: "T0SLACK"}
 INCIDENT_ID = "7f0c3a52-3d0e-4d55-9a4e-6f1f2b9c0a11"
 
 
@@ -37,7 +39,7 @@ def _store(security_incident: object) -> RecordIncidentStore:
             "security_incident": security_incident,
         },
     )
-    return RecordIncidentStore(records, TABLE)
+    return RecordIncidentStore(records, TABLE, TENANTS)
 
 
 @pytest.mark.parametrize("flag", [True, False])
@@ -72,6 +74,6 @@ def test_a_store_failure_is_classified_and_never_false() -> None:
         OperationStatus.PERMANENT_ERROR, message="AccessDenied", error_code="FORBIDDEN"
     )
 
-    result = RecordIncidentStore(records, TABLE).read_security_flag(INCIDENT_ID)
+    result = RecordIncidentStore(records, TABLE, TENANTS).read_security_flag(INCIDENT_ID)
 
     assert (result.status, result.error_code, result.data) == (OperationStatus.PERMANENT_ERROR, "FORBIDDEN", None)

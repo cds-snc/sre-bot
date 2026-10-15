@@ -31,6 +31,7 @@ pytestmark = pytest.mark.unit
 TABLE = incidents_table("incidents")
 CHANNEL = "C0INCIDENT"
 TENANT = "T0TENANT"
+TENANTS = {WorkplaceSystem.SLACK: TENANT}
 OTHER_TENANT = "T0OTHER"
 CONVERSATION = ConversationReference(system=WorkplaceSystem.SLACK, tenant=TENANT, vendor_id=CHANNEL)
 
@@ -60,7 +61,7 @@ def _store(*items: dict[str, Any]) -> RecordIncidentStore:
     records = InMemoryRecordStore()
     for item in items:
         assert records.put(TABLE, item).is_success
-    return RecordIncidentStore(records, TABLE)
+    return RecordIncidentStore(records, TABLE, TENANTS)
 
 
 def _incident(incident_id: str, conversation: ConversationReference | None = CONVERSATION) -> Incident:
@@ -138,7 +139,7 @@ def test_the_index_read_returns_non_key_attributes() -> None:
 
 def test_a_blank_conversation_id_queries_nothing() -> None:
     records = MagicMock(spec=RecordStore)
-    RecordIncidentStore(records, TABLE).find_by_conversation(_blank_conversation())
+    RecordIncidentStore(records, TABLE, TENANTS).find_by_conversation(_blank_conversation())
 
     records.query.assert_not_called()
 
@@ -180,8 +181,8 @@ def test_a_candidate_with_an_unreadable_conversation_map_is_skipped() -> None:
     assert store.find_by_conversation(CONVERSATION).data is not None
 
 
-def test_a_candidate_without_record_version_fails_closed_as_unreadable() -> None:
-    """Without the version its tenant cannot be trusted, so the lookup refuses instead of guessing."""
+def test_an_unreadable_candidate_fails_closed_as_unreadable() -> None:
+    """The candidate has no record_version and no legacy name, so its tenant cannot be checked and the lookup refuses instead of guessing."""
     store = _store(_item("inc-ours"), _item("inc-legacy", record_version=None))
 
     result = store.find_by_conversation(CONVERSATION)
@@ -196,7 +197,7 @@ def test_reaching_the_query_bound_is_ambiguous_without_a_fallback() -> None:
     for number in range(10):
         records.put(TABLE, _item(f"inc-{number}", tenant=OTHER_TENANT))
     spy = MagicMock(wraps=records)
-    store = RecordIncidentStore(spy, TABLE)
+    store = RecordIncidentStore(spy, TABLE, TENANTS)
 
     result = store.find_by_conversation(CONVERSATION)
 
@@ -210,7 +211,7 @@ def test_a_store_failure_is_classified_with_its_retry_hint() -> None:
         OperationStatus.TRANSIENT_ERROR, message="ThrottlingException", error_code="THROTTLED", retry_after=1.5
     )
 
-    result = RecordIncidentStore(records, TABLE).find_by_conversation(CONVERSATION)
+    result = RecordIncidentStore(records, TABLE, TENANTS).find_by_conversation(CONVERSATION)
 
     assert (result.status, result.error_code, result.retry_after) == (OperationStatus.TRANSIENT_ERROR, "THROTTLED", 1.5)
     assert result.message is not None

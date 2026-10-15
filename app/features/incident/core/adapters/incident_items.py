@@ -1,4 +1,4 @@
-"""Read an end-state incident item into the ``Incident`` record.
+"""Read an end-state incident item into the ``Incident`` record, and format its stored times.
 
 Pure: no store and no I/O. Stored attributes are named after the record fields
 (decisions/incident-management.md, The incident record); each reference kind is
@@ -13,7 +13,7 @@ the incident id and field; the incident stays readable.
 """
 
 from collections.abc import Mapping
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -118,6 +118,17 @@ def read_reference[R: ResourceReference](item: Mapping[str, Any], field: str, ki
         # Never log the map: its url may carry a vendor link.
         logger.warning("incident_field_unreadable", incident_id=incident_id, field=field)
         return None
+
+
+def format_stored_time(value: datetime) -> str:
+    """Return the stored form of a time: fixed-width ISO-8601 in UTC with its +00:00 offset.
+
+    Microseconds are always written, so stored times sort as text in time order.
+    A naive time raises ``ValueError``: storing it would assume the host timezone.
+    """
+    if value.utcoffset() is None:
+        raise ValueError("a stored time must be timezone-aware")
+    return value.astimezone(UTC).isoformat(timespec="microseconds")
 
 
 def incident_record_unreadable[T]() -> OperationResult[T]:
