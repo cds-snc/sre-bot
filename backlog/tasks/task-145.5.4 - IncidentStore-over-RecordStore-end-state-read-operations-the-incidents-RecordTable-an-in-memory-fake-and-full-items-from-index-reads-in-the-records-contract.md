@@ -4,10 +4,10 @@ title: >-
   IncidentStore over RecordStore: end-state read operations, the incidents
   RecordTable, an in-memory fake, and full items from index reads in the records
   contract
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-14 23:09'
-updated_date: '2026-10-15 18:27'
+updated_date: '2026-10-15 18:56'
 labels:
   - incident
   - features
@@ -44,14 +44,14 @@ DECISION RECORD (human, 2026-10-14): key formats, applied by the writers. opened
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 IncidentStore (Protocol in core/store.py, exported from core/api.py) is implemented over RecordStore with get, find_by_conversation, list_open and read_security_flag (returning bool), reading end-state items, tested against InMemoryRecordStore; no module in core/ imports an AWS client
-- [ ] #2 find_by_conversation takes the caller's ConversationReference, queries by_channel with a small bound, keeps only items matching its system and tenant, and handles zero, one, several (ambiguous), a blank id and the bound being reached (ambiguous, no bounded-list fallback); two tenants sharing one id are told apart; list_open returns only incidents carrying open_bucket, ordered by opened_at
-- [ ] #3 The end-state parser reads attributes named after the record fields (title, declared_by, declared_at, product, severity 0 to 4, security_incident, the five roles, one nested map per reference kind) with tolerant optional values: a severity outside 0 to 4, an unreadable optional time, a blank product or role, and a reference with a system that is not a WorkplaceSystem member, an invalid shape or a blank tenant read as not recorded, not assigned or no reference, each logged with the incident id and field, never raising
-- [ ] #4 An in-memory IncidentStore fake that explicitly subclasses the Protocol is importable from core/adapters/in_memory.py for consumer tests, with the same classifications as the real store
-- [ ] #5 The RecordStore docstring and conformance suite state and check that an index query returns full items on both stores
-- [ ] #6 No write operation is on IncidentStore, the store docstring names the slices that add them (TASK-145.7 create, TASK-145.8 update, TASK-145.9 timeline append), and timeline_table and the key-format helpers are absent from this layer
-- [ ] #7 A required value that is unreadable (status, declared_by, declared_at, security_incident) and an item without record_version return a classified INCIDENT_RECORD_UNREADABLE result logged with the incident id and field, never an exception; Incident carries declared_by and a required security_incident bool (IncidentSecurityFlag stays exported for TASK-145.5.5)
-- [ ] #8 The store takes no tenant ids and no settings object, and no module in features/incident imports a vendor settings slice (rg finds none); the legacy item bridge is not part of this layer
+- [x] #1 IncidentStore (Protocol in core/store.py, exported from core/api.py) is implemented over RecordStore with get, find_by_conversation, list_open and read_security_flag (returning bool), reading end-state items, tested against InMemoryRecordStore; no module in core/ imports an AWS client
+- [x] #2 find_by_conversation takes the caller's ConversationReference, queries by_channel with a small bound, keeps only items matching its system and tenant, and handles zero, one, several (ambiguous), a blank id and the bound being reached (ambiguous, no bounded-list fallback); two tenants sharing one id are told apart; list_open returns only incidents carrying open_bucket, ordered by opened_at
+- [x] #3 The end-state parser reads attributes named after the record fields (title, declared_by, declared_at, product, severity 0 to 4, security_incident, the five roles, one nested map per reference kind) with tolerant optional values: a severity outside 0 to 4, an unreadable optional time, a blank product or role, and a reference with a system that is not a WorkplaceSystem member, an invalid shape or a blank tenant read as not recorded, not assigned or no reference, each logged with the incident id and field, never raising
+- [x] #4 An in-memory IncidentStore fake that explicitly subclasses the Protocol is importable from core/adapters/in_memory.py for consumer tests, with the same classifications as the real store
+- [x] #5 The RecordStore docstring and conformance suite state and check that an index query returns full items on both stores
+- [x] #6 No write operation is on IncidentStore, the store docstring names the slices that add them (TASK-145.7 create, TASK-145.8 update, TASK-145.9 timeline append), and timeline_table and the key-format helpers are absent from this layer
+- [x] #7 A required value that is unreadable (status, declared_by, declared_at, security_incident) and an item without record_version return a classified INCIDENT_RECORD_UNREADABLE result logged with the incident id and field, never an exception; Incident carries declared_by and a required security_incident bool (IncidentSecurityFlag stays exported for TASK-145.5.5)
+- [x] #8 The store takes no tenant ids and no settings object, and no module in features/incident imports a vendor settings slice (rg finds none); the legacy item bridge is not part of this layer
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -124,6 +124,25 @@ No production caller reads the store, so runtime behaviour is unchanged; Inciden
 
 GATES (from app/): ruff check ., ruff format --check, lint-imports, mypy on touched files (0 in touched), pytest tests --ignore=tests/smoke.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented end-state reads (layer 5 of Stack K).
+
+- core/store.py: IncidentStore Protocol (exported from core/api.py; get, find_by_conversation, list_open, read_security_flag, no write operation, docstring names TASK-145.7/145.8/145.9), incidents_table(name) with by_channel and open matching terraform/dynamodb.tf (test reads the tf text), RECORD_VERSION = 1, OPEN_BUCKET = 'OPEN', RecordIncidentStore over RecordStore. find_by_conversation: by_channel with bound 10; a full page is AMBIGUOUS_INCIDENT_CONVERSATION; candidates of another system or tenant, or with an unreadable conversation map, are skipped before parsing; a candidate without record_version fails closed as INCIDENT_RECORD_UNREADABLE. list_open fails whole on one unreadable item (a partial list would hide an open incident). Store failures keep status, error_code and retry_after with a generic message; NOT_FOUND from a query becomes PERMANENT_ERROR.
+- core/adapters/incident_items.py: pure parser; required id, title, status (exact value), declared_by, declared_at (aware), security_incident (bool) else INCIDENT_RECORD_UNREADABLE (status logs its stored value); tolerant optional times, severity (int or integral Decimal 0-4, bools refused), product, roles, references (logged incident_field_unreadable with incident id and field; reference maps are never logged since url may be a vendor link). read_reference is generic over the reference kind.
+- core/adapters/in_memory.py: InMemoryIncidentStore(IncidentStore), seed(incident, *, open=None), same classifications (shared helpers in store.py), list_open by declared_at.
+- core/domain.py: Incident.declared_by; security_incident: bool required after declared_at, validated as bool. IncidentSecurityFlag untouched (TASK-145.5.5).
+- contracts: ErrorCode.INCIDENT_RECORD_UNREADABLE; RecordStore and DynamoDBRecordStore.query docstrings state index queries return full items; conformance case on both stores.
+- features/incident/README.md core row updated.
+
+Size: about 514 production lines with docstrings (store.py 228, parser 206, fake +57, rest ~23), about 345 executable; above the plan's ~390/under-300 estimate. The parser grew with explicit keyword arguments that mypy can check.
+
+AC1 and AC8 scope: the new modules import no AWS client and no settings. core/adapters/legacy_incidents.py and status_updates.py still import integrations.aws (client and settings); they predate this layer and go with TASK-145.5.5 and TASK-145.5.6. No module in features/incident imports a Slack or Google settings slice.
+
+Gates (from app/): ruff check . -> All checks passed; ruff format --check . -> 961 files already formatted; lint-imports -> 12 kept, 0 broken; bin.check_fake_coverage -> OK; mypy . -> 48 errors in 19 files, 0 in touched files; pytest tests --ignore=tests/smoke -> 5174 passed.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
