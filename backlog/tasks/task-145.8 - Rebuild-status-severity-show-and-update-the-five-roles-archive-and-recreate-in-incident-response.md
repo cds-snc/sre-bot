@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-14 19:31'
+updated_date: '2026-10-15 20:53'
 labels:
   - incident
   - features
@@ -14,6 +14,7 @@ labels:
 dependencies:
   - TASK-145.7
   - TASK-27.2
+  - TASK-36.1.2
 parent_task_id: TASK-145
 priority: medium
 type: feature
