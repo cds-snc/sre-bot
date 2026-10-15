@@ -15,12 +15,14 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.records import RecordStore
+from contracts.workplace import WorkplaceSystem
 from features.incident.core.store import OPEN_BUCKET, RecordIncidentStore, incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
 
 pytestmark = pytest.mark.unit
 
 TABLE = incidents_table("incidents")
+TENANTS = {WorkplaceSystem.SLACK: "T0SLACK"}
 
 
 def _item(incident_id: str, *, opened_at: str | None = None, **overrides: Any) -> dict[str, Any]:
@@ -43,7 +45,7 @@ def _store(*items: dict[str, Any]) -> RecordIncidentStore:
     records = InMemoryRecordStore()
     for item in items:
         assert records.put(TABLE, item).is_success
-    return RecordIncidentStore(records, TABLE)
+    return RecordIncidentStore(records, TABLE, TENANTS)
 
 
 def test_only_open_incidents_come_back_oldest_first() -> None:
@@ -68,8 +70,8 @@ def test_no_open_incident_is_an_empty_list() -> None:
     assert list(result.data) == []
 
 
-def test_an_open_item_without_record_version_makes_the_list_unreadable() -> None:
-    """A partial list would hide an open incident, so the read refuses."""
+def test_an_open_item_of_neither_shape_makes_the_list_unreadable() -> None:
+    """The item has no record_version and no legacy name; a partial list would hide an open incident, so the read refuses."""
     store = _store(
         _item("ok", opened_at="2026-10-15T09:00:00.000000+00:00"),
         _item("legacy", opened_at="2026-10-15T10:00:00.000000+00:00", record_version=None),
@@ -87,7 +89,7 @@ def test_a_store_failure_is_classified() -> None:
         OperationStatus.TRANSIENT_ERROR, message="timeout talking to dynamodb", error_code="TIMEOUT"
     )
 
-    result = RecordIncidentStore(records, TABLE).list_open()
+    result = RecordIncidentStore(records, TABLE, TENANTS).list_open()
 
     assert (result.status, result.error_code) == (OperationStatus.TRANSIENT_ERROR, "TIMEOUT")
     assert result.message is not None

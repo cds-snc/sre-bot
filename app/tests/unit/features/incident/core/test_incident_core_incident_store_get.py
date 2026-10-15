@@ -16,6 +16,7 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.records import RecordStore
+from contracts.workplace import WorkplaceSystem
 from features.incident.common.vocabulary import Severity
 from features.incident.core.store import IncidentStore, RecordIncidentStore, incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
@@ -23,6 +24,7 @@ from infrastructure.records.in_memory import InMemoryRecordStore
 pytestmark = pytest.mark.unit
 
 TABLE = incidents_table("incidents")
+TENANTS = {WorkplaceSystem.SLACK: "T0SLACK"}
 INCIDENT_ID = "7f0c3a52-3d0e-4d55-9a4e-6f1f2b9c0a11"
 
 
@@ -45,7 +47,7 @@ def _store(*items: dict[str, Any]) -> RecordIncidentStore:
     records = InMemoryRecordStore()
     for item in items:
         assert records.put(TABLE, item).is_success
-    return RecordIncidentStore(records, TABLE)
+    return RecordIncidentStore(records, TABLE, TENANTS)
 
 
 def test_the_store_satisfies_the_protocol() -> None:
@@ -81,7 +83,7 @@ def test_a_store_failure_is_classified_with_a_generic_message() -> None:
     )
 
     with capture_logs() as logs:
-        result = RecordIncidentStore(records, TABLE).get(INCIDENT_ID)
+        result = RecordIncidentStore(records, TABLE, TENANTS).get(INCIDENT_ID)
 
     assert (result.status, result.error_code, result.retry_after) == (OperationStatus.TRANSIENT_ERROR, "THROTTLED", 2.0)
     assert result.message is not None
@@ -90,14 +92,15 @@ def test_a_store_failure_is_classified_with_a_generic_message() -> None:
     assert [(log["operation"], log["table"], log["error_code"]) for log in failures] == [("get", "incidents", "THROTTLED")]
 
 
-def test_an_item_without_record_version_is_unreadable_until_the_bridge() -> None:
-    """A legacy item is not read as end state; it is classified and logged as not upgraded."""
+def test_an_item_of_neither_shape_is_unreadable() -> None:
+    """Without record_version the item goes through the legacy bridge, which finds no legacy name either."""
     with capture_logs() as logs:
         result = _store(_item(record_version=None)).get(INCIDENT_ID)
 
     assert result.status is OperationStatus.PERMANENT_ERROR
     assert result.error_code == ErrorCode.INCIDENT_RECORD_UNREADABLE
-    assert [log["incident_id"] for log in logs if log["event"] == "incident_item_not_upgraded"] == [INCIDENT_ID]
+    unreadable = [log for log in logs if log["event"] == "incident_record_unreadable"]
+    assert [(log["operation"], log["incident_id"], log["field"]) for log in unreadable] == [("get", INCIDENT_ID, "name")]
 
 
 def test_an_unreadable_status_is_unreadable_with_the_stored_value_logged() -> None:

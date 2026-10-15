@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-14 23:10'
-updated_date: '2026-10-15 18:20'
+updated_date: '2026-10-15 19:19'
 labels:
   - incident
   - features
@@ -37,7 +37,7 @@ Layer 10 of Stack K (handoff doc-13). The single legacy data upgrade for the inc
 WHAT IT DOES
 - Reads the whole incidents table with TASK-27.5's bounded full-table read and selects the items without record_version.
 - Runs each through the pure upgrade function features/incident/core/adapters/legacy_items.py (TASK-145.5.8; the same function the read bridge uses), then writes the end-state attributes and the nested reference maps (conversation, report, video_call, postmortem_meeting, external_case, source_alert, each {system, tenant, vendor_id, url}), sets open_bucket OPEN and opened_at (fixed-width ISO-8601 UTC of the legacy created_at) for incidents not Closed, and stamps record_version 1, in one guarded RecordStore.update per item (guarded on record_version absent), so reruns are no-ops and a concurrent writer wins.
-- RECORD_VERSION and OPEN_BUCKET come from core/store.py (TASK-145.5.4). opened_at and every stored time use the stored-time formatter in core/store.py, added by TASK-145.5.8.
+- RECORD_VERSION and OPEN_BUCKET come from core/store.py (TASK-145.5.4). opened_at and every stored time use the stored-time formatter format_stored_time in core/adapters/incident_items.py, added by TASK-145.5.8.
 - Legacy attributes are kept on the item; TASK-145.13 leaves them in place (no strip pass). channel_id stays as the by_channel key.
 - Status matches the five IncidentStatus values ignoring case and surrounding whitespace (production: 30 `closed` and 1 `reviewed` lowercase of 323 items). Any other value fails the run before apply writes anything, with the list of incident ids and stored values, for a manual fix in the table.
 - A missing legacy security flag becomes security_incident false.

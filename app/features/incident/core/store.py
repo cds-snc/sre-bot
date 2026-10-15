@@ -1,9 +1,10 @@
 """The incident store: the ``IncidentStore`` interface and its records-backed implementation.
 
 ``RecordIncidentStore`` reads the incidents table through the records contract
-(``RecordStore``), never a cloud SDK. It reads end-state items only, those
-carrying ``record_version``; an item without it is ``INCIDENT_RECORD_UNREADABLE``
-until the legacy item bridge (TASK-145.5.8) upgrades it on read.
+(``RecordStore``), never a cloud SDK. An item carrying ``record_version`` is
+parsed as stored; an item without it is upgraded on read by the legacy item
+bridge (``adapters/legacy_items.py``) with the configured tenants, and is
+``INCIDENT_RECORD_UNREADABLE`` when the bridge cannot read it.
 
 Production does not build this store yet: TASK-145.5.5 builds it from the
 registry with the table name from the incident core settings.
@@ -18,11 +19,13 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.records import KeySchema, RecordIndex, RecordQuery, RecordStore, RecordTable
+from contracts.workplace import WorkplaceSystem
 from features.incident.core.adapters.incident_items import (
     incident_record_unreadable,
     parse_incident_item,
     read_reference,
 )
+from features.incident.core.adapters.legacy_items import UnreadableLegacyItem, upgrade_legacy_item
 from features.incident.core.domain import ConversationReference, Incident
 
 logger = structlog.get_logger()
@@ -86,11 +89,16 @@ class IncidentStore(Protocol):
 
 
 class RecordIncidentStore(IncidentStore):
-    """Read incidents from the incidents table through the records contract."""
+    """Read incidents from the incidents table through the records contract.
 
-    def __init__(self, records: RecordStore, table: RecordTable) -> None:
+    ``tenants`` is the configured tenant per workplace system, which the legacy
+    item bridge gives the references of items without ``record_version``.
+    """
+
+    def __init__(self, records: RecordStore, table: RecordTable, tenants: Mapping[WorkplaceSystem, str]) -> None:
         self._records = records
         self._table = table
+        self._tenants = tenants
 
     def get(self, incident_id: str) -> OperationResult[Incident]:
         """Return the incident with this id."""
@@ -109,8 +117,9 @@ class RecordIncidentStore(IncidentStore):
 
         Queries the by_channel index with a small bound; index reads return full
         items. A candidate of another system or tenant, or with an unreadable
-        conversation, is skipped before parsing. A candidate without
-        ``record_version`` cannot be checked, so the lookup fails closed. A full
+        conversation, is skipped before parsing; a legacy candidate is upgraded
+        first. A candidate that cannot be read cannot be checked, so the lookup
+        fails closed. A full
         page means more may exist, so it is ambiguous; there is no fallback read.
         """
         if not conversation.vendor_id.strip():
@@ -126,8 +135,9 @@ class RecordIncidentStore(IncidentStore):
         if len(candidates) >= _CONVERSATION_QUERY_BOUND:
             return ambiguous_conversation(conversation, match_count=len(candidates))
         matches = []
-        for item in candidates:
-            if not _is_end_state(item, operation=operation):
+        for candidate in candidates:
+            item = self._end_state(candidate, operation=operation)
+            if item is None:
                 return incident_record_unreadable()
             stored = read_reference(item, "conversation", ConversationReference, item.get("id"))
             if stored is not None and (stored.system, stored.tenant) == (conversation.system, conversation.tenant):
@@ -136,12 +146,13 @@ class RecordIncidentStore(IncidentStore):
             return not_an_incident()
         if len(matches) > 1:
             return ambiguous_conversation(conversation, match_count=len(matches))
-        return self._parse(matches[0], operation=operation)
+        return parse_incident_item(matches[0])
 
     def list_open(self) -> OperationResult[Sequence[Incident]]:
         """Return every incident carrying open_bucket, oldest first by opened_at.
 
-        One unreadable item fails the whole read: a partial list would hide an
+        Legacy items carry open_bucket only once the legacy upgrade job
+        (TASK-145.5.7) has run. One unreadable item fails the whole read: a partial list would hide an
         open incident.
         """
         result = self._records.query(self._table, RecordQuery(partition=OPEN_BUCKET, index="open"))
@@ -163,9 +174,28 @@ class RecordIncidentStore(IncidentStore):
         return OperationResult.success(data=incident.data.security_incident)
 
     def _parse(self, item: Mapping[str, Any], *, operation: str) -> OperationResult[Incident]:
-        if not _is_end_state(item, operation=operation):
+        end_state = self._end_state(item, operation=operation)
+        if end_state is None:
             return incident_record_unreadable()
-        return parse_incident_item(item)
+        return parse_incident_item(end_state)
+
+    def _end_state(self, item: Mapping[str, Any], *, operation: str) -> Mapping[str, Any] | None:
+        """Return the item in the end-state shape, upgrading a legacy one; ``None`` when it cannot be read."""
+        if item.get("record_version") is not None:
+            return item
+        upgraded = upgrade_legacy_item(item, self._tenants)
+        if isinstance(upgraded, UnreadableLegacyItem):
+            # The value is logged for status only: other legacy values may be vendor links.
+            log_fields: dict[str, object] = {
+                "operation": operation,
+                "incident_id": upgraded.incident_id,
+                "field": upgraded.field,
+            }
+            if upgraded.field == "status":
+                log_fields["value"] = upgraded.value
+            logger.warning("incident_record_unreadable", **log_fields)
+            return None
+        return upgraded.item
 
     def _failed[T](self, result: OperationResult[Any], *, operation: str) -> OperationResult[T]:
         status = result.status
@@ -189,13 +219,6 @@ def _refusal[T](result: OperationResult[Any]) -> OperationResult[T]:
     return OperationResult.error(
         result.status, message=result.message or "", error_code=result.error_code, retry_after=result.retry_after
     )
-
-
-def _is_end_state(item: Mapping[str, Any], *, operation: str) -> bool:
-    if item.get("record_version") is not None:
-        return True
-    logger.warning("incident_item_not_upgraded", operation=operation, incident_id=item.get("id"))
-    return False
 
 
 def not_an_incident[T]() -> OperationResult[T]:
