@@ -98,6 +98,74 @@ resource "aws_dynamodb_table" "incidents_table" {
     name = "id"
     type = "S"
   }
+
+  attribute {
+    name = "channel_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "open_bucket"
+    type = "S"
+  }
+
+  attribute {
+    name = "opened_at"
+    type = "S"
+  }
+
+  # Look up the incident of a Slack channel.
+  # Write capacity matches the table's: with projection ALL every incident write is also written here.
+  global_secondary_index {
+    name            = "by_channel"
+    projection_type = "ALL"
+    read_capacity   = 1
+    write_capacity  = 2
+
+    key_schema {
+      attribute_name = "channel_id"
+      key_type       = "HASH"
+    }
+  }
+
+  # Sparse index of open incidents, oldest first.
+  # open_bucket is set to OPEN only while the incident is open; items without it are absent from the index.
+  # opened_at is fixed-width ISO-8601 UTC with microseconds and +00:00, so it sorts as text.
+  global_secondary_index {
+    name            = "open"
+    projection_type = "ALL"
+    read_capacity   = 1
+    write_capacity  = 2
+
+    key_schema {
+      attribute_name = "open_bucket"
+      key_type       = "HASH"
+    }
+    key_schema {
+      attribute_name = "opened_at"
+      key_type       = "RANGE"
+    }
+  }
+}
+
+# Incident timeline: one item per timeline entry.
+# entry_key is '<posted_at ISO-8601>#<entry_id>', so entries sort by posting time.
+resource "aws_dynamodb_table" "sre_bot_incident_timeline" {
+  name           = "sre_bot_incident_timeline"
+  hash_key       = "incident_id"
+  range_key      = "entry_key"
+  read_capacity  = 2
+  write_capacity = 2
+
+  attribute {
+    name = "incident_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "entry_key"
+    type = "S"
+  }
 }
 
 # Dedicated table for idempotency cache
@@ -161,19 +229,30 @@ resource "aws_dynamodb_table" "sre_bot_audit_trail" {
 
   global_secondary_index {
     name            = "user_email-timestamp-index"
-    hash_key        = "user_email"
-    range_key       = "timestamp"
     projection_type = "ALL"
     read_capacity   = 1
     write_capacity  = 1
+
+    key_schema {
+      attribute_name = "user_email"
+      key_type       = "HASH"
+    }
+    key_schema {
+      attribute_name = "timestamp"
+      key_type       = "RANGE"
+    }
   }
 
   global_secondary_index {
     name            = "correlation_id-index"
-    hash_key        = "correlation_id"
     projection_type = "ALL"
     read_capacity   = 1
     write_capacity  = 1
+
+    key_schema {
+      attribute_name = "correlation_id"
+      key_type       = "HASH"
+    }
   }
 }
 
@@ -208,12 +287,36 @@ resource "aws_dynamodb_table" "sre_bot_retry_records" {
   # Query ACTIVE or DLQ records that are due for processing (next_retry_at <= now)
   global_secondary_index {
     name            = "status-next_retry_at-index"
-    hash_key        = "status"
-    range_key       = "next_retry_at"
     projection_type = "ALL"
     read_capacity   = 2
     write_capacity  = 2
+
+    key_schema {
+      attribute_name = "status"
+      key_type       = "HASH"
+    }
+    key_schema {
+      attribute_name = "next_retry_at"
+      key_type       = "RANGE"
+    }
   }
+}
+
+# Every DynamoDB table goes in this list: it feeds both the backup selection below
+# and the task role's table statement in iam.tf, so a new table is backed up and reachable.
+locals {
+  dynamodb_table_arns = [
+    aws_dynamodb_table.webhooks_table.arn,
+    aws_dynamodb_table.aws_access_requests_table.arn,
+    aws_dynamodb_table.sre_bot_access.arn,
+    aws_dynamodb_table.sre_bot_access_requests.arn,
+    aws_dynamodb_table.sre_bot_incident_status_updates.arn,
+    aws_dynamodb_table.incidents_table.arn,
+    aws_dynamodb_table.sre_bot_incident_timeline.arn,
+    aws_dynamodb_table.sre_bot_idempotency.arn,
+    aws_dynamodb_table.sre_bot_audit_trail.arn,
+    aws_dynamodb_table.sre_bot_retry_records.arn,
+  ]
 }
 
 # The following code adds a backup configuration to the DynamoDB table.
@@ -256,16 +359,7 @@ resource "aws_backup_selection" "sre_bot_backup_selection" {
   name         = "sre-bot-dynamodb-backup-selection"
   plan_id      = aws_backup_plan.sre_bot_backup_plan.id
 
-  # Add all the tables we have created to the backup plan.
-  resources = [
-    aws_dynamodb_table.sre_bot_access.arn,
-    aws_dynamodb_table.webhooks_table.arn,
-    aws_dynamodb_table.aws_access_requests_table.arn,
-    aws_dynamodb_table.incidents_table.arn,
-    aws_dynamodb_table.sre_bot_idempotency.arn,
-    aws_dynamodb_table.sre_bot_audit_trail.arn,
-    aws_dynamodb_table.sre_bot_retry_records.arn,
-  ]
+  resources = local.dynamodb_table_arns
 }
 
 # Create an IAM role to allow AWS Backup to perform backups.
