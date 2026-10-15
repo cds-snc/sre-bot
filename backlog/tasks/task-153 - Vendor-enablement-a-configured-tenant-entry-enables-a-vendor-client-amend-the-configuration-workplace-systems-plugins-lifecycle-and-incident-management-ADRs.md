@@ -4,10 +4,10 @@ title: >-
   Vendor enablement: a configured tenant entry enables a vendor client; amend
   the configuration, workplace-systems, plugins, lifecycle and
   incident-management ADRs
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-15 16:06'
-updated_date: '2026-10-15 16:32'
+updated_date: '2026-10-15 16:40'
 labels:
   - decisions
   - configuration
