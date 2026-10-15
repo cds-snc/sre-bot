@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-14 23:08'
-updated_date: '2026-10-15 12:49'
+updated_date: '2026-10-15 13:02'
 labels:
   - incident
   - terraform
@@ -128,6 +128,12 @@ Gates:
 - ruff check .: All checks passed. mypy: no Python file touched (0 in touched files).
 - pytest tests --ignore=tests/smoke: 1 failed, 4884 passed. The failure is test_old_idempotency_package_is_not_discoverable, caused by the ignored local app/infrastructure/idempotency/__pycache__ directory (pre-existing, local only).
 AC 3 pending: PR tf_plan comment and the apply sequence (one apply).
+
+tf_plan on PR #1597 (commit 139b53c, 2026-10-15 12:51 UTC): Plan: 2 to add, 2 to change, 1 to destroy. add sre_bot_incident_timeline (incident_id HASH, entry_key RANGE, 2/2); update incidents_table (+3 attributes channel_id/open_bucket/opened_at, +2 GSIs by_channel and open, ALL, 1/2); update aws_iam_policy.sre-bot_secrets_manager (table statement gains the timeline ARN; whole document shows as known after apply because the new ARN is unknown until create); recreate aws_backup_selection.sre_bot_backup_selection (resources forces replacement; same plan and role, existing recovery points stay in the vault). Matches the expected change set.
+The plan warned 'hash_key is deprecated. Use key_schema instead' (19 occurrences): provider 6.56.0 deprecates global_secondary_index.hash_key/range_key (table-level hash_key/range_key are not deprecated, per terraform providers schema). Fixed here per the deprecation rule: all five GSIs (by_channel, open, user_email-timestamp-index, correlation_id-index, status-next_retry_at-index) use key_schema blocks.
+Plan-neutrality checked against DynamoDB Local with provider 6.56.0 (scratch config, deleted after): a table with a hash-only and a hash+range GSI created with hash_key/range_key, then the config switched to key_schema: terraform plan 'No changes'; switched back: 'No changes'. So existing audit trail and retry records indexes are not recreated. terraform validate: Success, no warnings. tflint: 7 warnings (baseline), none in dynamodb.tf or iam.tf. terraform fmt -check: exit 0.
+AC 3 re-check pending on the new tf_plan: expected identical to the above, with no change on sre_bot_audit_trail or sre_bot_retry_records and no deprecation warning.
+Apply sequence: one apply (provider creates the two GSIs one UpdateTable call at a time and waits for each ACTIVE; re-run tf_apply if the second create fails).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

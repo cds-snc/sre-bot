@@ -118,10 +118,14 @@ resource "aws_dynamodb_table" "incidents_table" {
   # Write capacity matches the table's: with projection ALL every incident write is also written here.
   global_secondary_index {
     name            = "by_channel"
-    hash_key        = "channel_id"
     projection_type = "ALL"
     read_capacity   = 1
     write_capacity  = 2
+
+    key_schema {
+      attribute_name = "channel_id"
+      key_type       = "HASH"
+    }
   }
 
   # Sparse index of open incidents, oldest first.
@@ -129,11 +133,18 @@ resource "aws_dynamodb_table" "incidents_table" {
   # opened_at is fixed-width ISO-8601 UTC with microseconds and +00:00, so it sorts as text.
   global_secondary_index {
     name            = "open"
-    hash_key        = "open_bucket"
-    range_key       = "opened_at"
     projection_type = "ALL"
     read_capacity   = 1
     write_capacity  = 2
+
+    key_schema {
+      attribute_name = "open_bucket"
+      key_type       = "HASH"
+    }
+    key_schema {
+      attribute_name = "opened_at"
+      key_type       = "RANGE"
+    }
   }
 }
 
@@ -218,19 +229,30 @@ resource "aws_dynamodb_table" "sre_bot_audit_trail" {
 
   global_secondary_index {
     name            = "user_email-timestamp-index"
-    hash_key        = "user_email"
-    range_key       = "timestamp"
     projection_type = "ALL"
     read_capacity   = 1
     write_capacity  = 1
+
+    key_schema {
+      attribute_name = "user_email"
+      key_type       = "HASH"
+    }
+    key_schema {
+      attribute_name = "timestamp"
+      key_type       = "RANGE"
+    }
   }
 
   global_secondary_index {
     name            = "correlation_id-index"
-    hash_key        = "correlation_id"
     projection_type = "ALL"
     read_capacity   = 1
     write_capacity  = 1
+
+    key_schema {
+      attribute_name = "correlation_id"
+      key_type       = "HASH"
+    }
   }
 }
 
@@ -265,11 +287,18 @@ resource "aws_dynamodb_table" "sre_bot_retry_records" {
   # Query ACTIVE or DLQ records that are due for processing (next_retry_at <= now)
   global_secondary_index {
     name            = "status-next_retry_at-index"
-    hash_key        = "status"
-    range_key       = "next_retry_at"
     projection_type = "ALL"
     read_capacity   = 2
     write_capacity  = 2
+
+    key_schema {
+      attribute_name = "status"
+      key_type       = "HASH"
+    }
+    key_schema {
+      attribute_name = "next_retry_at"
+      key_type       = "RANGE"
+    }
   }
 }
 

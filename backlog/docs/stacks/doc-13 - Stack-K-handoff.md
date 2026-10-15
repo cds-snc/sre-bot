@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: '2026-10-14 22:27'
-updated_date: '2026-10-15 12:40'
+updated_date: '2026-10-15 13:02'
 ---
 # Stack K handoff
 
@@ -21,7 +21,7 @@ updated_date: '2026-10-15 12:40'
 | --- | --- | --- | --- | --- | --- |
 | 0 | Planning edits (tasks and docs) | `stack-k/plan` | #1594 | in review | Docs and task files only. doc-2 rule edit (stack never completed before all layers are stacked) to commit here. |
 | 1 | TASK-152 IAM `/index/*` grants (audit trail, retry records, incidents) | `stack-k/task-152-iam-index-grants` | #1595 | in review | ACs 1 and 3 checked (tf_plan shows only the policy statement). AC 2 waits on the post-apply simulation. |
-| 2 | TASK-145.5.1 incidents GSIs (ALL), timeline table, devcontainer script run locally | `stack-k/task-145.5.1-incidents-gsis` | - | ready (uncommitted) | Implemented 2026-10-15; gates green (known local pycache failure only). ACs 1, 2, 4, 5 checked; AC 3 waits on the PR tf_plan comment. One apply. |
+| 2 | TASK-145.5.1 incidents GSIs (ALL), timeline table, devcontainer script run locally | `stack-k/task-145.5.1-incidents-gsis` | #1597 | in review | ACs 1, 2, 4, 5 checked. First tf_plan matched; uncommitted follow-up moves all GSIs to key_schema (provider deprecation, plan-neutral per local test). AC 3 after the new tf_plan. One apply. |
 | 3 | TASK-145.5.2 ServiceScopeOpener for Slack and job registrars; dependency-injection.md | - | - | planned | Bolt middleware alternative recorded in the task. |
 | 4 | TASK-145.5.3 vocabulary, record, references, core settings, platform tenant ids | - | - | planned | Plan settles how the Google customer id is validated (no Google enabled flag today). |
 | 5 | TASK-145.5.4 IncidentStore over RecordStore (reads), fake, index reads return full items | - | - | planned | |
@@ -33,29 +33,31 @@ updated_date: '2026-10-15 12:40'
 
 ## Position
 
-- Checked out: `stack-k/task-145.5.1-incidents-gsis` (on baafa94, top of stack #1596). PRs #1594 and #1595 open.
-- Uncommitted, all layer 2: `terraform/dynamodb.tf`, `terraform/iam.tf`, `.devcontainer/dynamodb-create.sh`, `backlog/docs/stacks/doc-13*` (this doc), `backlog/tasks/task-145.5.1 -*`.
+- Checked out: `stack-k/task-145.5.1-incidents-gsis` (139b53c, PR #1597, top of stack #1596). PRs #1594, #1595, #1597 open.
+- Uncommitted, layer 2: `terraform/dynamodb.tf` (GSI `hash_key`/`range_key` to `key_schema` on all five GSIs), `backlog/docs/stacks/doc-13*` (this doc), `backlog/tasks/task-145.5.1 -*` (notes).
 - Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-11*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`.
-- Local DynamoDB already has the incidents GSIs and the timeline table (script run 2026-10-15; the 37 local incidents items were kept).
+- Local DynamoDB has the incidents GSIs and the timeline table.
 - Local only: an ignored `app/infrastructure/idempotency/__pycache__` directory makes `test_old_idempotency_package_is_not_discoverable` fail; `rm -rf app/infrastructure/idempotency` clears it (cache files only).
 - No background agents.
 
 ## Next actions
 
-1. **human**: commit layer 2 and submit:
+1. **human**: commit the key_schema follow-up and push:
    ```
-   git add terraform/dynamodb.tf terraform/iam.tf .devcontainer/dynamodb-create.sh "backlog/docs/stacks/doc-13 - Stack-K-handoff.md" "backlog/tasks/task-145.5.1 - Terraform-and-local-tables-the-incidents-by_channel-and-open-GSIs-and-the-incident-timeline-table.md"
-   git commit -m "TASK-145.5.1 incidents GSIs and timeline table"
+   git add terraform/dynamodb.tf "backlog/docs/stacks/doc-13 - Stack-K-handoff.md" "backlog/tasks/task-145.5.1 - Terraform-and-local-tables-the-incidents-by_channel-and-open-GSIs-and-the-incident-timeline-table.md"
+   git commit -m "TASK-145.5.1 GSIs use key_schema"
    gh stack submit
    ```
-2. **agent**: read the layer 2 PR tf_plan comment; expect only: incidents_table in-place (+3 attributes, +2 GSIs), sre_bot_incident_timeline create, backup selection update or replace (+3 tables), aws_iam_policy.sre-bot_secrets_manager in-place (+1 ARN). Record it and the one-apply sequence in the TASK-145.5.1 notes, check AC 3.
-3. **human**: request review of #1594 and #1595 together (if not already), then the layer 2 PR.
-4. **human**: only after layer 2 is submitted, merge layers 0 and 1 bottom-up (layer 1 is a standalone Terraform merge; merging runs tf_apply against production). Then run the simulation from TASK-152 plan step 4 and paste the output:
+2. **agent**: read the new tf_plan comment on #1597; expect the same change set as the first plan (timeline create, incidents in-place +3 attributes +2 GSIs, IAM policy in-place +1 ARN, backup selection recreate), no change on `sre_bot_audit_trail` or `sre_bot_retry_records`, and no `hash_key is deprecated` warning. Record it in the TASK-145.5.1 notes and check AC 3.
+3. **human**: request review of #1594, #1595 and #1597 (review is due now that layers are stacked).
+4. **human**: merge layers 0 and 1 bottom-up (layer 1 is a standalone Terraform merge; merging runs tf_apply against production). Then run the simulation from TASK-152 plan step 4 and paste the output:
    ```
    aws iam simulate-principal-policy --policy-source-arn <sre-bot-ecs-role ARN> --action-names dynamodb:Query --resource-arns <audit trail table ARN>/index/correlation_id-index <webhooks table ARN>/index/x
    ```
 5. **agent**: record the simulation output in the TASK-152 notes and check AC 2 (expect allowed, then implicitDeny).
-6. **agent**: plan layer 3 (TASK-145.5.2) with `/plan-task TASK-145.5.2` on a new branch `stack-k/task-145.5.2-service-scope-opener` (human runs `gh stack add stack-k/task-145.5.2-service-scope-opener` first).
+6. **human**: create layer 3 so layer 2 can merge with a higher layer submitted: `gh stack add stack-k/task-145.5.2-service-scope-opener`.
+7. **agent**: plan layer 3 with `/plan-task TASK-145.5.2`.
+8. **human**: after layer 3 is submitted, merge layer 2 (standalone Terraform; tf_apply against production). Then confirm the tf_apply log shows the two GSI creations in sequence and `aws dynamodb describe-table --table-name incidents` shows both indexes ACTIVE; paste for the TASK-145.5.1 notes.
 
 ## Open decisions
 
