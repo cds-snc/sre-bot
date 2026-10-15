@@ -24,6 +24,46 @@ table_exists() {
   return 1
 }
 
+# Helper function to check if a table has a global secondary index
+gsi_exists() {
+  aws dynamodb describe-table --table-name "$1" --endpoint-url "$ENDPOINT" --no-cli-pager --output json 2>/dev/null \
+    | jq -e --arg index "$2" '.Table.GlobalSecondaryIndexes // [] | any(.IndexName == $index)' >/dev/null
+}
+
+# Helper function to wait until a table and one of its indexes are ACTIVE
+wait_for_active() {
+  local attempt status
+  for attempt in $(seq 1 30); do
+    status=$(aws dynamodb describe-table --table-name "$1" --endpoint-url "$ENDPOINT" --no-cli-pager --output json 2>/dev/null \
+      | jq -r --arg index "$2" '[.Table.TableStatus, (.Table.GlobalSecondaryIndexes // [] | map(select(.IndexName == $index)) | .[0].IndexStatus // "MISSING")] | join(" ")')
+    if [ "$status" = "ACTIVE ACTIVE" ]; then
+      return 0
+    fi
+    sleep 1
+  done
+  echo "Error: table '$1' index '$2' not ACTIVE after 30s (status: $status)" >&2
+  return 1
+}
+
+# Helper function to add a missing index to an existing table (one index per update-table call)
+add_gsi_if_missing() {
+  local table="$1" index="$2" attribute_definitions="$3" index_json="$4"
+  if gsi_exists "$table" "$index"; then
+    echo "✓ $table index $index already exists"
+    return 0
+  fi
+  echo "Adding $index index to $table table..."
+  # shellcheck disable=SC2086 # attribute_definitions holds several space-separated arguments
+  aws dynamodb update-table \
+    --table-name "$table" \
+    --attribute-definitions $attribute_definitions \
+    --global-secondary-index-updates "[{\"Create\":$index_json}]" \
+    --endpoint-url "$ENDPOINT" \
+    --no-cli-pager >/dev/null || return 1
+  wait_for_active "$table" "$index" || return 1
+  echo "✓ $table index $index added"
+}
+
 # webhooks table - Simple hash key
 if table_exists "webhooks"; then
   echo "✓ webhooks table already exists"
@@ -96,19 +136,50 @@ else
   echo "✓ sre_bot_incident_status_updates table created"
 fi
 
-# incidents table - Simple hash key
+# incidents table - Simple hash key with the by_channel GSI and the sparse open GSI
+INCIDENTS_BY_CHANNEL_GSI="{\"IndexName\":\"by_channel\",\"KeySchema\":[{\"AttributeName\":\"channel_id\",\"KeyType\":\"HASH\"}],\"Projection\":{\"ProjectionType\":\"ALL\"},\"ProvisionedThroughput\":{\"ReadCapacityUnits\":1,\"WriteCapacityUnits\":2}}"
+INCIDENTS_OPEN_GSI="{\"IndexName\":\"open\",\"KeySchema\":[{\"AttributeName\":\"open_bucket\",\"KeyType\":\"HASH\"},{\"AttributeName\":\"opened_at\",\"KeyType\":\"RANGE\"}],\"Projection\":{\"ProjectionType\":\"ALL\"},\"ProvisionedThroughput\":{\"ReadCapacityUnits\":1,\"WriteCapacityUnits\":2}}"
 if table_exists "incidents"; then
   echo "✓ incidents table already exists"
+  # Existing local tables predate the GSIs; codespaces are not rebuilt, so add what is missing.
+  add_gsi_if_missing incidents by_channel \
+    "AttributeName=channel_id,AttributeType=S" "$INCIDENTS_BY_CHANNEL_GSI"
+  add_gsi_if_missing incidents open \
+    "AttributeName=open_bucket,AttributeType=S AttributeName=opened_at,AttributeType=S" "$INCIDENTS_OPEN_GSI"
 else
-  echo "Creating incidents table..."
+  echo "Creating incidents table with GSIs..."
   aws dynamodb create-table \
     --table-name incidents \
-    --attribute-definitions AttributeName=id,AttributeType=S \
+    --attribute-definitions \
+      AttributeName=id,AttributeType=S \
+      AttributeName=channel_id,AttributeType=S \
+      AttributeName=open_bucket,AttributeType=S \
+      AttributeName=opened_at,AttributeType=S \
     --key-schema AttributeName=id,KeyType=HASH \
     --provisioned-throughput ReadCapacityUnits=2,WriteCapacityUnits=2 \
+    --global-secondary-indexes "[$INCIDENTS_BY_CHANNEL_GSI,$INCIDENTS_OPEN_GSI]" \
     --endpoint-url "$ENDPOINT" \
     --no-cli-pager >/dev/null
   echo "✓ incidents table created"
+fi
+
+# sre_bot_incident_timeline table - One item per timeline entry, entry_key '<posted_at ISO-8601>#<entry_id>'
+if table_exists "sre_bot_incident_timeline"; then
+  echo "✓ sre_bot_incident_timeline table already exists"
+else
+  echo "Creating sre_bot_incident_timeline table..."
+  aws dynamodb create-table \
+    --table-name sre_bot_incident_timeline \
+    --attribute-definitions \
+      AttributeName=incident_id,AttributeType=S \
+      AttributeName=entry_key,AttributeType=S \
+    --key-schema \
+      AttributeName=incident_id,KeyType=HASH \
+      AttributeName=entry_key,KeyType=RANGE \
+    --provisioned-throughput ReadCapacityUnits=2,WriteCapacityUnits=2 \
+    --endpoint-url "$ENDPOINT" \
+    --no-cli-pager >/dev/null
+  echo "✓ sre_bot_incident_timeline table created"
 fi
 
 # sre_bot_idempotency table - Idempotency cache with TTL
