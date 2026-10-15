@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: '2026-10-14 22:27'
-updated_date: '2026-10-15 13:25'
+updated_date: '2026-10-15 13:43'
 ---
 # Stack K handoff
 
@@ -22,7 +22,7 @@ updated_date: '2026-10-15 13:25'
 | 0 | Planning edits (tasks and docs) | `stack-k/plan` | #1594 | merged | Merged 2026-10-15 13:09 UTC; stack synced. |
 | 1 | TASK-152 IAM `/index/*` grants (audit trail, retry records, incidents) | `stack-k/task-152-iam-index-grants` | #1595 | in review | ACs 1 and 3 checked; tf_plan re-run 2026-10-15 passed (policy update only). AC 2 waits on the post-apply simulation. |
 | 2 | TASK-145.5.1 incidents GSIs (ALL), timeline table, devcontainer script run locally | `stack-k/task-145.5.1-incidents-gsis` | #1597 | in review | All 5 ACs checked. tf_plan on 6e67e67 (key_schema GSIs) matches the first plan, no hash_key warning, audit trail and retry records untouched. One apply; post-apply check in next action 6. |
-| 3 | TASK-145.5.2 ServiceScopeOpener for Slack and job registrars; dependency-injection.md | - | - | planned | Bolt middleware alternative recorded in the task. |
+| 3 | TASK-145.5.2 ServiceScopeOpener for Slack and job registrars; dependency-injection.md | `stack-k/task-145.5.2-service-scope-opener` | - | plan approved | Approved 2026-10-15 (task comment). Registrar opener kept over Bolt middleware; mypy type-abstract off repo-wide; contract (l); plugin-architecture.md line. 12 files, judged acceptable. |
 | 4 | TASK-145.5.3 vocabulary, record, references, core settings, platform tenant ids | - | - | planned | Plan settles how the Google customer id is validated (no Google enabled flag today). |
 | 5 | TASK-145.5.4 IncidentStore over RecordStore (reads), fake, index reads return full items | - | - | planned | |
 | 6 | TASK-145.5.5 cutover; narrow Protocols and legacy_incidents deleted | - | - | planned | Standalone merge and deploy after layers 1 and 2 are applied. |
@@ -33,9 +33,8 @@ updated_date: '2026-10-15 13:25'
 
 ## Position
 
-- Checked out: `stack-k/task-145.5.1-incidents-gsis` (6e67e67, PR #1597, top of stack #1596). #1594 merged; #1595 (base `main`) and #1597 (base `stack-k/task-152-iam-index-grants`) open.
-- Uncommitted, layer 2: `backlog/docs/stacks/doc-13*` (this doc), `backlog/tasks/task-145.5.1 -*` (tf_plan re-check notes, AC 3).
-- Uncommitted, layer 1: `backlog/tasks/task-152 -*` holds a reverted edit (AC 2 removed); discard it with `git restore` (next action 1).
+- Checked out: `stack-k/task-145.5.2-service-scope-opener` (created with `gh stack add`, no own commit yet; sits on 4d7f7a0). #1594 merged; #1595 (base `main`) and #1597 (base `stack-k/task-152-iam-index-grants`, head 4d7f7a0) open, review required.
+- Uncommitted, layer 3: `backlog/docs/stacks/doc-13*` (this doc), `backlog/tasks/task-145.5.2 -*` (approved plan, ACs 5 and 6 added, approval comment).
 - Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-11*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`.
 - Local DynamoDB has the incidents GSIs and the timeline table.
 - Local only: an ignored `app/infrastructure/idempotency/__pycache__` directory makes `test_old_idempotency_package_is_not_discoverable` fail; `rm -rf app/infrastructure/idempotency` clears it (cache files only).
@@ -43,22 +42,20 @@ updated_date: '2026-10-15 13:25'
 
 ## Next actions
 
-1. **human**: discard the reverted TASK-152 edit, commit layer 2's files and push:
+1. **human**: commit the plan and open layer 3's PR:
    ```
-   git restore "backlog/tasks/task-152 - Grant-DynamoDB-index-access-in-the-task-role-index-for-the-audit-trail-retry-records-and-incidents-tables.md"
-   git add "backlog/docs/stacks/doc-13 - Stack-K-handoff.md" "backlog/tasks/task-145.5.1 - Terraform-and-local-tables-the-incidents-by_channel-and-open-GSIs-and-the-incident-timeline-table.md"
-   git commit -m "TASK-145.5.1 record tf_plan re-check"
+   git add "backlog/docs/stacks/doc-13 - Stack-K-handoff.md" "backlog/tasks/task-145.5.2 - Per-invocation-service-scopes-for-non-HTTP-entry-points-a-ServiceScopeOpener-on-the-Slack-and-background-job-registrars.md"
+   git commit -m "TASK-145.5.2 plan"
    gh stack submit
    ```
-2. **human**: request review of #1595 and #1597. Create layer 3 now (layer 2 can merge only with a higher layer submitted): `gh stack add stack-k/task-145.5.2-service-scope-opener`.
-3. **agent**: plan layer 3 with `/plan-task TASK-145.5.2`; the human approves it in chat, the plan commit opens layer 3's PR (`gh stack submit`).
-4. **human**: merge layer 1 (#1595, standalone Terraform; tf_apply against production) once approved. Then `gh stack sync`, `gh stack submit`, and run the simulation from TASK-152 plan step 4, pasting the output:
+2. **human**: request review of #1595 and #1597 if not yet done. Merge layer 1 (#1595, standalone Terraform; tf_apply against production) once approved. Then `gh stack sync`, `gh stack submit`, and run the simulation from TASK-152 plan step 4, pasting the output:
    ```
    aws iam simulate-principal-policy --policy-source-arn <sre-bot-ecs-role ARN> --action-names dynamodb:Query --resource-arns <audit trail table ARN>/index/correlation_id-index <webhooks table ARN>/index/x
    ```
-5. **agent**: record the simulation output in the TASK-152 notes and check AC 2 (expect allowed, then implicitDeny). Human: `backlog task edit 152 --status Done` (committed with the next layer).
-6. **human**: once layer 3 is submitted and #1597 re-approved after the rebase, merge layer 2 (standalone Terraform; tf_apply against production). Confirm the tf_apply log shows the two GSI creations in sequence and `aws dynamodb describe-table --table-name incidents` shows both indexes ACTIVE; paste for the TASK-145.5.1 notes.
-7. **agent**: record the apply evidence in the TASK-145.5.1 notes. Human: `backlog task edit 145.5.1 --status Done` (committed with the next layer).
+3. **agent**: record the simulation output in the TASK-152 notes and check AC 2 (expect allowed, then implicitDeny). Human: `backlog task edit 152 --status Done` (committed with the next layer).
+4. **human**: once layer 3 is submitted and #1597 re-approved after the rebase, merge layer 2 (standalone Terraform; tf_apply against production). Confirm the tf_apply log shows the two GSI creations in sequence and `aws dynamodb describe-table --table-name incidents` shows both indexes ACTIVE; paste for the TASK-145.5.1 notes.
+5. **agent**: record the apply evidence in the TASK-145.5.1 notes. Human: `backlog task edit 145.5.1 --status Done` (committed with the next layer).
+6. **agent**: implement layer 3 (TDD) against the approved plan.
 
 ## Open decisions
 
@@ -66,4 +63,4 @@ updated_date: '2026-10-15 13:25'
 
 ## Planning queue
 
-- TASK-145.5.2 to TASK-145.5.7, TASK-27.5, TASK-145.6: each planned in turn after the layer below is implemented.
+- TASK-145.5.3 to TASK-145.5.7, TASK-27.5, TASK-145.6: each planned in turn after the layer below is implemented.
