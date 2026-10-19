@@ -3,10 +3,10 @@ id: TASK-145.5.10
 title: >-
   IncidentStore builder: the store from a resolved RecordStore, the incident
   core settings and the configured tenants
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-19 15:25'
-updated_date: '2026-10-19 19:18'
+updated_date: '2026-10-19 19:26'
 labels:
   - incident
   - features
