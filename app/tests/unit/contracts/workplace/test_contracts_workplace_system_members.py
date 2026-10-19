@@ -13,9 +13,9 @@ from contracts.workplace import WorkplaceSystem
 pytestmark = pytest.mark.unit
 
 
-def test_the_package_root_exports_only_the_workplace_system() -> None:
-    """The package root is the stable import path for the vocabulary."""
-    assert contracts.workplace.__all__ == ["WorkplaceSystem"]
+def test_the_package_root_exports_the_vocabulary_and_the_configured_systems_read() -> None:
+    """The package root is the stable import path for the vocabulary and the read."""
+    assert contracts.workplace.__all__ == ["ConfiguredSystems", "WorkplaceSystem"]
 
 
 def test_members_are_the_supported_systems_with_their_stored_values() -> None:

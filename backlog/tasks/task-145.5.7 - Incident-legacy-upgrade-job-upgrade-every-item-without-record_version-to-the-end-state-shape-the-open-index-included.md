@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-14 23:10'
-updated_date: '2026-10-15 19:19'
+updated_date: '2026-10-19 15:27'
 labels:
   - incident
   - features
@@ -32,7 +32,7 @@ ordinal: 393000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Layer 10 of Stack K (handoff doc-13). The single legacy data upgrade for the incidents table. Legacy items carry legacy attribute names, bare reference strings, free-text status, no security_incident, no open_bucket or opened_at and no record_version. This job upgrades them all to the end-state shape; it follows the shared legacy backfill rule set in decisions/incident-management.md (Migration).
+Layer 12 of Stack K (handoff doc-13). The single legacy data upgrade for the incidents table. Legacy items carry legacy attribute names, bare reference strings, free-text status, no security_incident, no open_bucket or opened_at and no record_version. This job upgrades them all to the end-state shape; it follows the shared legacy backfill rule set in decisions/incident-management.md (Migration).
 
 WHAT IT DOES
 - Reads the whole incidents table with TASK-27.5's bounded full-table read and selects the items without record_version.

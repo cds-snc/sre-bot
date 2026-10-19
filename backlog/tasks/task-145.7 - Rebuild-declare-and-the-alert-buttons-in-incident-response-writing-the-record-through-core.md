@@ -6,17 +6,19 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-15 20:59'
+updated_date: '2026-10-19 15:26'
 labels:
   - incident
   - features
   - slack
 dependencies:
+  - TASK-145.6
   - TASK-36.1.1
   - TASK-103
-  - TASK-145.6
+  - TASK-145.5.9
 references:
   - 'https://github.com/cds-snc/sre-bot/issues/1698'
+  - decisions/incident-management.md
 parent_task_id: TASK-145
 priority: medium
 type: feature
@@ -54,6 +56,7 @@ RECORD SHAPE (human, 2026-10-15; decisions/incident-management.md Migration)
 - [ ] #6 The legacy readers (app/models/incidents.py Incident and its callers) keep working on new items until TASK-145.8, by the option chosen at planning (dual-write with extra="ignore", or the same release as TASK-145.8), and the source_alert shape is recorded in the plan
 - [ ] #7 create imports RECORD_VERSION and OPEN_BUCKET from core/store.py and sets record_version, open_bucket and opened_at in the same write; opened_at comes from the core/store.py formatter (fixed-width ISO-8601 UTC, isoformat(timespec="microseconds"), +00:00), tested for width and offset
 - [ ] #8 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #9 The new-incident policy (INCIDENT_CORE__NEW_INCIDENT_SYSTEM) resolves at startup against the configured-systems read (TASK-145.5.9): set, or unset with one configured system; when the named system is unconfigured, none is configured, or the policy is unset with several, the declare path is not registered and one startup event names the key, while every other incident command still works (tested)
 <!-- AC:END -->
 
 ## Implementation Plan

@@ -17,9 +17,11 @@ from structlog.stdlib import BoundLogger
 from contracts.coordination import ConditionalWriteStore
 from contracts.records import RecordStore
 from contracts.services import ServiceResolver
+from contracts.workplace import ConfiguredSystems
 from infrastructure.coordination import DynamoDBConditionalWriteStore, get_conditional_write_settings
 from infrastructure.records.service import DynamoDBRecordStore
 from integrations.aws.client import get_aws_client
+from server.configured_systems import read_configured_systems
 
 
 @dataclass(frozen=True)
@@ -42,9 +44,14 @@ def _build_conditional_write_store() -> ConditionalWriteStore:
     return DynamoDBConditionalWriteStore(get_aws_client("dynamodb"), settings=get_conditional_write_settings())
 
 
+def _build_configured_systems() -> ConfiguredSystems:
+    return read_configured_systems()
+
+
 CORE_SERVICES: tuple[CoreService, ...] = (
     CoreService(RecordStore, _build_record_store),
     CoreService(ConditionalWriteStore, _build_conditional_write_store),
+    CoreService(ConfiguredSystems, _build_configured_systems),
 )
 
 
