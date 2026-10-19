@@ -3,10 +3,10 @@ id: TASK-145.5.9
 title: >-
   Configured-systems read: a platform read returning each configured workplace
   system with its tenant id
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-19 15:25'
-updated_date: '2026-10-19 15:33'
+updated_date: '2026-10-19 16:22'
 labels:
   - incident
   - platform
@@ -35,11 +35,11 @@ THIS SLICE
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The configured-systems Protocol ConfiguredSystems (one read, tenants() returning a read-only Mapping[WorkplaceSystem, str]) lives in contracts/workplace/; its immutable implementation and the settings-to-tenants builder live in app/server/configured_systems.py; it is registered under the Protocol in CORE_SERVICES and built once at phase 2
-- [ ] #2 The read returns Slack with the stripped SLACK_TEAM_ID when it is set and Google with the stripped customer id when the service-account key file is set; an unset or blank Slack id, an unset key file, a blank Google id or the my_customer alias leaves that system out (tested for each, including the reader's own guard when a slice is built without validation)
-- [ ] #3 The test service registry provides a fake configured-systems read (Slack only by default, overridable per test)
-- [ ] #4 No feature module imports a vendor settings slice; lint-imports passes with no new ignore entry and app/pyproject.toml is unchanged
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 The configured-systems Protocol ConfiguredSystems (one read, tenants() returning a read-only Mapping[WorkplaceSystem, str]) lives in contracts/workplace/; its immutable implementation and the settings-to-tenants builder live in app/server/configured_systems.py; it is registered under the Protocol in CORE_SERVICES and built once at phase 2
+- [x] #2 The read returns Slack with the stripped SLACK_TEAM_ID when it is set and Google with the stripped customer id when the service-account key file is set; an unset Slack id or an unset key file leaves that system out (tested). The read relies on boot validation for blank ids and the my_customer alias and repeats no check
+- [x] #3 The test service registry provides a fake configured-systems read (Slack only by default, overridable per test)
+- [x] #4 No feature module imports a vendor settings slice; lint-imports passes with no new ignore entry and app/pyproject.toml is unchanged
+- [x] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -92,6 +92,28 @@ Additive: no consumer yet. Failure mode is boot failure if the builder raises (i
 SIZE
 Production files: 5 (configured_systems.py new, contracts __init__, workplace_systems.py new, google.py, server/services.py). LOC about 100 with docstrings, about 55 without. Tests/fixtures excluded: about 5 new/edited test files. One subsystem family (platform read), no mechanical refactor beyond a constant extraction. Verdict: passes the single-PR gate (<400 LOC, <10 files).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented 2026-10-19 on stack-k/task-145.5.5-cutover (the name predates the split).
+
+- contracts/workplace/configured_systems.py: ConfiguredSystems Protocol, tenants() -> Mapping[WorkplaceSystem, str]; exported from contracts/workplace.
+- server/configured_systems.py: StaticConfiguredSystems (MappingProxyType copy), and a TenantSource(system, read) row per vendor in TENANT_SOURCES, the same pattern as CORE_SERVICES. read_configured_systems(sources=TENANT_SOURCES) keeps every source whose read returns a tenant id. slack_tenant: the stripped TEAM_ID, whatever SLACK_ENABLED says. google_tenant: the stripped customer id when the key file is set. A new system adds a row, not a parameter (human, 2026-10-19 review). When the slices hold uniform tenant entries (TASK-24, TASK-112), each source becomes a read of that entry. One configured_systems_built event names the systems, never the ids.
+- server/services.py: CoreService(ConfiguredSystems, _build_configured_systems), which calls read_configured_systems().
+- tests/fixtures/service_registry.py: build_fake_service_registry(configured_tenants=None) registers StaticConfiguredSystems, Slack only (FAKE_SLACK_TENANT) by default.
+- Tests: new test_server_configured_systems_read.py, test_server_services_configured_systems_resolve.py and test_contracts_workplace_configured_systems_protocol.py. Edited in place: test_server_services_registration.py (contract set), test_server_services_fixture.py (default and override), and test_contracts_workplace_system_members.py (package exports now include ConfiguredSystems).
+- Plan change (human, 2026-10-19 review): the reader does not repeat the blank-id and my_customer checks that boot validation already enforces. So google.py is untouched: no GOOGLE_CUSTOMER_ID_ALIAS constant in the legacy settings file that TASK-24 deletes. my_customer is Google API vocabulary, not configuration. In the ADR end state it is only rejected, never a default (configuration.md vendor enablement; workplace-systems.md rule 3). AC2 was reworded to match.
+- Size: 2 new and 2 edited production files, about 80 production lines with docstrings.
+- A1 verified: importing server.configured_systems and server.services creates no cycle.
+- AC4: this change adds no feature import of a vendor slice. These pre-existing adapter imports remain, outside this task: packages/oncall_sync/adapters/slack.py:18, features/incident/drive/adapters/google_drive.py:14, features/incident/scribe/adapters/google_docs.py:29, packages/talent/adapters/google_drive.py:11.
+
+Gates (cd app):
+- ruff check: All checks passed. ruff format --check: 976 files already formatted.
+- lint-imports: 12 kept, 0 broken; pyproject.toml unchanged.
+- mypy: 48 errors in 19 files, all pre-existing in legacy modules; 0 in touched files.
+- pytest tests --ignore=tests/smoke: 5363 passed.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
