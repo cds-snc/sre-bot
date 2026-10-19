@@ -37,7 +37,7 @@ THIS SLICE
 
 RECORD SHAPE (human, 2026-10-15; decisions/incident-management.md Migration)
 - create sets record_version = RECORD_VERSION and writes the end-state attribute names, never the legacy ones as the record of truth. RECORD_VERSION and OPEN_BUCKET are imported from core/store.py (defined by TASK-145.5.4, where list_open queries OPEN_BUCKET).
-- create sets open_bucket = OPEN_BUCKET and opened_at in the same write. opened_at uses the stored-time formatter in core/store.py (fixed-width ISO-8601 UTC, isoformat(timespec="microseconds"), +00:00), added by TASK-145.5.8 and shared with TASK-145.8 (reopen) and the TASK-145.5.7 job.
+- create sets open_bucket = OPEN_BUCKET and opened_at in the same write. opened_at uses the stored-time formatter format_stored_time in core/adapters/incident_items.py (fixed-width ISO-8601 UTC, isoformat(timespec="microseconds"), +00:00), added by TASK-145.5.8 and shared with TASK-145.8 (reopen) and the TASK-145.5.7 job.
 - References are nested maps per kind (conversation, report, video_call, postmortem_meeting, external_case, source_alert), each {system, tenant, vendor_id, url}, written whole. The conversation map and the top-level channel_id (the by_channel key) are set in one multi-change update.
 - security_incident is a required bool taken from the modal.
 - Decide the source_alert shape at planning: a chat alert is a message, so conversation plus message id, like MessageReference.
