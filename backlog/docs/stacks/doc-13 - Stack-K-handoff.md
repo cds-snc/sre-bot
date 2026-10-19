@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: '2026-10-14 22:27'
-updated_date: '2026-10-19 16:22'
+updated_date: '2026-10-19 16:29'
 ---
 # Stack K handoff
 
@@ -29,7 +29,7 @@ updated_date: '2026-10-19 16:22'
 | P2 | Planning edits of 2026-10-15: the human's GH-issue task sync, ADR refinement (incident-management.md stored form and legacy data upgrade, cloud-portability.md contract 4), task sync (TASK-145.5.4 split into 145.5.8, TASK-154, dependencies, renames) | `stack-k/task-145.5.4-incident-store` | #1721 | in review | A planning layer despite its name: the branch was created for TASK-145.5.4 before the split, and renaming failed in `gh stack modify` (human kept the name, 2026-10-15; a PR comment explains it). Three commits: f3f3aefd GH-issue task sync, ADRs, tasks and docs. |
 | 5 | TASK-145.5.4 IncidentStore end-state reads, incidents RecordTable, fake, full items from index reads | `stack-k/task-145.5.4-end-state-reads` | #1722 | in review | Committed 030ad9b and submitted 2026-10-15; review requested with P2. 8 ACs checked, gates green (5174 passed). ~514 prod lines with docstrings (~345 executable), above the plan's ~390; recorded in the task notes. |
 | 6 | TASK-145.5.8 legacy item bridge (`legacy_items.py`), store hook, tenants argument, stored-time formatter | `stack-k/task-145.5.8-legacy-item-bridge` | #1723 | in review | Submitted 2026-10-15: handoff-doc commit, layer commit 0eda3384 and a task-file commit 42694247. 6 ACs checked, gates green (5300 passed), ~323 prod lines with docstrings (~200 executable). |
-| 7 | TASK-145.5.9 configured-systems read: ConfiguredSystems Protocol in contracts/workplace, host implementation in server/configured_systems.py, core service, registry fake | `stack-k/task-145.5.5-cutover` | - | ready | The branch keeps its pre-split name: the `gh stack modify` rename failed (human kept the name, 2026-10-19, as for P2); a PR comment explains it. Implemented 2026-10-19: 5 ACs checked, gates green (5363 passed), about 90 prod lines with docstrings in 4 files (after review: google.py untouched; one TenantSource row per vendor). Two commits: f18dc821 holds the planning edits (ADR amendment, task split and sync, doc-2, this doc), then the layer commit (next action 1). |
+| 7 | TASK-145.5.9 configured-systems read: ConfiguredSystems Protocol in contracts/workplace, host implementation in server/configured_systems.py, core service, registry fake | `stack-k/task-145.5.5-cutover` | #1728 | in review | Submitted 2026-10-19 (c8a3a1f4). The branch keeps its pre-split name: the `gh stack modify` rename failed (human kept the name, 2026-10-19, as for P2); a PR comment explains it. Implemented 2026-10-19: 5 ACs checked, gates green (5363 passed), about 90 prod lines with docstrings in 4 files (after review: google.py untouched; one TenantSource row per vendor). Two commits: f18dc821 holds the planning edits (ADR amendment, task split and sync, doc-2, this doc), then the layer commit (next action 1). |
 | 8 | TASK-145.5.10 IncidentStore builder from a resolved RecordStore, the core settings and the configured tenants; no policy read | - | - | planned | Unused until layer 9; no behaviour change. |
 | 9 | TASK-145.5.5 cutover: entry points build the store and the ConversationReference; comms on IncidentStore and the bool security flag; startup registration check; narrow Protocols, legacy_incidents and IncidentSecurityFlag deleted | - | - | planned | Standalone merge and deploy, only after layers 5 to 8 have merged and with layer 10 submitted above it. ~200 changed, ~260 deleted, ~28 test files edited; size gate to re-check at planning. |
 | 10 | TASK-145.5.6 StatusUpdateStore onto RecordStore | - | - | planned | |
@@ -41,9 +41,8 @@ A planning-only refinement (ADR text, no code) is normally an earlier commit on 
 
 ## Position
 
-- Checked out: `stack-k/task-145.5.5-cutover` (layer 7, TASK-145.5.9), on layer 6. The planning commit f18dc821 is not pushed; no PR yet.
-- Rebase (2026-10-19): P2 #1721, layer 5 #1722 and layer 6 #1723 were rebased onto `main` 7a0de6a1 after the side PRs TASK-103 (#1725) and TASK-36.1.1 (#1726) merged. All three are open with review required and each needs a re-approval (approve-latest-push rule).
-- Uncommitted: the TASK-145.5.9 implementation (app/contracts/workplace, app/server/configured_systems.py and services.py, the test fixture and tests), its task file and this doc. All of it goes in the layer 7 commit (next action 1).
+- Checked out: `stack-k/task-145.5.5-cutover` (layer 7, #1728). Uncommitted: this doc only; it goes in the layer 8 commit.
+- Open PRs: #1721 (P2) approved; #1722 (layer 5) and #1723 (layer 6) need re-approval after the 2026-10-19 rebase onto `main` 7a0de6a1; #1728 (layer 7) in review.
 - Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-11*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`.
 - Production data facts (scans, 2026-10-15): 323 incident items; status values include 30 `closed` and 1 `reviewed` in lowercase, nothing else outside the five; security_incident absent on 316 items (only stored since #1549, 2026-10-07); every created_at is an epoch string. Production configures Slack (SLACK_TEAM_ID in SSM) and Google (GCP_SRE_SERVICE_ACCOUNT_KEY_FILE, terraform/ecs.tf:30); INCIDENT_CORE__NEW_INCIDENT_SYSTEM is not set anywhere.
 - Local DynamoDB has the incidents GSIs and the timeline table.
@@ -51,15 +50,9 @@ A planning-only refinement (ADR text, no code) is normally an earlier commit on 
 
 ## Next actions
 
-1. **human**: commit layer 7 and submit, then comment on the new PR that the branch name predates the split and the PR carries TASK-145.5.9:
-   ```
-   cd /workspace
-   git add app/contracts/workplace app/server app/tests/fixtures/service_registry.py app/tests/unit/server app/tests/unit/contracts/workplace backlog/tasks backlog/docs/stacks
-   git commit -m "feat: configured-systems read"
-   gh stack submit
-   ```
-2. The stack pauses for doc-11 Work queue row 5 (TASK-24, a side PR cut from `main`); its open layers stay in review. When it resumes at row 6, **human**: `gh stack checkout stack-k/task-145.5.5-cutover` then `gh stack add stack-k/task-145.5.10-incident-store-builder`; **agent**: /plan-task 145.5.10 on that branch, then stop for approval.
-3. **human**: re-approve #1721, #1722 and #1723 after the 2026-10-19 rebase; merge bottom-up (P2, then 5, then 6) only with layer 7 submitted above them.
+1. The stack pauses for doc-11 Work queue row 5 (TASK-24, a side PR cut from `main`); its open layers stay in review. TASK-24's Google and Slack settings slice merges only after #1728, since `server/configured_systems.py` reads both slices.
+2. When the stack resumes at row 6, **human**: `gh stack checkout stack-k/task-145.5.5-cutover` then `gh stack add stack-k/task-145.5.10-incident-store-builder`; **agent**: /plan-task 145.5.10 on that branch, then stop for approval.
+3. **human**: re-approve #1722 and #1723 after the 2026-10-19 rebase (#1721 is approved); merge bottom-up (P2, then 5, then 6), now that layer 7 is submitted above them.
 4. **agent**, after layer 8: /plan-task 145.5.5, stopping for approval. Layer 9 merges and deploys alone after layers 5 to 8 have merged.
 5. **human**: run the TASK-152 post-apply simulation and paste the output:
    ```

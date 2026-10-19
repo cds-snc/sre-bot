@@ -4,10 +4,10 @@ title: >-
   Pin the legacy /incident declare modal, locale toggle and alert buttons
   through the Bolt dispatch boundary, and extend the harness to legacy
   interactions
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-15 20:49'
-updated_date: '2026-10-15 21:03'
+updated_date: '2026-10-19 16:35'
 labels:
   - migration
   - testing
