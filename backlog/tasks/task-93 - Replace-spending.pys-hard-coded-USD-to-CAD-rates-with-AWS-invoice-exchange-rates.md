@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-15 15:14'
+updated_date: '2026-10-15 17:48'
 labels: []
 dependencies:
   - TASK-25.2.4.4
@@ -15,6 +16,7 @@ references:
   - app/integrations/aws/settings.py
   - decisions/sdk-typing.md
   - decisions/outbound-clients.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1644'
 priority: low
 ordinal: 209000
 ---

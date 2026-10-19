@@ -4,11 +4,13 @@ title: Un-approve or correct an approved incident status update
 status: To Do
 assignee: []
 created_date: '2026-10-07 18:52'
-updated_date: '2026-10-09 16:59'
+updated_date: '2026-10-15 17:50'
 labels:
   - incident
 dependencies:
   - TASK-140.6
+references:
+  - 'https://github.com/cds-snc/sre-bot/issues/1684'
 parent_task_id: TASK-140
 priority: low
 type: feature

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-10 17:48'
-updated_date: '2026-10-02 16:59'
+updated_date: '2026-10-15 17:47'
 labels:
   - incident
   - bug
@@ -16,6 +16,7 @@ references:
   - app/packages/incident/scheduling/adapters/google_calendar.py
   - >-
     https://developers.google.com/workspace/calendar/api/v3/reference/events/insert
+  - 'https://github.com/cds-snc/sre-bot/issues/1636'
 priority: high
 type: bug
 ordinal: 185000

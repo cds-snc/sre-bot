@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-13 13:59'
+updated_date: '2026-10-15 17:52'
 labels:
   - incident
   - features
@@ -14,6 +15,7 @@ dependencies: []
 references:
   - decisions/incident-management.md
   - decisions/workplace-systems.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1705'
 priority: high
 type: feature
 ordinal: 369000

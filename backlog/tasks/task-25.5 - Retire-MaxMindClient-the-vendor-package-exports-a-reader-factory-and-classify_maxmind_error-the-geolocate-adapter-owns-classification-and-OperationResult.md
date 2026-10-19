@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 16:47'
-updated_date: '2026-09-25 15:00'
+updated_date: '2026-10-15 17:44'
 labels:
   - clients
   - phase-3
@@ -20,6 +20,7 @@ references:
   - app/packages/geolocate/adapters/maxmind.py
   - app/api/v1/routes/geolocate.py
   - app/jobs/scheduled_tasks.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1601'
 parent_task_id: TASK-25
 priority: high
 ordinal: 238000

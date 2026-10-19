@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-15 14:08'
-updated_date: '2026-09-15 19:37'
+updated_date: '2026-10-15 17:45'
 labels:
   - infrastructure
   - phase-4
@@ -21,6 +21,7 @@ references:
   - app/bin/entry.sh
   - app/Makefile
   - app/tests/unit/infrastructure/logging/test_setup.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1609'
 parent_task_id: TASK-28
 priority: high
 ordinal: 208000

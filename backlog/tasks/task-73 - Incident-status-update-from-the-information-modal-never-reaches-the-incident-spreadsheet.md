@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-01 19:28'
-updated_date: '2026-10-02 16:46'
+updated_date: '2026-10-15 17:45'
 labels:
   - bug
   - incident
@@ -17,6 +17,7 @@ references:
   - app/modules/incident/incident_folder.py
   - app/modules/incident/information_update.py
   - app/modules/incident/incident_status.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1616'
 priority: medium
 ordinal: 129000
 ---

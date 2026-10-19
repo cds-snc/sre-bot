@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 16:51'
-updated_date: '2026-10-02 17:44'
+updated_date: '2026-10-15 17:44'
 labels:
   - clients
   - phase-3
@@ -24,6 +24,7 @@ references:
   - decisions/plugin-architecture.md
   - decisions/feature-packages.md
   - app/packages/incident/scribe/service.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1600'
 parent_task_id: TASK-25
 priority: medium
 ordinal: 243000

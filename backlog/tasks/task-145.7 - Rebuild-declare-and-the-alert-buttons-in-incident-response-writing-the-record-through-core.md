@@ -15,6 +15,8 @@ dependencies:
   - TASK-36.1.1
   - TASK-103
   - TASK-145.6
+references:
+  - 'https://github.com/cds-snc/sre-bot/issues/1698'
 parent_task_id: TASK-145
 priority: medium
 type: feature
@@ -32,6 +34,14 @@ THIS SLICE
 - The video-call creator moves from features/incident/meet into core/adapters/google_meet.py; meet/ is deleted.
 - The product picker reads ProductCatalog and respects Slack option limits. The severity picker offers none and SEV0 to SEV4 from common/vocabulary: SEV0 is the only new option, and the announcement's severity warning covers it as it covers SEV1 to SEV4.
 - Legacy registration of these surfaces is removed from modules/incident in the same PR; names, fields, replies and i18n keys unchanged, pinned by TASK-36.1. Settings values move to the response slice of common/settings.py; environment variable names unchanged.
+
+RECORD SHAPE (human, 2026-10-15; decisions/incident-management.md Migration)
+- create sets record_version = RECORD_VERSION and writes the end-state attribute names, never the legacy ones as the record of truth. RECORD_VERSION and OPEN_BUCKET are imported from core/store.py (defined by TASK-145.5.4, where list_open queries OPEN_BUCKET).
+- create sets open_bucket = OPEN_BUCKET and opened_at in the same write. opened_at uses the stored-time formatter in core/store.py (fixed-width ISO-8601 UTC, isoformat(timespec="microseconds"), +00:00), added by TASK-145.5.8 and shared with TASK-145.8 (reopen) and the TASK-145.5.7 job.
+- References are nested maps per kind (conversation, report, video_call, postmortem_meeting, external_case, source_alert), each {system, tenant, vendor_id, url}, written whole. The conversation map and the top-level channel_id (the by_channel key) are set in one multi-change update.
+- security_incident is a required bool taken from the modal.
+- Decide the source_alert shape at planning: a chat alert is a message, so conversation plus message id, like MessageReference.
+- Legacy readers stay live until TASK-145.8: app/models/incidents.py Incident (extra="forbid"; channel_name, teams and report_url required), used by information_display.py, information_update.py and db_operations.py, raises on a new-shape item. Decide at planning: either dual-write the legacy attributes and relax that model to extra="ignore", or ship in the same release as TASK-145.8.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -40,7 +50,10 @@ THIS SLICE
 - [ ] #2 The declare flow writes the record first and every resource reference as it is created; a failing resource is logged and leaves its reference empty without aborting the rest
 - [ ] #3 features/incident/meet is deleted and the video-call adapter lives in core/adapters/
 - [ ] #4 The pinned declare and alert-button behaviour passes unchanged
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #5 create stamps record_version 1 and writes the end-state attribute names, the nested reference maps and security_incident as a bool from the modal; the conversation map and channel_id are set in one multi-change update
+- [ ] #6 The legacy readers (app/models/incidents.py Incident and its callers) keep working on new items until TASK-145.8, by the option chosen at planning (dual-write with extra="ignore", or the same release as TASK-145.8), and the source_alert shape is recorded in the plan
+- [ ] #7 create imports RECORD_VERSION and OPEN_BUCKET from core/store.py and sets record_version, open_bucket and opened_at in the same write; opened_at comes from the core/store.py formatter (fixed-width ISO-8601 UTC, isoformat(timespec="microseconds"), +00:00), tested for width and offset
+- [ ] #8 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -54,17 +67,17 @@ Outline plan grounded at main d2d973ae (2026-10-09) against the legacy module; r
 - After TASK-145.5 and TASK-145.6: IncidentStore read path, IncidentConversation, IncidentReport, ProductCatalog exist; IncidentStore.create arrives here.
 
 ## Steps
-1. core/store.py: create(incident) with a conditional put on the id; adapter writes today's item shape (so the legacy module keeps reading it) plus the new fields; fake.
+1. core/store.py: create(incident) with a conditional put on the id; the adapter writes the end-state shape with record_version 1 (plus the legacy attributes if the dual-write option is chosen, see the description); fake.
 2. features/incident/response/: __init__.py (hookimpls register_slack_commands, register_i18n_resources), settings.py (slice of common settings: template id, folders, groups to invite, announcement channel), service.py declare(...) orchestrating in the order the coordinator fixes: record, conversation and purpose, report and bookmark, video call and bookmark, canvas, source-alert bookmark, invites (on-call through ProductCatalog's schedule reference and an interim core/adapters/opsgenie.py until TASK-146.3), groups, projection row, announcement; each reference written to the record as created; failures logged and left empty.
 3. response/entrypoints/slack.py: /incident command and the declare modal submission, the locale toggle, the two alert buttons registered through the Slack registrar (or the webhooks extension point when it exists); one service call each. slack_views.py: the modal (product picker from ProductCatalog, severity picker from Severity, security flag), the announcement blocks. locales/incident_response.*.yml copying the keys the declare surface uses from app/locales/incident.*.yml.
 4. meet/adapters/google_meet.py moves to core/adapters/google_meet.py behind a VideoCall interface; meet/ deleted.
 5. Legacy registration of /incident, incident_view, incident_change_locale and handle_incident_action_buttons removed from modules/incident/incident.py and incident_alert.py in the same PR; names, fields, replies and keys unchanged (pinned).
 
 ## AC traceability
-AC1: steps 2-3, 5 -> registration test, pinned declare and alert tests. AC2: step 2 -> declare service tests with fakes for every resource (record first, partial failures). AC3: step 4 -> `rg -l meet features/incident` shows core only. AC4: pinned surfaces green. AC5: gates.
+AC1: steps 2-3, 5 -> registration test, pinned declare and alert tests. AC2: step 2 -> declare service tests with fakes for every resource (record first, partial failures). AC3: step 4 -> `rg -l meet features/incident` shows core only. AC4: pinned surfaces green. AC8: gates.
 
 ## Test matrix
-Declare: full success writes every reference; conversation creation failure aborts after the record exists and reports; report, video call, canvas, invite and projection failures each leave their reference empty and continue; security flag yes/no/unknown stored; severity stored; product without schedule invites nobody. Alert buttons: call-incident opens the modal with the source alert reference; ignore posts. Locale toggle re-renders.
+Declare: full success writes every reference; conversation creation failure aborts after the record exists and reports; report, video call, canvas, invite and projection failures each leave their reference empty and continue; security flag yes/no stored as the security_incident bool; severity stored; product without schedule invites nobody. Alert buttons: call-incident opens the modal with the source alert reference; ignore posts. Locale toggle re-renders.
 
 ## Assumptions and doubts
 - The webhooks capability's extension point (TASK-37) may not exist; the coordinator's assumption registers through the Slack registrar and moves later.

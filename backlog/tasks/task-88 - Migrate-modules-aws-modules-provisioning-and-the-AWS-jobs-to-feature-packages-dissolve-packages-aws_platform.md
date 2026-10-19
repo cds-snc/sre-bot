@@ -26,6 +26,7 @@ references:
   - decisions/plugin-architecture.md
   - decisions/migration.md
   - decisions/authorization.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1641'
 priority: medium
 ordinal: 189000
 ---

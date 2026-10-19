@@ -4,7 +4,7 @@ title: Assess the impact on the AWS integration of hosting the app outside AWS
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:49'
-updated_date: '2026-09-25 15:00'
+updated_date: '2026-10-15 17:47'
 labels:
   - architecture
 dependencies: []
@@ -14,6 +14,7 @@ references:
   - decisions/workplace-systems.md
   - decisions/outbound-clients.md
   - decisions/plugin-architecture.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1642'
 priority: medium
 type: spike
 ordinal: 190000

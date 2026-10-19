@@ -4,7 +4,7 @@ title: Build AWS clients without ambient credential resolution at construction
 status: To Do
 assignee: []
 created_date: '2026-10-14 18:57'
-updated_date: '2026-10-14 19:23'
+updated_date: '2026-10-15 17:53'
 labels:
   - infrastructure
   - reliability
@@ -15,6 +15,7 @@ dependencies:
 references:
   - decisions/outbound-clients.md
   - decisions/lifecycle.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1716'
 priority: medium
 ordinal: 383000
 ---

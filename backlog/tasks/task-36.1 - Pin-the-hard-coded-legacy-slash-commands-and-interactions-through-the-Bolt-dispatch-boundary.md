@@ -17,6 +17,7 @@ references:
   - decisions/testing.md
   - decisions/migration.md
   - decisions/transport-slack.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1611'
 parent_task_id: TASK-36
 priority: high
 ordinal: 285000

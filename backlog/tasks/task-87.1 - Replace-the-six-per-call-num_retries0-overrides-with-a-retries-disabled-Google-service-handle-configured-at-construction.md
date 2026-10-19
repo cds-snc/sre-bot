@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-18 15:43'
-updated_date: '2026-10-02 20:51'
+updated_date: '2026-10-15 17:47'
 labels:
   - clients
   - reliability
@@ -15,6 +15,7 @@ references:
   - decisions/outbound-clients.md
   - app/integrations/google_workspace/client.py
   - app/packages/aws_platform/adapters/identity_center.py
+  - 'https://github.com/cds-snc/sre-bot/issues/1638'
 parent_task_id: TASK-87
 priority: medium
 ordinal: 235000

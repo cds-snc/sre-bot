@@ -3,68 +3,66 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: '2026-10-14 22:27'
-updated_date: '2026-10-15 17:31'
+updated_date: '2026-10-15 18:26'
 ---
 # Stack K handoff
 
 ## Stack
 
-- Name: Stack K, incident core: the IAM and table layout, the service scope opener, the incident record and its store over the records contract, the cutover, the status-update store move, the full-table read and the open-index reconcile, then the core resource interfaces. Trunk: `main`.
-- doc-2 line: "Legacy rebuild by surface": Stack K, started 2026-10-14 from `main` after TASK-109 (#1593). TASK-145.5 is the coordinator of TASK-145.5.1 to TASK-145.5.7; its plan lists the layer order and the subtask descriptions hold the decisions.
+- Name: Stack K, incident core: the IAM and table layout, the service scope opener, the incident record, its end-state store over the records contract and the legacy item bridge, the cutover, the status-update store move, the full-table read and the incident legacy upgrade job, then the core resource interfaces. Trunk: `main`.
+- doc-2 line: "Legacy rebuild by surface": Stack K, started 2026-10-14 from `main` after TASK-109 (#1593). TASK-145.5 is the coordinator of TASK-145.5.1 to TASK-145.5.8; its plan lists the layer order and the subtask descriptions hold the decisions.
 - Branch names: `stack-k/<task-id>-<slug>`; the planning layer is `stack-k/plan`.
 - Merges: squash, bottom-up, a re-approval per layer after its rebase (approve-latest-push rule). Review is requested once two layers are stacked, and at least two PRs stay open before any closes (human, 2026-10-14); a lone PR is not a stack. gh stack closes the stack once every layer has merged (later branches become independent PRs), so new layers are built on lower layers still in review, and a layer merges only when a higher layer is already submitted (human, 2026-10-14). Review changes to a lower layer are made on its branch, then `gh stack rebase`.
-- Standalone merges inside the stack: TASK-152 and TASK-145.5.1 (Terraform; merging to `main` runs tf_apply against production), TASK-145.5.5 (behaviour change, deployed on its own after both Terraform layers are applied). TASK-145.5.7 ships switched off and is run only after TASK-145.8 deploys, before TASK-145.9 merges.
+- Standalone merges inside the stack: TASK-152 and TASK-145.5.1 (Terraform, merged and applied), TASK-145.5.5 (behaviour change, deployed on its own; layers 5 and 6 must be merged first). TASK-145.5.7 ships switched off and is run after TASK-145.8 deploys, before TASK-145.9 merges, and again after TASK-145.12.
+- Decisions of 2026-10-15 (in decisions/incident-management.md, The incident record and Migration, and cloud-portability.md contract 4): stored attributes use the record's own names; one reference map per kind ({system, tenant, vendor_id, url}), replaced whole; `channel_id` top-level as the by_channel lookup copy, filtered by system and tenant; `record_version` marks end-state items; security flag is a required bool (missing legacy value is false); status is strict (legacy values matched ignoring case, anything else unreadable and fixed by hand); the legacy data upgrade rule set (one shared upgrade function, one in-app leased job runner, version marker, legacy attributes left on items).
 
 ## Layers
 
 | # | Task | Branch | PR | State | Notes |
 | --- | --- | --- | --- | --- | --- |
-| 0 | Planning edits (tasks and docs) | `stack-k/plan` | #1594 | merged | Merged 2026-10-15 13:09 UTC; stack synced. |
-| 1 | TASK-152 IAM `/index/*` grants (audit trail, retry records, incidents) | `stack-k/task-152-iam-index-grants` | #1595 | merged | Merged and task Done. AC 2 still unchecked: the post-apply simulation output was never recorded (next action 4). |
-| 2 | TASK-145.5.1 incidents GSIs (ALL), timeline table, devcontainer script run locally | `stack-k/task-145.5.1-incidents-gsis` | #1597 | merged | Merged 2026-10-15 16:32 UTC (tf_apply ran). All 5 ACs checked. Post-apply evidence pending (next action 4); task not Done yet. |
-| 3 | TASK-145.5.2 ServiceScopeOpener for Slack and job registrars; dependency-injection.md | `stack-k/task-145.5.2-service-scope-opener` | #1598 | in review | Rebased as 42c6e34 after #1597 merged; submitted. Task set Done by the human (5c1f6c7). All 6 ACs checked, gates green (4901 passed). |
-| 4 | TASK-153 vendor enablement ADRs (earlier commit), then TASK-145.5.3 vocabulary, record, references, core settings, platform tenant ids | `stack-k/task-145.5.3-incident-record` | #1599 | in review | Commits 03f00e9 (TASK-153 + plan), f88a231, 60568f8 (implementation: 9 ACs, gates green, 4998 passed), 5c1f6c7 (TASK-145.5.3 and TASK-145.5.2 set Done by the human). Prod SSM checked 2026-10-15: SLACK_ENABLED true, GOOGLE_WORKSPACE_CUSTOMER_ID real (sre-bot-config), SLACK_TEAM_ID set (sre-bot-config-infrastructure), each once. |
-| 5 | TASK-145.5.4 IncidentStore over RecordStore (reads), fake, index reads return full items | `stack-k/task-145.5.4-incident-store` | - | planned | Tolerant WorkplaceSystem read of stored values (synced by TASK-153). Tenant ids passed in at construction. |
-| 6 | TASK-145.5.5 configured-systems read; cutover; narrow Protocols and legacy_incidents deleted | - | - | planned | Standalone merge and deploy after layers 1 and 2 are applied. Builds the configured-systems read and checks the new-incident policy against it; size gate to re-check at planning. |
-| 7 | TASK-145.5.6 StatusUpdateStore onto RecordStore | - | - | planned | |
-| 8 | TASK-27.5 bounded full-table read | - | - | planned | Pulled forward; first consumer is layer 9. |
-| 9 | TASK-145.5.7 open-index reconcile, off by default | - | - | planned | Runner tentative (in-app leased job); options and references in the task, re-assessed at planning. |
-| 10 | TASK-145.6 core resource interfaces | - | - | planned | 2026-10-09 plan stale; re-plan after layer 6 is implemented. |
+| 0 | Planning edits (tasks and docs) | `stack-k/plan` | #1594 | merged | Merged 2026-10-15 13:09 UTC. |
+| 1 | TASK-152 IAM `/index/*` grants | `stack-k/task-152-iam-index-grants` | #1595 | merged | Task Done. AC 2 still unchecked: post-apply simulation output not recorded (next action 4). |
+| 2 | TASK-145.5.1 incidents GSIs, timeline table | `stack-k/task-145.5.1-incidents-gsis` | #1597 | merged | Merged 2026-10-15 16:32 UTC (tf_apply ran). Post-apply evidence pending (next action 5); task not Done yet. |
+| 3 | TASK-145.5.2 ServiceScopeOpener | `stack-k/task-145.5.2-service-scope-opener` | #1598 | merged | Merged 2026-10-15 (d1ff7a3c on main); stack synced, layer 4 rebased. Task Done. |
+| 4 | TASK-153 ADRs, then TASK-145.5.3 vocabulary, record, references, core settings, tenant ids | `stack-k/task-145.5.3-incident-record` | #1599 | in review | Rebased onto main after #1598 merged; head bb74bb52. Task Done. Review required. Not changed by the 2026-10-15 decisions: `IncidentSecurityFlag` predates the stack (#1549) and goes in TASK-145.5.5. |
+| P2 | Planning edits of 2026-10-15: the human's GH-issue task sync, ADR refinement (incident-management.md stored form and legacy data upgrade, cloud-portability.md contract 4), task sync (TASK-145.5.4 split into 145.5.8, TASK-154, dependencies, renames) | `stack-k/task-145.5.4-incident-store` | - | ready | A planning layer despite its name: the branch was created for TASK-145.5.4 before the split, and renaming failed in `gh stack modify` (human kept the name, 2026-10-15; a PR comment explains it). Three commits: f3f3aefd GH-issue task sync, ADRs, tasks and docs. |
+| 5 | TASK-145.5.4 IncidentStore end-state reads, incidents RecordTable, fake, full items from index reads | `stack-k/task-145.5.4-end-state-reads` | - | plan approved | Plan approved 2026-10-15 (8 ACs, ~390 prod lines, 8 files, gate passes near the line). Branch created on top of P2. |
+| 6 | TASK-145.5.8 legacy item bridge (`legacy_items.py`), store hook, tenants argument, stored-time formatter | - | - | planned | Split out of 145.5.4 (human, 2026-10-15). Description and ACs written; needs /plan-task. |
+| 7 | TASK-145.5.5 configured-systems read; cutover; comms to the bool security flag; narrow Protocols, legacy_incidents and IncidentSecurityFlag deleted | - | - | planned | Standalone merge and deploy. Builds the ConversationReference from the configured Slack tenant; size gate to re-check at planning. |
+| 8 | TASK-145.5.6 StatusUpdateStore onto RecordStore | - | - | planned | |
+| 9 | TASK-27.5 bounded full-table read | - | - | planned | First consumer is layer 10. |
+| 10 | TASK-145.5.7 incident legacy upgrade job | - | - | planned | Retitled 2026-10-15 (was the open-index reconcile): upgrades every item without record_version through the bridge, sets the open index, unmatched status fails the run with a list. Re-plan at pickup with a size-gate check. |
+| 11 | TASK-145.6 core resource interfaces | - | - | planned | 2026-10-09 plan stale; re-plan after layer 7. Now depends on 145.5.8. |
 
-A planning-only refinement (ADR text, no code) is not its own layer: it is an earlier commit on the layer it refines (human, 2026-10-15).
+A planning-only refinement (ADR text, no code) is normally an earlier commit on the layer it refines (human, 2026-10-15); a large planning sync goes on its own planning layer (`stack-k/plan-<n>`, labelled P<n> here so task layer numbers stay stable), as P2 did (its branch kept a task name). No parallel PR or reorder was needed for the split: the bridge needs layer 5's end-state shape and must merge before the layer 7 cutover, so it sits directly above layer 5.
 
 ## Position
 
-- Checked out: `stack-k/task-145.5.3-incident-record` at 5c1f6c7, pushed; #1599 (base #1598's branch). #1595 and #1597 merged; #1598 and #1599 open, review required.
-- Uncommitted, layer 4: this doc and a TASK-145.5.3 comment (prod SSM check).
-- Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-11*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`.
-- Local DynamoDB has the incidents GSIs and the timeline table. A local .env with Slack on or the Google key set needs SLACK_TEAM_ID and a real GOOGLE_WORKSPACE_CUSTOMER_ID.
+- Checked out: `stack-k/task-145.5.4-end-state-reads` (new, on top of P2 `stack-k/task-145.5.4-incident-store`), no commits of its own. #1599 open, review required; #1598 merged; P2's PR created by `gh stack submit`, so two PRs are open again.
+- Uncommitted: none expected.
+- Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-11*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`. doc-11 was updated 2026-10-15 for the new layer and TASK-154.
+- Production data facts (scan, 2026-10-15): 323 incident items; status values include 30 `closed` and 1 `reviewed` in lowercase, nothing else outside the five; security_incident absent on 316 items (only stored since #1549, 2026-10-07).
+- Local DynamoDB has the incidents GSIs and the timeline table.
 - No background agents.
 
 ## Next actions
 
-1. **human**: commit the handoff doc and the TASK-145.5.3 comment on layer 4, submit, request review of #1598 and #1599, then create layer 5:
-   ```
-   git add backlog/tasks "backlog/docs/stacks/doc-13 - Stack-K-handoff.md"
-   git commit -m "Stack K handoff after TASK-145.5.3"
-   gh stack submit
-   gh stack add stack-k/task-145.5.4-incident-store
-   ```
-2. **agent**: plan TASK-145.5.4 with /plan-task on `stack-k/task-145.5.4-incident-store` (tenant ids passed in at construction; tolerant WorkplaceSystem, IncidentStatus and Severity reads); **human** approves in chat.
-3. **human**: run the TASK-152 post-apply simulation and paste the output:
+1. Done 2026-10-15 (human): TASK-145.5.4 plan approved (task comment), planning committed on P2 and submitted, `stack-k/task-145.5.4-end-state-reads` added on top.
+2. **agent**: implement TASK-145.5.4 on `stack-k/task-145.5.4-end-state-reads`: set it In Progress, TDD from the plan's test matrix, gates, ACs checked one by one, notes; then hand the human the commit, `gh stack submit` and `gh stack add stack-k/task-145.5.8-legacy-item-bridge` commands. Request review of P2 and layer 5 once both are up.
+3. **agent**: plan TASK-145.5.8 with /plan-task on its branch; **human** approves in chat.
+4. **human**: run the TASK-152 post-apply simulation and paste the output:
    ```
    aws iam simulate-principal-policy --policy-source-arn <sre-bot-ecs-role ARN> --action-names dynamodb:Query --resource-arns <audit trail table ARN>/index/correlation_id-index <webhooks table ARN>/index/x
    ```
    **agent**: record it in the TASK-152 notes and check AC 2 (expect allowed, then implicitDeny).
-4. **human**: confirm the #1597 tf_apply log shows the two GSI creations in sequence and `aws dynamodb describe-table --table-name incidents` shows both indexes ACTIVE; paste for the TASK-145.5.1 notes. **agent**: record the evidence; human: `backlog task edit 145.5.1 --status Done` (committed with the next layer).
-5. Done 2026-10-15 (prod): the combined grep of `sre-bot-config` and `sre-bot-config-infrastructure` shows SLACK_ENABLED="true", GOOGLE_WORKSPACE_CUSTOMER_ID a real id and SLACK_TEAM_ID set, each once. Repeat the check for any other account that runs the bot.
+5. **human**: confirm the #1597 tf_apply log shows the two GSI creations and `aws dynamodb describe-table --table-name incidents` shows both indexes ACTIVE; paste for the TASK-145.5.1 notes. **agent**: record the evidence; human: `backlog task edit 145.5.1 --status Done`.
 
 ## Open decisions
 
-- Persisted-enum rule lives only in cloud-portability.md (contract 4); workplace-systems.md rule 4 points to it. Move it if preferred.
-- None else. (`aws_access_requests` is unused today but kept for the access feature enhancements; revisit when that work starts.)
+- None blocking. Recorded at task level for their planning: TASK-145.7 chooses dual-write with `extra="ignore"` on the legacy model or shipping with TASK-145.8, and the source_alert shape; TASK-145.8 decides whether a security flag flip triggers actions and how a partial update treats an item without record_version; TASK-154 redesigns the status lifecycle and close.
 
 ## Planning queue
 
-- TASK-145.5.4: next, planned on its own branch (next action 2).
-- TASK-145.5.5 to TASK-145.5.7, TASK-27.5, TASK-145.6: each planned in turn after the layer below is implemented; TASK-145.5.5 now also builds the configured-systems read, so re-check its size gate.
+- TASK-145.5.4: plan approved 2026-10-15; implementation next.
+- TASK-145.5.8: description and ACs written; /plan-task after layer 5 is implemented.
+- TASK-145.5.5, TASK-145.5.6, TASK-27.5, TASK-145.5.7, TASK-145.6: each planned in turn after the layer below is implemented; re-check the size gate on 145.5.5 and 145.5.7.

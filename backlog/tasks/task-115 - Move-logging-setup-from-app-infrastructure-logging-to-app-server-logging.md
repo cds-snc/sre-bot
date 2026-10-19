@@ -4,6 +4,7 @@ title: Move logging setup from app/infrastructure/logging/ to app/server/logging
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:00'
+updated_date: '2026-10-15 17:49'
 labels:
   - plugin-architecture
   - observability
@@ -14,6 +15,7 @@ dependencies:
 references:
   - decisions/plugin-architecture.md
   - decisions/observability.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1658'
 priority: medium
 type: task
 ordinal: 257000

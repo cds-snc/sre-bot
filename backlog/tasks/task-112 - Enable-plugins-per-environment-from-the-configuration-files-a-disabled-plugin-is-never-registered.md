@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-10-15 16:15'
+updated_date: '2026-10-15 17:48'
 labels:
   - plugin-architecture
   - plugins
@@ -19,6 +19,7 @@ references:
   - decisions/plugins.md
   - decisions/configuration.md
   - decisions/lifecycle.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1655'
 priority: medium
 type: feature
 ordinal: 254000

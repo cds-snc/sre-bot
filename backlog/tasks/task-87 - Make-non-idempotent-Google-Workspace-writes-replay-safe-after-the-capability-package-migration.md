@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 13:59'
-updated_date: '2026-10-02 20:51'
+updated_date: '2026-10-15 17:47'
 labels:
   - clients
 dependencies: []
@@ -18,6 +18,7 @@ references:
     https://developers.google.com/workspace/calendar/api/v3/reference/events/insert
   - 'https://developers.google.com/workspace/drive/api/guides/create-file'
   - decisions/plugin-architecture.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1637'
 priority: medium
 type: enhancement
 ordinal: 187000
