@@ -4,7 +4,7 @@ title: 'Webhooks slice 4: cutover and delete modules/webhooks'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:40'
-updated_date: '2026-10-13 13:42'
+updated_date: '2026-10-15 20:53'
 labels:
   - migration
   - webhooks
@@ -14,6 +14,7 @@ dependencies:
   - TASK-37.3
   - TASK-110
   - TASK-112
+  - TASK-36.1.4
 references:
   - decisions/webhooks.md
   - decisions/migration.md

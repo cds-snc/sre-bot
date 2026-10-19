@@ -6,15 +6,15 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-15 20:07'
+updated_date: '2026-10-15 20:59'
 labels:
   - incident
   - features
   - slack
 dependencies:
-  - TASK-145.6
-  - TASK-36.1
+  - TASK-36.1.1
   - TASK-103
+  - TASK-145.6
 parent_task_id: TASK-145
 priority: medium
 type: feature
@@ -90,5 +90,15 @@ Declare is the most-used surface; the legacy path is removed in the same PR, so 
 created: 2026-10-15 20:07
 ---
 TASK-103 (2026-10-15): IncidentStore.create can rely on put_if_not_exists reporting created for its own SDK-retried write; every incident item written through it carries a hidden _rs_write_token attribute that reads strip. Attribute names starting with _rs_ are reserved and rejected.
+---
+
+created: 2026-10-15 20:53
+---
+Legacy submit() in modules/incident/incident.py acks at line 137 and acks again with response_action=errors on validation failure, so Slack never shows the inline errors; the rebuilt declare submission should validate before its single ack. TASK-36.1.1 pins the current behaviour (empty-body ack, no channel).
+---
+
+created: 2026-10-15 20:59
+---
+Correction to the previous comment: Bolt returns whichever ack is set when its runner first polls (every 10 ms), and the two acks in submit() happen microseconds apart, so the validation errors usually do reach Slack; the double ack makes it a race, not a guaranteed loss. The rebuilt submission should still validate before a single ack. TASK-36.1.1 pins the errors response.
 ---
 <!-- COMMENTS:END -->

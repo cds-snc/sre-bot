@@ -12,8 +12,8 @@ command names, interaction ids and URLs. Every rebuild must keep them working.
 Each surface is assigned to a target by what it does, not by the module that
 holds it today. `modules/sre` and `modules/aws` are grab-bags, so their
 surfaces go to different targets. Incident surfaces go to `app/features/incident/`
-through TASK-38. TASK-38 is gated on the TASK-97 decision, and the TASK-97
-packet sets the subdomain split (TASK-38 lists the candidates).
+through TASK-145, which rebuilds the legacy incident module surface by surface;
+rows that still name TASK-38 are repointed as their pins land.
 
 Conventions:
 
@@ -26,16 +26,19 @@ Conventions:
 ## Hard-coded slash commands
 
 Each of these is registered by a module's `register(bot)`. `server/lifespan.py`
-calls every such function from `_register_legacy_handlers()`.
+calls every such function from `_register_legacy_handlers()`. The
+`legacy_handler_harness` fixture applies that same function to a real Bolt app,
+and `test_legacy_handler_registration_surface.py` pins the exact set of commands,
+actions, views and events it registers.
 
 | Surface | Defined at | Registration | Target | Rebuild ticket | Pinned by |
 | --- | --- | --- | --- | --- | --- |
-| `/aws` (subcommands `health`, `users`, `groups`, `lambdas`, `help`) | `modules/aws/aws.py:55` | hard-coded `register(bot)` | `app/features/`: one feature per business concern (account health, Identity Center users/groups, Lambda inventory); TASK-88 sets the boundaries | TASK-88 | not yet — TASK-36.1 |
-| `/talent-role` | `modules/role/role.py:37` | hard-coded `register(bot)` | `app/features/talent/` | TASK-39 | not yet — TASK-36.1 |
-| `/secret` | `modules/secret/secret.py:24` | hard-coded `register(bot)` | `app/features/secret/` | TASK-39 | not yet — TASK-36.1 |
-| `/atip` | `modules/atip/atip.py:39` | hard-coded `register(bot)` | `app/features/atip/` | TASK-39 | not yet — TASK-36.1 |
-| `/aiprp` (French alias of `/atip`, same handler) | `modules/atip/atip.py:40` | hard-coded `register(bot)` | `app/features/atip/` | TASK-39 | not yet — TASK-36.1 |
-| `/incident` | `modules/incident/incident.py:38` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
+| `/aws` (subcommands `health`, `users`, `groups`, `lambdas`, `help`) | `modules/aws/aws.py:55` | hard-coded `register(bot)` | `app/features/`: one feature per business concern (account health, Identity Center users/groups, Lambda inventory); TASK-88 sets the boundaries | TASK-88 | not yet — TASK-36.1.3 |
+| `/talent-role` | `modules/role/role.py:37` | hard-coded `register(bot)` | `app/features/talent/` | TASK-39 | not yet — TASK-36.1.3 |
+| `/secret` | `modules/secret/secret.py:24` | hard-coded `register(bot)` | `app/features/secret/` | TASK-39 | not yet — TASK-36.1.3 |
+| `/atip` | `modules/atip/atip.py:39` | hard-coded `register(bot)` | `app/features/atip/` | TASK-39 | not yet — TASK-36.1.3 |
+| `/aiprp` (French alias of `/atip`, same handler) | `modules/atip/atip.py:40` | hard-coded `register(bot)` | `app/features/atip/` | TASK-39 | not yet — TASK-36.1.3 |
+| `/incident` | `modules/incident/incident.py:38` | hard-coded `register(bot)` | `app/features/incident/` | TASK-145.7 | `test_incident_declare_surface.py` `-k incident_command` |
 
 ## Interactions (actions, views, events)
 
@@ -44,39 +47,39 @@ All of these are registered inside a module's `register(bot)`, which
 
 | Surface | Defined at | Registration | Target | Rebuild ticket | Pinned by |
 | --- | --- | --- | --- | --- | --- |
-| view `incident_view` | `modules/incident/incident.py:39` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `incident_change_locale` | `modules/incident/incident.py:40` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `handle_incident_action_buttons` | `modules/incident/incident_helper.py:151` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `add_folder_metadata` | `modules/incident/incident_helper.py:152` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `view_folder_metadata` | `modules/incident/incident_helper.py:153` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| view `view_folder_metadata_modal` | `modules/incident/incident_helper.py:154` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| view `add_metadata_view` | `modules/incident/incident_helper.py:155` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `delete_folder_metadata` | `modules/incident/incident_helper.py:156` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| view `view_save_incident_roles` | `modules/incident/incident_helper.py:157` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| view `view_save_event` | `modules/incident/incident_helper.py:158` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `confirm_click` | `modules/incident/incident_helper.py:159` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `user_select_action` | `modules/incident/incident_helper.py:160` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `archive_channel` | `modules/incident/incident_helper.py:161` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| event `reaction_added` (floppy-disk matcher) | `modules/incident/incident_helper.py:162` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| event `reaction_removed` (floppy-disk matcher) | `modules/incident/incident_helper.py:163` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| event `reaction_added` (ack-only fallback) | `modules/incident/incident_helper.py:164` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| event `reaction_removed` (ack-only fallback) | `modules/incident/incident_helper.py:165` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| action `update_incident_field` | `modules/incident/incident_helper.py:166` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| view `update_field_modal` | `modules/incident/incident_helper.py:167` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1 |
-| view `create_webhooks_view` | `modules/sre/webhook_helper.py:26` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1 |
-| action `toggle_webhook` | `modules/sre/webhook_helper.py:27` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1 |
-| action `reveal_webhook` | `modules/sre/webhook_helper.py:28` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1 |
-| action `next_page` | `modules/sre/webhook_helper.py:29` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1 |
-| action `channel` (ack only) | `modules/sre/webhook_helper.py:30` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1 |
-| action `hook_type` (ack only) | `modules/sre/webhook_helper.py:31` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1 |
-| view `aws_health_view` | `modules/aws/aws.py:56` | hard-coded `register(bot)` | `app/features/` account-health feature (boundary set by TASK-88) | TASK-88 | not yet — TASK-36.1 |
-| view `role_view` | `modules/role/role.py:38` | hard-coded `register(bot)` | `app/features/talent/` | TASK-39 | not yet — TASK-36.1 |
-| action `role_change_locale` | `modules/role/role.py:39` | hard-coded `register(bot)` | `app/features/talent/` | TASK-39 | not yet — TASK-36.1 |
-| action `secret_change_locale` | `modules/secret/secret.py:25` | hard-coded `register(bot)` | `app/features/secret/` | TASK-39 | not yet — TASK-36.1 |
-| view `secret_view` | `modules/secret/secret.py:26` | hard-coded `register(bot)` | `app/features/secret/` | TASK-39 | not yet — TASK-36.1 |
-| action `ati_search_width` | `modules/atip/atip.py:41` | hard-coded `register(bot)` | `app/features/atip/` | TASK-39 | not yet — TASK-36.1 |
-| view `atip_view` | `modules/atip/atip.py:42` | hard-coded `register(bot)` | `app/features/atip/` | TASK-39 | not yet — TASK-36.1 |
-| action `atip_change_locale` | `modules/atip/atip.py:43` | hard-coded `register(bot)` | `app/features/atip/` | TASK-39 | not yet — TASK-36.1 |
+| view `incident_view` | `modules/incident/incident.py:39` | hard-coded `register(bot)` | `app/features/incident/` | TASK-145.7 | `test_incident_declare_surface.py` `-k declare_submission` |
+| action `incident_change_locale` | `modules/incident/incident.py:40` | hard-coded `register(bot)` | `app/features/incident/` | TASK-145.7 | `test_incident_declare_surface.py` `-k locale_button` |
+| action `handle_incident_action_buttons` (`call-incident`, `ignore-incident`) | `modules/incident/incident_helper.py:151` | hard-coded `register(bot)` | `app/features/incident/` | TASK-145.7 | `test_incident_declare_surface.py` `-k incident_button` |
+| action `add_folder_metadata` | `modules/incident/incident_helper.py:152` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| action `view_folder_metadata` | `modules/incident/incident_helper.py:153` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| view `view_folder_metadata_modal` | `modules/incident/incident_helper.py:154` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| view `add_metadata_view` | `modules/incident/incident_helper.py:155` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| action `delete_folder_metadata` | `modules/incident/incident_helper.py:156` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| view `view_save_incident_roles` | `modules/incident/incident_helper.py:157` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| view `view_save_event` | `modules/incident/incident_helper.py:158` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| action `confirm_click` | `modules/incident/incident_helper.py:159` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| action `user_select_action` | `modules/incident/incident_helper.py:160` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| action `archive_channel` | `modules/incident/incident_helper.py:161` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| event `reaction_added` (floppy-disk matcher) | `modules/incident/incident_helper.py:162` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| event `reaction_removed` (floppy-disk matcher) | `modules/incident/incident_helper.py:163` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| event `reaction_added` (ack-only fallback) | `modules/incident/incident_helper.py:164` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| event `reaction_removed` (ack-only fallback) | `modules/incident/incident_helper.py:165` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| action `update_incident_field` | `modules/incident/incident_helper.py:166` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| view `update_field_modal` | `modules/incident/incident_helper.py:167` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| view `create_webhooks_view` | `modules/sre/webhook_helper.py:26` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1.4 |
+| action `toggle_webhook` | `modules/sre/webhook_helper.py:27` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1.4 |
+| action `reveal_webhook` | `modules/sre/webhook_helper.py:28` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1.4 |
+| action `next_page` | `modules/sre/webhook_helper.py:29` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1.4 |
+| action `channel` (ack only) | `modules/sre/webhook_helper.py:30` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1.4 |
+| action `hook_type` (ack only) | `modules/sre/webhook_helper.py:31` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1.4 |
+| view `aws_health_view` | `modules/aws/aws.py:56` | hard-coded `register(bot)` | `app/features/` account-health feature (boundary set by TASK-88) | TASK-88 | not yet — TASK-36.1.3 |
+| view `role_view` | `modules/role/role.py:38` | hard-coded `register(bot)` | `app/features/talent/` | TASK-39 | not yet — TASK-36.1.3 |
+| action `role_change_locale` | `modules/role/role.py:39` | hard-coded `register(bot)` | `app/features/talent/` | TASK-39 | not yet — TASK-36.1.3 |
+| action `secret_change_locale` | `modules/secret/secret.py:25` | hard-coded `register(bot)` | `app/features/secret/` | TASK-39 | not yet — TASK-36.1.3 |
+| view `secret_view` | `modules/secret/secret.py:26` | hard-coded `register(bot)` | `app/features/secret/` | TASK-39 | not yet — TASK-36.1.3 |
+| action `ati_search_width` | `modules/atip/atip.py:41` | hard-coded `register(bot)` | `app/features/atip/` | TASK-39 | not yet — TASK-36.1.3 |
+| view `atip_view` | `modules/atip/atip.py:42` | hard-coded `register(bot)` | `app/features/atip/` | TASK-39 | not yet — TASK-36.1.3 |
+| action `atip_change_locale` | `modules/atip/atip.py:43` | hard-coded `register(bot)` | `app/features/atip/` | TASK-39 | not yet — TASK-36.1.3 |
 
 Totals: 18 actions, 11 views and 4 events, 33 interactions in all.
 
