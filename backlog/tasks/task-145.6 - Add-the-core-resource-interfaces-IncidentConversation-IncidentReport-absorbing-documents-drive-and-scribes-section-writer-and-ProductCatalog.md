@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-15 18:20'
+updated_date: '2026-10-19 15:27'
 labels:
   - incident
   - features
@@ -99,4 +99,6 @@ Behaviour-preserving behind the legacy module; a bad merge of the Docs adapter b
 2026-10-14 (TASK-145.5 split): conversation_is_writable (the second part of the command check, incident-management.md:44) moved here from TASK-145.5 and is served by IncidentConversation. The 2026-10-09 plan predates the split and the svcs registry; re-plan after TASK-145.5.5 is implemented. Stack K layer 10.
 
 2026-10-15: Stack K layer 11 after the legacy item bridge (TASK-145.5.8) was inserted as layer 6; depends on it because the report and conversation references come from the record, legacy items included.
+
+2026-10-19: Stack K layer 13 after TASK-145.5.5 was split (TASK-145.5.9 and TASK-145.5.10 are layers 7 and 8, the cutover layer 9); re-plan after the cutover is implemented.
 <!-- SECTION:NOTES:END -->

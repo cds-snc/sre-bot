@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-15 18:18'
+updated_date: '2026-10-19 15:27'
 labels:
   - incident
   - features
@@ -26,7 +26,7 @@ ordinal: 355000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Layer B1 of TASK-145, delivered as Stack K (handoff doc-13). Coordinator: the work is in subtasks TASK-145.5.1 to TASK-145.5.8, with TASK-152 and TASK-27.5 as layers of the same stack. It builds the incident record and its store in features/incident/core over the records contract, moves the incident lookup and security flag onto it, and moves the status-update store onto the records contract. The legacy module keeps working on the same table.
+Layer B1 of TASK-145, delivered as Stack K (handoff doc-13). Coordinator: the work is in subtasks TASK-145.5.1 to TASK-145.5.10, with TASK-152 and TASK-27.5 as layers of the same stack. It builds the incident record and its store in features/incident/core over the records contract, moves the incident lookup and security flag onto it, and moves the status-update store onto the records contract. The legacy module keeps working on the same table.
 
 Split on 2026-10-14 for the single-PR gate (about 950 production lines across about 20 files, spanning app, server/contracts and Terraform, mixing additive work with a cutover).
 
@@ -39,10 +39,10 @@ Out of this task:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 TASK-152, TASK-145.5.1 to TASK-145.5.6 and TASK-145.5.8 are done (TASK-145.5.7 and TASK-27.5 may close after this task; they gate TASK-145.9)
-- [ ] #2 The incident record, its typed references with system and tenant, and the vocabulary exist in core/domain.py and common/ (TASK-145.5.3)
-- [ ] #3 find_incident_for_conversation and the security flag resolve through IncidentStore over RecordStore, obtained through the ServiceScopeOpener; legacy_incidents.py and the narrow lookup Protocols are gone (TASK-145.5.4, TASK-145.5.5)
-- [ ] #4 No incident adapter in core/ imports an AWS client (TASK-145.5.6)
+- [ ] #1 The incident record, its typed references with system and tenant, and the vocabulary exist in core/domain.py and common/ (TASK-145.5.3)
+- [ ] #2 find_incident_for_conversation and the security flag resolve through IncidentStore over RecordStore, obtained through the ServiceScopeOpener; legacy_incidents.py and the narrow lookup Protocols are gone (TASK-145.5.4, TASK-145.5.5)
+- [ ] #3 No incident adapter in core/ imports an AWS client (TASK-145.5.6)
+- [ ] #4 TASK-152, TASK-145.5.1 to TASK-145.5.6 and TASK-145.5.8 to TASK-145.5.10 are done (TASK-145.5.7 and TASK-27.5 may close after this task; they gate TASK-145.9)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -52,16 +52,18 @@ Coordinator plan. Each layer is planned in its own session, after the layer belo
 
 Stack K layers, bottom first:
 1. TASK-152: IAM /index/* grants for the audit trail, retry records and incidents tables. Terraform. Standalone merge, tf_apply.
-2. TASK-145.5.1: the incidents by_channel and open GSIs (projection ALL), the timeline table, and the devcontainer script, run locally. Terraform. Standalone merge, tf_apply before layer 7.
+2. TASK-145.5.1: the incidents by_channel and open GSIs (projection ALL), the timeline table, and the devcontainer script, run locally. Terraform. Standalone merge, tf_apply before layer 9.
 3. TASK-145.5.2: ServiceScopeOpener for the Slack and background-job registrars, and the dependency-injection.md update (Bolt middleware alternative recorded).
 4. TASK-153 then TASK-145.5.3, one layer: TASK-153 amends the ADRs for vendor enablement (a configured tenant entry enables a vendor client; the new-incident policy names a system) in an earlier commit, then TASK-145.5.3: vocabulary, record, references, incident core settings, platform tenant ids (SLACK_TEAM_ID required when Slack is enabled; the Google customer id is not the my_customer alias when Google is configured).
 5. TASK-145.5.4: IncidentStore over RecordStore (end-state reads only; an item without record_version is INCIDENT_RECORD_UNREADABLE), its in-memory fake, the key-format decision, and index reads returning full items in the records contract.
 6. TASK-145.5.8: the legacy item bridge: legacy_items.py, one pure upgrade function, applied by the store to items without record_version (split out of TASK-145.5.4, human 2026-10-15).
-7. TASK-145.5.5: cutover of the lookup and security flag; narrow Protocols and legacy_incidents deleted. Standalone merge and deploy.
-8. TASK-145.5.6: StatusUpdateStore onto RecordStore through the registry.
-9. TASK-27.5: bounded full-table read (pulled forward; first consumer TASK-145.5.7).
-10. TASK-145.5.7: the incident legacy upgrade job (legacy_items.py from TASK-145.5.8 over every item without record_version: end-state attributes, reference maps, security_incident, the open index, record_version), an in-app leased job, off by default. Run after TASK-145.8 deploys, before TASK-145.9 merges, and again after TASK-145.12. Re-planned at pickup.
-11. TASK-145.6: core resource interfaces, re-planned after layer 7.
+7. TASK-145.5.9: the configured-systems read (contracts/workplace Protocol, infrastructure provider from the vendor slices, core service). No behaviour change. Split out of TASK-145.5.5 (human, 2026-10-19).
+8. TASK-145.5.10: the IncidentStore builder from a resolved RecordStore, the incident core settings and the configured tenants; it does not read the new-incident policy, which only the declare path resolves (TASK-145.7). Unused until layer 9.
+9. TASK-145.5.5: cutover of the lookup and security flag; the entry point builds the ConversationReference; narrow Protocols and legacy_incidents deleted. Standalone merge and deploy, after layers 5 to 8 have merged.
+10. TASK-145.5.6: StatusUpdateStore onto RecordStore through the registry.
+11. TASK-27.5: bounded full-table read (pulled forward; first consumer TASK-145.5.7).
+12. TASK-145.5.7: the incident legacy upgrade job (legacy_items.py from TASK-145.5.8 over every item without record_version: end-state attributes, reference maps, security_incident, the open index, record_version), an in-app leased job, off by default. Run after TASK-145.8 deploys, before TASK-145.9 merges, and again after TASK-145.12. Re-planned at pickup.
+13. TASK-145.6: core resource interfaces, re-planned after layer 9.
 
 Review cadence: review is requested once two layers are stacked, and at least two PRs stay open before any closes.
 <!-- SECTION:PLAN:END -->

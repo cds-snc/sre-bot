@@ -7,7 +7,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-15 16:06'
-updated_date: '2026-10-15 16:40'
+updated_date: '2026-10-19 15:27'
 labels:
   - decisions
   - configuration
@@ -116,5 +116,10 @@ Gates (2026-10-15, from app/, ADR and task text only): ruff check . -> All check
 created: 2026-10-15 16:13
 ---
 2026-10-15 (human): plan approved (agreed with the intent); folded into layer 4 as an earlier commit on the TASK-145.5.3 branch, not its own layer.
+---
+
+created: 2026-10-19 15:27
+---
+2026-10-19 (human, TASK-145.5.5 planning): decisions/incident-management.md amended. The new-incident policy is resolved only by the declare path at startup (TASK-145.7 AC9). A failed resolution leaves declare unregistered instead of skipping the whole feature: production configures Slack and Google with the policy unset, so the feature-wide skip would have removed every incident command at the cutover.
 ---
 <!-- COMMENTS:END -->

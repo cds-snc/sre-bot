@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-14 23:09'
-updated_date: '2026-10-15 17:30'
+updated_date: '2026-10-19 15:27'
 labels:
   - incident
   - features
@@ -162,5 +162,10 @@ created: 2026-10-15 16:56
 created: 2026-10-15 17:30
 ---
 2026-10-15 (human): prod SSM checked before deploy. sre-bot-config has SLACK_ENABLED=true and a real GOOGLE_WORKSPACE_CUSTOMER_ID (not my_customer); SLACK_TEAM_ID lives in sre-bot-config-infrastructure, which app/bin/entry.sh appends to the same .env, so both new boot checks are satisfied. The deploy prerequisite in the plan and notes covers both parameters.
+---
+
+created: 2026-10-19 15:27
+---
+2026-10-19: the policy resolution moved from where the store is built to the declare path at startup (decisions/incident-management.md amended; TASK-145.7 AC9). TASK-145.5.5 was split into TASK-145.5.9 (configured-systems read), TASK-145.5.10 (store builder) and the cutover.
 ---
 <!-- COMMENTS:END -->
