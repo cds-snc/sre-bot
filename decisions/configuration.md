@@ -12,7 +12,7 @@ scope: Settings ownership, configuration files, plugin enablement, environment i
 Every setting is read from environment variables today, through about three dozen `BaseSettings` classes with no configuration files.
 
 Current code:
-- AWS settings live only in `integrations/aws/settings.py`. Slack's settings have two homes: `integrations/slack/settings.py` and `infrastructure/configuration/integrations/slack.py`. Other vendors (Google, OpsGenie, Trello and more) live only in `infrastructure/configuration/integrations/`.
+- AWS settings live only in `integrations/aws/settings.py`. Slack's settings have two homes: `integrations/slack/settings.py` and `infrastructure/configuration/integrations/slack.py`. OpenAI, Trello, MaxMind, Notify, OpsGenie and Sentinel live only in `integrations/<vendor>/settings.py`; Google lives only in `infrastructure/configuration/integrations/`.
 - Some feature settings sit with their feature (`packages/access/common`, `incident/scribe`, `oncall_sync`, `user_rotations`); others sit in `infrastructure/configuration/features/` (`atip`, `aws_ops`, `groups`, `incident`, `sre_ops`).
 - Security settings are split: `CORS_ALLOWED_ORIGINS` and `DEV_BYPASS_ENABLED` on `AppSettings`, `ISSUER_CONFIG` and `DEV_BYPASS_TOKEN` on `ServerSettings`. No `SecuritySettings` slice exists.
 - `AppSettings.ENVIRONMENT` is typed `Literal["local", "ci", "dev", "staging", "production"]` and drives environment-conditional behaviour. `AppSettings.PREFIX` no longer exists, and the `Settings` aggregator in `infrastructure/configuration/settings.py` is gone.

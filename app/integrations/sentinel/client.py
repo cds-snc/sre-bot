@@ -9,7 +9,7 @@ import requests
 import structlog
 
 from infrastructure.audit.models import AuditEvent
-from infrastructure.configuration.integrations.sentinel import get_sentinel_settings
+from integrations.sentinel.settings import get_sentinel_settings
 
 logger = structlog.get_logger()
 sentinel_settings = get_sentinel_settings()

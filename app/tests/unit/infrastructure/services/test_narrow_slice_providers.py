@@ -1,4 +1,4 @@
-"""Tests for PR-6: provider narrow-slice migration.
+"""Tests for provider narrow-slice construction.
 
 Verifies each provider calls only its domain singleton
 instead of the full Settings aggregator.
@@ -11,9 +11,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from infrastructure.configuration.infrastructure.retry import RetrySettings
-from infrastructure.configuration.integrations.maxmind import MaxMindSettings
 from infrastructure.resilience.service import ResilienceService
 from integrations.maxmind.client import MaxMindClient
+from integrations.maxmind.settings import MaxMindSettings
 
 pytestmark = pytest.mark.unit
 

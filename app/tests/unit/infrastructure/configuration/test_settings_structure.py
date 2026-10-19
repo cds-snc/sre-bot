@@ -33,12 +33,7 @@ from infrastructure.configuration.infrastructure.server import (
 from infrastructure.configuration.integrations import (
     GoogleResourcesConfig,
     GoogleWorkspaceSettings,
-    MaxMindSettings,
-    NotifySettings,
-    OpsGenieSettings,
-    SentinelSettings,
     SlackSettings,
-    TrelloSettings,
 )
 from infrastructure.configuration.integrations.google import (
     get_google_workspace_settings,
@@ -133,11 +128,6 @@ class TestSettingsStructure:
             SlackSettings(),
             GoogleWorkspaceSettings(),
             GoogleResourcesConfig(),
-            MaxMindSettings(),
-            NotifySettings(),
-            OpsGenieSettings(),
-            SentinelSettings(),
-            TrelloSettings(),
         ]
 
         # Verify they are all instances of IntegrationSettings

@@ -9,10 +9,10 @@ import structlog
 from geoip2.errors import AddressNotFoundError, GeoIP2Error
 
 from contracts.operations import OperationResult, OperationStatus
-from infrastructure.configuration.integrations.maxmind import get_maxmind_settings
+from integrations.maxmind.settings import get_maxmind_settings
 
 if TYPE_CHECKING:
-    from infrastructure.configuration.integrations.maxmind import MaxMindSettings
+    from integrations.maxmind.settings import MaxMindSettings
 
 logger = structlog.get_logger()
 

@@ -4,7 +4,7 @@ from urllib.request import Request, urlopen
 
 import structlog
 
-from infrastructure.configuration.integrations.opsgenie import get_opsgenie_settings
+from integrations.opsgenie.settings import get_opsgenie_settings
 
 # Use the integrations API Key as the Opsgenie API Key
 OPSGENIE_KEY = get_opsgenie_settings().OPSGENIE_INTEGRATIONS_KEY

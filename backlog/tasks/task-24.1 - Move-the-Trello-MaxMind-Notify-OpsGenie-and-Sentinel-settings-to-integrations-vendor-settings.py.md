@@ -3,10 +3,11 @@ id: TASK-24.1
 title: >-
   Move the Trello, MaxMind, Notify, OpsGenie and Sentinel settings to
   integrations/<vendor>/settings.py
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-10-19 17:18'
-updated_date: '2026-10-19 17:21'
+updated_date: '2026-10-19 17:56'
 labels:
   - clients
   - phase-3
@@ -32,11 +33,11 @@ Independent of Stack K: no open layer touches these files.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Trello, MaxMind, Notify, OpsGenie and Sentinel each have exactly one settings class, in app/integrations/<vendor>/settings.py, and their files under app/infrastructure/configuration/integrations/ are deleted
-- [ ] #2 Env var names, defaults and validators are unchanged; existing settings tests pass against the new homes
-- [ ] #3 Every consumer and test imports from the new home; no re-export remains at the old path, and the matching import-linter ignore entries are deleted
-- [ ] #4 decisions/configuration.md records the environment naming rule and TASK-111 as the rename ticket
-- [ ] #5 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [x] #1 Trello, MaxMind, Notify, OpsGenie and Sentinel each have exactly one settings class, in app/integrations/<vendor>/settings.py, and their files under app/infrastructure/configuration/integrations/ are deleted
+- [x] #2 Env var names, defaults and validators are unchanged; existing settings tests pass against the new homes
+- [x] #3 Every consumer and test imports from the new home; no re-export remains at the old path, and the matching import-linter ignore entries are deleted
+- [x] #4 decisions/configuration.md records the environment naming rule and TASK-111 as the rename ticket
+- [x] #5 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -78,3 +79,26 @@ Assumptions and doubts
 
 Blast radius and rollback: an import error in a client fails the module's import at boot or in a legacy command; covered by the client tests and the full pytest run. One git revert restores everything; no env, deploy or data change. No ordering constraint: no Stack K layer touches these files.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+What changed (pure move, no behaviour change)
+- New app/integrations/{trello,maxmind,notify,opsgenie,sentinel}/settings.py: the five classes and lru_cache getters moved unchanged in name, fields, defaults and env names. They subclass BaseSettings with an explicit model_config (env_file .env, case_sensitive, extra ignore), identical to IntegrationSettings, so the vendor packages no longer import infrastructure. The redundant alias equal to each field name is dropped (same env name under case_sensitive; the ADR rule bans per-field aliases).
+- The five clients import from their own settings module. The five old files are deleted, and infrastructure/configuration/integrations/__init__.py exports only Google and Slack.
+- pyproject.toml: the 10 now-unmatched import-linter ignores are deleted (5 per contract).
+- Docs: decisions/configuration.md (current-state line) and decisions/outbound-clients.md (6 remaining integrations->infrastructure imports; only Google and Slack settings left in the old package). The naming rule itself landed in the planning commit.
+- Tests: tests/unit/integrations/<vendor>/test_<vendor>_settings_load.py (26 tests: singleton, each field from its env var, defaults, model_config) replace the five vendor classes in test_integration_settings_singletons.py; test_settings_structure.py and test_narrow_slice_providers.py drop or repoint the five classes; stale PR-2/PR-6 docstring labels fixed.
+- Deviation from plan step 6: tests/unit/infrastructure/configuration/test_settings_delegation.py is deleted, not edited. It defined no tests (an autouse cache-clearing fixture only) and its docstring described the removed Settings aggregator.
+
+Evidence (from app/)
+- uv run ruff check . -> All checks passed!; ruff format --check . -> 958 files already formatted
+- uv run lint-imports -> Contracts: 12 kept, 0 broken
+- uv run mypy . --exclude .venv -> Found 48 errors in 19 files; 0 in touched files (all in legacy modules/ and other untouched files)
+- uv run pytest tests --ignore=tests/smoke -> 5055 passed
+- rg for configuration.integrations.(trello|maxmind|notify|opsgenie|sentinel) outside backlog/ -> no hits
+
+Open question for review: the trello, sentinel, notify and opsgenie clients read their settings at import time (module-level get_*_settings()); left as is because changing it changes client construction.
+
+Human: review, commit, open the PR (reference decisions/configuration.md).
+<!-- SECTION:NOTES:END -->

@@ -245,16 +245,11 @@ ignore_imports = [
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/plugin-architecture.md Migration and decisions/outbound-clients.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one.
     "integrations.google_workspace.client -> infrastructure.configuration.integrations.google",
-    "integrations.maxmind.client -> infrastructure.configuration.integrations.maxmind",
     "integrations.notify.client -> infrastructure.configuration.app",
-    "integrations.notify.client -> infrastructure.configuration.integrations.notify",
-    "integrations.opsgenie.client -> infrastructure.configuration.integrations.opsgenie",
     "integrations.sentinel.client -> infrastructure.audit.models",
-    "integrations.sentinel.client -> infrastructure.configuration.integrations.sentinel",
     "integrations.slack.formatter -> infrastructure.i18n",
     "integrations.slack.provider -> infrastructure.i18n",
     "integrations.slack.provider -> infrastructure.slack.settings",
-    "integrations.trello.client -> infrastructure.configuration.integrations.trello",
 ]
 
 [[tool.importlinter.contracts]]
@@ -327,16 +322,11 @@ ignore_imports = [
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/outbound-clients.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one.
     "integrations.google_workspace.client -> infrastructure.configuration.integrations.google",
-    "integrations.maxmind.client -> infrastructure.configuration.integrations.maxmind",
     "integrations.notify.client -> infrastructure.configuration.app",
-    "integrations.notify.client -> infrastructure.configuration.integrations.notify",
-    "integrations.opsgenie.client -> infrastructure.configuration.integrations.opsgenie",
     "integrations.sentinel.client -> infrastructure.audit.models",
-    "integrations.sentinel.client -> infrastructure.configuration.integrations.sentinel",
     "integrations.slack.formatter -> infrastructure.i18n",
     "integrations.slack.provider -> infrastructure.i18n",
     "integrations.slack.provider -> infrastructure.slack.settings",
-    "integrations.trello.client -> infrastructure.configuration.integrations.trello",
 ]
 
 [[tool.importlinter.contracts]]
