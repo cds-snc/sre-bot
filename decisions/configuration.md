@@ -12,7 +12,7 @@ scope: Settings ownership, configuration files, plugin enablement, environment i
 Every setting is read from environment variables today, through about three dozen `BaseSettings` classes with no configuration files.
 
 Current code:
-- AWS settings live only in `integrations/aws/settings.py`. Slack's settings have two homes: `integrations/slack/settings.py` and `infrastructure/configuration/integrations/slack.py`. Other vendors (Google, OpsGenie, Trello and more) live only in `infrastructure/configuration/integrations/`.
+- AWS settings live only in `integrations/aws/settings.py`. Slack's settings have two homes: `integrations/slack/settings.py` and `infrastructure/configuration/integrations/slack.py`. OpenAI, Trello, MaxMind, Notify, OpsGenie and Sentinel live only in `integrations/<vendor>/settings.py`; Google lives only in `infrastructure/configuration/integrations/`.
 - Some feature settings sit with their feature (`packages/access/common`, `incident/scribe`, `oncall_sync`, `user_rotations`); others sit in `infrastructure/configuration/features/` (`atip`, `aws_ops`, `groups`, `incident`, `sre_ops`).
 - Security settings are split: `CORS_ALLOWED_ORIGINS` and `DEV_BYPASS_ENABLED` on `AppSettings`, `ISSUER_CONFIG` and `DEV_BYPASS_TOKEN` on `ServerSettings`. No `SecuritySettings` slice exists.
 - `AppSettings.ENVIRONMENT` is typed `Literal["local", "ci", "dev", "staging", "production"]` and drives environment-conditional behaviour. `AppSettings.PREFIX` no longer exists, and the `Settings` aggregator in `infrastructure/configuration/settings.py` is gone.
@@ -34,6 +34,8 @@ A system reached in more than one role holds one least-privilege credential per 
 **Values come from checked-in TOML configuration files.** A base file holds defaults for every slice; one file per environment overrides it. `ENVIRONMENT` selects the environment file. pydantic-settings' TOML source loads both, and each slice reads its own table. Files are reviewed like code and validated at boot.
 
 **Environment variables carry only secrets and deployment identity.** Identity is `ENVIRONMENT` plus values the platform injects (such as `GIT_SHA`). Everything else is in the configuration files.
+
+**Environment names mirror the configuration path.** A secret a slice reads from the environment is named `<SLICE>__<FIELD>`: the slice's table name and the field, joined by a double underscore, with nested entries joined the same way (`<SLICE>__<ENTRY>__<FIELD>`). Each slice sets `env_prefix="<SLICE>__"` and `env_nested_delimiter="__"` and declares no per-field environment alias, which pydantic-settings applies without the prefix ([pydantic-settings](https://pydantic.dev/docs/validation/latest/concepts/pydantic_settings/)). The double underscore is the hierarchy separator of ASP.NET Core and Dynaconf ([ASP.NET Core configuration](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/configuration/), [Dynaconf](https://www.dynaconf.com/envvars/)); it cannot collide with platform and SDK names such as `AWS_REGION`, or with a field name that contains a single underscore. Deployment identity (`ENVIRONMENT`, `GIT_SHA`) keeps its bare name.
 
 **Plugin enablement lives in the configuration files.** Every plugin's entry point has an enablement key in the base file; an environment file may override it. The host skips a disabled plugin before registering it and never validates its settings slice ([plugins.md](plugins.md)).
 
@@ -72,7 +74,7 @@ A system reached in more than one role holds one least-privilege credential per 
 
 ## Migration
 
-Tickets: TASK-24 (single home per vendor, `SecuritySettings` slice), TASK-111 (configuration files and TOML loading), TASK-112 (tenant entries and the Slack transport key in the configuration files).
+Tickets: TASK-24 (single home per vendor, `SecuritySettings` slice), TASK-111 (configuration files and TOML loading, and the environment renames), TASK-112 (tenant entries and the Slack transport key in the configuration files).
 
 Tolerated until closed:
 - dual vendor homes in `infrastructure/configuration/integrations/` and `integrations/<vendor>/settings.py`;
@@ -80,6 +82,7 @@ Tolerated until closed:
 - security settings split across `AppSettings` and `ServerSettings`;
 - all non-secret settings, and feature and job switches, read from environment variables;
 - plain environment-variable secrets;
+- flat, bare or aliased environment names (`SLACK_BOT_TOKEN`, `APP_TOKEN`, `SLACK__COMMAND_PREFIX`), until TASK-111 renames the variables that remain after values move into the files;
 - `SLACK_ENABLED` as the interim Slack transport switch, with `SLACK_TEAM_ID` required when it is on, until TASK-112; Google in use when its service-account key file is set;
 - production values held in the `sre-bot-config` and `sre-bot-config-infrastructure` SSM parameters, which `app/bin/entry.sh` writes to `.env` at container start and terraform reads but does not manage.
 
@@ -87,3 +90,4 @@ Tolerated until closed:
 - 2026-09-24: Migration names epic tickets only; values move to per-environment TOML files with plugin enablement, and the closed `PREFIX` and aggregator items are removed.
 - 2026-09-25: settings validation stays static and runs only for enabled plugins; an invalid feature slice skips that feature; credential validity is a separate boot check.
 - 2026-10-15: a vendor client is enabled by a tenant entry in its slice, with no `<VENDOR>_ENABLED` key; an invalid vendor slice fails boot; the Slack transport gets an enablement key in the configuration files (TASK-153).
+- 2026-10-19: environment names mirror the configuration path (`<SLICE>__<FIELD>`, double-underscore nesting, no per-field aliases); the renames ride with TASK-111, once, for the variables that remain.

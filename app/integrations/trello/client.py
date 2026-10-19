@@ -2,7 +2,7 @@
 
 from trello import TrelloApi  # type: ignore
 
-from infrastructure.configuration.integrations.trello import get_trello_settings
+from integrations.trello.settings import get_trello_settings
 
 trello_settings = get_trello_settings()
 

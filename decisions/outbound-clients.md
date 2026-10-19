@@ -61,7 +61,7 @@ Clients **raise typed SDK exceptions**. They do not return `OperationResult`, im
 
 Tickets: TASK-25 (per-vendor contract), TASK-87 (Google write replay safety) and TASK-98 (lazy, refreshable AWS role credentials). Every vendor diverges as listed. Tolerated until closed:
 - `integrations/aws/client.py` assumes a role through STS while building a client and never reuses the credentials, so a role-bearing client costs one STS call per build and fails at construction when STS or credentials fail (TASK-98);
-- `integrations/` making 11 `infrastructure` imports (settings under `infrastructure.configuration`, `infrastructure.audit.models`, `infrastructure.i18n`, `infrastructure.slack.settings`), held as ignore entries on import-linter contract (d);
+- `integrations/` making 6 `infrastructure` imports (settings under `infrastructure.configuration`, `infrastructure.audit.models`, `infrastructure.i18n`, `infrastructure.slack.settings`), held as ignore entries on import-linter contract (d);
 - non-idempotent Google writes (Drive create and copy) issued on the retrying handle;
 - a per-call `num_retries=0` override at six Google writes (Calendar event insert, Meet space create, incident scribe Drive copy and Docs batchUpdate, incident documents apply_document_edits, Sheets values.append): a call-site exception to "no retry decision repeated at call sites";
 - a replayed Directory `members.insert` that returns 409 is not treated as success;
@@ -72,7 +72,7 @@ Tickets: TASK-25 (per-vendor contract), TASK-87 (Google write replay safety) and
 - Notify: `revoke_api_key` lives in the vendor package, which has no classifier;
 - Trello: ATIP operations in the vendor package, no classifier, no explicit timeout or retry;
 - OpenAI: the `Summarizer` port and implementation live in the vendor package instead of the text-generation capability ([plugin-architecture.md](plugin-architecture.md)), and `classify_openai_error` returns `OperationResult`;
-- every vendor's settings except AWS's still live in `infrastructure/configuration/integrations/` (TASK-24).
+- Google's settings, and Slack's legacy second home, still live in `infrastructure/configuration/integrations/` (TASK-24).
 
 **Changes:**
 - 2026-09-08: adapters must not leak vendor-only concepts through Path A Protocols.

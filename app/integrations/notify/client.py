@@ -9,7 +9,7 @@ import requests
 import structlog
 
 from infrastructure.configuration.app import get_app_settings
-from infrastructure.configuration.integrations.notify import get_notify_settings
+from integrations.notify.settings import get_notify_settings
 
 logger = structlog.get_logger()
 settings = get_app_settings()
