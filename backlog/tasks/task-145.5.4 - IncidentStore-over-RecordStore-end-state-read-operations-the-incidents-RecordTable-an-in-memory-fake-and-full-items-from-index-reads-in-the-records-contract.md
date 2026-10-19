@@ -4,10 +4,10 @@ title: >-
   IncidentStore over RecordStore: end-state read operations, the incidents
   RecordTable, an in-memory fake, and full items from index reads in the records
   contract
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-14 23:09'
-updated_date: '2026-10-15 18:56'
+updated_date: '2026-10-19 18:39'
 labels:
   - incident
   - features
