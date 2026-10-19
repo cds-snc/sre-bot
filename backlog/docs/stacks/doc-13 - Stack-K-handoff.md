@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: '2026-10-14 22:27'
-updated_date: '2026-10-15 18:26'
+updated_date: '2026-10-15 18:56'
 ---
 # Stack K handoff
 
@@ -25,8 +25,8 @@ updated_date: '2026-10-15 18:26'
 | 2 | TASK-145.5.1 incidents GSIs, timeline table | `stack-k/task-145.5.1-incidents-gsis` | #1597 | merged | Merged 2026-10-15 16:32 UTC (tf_apply ran). Post-apply evidence pending (next action 5); task not Done yet. |
 | 3 | TASK-145.5.2 ServiceScopeOpener | `stack-k/task-145.5.2-service-scope-opener` | #1598 | merged | Merged 2026-10-15 (d1ff7a3c on main); stack synced, layer 4 rebased. Task Done. |
 | 4 | TASK-153 ADRs, then TASK-145.5.3 vocabulary, record, references, core settings, tenant ids | `stack-k/task-145.5.3-incident-record` | #1599 | in review | Rebased onto main after #1598 merged; head bb74bb52. Task Done. Review required. Not changed by the 2026-10-15 decisions: `IncidentSecurityFlag` predates the stack (#1549) and goes in TASK-145.5.5. |
-| P2 | Planning edits of 2026-10-15: the human's GH-issue task sync, ADR refinement (incident-management.md stored form and legacy data upgrade, cloud-portability.md contract 4), task sync (TASK-145.5.4 split into 145.5.8, TASK-154, dependencies, renames) | `stack-k/task-145.5.4-incident-store` | - | ready | A planning layer despite its name: the branch was created for TASK-145.5.4 before the split, and renaming failed in `gh stack modify` (human kept the name, 2026-10-15; a PR comment explains it). Three commits: f3f3aefd GH-issue task sync, ADRs, tasks and docs. |
-| 5 | TASK-145.5.4 IncidentStore end-state reads, incidents RecordTable, fake, full items from index reads | `stack-k/task-145.5.4-end-state-reads` | - | plan approved | Plan approved 2026-10-15 (8 ACs, ~390 prod lines, 8 files, gate passes near the line). Branch created on top of P2. |
+| P2 | Planning edits of 2026-10-15: the human's GH-issue task sync, ADR refinement (incident-management.md stored form and legacy data upgrade, cloud-portability.md contract 4), task sync (TASK-145.5.4 split into 145.5.8, TASK-154, dependencies, renames) | `stack-k/task-145.5.4-incident-store` | #1721 | in review | A planning layer despite its name: the branch was created for TASK-145.5.4 before the split, and renaming failed in `gh stack modify` (human kept the name, 2026-10-15; a PR comment explains it). Three commits: f3f3aefd GH-issue task sync, ADRs, tasks and docs. |
+| 5 | TASK-145.5.4 IncidentStore end-state reads, incidents RecordTable, fake, full items from index reads | `stack-k/task-145.5.4-end-state-reads` | - | in progress | Implemented 2026-10-15: 8 ACs checked, notes written, gates green (5174 passed, mypy 0 in touched). Uncommitted until the human commits (next action 1). Came out at ~514 prod lines with docstrings (~345 executable), above the plan's ~390; recorded in the task notes. |
 | 6 | TASK-145.5.8 legacy item bridge (`legacy_items.py`), store hook, tenants argument, stored-time formatter | - | - | planned | Split out of 145.5.4 (human, 2026-10-15). Description and ACs written; needs /plan-task. |
 | 7 | TASK-145.5.5 configured-systems read; cutover; comms to the bool security flag; narrow Protocols, legacy_incidents and IncidentSecurityFlag deleted | - | - | planned | Standalone merge and deploy. Builds the ConversationReference from the configured Slack tenant; size gate to re-check at planning. |
 | 8 | TASK-145.5.6 StatusUpdateStore onto RecordStore | - | - | planned | |
@@ -38,8 +38,8 @@ A planning-only refinement (ADR text, no code) is normally an earlier commit on 
 
 ## Position
 
-- Checked out: `stack-k/task-145.5.4-end-state-reads` (new, on top of P2 `stack-k/task-145.5.4-incident-store`), no commits of its own. #1599 open, review required; #1598 merged; P2's PR created by `gh stack submit`, so two PRs are open again.
-- Uncommitted: none expected.
+- Checked out: `stack-k/task-145.5.4-end-state-reads` (on top of P2 `stack-k/task-145.5.4-incident-store`, #1721), no commits of its own yet. #1599 and #1721 open, review required.
+- Uncommitted: the TASK-145.5.4 implementation (layer 5): app/contracts/operations/codes.py, app/contracts/records/store.py, app/infrastructure/records/service.py, app/features/incident/README.md, app/features/incident/core/ (store.py, api.py, domain.py, adapters/in_memory.py, adapters/incident_items.py), the tests under app/tests/unit/features/incident/core/ and the records query conformance test, the TASK-145.5.4 task file and this doc.
 - Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-11*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`. doc-11 was updated 2026-10-15 for the new layer and TASK-154.
 - Production data facts (scan, 2026-10-15): 323 incident items; status values include 30 `closed` and 1 `reviewed` in lowercase, nothing else outside the five; security_incident absent on 316 items (only stored since #1549, 2026-10-07).
 - Local DynamoDB has the incidents GSIs and the timeline table.
@@ -47,15 +47,21 @@ A planning-only refinement (ADR text, no code) is normally an earlier commit on 
 
 ## Next actions
 
-1. Done 2026-10-15 (human): TASK-145.5.4 plan approved (task comment), planning committed on P2 and submitted, `stack-k/task-145.5.4-end-state-reads` added on top.
-2. **agent**: implement TASK-145.5.4 on `stack-k/task-145.5.4-end-state-reads`: set it In Progress, TDD from the plan's test matrix, gates, ACs checked one by one, notes; then hand the human the commit, `gh stack submit` and `gh stack add stack-k/task-145.5.8-legacy-item-bridge` commands. Request review of P2 and layer 5 once both are up.
-3. **agent**: plan TASK-145.5.8 with /plan-task on its branch; **human** approves in chat.
-4. **human**: run the TASK-152 post-apply simulation and paste the output:
+1. **human**: commit layer 5, submit, request review, and add layer 6:
+   ```
+   git add app/contracts/operations/codes.py app/contracts/records/store.py app/infrastructure/records/service.py app/features/incident/README.md app/features/incident/core app/tests/integration/infrastructure/records/test_records_store_query_conformance.py app/tests/unit/features/incident/core backlog/tasks/task-145.5.4*.md "backlog/docs/stacks/doc-13 - Stack-K-handoff.md"
+   git commit -m "feat: IncidentStore end-state reads"
+   gh stack submit
+   gh stack add stack-k/task-145.5.8-legacy-item-bridge
+   ```
+   Then request review of P2 (#1721) and the new layer-5 PR.
+2. **agent**: plan TASK-145.5.8 with /plan-task on `stack-k/task-145.5.8-legacy-item-bridge`; **human** approves in chat.
+3. **human**: run the TASK-152 post-apply simulation and paste the output:
    ```
    aws iam simulate-principal-policy --policy-source-arn <sre-bot-ecs-role ARN> --action-names dynamodb:Query --resource-arns <audit trail table ARN>/index/correlation_id-index <webhooks table ARN>/index/x
    ```
    **agent**: record it in the TASK-152 notes and check AC 2 (expect allowed, then implicitDeny).
-5. **human**: confirm the #1597 tf_apply log shows the two GSI creations and `aws dynamodb describe-table --table-name incidents` shows both indexes ACTIVE; paste for the TASK-145.5.1 notes. **agent**: record the evidence; human: `backlog task edit 145.5.1 --status Done`.
+4. **human**: confirm the #1597 tf_apply log shows the two GSI creations and `aws dynamodb describe-table --table-name incidents` shows both indexes ACTIVE; paste for the TASK-145.5.1 notes. **agent**: record the evidence; human: `backlog task edit 145.5.1 --status Done`.
 
 ## Open decisions
 
@@ -63,6 +69,5 @@ A planning-only refinement (ADR text, no code) is normally an earlier commit on 
 
 ## Planning queue
 
-- TASK-145.5.4: plan approved 2026-10-15; implementation next.
-- TASK-145.5.8: description and ACs written; /plan-task after layer 5 is implemented.
+- TASK-145.5.8: description and ACs written; /plan-task next, on its branch once the human adds it (next action 1).
 - TASK-145.5.5, TASK-145.5.6, TASK-27.5, TASK-145.5.7, TASK-145.6: each planned in turn after the layer below is implemented; re-check the size gate on 145.5.5 and 145.5.7.

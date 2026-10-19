@@ -214,10 +214,12 @@ def validate_record_update(
 class RecordStore(Protocol):
     """Record operations abstracted over the backing store.
 
-    Index semantics: an item missing any of an index's key attributes is
-    excluded from that index's queries (sparse indexes), so removing an
-    attribute takes the item out of the index. Index reads may be eventually
-    consistent and index keys are not unique.
+    Index semantics: an index query returns full items, like a table query
+    (indexes are declared with every attribute projected), so a caller never
+    follows it with a ``get``. An item missing any of an index's key
+    attributes is excluded from that index's queries (sparse indexes), so
+    removing an attribute takes the item out of the index. Index reads may be
+    eventually consistent and index keys are not unique.
 
     ``update`` changes one existing item atomically and never creates one:
 
