@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-10-20 12:32'
+updated_date: '2026-10-20 15:06'
 labels:
   - plugin-architecture
   - configuration
@@ -34,6 +34,8 @@ This is the "configuration files and TOML loading" ticket the record says is sti
 Scope: the loader, the precedence rules, the file layout, the CI checks, and moving the non-secret values of the host and framework slices (server, security, logging, transport) into the files. The deployment side (terraform task definitions, SSM parameters) stops setting the moved non-secret values in the same change.
 
 Feature and capability slices move their values into the files when their package moves (decisions/configuration.md: "Migration rides with the work"). Each package-move ticket carries that acceptance criterion, so no slice is left split between files and environment variables.
+
+GOOGLE_RESOURCES (from TASK-24.4 planning, 2026-10-20): GoogleResourcesConfig sits in integrations/google_workspace/settings.py, the Google vendor module, as a tolerated interim home. It is feature data (inc, tal, aws, cal document IDs) and splits into the owning feature slices (incident, talent, aws, the calendar owner) as non-secret values in the files; the single GOOGLE_RESOURCES variable and GoogleResourcesConfig are then deleted.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

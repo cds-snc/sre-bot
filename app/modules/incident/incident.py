@@ -8,8 +8,8 @@ from slack_sdk.models import blocks, views
 from structlog import get_logger
 
 from infrastructure.configuration.features.incident import get_incident_settings
-from infrastructure.configuration.integrations.google import get_google_resources_config
 from infrastructure.slack.settings import get_slack_transport_settings
+from integrations.google_workspace.settings import get_google_resources_config
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import users as slack_users
 from models.incidents import IncidentPayload

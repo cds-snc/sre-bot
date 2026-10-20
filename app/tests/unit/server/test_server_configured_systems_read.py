@@ -14,7 +14,7 @@ import pytest
 from structlog.testing import capture_logs
 
 from contracts.workplace import WorkplaceSystem
-from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
+from integrations.google_workspace.settings import GoogleWorkspaceSettings
 from integrations.slack.settings import SlackSettings
 from server.configured_systems import (
     TENANT_SOURCES,

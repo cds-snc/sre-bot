@@ -8,8 +8,8 @@ from typing import Any
 import structlog
 
 from contracts.operations import OperationResult
-from infrastructure.configuration.integrations.google import get_google_workspace_settings
 from infrastructure.drive.factory import get_drive_provider
+from integrations.google_workspace.settings import get_google_workspace_settings
 
 logger = structlog.get_logger()
 BOT_EMAIL = get_google_workspace_settings().SRE_BOT_EMAIL

@@ -12,7 +12,7 @@ from features.incident.scheduling.availability import (
     find_first_available_slot,
     identify_unavailable_users,
 )
-from infrastructure.configuration.integrations.google import get_google_resources_config
+from integrations.google_workspace.settings import get_google_resources_config
 from integrations.slack import channels as slack_channels
 from modules.incident import incident_conversation
 

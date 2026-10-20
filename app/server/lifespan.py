@@ -21,7 +21,6 @@ from infrastructure.configuration.infrastructure.server import (
     ServerSettings,
     get_server_settings,
 )
-from infrastructure.configuration.integrations.google import get_google_workspace_settings
 from infrastructure.directory import (
     DirectorySettings,
     get_directory_provider,
@@ -36,6 +35,7 @@ from infrastructure.logging.settings import LoggingSettings, get_logging_setting
 from infrastructure.logging.setup import configure_logging
 from infrastructure.security import get_jwks_manager
 from infrastructure.security.settings import SecuritySettings, get_security_settings
+from integrations.google_workspace.settings import get_google_workspace_settings
 from integrations.slack.provider import get_slack_provider
 from integrations.slack.settings import get_slack_settings
 from jobs import scheduled_tasks
