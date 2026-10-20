@@ -1,10 +1,10 @@
 ---
 id: TASK-24.5
 title: Add the Google and Slack tenant entries
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-19 17:19'
-updated_date: '2026-10-20 20:26'
+updated_date: '2026-10-20 20:35'
 labels:
   - clients
   - phase-3
