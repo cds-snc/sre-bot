@@ -7,7 +7,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-14 23:09'
-updated_date: '2026-10-20 17:20'
+updated_date: '2026-10-20 18:36'
 labels:
   - incident
   - features
@@ -148,6 +148,8 @@ DEPLOY PRECONDITIONS
 - Merges and deploys alone, after #1730 (layer 8) merges and with layer 10 (TASK-145.5.6) submitted above it.
 - Before the deploy: TASK-152 post-apply simulation should show the task role allowed to Query <incidents table ARN>/index/by_channel (not yet recorded).
 - After the deploy: open /sre incident status-update in an existing incident channel and in a non-incident channel; TASK-24.5 waits for this check. Rollback: revert the squash commit.
+
+2026-10-20 (SLACK_TEAM_ID review, reviewer question on #1734): no code change. The cutover stamps the configured tenant onto legacy items on every read and status updates store no tenant, so nothing persisted depends on SLACK_TEAM_ID yet and a corrected value fixes every read at once. The per-request tenant check is TASK-157; the first persisting writers (TASK-145.5.7 apply, TASK-145.7) depend on it.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-10-15 17:48'
+updated_date: '2026-10-20 18:36'
 labels:
   - plugin-architecture
   - plugins
@@ -43,6 +43,12 @@ Vendor tenant entries (decisions/configuration.md, workplace-systems.md): a vend
 - [ ] #4 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 - [ ] #5 Enablement keys in the base configuration are grouped by product area as decisions/product-scope.md names them (incident response, cloud operations, platform access, workplace utilities)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-20 (SLACK_TEAM_ID review): tenant entries stay validated at boot with no network call; the Slack entry (team id and optional enterprise id, TASK-157) is verified per inbound request by the runtime guard, and a stamping batch job verifies it with auth.test (decisions/workplace-systems.md rule 3). Moving the entries into the files keeps both ids.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

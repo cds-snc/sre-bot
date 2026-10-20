@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-14 23:10'
-updated_date: '2026-10-19 15:27'
+updated_date: '2026-10-20 18:36'
 labels:
   - incident
   - features
@@ -16,6 +16,7 @@ dependencies:
   - TASK-145.5.2
   - TASK-145.5.8
   - TASK-27.5
+  - TASK-157
 references:
   - decisions/reliability.md
   - decisions/lifecycle.md
@@ -61,10 +62,15 @@ TIMING
 - [ ] #3 Every write is a guarded RecordStore.update, so reruns change nothing and a concurrent writer wins (guard_lost counted); legacy attributes stay on the item
 - [ ] #4 A status outside the five IncidentStatus values (ignoring case and surrounding whitespace) fails the run before any apply write, reporting the incident ids and stored values
 - [ ] #5 One structured report event per run carries the counts; the run procedure (per environment, dry run then apply, after TASK-145.8 deploys and again after TASK-145.12) and the removal owner (TASK-145.13) are recorded; running it is a precondition of TASK-145.9, not of this task
+- [ ] #6 The whole-table read is RecordStore.read_all with max_items from the documented incident core setting INCIDENT_CORE__FULL_READ_MAX_ITEMS (features/incident/common/settings.py, default 10000); past the cap the run fails before any apply write and the report names the cap (decisions/cloud-portability.md contract 4, whole-table reads)
+- [ ] #7 Before apply writes anything, the job calls Slack auth.test and checks that its enterprise_id (when SLACK_ENTERPRISE_ID is set) or team_id equals the configured Slack tenant; a mismatch or a failed call fails the run with the expected and received ids, and dry_run reports the same check (decisions/workplace-systems.md rule 3, TASK-157)
+- [ ] #8 IncidentStore.find_by_conversation logs a warning naming the stored and requested tenants for each by_channel candidate it drops for its tenant, never dropping one silently (decisions/incident-management.md, Stored form)
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-15: scope widened from the open-index reconcile to the single incident legacy upgrade job (human, Stack K layer 5 planning). Needs re-planning at pickup, with a size-gate re-check then.
+
+2026-10-20 (SLACK_TEAM_ID review): this job is the first writer to persist tenants without a request, so it verifies the configured tenant with auth.test before apply (AC7) and owns the lookup warning (AC8). Depends on TASK-157 (inbound tenant guard).
 <!-- SECTION:NOTES:END -->

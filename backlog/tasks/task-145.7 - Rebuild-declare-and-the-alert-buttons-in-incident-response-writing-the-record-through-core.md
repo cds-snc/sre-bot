@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-19 15:26'
+updated_date: '2026-10-20 18:36'
 labels:
   - incident
   - features
@@ -16,6 +16,7 @@ dependencies:
   - TASK-36.1.1
   - TASK-103
   - TASK-145.5.9
+  - TASK-157
 references:
   - 'https://github.com/cds-snc/sre-bot/issues/1698'
   - decisions/incident-management.md
@@ -98,6 +99,8 @@ Declare is the most-used surface; the legacy path is removed in the same PR, so 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-14 (TASK-145.5 split): create sets open_bucket OPEN and opened_at (fixed-width ISO-8601 UTC, microseconds, +00:00) in the same write, and every reference takes its tenant from the event payload (Slack team_id), not from settings.
+
+2026-10-20 (SLACK_TEAM_ID review): writers stamp the configured Slack tenant, which TASK-157's runtime guard has verified against the request (decisions/workplace-systems.md rule 3); with SLACK_ENTERPRISE_ID set the tenant is the Enterprise org id. Depends on TASK-157.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
