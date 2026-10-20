@@ -3,10 +3,10 @@ id: TASK-24.4
 title: >-
   Move the Google Workspace settings to
   integrations/google_workspace/settings.py
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-19 17:19'
-updated_date: '2026-10-20 14:39'
+updated_date: '2026-10-20 14:49'
 labels:
   - clients
   - phase-3
