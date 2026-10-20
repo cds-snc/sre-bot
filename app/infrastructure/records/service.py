@@ -22,6 +22,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.records import (
+    READ_LIMIT_EXCEEDED,
     ExpectedValue,
     IncrementAttribute,
     KeySchema,
@@ -35,6 +36,7 @@ from contracts.records import (
     SortOperator,
     SortOrder,
     resolve_query_key,
+    validate_read_limit,
     validate_record_item,
     validate_record_update,
 )
@@ -472,6 +474,57 @@ class DynamoDBRecordStore(RecordStore):
             )
             return result
         raw_items = result.data if isinstance(result.data, list) else []
+        return OperationResult.success(data=[_deserialize_item(item) for item in raw_items])
+
+    def read_all(
+        self,
+        table: RecordTable,
+        *,
+        max_items: int,
+    ) -> OperationResult:
+        """Read every item of the table with a strongly consistent Scan.
+
+        Follows ``LastEvaluatedKey`` page by page and stops as soon as one
+        item more than ``max_items`` has been read, so an oversized table
+        costs at most one page past the cap. ``ConsistentRead`` includes every
+        write completed before the Scan began, at twice the read cost.
+
+        Args:
+            table: Table declaration; the Scan reads the table, never an index.
+            max_items: The most items the caller expects the table to hold.
+
+        Returns:
+            ``OperationResult[list[dict]]`` with every deserialized item;
+            ``PERMANENT_ERROR`` with ``READ_LIMIT_EXCEEDED`` when the table
+            holds more than ``max_items``; or a classified SDK error.
+
+        Raises:
+            ValueError: ``max_items`` is below 1.
+        """
+        validate_read_limit(max_items)
+        log = logger.bind(table=table.name, operation="read_all", max_items=max_items)
+        raw_items: list[dict[str, Any]] = []
+        try:
+            paginator = self._dynamodb.get_paginator("scan")
+            pages = paginator.paginate(
+                TableName=table.name,
+                ConsistentRead=True,
+                PaginationConfig={"MaxItems": max_items + 1},
+            )
+            for page in pages:
+                raw_items.extend(page.get("Items", []))
+        except (ClientError, BotoCoreError) as exc:
+            result: OperationResult[Any] = self._map_sdk_exception(exc)
+            log.error("records_read_all_error", error=result.message, error_code=result.error_code)
+            return result
+        if len(raw_items) > max_items:
+            log.warning("records_read_all_limit_exceeded")
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR,
+                message=f"{table.name} holds more than {max_items} items",
+                error_code=READ_LIMIT_EXCEEDED,
+            )
+        log.debug("records_read_all_ok", count=len(raw_items))
         return OperationResult.success(data=[_deserialize_item(item) for item in raw_items])
 
 

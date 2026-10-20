@@ -112,6 +112,7 @@ class TestProtocolSurface:
             ("get", ["self", "table", "key"]),
             ("query", ["self", "table", "spec"]),
             ("delete", ["self", "table", "key"]),
+            ("read_all", ["self", "table", "max_items"]),
         ],
     )
     def test_method_parameters(self, method: str, params: list[str]) -> None:
@@ -130,6 +131,9 @@ class TestProtocolSurface:
             "UpdateExpression",
             "ConditionExpression",
             "attribute_not_exists",
+            "ConsistentRead",
+            "ExclusiveStartKey",
+            "Segment",
             "boto",
             "dynamodb",
         ):
