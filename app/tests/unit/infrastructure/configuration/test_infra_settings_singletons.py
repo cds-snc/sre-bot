@@ -1,8 +1,5 @@
 """Unit tests for infrastructure settings singleton providers (PR-3)."""
 
-import pytest
-from pydantic import ValidationError
-
 from infrastructure.configuration.infrastructure.platforms import (
     PlatformsSettings,
     get_platforms_settings,
@@ -80,30 +77,3 @@ class TestPlatformsSettingsSingleton:
     def test_default_providers_disabled(self):
         settings = PlatformsSettings()
         assert settings.slack.ENABLED is False
-
-
-class TestServerSettingsIssuerConfigValidation:
-    def test_issuer_config_missing_audience_raises_validation_error(self):
-        with pytest.raises(ValidationError):
-            ServerSettings(
-                ISSUER_CONFIG={
-                    "issuer-1": {
-                        "jwks_uri": "https://issuer.example.com/.well-known/jwks.json",
-                        "algorithms": ["RS256"],
-                    }
-                }
-            )
-
-    def test_issuer_config_with_audience_is_valid(self):
-        settings = ServerSettings(
-            ISSUER_CONFIG={
-                "issuer-1": {
-                    "jwks_uri": "https://issuer.example.com/.well-known/jwks.json",
-                    "algorithms": ["RS256"],
-                    "audience": "aud-1",
-                }
-            }
-        )
-
-        assert settings.ISSUER_CONFIG is not None
-        assert settings.ISSUER_CONFIG["issuer-1"]["audience"] == "aud-1"

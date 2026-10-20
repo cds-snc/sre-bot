@@ -10,23 +10,21 @@ from typing import Any
 import structlog
 from jwt import PyJWKClient, PyJWKClientError
 
-from infrastructure.configuration.infrastructure.server import (
-    get_server_settings,
-)
+from infrastructure.security.settings import get_security_settings
 
 logger = structlog.get_logger()
 
 
-def get_issuer_config() -> dict[str, dict[str, Any]] | None:
-    """Return the JWKS settings slice from the unified security settings."""
-    settings = get_server_settings()
-    if settings.ISSUER_CONFIG is not None:
+def get_issuer_config() -> dict[str, dict[str, Any]]:
+    """Return the JWT issuers configured in the security settings slice, warning when there are none."""
+    settings = get_security_settings()
+    if settings.ISSUER_CONFIG:
         return settings.ISSUER_CONFIG
 
-    log = logger.bind()
+    log = logger.bind(key="ISSUER_CONFIG", operation="get_issuer_config")
     log.warning(
         "issuer_config_not_set",
-        detail="ISSUER_CONFIG is not set in server settings",
+        detail="ISSUER_CONFIG is not set in the security settings",
     )
     return {}
 
@@ -45,8 +43,8 @@ class JWKSManager:
         """Initialize JWKS manager.
 
         Args:
-            issuer_config: Optional issuer configuration dictionary.
-                          If None, uses settings.server.ISSUER_CONFIG.
+            issuer_config: Issuer configuration dictionary; required. Use
+                          get_jwks_manager() to build it from the security settings.
         """
         if issuer_config is None:
             raise ValueError("issuer_config must be provided explicitly. Use get_jwks_manager() provider for DI.")

@@ -41,7 +41,7 @@ class TestAppSettings:
 
 
 class TestAppSettingsEnvironment:
-    """Behavior tests for ENVIRONMENT and DEV_BYPASS_ENABLED settings."""
+    """Behavior tests for the ENVIRONMENT setting."""
 
     def test_environment_default_is_local(self, monkeypatch):
         """Default environment should be local."""
@@ -65,18 +65,6 @@ class TestAppSettingsEnvironment:
         """Unknown environment values should fail validation at settings construction."""
         with pytest.raises(ValidationError):
             AppSettings(ENVIRONMENT="uat")
-
-    def test_dev_bypass_enabled_default_false(self):
-        """DEV_BYPASS_ENABLED should default to False."""
-        settings = AppSettings()
-
-        assert settings.DEV_BYPASS_ENABLED is False
-
-    def test_dev_bypass_enabled_can_be_set_true(self):
-        """DEV_BYPASS_ENABLED should be configurable to True."""
-        settings = AppSettings(DEV_BYPASS_ENABLED=True)
-
-        assert settings.DEV_BYPASS_ENABLED is True
 
 
 class TestAppSettingsWebhookMaxBodyBytes:
@@ -102,55 +90,3 @@ class TestAppSettingsWebhookMaxBodyBytes:
         legacy_attr = "is" + "_production"
 
         assert not hasattr(settings, legacy_attr)
-
-
-class TestAppSettingsCors:
-    """Behavior tests for CORS settings defaults and wildcard rejection."""
-
-    def test_cors_defaults_are_explicit_and_non_wildcard(self):
-        """Defaults should not allow wildcard methods or headers and should start with no origins."""
-        settings = AppSettings()
-
-        assert settings.CORS_ALLOWED_ORIGINS == []
-        assert settings.CORS_ALLOWED_METHODS == [
-            "GET",
-            "POST",
-            "PUT",
-            "PATCH",
-            "DELETE",
-            "OPTIONS",
-        ]
-        assert settings.CORS_ALLOWED_HEADERS == [
-            "Authorization",
-            "Content-Type",
-            "X-Request-ID",
-            "traceparent",
-        ]
-        assert "*" not in settings.CORS_ALLOWED_METHODS
-        assert "*" not in settings.CORS_ALLOWED_HEADERS
-
-    def test_cors_explicit_lists_round_trip(self):
-        """Configured CORS lists should be preserved exactly."""
-        settings = AppSettings(
-            CORS_ALLOWED_ORIGINS=["https://frontend.example"],
-            CORS_ALLOWED_METHODS=["GET", "POST"],
-            CORS_ALLOWED_HEADERS=["Authorization", "Content-Type"],
-        )
-
-        assert settings.CORS_ALLOWED_ORIGINS == ["https://frontend.example"]
-        assert settings.CORS_ALLOWED_METHODS == ["GET", "POST"]
-        assert settings.CORS_ALLOWED_HEADERS == ["Authorization", "Content-Type"]
-
-    @pytest.mark.parametrize(
-        "payload",
-        [
-            {"CORS_ALLOWED_ORIGINS": ["*"]},
-            {"CORS_ALLOWED_ORIGINS": ["*", "https://frontend.example"]},
-            {"CORS_ALLOWED_METHODS": ["*"]},
-            {"CORS_ALLOWED_HEADERS": ["*"]},
-        ],
-    )
-    def test_cors_wildcards_raise_validation_error(self, payload):
-        """Any wildcard in configured CORS lists should fail settings construction."""
-        with pytest.raises(ValidationError):
-            AppSettings(**payload)

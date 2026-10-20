@@ -19,7 +19,7 @@ The 2026-07 review found production CORS resolving to wildcard-with-credentials,
 
 **Dev bypass:** requires `ENVIRONMENT != "production"` **and** `DEV_BYPASS_ENABLED=true` (default false) — two independent guards ([configuration.md](configuration.md)); every use is logged.
 
-**CORS:** explicit origin allow-list from settings. A validator rejects `*` combined with credentials at boot, in every environment. No environment-derived origin logic.
+**CORS:** explicit origin allow-list from the security settings slice, empty by default. A validator rejects `*` in the origin, method and header lists at boot, in every environment. No credentials mode: the API authenticates with bearer tokens in the `Authorization` header, which needs none, so an allowed origin cannot ride a user's cookies. Allowed methods default to the ones the API serves (`GET`, `POST`). No environment-derived origin logic.
 
 **Rate limiting:** SlowAPI with a shared storage backend (`redis://`) whenever more than one replica can run; `memory://` only for local. Keyed per-principal when authenticated, per-IP otherwise. **No header-based exemptions** — trusted internal sources authenticate like everyone else. 429s are problem-details with `Retry-After` ([errors-and-http.md](errors-and-http.md)). Default limits apply to all routes; exemptions (health) are explicit.
 
@@ -36,7 +36,7 @@ The 2026-07 review found production CORS resolving to wildcard-with-credentials,
 
 ## Checks
 
-- Tests: JWT missing-`aud` config fails boot; tampered/HS256 tokens rejected; CORS validator rejects wildcard+credentials; unauthenticated request to a feature route → 401; provider-signed webhook with an invalid signature → 403 in all environments; a Bot-issued HMAC webhook with a missing/invalid signature → 401/403; oversized webhook body rejected; a not-yet-migrated legacy webhook is accepted only while flagged legacy and each acceptance emits an origin-fingerprint event; 429 carries `Retry-After`.
+- Tests: JWT missing-`aud` config fails boot; tampered/HS256 tokens rejected; CORS validator rejects wildcards and the middleware sends no `Access-Control-Allow-Credentials`; unauthenticated request to a feature route → 401; provider-signed webhook with an invalid signature → 403 in all environments; a Bot-issued HMAC webhook with a missing/invalid signature → 401/403; oversized webhook body rejected; a not-yet-migrated legacy webhook is accepted only while flagged legacy and each acceptance emits an origin-fingerprint event; 429 carries `Retry-After`.
 - grep: no `X-Sentinel-Source` (or any header-presence) limiter exemption; `allow_origins` never computed from environment shape.
 
 ## Migration
@@ -45,3 +45,4 @@ Ticket: Phase-0 security hotfixes — known gaps at adoption time: prod CORS wil
 
 **Changes:**
 - 2026-09-25: feature permissions come from authorization.md, not JWT scopes; token scopes grant API access only.
+- 2026-10-20: CORS drops credentials mode (bearer tokens need none), methods default to `GET` and `POST`, and the settings live in the `SecuritySettings` slice (TASK-24.2).
