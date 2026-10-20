@@ -4,10 +4,10 @@ title: >-
   Cutover: the incident command check and security flag read through
   IncidentStore from the registry; delete legacy_incidents and the narrow lookup
   Protocols
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-14 23:09'
-updated_date: '2026-10-20 16:04'
+updated_date: '2026-10-20 17:20'
 labels:
   - incident
   - features
