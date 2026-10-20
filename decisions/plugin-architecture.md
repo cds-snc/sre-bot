@@ -39,7 +39,7 @@ Current state:
 | `capabilities/` | Engines and shared business capabilities (approvals, notifications, audit trail, people and accounts, workplace systems, text generation, on-call) | `contracts`, lower capabilities' `api.py`; its `adapters/` may import `integrations` |
 | `infrastructure/` | Hosting implementations of `contracts` Protocols | `contracts`, `integrations` |
 | `integrations/` | Vendor clients ([outbound-clients.md](outbound-clients.md), unchanged) | `contracts` (shared types only) |
-| `contracts/` | The public plugin API | the standard library, `typing`, `pluggy` markers and the third-party types a hookspec parameter names (FastAPI, structlog) only |
+| `contracts/` | The public plugin API | the standard library, `typing`, `pluggy` markers, the third-party types a hookspec parameter names (FastAPI, structlog), and `pydantic-settings` for the settings-slice base only |
 
 **`contracts/` is the public plugin API.** It holds:
 - hookspecs, including the host's extension points;
@@ -94,7 +94,7 @@ Whether it is generic or supporting is recorded in its README, not by its direct
 
 **`infrastructure/` is hosting only:** code that talks to the hosting environment and is swapped per deployment. Its contracts expose no provider concept (DynamoDB keys and indexes, stream records), so a second cloud's implementation can be added. Which store is the portability target is a separate decision.
 
-**Framework services are host code.** The plugin manager, transport runtimes, i18n, auth and logging setup are implemented in `server/`, with their contracts in `contracts/`. i18n is built in: every user-facing feature string goes through the translator contract, whose implementation uses a maintained library (a separate decision).
+**Framework services are host code.** The plugin manager, transport runtimes, i18n, auth and logging setup are implemented in `server/`, with their contracts in `contracts/`. Configuration loading is one of them: `contracts/configuration.py` holds the settings-slice base class every owner's slice derives from and the Protocol that supplies the configuration files, and `server/configuration/` implements it, so a slice in any layer, `integrations/` included, needs only `contracts/` ([configuration.md](configuration.md)). i18n is built in: every user-facing feature string goes through the translator contract, whose implementation uses a maintained library (a separate decision).
 
 **Enforcement comes before any move.** Import-linter contracts for this table land first. Existing violations are listed as `ignore_imports` entries, which may only be removed (`unmatched_ignore_imports_alerting = error`). Layers that don't exist yet are marked optional.
 
@@ -151,3 +151,4 @@ Tolerated until then:
 - 2026-10-13: wording aligned with workplace-systems.md rule 2: vendor concepts leave a feature's domain, vendor code sits in adapters.
 - 2026-10-14: `contracts/` may hold pure, I/O-free facades over its own Protocols, under the criteria in the Decision; the first are the coordination contract's `LeaseStore` and `IdempotencyStore` (TASK-58.2). Lease enforcement (`run_if_leased`) is orchestration and stays out of `contracts/`.
 - 2026-10-15: `contracts/services` holds `ServiceScopeOpener` and `ServiceResolver`, the per-invocation scope a Slack handler or job opens; import-linter contract (l) keeps svcs out of `contracts/` (TASK-145.5.2).
+- 2026-10-20: `contracts/` may import pydantic-settings for the settings-slice base; the configuration loader is host code in `server/configuration/` (TASK-111).
