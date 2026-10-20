@@ -35,7 +35,7 @@ A system reached in more than one role holds one least-privilege credential per 
 
 **Environment variables carry only secrets and deployment identity.** Identity is `ENVIRONMENT` plus values the platform injects (such as `GIT_SHA`). Everything else is in the configuration files.
 
-**Environment names mirror the configuration path.** A secret a slice reads from the environment is named `<SLICE>__<FIELD>`: the slice's table name and the field, joined by a double underscore, with nested entries joined the same way (`<SLICE>__<ENTRY>__<FIELD>`). Each slice sets `env_prefix="<SLICE>__"` and `env_nested_delimiter="__"` and declares no per-field environment alias, which pydantic-settings applies without the prefix ([pydantic-settings](https://pydantic.dev/docs/validation/latest/concepts/pydantic_settings/)). The double underscore is the hierarchy separator of ASP.NET Core and Dynaconf ([ASP.NET Core configuration](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/configuration/), [Dynaconf](https://www.dynaconf.com/envvars/)); it cannot collide with platform and SDK names such as `AWS_REGION`, or with a field name that contains a single underscore. Deployment identity (`ENVIRONMENT`, `GIT_SHA`) keeps its bare name.
+**Environment names mirror the configuration path.** A secret a slice reads from the environment is named `<SLICE>__<FIELD>`: the slice's table name and the field, joined by a double underscore, with nested entries joined the same way (`<SLICE>__<ENTRY>__<FIELD>`). Each slice sets `env_prefix="<SLICE>__"` and `env_nested_delimiter="__"` and declares no per-field environment alias, which pydantic-settings applies without the prefix ([pydantic-settings](https://pydantic.dev/docs/validation/latest/concepts/pydantic_settings/)). The double underscore is the hierarchy separator of ASP.NET Core and Dynaconf ([ASP.NET Core configuration](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/configuration/), [Dynaconf](https://www.dynaconf.com/envvars/)); it cannot collide with platform and SDK names such as `AWS_REGION`, or with a field name that contains a single underscore. Deployment identity (`ENVIRONMENT`, `GIT_SHA`) keeps its bare name. Environment names are upper case, the convention POSIX sets for environment variables ([POSIX XBD 8.1](https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/V1_chap08.html)), and each slice matches them exactly (`case_sensitive=True`). Two names that differ only by case are still one key for ownership, because pydantic-settings matches case-insensitively by default, always on Windows, and for aliases.
 
 **Plugin enablement lives in the configuration files.** Every plugin's entry point has an enablement key in the base file; an environment file may override it. The host skips a disabled plugin before registering it and never validates its settings slice ([plugins.md](plugins.md)).
 
@@ -62,14 +62,14 @@ A system reached in more than one role holds one least-privilege credential per 
 
 ## Checks
 
-- CI: each key is owned by exactly one settings slice.
+- CI (`bin/check_settings_key_ownership.py`): each key is owned by exactly one settings slice, compared case-insensitively.
 - CI: no secret-shaped key (token, password, key) appears in a configuration file.
 - Boot test: every plugin entry point has an enablement key in the base file.
 - Boot test: a disabled plugin's slice is never validated; an enabled feature with a missing required key is skipped with an event naming the key.
 - Boot test: missing required secret → clean failure naming it.
 - Boot test: a vendor slice with a tenant entry missing a secret or failing its shape check fails boot naming the key; an absent entry boots with the vendor unconfigured and no network call.
-- grep: no settings field named `<VENDOR>_ENABLED` in `integrations/` (`SLACK_ENABLED` excepted until TASK-112).
-- grep: no environment derivation outside `ENVIRONMENT`; no `os.environ` reads outside settings classes.
+- CI (same script): no settings key named `<VENDOR>_ENABLED` in `integrations/` (`SLACK_ENABLED` excepted until TASK-112); no `os.environ` or `os.getenv` reads outside settings classes (`bin/` developer scripts and tests excepted).
+- grep: no environment derivation outside `ENVIRONMENT`.
 - Review: no feature or capability reads an environment variable directly.
 
 ## Migration
@@ -96,3 +96,4 @@ Tolerated until closed:
 - 2026-10-20: Google settings have one home, `integrations/google_workspace/settings.py`, and `infrastructure/configuration/integrations/` is deleted; `GOOGLE_RESOURCES` waits in the same module until TASK-111 splits it into feature slices (TASK-24.4).
 - 2026-10-20: the interim Slack tenant entry is `SLACK_TEAM_ID` or, for an Enterprise org, `SLACK_ENTERPRISE_ID`, checked against every inbound request (TASK-157).
 - 2026-10-20: the interim tenant entries are frozen sub-models derived from the flat variables and read by every consumer; Google's entry is present when its key file or customer id is set and then needs both, and the customer id has no `my_customer` default (TASK-24.5).
+- 2026-10-20: environment names are upper case and matched exactly by each slice; key ownership compares them case-insensitively, and one CI script enforces ownership, the vendor-switch ban and the `os.environ` ban (TASK-24.6).

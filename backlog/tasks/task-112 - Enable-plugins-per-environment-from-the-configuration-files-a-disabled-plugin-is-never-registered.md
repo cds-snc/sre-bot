@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-10-20 18:36'
+updated_date: '2026-10-20 21:13'
 labels:
   - plugin-architecture
   - plugins
@@ -42,6 +42,7 @@ Vendor tenant entries (decisions/configuration.md, workplace-systems.md): a vend
 - [ ] #3 grep finds no environment-variable feature switch or ENVIRONMENT check deciding whether a plugin runs
 - [ ] #4 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 - [ ] #5 Enablement keys in the base configuration are grouped by product area as decisions/product-scope.md names them (incident response, cloud operations, platform access, workplace utilities)
+- [ ] #6 The SLACK_ENABLED exception is removed from bin/check_settings_key_ownership.py's vendor-enabled rule, and the check passes with an empty allowlist
 <!-- AC:END -->
 
 ## Implementation Notes
