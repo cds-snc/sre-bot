@@ -4,7 +4,7 @@ title: Add the Google and Slack tenant entries
 status: To Do
 assignee: []
 created_date: '2026-10-19 17:19'
-updated_date: '2026-10-20 15:06'
+updated_date: '2026-10-20 18:36'
 labels:
   - clients
   - phase-3
@@ -43,3 +43,9 @@ Merge order (human, 2026-10-19): only after TASK-145.5.5 (Stack K layer 9, the i
 - [ ] #4 Each vendor has exactly one vendor settings slice (GoogleResourcesConfig is feature data, tolerated until TASK-111)
 - [ ] #5 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-20 (SLACK_TEAM_ID review): the Slack tenant entry is the expected tenant, Slack's pair in Slack's terms: SLACK_TEAM_ID and the optional SLACK_ENTERPRISE_ID added by TASK-157 (the Enterprise org id is the tenant when set). Line 30 and AC2 read with that: the entry carries both ids, transport on with neither fails boot naming the keys. The per-request check is TASK-157's, not this task's.
+<!-- SECTION:NOTES:END -->

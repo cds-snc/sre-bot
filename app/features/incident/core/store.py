@@ -6,8 +6,9 @@ parsed as stored; an item without it is upgraded on read by the legacy item
 bridge (``adapters/legacy_items.py``) with the configured tenants, and is
 ``INCIDENT_RECORD_UNREADABLE`` when the bridge cannot read it.
 
-Production does not build this store yet: TASK-145.5.5 builds it from the
-registry with the table name from the incident core settings.
+Entry points build it per service scope with ``build_incident_store`` in
+``core/api.py``, from the resolved ``RecordStore``, the configured systems and
+the incident core settings.
 """
 
 from collections.abc import Mapping, Sequence

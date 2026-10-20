@@ -7,14 +7,14 @@ configured. ``start_status_update_draft`` is patched with a ``MagicMock``, the
 availability predicate with a constant, and the Slack client is a
 ``MagicMock``, so the tests assert the service arguments and the view sent to
 ``views.update``; one test binds the real service to a core
-``InMemoryStatusUpdateStore``, a stub lookup and a stub transcript reader to
-assert the stored record.
+``InMemoryStatusUpdateStore``, an in-memory incident store holding the
+channel's incident and a stub transcript reader to assert the stored record.
+Handlers run over a fake scope opener with Slack configured.
 """
 
 import json
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
-from functools import partial
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -29,6 +29,8 @@ from features.incident.comms.entrypoints.slack_views import NEW_ACTION_ID, REVIE
 from features.incident.comms.service import start_status_update_draft
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import (
+    ConversationReference,
+    IncidentStore,
     StatusUpdate,
     StatusUpdateOrigin,
     StatusUpdateStage,
@@ -36,6 +38,8 @@ from features.incident.core.api import (
     StatusUpdateText,
     TranscriptMessage,
 )
+from tests.factories.incident import incident_on, incident_scopes, incident_store_with, slack_conversation
+from tests.factories.slack import FakeSlackRegistrar
 
 pytestmark = pytest.mark.unit
 
@@ -70,11 +74,6 @@ _DRAFT = StatusUpdate(
     transcript_fingerprint="v1:sha256:abc123",
     created_at=_NOW,
 )
-
-
-class _StubLookup:
-    def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
-        return OperationResult.success(data=_INCIDENT)
 
 
 class _StubReader:
@@ -129,22 +128,30 @@ class TestNewUpdateAction:
         service = _service(StatusUpdateOutcomeKind.MANUAL)
 
         with patch(_TARGET, new=service):
-            handle_new_update_action(ack, _body(), MagicMock())
+            handle_new_update_action(ack, _body(), MagicMock(), incident_scopes())
 
         ack.assert_called_once()
-        assert (service.call_args.args, service.call_args.kwargs) == ((_CHANNEL,), {"author": _USER})
+        incidents, conversation = service.call_args.args
+        assert isinstance(incidents, IncidentStore)
+        assert (conversation, service.call_args.kwargs) == (slack_conversation(_CHANNEL), {"author": _USER})
 
     def test_stores_a_blank_hand_written_draft_and_shows_its_form(self) -> None:
         """With the real service, the first update is stored as a blank HAND draft by the presser and its form is shown."""
         store = InMemoryStatusUpdateStore()
         client = MagicMock()
-        service = partial(start_status_update_draft, lookup=_StubLookup(), reader=_StubReader(), store=store, now=_NOW)
+        incidents = incident_store_with(incident_on(_CHANNEL, _INCIDENT))
+
+        def service(
+            _: IncidentStore, conversation: ConversationReference, *, author: str
+        ) -> OperationResult[StatusUpdateDraftOutcome]:
+            return start_status_update_draft(incidents, conversation, author=author, reader=_StubReader(), store=store, now=_NOW)
 
         with patch(_TARGET, new=service):
-            handle_new_update_action(MagicMock(), _body(), client)
+            handle_new_update_action(MagicMock(), _body(), client, incident_scopes())
 
-        assert store.list_for_incident(_INCIDENT).data is not None
-        (stored,) = store.list_for_incident(_INCIDENT).data
+        listed = store.list_for_incident(_INCIDENT).data
+        assert listed is not None
+        (stored,) = listed
         assert (stored.sequence, stored.state, stored.author, stored.origin) == (
             1,
             StatusUpdateState.DRAFT,
@@ -163,7 +170,7 @@ class TestNewUpdateAction:
         client = MagicMock()
 
         with patch(_TARGET, new=_service(kind)):
-            handle_new_update_action(MagicMock(), _body(), client)
+            handle_new_update_action(MagicMock(), _body(), client, incident_scopes())
 
         assert _sent_view(client) == build_review_view(_DRAFT, "en-US", json.dumps(_METADATA), with_ai=True)
 
@@ -173,7 +180,7 @@ class TestNewUpdateAction:
         client = MagicMock()
 
         with patch(_TARGET, new=_service(StatusUpdateOutcomeKind.MANUAL)):
-            handle_new_update_action(MagicMock(), _body(), client)
+            handle_new_update_action(MagicMock(), _body(), client, incident_scopes())
 
         view = _sent_view(client)
         assert view == build_review_view(_DRAFT, "en-US", json.dumps(_METADATA), with_ai=False)
@@ -182,10 +189,10 @@ class TestNewUpdateAction:
     def test_a_refusal_shows_the_error_view(self) -> None:
         """With no conversation to write about, the modal shows the localized error with Close."""
         client = MagicMock()
-        refusal = OperationResult.permanent_error(message="empty", error_code=ErrorCode.EMPTY_HISTORY)
+        refusal: OperationResult[Any] = OperationResult.permanent_error(message="empty", error_code=ErrorCode.EMPTY_HISTORY)
 
         with patch(_TARGET, new=MagicMock(return_value=refusal)):
-            handle_new_update_action(MagicMock(), _body(), client)
+            handle_new_update_action(MagicMock(), _body(), client, incident_scopes())
 
         view = _sent_view(client)
         assert "callback_id" not in view
@@ -193,10 +200,17 @@ class TestNewUpdateAction:
 
 
 def test_register_includes_the_new_update_action() -> None:
-    """The New update button is registered as a block action with its own listener."""
-    registrar = MagicMock()
+    """The New update button is registered as a block action whose listener starts a draft in the pressed channel.
+
+    The registered listener wraps the handler with the registrar's scope
+    opener, so it is called with Bolt's arguments and the patched service's
+    call proves it reached the New update handler.
+    """
+    registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
+    service = _service(StatusUpdateOutcomeKind.MANUAL)
 
     register(registrar)
+    with patch(_TARGET, new=service):
+        registrar.block_actions[NEW_ACTION_ID](ack=MagicMock(), body=_body(), client=MagicMock())
 
-    registered = {call.args[0]: call.args[1] for call in registrar.register_block_action.call_args_list}
-    assert registered[NEW_ACTION_ID] is handle_new_update_action
+    assert service.call_args.args[1] == slack_conversation(_CHANNEL)

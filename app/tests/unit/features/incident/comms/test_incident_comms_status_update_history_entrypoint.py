@@ -37,14 +37,11 @@ from features.incident.comms.comms_profile import ProfileLabels
 from features.incident.comms.domain import CopyReadyText, StatusUpdateOverview
 from features.incident.comms.entrypoints import slack as slack_entrypoints
 from features.incident.comms.entrypoints.slack import (
-    handle_generate_action,
     handle_history_action,
-    handle_new_update_action,
     handle_open_action,
     handle_published_action,
     handle_review_action,
     handle_review_submission,
-    handle_save_action,
     register,
 )
 from features.incident.comms.entrypoints.slack_views import (
@@ -65,7 +62,15 @@ from features.incident.comms.history import get_approved_update
 from features.incident.comms.publisher import render_copy_ready
 from features.incident.comms.service import get_status_update_overview
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
-from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from features.incident.core.api import (
+    ConversationReference,
+    IncidentStore,
+    StatusUpdate,
+    StatusUpdateStage,
+    StatusUpdateState,
+    StatusUpdateText,
+)
+from tests.factories.incident import incident_on, incident_scopes, incident_store_with, slack_conversation
 from tests.factories.slack import FakeSlackRegistrar
 
 pytestmark = pytest.mark.unit
@@ -127,7 +132,7 @@ class _Services:
     )
     publish_result: OperationResult[CopyReadyText] = field(default_factory=lambda: OperationResult.success(data=_COPY))
     approved_calls: list[tuple[str, int]] = field(default_factory=list)
-    overview_calls: list[str] = field(default_factory=list)
+    overview_calls: list[ConversationReference] = field(default_factory=list)
     publish_calls: list[tuple[StatusUpdate, ProfileLabels, ProfileLabels]] = field(default_factory=list)
 
     async def get_approved_update(self, incident_id: str, sequence: int) -> OperationResult[StatusUpdate]:
@@ -135,9 +140,11 @@ class _Services:
         self.approved_calls.append((incident_id, sequence))
         return self.approved_result
 
-    def get_status_update_overview(self, conversation_id: str) -> OperationResult[StatusUpdateOverview]:
+    def get_status_update_overview(
+        self, incidents: IncidentStore, conversation: ConversationReference
+    ) -> OperationResult[StatusUpdateOverview]:
         self.events.append("get_status_update_overview")
-        self.overview_calls.append(conversation_id)
+        self.overview_calls.append(conversation)
         return self.overview_result
 
     async def publish(
@@ -170,11 +177,6 @@ class _CountingStore:
 
     def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
         return self._inner.list_for_incident(incident_id)
-
-
-class _StubLookup:
-    def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
-        return OperationResult.success(data=_INCIDENT)
 
 
 @pytest.fixture
@@ -234,20 +236,28 @@ def _client_method_names(client: MagicMock) -> list[str]:
 
 class TestRegister:
     def test_registers_open_and_back_beside_the_existing_listeners(self) -> None:
-        """Registration adds the Open and Back block actions and keeps every existing listener."""
-        registrar = FakeSlackRegistrar()
+        """Registration adds the Open and Back block actions and keeps every existing listener.
+
+        Review, Open and the published toggle are the handlers themselves; New
+        update, Save, Draft with AI and Back are scope-binding wrappers, so only
+        their ids are asserted.
+        """
+        registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
 
         register(registrar)
 
-        assert registrar.block_actions == {
-            NEW_ACTION_ID: handle_new_update_action,
-            REVIEW_ACTION_ID: handle_review_action,
-            OPEN_ACTION_ID: handle_open_action,
-            HISTORY_ACTION_ID: handle_history_action,
-            PUBLISHED_ACTION_ID: handle_published_action,
-            GENERATE_ACTION_ID: handle_generate_action,
-            SAVE_ACTION_ID: handle_save_action,
+        assert set(registrar.block_actions) == {
+            NEW_ACTION_ID,
+            REVIEW_ACTION_ID,
+            OPEN_ACTION_ID,
+            HISTORY_ACTION_ID,
+            PUBLISHED_ACTION_ID,
+            GENERATE_ACTION_ID,
+            SAVE_ACTION_ID,
         }
+        assert registrar.block_actions[REVIEW_ACTION_ID] is handle_review_action
+        assert registrar.block_actions[OPEN_ACTION_ID] is handle_open_action
+        assert registrar.block_actions[PUBLISHED_ACTION_ID] is handle_published_action
         assert registrar.view_submissions == {REVIEW_CALLBACK_ID: handle_review_submission}
 
 
@@ -393,21 +403,21 @@ class TestHandleHistoryAction:
         self, ack: MagicMock, client: MagicMock, services: _Services, events: list[str]
     ) -> None:
         """Ack comes first, then the overview read, then the one view update; nothing is rendered by the publisher."""
-        handle_history_action(ack, _back_body(), client)
+        handle_history_action(ack, _back_body(), client, incident_scopes())
 
         assert events == ["ack", "get_status_update_overview", "views_update"]
         ack.assert_called_once_with()
 
     def test_reads_the_overview_of_the_button_channel(self, ack: MagicMock, client: MagicMock, services: _Services) -> None:
         """The overview is read for the channel id decoded from the Back button's value."""
-        handle_history_action(ack, _back_body(), client)
+        handle_history_action(ack, _back_body(), client, incident_scopes())
 
-        assert services.overview_calls == [_CHANNEL]
+        assert services.overview_calls == [slack_conversation(_CHANNEL)]
 
     @pytest.mark.parametrize("locale", ["en-US", "fr-FR"])
     def test_replaces_the_modal_with_the_list(self, ack: MagicMock, client: MagicMock, services: _Services, locale: str) -> None:
         """One views_update by view id and hash shows the overview view, keeping the channel and locale metadata."""
-        handle_history_action(ack, _back_body(locale), client)
+        handle_history_action(ack, _back_body(locale), client, incident_scopes())
 
         assert client.views_update.call_args_list == [
             call(view_id=_VIEW_ID, hash=_VIEW_HASH, view=build_overview_view(_OVERVIEW, locale, _metadata(locale)))
@@ -427,7 +437,7 @@ class TestHandleHistoryAction:
         """A failed overview read shows the Close-only error view for its code."""
         services.overview_result = result
 
-        handle_history_action(ack, _back_body(), client)
+        handle_history_action(ack, _back_body(), client, incident_scopes())
 
         assert client.views_update.call_args_list == [
             call(view_id=_VIEW_ID, hash=_VIEW_HASH, view=build_draft_error_view(result.error_code, "en-US", _metadata()))
@@ -438,7 +448,7 @@ class TestHandleHistoryAction:
         services.overview_result = OperationResult.transient_error(message="x", error_code=ErrorCode.RATE_LIMITED)
 
         with capture_logs() as logs:
-            handle_history_action(ack, _back_body(), client)
+            handle_history_action(ack, _back_body(), client, incident_scopes())
 
         failures = [entry for entry in logs if entry["event"] == "incident_status_update_history_failed"]
         assert [(entry["log_level"], entry["error_code"]) for entry in failures] == [("warning", ErrorCode.RATE_LIMITED)]
@@ -448,14 +458,14 @@ class TestHandleHistoryAction:
         client.views_update.side_effect = RuntimeError("view_not_found")
 
         with capture_logs() as logs:
-            handle_history_action(ack, _back_body(), client)
+            handle_history_action(ack, _back_body(), client, incident_scopes())
 
         failures = [entry for entry in logs if entry["event"] == "incident_status_update_history_update_failed"]
         assert [entry["log_level"] for entry in failures] == ["warning"]
 
     def test_only_updates_the_view(self, ack: MagicMock, client: MagicMock, services: _Services) -> None:
         """The only Slack call is views_update: nothing is posted to the incident channel."""
-        handle_history_action(ack, _back_body(), client)
+        handle_history_action(ack, _back_body(), client, incident_scopes())
 
         assert _client_method_names(client) == ["views_update"]
 
@@ -466,13 +476,14 @@ class TestHandleHistoryActionOverRealServices:
     ) -> None:
         """Over the real overview read, the store sees no write and the list shows the stored records."""
         store = _CountingStore(_APPROVED, _DRAFT)
-        monkeypatch.setattr(
-            slack_entrypoints,
-            "get_status_update_overview",
-            partial(get_status_update_overview, lookup=_StubLookup(), store=store),
-        )
+        incidents = incident_store_with(incident_on(_CHANNEL, _INCIDENT))
 
-        handle_history_action(ack, _back_body(), client)
+        def overview(_: IncidentStore, conversation: ConversationReference) -> OperationResult[StatusUpdateOverview]:
+            return get_status_update_overview(incidents, conversation, store=store)
+
+        monkeypatch.setattr(slack_entrypoints, "get_status_update_overview", overview)
+
+        handle_history_action(ack, _back_body(), client, incident_scopes())
 
         assert store.writes == []
         assert client.views_update.call_args_list == [

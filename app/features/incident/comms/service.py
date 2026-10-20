@@ -3,7 +3,9 @@
 Platform-neutral use cases behind ``/sre incident status-update``
 (decisions/incident-management.md, External status updates). A responder
 writes the update; AI is an optional assist inside the form. Each use case
-resolves the incident through the core and works on its status-update records:
+resolves the incident through the core's command check, over the
+``IncidentStore`` and ``ConversationReference`` its entry point built, and
+works on its status-update records:
 
 - ``start_status_update_draft`` returns the pending draft as ``PENDING``, or
   stores the latest approved update (blank at the first stage when there is
@@ -15,8 +17,8 @@ resolves the incident through the core and works on its status-update records:
   responder's fields. With nothing new and no instructions it carries them
   forward by code (``CARRIED_FORWARD``); otherwise one model call over the
   conversation since the latest approved update fills them (``DRAFTED``).
-  Instructions steer the fields only. A security or unknown-flag incident is
-  refused until the responder confirms.
+  Instructions steer the fields only. A security incident, or one whose flag
+  cannot be read, is refused until the responder confirms.
 
 Code, not the model, decides that nothing is new: only messages posted by a
 person strictly after the latest approved update's transcript cutoff count.
@@ -60,9 +62,8 @@ from features.incident.comms.prompt import (
 )
 from features.incident.comms.settings import IncidentStatusUpdateSettings, get_incident_status_update_settings
 from features.incident.core.api import (
-    IncidentLookup,
-    IncidentSecurityFlag,
-    IncidentSecurityReader,
+    ConversationReference,
+    IncidentStore,
     IncidentTranscriptReader,
     StatusUpdate,
     StatusUpdateOrigin,
@@ -71,8 +72,7 @@ from features.incident.core.api import (
     StatusUpdateStore,
     StatusUpdateText,
     TranscriptMessage,
-    get_incident_lookup,
-    get_incident_security_reader,
+    find_incident_for_conversation,
     get_incident_transcript_reader,
     get_status_update_store,
 )
@@ -85,31 +85,30 @@ _STAGE_ORDER = tuple(StatusUpdateStage)
 
 
 def get_status_update_overview(
-    conversation_id: str,
+    incidents: IncidentStore,
+    conversation: ConversationReference,
     *,
-    lookup: IncidentLookup | None = None,
     store: StatusUpdateStore | None = None,
 ) -> OperationResult[StatusUpdateOverview]:
     """Return the incident's pending draft and approved updates, without drafting anything.
 
     Args:
-        conversation_id: The incident conversation the command ran in.
-        lookup: Resolves the conversation to its incident; core's by default.
+        incidents: Reads the incident records.
+        conversation: The incident conversation the command ran in.
         store: Holds the incident's status updates; core's by default.
 
     Returns:
         Success with the latest record as ``pending`` when it is a draft, and
-        every approved or published record newest first. Otherwise the lookup's
-        refusal (``NOT_AN_INCIDENT``, ``AMBIGUOUS_INCIDENT_CONVERSATION``) or
+        every approved or published record newest first. Otherwise the command
+        check's refusal (``NOT_AN_INCIDENT``, ``AMBIGUOUS_INCIDENT_CONVERSATION``) or
         the store's classified error.
     """
-    lookup = lookup or get_incident_lookup()
-    incident = lookup.find_incident_for_conversation(conversation_id)
+    incident = find_incident_for_conversation(incidents, conversation)
     if not incident.is_success or incident.data is None:
         return _failure(incident)
 
     store = store or get_status_update_store()
-    listed = store.list_for_incident(incident.data)
+    listed = store.list_for_incident(incident.data.id)
     if not listed.is_success or listed.data is None:
         return _failure(listed)
     latest = listed.data[0] if listed.data else None
@@ -119,16 +118,16 @@ def get_status_update_overview(
 
 
 def get_pending_status_update(
-    conversation_id: str,
+    incidents: IncidentStore,
+    conversation: ConversationReference,
     *,
-    lookup: IncidentLookup | None = None,
     store: StatusUpdateStore | None = None,
 ) -> OperationResult[StatusUpdate | None]:
     """Return the incident's pending draft, without drafting anything.
 
     Args:
-        conversation_id: The incident conversation the command ran in.
-        lookup: Resolves the conversation to its incident; core's by default.
+        incidents: Reads the incident records.
+        conversation: The incident conversation the command ran in.
         store: Holds the incident's status updates; core's by default.
 
     Returns:
@@ -136,17 +135,17 @@ def get_pending_status_update(
         there is no record or the latest is not a draft. Otherwise the error
         of ``get_status_update_overview``.
     """
-    overview = get_status_update_overview(conversation_id, lookup=lookup, store=store)
+    overview = get_status_update_overview(incidents, conversation, store=store)
     if not overview.is_success or overview.data is None:
         return _failure(overview)
     return OperationResult.success(data=overview.data.pending)
 
 
 def start_status_update_draft(
-    conversation_id: str,
+    incidents: IncidentStore,
+    conversation: ConversationReference,
     *,
     author: str,
-    lookup: IncidentLookup | None = None,
     reader: IncidentTranscriptReader | None = None,
     store: StatusUpdateStore | None = None,
     now: datetime | None = None,
@@ -157,9 +156,9 @@ def start_status_update_draft(
     new draft (its cutoff and fingerprint); nothing reaches a model.
 
     Args:
-        conversation_id: The incident conversation the modal was opened from.
+        incidents: Reads the incident records.
+        conversation: The incident conversation the modal was opened from.
         author: Platform user id of the responder starting the update.
-        lookup: Resolves the conversation to its incident; core's by default.
         reader: Reads the conversation; core's by default.
         store: Holds the incident's status updates; core's by default.
         now: The current time; injected in tests.
@@ -167,7 +166,7 @@ def start_status_update_draft(
     Returns:
         Success with the latest record as ``PENDING`` when it is a draft (or
         when another writer's draft took the sequence), otherwise the new
-        draft (origin ``HAND``) as ``MANUAL``. Otherwise the lookup's refusal
+        draft (origin ``HAND``) as ``MANUAL``. Otherwise the command check's refusal
         (``NOT_AN_INCIDENT``, ``AMBIGUOUS_INCIDENT_CONVERSATION``), the store's
         classified error, ``EMPTY_HISTORY`` when there is no update yet and no
         person has posted, or ``STATUS_UPDATE_CONFLICT`` when another writer
@@ -175,13 +174,12 @@ def start_status_update_draft(
     """
     settings = get_incident_status_update_settings()
     now = now or datetime.now(UTC)
-    lookup = lookup or get_incident_lookup()
-    log = logger.bind(operation="start_status_update_draft", conversation_id=conversation_id)
+    log = logger.bind(operation="start_status_update_draft", conversation_id=conversation.vendor_id)
 
-    incident = lookup.find_incident_for_conversation(conversation_id)
+    incident = find_incident_for_conversation(incidents, conversation)
     if not incident.is_success or incident.data is None:
         return _failure(incident)
-    incident_id = incident.data
+    incident_id = incident.data.id
     log = log.bind(incident_id=incident_id)
 
     store = store or get_status_update_store()
@@ -195,7 +193,8 @@ def start_status_update_draft(
         return OperationResult.success(data=StatusUpdateDraftOutcome(update=latest, kind=StatusUpdateOutcomeKind.PENDING))
     last_public = latest
 
-    messages = _read_window(reader or get_incident_transcript_reader(), conversation_id, last_public, settings, now, log)
+    reader = reader or get_incident_transcript_reader()
+    messages = _read_window(reader, conversation.vendor_id, last_public, settings, now, log)
     people = [message for message in messages if not message.is_bot and message.posted_at is not None]
     if last_public is None and not people:
         log.info("incident_status_update_empty_history")
@@ -220,12 +219,12 @@ def start_status_update_draft(
 
 
 def save_status_update_draft(
-    conversation_id: str,
+    incidents: IncidentStore,
+    conversation: ConversationReference,
     sequence: int,
     *,
     edit: StatusUpdateEdit,
     author: str,
-    lookup: IncidentLookup | None = None,
     store: StatusUpdateStore | None = None,
     now: datetime | None = None,
 ) -> OperationResult[StatusUpdate]:
@@ -236,11 +235,11 @@ def save_status_update_draft(
     draft's, since saving reads no conversation.
 
     Args:
-        conversation_id: The incident conversation the form was opened from.
+        incidents: Reads the incident records.
+        conversation: The incident conversation the form was opened from.
         sequence: The pending draft's sequence the responder is editing.
         edit: The responder's stage and both languages' fields.
         author: Platform user id of the saving responder.
-        lookup: Resolves the conversation to its incident; core's by default.
         store: Holds the incident's status updates; core's by default.
         now: The current time; injected in tests.
 
@@ -248,22 +247,21 @@ def save_status_update_draft(
         Success with the stored draft: the new record (origin ``HAND``), the
         latest draft unchanged when it already holds ``edit`` by ``author``
         (a repeated save), or another writer's newer draft that took the
-        sequence. Otherwise the lookup's refusal, the store's classified error,
+        sequence. Otherwise the command check's refusal, the store's classified error,
         or ``STATUS_UPDATE_CONFLICT`` when the latest record is not the draft
         at ``sequence``.
     """
     settings = get_incident_status_update_settings()
     now = now or datetime.now(UTC)
-    lookup = lookup or get_incident_lookup()
-    log = logger.bind(operation="save_status_update_draft", conversation_id=conversation_id, sequence=sequence)
+    log = logger.bind(operation="save_status_update_draft", conversation_id=conversation.vendor_id, sequence=sequence)
 
-    incident = lookup.find_incident_for_conversation(conversation_id)
+    incident = find_incident_for_conversation(incidents, conversation)
     if not incident.is_success or incident.data is None:
         return _failure(incident)
-    log = log.bind(incident_id=incident.data)
+    log = log.bind(incident_id=incident.data.id)
 
     store = store or get_status_update_store()
-    listed = store.list_for_incident(incident.data)
+    listed = store.list_for_incident(incident.data.id)
     if not listed.is_success or listed.data is None:
         return _failure(listed)
     latest = listed.data[0] if listed.data else None
@@ -303,7 +301,8 @@ def save_status_update_draft(
 
 
 async def generate_status_update_draft(
-    conversation_id: str,
+    incidents: IncidentStore,
+    conversation: ConversationReference,
     sequence: int,
     *,
     current: StatusUpdateEdit,
@@ -312,11 +311,9 @@ async def generate_status_update_draft(
     instructions: str = "",
     security_confirmed: bool = False,
     on_started: Callable[[], None] | None = None,
-    lookup: IncidentLookup | None = None,
     reader: IncidentTranscriptReader | None = None,
     store: StatusUpdateStore | None = None,
     generator: TextGenerator | None = None,
-    security_reader: IncidentSecurityReader | None = None,
     now: datetime | None = None,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
     """Fill the pending draft with AI from the responder's fields and store it as the next draft.
@@ -328,26 +325,25 @@ async def generate_status_update_draft(
     fills the fields, with the responder's fields as its base.
 
     Args:
-        conversation_id: The incident conversation the form was opened from.
+        incidents: Reads the incident records and its security flag.
+        conversation: The incident conversation the form was opened from.
         sequence: The pending draft's sequence the responder is looking at.
         current: The responder's current stage and fields, the model's base.
         author: Platform user id of the responder asking for the fill.
         wording: The no-new-information wording of a carried-forward update.
         instructions: The responder's guidance, trimmed and capped; may be blank.
-        security_confirmed: The responder confirmed sending a security or
-            unknown-flag incident to the model; the flag is then not read.
+        security_confirmed: The responder confirmed sending a security
+            incident to the model; the flag is then not read.
         on_started: Called once just before the model call.
-        lookup: Resolves the conversation to its incident; core's by default.
         reader: Reads the conversation; core's by default.
         store: Holds the incident's status updates; core's by default.
         generator: Fills the fields; the comms provider's by default.
-        security_reader: Reads the incident's security flag; core's by default.
         now: The current time; injected in tests.
 
     Returns:
         Success with the new draft, ``CARRIED_FORWARD`` (origin
         ``CARRIED_FORWARD``) or ``DRAFTED`` (origin ``MODEL``, or
-        ``MODEL_INSTRUCTED`` with instructions). Otherwise the lookup's refusal,
+        ``MODEL_INSTRUCTED`` with instructions). Otherwise the command check's refusal,
         the store's or the generator's classified error, ``EMPTY_HISTORY`` with
         no approved update, no person's message and no instructions,
         ``STATUS_UPDATE_CONFLICT`` when the latest record is not the draft at
@@ -358,18 +354,17 @@ async def generate_status_update_draft(
     settings = get_incident_status_update_settings()
     now = now or datetime.now(UTC)
     guidance = normalize_instructions(instructions)
-    lookup = lookup or get_incident_lookup()
     log = logger.bind(
         operation="generate_status_update_draft",
-        conversation_id=conversation_id,
+        conversation_id=conversation.vendor_id,
         sequence=sequence,
         instructions_length=len(guidance),
     )
 
-    incident = lookup.find_incident_for_conversation(conversation_id)
+    incident = find_incident_for_conversation(incidents, conversation)
     if not incident.is_success or incident.data is None:
         return _failure(incident)
-    incident_id = incident.data
+    incident_id = incident.data.id
     log = log.bind(incident_id=incident_id)
 
     store = store or get_status_update_store()
@@ -382,7 +377,8 @@ async def generate_status_update_draft(
         return _stale(log)
     last_public = next((record for record in records if record.state is not StatusUpdateState.DRAFT), None)
 
-    messages = _read_window(reader or get_incident_transcript_reader(), conversation_id, last_public, settings, now, log)
+    reader = reader or get_incident_transcript_reader()
+    messages = _read_window(reader, conversation.vendor_id, last_public, settings, now, log)
     people = [message for message in messages if not message.is_bot and message.posted_at is not None]
     new_from_people = [
         message for message in people if last_public is None or _posted_at(message) > last_public.transcript_cutoff
@@ -418,7 +414,7 @@ async def generate_status_update_draft(
             store, record(carried, StatusUpdateOrigin.CARRIED_FORWARD, ()), StatusUpdateOutcomeKind.CARRIED_FORWARD, log
         )
 
-    refusal = _security_gate(incident_id, security_confirmed, security_reader, log)
+    refusal = _security_gate(incidents, incident_id, security_confirmed, log)
     if refusal is not None:
         return refusal
 
@@ -482,21 +478,22 @@ def _holds(update: StatusUpdate, fields: DraftedFields) -> bool:
 
 
 def _security_gate(
+    incidents: IncidentStore,
     incident_id: str,
     security_confirmed: bool,
-    security_reader: IncidentSecurityReader | None,
     log: structlog.stdlib.BoundLogger,
 ) -> OperationResult[StatusUpdateDraftOutcome] | None:
     """Return a refusal unless drafting for this incident may reach the model.
 
     Confirmation is explicit consent, so the flag is not read when given. A
-    security, unknown or unreadable flag refuses with one code; the underlying
-    read error is logged, never returned.
+    security incident or an unreadable flag refuses with one code; the
+    underlying read error is logged, never returned. A legacy incident stored
+    without the flag reads as not a security incident.
     """
     if security_confirmed:
         return None
-    flag = (security_reader or get_incident_security_reader()).read_security_flag(incident_id)
-    if flag.is_success and flag.data is IncidentSecurityFlag.NO:
+    flag = incidents.read_security_flag(incident_id)
+    if flag.is_success and flag.data is False:
         return None
     if flag.is_success:
         log.info("incident_status_update_security_confirmation_required", error_code=ErrorCode.SECURITY_CONFIRMATION_REQUIRED)

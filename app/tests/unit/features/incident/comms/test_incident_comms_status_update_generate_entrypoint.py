@@ -19,9 +19,10 @@ the platform view builders, and notice wording is pinned literally (the
 catalogue is not loaded in unit tests).
 
 ``TestWithTheService`` binds the real services to a core
-``InMemoryStatusUpdateStore`` and stubs for the lookup, the transcript reader,
-the security flag reader and a recording text generator, so the number of model
-calls and what reaches the model are asserted at the listener.
+``InMemoryStatusUpdateStore``, an in-memory incident store that counts security
+flag reads, a stub transcript reader and a recording text generator, so the
+number of model calls and what reaches the model are asserted at the listener.
+Every handler runs over a fake scope opener with Slack configured.
 """
 
 import json
@@ -46,13 +47,10 @@ from features.incident.comms.domain import (
 )
 from features.incident.comms.entrypoints.slack import (
     handle_generate_action,
-    handle_history_action,
-    handle_new_update_action,
     handle_open_action,
     handle_published_action,
     handle_review_action,
     handle_review_submission,
-    handle_save_action,
     register,
 )
 from features.incident.comms.entrypoints.slack_views import (
@@ -70,15 +68,17 @@ from features.incident.comms.entrypoints.slack_views import (
     build_review_view,
 )
 from features.incident.comms.service import DRAFT_UNPARSEABLE_CODE, generate_status_update_draft
-from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
+from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
 from features.incident.core.api import (
-    IncidentSecurityFlag,
+    ConversationReference,
+    IncidentStore,
     StatusUpdate,
     StatusUpdateStage,
     StatusUpdateState,
     StatusUpdateText,
     TranscriptMessage,
 )
+from tests.factories.incident import incident_on, incident_scopes, slack_conversation
 from tests.factories.slack import FakeSlackRegistrar
 
 pytestmark = pytest.mark.unit
@@ -183,7 +183,8 @@ class _Services:
 
     async def generate_status_update_draft(
         self,
-        conversation_id: str,
+        incidents: IncidentStore,
+        conversation: ConversationReference,
         sequence: int,
         *,
         current: StatusUpdateEdit,
@@ -193,10 +194,11 @@ class _Services:
         security_confirmed: bool = False,
         on_started: Any = None,
     ) -> OperationResult[StatusUpdateDraftOutcome]:
+        assert isinstance(incidents, IncidentStore)
         self.events.append("generate_status_update_draft")
         self.generate_calls.append(
             {
-                "conversation_id": conversation_id,
+                "conversation": conversation,
                 "sequence": sequence,
                 "current": current,
                 "author": author,
@@ -295,7 +297,7 @@ def _generate_call(
     *, current: StatusUpdateEdit = _EDIT, instructions: str = _GUIDANCE, security_confirmed: bool = False
 ) -> dict[str, Any]:
     return {
-        "conversation_id": _CHANNEL,
+        "conversation": slack_conversation(_CHANNEL),
         "sequence": _SEQUENCE,
         "current": current,
         "author": _USER,
@@ -311,20 +313,27 @@ def _client_method_names(client: MagicMock) -> list[str]:
 
 class TestRegister:
     def test_registers_exactly_the_final_listeners(self) -> None:
-        """Seven block actions and the approval submission; no overview Draft, Confirm and draft or Redraft."""
-        registrar = FakeSlackRegistrar()
+        """Seven block actions and the approval submission; no overview Draft, Confirm and draft or Redraft.
+
+        New update, Save, Draft with AI and Back are scope-binding wrappers, so
+        only their ids are asserted; the other listeners are the handlers themselves.
+        """
+        registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
 
         register(registrar)
 
-        assert registrar.block_actions == {
-            NEW_ACTION_ID: handle_new_update_action,
-            SAVE_ACTION_ID: handle_save_action,
-            GENERATE_ACTION_ID: handle_generate_action,
-            REVIEW_ACTION_ID: handle_review_action,
-            OPEN_ACTION_ID: handle_open_action,
-            HISTORY_ACTION_ID: handle_history_action,
-            PUBLISHED_ACTION_ID: handle_published_action,
+        assert set(registrar.block_actions) == {
+            NEW_ACTION_ID,
+            SAVE_ACTION_ID,
+            GENERATE_ACTION_ID,
+            REVIEW_ACTION_ID,
+            OPEN_ACTION_ID,
+            HISTORY_ACTION_ID,
+            PUBLISHED_ACTION_ID,
         }
+        assert registrar.block_actions[REVIEW_ACTION_ID] is handle_review_action
+        assert registrar.block_actions[OPEN_ACTION_ID] is handle_open_action
+        assert registrar.block_actions[PUBLISHED_ACTION_ID] is handle_published_action
         assert registrar.view_submissions == {REVIEW_CALLBACK_ID: handle_review_submission}
 
 
@@ -333,7 +342,7 @@ class TestDrafted:
         self, ack: MagicMock, client: MagicMock, services: _Services, events: list[str]
     ) -> None:
         """The service gets the conversation, the sequence, the typed values, the wording, the instructions and the presser."""
-        handle_generate_action(ack, _generate_body(), client)
+        handle_generate_action(ack, _generate_body(), client, incident_scopes())
 
         ack.assert_called_once_with()
         assert services.generate_calls == [_generate_call()]
@@ -344,7 +353,7 @@ class TestDrafted:
         self, ack: MagicMock, client: MagicMock, services: _Services, instructions: str | None
     ) -> None:
         """Instructions are optional: blank ones reach the service as typed, which drafts from the conversation."""
-        handle_generate_action(ack, _generate_body(instructions), client)
+        handle_generate_action(ack, _generate_body(instructions), client, incident_scopes())
 
         assert services.generate_calls == [_generate_call(instructions=instructions or "")]
         assert services.review_calls == []
@@ -353,7 +362,7 @@ class TestDrafted:
         self, ack: MagicMock, client: MagicMock, services: _Services
     ) -> None:
         """When the stage cannot be parsed the stored draft is the model's base."""
-        handle_generate_action(ack, _generate_body(stage_value="not-a-stage"), client)
+        handle_generate_action(ack, _generate_body(stage_value="not-a-stage"), client, incident_scopes())
 
         assert services.review_calls == [(_INCIDENT, _SEQUENCE)]
         assert services.generate_calls == [_generate_call(current=_STORED_EDIT)]
@@ -363,7 +372,7 @@ class TestDrafted:
         self, ack: MagicMock, client: MagicMock, services: _Services, locale: str
     ) -> None:
         """The modal shows the generating view, then the new draft's form with the new sequence, a note and no instructions."""
-        handle_generate_action(ack, _generate_body(locale=locale), client)
+        handle_generate_action(ack, _generate_body(locale=locale), client, incident_scopes())
 
         assert client.views_update.call_args_list == [
             call(view_id=_VIEW_ID, hash=_VIEW_HASH, view=build_generating_view(locale, _review_metadata(locale))),
@@ -381,7 +390,7 @@ class TestDrafted:
 
     def test_only_updates_the_view(self, ack: MagicMock, client: MagicMock, services: _Services) -> None:
         """The only Slack calls are views_update: nothing is posted to the incident channel."""
-        handle_generate_action(ack, _generate_body(), client)
+        handle_generate_action(ack, _generate_body(), client, incident_scopes())
 
         assert _client_method_names(client) == ["views_update", "views_update"]
 
@@ -389,7 +398,7 @@ class TestDrafted:
         """A views.update exception never escapes the listener; the fill still ran once."""
         client.views_update.side_effect = RuntimeError("view_not_found")
 
-        handle_generate_action(ack, _generate_body(), client)
+        handle_generate_action(ack, _generate_body(), client, incident_scopes())
 
         assert services.generate_calls == [_generate_call()]
 
@@ -406,7 +415,7 @@ class TestCarriedForward:
             data=StatusUpdateDraftOutcome(update=carried, kind=StatusUpdateOutcomeKind.CARRIED_FORWARD)
         )
 
-        handle_generate_action(ack, _generate_body("", locale=locale), client)
+        handle_generate_action(ack, _generate_body("", locale=locale), client, incident_scopes())
 
         assert client.views_update.call_args_list == [
             call(
@@ -451,7 +460,7 @@ class TestFailureKeepsTheTypedValues:
         """After the generating view, the form is re-rendered from the responder's values with their instructions kept."""
         services.generate_result = result
 
-        handle_generate_action(ack, _generate_body(locale=locale), client)
+        handle_generate_action(ack, _generate_body(locale=locale), client, incident_scopes())
 
         assert client.views_update.call_args_list == [
             call(view_id=_VIEW_ID, hash=_VIEW_HASH, view=build_generating_view(locale, _review_metadata(locale))),
@@ -475,7 +484,7 @@ class TestFailureKeepsTheTypedValues:
         services.model_calls = 0
         services.generate_result = OperationResult.permanent_error(message="empty", error_code=ErrorCode.EMPTY_HISTORY)
 
-        handle_generate_action(ack, _generate_body(""), client)
+        handle_generate_action(ack, _generate_body(""), client, incident_scopes())
 
         assert client.views_update.call_args_list == [
             call(
@@ -495,7 +504,7 @@ class TestFailureKeepsTheTypedValues:
             message="off", error_code=ErrorCode.TEXT_GENERATION_UNAVAILABLE
         )
 
-        handle_generate_action(ack, _generate_body(), client)
+        handle_generate_action(ack, _generate_body(), client, incident_scopes())
 
         assert client.views_update.call_args_list[-1] == call(
             view_id=_VIEW_ID,
@@ -514,7 +523,7 @@ class TestFailureKeepsTheTypedValues:
         """A failed fill posts nothing either."""
         services.generate_result = OperationResult.permanent_error(message="unreadable", error_code=DRAFT_UNPARSEABLE_CODE)
 
-        handle_generate_action(ack, _generate_body(), client)
+        handle_generate_action(ack, _generate_body(), client, incident_scopes())
 
         assert _client_method_names(client) == ["views_update", "views_update"]
 
@@ -524,7 +533,7 @@ class TestFailureKeepsTheTypedValues:
         """Without typed values or the stored draft there is no base and nothing to re-render, so nothing is filled."""
         services.review_result = OperationResult.transient_error(message="down", error_code=ErrorCode.STATUS_UPDATE_UNREADABLE)
 
-        handle_generate_action(ack, _generate_body(stage_value="not-a-stage"), client)
+        handle_generate_action(ack, _generate_body(stage_value="not-a-stage"), client, incident_scopes())
 
         assert services.generate_calls == []
         assert client.views_update.call_args_list == [
@@ -547,7 +556,7 @@ class TestSecurityConfirmation:
             message="confirm", error_code=ErrorCode.SECURITY_CONFIRMATION_REQUIRED
         )
 
-        handle_generate_action(ack, _generate_body(locale=locale), client)
+        handle_generate_action(ack, _generate_body(locale=locale), client, incident_scopes())
 
         assert client.views_update.call_args_list == [
             call(
@@ -569,13 +578,13 @@ class TestSecurityConfirmation:
         self, ack: MagicMock, client: MagicMock, services: _Services
     ) -> None:
         """The checked confirmation reaches the service as ``security_confirmed=True``."""
-        handle_generate_action(ack, _generate_body(extra_values=_checkbox("confirmed")), client)
+        handle_generate_action(ack, _generate_body(extra_values=_checkbox("confirmed")), client, incident_scopes())
 
         assert services.generate_calls == [_generate_call(security_confirmed=True)]
 
     def test_an_unchecked_box_does_not_confirm(self, ack: MagicMock, client: MagicMock, services: _Services) -> None:
         """Showing the checkbox is not consent; left unchecked it passes ``security_confirmed=False``."""
-        handle_generate_action(ack, _generate_body(extra_values=_checkbox()), client)
+        handle_generate_action(ack, _generate_body(extra_values=_checkbox()), client, incident_scopes())
 
         assert services.generate_calls == [_generate_call(security_confirmed=False)]
 
@@ -589,7 +598,7 @@ class TestConflict:
             message="conflict", error_code=ErrorCode.STATUS_UPDATE_CONFLICT
         )
 
-        handle_generate_action(ack, _generate_body(), client)
+        handle_generate_action(ack, _generate_body(), client, incident_scopes())
 
         assert client.views_update.call_args_list == [
             call(view_id=_VIEW_ID, hash=_VIEW_HASH, view=build_generating_view("en-US", _review_metadata())),
@@ -609,7 +618,7 @@ class TestConflict:
             message="conflict", error_code=ErrorCode.STATUS_UPDATE_CONFLICT
         )
 
-        handle_generate_action(ack, _generate_body(locale="fr-FR"), client)
+        handle_generate_action(ack, _generate_body(locale="fr-FR"), client, incident_scopes())
 
         assert client.views_update.call_args_list == [
             call(
@@ -633,11 +642,6 @@ def _model_answer() -> str:
     return json.dumps(answer)
 
 
-class _StubLookup:
-    def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
-        return OperationResult.success(data=_INCIDENT)
-
-
 class _StubReader:
     def __init__(self, messages: Sequence[TranscriptMessage]) -> None:
         self._messages = list(messages)
@@ -651,14 +655,17 @@ class _StubReader:
         return self._messages
 
 
-class _StubSecurityReader:
-    def __init__(self, flag: IncidentSecurityFlag) -> None:
-        self._flag = flag
+class _CountingIncidents(InMemoryIncidentStore):
+    """In-memory incident store holding the channel's incident; records each security flag read."""
+
+    def __init__(self, *, security_incident: bool) -> None:
+        super().__init__()
+        self.seed(incident_on(_CHANNEL, _INCIDENT, security_incident=security_incident))
         self.calls: list[str] = []
 
-    def read_security_flag(self, incident_id: str) -> OperationResult[IncidentSecurityFlag]:
+    def read_security_flag(self, incident_id: str) -> OperationResult[bool]:
         self.calls.append(incident_id)
-        return OperationResult.success(data=self._flag)
+        return super().read_security_flag(incident_id)
 
 
 class _RecordingGenerator:
@@ -676,23 +683,33 @@ class _RecordingGenerator:
 class _World:
     store: InMemoryStatusUpdateStore
     generator: _RecordingGenerator
-    security_reader: _StubSecurityReader
+    incidents: _CountingIncidents
 
 
-def _bind(monkeypatch: pytest.MonkeyPatch, *, messages: Sequence[TranscriptMessage], flag: IncidentSecurityFlag) -> _World:
-    """Bind the real service to an in-memory store holding an approved update and the pending draft."""
-    world = _World(InMemoryStatusUpdateStore(), _RecordingGenerator(), _StubSecurityReader(flag))
+def _bind(monkeypatch: pytest.MonkeyPatch, *, messages: Sequence[TranscriptMessage], security_incident: bool) -> _World:
+    """Bind the real service to an in-memory store holding an approved update and the pending draft.
+
+    The incident store built in the handler's scope is replaced by the
+    counting in-memory one, so the security flag reads are observable.
+    """
+    world = _World(InMemoryStatusUpdateStore(), _RecordingGenerator(), _CountingIncidents(security_incident=security_incident))
     world.store.append(_APPROVED)
     world.store.append(_PENDING)
-    service = partial(
-        generate_status_update_draft,
-        lookup=_StubLookup(),
-        reader=_StubReader(messages),
-        store=world.store,
-        generator=world.generator,
-        security_reader=world.security_reader,
-        now=_NOW,
-    )
+
+    async def service(
+        _: IncidentStore, conversation: ConversationReference, sequence: int, **kwargs: Any
+    ) -> OperationResult[StatusUpdateDraftOutcome]:
+        return await generate_status_update_draft(
+            world.incidents,
+            conversation,
+            sequence,
+            reader=_StubReader(messages),
+            store=world.store,
+            generator=world.generator,
+            now=_NOW,
+            **kwargs,
+        )
+
     monkeypatch.setattr(form, "generate_status_update_draft", service)
     monkeypatch.setattr(form, "get_draft_for_review", partial(get_draft_for_review, store=world.store))
     return world
@@ -713,11 +730,11 @@ class TestWithTheService:
         self, monkeypatch: pytest.MonkeyPatch, client: MagicMock
     ) -> None:
         """Code decides nothing is new: zero model calls, and the new draft's current action is the no-new-information wording."""
-        world = _bind(monkeypatch, messages=[_OLD], flag=IncidentSecurityFlag.YES)
+        world = _bind(monkeypatch, messages=[_OLD], security_incident=True)
 
-        handle_generate_action(MagicMock(), _generate_body(""), client)
+        handle_generate_action(MagicMock(), _generate_body(""), client, incident_scopes())
 
-        assert world.generator.calls == [] and world.security_reader.calls == []
+        assert world.generator.calls == [] and world.incidents.calls == []
         carried = _latest(world)
         assert (carried.sequence, carried.en.current_action) == (_SEQUENCE + 1, build_no_new_information_wording().en)
         (sent,) = client.views_update.call_args_list
@@ -728,9 +745,9 @@ class TestWithTheService:
         self, monkeypatch: pytest.MonkeyPatch, client: MagicMock
     ) -> None:
         """Someone posted since the approved update, so the model is called once and its fields are the new draft."""
-        world = _bind(monkeypatch, messages=[_NEW], flag=IncidentSecurityFlag.NO)
+        world = _bind(monkeypatch, messages=[_NEW], security_incident=False)
 
-        handle_generate_action(MagicMock(), _generate_body(""), client)
+        handle_generate_action(MagicMock(), _generate_body(""), client, incident_scopes())
 
         assert len(world.generator.calls) == 1
         filled = _latest(world)
@@ -742,9 +759,9 @@ class TestWithTheService:
 
     def test_typed_instructions_reach_the_model(self, monkeypatch: pytest.MonkeyPatch, client: MagicMock) -> None:
         """The responder's guidance is part of the one model call's instructions, even with nothing new."""
-        world = _bind(monkeypatch, messages=[_OLD], flag=IncidentSecurityFlag.NO)
+        world = _bind(monkeypatch, messages=[_OLD], security_incident=False)
 
-        handle_generate_action(MagicMock(), _generate_body(_GUIDANCE), client)
+        handle_generate_action(MagicMock(), _generate_body(_GUIDANCE), client, incident_scopes())
 
         (model_call,) = world.generator.calls
         assert _GUIDANCE in str(model_call["instructions"])
@@ -753,18 +770,18 @@ class TestWithTheService:
         self, monkeypatch: pytest.MonkeyPatch, client: MagicMock
     ) -> None:
         """Unconfirmed: no model call and the checkbox is shown. Checked: one call, and the flag is not read again."""
-        world = _bind(monkeypatch, messages=[_NEW], flag=IncidentSecurityFlag.YES)
+        world = _bind(monkeypatch, messages=[_NEW], security_incident=True)
 
-        handle_generate_action(MagicMock(), _generate_body(), client)
+        handle_generate_action(MagicMock(), _generate_body(), client, incident_scopes())
 
         assert world.generator.calls == []
         assert _latest(world) == _PENDING
         refused = client.views_update.call_args_list[-1].kwargs["view"]
         assert "security_confirm" in [block.get("block_id") for block in refused["blocks"]]
 
-        reads_before = len(world.security_reader.calls)
-        handle_generate_action(MagicMock(), _generate_body(extra_values=_checkbox("confirmed")), client)
+        reads_before = len(world.incidents.calls)
+        handle_generate_action(MagicMock(), _generate_body(extra_values=_checkbox("confirmed")), client, incident_scopes())
 
         assert len(world.generator.calls) == 1
-        assert len(world.security_reader.calls) == reads_before
+        assert len(world.incidents.calls) == reads_before
         client.chat_postMessage.assert_not_called()

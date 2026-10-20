@@ -15,24 +15,21 @@ from contracts.operations.result import OperationResult
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from features.incident.common import vocabulary
 from features.incident.core import api
-from features.incident.core.adapters import legacy_incidents as legacy_incidents_adapter
 from features.incident.core.adapters import slack as slack_adapter
 from features.incident.core.adapters import status_updates as status_updates_adapter
+from features.incident.core.adapters.in_memory import InMemoryIncidentStore
+from tests.factories.incident import incident_on, slack_conversation
 
 pytestmark = pytest.mark.unit
 
 
 @pytest.fixture(autouse=True)
 def _clear_provider_cache() -> Iterator[None]:
-    """Keep the cached reader, lookup and store from leaking between tests."""
+    """Keep the cached reader and store from leaking between tests."""
     api.get_incident_transcript_reader.cache_clear()
-    api.get_incident_lookup.cache_clear()
-    api.get_incident_security_reader.cache_clear()
     api.get_status_update_store.cache_clear()
     yield
     api.get_incident_transcript_reader.cache_clear()
-    api.get_incident_lookup.cache_clear()
-    api.get_incident_security_reader.cache_clear()
     api.get_status_update_store.cache_clear()
 
 
@@ -42,9 +39,6 @@ def test_api_exports_exactly_the_public_names() -> None:
         "ConversationReference",
         "ExternalCaseReference",
         "Incident",
-        "IncidentLookup",
-        "IncidentSecurityFlag",
-        "IncidentSecurityReader",
         "IncidentStore",
         "IncidentTranscriptReader",
         "MessageReference",
@@ -62,8 +56,6 @@ def test_api_exports_exactly_the_public_names() -> None:
         "VideoCallReference",
         "build_incident_store",
         "find_incident_for_conversation",
-        "get_incident_lookup",
-        "get_incident_security_reader",
         "get_incident_transcript_reader",
         "get_status_update_store",
         "translate",
@@ -119,66 +111,23 @@ def test_provider_returns_one_cached_reader_built_on_the_slack_web_client(monkey
     client.conversations_info.assert_called_once_with(channel="C123")
 
 
-def test_lookup_signature_carries_only_a_conversation_id_and_an_operation_result() -> None:
-    """No table, item or SDK shape crosses the lookup interface, so the store can replace the adapter behind it."""
-    find = inspect.signature(api.IncidentLookup.find_incident_for_conversation)
+def test_find_incident_for_conversation_answers_with_the_store_for_the_reference() -> None:
+    """The command check every command calls asks the given store for the conversation reference it was handed."""
+    incident = incident_on("C0INCIDENT", "7f0c3a52-3d0e-4d55-9a4e-6f1f2b9c0a11")
+    asked: list[api.ConversationReference] = []
 
-    assert {name: p.annotation for name, p in find.parameters.items() if name != "self"} == {"conversation_id": str}
-    assert find.return_annotation == OperationResult[str]
+    class _RecordingStore(InMemoryIncidentStore):
+        def find_by_conversation(self, conversation: api.ConversationReference) -> OperationResult[api.Incident]:
+            asked.append(conversation)
+            return super().find_by_conversation(conversation)
 
+    store = _RecordingStore()
+    store.seed(incident)
 
-def test_lookup_provider_returns_one_cached_lookup_built_by_the_legacy_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The provider builds the interim legacy-table lookup once and hands out that same instance."""
-    built = MagicMock(spec=legacy_incidents_adapter.LegacyIncidentTableLookup)
-    builder = MagicMock(return_value=built)
-    monkeypatch.setattr(api, "build_legacy_incident_lookup", builder)
+    result = api.find_incident_for_conversation(store, slack_conversation("C0INCIDENT"))
 
-    lookup = api.get_incident_lookup()
-
-    assert lookup is built
-    assert api.get_incident_lookup() is built
-    builder.assert_called_once_with()
-
-
-def test_find_incident_for_conversation_returns_the_provided_lookup_result(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The module function is the command check every command calls; it answers with the provided lookup's result."""
-    expected = OperationResult.success(data="7f0c3a52-3d0e-4d55-9a4e-6f1f2b9c0a11")
-
-    class FakeLookup:
-        def __init__(self) -> None:
-            self.asked: list[str] = []
-
-        def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
-            self.asked.append(conversation_id)
-            return expected
-
-    fake = FakeLookup()
-    assert isinstance(fake, api.IncidentLookup)
-    monkeypatch.setattr(api, "get_incident_lookup", lambda: fake)
-
-    assert api.find_incident_for_conversation("C0INCIDENT") is expected
-    assert fake.asked == ["C0INCIDENT"]
-
-
-def test_security_reader_signature_carries_only_incident_id_and_operation_result() -> None:
-    """No table, item or SDK shape crosses the reader interface, so the store can replace the adapter behind it."""
-    read = inspect.signature(api.IncidentSecurityReader.read_security_flag)
-
-    assert {name: p.annotation for name, p in read.parameters.items() if name != "self"} == {"incident_id": str}
-    assert "OperationResult" in str(read.return_annotation)
-
-
-def test_security_reader_provider_returns_one_cached_reader_built_by_the_legacy_adapter(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The provider builds the legacy-table security reader once and hands out that same instance."""
-    built = MagicMock(spec=legacy_incidents_adapter.LegacyIncidentTableLookup)
-    builder = MagicMock(return_value=built)
-    monkeypatch.setattr(api, "build_legacy_incident_security_reader", builder)
-
-    reader = api.get_incident_security_reader()
-
-    assert reader is built
-    assert api.get_incident_security_reader() is built
-    builder.assert_called_once_with()
+    assert result.data == incident
+    assert asked == [slack_conversation("C0INCIDENT")]
 
 
 def test_status_update_store_signatures_carry_only_domain_types_and_operation_results() -> None:

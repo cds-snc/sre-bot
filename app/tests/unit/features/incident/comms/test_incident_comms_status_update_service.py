@@ -1,10 +1,11 @@
 """Tests for starting an incident status update by hand in the comms service.
 
-The service runs against the in-memory status-update store and stubs for the
-incident lookup and the transcript reader, with a fixed ``now``, so each test
-controls exactly which records exist and which messages are read, and asserts
-what was stored. Starting takes no text generator and no security reader, so no
-model call or security read can happen.
+The service runs against the in-memory status-update store, an in-memory
+incident store holding the incident on the channel, and a stub transcript
+reader, with a fixed ``now``, so each test controls exactly which records exist
+and which messages are read, and asserts what was stored. Starting takes no text
+generator and never reads the security flag, so no model call or security read
+can happen.
 """
 
 from collections.abc import Sequence
@@ -19,7 +20,7 @@ from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
 from features.incident.comms.domain import StatusUpdateDraftOutcome, StatusUpdateOutcomeKind
 from features.incident.comms.service import start_status_update_draft
-from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
+from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
 from features.incident.core.api import (
     StatusUpdate,
     StatusUpdateOrigin,
@@ -28,6 +29,7 @@ from features.incident.core.api import (
     StatusUpdateText,
     TranscriptMessage,
 )
+from tests.factories.incident import incident_on, incident_store_with, slack_conversation
 
 pytestmark = pytest.mark.unit
 
@@ -76,16 +78,6 @@ def _record(
         transcript_fingerprint=f"v1:sha256:prior{sequence}",
         created_at=_at(cutoff_minutes_ago),
     )
-
-
-class _StubLookup:
-    def __init__(self, result: OperationResult[str] | None = None) -> None:
-        self._result = result or OperationResult.success(data=_INCIDENT)
-        self.calls: list[str] = []
-
-    def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
-        self.calls.append(conversation_id)
-        return self._result
 
 
 class _StubReader:
@@ -148,12 +140,12 @@ def _start(
     *,
     store: InMemoryStatusUpdateStore | None = None,
     reader: _StubReader | None = None,
-    lookup: _StubLookup | None = None,
+    incidents: InMemoryIncidentStore | None = None,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
     return start_status_update_draft(
-        _CHANNEL,
+        incidents if incidents is not None else incident_store_with(incident_on(_CHANNEL, _INCIDENT)),
+        slack_conversation(_CHANNEL),
         author="U123",
-        lookup=lookup or _StubLookup(),
         reader=reader or _StubReader(),
         store=store if store is not None else InMemoryStatusUpdateStore(),
         now=_NOW,
@@ -301,21 +293,26 @@ class TestConcurrentStarts:
 
 class TestFailures:
     @pytest.mark.parametrize(
-        "refusal",
+        ("incidents", "refusal"),
         [
-            OperationResult.error(OperationStatus.NOT_FOUND, message="no incident", error_code=ErrorCode.NOT_AN_INCIDENT),
-            OperationResult.permanent_error(message="two incidents", error_code=ErrorCode.AMBIGUOUS_INCIDENT_CONVERSATION),
+            (incident_store_with(), (OperationStatus.NOT_FOUND, ErrorCode.NOT_AN_INCIDENT)),
+            (
+                incident_store_with(incident_on(_CHANNEL, _INCIDENT), incident_on(_CHANNEL, "inc-uuid-2")),
+                (OperationStatus.PERMANENT_ERROR, ErrorCode.AMBIGUOUS_INCIDENT_CONVERSATION),
+            ),
         ],
         ids=["not-an-incident", "ambiguous"],
     )
-    def test_a_lookup_refusal_passes_through_before_anything_is_read(self, refusal: OperationResult[str]) -> None:
-        """Outside an incident nothing is read or stored."""
+    def test_an_incident_refusal_passes_through_before_anything_is_read(
+        self, incidents: InMemoryIncidentStore, refusal: tuple[OperationStatus, ErrorCode]
+    ) -> None:
+        """Outside an incident, or with two incidents on the channel, nothing is read or stored."""
         store = InMemoryStatusUpdateStore()
         reader = _StubReader([_human("hi", 5)])
 
-        result = _start(store=store, reader=reader, lookup=_StubLookup(refusal))
+        result = _start(store=store, reader=reader, incidents=incidents)
 
-        assert (result.status, result.error_code) == (refusal.status, refusal.error_code)
+        assert (result.status, result.error_code) == refusal
         assert reader.reads == [] and _stored(store) == ()
 
     def test_a_store_read_failure_passes_through_before_the_transcript_is_read(self) -> None:

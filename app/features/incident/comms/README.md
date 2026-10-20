@@ -23,11 +23,12 @@ Slack  /sre incident status-update, modal buttons, Approve submission
   │
   ▼
 entrypoints/slack.py      parse payload → typed values → one service call → OperationResult → render (slack_views.py, i18n)
+  │                         one service scope per call: RecordStore + ConfiguredSystems → IncidentStore, ConversationReference
   │
   ▼
 form.py | approval.py | history.py | service.py      platform-agnostic; no Slack or OpenAI imports
   │
-  ├─► IncidentLookup, IncidentSecurityReader, IncidentTranscriptReader, StatusUpdateStore ── core/api.py
+  ├─► IncidentStore (passed in), IncidentTranscriptReader, StatusUpdateStore ── core/api.py
   ├─► TextGenerator ──────── providers.py ──► adapters/text_generation.py   (integrations.openai)
   └─► StatusPagePublisher ── providers.py ──► adapters/copy_ready.py         (publisher.py, comms_profile.py)
 ```
@@ -41,7 +42,13 @@ form.py | approval.py | history.py | service.py      platform-agnostic; no Slack
 - `entrypoints/slack.py` — the `status-update` command handler registered
   under `sre.incident`, and the status-updates modal's block-action and
   view-submission listeners, all by one `register`. Each handler acks, makes
-  one service call and updates the modal; no `slack_sdk` import.
+  one service call and updates the modal; no `slack_sdk` import. A handler
+  that resolves the channel's incident opens one service scope, builds the
+  `IncidentStore` there with `build_incident_store` and the channel's
+  `ConversationReference` under the configured Slack tenant, and passes both
+  to the service. Without a configured Slack tenant `register` registers
+  nothing and logs `incident_comms_registration_skipped` naming
+  `SLACK_TEAM_ID`.
 - `entrypoints/slack_views.py` — the Block Kit view builders, payload parsers,
   action ids (`incident.comms.status_update.*`) and every translated string,
   reached through `core.api.translate` (no comms module imports
@@ -154,9 +161,11 @@ with the instructions when given, keeps the stage floor and strict parsing,
 and stores the result as the next draft. The modal shows a generating view
 only while the model runs.
 
-Security gate: before a model call, `generate_status_update_draft` refuses a
-security, unknown-flag or unreadable-flag incident with
+Security gate: before a model call, `generate_status_update_draft` reads the
+flag with `IncidentStore.read_security_flag` and refuses a security incident,
+or one whose flag cannot be read, with
 `SECURITY_CONFIRMATION_REQUIRED` unless called with `security_confirmed=True`.
+A legacy incident stored without the flag reads as not a security incident.
 The form then comes back with a warning and a confirmation checkbox; pressing
 Draft with AI with the box checked confirms. A hand-written or saved draft and
 its approval need no confirmation. Any refusal or failure keeps the previous

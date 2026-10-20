@@ -28,18 +28,6 @@ class TranscriptMessage:
     is_bot: bool = False
 
 
-class IncidentSecurityFlag(StrEnum):
-    """Whether an incident was declared as a security incident.
-
-    UNKNOWN means the answer was never stored (older incidents, the recreate
-    path or an unexpected value); callers treat it as unconfirmed, not as NO.
-    """
-
-    YES = "yes"
-    NO = "no"
-    UNKNOWN = "unknown"
-
-
 class StatusUpdateState(StrEnum):
     """Where a status update is in its draft, approve, publish life."""
 

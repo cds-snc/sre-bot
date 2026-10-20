@@ -9,6 +9,9 @@ check. Payloads are form-encoded as Slack posts them and fed to
 (``get_approved_update`` and ``get_status_update_overview`` in the entrypoint
 module, the publisher from ``providers.get_status_page_publisher``) is replaced
 by module-level recording fakes that return real ``OperationResult`` values.
+The plugin's service scopes resolve an empty ``InMemoryRecordStore`` and Slack
+configured under one tenant, so the Back listener builds the channel's real
+conversation reference.
 Assertions read the HTTP status Bolt returns and the exact Web API calls made,
 which must be one ``views.update`` and nothing posted to a channel.
 """
@@ -34,7 +37,15 @@ from features.incident.comms.entrypoints.slack_views import (
     build_overview_view,
     build_profile_labels,
 )
-from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from features.incident.core.api import (
+    ConversationReference,
+    IncidentStore,
+    StatusUpdate,
+    StatusUpdateStage,
+    StatusUpdateState,
+    StatusUpdateText,
+)
+from tests.factories.incident import incident_scopes, slack_conversation
 from tests.factories.slack_bolt import TRIGGER_ID, Harness, harness_fixture
 
 pytestmark = pytest.mark.integration
@@ -82,15 +93,17 @@ class ServiceFakes:
     """Recording fakes for the comms service boundary, answering with successful results."""
 
     approved_calls: list[tuple[str, int]] = field(default_factory=list)
-    overview_calls: list[str] = field(default_factory=list)
+    overview_calls: list[ConversationReference] = field(default_factory=list)
     publish_calls: list[tuple[StatusUpdate, ProfileLabels, ProfileLabels]] = field(default_factory=list)
 
     async def get_approved_update(self, incident_id: str, sequence: int) -> OperationResult[StatusUpdate]:
         self.approved_calls.append((incident_id, sequence))
         return OperationResult.success(data=_APPROVED)
 
-    def get_status_update_overview(self, conversation_id: str) -> OperationResult[StatusUpdateOverview]:
-        self.overview_calls.append(conversation_id)
+    def get_status_update_overview(
+        self, incidents: IncidentStore, conversation: ConversationReference
+    ) -> OperationResult[StatusUpdateOverview]:
+        self.overview_calls.append(conversation)
         return OperationResult.success(data=_OVERVIEW)
 
     async def publish(
@@ -111,7 +124,7 @@ def fakes(monkeypatch: pytest.MonkeyPatch) -> ServiceFakes:
 
 @pytest.fixture
 def harness(monkeypatch: pytest.MonkeyPatch, fakes: ServiceFakes) -> Iterator[Harness]:
-    yield from harness_fixture("incident.comms")(monkeypatch, comms_module)
+    yield from harness_fixture("incident.comms", incident_scopes)(monkeypatch, comms_module)
 
 
 def _button_action(action_id: str, value: dict[str, Any]) -> dict[str, Any]:
@@ -170,10 +183,10 @@ def test_back_is_acked(harness: Harness) -> None:
 
 
 def test_back_reads_the_channel_overview(harness: Harness, fakes: ServiceFakes) -> None:
-    """The Back listener reads the overview for the channel named by the button, and renders nothing."""
+    """The Back listener reads the overview for the button's channel under the configured Slack tenant, and renders nothing."""
     harness.dispatch(_back_action())
 
-    assert fakes.overview_calls == [_CHANNEL]
+    assert fakes.overview_calls == [slack_conversation(_CHANNEL)]
     assert fakes.publish_calls == []
 
 

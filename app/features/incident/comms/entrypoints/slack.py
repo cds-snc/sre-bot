@@ -15,6 +15,13 @@ registrar. Each acks, makes one call to a status-update service and updates the
 modal in place with the result or a localized error. Slack API failures are
 logged and never raised; nothing is posted to the channel.
 
+A handler that resolves the channel's incident opens one service scope, builds
+the ``IncidentStore`` there from the resolved ``RecordStore`` and the
+configured systems, builds the channel's ``ConversationReference`` under the
+configured Slack tenant, and passes both to the service inside the scope.
+Registration reads the configured systems once: without a Slack tenant nothing
+is registered and one startup event names ``SLACK_TEAM_ID``.
+
 The New update button, shown when no draft is pending, starts a draft by hand
 (no model call, no security read) and replaces the modal with the review form
 for it, or for a draft another responder started meanwhile.
@@ -29,8 +36,9 @@ only when text generation is configured. Draft with AI sends the responder's
 current form values and instructions to the generate service, which calls back
 just before a model call so the modal shows a generating state only then. A
 fill shows the new draft's form; nothing new carries the typed values forward
-without a model call. For a security or unknown-flag incident the service
-refuses until the responder checks the confirmation box the form then shows. A
+without a model call. For a security incident, or when its flag cannot be
+read, the service refuses until the responder checks the confirmation box the
+form then shows. A
 refusal or failure re-renders the typed values with a notice (the previous
 draft is kept). Only the modal is updated.
 
@@ -46,15 +54,20 @@ Only the modal is updated.
 
 import asyncio
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, TypedDict
 
 import structlog
 
+from contracts.records import RecordStore
+from contracts.services import ServiceScopeOpener
 from contracts.slack.models import CommandPayload, CommandResponse
 from contracts.slack.registrar import SlackCommandRegistrar
 from contracts.slack.reply import SlackReplySender
+from contracts.workplace import ConfiguredSystems, WorkplaceSystem
+from features.incident.common.settings import get_incident_core_settings
 from features.incident.comms.approval import approve_and_publish
 from features.incident.comms.comms_profile import ProfileLabels
 from features.incident.comms.entrypoints.slack_views import (
@@ -96,8 +109,11 @@ from features.incident.comms.form import (
 )
 from features.incident.comms.history import read_published, set_published_and_render
 from features.incident.comms.service import get_status_update_overview
+from features.incident.core.api import ConversationReference, IncidentStore, build_incident_store
 
 logger = structlog.get_logger()
+
+type _ScopedListener = Callable[[Callable[[], Any], dict[str, Any], Any, ServiceScopeOpener], None]
 
 
 def register(registrar: SlackCommandRegistrar) -> None:
@@ -105,14 +121,21 @@ def register(registrar: SlackCommandRegistrar) -> None:
 
     Registers the ``/sre incident status-update`` subcommand, then the New
     update, Save draft, Draft with AI, Review, Open, Back and published toggle
-    listeners and the approval submission.
+    listeners and the approval submission. Registers nothing when Slack is not
+    a configured system, since no conversation could be resolved to an incident.
 
     Args:
         registrar: Slack command registrar.
     """
+    scopes = registrar.service_scopes
+    with scopes.create_scope() as services:
+        slack_configured = WorkplaceSystem.SLACK in services.get(ConfiguredSystems).tenants()
+    if not slack_configured:
+        logger.warning("incident_comms_registration_skipped", reason="slack_not_configured", setting="SLACK_TEAM_ID")
+        return
 
     def _dispatch_status_update(payload: CommandPayload) -> CommandResponse:
-        return handle_status_update_command(payload, {}, registrar.reply)
+        return handle_status_update_command(payload, {}, registrar.reply, scopes)
 
     registrar.register_command(
         command="status-update",
@@ -124,20 +147,45 @@ def register(registrar: SlackCommandRegistrar) -> None:
         examples=[""],
         example_keys=[f"{STATUS_UPDATE_DOMAIN}.examples.default"],
     )
-    registrar.register_block_action(NEW_ACTION_ID, handle_new_update_action)
-    registrar.register_block_action(SAVE_ACTION_ID, handle_save_action)
-    registrar.register_block_action(GENERATE_ACTION_ID, handle_generate_action)
+    registrar.register_block_action(NEW_ACTION_ID, _with_scopes(handle_new_update_action, scopes))
+    registrar.register_block_action(SAVE_ACTION_ID, _with_scopes(handle_save_action, scopes))
+    registrar.register_block_action(GENERATE_ACTION_ID, _with_scopes(handle_generate_action, scopes))
     registrar.register_block_action(REVIEW_ACTION_ID, handle_review_action)
     registrar.register_block_action(OPEN_ACTION_ID, handle_open_action)
-    registrar.register_block_action(HISTORY_ACTION_ID, handle_history_action)
+    registrar.register_block_action(HISTORY_ACTION_ID, _with_scopes(handle_history_action, scopes))
     registrar.register_block_action(PUBLISHED_ACTION_ID, handle_published_action)
     registrar.register_view_submission(REVIEW_CALLBACK_ID, handle_review_submission)
+
+
+def _with_scopes(handler: _ScopedListener, scopes: ServiceScopeOpener) -> Callable[..., None]:
+    """Return a Bolt listener, taking Bolt's ``ack``, ``body`` and ``client`` by name, that runs ``handler`` with ``scopes``."""
+
+    def listener(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+        handler(ack, body, client, scopes)
+
+    return listener
+
+
+@contextmanager
+def _incident_scope(scopes: ServiceScopeOpener, channel_id: str) -> Iterator[tuple[IncidentStore, ConversationReference]]:
+    """Open one service scope; yield the incident store built in it and the channel's conversation reference.
+
+    The caller makes its service call inside the block, so the resolved
+    services are released once it returns. The Slack tenant is present, since
+    ``register`` registers nothing without it.
+    """
+    with scopes.create_scope() as services:
+        systems = services.get(ConfiguredSystems)
+        incidents = build_incident_store(services.get(RecordStore), systems, get_incident_core_settings())
+        tenant = systems.tenants()[WorkplaceSystem.SLACK]
+        yield incidents, ConversationReference(system=WorkplaceSystem.SLACK, tenant=tenant, vendor_id=channel_id)
 
 
 def handle_status_update_command(
     payload: CommandPayload,
     parsed_args: dict[str, Any],
     reply: SlackReplySender,
+    scopes: ServiceScopeOpener,
 ) -> CommandResponse:
     """Handle ``/sre incident status-update`` by opening the status-updates modal.
 
@@ -151,6 +199,7 @@ def handle_status_update_command(
         payload: Command payload; ``platform_metadata["trigger_id"]`` opens the view.
         parsed_args: Unused; the command takes no arguments.
         reply: Interface used to open and update the modal.
+        scopes: Opens the service scope the incident store is built in.
 
     Returns:
         An empty ephemeral response once the modal opened; a localized
@@ -166,27 +215,22 @@ def handle_status_update_command(
         return status_update_open_failed(locale)
 
     private_metadata = json.dumps({"channel_id": payload.channel_id, "locale": locale})
-    opened = reply.open_view(
-        trigger_id=trigger_id,
-        view=status_update_view(
-            locale, private_metadata, mrkdwn_blocks(status_t("loading", locale, "Loading the status update...")), close=False
-        ),
-    )
+    loading = status_t("loading", locale, "Loading the status update...")
+    opened = reply.open_view(trigger_id=trigger_id, view=_text_view(locale, private_metadata, loading, close=False))
     if not opened.is_success or opened.data is None:
         log.warning("incident_status_update_open_failed", error=opened.message, error_code=opened.error_code)
         return status_update_open_failed(locale)
     view_id = opened.data
 
-    overview = get_status_update_overview(payload.channel_id)
+    with _incident_scope(scopes, payload.channel_id) as (incidents, conversation):
+        overview = get_status_update_overview(incidents, conversation)
     if overview.is_success and overview.data is not None:
         view = build_overview_view(overview.data, locale, private_metadata)
     else:
         log.warning(
             "incident_status_update_failed", status=overview.status, error_code=overview.error_code, error=overview.message
         )
-        view = status_update_view(
-            locale, private_metadata, mrkdwn_blocks(status_error_text(overview.error_code, locale)), close=True
-        )
+        view = _text_view(locale, private_metadata, status_error_text(overview.error_code, locale), close=True)
 
     updated = reply.update_view(view_id=view_id, view=view)
     if not updated.is_success:
@@ -194,19 +238,26 @@ def handle_status_update_command(
     return CommandResponse(message="", ephemeral=True)
 
 
-def handle_new_update_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+def _text_view(locale: str, private_metadata: str, text: str, *, close: bool) -> dict[str, Any]:
+    """The status-updates modal showing one localized message."""
+    return status_update_view(locale, private_metadata, mrkdwn_blocks(text), close=close)
+
+
+def handle_new_update_action(ack: Callable[[], Any], body: dict[str, Any], client: Any, scopes: ServiceScopeOpener) -> None:
     """Handle a press of New update in the status-updates modal: start a hand-written draft and show its form.
 
     Args:
         ack: Bolt ack callable, called first.
         body: Block-actions payload; carries the view id, hash and private metadata.
         client: Bolt Slack web client.
+        scopes: Opens the service scope the incident store is built in.
     """
     ack()
     action = _parse_action(body)
     log = action.bind("incident_status_update_new")
 
-    result = start_status_update_form(action.channel_id, author=action.user_id)
+    with _incident_scope(scopes, action.channel_id) as (incidents, conversation):
+        result = start_status_update_form(incidents, conversation, author=action.user_id)
     if result.is_success and result.data is not None:
         update = result.data.update
         metadata = action.review_metadata(update.incident_id, update.sequence)
@@ -236,6 +287,10 @@ class _ModalCursor:
             self._hash = _response_hash(response)
         except Exception:
             self._log.warning(failure_event, exc_info=True)
+
+    def updater(self, view: dict[str, Any], *, failure_event: str) -> Callable[[], None]:
+        """Return a callable that replaces the modal's view with ``view`` when called."""
+        return lambda: self.update(view, failure_event=failure_event)
 
 
 @dataclass(frozen=True)
@@ -361,13 +416,14 @@ def handle_open_action(ack: Callable[[], Any], body: dict[str, Any], client: Any
     action.modal(client, log).update(next_view, failure_event="incident_status_update_open_update_failed")
 
 
-def handle_history_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+def handle_history_action(ack: Callable[[], Any], body: dict[str, Any], client: Any, scopes: ServiceScopeOpener) -> None:
     """Handle a press of Back: replace the modal in place with the incident's status-updates list.
 
     Args:
         ack: Bolt ack callable, called first.
         body: Block-actions payload; the button value names the channel.
         client: Bolt Slack web client.
+        scopes: Opens the service scope the incident store is built in.
     """
     ack()
     action = _parse_action(body)
@@ -375,7 +431,8 @@ def handle_history_action(ack: Callable[[], Any], body: dict[str, Any], client: 
     log = action.bind("incident_status_update_history", channel_id=channel_id)
     metadata = action.list_metadata(channel_id)
 
-    result = get_status_update_overview(channel_id)
+    with _incident_scope(scopes, channel_id) as (incidents, conversation):
+        result = get_status_update_overview(incidents, conversation)
     if result.is_success and result.data is not None:
         next_view = build_overview_view(result.data, action.locale, metadata)
     else:
@@ -412,7 +469,7 @@ def handle_published_action(ack: Callable[[], Any], body: dict[str, Any], client
     action.modal(client, log).update(next_view, failure_event="incident_status_update_published_update_failed")
 
 
-def handle_generate_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+def handle_generate_action(ack: Callable[[], Any], body: dict[str, Any], client: Any, scopes: ServiceScopeOpener) -> None:
     """Handle a press of Draft with AI in the review form: fill the draft from the typed values, then update the modal in place.
 
     A fill or a carry forward shows the new draft's form with a notice. A
@@ -424,6 +481,7 @@ def handle_generate_action(ack: Callable[[], Any], body: dict[str, Any], client:
         ack: Bolt ack callable, called first.
         body: Block-actions payload; carries the view id, hash, review metadata and form state.
         client: Bolt Slack web client.
+        scopes: Opens the service scope the incident store is built in.
     """
     ack()
     action = _parse_action(body)
@@ -432,15 +490,12 @@ def handle_generate_action(ack: Callable[[], Any], body: dict[str, Any], client:
     instructions, security_confirmed = parse_ai_form(action.view)
     current_metadata = action.review_metadata(action.incident_id, action.sequence)
 
-    def show_generating() -> None:
-        modal.update(
-            build_generating_view(action.locale, current_metadata),
-            failure_event="incident_status_update_generating_update_failed",
-        )
-
-    result = asyncio.run(
-        fill_status_update_form(
-            action.channel_id,
+    generating = build_generating_view(action.locale, current_metadata)
+    show_generating = modal.updater(generating, failure_event="incident_status_update_generating_update_failed")
+    with _incident_scope(scopes, action.channel_id) as (incidents, conversation):
+        filled = fill_status_update_form(
+            incidents,
+            conversation,
             action.incident_id,
             action.sequence,
             edit=parse_review_submission(action.view),
@@ -450,7 +505,7 @@ def handle_generate_action(ack: Callable[[], Any], body: dict[str, Any], client:
             security_confirmed=security_confirmed,
             on_started=show_generating,
         )
-    )
+        result = asyncio.run(filled)
     if result.is_success and result.data is not None:
         if result.data.kept:
             log.warning("incident_status_update_generate_failed", error_code=result.data.failure_code)
@@ -462,7 +517,7 @@ def handle_generate_action(ack: Callable[[], Any], body: dict[str, Any], client:
     modal.update(next_view, failure_event="incident_status_update_generate_update_failed")
 
 
-def handle_save_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+def handle_save_action(ack: Callable[[], Any], body: dict[str, Any], client: Any, scopes: ServiceScopeOpener) -> None:
     """Handle a press of Save draft in the review form: store the typed values, then update the modal in place.
 
     A save shows the saved draft's form with a notice. A stale sequence shows
@@ -473,15 +528,18 @@ def handle_save_action(ack: Callable[[], Any], body: dict[str, Any], client: Any
         ack: Bolt ack callable, called first.
         body: Block-actions payload; carries the view id, hash, review metadata and form state.
         client: Bolt Slack web client.
+        scopes: Opens the service scope the incident store is built in.
     """
     ack()
     action = _parse_action(body)
     log = action.bind("incident_status_update_save")
     edit = parse_review_submission(action.view)
 
-    result = asyncio.run(
-        save_status_update_form(action.channel_id, action.incident_id, action.sequence, edit=edit, author=action.user_id)
-    )
+    with _incident_scope(scopes, action.channel_id) as (incidents, conversation):
+        saved = save_status_update_form(
+            incidents, conversation, action.incident_id, action.sequence, edit=edit, author=action.user_id
+        )
+        result = asyncio.run(saved)
     if result.is_success and result.data is not None:
         if result.data.kept:
             log.warning("incident_status_update_save_failed", error_code=result.data.failure_code)

@@ -1,9 +1,10 @@
 """Tests for filling a status-update draft with AI in the comms service.
 
-The service runs against the in-memory status-update store and stubs for the
-incident lookup, the transcript reader, the security flag reader and the text
-generator, with a fixed ``now``, so each test controls which records exist,
-which messages are read and what the model answers. Assertions compare the
+The service runs against the in-memory status-update store, an in-memory
+incident store holding one incident on the channel that counts security flag
+reads, and stubs for the transcript reader and the text generator, with a fixed
+``now``, so each test controls which records exist, which messages are read and
+what the model answers. Assertions compare the
 exact model call, the exact stored records, the outcome kind and the result
 codes, because a fill makes at most one model call, adds at most one new draft
 and leaves every earlier record as it was.
@@ -27,9 +28,8 @@ from features.incident.comms.domain import (
 )
 from features.incident.comms.prompt import INSTRUCTIONS, build_redraft_input, build_redraft_instructions
 from features.incident.comms.service import DRAFT_UNPARSEABLE_CODE, generate_status_update_draft
-from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
+from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
 from features.incident.core.api import (
-    IncidentSecurityFlag,
     StatusUpdate,
     StatusUpdateOrigin,
     StatusUpdateStage,
@@ -37,6 +37,7 @@ from features.incident.core.api import (
     StatusUpdateText,
     TranscriptMessage,
 )
+from tests.factories.incident import incident_on, slack_conversation
 
 pytestmark = pytest.mark.unit
 
@@ -100,19 +101,18 @@ def _filled_text(language: str) -> StatusUpdateText:
     return StatusUpdateText(**{field: f"{language} {field} filled" for field in _FIELDS})
 
 
-class _StubLookup:
-    def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
-        return OperationResult.success(data=_INCIDENT)
+class _CountingIncidents(InMemoryIncidentStore):
+    """Holds the one incident on the channel and counts security flag reads; ``failure`` fails each read."""
 
-
-class _StubSecurityReader:
-    def __init__(self, result: OperationResult[IncidentSecurityFlag] | None = None) -> None:
-        self._result = result or OperationResult.success(data=IncidentSecurityFlag.NO)
+    def __init__(self, *, security_incident: bool = False, failure: OperationResult[bool] | None = None) -> None:
+        super().__init__()
+        self.seed(incident_on(_CHANNEL, _INCIDENT, security_incident=security_incident))
+        self._failure = failure
         self.calls: list[str] = []
 
-    def read_security_flag(self, incident_id: str) -> OperationResult[IncidentSecurityFlag]:
+    def read_security_flag(self, incident_id: str) -> OperationResult[bool]:
         self.calls.append(incident_id)
-        return self._result
+        return self._failure if self._failure is not None else super().read_security_flag(incident_id)
 
 
 class _StubReader:
@@ -171,22 +171,21 @@ async def _generate(
     instructions: str = "",
     reader: _StubReader | None = None,
     generator: _StubGenerator | None = None,
-    security_reader: _StubSecurityReader | None = None,
+    incidents: _CountingIncidents | None = None,
     security_confirmed: bool = False,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
     return await generate_status_update_draft(
-        _CHANNEL,
+        incidents if incidents is not None else _CountingIncidents(),
+        slack_conversation(_CHANNEL),
         sequence,
         current=_CURRENT,
         author=_FILLER,
         wording=_WORDING,
         instructions=instructions,
         security_confirmed=security_confirmed,
-        lookup=_StubLookup(),
         reader=reader or _StubReader(),
         store=store,
         generator=generator or _StubGenerator(),
-        security_reader=security_reader or _StubSecurityReader(),
         now=_NOW,
     )
 
@@ -200,9 +199,9 @@ class TestNothingNew:
         """Code decides nothing is new: the typed fields are kept, current action takes the wording, nothing is sent out."""
         store = _store(_APPROVED, _PENDING)
         generator = _StubGenerator()
-        security_reader = _StubSecurityReader()
+        incidents = _CountingIncidents()
 
-        result = await _generate(store=store, reader=_StubReader(messages), generator=generator, security_reader=security_reader)
+        result = await _generate(store=store, reader=_StubReader(messages), generator=generator, incidents=incidents)
 
         expected = replace(
             _PENDING,
@@ -215,7 +214,7 @@ class TestNothingNew:
             origin=StatusUpdateOrigin.CARRIED_FORWARD,
         )
         assert result.data == StatusUpdateDraftOutcome(update=expected, kind=StatusUpdateOutcomeKind.CARRIED_FORWARD)
-        assert (generator.calls, security_reader.calls) == ([], [])
+        assert (generator.calls, incidents.calls) == ([], [])
         assert _stored(store) == (expected, _PENDING, _APPROVED)
 
     @pytest.mark.asyncio
@@ -295,18 +294,15 @@ class TestModelCall:
 
 class TestSecurityGate:
     @pytest.mark.parametrize(
-        "flag_result",
+        "incident",
         [
-            OperationResult.success(data=IncidentSecurityFlag.YES),
-            OperationResult.success(data=IncidentSecurityFlag.UNKNOWN),
-            OperationResult.transient_error(message="store error", error_code=ErrorCode.RATE_LIMITED),
+            {"security_incident": True},
+            {"failure": OperationResult.transient_error(message="store error", error_code=ErrorCode.RATE_LIMITED)},
         ],
-        ids=["yes", "unknown", "unreadable"],
+        ids=["security-incident", "unreadable"],
     )
     @pytest.mark.asyncio
-    async def test_an_unconfirmed_security_incident_refuses_before_the_model(
-        self, flag_result: OperationResult[IncidentSecurityFlag]
-    ) -> None:
+    async def test_an_unconfirmed_security_incident_refuses_before_the_model(self, incident: dict[str, Any]) -> None:
         """A model call that may expose a security incident needs the responder's confirmation first."""
         store = _store(_APPROVED, _PENDING)
         generator = _StubGenerator()
@@ -315,7 +311,7 @@ class TestSecurityGate:
             store=store,
             reader=_StubReader([_human("x", 5)]),
             generator=generator,
-            security_reader=_StubSecurityReader(flag_result),
+            incidents=_CountingIncidents(**incident),
         )
 
         assert (result.status, result.error_code) == (
@@ -329,19 +325,19 @@ class TestSecurityGate:
     async def test_confirmation_skips_the_flag(self) -> None:
         """The responder's confirmation is explicit consent, so the flag is not read."""
         store = _store(_APPROVED, _PENDING)
-        security_reader = _StubSecurityReader(OperationResult.success(data=IncidentSecurityFlag.YES))
+        incidents = _CountingIncidents(security_incident=True)
         generator = _StubGenerator()
 
         result = await _generate(
             store=store,
             reader=_StubReader([_human("x", 5)]),
             generator=generator,
-            security_reader=security_reader,
+            incidents=incidents,
             security_confirmed=True,
         )
 
         assert result.is_success
-        assert security_reader.calls == []
+        assert incidents.calls == []
         assert len(generator.calls) == 1
 
 

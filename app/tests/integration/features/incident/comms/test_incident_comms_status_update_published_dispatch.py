@@ -6,7 +6,8 @@ harness proves the toggle's action id passes the provider's plugin-prefix
 check. Payloads are form-encoded as Slack posts them and fed to
 ``App.dispatch`` with listeners run inline; the harness sends every payload as
 user ``USER_ID``. Only edges are stubbed: ``WebClient.api_call`` records Web API
-calls, and the entrypoint's ``set_published`` is the real service bound to a
+calls, the plugin's service scopes resolve an empty ``InMemoryRecordStore`` and
+Slack configured under one tenant, and the entrypoint's ``set_published`` is the real service bound to a
 core ``InMemoryStatusUpdateStore`` and a fixed ``now``. The publisher is the real
 copy-ready one. Assertions read the HTTP status Bolt returns, the exact Web API
 calls made (one ``views.update`` and nothing posted to a channel) and the record
@@ -34,6 +35,7 @@ from features.incident.comms.history import set_published
 from features.incident.comms.publisher import render_copy_ready
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from tests.factories.incident import incident_scopes
 from tests.factories.slack_bolt import TRIGGER_ID, USER_ID, Harness, harness_fixture
 
 pytestmark = pytest.mark.integration
@@ -88,7 +90,7 @@ def store(monkeypatch: pytest.MonkeyPatch) -> InMemoryStatusUpdateStore:
 
 @pytest.fixture
 def harness(monkeypatch: pytest.MonkeyPatch, store: InMemoryStatusUpdateStore) -> Iterator[Harness]:
-    yield from harness_fixture("incident.comms")(monkeypatch, comms_module)
+    yield from harness_fixture("incident.comms", incident_scopes)(monkeypatch, comms_module)
 
 
 def _toggle_action(*, published: bool) -> dict[str, Any]:

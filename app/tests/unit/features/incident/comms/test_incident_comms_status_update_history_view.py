@@ -39,7 +39,15 @@ from features.incident.comms.entrypoints.slack_views import (
     build_overview_view,
     build_profile_labels,
 )
-from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from features.incident.core.api import (
+    ConversationReference,
+    IncidentStore,
+    StatusUpdate,
+    StatusUpdateStage,
+    StatusUpdateState,
+    StatusUpdateText,
+)
+from tests.factories.incident import incident_scopes, slack_conversation
 from tests.factories.slack import FakeSlackReply
 
 pytestmark = pytest.mark.unit
@@ -418,10 +426,10 @@ class TestCommandShowsOverview:
         reply fake records the view the command sent.
         """
         overview = StatusUpdateOverview(pending=_DRAFT, approved=(_APPROVED, _PUBLISHED))
-        reads: list[str] = []
+        reads: list[ConversationReference] = []
 
-        def read_overview(conversation_id: str) -> OperationResult[StatusUpdateOverview]:
-            reads.append(conversation_id)
+        def read_overview(_: IncidentStore, conversation: ConversationReference) -> OperationResult[StatusUpdateOverview]:
+            reads.append(conversation)
             return OperationResult.success(data=overview)
 
         monkeypatch.setattr(slack_entrypoints, "get_status_update_overview", read_overview)
@@ -430,9 +438,9 @@ class TestCommandShowsOverview:
             text="", user_id="U9", channel_id=_CHANNEL, user_locale="en-US", platform_metadata={"trigger_id": "T1"}
         )
 
-        handle_status_update_command(payload, {}, reply)
+        handle_status_update_command(payload, {}, reply, incident_scopes())
 
-        assert reads == [_CHANNEL]
+        assert reads == [slack_conversation(_CHANNEL)]
         assert [call["view"] for call in reply.calls_to("update_view")] == [build_overview_view(overview, "en-US", _METADATA)]
 
 

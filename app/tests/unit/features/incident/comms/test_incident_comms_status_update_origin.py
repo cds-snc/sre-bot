@@ -1,8 +1,9 @@
 """Tests for the origin the comms service records on every draft it appends.
 
 ``start_status_update_draft`` and ``generate_status_update_draft`` run against
-the in-memory store and stubs for the lookup, the transcript reader, the
-security flag reader and the text generator, with a fixed ``now``. Each test
+the in-memory status-update store, an in-memory incident store holding one
+non-security incident on the channel, and stubs for the transcript reader and
+the text generator, with a fixed ``now``. Each test
 drives one path and asserts only the stored record's origin, since the record's
 other fields are pinned by the start and generate tests.
 """
@@ -19,7 +20,6 @@ from features.incident.comms.domain import NoNewInformationWording, StatusUpdate
 from features.incident.comms.service import generate_status_update_draft, start_status_update_draft
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import (
-    IncidentSecurityFlag,
     StatusUpdate,
     StatusUpdateOrigin,
     StatusUpdateStage,
@@ -27,6 +27,7 @@ from features.incident.core.api import (
     StatusUpdateText,
     TranscriptMessage,
 )
+from tests.factories.incident import incident_on, incident_store_with, slack_conversation
 
 pytestmark = pytest.mark.unit
 
@@ -69,14 +70,7 @@ def _model_answer() -> str:
     return json.dumps(answer)
 
 
-class _StubLookup:
-    def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
-        return OperationResult.success(data=_INCIDENT)
-
-
-class _StubSecurityReader:
-    def read_security_flag(self, incident_id: str) -> OperationResult[IncidentSecurityFlag]:
-        return OperationResult.success(data=IncidentSecurityFlag.NO)
+_CONVERSATION = slack_conversation(_CHANNEL)
 
 
 class _StubReader:
@@ -117,10 +111,8 @@ def _store(*records: StatusUpdate) -> InMemoryStatusUpdateStore:
 
 def _stubs(messages: Sequence[TranscriptMessage]) -> dict[str, Any]:
     return {
-        "lookup": _StubLookup(),
         "reader": _StubReader(messages),
         "generator": _StubGenerator(),
-        "security_reader": _StubSecurityReader(),
         "now": _NOW,
     }
 
@@ -135,7 +127,12 @@ def test_starting_by_hand_is_hand(messages: list[TranscriptMessage]) -> None:
     store = _store(_APPROVED)
 
     result = start_status_update_draft(
-        _CHANNEL, author="U0WRITER", store=store, lookup=_StubLookup(), reader=_StubReader(messages), now=_NOW
+        incident_store_with(incident_on(_CHANNEL, _INCIDENT)),
+        _CONVERSATION,
+        author="U0WRITER",
+        store=store,
+        reader=_StubReader(messages),
+        now=_NOW,
     )
 
     assert result.data is not None
@@ -160,7 +157,8 @@ async def test_draft_with_ai_records_how_its_text_came_to_be(
     store = _store(_APPROVED, _PENDING)
 
     result = await generate_status_update_draft(
-        _CHANNEL,
+        incident_store_with(incident_on(_CHANNEL, _INCIDENT)),
+        _CONVERSATION,
         _PENDING.sequence,
         current=_CURRENT,
         author="U0FILLER",

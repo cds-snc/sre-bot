@@ -5,7 +5,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from contracts.services import ServiceScopeOpener
 from server.plugins.manager import get_plugin_manager, load_plugins
+from tests.factories.incident import incident_scopes
 
 _ACCESS_ENV_KEYS = (
     "ACCESS_SYNC_ENABLED",
@@ -38,6 +40,11 @@ class _FakeApp:
 class _FakeSlackProvider:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str | None]] = []
+        self._service_scopes = incident_scopes()
+
+    @property
+    def service_scopes(self) -> ServiceScopeOpener:
+        return self._service_scopes
 
     def register_command(self, command: str, **kwargs) -> None:
         self.calls.append((command, kwargs.get("parent")))

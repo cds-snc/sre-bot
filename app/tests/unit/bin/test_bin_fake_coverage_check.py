@@ -258,7 +258,7 @@ def test_feature_package_and_capability_adapter_protocols_are_never_scanned(tmp_
         monkeypatch,
         {
             "features/incident/comms/ports.py": PROTOCOL_SOURCE.format(name="StatusPagePublisher"),
-            "features/incident/core/api.py": PROTOCOL_SOURCE.format(name="IncidentLookup"),
+            "features/incident/core/api.py": PROTOCOL_SOURCE.format(name="IncidentTranscriptReader"),
             "packages/oncall_sync/ports.py": PROTOCOL_SOURCE.format(name="OnCallScheduleProvider"),
             "capabilities/directory/adapters/ports.py": PROTOCOL_SOURCE.format(name="AdapterOnlyPort"),
             "capabilities/directory/service.py": PROTOCOL_SOURCE.format(name="NonApiPort"),

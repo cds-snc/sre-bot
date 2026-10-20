@@ -6,7 +6,8 @@ provider functions that resolve the default implementations, and
 ``find_incident_for_conversation``, the command check every incident command
 applies first. ``StatusUpdateStore`` keeps each public status update as its own
 record under the incident id. ``IncidentStore`` reads the incident record;
-entry points build it per service scope with ``build_incident_store``.
+entry points build it per service scope with ``build_incident_store`` and pass
+it, with the conversation reference they build, to the subdomain services.
 """
 
 from collections.abc import Sequence
@@ -20,17 +21,12 @@ from contracts.workplace import ConfiguredSystems
 from features.incident.common.settings import IncidentCoreSettings
 from features.incident.common.vocabulary import StatusUpdateStage
 from features.incident.core.adapters.i18n import translate
-from features.incident.core.adapters.legacy_incidents import (
-    build_legacy_incident_lookup,
-    build_legacy_incident_security_reader,
-)
 from features.incident.core.adapters.slack import build_incident_transcript_reader
 from features.incident.core.adapters.status_updates import build_status_update_store
 from features.incident.core.domain import (
     ConversationReference,
     ExternalCaseReference,
     Incident,
-    IncidentSecurityFlag,
     MessageReference,
     PostmortemMeetingReference,
     ReportReference,
@@ -49,9 +45,6 @@ __all__ = [
     "ConversationReference",
     "ExternalCaseReference",
     "Incident",
-    "IncidentLookup",
-    "IncidentSecurityFlag",
-    "IncidentSecurityReader",
     "IncidentStore",
     "IncidentTranscriptReader",
     "MessageReference",
@@ -69,43 +62,10 @@ __all__ = [
     "VideoCallReference",
     "build_incident_store",
     "find_incident_for_conversation",
-    "get_incident_lookup",
-    "get_incident_security_reader",
     "get_incident_transcript_reader",
     "get_status_update_store",
     "translate",
 ]
-
-
-@runtime_checkable
-class IncidentLookup(Protocol):
-    """Interface resolving a conversation to the incident it belongs to."""
-
-    def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
-        """Return the incident id for the conversation, or a classified refusal.
-
-        Success carries the incident's id (the legacy UUID). A conversation
-        that belongs to no incident is NOT_FOUND with ``NOT_AN_INCIDENT``; one
-        that maps to several is PERMANENT_ERROR with
-        ``AMBIGUOUS_INCIDENT_CONVERSATION``. A store failure is a classified
-        error result, never an exception.
-        """
-        ...
-
-
-@runtime_checkable
-class IncidentSecurityReader(Protocol):
-    """Interface reading whether an incident was declared as a security incident."""
-
-    def read_security_flag(self, incident_id: str) -> OperationResult[IncidentSecurityFlag]:
-        """Return the incident's security flag, or a classified refusal.
-
-        Success carries YES, NO or UNKNOWN (never stored). An incident that does
-        not exist (or a blank id) is NOT_FOUND with ``NOT_AN_INCIDENT``. A store
-        failure is a classified error result with a generic message, never an
-        exception and never NO.
-        """
-        ...
 
 
 @runtime_checkable
@@ -212,21 +172,15 @@ def get_incident_transcript_reader() -> IncidentTranscriptReader:
     return build_incident_transcript_reader()
 
 
-@lru_cache(maxsize=1)
-def get_incident_lookup() -> IncidentLookup:
-    """Return the process-wide ``IncidentLookup`` over the legacy incidents table."""
-    return build_legacy_incident_lookup()
+def find_incident_for_conversation(store: IncidentStore, conversation: ConversationReference) -> OperationResult[Incident]:
+    """Resolve the command's conversation to its incident, or a classified refusal.
 
-
-@lru_cache(maxsize=1)
-def get_incident_security_reader() -> IncidentSecurityReader:
-    """Return the process-wide ``IncidentSecurityReader`` over the legacy incidents table."""
-    return build_legacy_incident_security_reader()
-
-
-def find_incident_for_conversation(conversation_id: str) -> OperationResult[str]:
-    """Resolve the command's conversation to its incident id, or a classified refusal."""
-    return get_incident_lookup().find_incident_for_conversation(conversation_id)
+    The command check every incident command applies first. A conversation that
+    belongs to no incident is NOT_FOUND with ``NOT_AN_INCIDENT``; one that maps
+    to several is PERMANENT_ERROR with ``AMBIGUOUS_INCIDENT_CONVERSATION``; a
+    store failure is a classified error result, never an exception.
+    """
+    return store.find_by_conversation(conversation)
 
 
 @lru_cache(maxsize=1)

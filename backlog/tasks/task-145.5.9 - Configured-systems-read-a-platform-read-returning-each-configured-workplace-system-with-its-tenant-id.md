@@ -3,10 +3,10 @@ id: TASK-145.5.9
 title: >-
   Configured-systems read: a platform read returning each configured workplace
   system with its tenant id
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-19 15:25'
-updated_date: '2026-10-19 16:22'
+updated_date: '2026-10-20 15:33'
 labels:
   - incident
   - platform

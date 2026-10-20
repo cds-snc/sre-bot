@@ -1,13 +1,14 @@
 """Tests for reading an incident's status-update overview: the pending draft and the approved updates.
 
 ``get_status_update_overview`` resolves the conversation to its incident with
-one lookup, lists the incident's records once, and returns the latest record as
+one incident-store read, lists the incident's records once, and returns the latest record as
 the pending draft when it is a draft, beside every approved or published record
 newest first. ``get_pending_status_update`` returns the overview's pending
 draft, so its results are unchanged.
 
 The store is the core's ``InMemoryStatusUpdateStore`` behind a counting wrapper
-and the lookup is a counting stub, so each test asserts the exact overview and,
+and the incident store is an ``InMemoryIncidentStore`` holding one incident on
+the channel that counts conversation reads, so each test asserts the exact overview and,
 where it matters, the exact number of reads. Error results are compared on
 status, error code and retry hint, the classification callers branch on.
 """
@@ -22,8 +23,16 @@ from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
 from features.incident.comms.domain import StatusUpdateOverview
 from features.incident.comms.service import get_pending_status_update, get_status_update_overview
-from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
-from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
+from features.incident.core.api import (
+    ConversationReference,
+    Incident,
+    StatusUpdate,
+    StatusUpdateStage,
+    StatusUpdateState,
+    StatusUpdateText,
+)
+from tests.factories.incident import incident_on, slack_conversation
 
 pytestmark = pytest.mark.unit
 
@@ -64,16 +73,21 @@ def _update(sequence: int, state: StatusUpdateState) -> StatusUpdate:
     return replace(approved, state=StatusUpdateState.PUBLISHED, published_at=created)
 
 
-class _CountingLookup:
-    """Lookup stub answering with one fixed result and counting its calls."""
+_CONVERSATION = slack_conversation(_CHANNEL)
 
-    def __init__(self, result: OperationResult[str] | None = None) -> None:
-        self._result = result or OperationResult.success(data=_INCIDENT)
-        self.calls: list[str] = []
 
-    def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
-        self.calls.append(conversation_id)
-        return self._result
+class _CountingIncidents(InMemoryIncidentStore):
+    """Holds the one incident on the channel and counts conversation reads; ``result`` replaces each answer."""
+
+    def __init__(self, result: OperationResult[Incident] | None = None) -> None:
+        super().__init__()
+        self.seed(incident_on(_CHANNEL, _INCIDENT))
+        self._result = result
+        self.calls: list[ConversationReference] = []
+
+    def find_by_conversation(self, conversation: ConversationReference) -> OperationResult[Incident]:
+        self.calls.append(conversation)
+        return self._result if self._result is not None else super().find_by_conversation(conversation)
 
 
 class _CountingStore:
@@ -115,7 +129,7 @@ class TestOverview:
             _update(3, StatusUpdateState.DRAFT),
         )
 
-        result = get_status_update_overview(_CHANNEL, lookup=_CountingLookup(), store=store)
+        result = get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=store)
 
         assert result.status == OperationStatus.SUCCESS
         assert result.data == StatusUpdateOverview(
@@ -127,7 +141,7 @@ class TestOverview:
         """With an approved latest record nothing is pending and every record is listed as approved."""
         store = _CountingStore(_update(1, StatusUpdateState.APPROVED), _update(2, StatusUpdateState.APPROVED))
 
-        result = get_status_update_overview(_CHANNEL, lookup=_CountingLookup(), store=store)
+        result = get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=store)
 
         assert result.data == StatusUpdateOverview(
             pending=None,
@@ -138,7 +152,7 @@ class TestOverview:
         """A lone draft is pending and the approved tuple is empty."""
         store = _CountingStore(_update(1, StatusUpdateState.DRAFT))
 
-        result = get_status_update_overview(_CHANNEL, lookup=_CountingLookup(), store=store)
+        result = get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=store)
 
         assert result.data == StatusUpdateOverview(pending=_update(1, StatusUpdateState.DRAFT), approved=())
 
@@ -146,7 +160,7 @@ class TestOverview:
         """Published records are listed with the approved ones, keeping their published state."""
         store = _CountingStore(_update(1, StatusUpdateState.PUBLISHED), _update(2, StatusUpdateState.PUBLISHED))
 
-        result = get_status_update_overview(_CHANNEL, lookup=_CountingLookup(), store=store)
+        result = get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=store)
 
         assert result.data == StatusUpdateOverview(
             pending=None,
@@ -155,19 +169,19 @@ class TestOverview:
 
     def test_empty_incident(self) -> None:
         """An incident with no records has no pending draft and no approved updates."""
-        result = get_status_update_overview(_CHANNEL, lookup=_CountingLookup(), store=_CountingStore())
+        result = get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=_CountingStore())
 
         assert result.status == OperationStatus.SUCCESS
         assert result.data == StatusUpdateOverview(pending=None, approved=())
 
-    def test_one_lookup_and_one_list(self) -> None:
+    def test_one_incident_read_and_one_list(self) -> None:
         """The conversation is resolved once and the resolved incident's records are listed once."""
-        lookup = _CountingLookup()
+        incidents = _CountingIncidents()
         store = _CountingStore(_update(1, StatusUpdateState.APPROVED), _update(2, StatusUpdateState.DRAFT))
 
-        get_status_update_overview(_CHANNEL, lookup=lookup, store=store)
+        get_status_update_overview(incidents, _CONVERSATION, store=store)
 
-        assert lookup.calls == [_CHANNEL]
+        assert incidents.calls == [_CONVERSATION]
         assert store.list_calls == [_INCIDENT]
 
     def test_overview_is_frozen(self) -> None:
@@ -187,18 +201,18 @@ class TestOverviewErrors:
         ],
         ids=["not-an-incident", "ambiguous"],
     )
-    def test_lookup_refusal_is_returned_without_listing(self, refusal: OperationResult[str]) -> None:
-        """A lookup refusal is returned with its status and code, and the store is never read."""
+    def test_incident_refusal_is_returned_without_listing(self, refusal: OperationResult[Incident]) -> None:
+        """An incident-store refusal is returned with its status and code, and the store is never read."""
         store = _CountingStore()
 
-        result = get_status_update_overview(_CHANNEL, lookup=_CountingLookup(refusal), store=store)
+        result = get_status_update_overview(_CountingIncidents(refusal), _CONVERSATION, store=store)
 
         assert (result.status, result.error_code) == (refusal.status, refusal.error_code)
         assert store.list_calls == []
 
     def test_store_error_is_returned_with_its_classification(self) -> None:
         """A failed list read is returned with its status, code and retry hint."""
-        result = get_status_update_overview(_CHANNEL, lookup=_CountingLookup(), store=_FailingStore())  # type: ignore[arg-type]
+        result = get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=_FailingStore())  # type: ignore[arg-type]
 
         assert (result.status, result.error_code, result.retry_after) == (
             OperationStatus.TRANSIENT_ERROR,
@@ -221,24 +235,24 @@ class TestPendingDelegates:
         """The pending read returns exactly the overview's pending draft for the same records."""
         records = [_update(index, state) for index, state in enumerate(states, start=1)]
 
-        pending = get_pending_status_update(_CHANNEL, lookup=_CountingLookup(), store=_CountingStore(*records))
-        overview = get_status_update_overview(_CHANNEL, lookup=_CountingLookup(), store=_CountingStore(*records))
+        pending = get_pending_status_update(_CountingIncidents(), _CONVERSATION, store=_CountingStore(*records))
+        overview = get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=_CountingStore(*records))
 
         assert overview.data is not None
         assert (pending.status, pending.data) == (OperationStatus.SUCCESS, overview.data.pending)
 
     def test_pending_read_lists_once(self) -> None:
         """The pending read still resolves once and lists once."""
-        lookup = _CountingLookup()
+        incidents = _CountingIncidents()
         store = _CountingStore(_update(1, StatusUpdateState.DRAFT))
 
-        get_pending_status_update(_CHANNEL, lookup=lookup, store=store)
+        get_pending_status_update(incidents, _CONVERSATION, store=store)
 
-        assert (lookup.calls, store.list_calls) == ([_CHANNEL], [_INCIDENT])
+        assert (incidents.calls, store.list_calls) == ([_CONVERSATION], [_INCIDENT])
 
     def test_pending_read_keeps_the_store_error(self) -> None:
         """The pending read returns the store's classified error as before."""
-        result = get_pending_status_update(_CHANNEL, lookup=_CountingLookup(), store=_FailingStore())  # type: ignore[arg-type]
+        result = get_pending_status_update(_CountingIncidents(), _CONVERSATION, store=_FailingStore())  # type: ignore[arg-type]
 
         assert (result.status, result.error_code, result.retry_after) == (
             OperationStatus.TRANSIENT_ERROR,
