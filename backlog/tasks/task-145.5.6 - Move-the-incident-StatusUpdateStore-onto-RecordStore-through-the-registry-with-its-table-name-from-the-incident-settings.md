@@ -3,7 +3,7 @@ id: TASK-145.5.6
 title: >-
   Move the incident StatusUpdateStore onto RecordStore through the registry,
   with its table name from the incident settings
-status: In Progress
+status: Done
 assignee: []
 created_date: 2026-10-14 23:09
 updated_date: '2026-10-28T13:47:00Z'
