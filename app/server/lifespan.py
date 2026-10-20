@@ -35,6 +35,7 @@ from infrastructure.i18n import (
 from infrastructure.logging.settings import LoggingSettings, get_logging_settings
 from infrastructure.logging.setup import configure_logging
 from infrastructure.security import get_jwks_manager
+from infrastructure.security.settings import SecuritySettings, get_security_settings
 from integrations.slack.provider import get_slack_provider
 from integrations.slack.settings import get_slack_settings
 from jobs import scheduled_tasks
@@ -78,6 +79,7 @@ def _get_logger_from_app(
 def _list_configs_from_sections(
     app_settings: AppSettings,
     server_settings: ServerSettings,
+    security_settings: SecuritySettings,
     directory_settings: DirectorySettings,
     sre_ops_settings: SreOpsSettings,
     logger: BoundLogger,
@@ -91,6 +93,7 @@ def _list_configs_from_sections(
 
     config_settings["app"] = tuple(app_settings.model_dump().keys())
     config_settings["server"] = tuple(server_settings.model_dump().keys())
+    config_settings["security"] = tuple(security_settings.model_dump().keys())
     config_settings["directory"] = tuple(directory_settings.model_dump().keys())
     config_settings["sre_ops"] = tuple(sre_ops_settings.model_dump().keys())
 
@@ -142,8 +145,7 @@ def _stop_scheduled_tasks(stop_event: threading.Event | None) -> None:
 
 
 def _initialize_security_services(
-    app: FastAPI,
-    settings: ServerSettings,
+    settings: SecuritySettings,
     logger: BoundLogger,
 ) -> None:
     """Pre-initialize JWT/JWKS security infrastructure at startup.
@@ -241,6 +243,7 @@ def _initialize_translation_service(pm: FeaturePluginManager, logger: BoundLogge
 async def lifespan(app: FastAPI, registry: svcs.Registry) -> AsyncGenerator[None]:
     app_settings = get_app_settings()
     server_settings = get_server_settings()
+    security_settings = get_security_settings()
     directory_settings = get_directory_settings()
     sre_ops_settings = get_sre_ops_settings()
     logging_settings = get_logging_settings()
@@ -256,6 +259,7 @@ async def lifespan(app: FastAPI, registry: svcs.Registry) -> AsyncGenerator[None
     _list_configs_from_sections(
         app_settings,
         server_settings,
+        security_settings,
         directory_settings,
         sre_ops_settings,
         logger,
@@ -264,7 +268,7 @@ async def lifespan(app: FastAPI, registry: svcs.Registry) -> AsyncGenerator[None
     await initialize_core_services(registry, logger)
     service_scopes = SvcsServiceScopeOpener(registry)
 
-    _initialize_security_services(app, server_settings, logger)
+    _initialize_security_services(security_settings, logger)
     _initialize_directory_provider(app, directory_settings, logger)
 
     app.state.slack_provider = get_slack_provider()

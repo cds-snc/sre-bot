@@ -1,9 +1,8 @@
 """Server and development infrastructure settings."""
 
 from functools import lru_cache
-from typing import Any
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field
 
 from infrastructure.configuration.base import InfrastructureSettings
 
@@ -18,10 +17,6 @@ class ServerSettings(InfrastructureSettings):
         GOOGLE_CLIENT_ID: Google OAuth client ID
         GOOGLE_CLIENT_SECRET: Google OAuth client secret
         SESSION_SECRET_KEY: Secret key for session encryption
-        ISSUER_CONFIG: JSON dict of JWT issuer configurations
-        DEV_BYPASS_TOKEN: Static bearer token accepted in non-production environments
-            only. Allows local smoke testing without a real Backstage instance.
-            Must be a long random string. NEVER set in production.
 
     Example:
         ```python
@@ -44,31 +39,6 @@ class ServerSettings(InfrastructureSettings):
     SECRET_KEY: str | None = Field(default=None, alias="SESSION_SECRET_KEY")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     ACCESS_TOKEN_MAX_AGE_MINUTES: int = 1440  # Defaults to 24 hours
-    ISSUER_CONFIG: dict[str, dict[str, Any]] | None = Field(
-        default=None,
-        alias="ISSUER_CONFIG",
-    )
-    DEV_BYPASS_TOKEN: str | None = Field(
-        default=None,
-        alias="DEV_BYPASS_TOKEN",
-    )
-
-    @field_validator("ISSUER_CONFIG", mode="before")
-    @classmethod
-    def validate_issuer_config(cls, v: dict[str, dict[str, Any]] | None) -> Any:
-        """Validate the ISSUER_CONFIG field."""
-        if v is None or not isinstance(v, dict):
-            return {}
-        return v
-
-    @model_validator(mode="after")
-    def validate_issuer_config_requires_audience(self) -> ServerSettings:
-        """Reject issuer entries that do not define an audience."""
-        issuer_config = self.ISSUER_CONFIG or {}
-        for issuer, cfg in issuer_config.items():
-            if not isinstance(cfg, dict) or not cfg.get("audience"):
-                raise ValueError(f"ISSUER_CONFIG entry for issuer '{issuer}' is missing required 'audience'")
-        return self
 
 
 class DevSettings(InfrastructureSettings):

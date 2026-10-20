@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-10-19 17:19'
+updated_date: '2026-10-20 12:32'
 labels:
   - plugin-architecture
   - configuration
@@ -58,5 +58,10 @@ Feature and capability slices move their values into the files when their packag
 created: 2026-10-19 17:19
 ---
 2026-10-19 (TASK-24 planning, human): the environment renames move here from TASK-24 step 3, with TASK-24's DoD 'deployment env files updated for renamed variables'. Rename once, after the inventory (AC #6) shows which variables remain as secrets; the rule is in decisions/configuration.md (TASK-24.1). This task now waits on TASK-24.6, the last TASK-24 slice.
+---
+
+created: 2026-10-20 12:32
+---
+2026-10-20: AC7 reads old env names through AliasChoices for one release, which conflicts with decisions/configuration.md's no-per-field-alias rule (lines 38, 93). Settle it when this task is planned: either a one-release migration without per-field aliases (for example a temporary settings source mapping old names) or a dated ADR exception.
 ---
 <!-- COMMENTS:END -->

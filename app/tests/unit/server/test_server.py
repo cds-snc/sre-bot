@@ -3,8 +3,9 @@
 import importlib
 
 import pytest
+from fastapi.testclient import TestClient
 
-from infrastructure.configuration.app import AppSettings
+from infrastructure.security.settings import SecuritySettings
 from server import server
 
 
@@ -27,7 +28,7 @@ def test_server_app_exported_correctly():
 
 @pytest.mark.unit
 def test_cors_middleware_configured():
-    """CORS middleware should use explicit non-wildcard lists from settings."""
+    """CORS middleware should use the security slice's explicit non-wildcard lists and no credentials mode."""
     # Arrange
     app = server.handler
 
@@ -37,10 +38,10 @@ def test_cors_middleware_configured():
         None,
     )
     assert cors_middleware is not None
-    assert cors_middleware.kwargs["allow_credentials"] is True
-    assert cors_middleware.kwargs["allow_origins"] == server.app_settings.CORS_ALLOWED_ORIGINS
-    assert cors_middleware.kwargs["allow_methods"] == server.app_settings.CORS_ALLOWED_METHODS
-    assert cors_middleware.kwargs["allow_headers"] == server.app_settings.CORS_ALLOWED_HEADERS
+    assert cors_middleware.kwargs["allow_credentials"] is False
+    assert cors_middleware.kwargs["allow_origins"] == server.security_settings.CORS_ALLOWED_ORIGINS
+    assert cors_middleware.kwargs["allow_methods"] == server.security_settings.CORS_ALLOWED_METHODS
+    assert cors_middleware.kwargs["allow_headers"] == server.security_settings.CORS_ALLOWED_HEADERS
     assert "*" not in cors_middleware.kwargs["allow_origins"]
     assert "*" not in cors_middleware.kwargs["allow_methods"]
     assert "*" not in cors_middleware.kwargs["allow_headers"]
@@ -51,9 +52,9 @@ def test_cors_middleware_uses_configured_origin_list_after_reload(monkeypatch):
     """Reloaded server module should preserve the exact configured origin allow-list."""
     configured_origins = ["https://frontend.example"]
     monkeypatch.setattr(
-        "infrastructure.configuration.app.get_app_settings",
-        lambda: AppSettings(
-            ENVIRONMENT="production",
+        "infrastructure.security.settings.get_security_settings",
+        lambda: SecuritySettings(
+            _env_file=None,
             CORS_ALLOWED_ORIGINS=configured_origins,
             CORS_ALLOWED_METHODS=["GET", "POST"],
             CORS_ALLOWED_HEADERS=["Authorization", "Content-Type"],
@@ -68,6 +69,31 @@ def test_cors_middleware_uses_configured_origin_list_after_reload(monkeypatch):
 
     assert cors_middleware is not None
     assert cors_middleware.kwargs["allow_origins"] == configured_origins
+
+
+@pytest.mark.unit
+def test_cors_preflight_from_allowed_origin_grants_no_credentials(monkeypatch):
+    """A preflight from an allowed origin is answered without Access-Control-Allow-Credentials.
+
+    The server module is reloaded with a security slice allowing one origin; the
+    preflight is answered by the CORS middleware, so the lifespan never runs.
+    """
+    origin = "https://frontend.example"
+    monkeypatch.setattr(
+        "infrastructure.security.settings.get_security_settings",
+        lambda: SecuritySettings(_env_file=None, CORS_ALLOWED_ORIGINS=[origin]),
+    )
+    reloaded = importlib.reload(server)
+
+    response = TestClient(reloaded.handler).options(
+        "/version",
+        headers={"Origin": origin, "Access-Control-Request-Method": "GET"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == origin
+    assert "access-control-allow-credentials" not in response.headers
+    assert "PUT" not in response.headers["access-control-allow-methods"]
 
 
 @pytest.mark.unit
