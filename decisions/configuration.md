@@ -82,7 +82,8 @@ Tolerated until closed:
 - all non-secret settings, and feature and job switches, read from environment variables;
 - plain environment-variable secrets;
 - flat, bare or aliased environment names (`SLACK_BOT_TOKEN`, `APP_TOKEN`, `SLACK__COMMAND_PREFIX`), until TASK-111 renames the variables that remain after values move into the files;
-- `SLACK_ENABLED` as the interim Slack transport switch, with `SLACK_TEAM_ID` (or, for an Enterprise org, `SLACK_ENTERPRISE_ID`) required when it is on and checked against every inbound request ([workplace-systems.md](workplace-systems.md) rule 3), until TASK-112; Google in use when its service-account key file is set;
+- `SLACK_ENABLED` as the interim Slack transport switch, with `SLACK_TEAM_ID` (or, for an Enterprise org, `SLACK_ENTERPRISE_ID`) required when it is on and checked against every inbound request ([workplace-systems.md](workplace-systems.md) rule 3), until TASK-112; Google in use when its service-account key file or customer id is set, both then required;
+- tenant entries derived from those flat variables (`SlackSettings.tenant`, `GoogleWorkspaceSettings.tenant`, frozen sub-models read by every consumer instead of the flat fields), until TASK-111 makes each a nested field named `<SLICE>__TENANT__<FIELD>` and TASK-112 moves it into the configuration files;
 - production values held in the `sre-bot-config` and `sre-bot-config-infrastructure` SSM parameters, which `app/bin/entry.sh` writes to `.env` at container start and terraform reads but does not manage.
 
 **Changes:**
@@ -94,3 +95,4 @@ Tolerated until closed:
 - 2026-10-20: Slack settings have one home, `integrations/slack/settings.py`; the legacy slice in `infrastructure/configuration/integrations/` and `SlackPlatformSettings` are deleted, and only Google is left in the tolerated second home (TASK-24.3).
 - 2026-10-20: Google settings have one home, `integrations/google_workspace/settings.py`, and `infrastructure/configuration/integrations/` is deleted; `GOOGLE_RESOURCES` waits in the same module until TASK-111 splits it into feature slices (TASK-24.4).
 - 2026-10-20: the interim Slack tenant entry is `SLACK_TEAM_ID` or, for an Enterprise org, `SLACK_ENTERPRISE_ID`, checked against every inbound request (TASK-157).
+- 2026-10-20: the interim tenant entries are frozen sub-models derived from the flat variables and read by every consumer; Google's entry is present when its key file or customer id is set and then needs both, and the customer id has no `my_customer` default (TASK-24.5).

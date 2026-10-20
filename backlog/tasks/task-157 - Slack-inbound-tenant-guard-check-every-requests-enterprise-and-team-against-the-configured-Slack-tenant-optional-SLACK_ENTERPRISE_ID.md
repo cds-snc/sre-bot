@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-20 18:35'
+updated_date: '2026-10-20 20:20'
 labels:
   - security
   - slack
@@ -44,3 +45,9 @@ OUT OF SCOPE. Re-stamping stored tenants after a Grid migration (a job planned w
 - [ ] #4 decisions/transport-slack.md, workplace-systems.md and configuration.md match the shipped behaviour; the settings docstring states the per-request check
 - [ ] #5 ruff, lint-imports, mypy (no errors in touched files) and pytest tests --ignore=tests/smoke pass, with commands and output recorded in notes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-20 (TASK-24.5): the Slack tenant entry is SlackTenant (integrations/slack/settings.py), read through SlackSettings.tenant, with team_id and a tenant_id read. Add the optional enterprise_id inside it, make team_id optional, and make tenant_id the enterprise id when set; server/configured_systems.py already reads tenant_id and does not change. Production (2026-10-20): team T2G2S06PM, enterprise_id null, is_enterprise_install false, no SLACK_ENTERPRISE_ID set.
+<!-- SECTION:NOTES:END -->

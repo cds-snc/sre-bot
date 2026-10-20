@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-19 17:19'
-updated_date: '2026-10-19 17:21'
+updated_date: '2026-10-20 20:20'
 labels:
   - clients
   - phase-3
@@ -41,3 +41,9 @@ After this slice TASK-24's umbrella ACs are verifiable and TASK-111 can start.
 - [ ] #3 A grep check finds no <VENDOR>_ENABLED field in app/integrations/ other than SLACK_ENABLED
 - [ ] #4 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-20 (TASK-24.5): the Google missing-credential boot case exists: GOOGLE_WORKSPACE_CUSTOMER_ID set without GCP_SRE_SERVICE_ACCOUNT_KEY_FILE fails naming the key file (tests/integration/server/test_lifespan_vendor_slice_validation.py). AC2 can point to it or generalise it.
+<!-- SECTION:NOTES:END -->

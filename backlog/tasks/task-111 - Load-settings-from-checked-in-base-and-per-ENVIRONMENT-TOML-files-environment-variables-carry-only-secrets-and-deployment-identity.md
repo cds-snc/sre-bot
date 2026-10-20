@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-10-20 15:06'
+updated_date: '2026-10-20 20:20'
 labels:
   - plugin-architecture
   - configuration
@@ -53,6 +53,12 @@ GOOGLE_RESOURCES (from TASK-24.4 planning, 2026-10-20): GoogleResourcesConfig si
 <!-- DOD:BEGIN -->
 - [ ] #1 Deployment env files (SSM parameters, terraform task definitions, CI workflow, Makefile) updated for the renamed variables; the renames are listed in the PR description
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-20 (TASK-24.5): the vendor tenant entries are derived today: SlackSettings.tenant (SlackTenant) and GoogleWorkspaceSettings.tenant (GoogleWorkspaceTenant), frozen sub-models built from the flat fields, read by every consumer. The renames here make each a nested field read as <SLICE>__TENANT__<FIELD> and drop the flat fields (SLACK_TEAM_ID, GOOGLE_WORKSPACE_CUSTOMER_ID, GCP_SRE_SERVICE_ACCOUNT_KEY_FILE); consumers do not change.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
