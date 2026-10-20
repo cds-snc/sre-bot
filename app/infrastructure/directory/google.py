@@ -51,7 +51,7 @@ class GoogleDirectoryProvider:
         self,
         get_service: Callable[[list[str]], AdminDirectoryResource],
         directory_settings: DirectorySettings,
-        customer_id: str = "my_customer",
+        customer_id: str,
     ) -> None:
         """Initialise with an injected, per-call scoped service factory.
 
@@ -59,11 +59,12 @@ class GoogleDirectoryProvider:
             get_service: Factory building a scoped Admin Directory Resource
                 for a given OAuth scope list — called once per operation.
             directory_settings: Directory provider settings.
-            customer_id: Google Workspace customer ID for directory operations.
+            customer_id: Real Google Workspace customer id for directory operations
+                (the tenant entry's id; never the my_customer alias).
         """
         self._get_service = get_service
         self._directory_settings = directory_settings
-        self._customer_id = customer_id or "my_customer"
+        self._customer_id = customer_id
         self._logger = logger.bind(provider="google")
 
     def _map_sdk_exception(self, exc: Exception, operation: str) -> OperationResult[Any]:

@@ -51,6 +51,7 @@ def get_directory_provider() -> DirectoryProvider:
     provider_key = directory_settings.provider
     if provider_key == "google":
         workspace_settings = get_google_workspace_settings()
+        tenant = workspace_settings.tenant
         get_service = partial(
             get_admin_directory_service,
             delegated_user_email=workspace_settings.SRE_BOT_EMAIL or None,
@@ -58,6 +59,7 @@ def get_directory_provider() -> DirectoryProvider:
         return build_google_directory_provider(
             get_service=get_service,
             directory_settings=directory_settings,
-            customer_id=workspace_settings.GOOGLE_WORKSPACE_CUSTOMER_ID,
+            # Without the Google entry there is no key either, so no call ever sends the empty id.
+            customer_id=tenant.customer_id if tenant is not None else "",
         )
     raise ValueError(f"Unsupported directory provider: {provider_key!r}")

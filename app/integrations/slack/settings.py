@@ -1,10 +1,13 @@
 """Vendor settings for Slack runtime credentials and delivery mode.
 
-Exposes `SlackSettings` and the cached `get_slack_settings()` provider.
+Exposes `SlackSettings`, its tenant entry `SlackTenant`, and the cached `get_slack_settings()` provider.
 
 `SLACK_ENABLED` is the interim switch for the Slack transport and
-`SLACK_TEAM_ID` the interim Slack tenant entry, until both move to the
-configuration files (TASK-112; decisions/configuration.md):
+`SLACK_TEAM_ID` the source of the interim Slack tenant entry (`SlackTenant`,
+read through `SlackSettings.tenant`), until TASK-111 makes the entry a nested
+field and TASK-112 moves it to the configuration files
+(decisions/configuration.md). Readers use the entry, never the flat field.
+The entry is the expected tenant; checking each request against it is TASK-157's.
 - The transport switched on fails boot without a non-blank `SLACK_TEAM_ID`.
 - With the transport off the id is optional; an empty value counts as absent
     and a present one must be non-blank. The id is opaque (Slack documents no
@@ -25,10 +28,23 @@ configuration (channel IDs, user-group IDs) lives with the consuming feature.
 from functools import lru_cache
 
 import structlog
-from pydantic import Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = structlog.get_logger(__name__)
+
+
+class SlackTenant(BaseModel):
+    """The Slack tenant this instance works with: the expected tenant, in Slack's terms."""
+
+    model_config = ConfigDict(frozen=True)
+
+    team_id: str = Field(description="Slack workspace (team) id, as auth.test returns it.")
+
+    @property
+    def tenant_id(self) -> str:
+        """Return Slack's tenant id for this entry: the workspace (team) id."""
+        return self.team_id
 
 
 class SlackSettings(BaseSettings):
@@ -89,6 +105,13 @@ class SlackSettings(BaseSettings):
         alias="SLACK_TRANSIENT_ERRORS",
         description="Slack Web API error codes classified as TRANSIENT_ERROR.",
     )
+
+    @property
+    def tenant(self) -> SlackTenant | None:
+        """Return the Slack tenant entry, or None when Slack is not configured."""
+        if self.TEAM_ID is None:
+            return None
+        return SlackTenant(team_id=self.TEAM_ID.strip())
 
     @field_validator("TEAM_ID", mode="before")
     @classmethod
