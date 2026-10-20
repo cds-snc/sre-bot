@@ -39,7 +39,7 @@ message, you will see:
 The window is private, but saved drafts and approved updates belong to the
 incident: other responders can open them through the same command.
 
-*Screenshot: the Status updates window, showing New update or a pending draft.*
+![Status updates window with New update and no approved updates yet.](./incident-status-update-00-new.png)
 
 ## 2. Prepare your update
 
@@ -64,7 +64,10 @@ fields. The stage cannot move backwards from the latest approved update.
 Use **Save draft** before leaving if you want to keep your edits; do not rely
 on **Cancel** to save them.
 
-*Screenshot: the review form, including both language sections and the buttons.*
+![Top of the review form showing optional AI instructions, Draft with AI, the stage selector and the first English field.](./incident-status-update-01-form.png)
+
+Scroll down in the form to reach the remaining English and French fields and
+**Save draft**.
 
 ## 3. Ask AI for help if you'd like
 
@@ -91,7 +94,7 @@ Only confirm if sharing that content is appropriate. You can instead continue
 writing manually. If AI drafting fails, the form keeps your text and shows a
 notice.
 
-*Screenshot: AI instructions and Draft with AI; optionally, the security warning.*
+![Status updates window displaying the AI drafting progress message.](./incident-status-update-02-ai-drafting.png)
 
 ## 4. Review it, then share it yourself
 
@@ -108,19 +111,24 @@ that line.
 Proofread both versions, then copy and post them to the appropriate destination.
 **Approval is not publication.**
 
-*Screenshot: the approved, copy-ready English and French text.*
+![Approved update with copy-ready English text and the start of the French section below it.](./incident-status-update-03-approved.png)
 
 ## 5. Let other responders know it's been shared
 
 Run the command again and select **Open** beside the update in **Approved
-updates**. Select **Mark as published** after you have shared it.
+updates**.
+
+![Approved updates list showing an update marked Not published and its Open button.](./incident-status-update-04-list.png)
+
+The update opens with its copy-ready text and a **Mark as published** button.
+Select **Mark as published** after you have shared it.
+
+![Reopened approved update showing Not published, the Mark as published button and copy-ready text.](./incident-status-update-05-open.png)
 
 This helps other responders see which updates have been shared. It records who
 marked the update published and when; it does not send any messages.
 You can reverse the marker with **Mark as not published**. Use **Back** to
 return to the overview. The list shows up to the latest 50 approved updates.
-
-*Screenshot: a reopened update with its publication marker.*
 
 ## If something looks different
 
