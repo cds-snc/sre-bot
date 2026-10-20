@@ -11,7 +11,7 @@ scope: The Slack transport — delivery mode, verification, handler mechanics, e
 
 Slack is the app's primary front door and a first-class part of the process, not an occasional outbound SDK. Six legacy records deferred Slack decisions to a `transport-slack.md` that never existed; this is that record.
 
-Current state: sync Bolt (`App` + `SocketModeHandler` + threads) in `integrations/slack/provider.py`, while `integrations/slack/bootstrap.py` already builds an `AsyncApp`. The parser, formatter and per-command help also live in `integrations/slack/`. Legacy modules register through a hard-coded list beside pluggy discovery. `infrastructure/slack/settings.py` holds `COMMAND_PREFIX`; `infrastructure/configuration/infrastructure/platforms.py` still duplicates the Slack credential and mode fields.
+Current state: sync Bolt (`App` + `SocketModeHandler` + threads) in `integrations/slack/provider.py`, while `integrations/slack/bootstrap.py` already builds an `AsyncApp`. The parser, formatter and per-command help also live in `integrations/slack/`. Legacy modules register through a hard-coded list beside pluggy discovery. `infrastructure/slack/settings.py` holds `COMMAND_PREFIX`.
 
 ## Decision
 
@@ -68,8 +68,7 @@ Tolerated until then:
 - sync `SocketModeHandler` in `provider.py` beside the `AsyncApp` in `bootstrap.py`;
 - dual registration: the legacy `register(bot)` list in `server/lifespan.py` beside the `register_slack_commands(registrar: SlackCommandRegistrar)` hookspec;
 - `slack_sdk.WebClient` imported outside `adapters/` in `packages/oncall_sync/providers.py` and `packages/rant/platforms/slack.py`;
-- legacy modules building command names from `COMMAND_PREFIX` in their own `bot.command()` calls;
-- the duplicate Slack settings in `infrastructure/configuration/infrastructure/platforms.py`, deleted rather than extended.
+- legacy modules building command names from `COMMAND_PREFIX` in their own `bot.command()` calls.
 
 **Changes:**
 - 2026-09-24: runtime moves to `server/slack/`, hookspecs and the outbound Protocol to `contracts/`, per plugin-architecture.md; dropped the closed `PREFIX` retirement; Migration names epic tickets only; shared Slack helpers never wrap Bolt or `slack_sdk`, and a standard toolkit is an open Draft.
@@ -77,3 +76,4 @@ Tolerated until then:
 - 2026-10-06: block actions and view submissions are registered through the registrar as native Bolt listeners in feature entry points; `slack_bolt` is allowed there only (TASK-140.1).
 - 2026-10-09: the first consumer is described as the human-first status-update modal, where AI drafting is an optional assist (TASK-144).
 - 2026-10-09: ids follow the plugin name; the status-update modal's ids become `incident.comms.…` when the comms subdomain is carved out (TASK-145).
+- 2026-10-20: the duplicate Slack settings in `infrastructure/configuration/infrastructure/platforms.py` are deleted; `integrations/slack/settings.py` is the only Slack settings slice (TASK-24.3).

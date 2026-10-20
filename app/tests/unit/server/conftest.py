@@ -17,21 +17,6 @@ def mock_fastapi_app():
 
 
 @pytest.fixture
-def mock_settings():
-    """Create a mock settings object."""
-    settings = MagicMock()
-    settings.server = MagicMock()
-    settings.server.SECRET_KEY = "test_secret_key"
-    settings.server.ACCESS_TOKEN_EXPIRE_MINUTES = 30
-    settings.server.ACCESS_TOKEN_MAX_AGE_MINUTES = 60
-    settings.slack = MagicMock()
-    settings.slack.SLACK_TOKEN = "xoxb-test-token"
-    settings.slack.APP_TOKEN = "xapp-test-token"
-    settings.ENVIRONMENT = "local"
-    return settings
-
-
-@pytest.fixture
 def mock_bot():
     """Create a mock Slack Bot."""
     bot = MagicMock()

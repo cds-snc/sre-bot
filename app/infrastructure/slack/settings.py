@@ -4,8 +4,6 @@ Owns transport-level Slack presentation settings that are independent from
 vendor credentials and feature-domain configuration.
 """
 
-from __future__ import annotations
-
 from functools import lru_cache
 
 from pydantic import Field

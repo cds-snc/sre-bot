@@ -1,9 +1,5 @@
-"""Unit tests for infrastructure settings singleton providers (PR-3)."""
+"""Unit tests for infrastructure settings singleton providers."""
 
-from infrastructure.configuration.infrastructure.platforms import (
-    PlatformsSettings,
-    get_platforms_settings,
-)
 from infrastructure.configuration.infrastructure.retry import (
     RetrySettings,
     get_retry_settings,
@@ -62,18 +58,3 @@ class TestRetrySettingsSingleton:
         monkeypatch.setenv("RETRY_MAX_ATTEMPTS", "10")
         settings = RetrySettings()
         assert settings.max_attempts == 10
-
-
-class TestPlatformsSettingsSingleton:
-    def test_singleton_returns_same_instance(self):
-        get_platforms_settings.cache_clear()
-        assert get_platforms_settings() is get_platforms_settings()
-
-    def test_has_required_model_config(self):
-        config = PlatformsSettings.model_config
-        assert config.get("env_file") == ".env"
-        assert config.get("extra") == "ignore"
-
-    def test_default_providers_disabled(self):
-        settings = PlatformsSettings()
-        assert settings.slack.ENABLED is False
