@@ -17,6 +17,7 @@ import contracts.records
 pytestmark = pytest.mark.unit
 
 PUBLIC_NAMES = {
+    "READ_LIMIT_EXCEEDED",
     "RESERVED_ATTRIBUTE_PREFIX",
     "ExpectedValue",
     "IncrementAttribute",
@@ -33,6 +34,7 @@ PUBLIC_NAMES = {
     "SortOperator",
     "SortOrder",
     "resolve_query_key",
+    "validate_read_limit",
     "validate_record_item",
     "validate_record_update",
 }

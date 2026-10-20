@@ -1,6 +1,7 @@
 """Records contract: the RecordStore Protocol and its vendor-neutral value types."""
 
 from contracts.records.store import (
+    READ_LIMIT_EXCEEDED,
     RESERVED_ATTRIBUTE_PREFIX,
     ExpectedValue,
     IncrementAttribute,
@@ -17,11 +18,13 @@ from contracts.records.store import (
     SortOperator,
     SortOrder,
     resolve_query_key,
+    validate_read_limit,
     validate_record_item,
     validate_record_update,
 )
 
 __all__ = [
+    "READ_LIMIT_EXCEEDED",
     "RESERVED_ATTRIBUTE_PREFIX",
     "ExpectedValue",
     "IncrementAttribute",
@@ -38,6 +41,7 @@ __all__ = [
     "SortOperator",
     "SortOrder",
     "resolve_query_key",
+    "validate_read_limit",
     "validate_record_item",
     "validate_record_update",
 ]

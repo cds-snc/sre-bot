@@ -8,6 +8,7 @@ from typing import Any
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.records import (
+    READ_LIMIT_EXCEEDED,
     ExpectedValue,
     IncrementAttribute,
     KeySchema,
@@ -21,6 +22,7 @@ from contracts.records import (
     SortOperator,
     SortOrder,
     resolve_query_key,
+    validate_read_limit,
     validate_record_item,
     validate_record_update,
 )
@@ -63,7 +65,7 @@ class InMemoryRecordStore(RecordStore):
 
     Mirrors the DynamoDB-backed store's semantics (overwrite on put,
     full-key conditional create, key-condition queries with sort order and a
-    total limit, atomic guarded updates) while keeping data in process memory
+    total limit, atomic guarded updates, a capped whole-table read) while keeping data in process memory
     for deterministic tests and development. One lock serializes every
     operation so concurrent callers see the same atomicity as the real store.
     """
@@ -168,3 +170,15 @@ class InMemoryRecordStore(RecordStore):
                 _apply(updated, change)
             self._tables[table.name][full_key] = updated
             return OperationResult.success(data=deepcopy(updated))
+
+    def read_all(self, table: RecordTable, *, max_items: int) -> OperationResult:
+        validate_read_limit(max_items)
+        with self._lock:
+            records = list(self._tables.get(table.name, {}).values())
+            if len(records) > max_items:
+                return OperationResult.error(
+                    status=OperationStatus.PERMANENT_ERROR,
+                    message=f"{table.name} holds more than {max_items} items",
+                    error_code=READ_LIMIT_EXCEEDED,
+                )
+            return OperationResult.success(data=deepcopy(records))

@@ -5,7 +5,8 @@ infrastructure services, and the vendor-neutral value types it speaks:
 a table declares its key layout once (``RecordTable``) and reads describe
 what they want (``RecordQuery``), never how a backend expresses it.
 Writes to an existing item describe their changes (``RecordChange``) and
-an optional equality guard, never a backend update expression.
+an optional equality guard, never a backend update expression. A whole-table
+read (``read_all``) returns every item or an error past the caller's cap.
 Concrete implementations can vary by backing store.
 """
 
@@ -162,6 +163,20 @@ def _check_attribute_name(attribute: str) -> None:
         raise ValueError(f"attribute {attribute!r} uses the reserved prefix {RESERVED_ATTRIBUTE_PREFIX!r}")
 
 
+# Error code of a whole-table read whose table holds more items than the caller's cap.
+READ_LIMIT_EXCEEDED = "RECORD_READ_LIMIT_EXCEEDED"
+
+
+def validate_read_limit(max_items: int) -> None:
+    """Check a whole-table read's cap.
+
+    Raises:
+        ValueError: ``max_items`` is below 1, a caller programming error.
+    """
+    if max_items < 1:
+        raise ValueError("max_items must be at least 1")
+
+
 def validate_record_item(item: Mapping[str, Any]) -> None:
     """Check that an item written by a caller names no reserved attribute.
 
@@ -239,10 +254,22 @@ class RecordStore(Protocol):
     return it, and an item, change or guard naming such an attribute raises
     ``ValueError``.
 
+    ``read_all`` reads every item of the table (never an index) for a batch
+    job or a configuration-sized table; it is never a lookup, which goes
+    through a declared index, nor a user-facing listing:
+
+    - it returns ``success`` with every item, or ``PERMANENT_ERROR`` with
+      ``READ_LIMIT_EXCEEDED`` and no data when the table holds more than
+      ``max_items``, never a truncated list;
+    - ``max_items`` is the caller's expectation of the table's size, taken
+      from its package settings; below 1 raises ``ValueError``;
+    - the read is strongly consistent as of its start, so every write
+      completed before it is included, and its order is unspecified;
+    - items carry no store bookkeeping, and any filtering is the caller's.
+
     Appending to a list attribute is deliberately not offered: a growing
     sequence, such as incident timeline entries, is stored as its own records
-    in a separate table. A bounded full-table read is a separate operation,
-    added with its first consumer.
+    in a separate table.
     """
 
     def put(self, table: RecordTable, item: dict[str, Any]) -> OperationResult: ...
@@ -263,3 +290,5 @@ class RecordStore(Protocol):
         *,
         expected: Mapping[str, ExpectedValue] | None = None,
     ) -> OperationResult: ...
+
+    def read_all(self, table: RecordTable, *, max_items: int) -> OperationResult: ...
