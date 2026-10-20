@@ -1,10 +1,10 @@
 ---
 id: TASK-27.5
 title: 'Records: bounded or paginated full-table read, shaped with its first consumer'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-13 19:59'
-updated_date: '2026-10-20 19:01'
+updated_date: '2026-10-20 19:23'
 labels:
   - infrastructure
   - phase-4
