@@ -4,7 +4,6 @@ These tests define expected error-classification and service-construction
 behavior for Google Directory API adapter wiring.
 """
 
-import importlib
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
@@ -16,6 +15,7 @@ from googleapiclient.http import HttpRequest
 from pydantic import ValidationError
 
 from contracts.operations.status import OperationStatus
+from integrations.google_workspace import client as google_client
 from integrations.google_workspace.settings import GoogleWorkspaceSettings
 
 
@@ -33,10 +33,7 @@ def _http_error(status: int, reason: str = "boom", retry_after: str | None = Non
 
 @pytest.fixture
 def google_client_module() -> Any:
-    try:
-        return importlib.import_module("integrations.google_workspace.client")
-    except ModuleNotFoundError as exc:
-        pytest.fail(f"Expected integrations.google_workspace.client module to exist: {exc}")
+    return google_client
 
 
 @pytest.mark.unit
@@ -94,7 +91,7 @@ def test_get_admin_directory_service_builds_with_static_discovery_and_no_cache(
     captured: dict[str, Any] = {}
 
     settings = SimpleNamespace(
-        GCP_SRE_SERVICE_ACCOUNT_KEY_FILE='{"client_email":"sre-bot@example.com","private_key":"FAKE"}',
+        tenant=SimpleNamespace(service_account_key='{"client_email":"sre-bot@example.com","private_key":"FAKE"}'),
         SRE_BOT_EMAIL="sre-bot@example.com",
         GOOGLE_API_NUM_RETRIES=3,
         GOOGLE_API_TIMEOUT_SECONDS=10.0,
@@ -146,7 +143,7 @@ def _install_fake_build(
     timeout_seconds: float = 10.0,
 ) -> Any:
     settings = SimpleNamespace(
-        GCP_SRE_SERVICE_ACCOUNT_KEY_FILE='{"client_email":"sre-bot@example.com","private_key":"FAKE"}',
+        tenant=SimpleNamespace(service_account_key='{"client_email":"sre-bot@example.com","private_key":"FAKE"}'),
         SRE_BOT_EMAIL="sre-bot@example.com",
         GOOGLE_API_NUM_RETRIES=3,
         GOOGLE_API_TIMEOUT_SECONDS=timeout_seconds,
@@ -419,3 +416,16 @@ def test_google_workspace_settings_timeout_rejects_non_positive(
 
     with pytest.raises(ValidationError):
         GoogleWorkspaceSettings()
+
+
+@pytest.mark.unit
+def test_build_service_without_a_google_tenant_entry_fails_naming_the_keys(
+    monkeypatch: pytest.MonkeyPatch,
+    google_client_module: Any,
+) -> None:
+    """Without the tenant entry Google is not configured, so building a client names the missing keys."""
+    settings = SimpleNamespace(tenant=None, SRE_BOT_EMAIL="", GOOGLE_API_NUM_RETRIES=3, GOOGLE_API_TIMEOUT_SECONDS=10.0)
+    monkeypatch.setattr(google_client_module, "get_google_workspace_settings", lambda: settings)
+
+    with pytest.raises(ValueError, match="GCP_SRE_SERVICE_ACCOUNT_KEY_FILE"):
+        google_client_module.get_admin_directory_service(scopes=[])

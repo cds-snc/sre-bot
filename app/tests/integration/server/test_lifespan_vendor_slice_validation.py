@@ -85,6 +85,12 @@ async def test_google_key_with_the_my_customer_alias_fails_boot_naming_the_key(m
     await _boot_fails_naming("GOOGLE_WORKSPACE_CUSTOMER_ID")
 
 
+async def test_google_customer_id_without_the_key_fails_boot_naming_the_key_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GOOGLE_WORKSPACE_CUSTOMER_ID", "C03abc123")
+
+    await _boot_fails_naming("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE")
+
+
 async def test_absent_vendor_entries_boot_without_a_network_call(monkeypatch: pytest.MonkeyPatch) -> None:
     connects: list[object] = []
     real_connect = socket.socket.connect

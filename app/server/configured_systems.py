@@ -4,9 +4,10 @@ Host code, not infrastructure: which workplace systems an instance works with
 is a workplace concern (``decisions/workplace-systems.md`` rule 3,
 ``decisions/plugin-architecture.md``). Each vendor has one tenant source in
 TENANT_SOURCES that returns its tenant id, or None when the vendor is not
-configured; a new system adds a row, not a parameter. The sources read
-validated slices: boot validation already rejects a blank Slack id and, with
-the Google key file set, a blank customer id or the my_customer alias.
+configured; a new system adds a row, not a parameter. The sources read each
+validated slice's tenant entry: boot validation already rejects a blank Slack
+id, and a Google entry missing its key or holding a blank id or the
+my_customer alias.
 """
 
 from collections.abc import Callable, Iterable, Mapping
@@ -42,15 +43,15 @@ class TenantSource:
 
 
 def slack_tenant(settings: SlackSettings) -> str | None:
-    """Return the stripped SLACK_TEAM_ID, whether or not the transport is switched on."""
-    return settings.TEAM_ID.strip() if settings.TEAM_ID is not None else None
+    """Return the Slack entry's tenant id, whether or not the transport is switched on."""
+    tenant = settings.tenant
+    return tenant.tenant_id if tenant is not None else None
 
 
 def google_tenant(settings: GoogleWorkspaceSettings) -> str | None:
-    """Return the stripped customer id when the service-account key file is set."""
-    if not settings.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE:
-        return None
-    return settings.GOOGLE_WORKSPACE_CUSTOMER_ID.strip()
+    """Return the Google entry's customer id."""
+    tenant = settings.tenant
+    return tenant.customer_id if tenant is not None else None
 
 
 TENANT_SOURCES: tuple[TenantSource, ...] = (

@@ -133,9 +133,15 @@ def _build_service(
     delegated_user_email: str | None,
 ) -> Any:
     settings = get_google_workspace_settings()
+    tenant = settings.tenant
+    if tenant is None:
+        logger.error("google_workspace_not_configured", api_name=api_name, api_version=api_version)
+        raise ValueError(
+            "Google Workspace is not configured: set GCP_SRE_SERVICE_ACCOUNT_KEY_FILE and GOOGLE_WORKSPACE_CUSTOMER_ID"
+        )
 
     try:
-        creds_info = json.loads(settings.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE)
+        creds_info = json.loads(tenant.service_account_key)
     except json.JSONDecodeError as exc:
         logger.error("invalid_credentials_json", error=str(exc))
         raise ValueError("Invalid credentials JSON") from exc

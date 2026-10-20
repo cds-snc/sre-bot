@@ -2,15 +2,17 @@
 
 read_configured_systems is driven by stub TenantSource rows returning fixed
 values, so the tests state only the systems they are about. The vendor tenant
-functions get Slack and Google slices built with model_construct, holding values
-their validators accept; the blank-id and my_customer alias rejections belong to
-boot validation and are covered by the settings tests. One test builds the
-slices from monkeypatched environment variables with the .env file disabled, to
-show the validated path end to end. structlog's capture_logs checks the boot
+functions read each slice's tenant entry; they get Slack and Google slices
+built with model_construct, holding values their validators accept. The
+blank-id, my_customer alias and missing-key rejections belong to boot
+validation and are covered by the settings tests. Two tests build the slices
+from monkeypatched environment variables with the .env file disabled, to show
+the validated path end to end and that an invalid entry never reaches a source. structlog's capture_logs checks the boot
 event names systems and never carries a tenant id.
 """
 
 import pytest
+from pydantic import ValidationError
 from structlog.testing import capture_logs
 
 from contracts.workplace import WorkplaceSystem
@@ -36,7 +38,7 @@ def _slack(team_id: str | None = None, *, enabled: bool = False) -> SlackSetting
     return SlackSettings.model_construct(TEAM_ID=team_id, ENABLED=enabled)
 
 
-def _google(customer_id: str = "my_customer", key_file: str = "") -> GoogleWorkspaceSettings:
+def _google(customer_id: str | None = None, key_file: str = "") -> GoogleWorkspaceSettings:
     return GoogleWorkspaceSettings.model_construct(
         GOOGLE_WORKSPACE_CUSTOMER_ID=customer_id, GCP_SRE_SERVICE_ACCOUNT_KEY_FILE=key_file
     )
@@ -75,12 +77,12 @@ def test_slack_tenant_entry_counts_with_the_transport_off() -> None:
     assert slack_tenant(_slack("T0123", enabled=False)) == "T0123"
 
 
-def test_google_tenant_is_the_stripped_customer_id_when_the_key_file_is_set() -> None:
+def test_google_tenant_is_the_entry_customer_id() -> None:
     assert google_tenant(_google(" C0abc ", key_file="/run/key.json")) == "C0abc"
 
 
-def test_google_without_a_key_file_is_not_configured() -> None:
-    assert google_tenant(_google("C0abc")) is None
+def test_google_without_an_entry_is_not_configured() -> None:
+    assert google_tenant(_google()) is None
 
 
 def test_validated_settings_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -92,6 +94,16 @@ def test_validated_settings_from_the_environment(monkeypatch: pytest.MonkeyPatch
 
     assert slack_tenant(SlackSettings(_env_file=None)) is None  # type: ignore[call-arg]
     assert google_tenant(GoogleWorkspaceSettings(_env_file=None)) == "C0abc"  # type: ignore[call-arg]
+
+
+def test_an_invalid_google_entry_fails_before_any_tenant_is_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A customer id without its key is a present entry missing a secret, so the slice never builds."""
+    monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "")
+    monkeypatch.setenv("GOOGLE_WORKSPACE_CUSTOMER_ID", "C0abc")
+    source = TenantSource(WorkplaceSystem.GOOGLE, lambda: google_tenant(GoogleWorkspaceSettings(_env_file=None)))  # type: ignore[call-arg]
+
+    with pytest.raises(ValidationError, match="GCP_SRE_SERVICE_ACCOUNT_KEY_FILE"):
+        read_configured_systems([source])
 
 
 def test_tenants_are_read_only_and_copied() -> None:

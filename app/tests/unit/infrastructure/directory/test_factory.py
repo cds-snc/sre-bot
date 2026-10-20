@@ -66,7 +66,7 @@ def test_get_directory_provider_uses_scoped_google_service_factory(monkeypatch: 
     directory_settings = SimpleNamespace(provider="google")
     workspace_settings = SimpleNamespace(
         SRE_BOT_EMAIL="sre-bot@example.com",
-        GOOGLE_WORKSPACE_CUSTOMER_ID="my_customer",
+        tenant=SimpleNamespace(customer_id="C03abc123"),
     )
 
     captured: dict[str, object] = {}
@@ -92,7 +92,7 @@ def test_get_directory_provider_uses_scoped_google_service_factory(monkeypatch: 
 
     assert isinstance(provider, DirectoryProvider)
     assert captured["directory_settings"] is directory_settings
-    assert captured["customer_id"] == "my_customer"
+    assert captured["customer_id"] == "C03abc123"
 
     scoped_get_service = captured["get_service"]
     assert callable(scoped_get_service)
@@ -104,3 +104,27 @@ def test_get_directory_provider_uses_scoped_google_service_factory(monkeypatch: 
             "sre-bot@example.com",
         )
     ]
+
+
+@pytest.mark.unit
+def test_get_directory_provider_without_a_google_tenant_entry_passes_no_customer_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without the Google entry there are no credentials either, so the provider gets no id and no alias."""
+    directory_factory.get_directory_provider.cache_clear()
+    captured: dict[str, object] = {}
+
+    def fake_builder(*, get_service, directory_settings, customer_id):
+        captured["customer_id"] = customer_id
+        return MagicMock(spec=DirectoryProvider)
+
+    monkeypatch.setattr(directory_factory, "get_directory_settings", lambda: SimpleNamespace(provider="google"))
+    monkeypatch.setattr(
+        directory_factory, "get_google_workspace_settings", lambda: SimpleNamespace(SRE_BOT_EMAIL="", tenant=None)
+    )
+    monkeypatch.setattr(directory_factory, "build_google_directory_provider", fake_builder)
+
+    directory_factory.get_directory_provider()
+    directory_factory.get_directory_provider.cache_clear()
+
+    assert captured["customer_id"] == ""

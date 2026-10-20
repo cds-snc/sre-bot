@@ -42,7 +42,7 @@ def test_slice_reads_the_env_file_case_sensitively_and_ignores_unknown_keys() ->
 
 @pytest.mark.usefixtures("google_unused")
 def test_defaults_apply_while_google_is_not_configured() -> None:
-    """Without any Google variable the slice builds with its defaults."""
+    """Without any Google variable the slice builds with its defaults, and the customer id has none."""
     settings = GoogleWorkspaceSettings(_env_file=None)  # type: ignore[call-arg]
 
     assert (
@@ -52,7 +52,7 @@ def test_defaults_apply_while_google_is_not_configured() -> None:
         settings.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE,
         settings.GOOGLE_API_NUM_RETRIES,
         settings.GOOGLE_API_TIMEOUT_SECONDS,
-    ) == ("", "", "my_customer", "", 3, 10.0)
+    ) == ("", "", None, "", 3, 10.0)
 
 
 @pytest.mark.usefixtures("google_unused")

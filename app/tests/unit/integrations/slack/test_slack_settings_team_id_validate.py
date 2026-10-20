@@ -5,13 +5,14 @@ file disabled, so a developer's local file cannot satisfy a check. Building
 the settings makes no network call. SLACK_ENABLED is the interim transport
 switch: switched on, it needs the workspace id; switched off, the id is
 optional and only shape-checked when present. The id is opaque (Slack
-documents no format), so any non-blank value is accepted.
+documents no format), so any non-blank value is accepted. The validated id is
+exposed as the slice's tenant entry, which readers use instead of the field.
 """
 
 import pytest
 from pydantic import ValidationError
 
-from integrations.slack.settings import SlackSettings
+from integrations.slack.settings import SlackSettings, SlackTenant
 
 pytestmark = pytest.mark.unit
 
@@ -79,3 +80,33 @@ def test_transport_off_keeps_a_present_team_id(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("SLACK_TEAM_ID", "T0123ABCD")
 
     assert SlackSettings(_env_file=None).TEAM_ID == "T0123ABCD"  # type: ignore[call-arg]
+
+
+@pytest.mark.usefixtures("transport_off")
+def test_tenant_entry_carries_the_stripped_team_id_as_the_tenant_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The entry holds the workspace id without surrounding whitespace and names it as Slack's tenant."""
+    monkeypatch.setenv("SLACK_TEAM_ID", " T0123ABCD ")
+
+    tenant = SlackSettings(_env_file=None).tenant  # type: ignore[call-arg]
+
+    assert tenant is not None
+    assert tenant == SlackTenant(team_id="T0123ABCD")
+    assert tenant.tenant_id == "T0123ABCD"
+
+
+@pytest.mark.usefixtures("transport_off")
+@pytest.mark.parametrize("value", [None, ""])
+def test_tenant_entry_is_absent_without_a_team_id(monkeypatch: pytest.MonkeyPatch, value: str | None) -> None:
+    """An unset or empty id means Slack is not configured, so there is no entry."""
+    if value is not None:
+        monkeypatch.setenv("SLACK_TEAM_ID", value)
+
+    assert SlackSettings(_env_file=None).tenant is None  # type: ignore[call-arg]
+
+
+def test_tenant_entry_is_frozen() -> None:
+    """The entry is the expected tenant for the process lifetime, so it cannot be reassigned."""
+    tenant = SlackTenant(team_id="T0123ABCD")
+
+    with pytest.raises(ValidationError):
+        tenant.team_id = "T0OTHER"  # type: ignore[misc]
