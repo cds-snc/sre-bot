@@ -3,10 +3,10 @@ id: TASK-24.3
 title: >-
   Give Slack one settings home: delete the legacy Slack settings and
   SlackPlatformSettings
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-19 17:18'
-updated_date: '2026-10-20 13:44'
+updated_date: '2026-10-20 13:48'
 labels:
   - clients
   - phase-3
