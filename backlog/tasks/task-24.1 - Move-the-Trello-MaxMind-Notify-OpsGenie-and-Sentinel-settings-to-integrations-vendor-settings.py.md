@@ -3,11 +3,11 @@ id: TASK-24.1
 title: >-
   Move the Trello, MaxMind, Notify, OpsGenie and Sentinel settings to
   integrations/<vendor>/settings.py
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-10-19 17:18'
-updated_date: '2026-10-19 17:56'
+updated_date: '2026-10-20 21:43'
 labels:
   - clients
   - phase-3

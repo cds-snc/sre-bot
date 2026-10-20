@@ -1,10 +1,10 @@
 ---
 id: TASK-24
 title: One settings home per vendor; introduce the SecuritySettings slice
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-10-19 17:19'
+updated_date: '2026-10-20 21:43'
 labels:
   - clients
   - phase-3
@@ -41,15 +41,15 @@ Decomposed 2026-10-19 (size gate), one PR each:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 infrastructure/configuration/integrations/ no longer exists; each vendor has exactly one settings class
-- [ ] #2 A boot test shows a missing required credential fails with a message naming the env var
-- [ ] #3 CI/grep check: no env var read by two BaseSettings classes
-- [ ] #4 SecuritySettings owns issuers/JWKS, CORS and dev-bypass config and is consumed by the security stack
+- [x] #1 infrastructure/configuration/integrations/ no longer exists; each vendor has exactly one settings class
+- [x] #2 A boot test shows a missing required credential fails with a message naming the env var
+- [x] #3 CI/grep check: no env var read by two BaseSettings classes
+- [x] #4 SecuritySettings owns issuers/JWKS, CORS and dev-bypass config and is consumed by the security stack
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 PR references decisions/configuration.md
+- [x] #1 PR references decisions/configuration.md
 <!-- DOD:END -->
 
 ## Comments
