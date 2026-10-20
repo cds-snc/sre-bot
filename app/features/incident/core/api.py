@@ -2,12 +2,13 @@
 
 Subdomains of the incident feature import this module and nothing else from
 ``core``: the interfaces every subdomain works on, their domain types, the
-provider functions that resolve the default implementations, and
+functions that build or provide their implementations, and
 ``find_incident_for_conversation``, the command check every incident command
-applies first. ``StatusUpdateStore`` keeps each public status update as its own
-record under the incident id. ``IncidentStore`` reads the incident record;
-entry points build it per service scope with ``build_incident_store`` and pass
-it, with the conversation reference they build, to the subdomain services.
+applies first. ``IncidentStore`` reads the incident record and
+``StatusUpdateStore`` keeps each public status update as its own record under
+the incident id; entry points build both per service scope with
+``build_incident_store`` and ``build_status_update_store`` and pass them, with
+the conversation reference they build, to the subdomain services.
 """
 
 from collections.abc import Sequence
@@ -22,7 +23,6 @@ from features.incident.common.settings import IncidentCoreSettings
 from features.incident.common.vocabulary import StatusUpdateStage
 from features.incident.core.adapters.i18n import translate
 from features.incident.core.adapters.slack import build_incident_transcript_reader
-from features.incident.core.adapters.status_updates import build_status_update_store
 from features.incident.core.domain import (
     ConversationReference,
     ExternalCaseReference,
@@ -39,7 +39,14 @@ from features.incident.core.domain import (
     TranscriptMessage,
     VideoCallReference,
 )
-from features.incident.core.store import IncidentStore, RecordIncidentStore, incidents_table
+from features.incident.core.store import (
+    IncidentStore,
+    RecordIncidentStore,
+    RecordStatusUpdateStore,
+    StatusUpdateStore,
+    incidents_table,
+    status_updates_table,
+)
 
 __all__ = [
     "ConversationReference",
@@ -61,9 +68,9 @@ __all__ = [
     "TranscriptMessage",
     "VideoCallReference",
     "build_incident_store",
+    "build_status_update_store",
     "find_incident_for_conversation",
     "get_incident_transcript_reader",
-    "get_status_update_store",
     "translate",
 ]
 
@@ -112,47 +119,6 @@ class IncidentTranscriptReader(Protocol):
         ...
 
 
-@runtime_checkable
-class StatusUpdateStore(Protocol):
-    """Interface keeping an incident's public status updates, each its own record.
-
-    Records live under the incident id, never on the incident item. Every
-    write is a single conditional write, never a read-modify-write. A store
-    failure is a classified error result, never an exception; a conflict is
-    PERMANENT_ERROR with ``STATUS_UPDATE_CONFLICT``.
-    """
-
-    def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
-        """Store a new update at its sequence.
-
-        The caller numbers it: the latest update's sequence plus one, or 1.
-        A different record already at that sequence is a conflict; the same
-        record (a replay) is success.
-        """
-        ...
-
-    def latest(self, incident_id: str) -> OperationResult[StatusUpdate | None]:
-        """Return the incident's highest-sequence update in one read; success with ``None`` when it has none."""
-        ...
-
-    def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
-        """Return every update of the incident, newest first."""
-        ...
-
-    def transition(self, update: StatusUpdate, *, expected_state: StatusUpdateState) -> OperationResult[StatusUpdate]:
-        """Replace the stored update with ``update`` while its stored state is ``expected_state``.
-
-        Used to approve (with the approver and edited text), to publish (with
-        the time and the person) and to unpublish (clearing both). A
-        stored state that moved on, or no stored record, is a conflict; the
-        same write repeated is success.
-
-        Raises:
-            ValueError: ``expected_state`` cannot move to ``update.state``.
-        """
-        ...
-
-
 def build_incident_store(records: RecordStore, systems: ConfiguredSystems, settings: IncidentCoreSettings) -> IncidentStore:
     """Return the ``IncidentStore`` over the resolved ``RecordStore``.
 
@@ -164,6 +130,16 @@ def build_incident_store(records: RecordStore, systems: ConfiguredSystems, setti
     reading existing incidents never depends on it.
     """
     return RecordIncidentStore(records, incidents_table(settings.INCIDENTS_TABLE), dict(systems.tenants()))
+
+
+def build_status_update_store(records: RecordStore, settings: IncidentCoreSettings) -> StatusUpdateStore:
+    """Return the ``StatusUpdateStore`` over the resolved ``RecordStore``.
+
+    A plain function, called by an entry point inside its service scope with the
+    records contract it resolved there. The table name comes from the incident
+    core settings.
+    """
+    return RecordStatusUpdateStore(records, status_updates_table(settings.STATUS_UPDATES_TABLE))
 
 
 @lru_cache(maxsize=1)
@@ -181,9 +157,3 @@ def find_incident_for_conversation(store: IncidentStore, conversation: Conversat
     store failure is a classified error result, never an exception.
     """
     return store.find_by_conversation(conversation)
-
-
-@lru_cache(maxsize=1)
-def get_status_update_store() -> StatusUpdateStore:
-    """Return the process-wide DynamoDB-backed ``StatusUpdateStore``."""
-    return build_status_update_store()

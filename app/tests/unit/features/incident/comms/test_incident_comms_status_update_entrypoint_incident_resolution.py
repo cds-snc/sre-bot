@@ -3,12 +3,12 @@
 The command handler runs over a fake service scope opener that resolves an
 InMemoryRecordStore holding incident items as stored, and Slack configured under
 one tenant, so the real store builder, the legacy item bridge and the by_channel
-read all take part. Status updates come from an InMemoryStatusUpdateStore
-patched in as the service's default store. Each test asserts the view text the
+read all take part. One pending draft is seeded in the same record store
+through the status-update store builder, so the handler's own store finds it.
+Each test asserts the view text the
 responder sees, and that the one scope the handler opened was closed.
 """
 
-from collections.abc import Iterator
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -18,13 +18,11 @@ import pytest
 from contracts.operations import OperationResult
 from contracts.records import RecordQuery, RecordTable
 from contracts.slack.models import CommandPayload
-from features.incident.comms import service
 from features.incident.comms.entrypoints.slack import handle_status_update_command
-from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
 from features.incident.core.store import incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
-from tests.factories.incident import SLACK_TENANT, incident_scopes
+from tests.factories.incident import SLACK_TENANT, incident_scopes, status_update_store_in
 from tests.factories.services import FakeServiceScopeOpener
 from tests.factories.slack import FakeSlackReply
 
@@ -65,11 +63,16 @@ def _end_state_item(incident_id: str, *, tenant: str) -> dict[str, Any]:
     }
 
 
-def _records(*items: dict[str, Any]) -> InMemoryRecordStore:
-    records = InMemoryRecordStore()
+def _seeded[R: InMemoryRecordStore](records: R, *items: dict[str, Any]) -> R:
+    """Put the incident ``items`` and one pending draft for the incident into ``records``."""
     for item in items:
         assert records.put(_TABLE, item).is_success
+    assert status_update_store_in(records).append(_pending()).is_success
     return records
+
+
+def _records(*items: dict[str, Any]) -> InMemoryRecordStore:
+    return _seeded(InMemoryRecordStore(), *items)
 
 
 class _FailingQueries(InMemoryRecordStore):
@@ -94,15 +97,6 @@ def _pending(incident_id: str = _INCIDENT) -> StatusUpdate:
         transcript_fingerprint="v1:sha256:abc",
         created_at=_NOW,
     )
-
-
-@pytest.fixture(autouse=True)
-def status_updates(monkeypatch: pytest.MonkeyPatch) -> Iterator[InMemoryStatusUpdateStore]:
-    """The status-update store the service falls back to, holding one pending draft for the incident."""
-    store = InMemoryStatusUpdateStore()
-    assert store.append(_pending()).is_success
-    monkeypatch.setattr(service, "get_status_update_store", lambda: store)
-    yield store
 
 
 def _run(scopes: FakeServiceScopeOpener) -> str:
@@ -153,7 +147,7 @@ def test_a_channel_with_two_incidents_is_ambiguous() -> None:
 
 
 def test_a_store_failure_shows_the_generic_error_and_closes_the_scope() -> None:
-    scopes = incident_scopes(_FailingQueries())
+    scopes = incident_scopes(_seeded(_FailingQueries()))
 
     text = _run(scopes)
 

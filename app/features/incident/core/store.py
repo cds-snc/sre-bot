@@ -1,4 +1,4 @@
-"""The incident store: the ``IncidentStore`` interface and its records-backed implementation.
+"""The incident core stores: their interfaces and records-backed implementations.
 
 ``RecordIncidentStore`` reads the incidents table through the records contract
 (``RecordStore``), never a cloud SDK. An item carrying ``record_version`` is
@@ -6,9 +6,12 @@ parsed as stored; an item without it is upgraded on read by the legacy item
 bridge (``adapters/legacy_items.py``) with the configured tenants, and is
 ``INCIDENT_RECORD_UNREADABLE`` when the bridge cannot read it.
 
-Entry points build it per service scope with ``build_incident_store`` in
-``core/api.py``, from the resolved ``RecordStore``, the configured systems and
-the incident core settings.
+``RecordStatusUpdateStore`` keeps each public status update as its own item in
+the status-updates table, in the layout of ``adapters/status_updates.py``.
+
+Entry points build both per service scope with ``build_incident_store`` and
+``build_status_update_store`` in ``core/api.py``, from the resolved
+``RecordStore`` and the incident core settings.
 """
 
 from collections.abc import Mapping, Sequence
@@ -19,7 +22,19 @@ import structlog
 from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
-from contracts.records import KeySchema, RecordIndex, RecordQuery, RecordStore, RecordTable
+from contracts.records import (
+    KeySchema,
+    RecordChange,
+    RecordIndex,
+    RecordQuery,
+    RecordStore,
+    RecordTable,
+    RemoveAttribute,
+    SetAttribute,
+    SortCondition,
+    SortOperator,
+    SortOrder,
+)
 from contracts.workplace import WorkplaceSystem
 from features.incident.core.adapters.incident_items import (
     incident_record_unreadable,
@@ -27,7 +42,18 @@ from features.incident.core.adapters.incident_items import (
     read_reference,
 )
 from features.incident.core.adapters.legacy_items import UnreadableLegacyItem, upgrade_legacy_item
-from features.incident.core.domain import ConversationReference, Incident
+from features.incident.core.adapters.status_updates import (
+    OPTIONAL_ATTRIBUTES,
+    PARTITION_ATTRIBUTE,
+    SORT_ATTRIBUTE,
+    SORT_KEY_PREFIX,
+    UnreadableStatusUpdateItemError,
+    parse_status_update_item,
+    partition_key,
+    status_update_item,
+    status_update_key,
+)
+from features.incident.core.domain import ConversationReference, Incident, StatusUpdate, StatusUpdateState
 
 logger = structlog.get_logger()
 
@@ -39,6 +65,9 @@ OPEN_BUCKET = "OPEN"
 # Far above any real count of incidents sharing one channel id; reaching it fails closed.
 _CONVERSATION_QUERY_BOUND = 10
 _STORE_FAILED_MESSAGE = "The incident store is unavailable."
+_STATUS_UPDATE_STORE_FAILED_MESSAGE = "The status update store is unavailable."
+_STATUS_UPDATE_CONFLICT_MESSAGE = "The status update was changed or taken by another writer."
+_STATUS_UPDATE_UNREADABLE_MESSAGE = "A stored status update could not be read."
 
 
 def incidents_table(name: str) -> RecordTable:
@@ -51,6 +80,11 @@ def incidents_table(name: str) -> RecordTable:
             "open": RecordIndex(physical_name="open", key=KeySchema(partition="open_bucket", sort="opened_at")),
         },
     )
+
+
+def status_updates_table(name: str) -> RecordTable:
+    """Return the status-updates table declaration; the keys match terraform/dynamodb.tf."""
+    return RecordTable(name=name, key=KeySchema(partition=PARTITION_ATTRIBUTE, sort=SORT_ATTRIBUTE))
 
 
 @runtime_checkable
@@ -250,3 +284,154 @@ def ambiguous_conversation[T](conversation: ConversationReference, *, match_coun
         message="More than one incident is recorded for this conversation.",
         error_code=ErrorCode.AMBIGUOUS_INCIDENT_CONVERSATION,
     )
+
+
+@runtime_checkable
+class StatusUpdateStore(Protocol):
+    """Interface keeping an incident's public status updates, each its own record.
+
+    Records live under the incident id, never on the incident item. Every
+    write is a single conditional write, never a read-modify-write. A store
+    failure is a classified error result, never an exception; a conflict is
+    PERMANENT_ERROR with ``STATUS_UPDATE_CONFLICT``. A write whose condition no
+    longer holds is a conflict also when it repeats a write that already
+    landed; a store resolves only its own SDK retry. The caller that needs to
+    tell its own write from another writer's re-reads once.
+    """
+
+    def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
+        """Store a new update at its sequence.
+
+        The caller numbers it: the latest update's sequence plus one, or 1.
+        Any record already at that sequence is a conflict.
+        """
+        ...
+
+    def latest(self, incident_id: str) -> OperationResult[StatusUpdate | None]:
+        """Return the incident's highest-sequence update in one read; success with ``None`` when it has none."""
+        ...
+
+    def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
+        """Return every update of the incident, newest first."""
+        ...
+
+    def transition(self, update: StatusUpdate, *, expected_state: StatusUpdateState) -> OperationResult[StatusUpdate]:
+        """Replace the stored update with ``update`` while its stored state is ``expected_state``.
+
+        Used to approve (with the approver and edited text), to publish (with
+        the time and the person) and to unpublish (clearing both). A stored
+        state that moved on, or no stored record, is a conflict.
+
+        Raises:
+            ValueError: ``expected_state`` cannot move to ``update.state``.
+        """
+        ...
+
+
+class RecordStatusUpdateStore(StatusUpdateStore):
+    """Keep status updates in the status-updates table through the records contract."""
+
+    def __init__(self, records: RecordStore, table: RecordTable) -> None:
+        self._records = records
+        self._table = table
+
+    def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
+        """Create the update's item only where none exists."""
+        result = self._records.put_if_not_exists(self._table, status_update_item(update))
+        if not result.is_success:
+            return self._failed(result, operation="append", incident_id=update.incident_id)
+        if result.data is not True:
+            return self._conflict(update, operation="append")
+        return OperationResult.success(data=update)
+
+    def transition(self, update: StatusUpdate, *, expected_state: StatusUpdateState) -> OperationResult[StatusUpdate]:
+        """Rewrite the update's attributes in one update guarded on the stored state.
+
+        Raises:
+            ValueError: ``expected_state`` cannot move to ``update.state``.
+        """
+        if not expected_state.can_move_to(update.state):
+            raise ValueError(f"no status update transition from {expected_state} to {update.state}")
+        item = status_update_item(update)
+        key = status_update_key(update.incident_id, update.sequence)
+        changes: list[RecordChange] = [SetAttribute(name, value) for name, value in item.items() if name not in key]
+        changes += [RemoveAttribute(name) for name in OPTIONAL_ATTRIBUTES if name not in item]
+        result = self._records.update(self._table, key, changes, expected={"state": expected_state.value})
+        # A missing item is NOT_FOUND without an error code; a missing table carries the backend's code.
+        missing_item = result.status is OperationStatus.NOT_FOUND and result.error_code is None
+        if missing_item or (result.is_success and result.data is None):
+            return self._conflict(update, operation="transition")
+        if not result.is_success:
+            return self._failed(result, operation="transition", incident_id=update.incident_id)
+        return OperationResult.success(data=update)
+
+    def latest(self, incident_id: str) -> OperationResult[StatusUpdate | None]:
+        """Return the incident's highest-sequence update, or success with ``None`` when it has none."""
+        updates = self._query(incident_id, operation="latest", limit=1)
+        if updates.data is None:
+            return _refusal(updates)
+        return OperationResult.success(data=updates.data[0] if updates.data else None)
+
+    def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
+        """Return every update of the incident, newest first."""
+        return self._query(incident_id, operation="list_for_incident", limit=None)
+
+    def _query(self, incident_id: str, *, operation: str, limit: int | None) -> OperationResult[Sequence[StatusUpdate]]:
+        spec = RecordQuery(
+            partition=partition_key(incident_id),
+            sort=SortCondition(SortOperator.BEGINS_WITH, SORT_KEY_PREFIX),
+            limit=limit,
+            order=SortOrder.DESC,
+        )
+        result = self._records.query(self._table, spec)
+        if not result.is_success:
+            return self._failed(result, operation=operation, incident_id=incident_id)
+        try:
+            return OperationResult.success(data=tuple(parse_status_update_item(item) for item in result.data or []))
+        except UnreadableStatusUpdateItemError as exc:
+            logger.error(
+                "status_update_unreadable",
+                operation=operation,
+                table=self._table.name,
+                incident_id=incident_id,
+                reason=str(exc),
+            )
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR,
+                message=_STATUS_UPDATE_UNREADABLE_MESSAGE,
+                error_code=ErrorCode.STATUS_UPDATE_UNREADABLE,
+            )
+
+    def _conflict[T](self, update: StatusUpdate, *, operation: str) -> OperationResult[T]:
+        logger.info(
+            "status_update_conflict",
+            operation=operation,
+            table=self._table.name,
+            incident_id=update.incident_id,
+            sequence=update.sequence,
+        )
+        return OperationResult.error(
+            OperationStatus.PERMANENT_ERROR,
+            message=_STATUS_UPDATE_CONFLICT_MESSAGE,
+            error_code=ErrorCode.STATUS_UPDATE_CONFLICT,
+        )
+
+    def _failed[T](self, result: OperationResult[Any], *, operation: str, incident_id: str) -> OperationResult[T]:
+        status = result.status
+        if status is OperationStatus.NOT_FOUND:
+            # A missing table is a broken store, not an incident without updates.
+            status = OperationStatus.PERMANENT_ERROR
+        logger.warning(
+            "status_update_store_failed",
+            operation=operation,
+            table=self._table.name,
+            incident_id=incident_id,
+            status=status.value,
+            error_code=result.error_code,
+        )
+        return OperationResult.error(
+            status,
+            message=_STATUS_UPDATE_STORE_FAILED_MESSAGE,
+            error_code=result.error_code,
+            retry_after=result.retry_after,
+        )

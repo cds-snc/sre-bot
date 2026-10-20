@@ -230,7 +230,10 @@ class RecordStore(Protocol):
       missing item returns ``NOT_FOUND``, and an unmet guard returns
       ``success`` with ``data=None`` and nothing written;
     - an increment is not idempotent: an SDK retry after a lost response may
-      apply it twice, which is acceptable for counters.
+      apply it twice, which is acceptable for counters;
+    - a guarded update retried by the SDK after a lost response finds its own
+      write and reports the guard unmet; a caller that must tell its own write
+      from another writer's re-reads the item.
 
     ``put_if_not_exists`` returns ``data=True`` only to the call that created
     the item, including when the SDK retried that call after a lost response,

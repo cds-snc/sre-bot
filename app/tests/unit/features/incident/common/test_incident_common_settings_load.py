@@ -29,20 +29,25 @@ def test_table_names_default_to_the_provisioned_tables() -> None:
 
     assert settings.INCIDENTS_TABLE == "incidents"
     assert settings.TIMELINE_TABLE == "sre_bot_incident_timeline"
+    assert settings.STATUS_UPDATES_TABLE == "sre_bot_incident_status_updates"
 
 
 def test_table_names_read_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     """Each table name has its own INCIDENT_CORE__ key."""
     monkeypatch.setenv("INCIDENT_CORE__INCIDENTS_TABLE", "incidents_test")
     monkeypatch.setenv("INCIDENT_CORE__TIMELINE_TABLE", "timeline_test")
+    monkeypatch.setenv("INCIDENT_CORE__STATUS_UPDATES_TABLE", "status_updates_test")
 
     settings = IncidentCoreSettings()
 
     assert settings.INCIDENTS_TABLE == "incidents_test"
     assert settings.TIMELINE_TABLE == "timeline_test"
+    assert settings.STATUS_UPDATES_TABLE == "status_updates_test"
 
 
-@pytest.mark.parametrize("key", ["INCIDENT_CORE__INCIDENTS_TABLE", "INCIDENT_CORE__TIMELINE_TABLE"])
+@pytest.mark.parametrize(
+    "key", ["INCIDENT_CORE__INCIDENTS_TABLE", "INCIDENT_CORE__TIMELINE_TABLE", "INCIDENT_CORE__STATUS_UPDATES_TABLE"]
+)
 def test_a_blank_table_name_is_rejected_naming_the_key(monkeypatch: pytest.MonkeyPatch, key: str) -> None:
     """A blank name could never address a table, so the slice fails validation."""
     monkeypatch.setenv(key, "  ")

@@ -34,7 +34,13 @@ from features.incident.comms.entrypoints.slack_views import (
     build_review_field_errors,
     build_saving_view,
 )
-from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from features.incident.core.api import (
+    StatusUpdate,
+    StatusUpdateStage,
+    StatusUpdateState,
+    StatusUpdateStore,
+    StatusUpdateText,
+)
 from tests.factories.incident import incident_scopes
 from tests.factories.slack_bolt import TRIGGER_ID, USER_ID, Harness, harness_fixture
 
@@ -85,15 +91,20 @@ class ServiceFakes:
     review_calls: list[tuple[str, int]] = field(default_factory=list)
     approve_calls: list[tuple[str, int, str, StatusUpdateEdit]] = field(default_factory=list)
     publish_calls: list[tuple[StatusUpdate, ProfileLabels, ProfileLabels]] = field(default_factory=list)
+    stores: list[StatusUpdateStore] = field(default_factory=list)
 
-    async def get_draft_for_review(self, incident_id: str, sequence: int) -> OperationResult[StatusUpdate]:
+    async def get_draft_for_review(
+        self, incident_id: str, sequence: int, *, store: StatusUpdateStore
+    ) -> OperationResult[StatusUpdate]:
         self.review_calls.append((incident_id, sequence))
+        self.stores.append(store)
         return OperationResult.success(data=_DRAFT)
 
     async def approve_status_update(
-        self, incident_id: str, sequence: int, *, approver: str, edit: StatusUpdateEdit
+        self, incident_id: str, sequence: int, *, approver: str, edit: StatusUpdateEdit, store: StatusUpdateStore
     ) -> OperationResult[StatusUpdate]:
         self.approve_calls.append((incident_id, sequence, approver, edit))
+        self.stores.append(store)
         return OperationResult.success(data=_APPROVED)
 
     async def publish(
@@ -171,6 +182,7 @@ def test_review_action_updates_the_modal_once_in_place(harness: Harness, fakes: 
 
     assert response.status == 200
     assert fakes.review_calls == [(_INCIDENT, _SEQUENCE)]
+    assert len(fakes.stores) == 1 and isinstance(fakes.stores[0], StatusUpdateStore)
     ((method, payload),) = harness.api_calls
     assert method == "views.update"
     assert (payload["view_id"], payload["hash"]) == (_VIEW_ID, _VIEW_HASH)
@@ -206,6 +218,7 @@ def test_valid_submission_approves_as_the_submitting_user(harness: Harness, fake
     harness.dispatch(_submission())
 
     assert fakes.approve_calls == [(_INCIDENT, _SEQUENCE, USER_ID, _EDIT)]
+    assert len(fakes.stores) == 1 and isinstance(fakes.stores[0], StatusUpdateStore)
     assert [update for update, _, _ in fakes.publish_calls] == [_APPROVED]
 
 

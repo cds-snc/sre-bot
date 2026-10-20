@@ -43,6 +43,7 @@ from features.incident.core.api import (
     StatusUpdate,
     StatusUpdateStage,
     StatusUpdateState,
+    StatusUpdateStore,
     StatusUpdateText,
 )
 from tests.factories.incident import incident_scopes, slack_conversation
@@ -95,15 +96,20 @@ class ServiceFakes:
     approved_calls: list[tuple[str, int]] = field(default_factory=list)
     overview_calls: list[ConversationReference] = field(default_factory=list)
     publish_calls: list[tuple[StatusUpdate, ProfileLabels, ProfileLabels]] = field(default_factory=list)
+    stores: list[StatusUpdateStore] = field(default_factory=list)
 
-    async def get_approved_update(self, incident_id: str, sequence: int) -> OperationResult[StatusUpdate]:
+    async def get_approved_update(
+        self, incident_id: str, sequence: int, *, store: StatusUpdateStore
+    ) -> OperationResult[StatusUpdate]:
         self.approved_calls.append((incident_id, sequence))
+        self.stores.append(store)
         return OperationResult.success(data=_APPROVED)
 
     def get_status_update_overview(
-        self, incidents: IncidentStore, conversation: ConversationReference
+        self, incidents: IncidentStore, conversation: ConversationReference, *, store: StatusUpdateStore
     ) -> OperationResult[StatusUpdateOverview]:
         self.overview_calls.append(conversation)
+        self.stores.append(store)
         return OperationResult.success(data=_OVERVIEW)
 
     async def publish(
@@ -156,6 +162,7 @@ def test_open_reads_and_renders_the_named_update(harness: Harness, fakes: Servic
     harness.dispatch(_open_action())
 
     assert fakes.approved_calls == [(_INCIDENT, _SEQUENCE)]
+    assert len(fakes.stores) == 1 and isinstance(fakes.stores[0], StatusUpdateStore)
     assert fakes.publish_calls == [(_APPROVED, build_profile_labels("en-US"), build_profile_labels("fr-FR"))]
 
 
@@ -187,6 +194,7 @@ def test_back_reads_the_channel_overview(harness: Harness, fakes: ServiceFakes) 
     harness.dispatch(_back_action())
 
     assert fakes.overview_calls == [slack_conversation(_CHANNEL)]
+    assert len(fakes.stores) == 1 and isinstance(fakes.stores[0], StatusUpdateStore)
     assert fakes.publish_calls == []
 
 

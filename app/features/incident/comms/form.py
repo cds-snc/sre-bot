@@ -31,11 +31,11 @@ from features.incident.comms.service import (
     start_status_update_draft,
     text_generation_available,
 )
-from features.incident.core.api import ConversationReference, IncidentStore, StatusUpdate
+from features.incident.core.api import ConversationReference, IncidentStore, StatusUpdate, StatusUpdateStore
 
 
 def start_status_update_form(
-    incidents: IncidentStore, conversation: ConversationReference, *, author: str
+    incidents: IncidentStore, conversation: ConversationReference, *, author: str, store: StatusUpdateStore
 ) -> OperationResult[StatusUpdateFormState]:
     """Return the form for the pending draft, starting a hand-written draft when none is pending.
 
@@ -43,11 +43,12 @@ def start_status_update_form(
         incidents: Reads the incident records.
         conversation: The incident conversation the modal was opened from.
         author: Platform user id of the responder who pressed New update.
+        store: Holds the incident's status updates.
 
     Returns:
         Success with the draft and how it came to be; otherwise the start's classified error.
     """
-    started = start_status_update_draft(incidents, conversation, author=author)
+    started = start_status_update_draft(incidents, conversation, author=author, store=store)
     if not started.is_success or started.data is None:
         return _failure(started)
     return OperationResult.success(
@@ -55,14 +56,16 @@ def start_status_update_form(
     )
 
 
-async def open_status_update_form(incident_id: str, sequence: int) -> OperationResult[StatusUpdateFormState]:
-    """Return the form for the incident's pending draft at ``sequence``.
+async def open_status_update_form(
+    incident_id: str, sequence: int, *, store: StatusUpdateStore
+) -> OperationResult[StatusUpdateFormState]:
+    """Return the form for the incident's pending draft at ``sequence``, read from ``store``.
 
     Returns:
         Success with the draft; ``STATUS_UPDATE_CONFLICT`` when it is no longer
         the pending draft; otherwise the store's classified error.
     """
-    stored = await get_draft_for_review(incident_id, sequence)
+    stored = await get_draft_for_review(incident_id, sequence, store=store)
     if not stored.is_success or stored.data is None:
         return _failure(stored)
     return OperationResult.success(data=StatusUpdateFormState(update=stored.data, ai_available=text_generation_available()))
@@ -76,6 +79,7 @@ async def save_status_update_form(
     *,
     edit: StatusUpdateEdit | None,
     author: str,
+    store: StatusUpdateStore,
 ) -> OperationResult[StatusUpdateFormState]:
     """Store the typed values as the next draft and return the form to show.
 
@@ -86,6 +90,7 @@ async def save_status_update_form(
         sequence: The pending draft's sequence the responder is editing.
         edit: The typed stage and fields; ``None`` when the form had no readable stage.
         author: Platform user id of the responder who pressed Save draft.
+        store: Holds the incident's status updates.
 
     Returns:
         Success with the saved draft; success with ``kept`` set when nothing
@@ -95,7 +100,7 @@ async def save_status_update_form(
     if edit is None:
         failure_code: str | None = ErrorCode.STATUS_UPDATE_FIELDS_INVALID
     else:
-        saved = save_status_update_draft(incidents, conversation, sequence, edit=edit, author=author)
+        saved = save_status_update_draft(incidents, conversation, sequence, edit=edit, author=author, store=store)
         if saved.is_success and saved.data is not None:
             return OperationResult.success(
                 data=StatusUpdateFormState(update=saved.data, ai_available=text_generation_available())
@@ -103,7 +108,7 @@ async def save_status_update_form(
         if saved.error_code == ErrorCode.STATUS_UPDATE_CONFLICT:
             return _failure(saved)
         failure_code = saved.error_code
-    return await _kept(incident_id, sequence, edit, failure_code, ai_available=text_generation_available())
+    return await _kept(store, incident_id, sequence, edit, failure_code, ai_available=text_generation_available())
 
 
 async def fill_status_update_form(
@@ -117,6 +122,7 @@ async def fill_status_update_form(
     wording: NoNewInformationWording,
     instructions: str,
     security_confirmed: bool,
+    store: StatusUpdateStore,
     on_started: Callable[[], None] | None = None,
 ) -> OperationResult[StatusUpdateFormState]:
     """Fill the pending draft with AI from the typed values and return the form to show.
@@ -134,6 +140,7 @@ async def fill_status_update_form(
         wording: The no-new-information wording for a carry forward.
         instructions: The responder's instructions; blank means "draft from the conversation".
         security_confirmed: Whether the responder checked the security confirmation.
+        store: Holds the incident's status updates.
         on_started: Called just before a model call.
 
     Returns:
@@ -143,7 +150,7 @@ async def fill_status_update_form(
     """
     base: StatusUpdate | None = None
     if edit is None:
-        stored = await get_draft_for_review(incident_id, sequence)
+        stored = await get_draft_for_review(incident_id, sequence, store=store)
         if not stored.is_success or stored.data is None:
             return _failure(stored)
         base = stored.data
@@ -159,6 +166,7 @@ async def fill_status_update_form(
         wording=wording,
         instructions=instructions,
         security_confirmed=security_confirmed,
+        store=store,
         on_started=on_started,
     )
     if filled.is_success and filled.data is not None:
@@ -168,10 +176,11 @@ async def fill_status_update_form(
     if filled.error_code == ErrorCode.STATUS_UPDATE_CONFLICT:
         return _failure(filled)
     ai_available = filled.error_code != ErrorCode.TEXT_GENERATION_UNAVAILABLE
-    return await _kept(incident_id, sequence, edit, filled.error_code, ai_available=ai_available, stored=base)
+    return await _kept(store, incident_id, sequence, edit, filled.error_code, ai_available=ai_available, stored=base)
 
 
 async def _kept(
+    store: StatusUpdateStore,
     incident_id: str,
     sequence: int,
     edit: StatusUpdateEdit | None,
@@ -182,7 +191,7 @@ async def _kept(
 ) -> OperationResult[StatusUpdateFormState]:
     """The stored draft overlaid with the typed values, read unless already in hand."""
     if stored is None:
-        read = await get_draft_for_review(incident_id, sequence)
+        read = await get_draft_for_review(incident_id, sequence, store=store)
         if not read.is_success or read.data is None:
             return _failure(read)
         stored = read.data

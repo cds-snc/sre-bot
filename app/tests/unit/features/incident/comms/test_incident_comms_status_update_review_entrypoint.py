@@ -29,8 +29,6 @@ from features.incident.comms import approval, form, providers
 from features.incident.comms.comms_profile import ProfileLabels
 from features.incident.comms.domain import CopyReadyText, StatusUpdateEdit
 from features.incident.comms.entrypoints.slack import (
-    handle_open_action,
-    handle_published_action,
     handle_review_action,
     handle_review_submission,
     register,
@@ -51,7 +49,13 @@ from features.incident.comms.entrypoints.slack_views import (
     build_review_view,
     build_saving_view,
 )
-from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from features.incident.core.api import (
+    StatusUpdate,
+    StatusUpdateStage,
+    StatusUpdateState,
+    StatusUpdateStore,
+    StatusUpdateText,
+)
 from tests.factories.incident import incident_scopes
 from tests.factories.slack import FakeSlackRegistrar
 
@@ -118,17 +122,22 @@ class _Services:
     publish_result: OperationResult[CopyReadyText] = field(default_factory=lambda: OperationResult.success(data=_COPY))
     review_calls: list[tuple[str, int]] = field(default_factory=list)
     approve_calls: list[tuple[str, int, str, StatusUpdateEdit]] = field(default_factory=list)
+    stores: list[StatusUpdateStore] = field(default_factory=list)
     publish_calls: list[tuple[StatusUpdate, ProfileLabels, ProfileLabels]] = field(default_factory=list)
 
-    async def get_draft_for_review(self, incident_id: str, sequence: int) -> OperationResult[StatusUpdate]:
+    async def get_draft_for_review(
+        self, incident_id: str, sequence: int, *, store: StatusUpdateStore
+    ) -> OperationResult[StatusUpdate]:
         self.events.append("get_draft_for_review")
+        self.stores.append(store)
         self.review_calls.append((incident_id, sequence))
         return self.review_result
 
     async def approve_status_update(
-        self, incident_id: str, sequence: int, *, approver: str, edit: StatusUpdateEdit
+        self, incident_id: str, sequence: int, *, approver: str, edit: StatusUpdateEdit, store: StatusUpdateStore
     ) -> OperationResult[StatusUpdate]:
         self.events.append("approve_status_update")
+        self.stores.append(store)
         self.approve_calls.append((incident_id, sequence, approver, edit))
         return self.approve_result
 
@@ -244,8 +253,9 @@ class TestRegister:
     def test_registers_review_action_and_approval_submission(self) -> None:
         """Registration adds the Review block action and the approval view submission beside the Draft listeners.
 
-        New update, Save, Draft with AI and Back are scope-binding wrappers, so
-        only their ids are asserted; the other listeners are the handlers themselves.
+        Every listener is a scope-binding wrapper around its handler, so the ids
+        are asserted and the Review listener is called to show it reaches the
+        handler.
         """
         registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
 
@@ -260,10 +270,19 @@ class TestRegister:
             GENERATE_ACTION_ID,
             SAVE_ACTION_ID,
         }
-        assert registrar.block_actions[REVIEW_ACTION_ID] is handle_review_action
-        assert registrar.block_actions[OPEN_ACTION_ID] is handle_open_action
-        assert registrar.block_actions[PUBLISHED_ACTION_ID] is handle_published_action
-        assert registrar.view_submissions == {REVIEW_CALLBACK_ID: handle_review_submission}
+        assert list(registrar.view_submissions) == [REVIEW_CALLBACK_ID]
+
+    def test_registered_review_listener_reaches_the_review_handler(
+        self, ack: MagicMock, client: MagicMock, services: _Services
+    ) -> None:
+        """The Review listener, called with Bolt's keyword arguments, runs the Review handler over the registrar's scopes."""
+        registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
+        register(registrar)
+
+        registrar.block_actions[REVIEW_ACTION_ID](ack=ack, body=_review_action_body(), client=client)
+
+        assert services.review_calls == [(_INCIDENT, _SEQUENCE)]
+        assert isinstance(services.stores[0], StatusUpdateStore)
 
 
 class TestHandleReviewAction:
@@ -271,22 +290,23 @@ class TestHandleReviewAction:
         self, ack: MagicMock, client: MagicMock, services: _Services, events: list[str]
     ) -> None:
         """Ack comes first, then the draft read, then the one view update."""
-        handle_review_action(ack, _review_action_body(), client)
+        handle_review_action(ack, _review_action_body(), client, incident_scopes())
 
         assert events == ["ack", "get_draft_for_review", "views_update"]
         ack.assert_called_once_with()
 
     def test_reads_the_draft_named_by_the_button(self, ack: MagicMock, client: MagicMock, services: _Services) -> None:
         """The service is asked for the incident id and sequence decoded from the button value."""
-        handle_review_action(ack, _review_action_body(), client)
+        handle_review_action(ack, _review_action_body(), client, incident_scopes())
 
         assert services.review_calls == [(_INCIDENT, _SEQUENCE)]
+        assert len(services.stores) == 1 and isinstance(services.stores[0], StatusUpdateStore)
 
     def test_replaces_the_modal_in_place_with_view_id_and_hash(
         self, ack: MagicMock, client: MagicMock, services: _Services
     ) -> None:
         """The modal is updated by the pressed view's id and hash, so a concurrent change is not overwritten."""
-        handle_review_action(ack, _review_action_body(), client)
+        handle_review_action(ack, _review_action_body(), client, incident_scopes())
 
         (update,) = client.views_update.call_args_list
         assert update.kwargs["view_id"] == _VIEW_ID
@@ -297,7 +317,7 @@ class TestHandleReviewAction:
         self, ack: MagicMock, client: MagicMock, services: _Services, locale: str
     ) -> None:
         """The update is the review view of the returned draft in the invoker's locale."""
-        handle_review_action(ack, _review_action_body(locale), client)
+        handle_review_action(ack, _review_action_body(locale), client, incident_scopes())
 
         view = _sent_view(client)
         assert view == build_review_view(_DRAFT, locale, view["private_metadata"])
@@ -308,7 +328,7 @@ class TestHandleReviewAction:
         """With the generator unconfigured the form is built without Draft with AI; Save draft and Approve remain."""
         monkeypatch.setattr(form, "text_generation_available", lambda: False)
 
-        handle_review_action(ack, _review_action_body(), client)
+        handle_review_action(ack, _review_action_body(), client, incident_scopes())
 
         view = _sent_view(client)
         assert view == build_review_view(_DRAFT, "en-US", view["private_metadata"], with_ai=False)
@@ -317,7 +337,7 @@ class TestHandleReviewAction:
         self, ack: MagicMock, client: MagicMock, services: _Services
     ) -> None:
         """The review view's metadata carries the channel, locale, incident id and sequence for the submission."""
-        handle_review_action(ack, _review_action_body(), client)
+        handle_review_action(ack, _review_action_body(), client, incident_scopes())
 
         assert json.loads(_sent_view(client)["private_metadata"]) == {
             "channel_id": _CHANNEL,
@@ -340,7 +360,7 @@ class TestHandleReviewAction:
         """A conflict or store error replaces the modal with the review error view for that code."""
         services.review_result = result
 
-        handle_review_action(ack, _review_action_body(), client)
+        handle_review_action(ack, _review_action_body(), client, incident_scopes())
 
         view = _sent_view(client)
         assert view == build_review_error_view(result.error_code, "en-US", view["private_metadata"])
@@ -352,14 +372,14 @@ class TestHandleReviewAction:
         client.views_update.side_effect = RuntimeError("view_not_found")
 
         with capture_logs() as logs:
-            handle_review_action(ack, _review_action_body(), client)
+            handle_review_action(ack, _review_action_body(), client, incident_scopes())
 
         failures = [entry for entry in logs if entry["event"] == "incident_status_update_review_update_failed"]
         assert [entry["log_level"] for entry in failures] == ["warning"]
 
     def test_only_updates_the_view(self, ack: MagicMock, client: MagicMock, services: _Services) -> None:
         """The only Slack call is views_update: nothing is posted to a channel."""
-        handle_review_action(ack, _review_action_body(), client)
+        handle_review_action(ack, _review_action_body(), client, incident_scopes())
 
         assert _client_method_names(client) == ["views_update"]
 
@@ -367,7 +387,7 @@ class TestHandleReviewAction:
 class TestHandleReviewSubmissionRejected:
     def test_unparseable_stage_acks_a_stage_error(self, ack: MagicMock, client: MagicMock, services: _Services) -> None:
         """An unknown stage acks with an error on the stage block, and nothing else happens."""
-        handle_review_submission(ack, _submission_body(stage_value="not-a-stage"), client)
+        handle_review_submission(ack, _submission_body(stage_value="not-a-stage"), client, incident_scopes())
 
         assert ack.call_args_list == [call(response_action="errors", errors=build_review_field_errors(("stage",), "en-US"))]
         assert services.approve_calls == []
@@ -379,7 +399,7 @@ class TestHandleReviewSubmissionRejected:
         self, ack: MagicMock, client: MagicMock, services: _Services, block_id: str, value: str | None
     ) -> None:
         """A blank field acks with an error keyed by its block id only."""
-        handle_review_submission(ack, _submission_body(values={block_id: value}), client)
+        handle_review_submission(ack, _submission_body(values={block_id: value}), client, incident_scopes())
 
         assert ack.call_args_list == [call(response_action="errors", errors=build_review_field_errors((block_id,), "en-US"))]
 
@@ -388,7 +408,7 @@ class TestHandleReviewSubmissionRejected:
         self, ack: MagicMock, client: MagicMock, services: _Services, block_id: str
     ) -> None:
         """A blank field is rejected before approval and before any Slack call."""
-        handle_review_submission(ack, _submission_body(values={block_id: " "}), client)
+        handle_review_submission(ack, _submission_body(values={block_id: " "}), client, incident_scopes())
 
         assert services.approve_calls == []
         assert services.publish_calls == []
@@ -396,7 +416,7 @@ class TestHandleReviewSubmissionRejected:
 
     def test_every_blank_field_is_reported_at_once(self, ack: MagicMock, client: MagicMock, services: _Services) -> None:
         """Several blank fields are reported together in validation order."""
-        handle_review_submission(ack, _submission_body(values={"fr.workaround": "", "en.impact": ""}), client)
+        handle_review_submission(ack, _submission_body(values={"fr.workaround": "", "en.impact": ""}), client, incident_scopes())
 
         assert ack.call_args_list == [
             call(response_action="errors", errors=build_review_field_errors(("en.impact", "fr.workaround"), "en-US"))
@@ -404,7 +424,7 @@ class TestHandleReviewSubmissionRejected:
 
     def test_field_errors_use_the_metadata_locale(self, ack: MagicMock, client: MagicMock, services: _Services) -> None:
         """Field error messages are in the locale recorded in the review view's metadata."""
-        handle_review_submission(ack, _submission_body(values={"en.impact": ""}, locale="fr-FR"), client)
+        handle_review_submission(ack, _submission_body(values={"en.impact": ""}, locale="fr-FR"), client, incident_scopes())
 
         assert ack.call_args_list == [call(response_action="errors", errors=build_review_field_errors(("en.impact",), "fr-FR"))]
 
@@ -412,21 +432,22 @@ class TestHandleReviewSubmissionRejected:
 class TestHandleReviewSubmissionApproved:
     def test_acks_with_the_saving_view(self, ack: MagicMock, client: MagicMock, services: _Services) -> None:
         """A valid submission acks once, replacing the form with the saving view."""
-        handle_review_submission(ack, _submission_body(), client)
+        handle_review_submission(ack, _submission_body(), client, incident_scopes())
 
         assert ack.call_args_list == [call(response_action="update", view=build_saving_view("en-US", _review_metadata()))]
 
     def test_approves_with_the_approver_and_parsed_edit(self, ack: MagicMock, client: MagicMock, services: _Services) -> None:
         """Approval gets the draft named in the metadata, the submitting user and the submitted edit."""
-        handle_review_submission(ack, _submission_body(), client)
+        handle_review_submission(ack, _submission_body(), client, incident_scopes())
 
         assert services.approve_calls == [(_INCIDENT, _SEQUENCE, _USER, _EDIT)]
+        assert len(services.stores) == 1 and isinstance(services.stores[0], StatusUpdateStore)
 
     def test_publishes_the_approved_record_with_both_label_sets(
         self, ack: MagicMock, client: MagicMock, services: _Services
     ) -> None:
         """The approved record, not the draft, is rendered with the English and French profile labels."""
-        handle_review_submission(ack, _submission_body(), client)
+        handle_review_submission(ack, _submission_body(), client, incident_scopes())
 
         assert services.publish_calls == [(_APPROVED, build_profile_labels("en-US"), build_profile_labels("fr-FR"))]
         assert services.publish_calls[0][0] is services.approve_result.data
@@ -435,7 +456,7 @@ class TestHandleReviewSubmissionApproved:
         self, ack: MagicMock, client: MagicMock, services: _Services
     ) -> None:
         """The submitted view is updated by id alone to the copy-ready view of the published text."""
-        handle_review_submission(ack, _submission_body(), client)
+        handle_review_submission(ack, _submission_body(), client, incident_scopes())
 
         assert client.views_update.call_args_list == [
             call(view_id=_REVIEW_VIEW_ID, view=build_copy_ready_view(_COPY, "en-US", _review_metadata()))
@@ -445,7 +466,7 @@ class TestHandleReviewSubmissionApproved:
         self, ack: MagicMock, client: MagicMock, services: _Services, events: list[str]
     ) -> None:
         """The ack is sent inside Slack's window, before the service runs; the view update comes last."""
-        handle_review_submission(ack, _submission_body(), client)
+        handle_review_submission(ack, _submission_body(), client, incident_scopes())
 
         assert events == ["ack", "approve_status_update", "publish", "views_update"]
 
@@ -465,7 +486,7 @@ class TestHandleReviewSubmissionApproved:
         """A refused approval is not published; the modal shows the review error view for its code."""
         services.approve_result = result
 
-        handle_review_submission(ack, _submission_body(), client)
+        handle_review_submission(ack, _submission_body(), client, incident_scopes())
 
         assert services.publish_calls == []
         assert client.views_update.call_args_list == [
@@ -478,7 +499,7 @@ class TestHandleReviewSubmissionApproved:
             message="not approved", error_code=ErrorCode.STATUS_UPDATE_NOT_APPROVED
         )
 
-        handle_review_submission(ack, _submission_body(), client)
+        handle_review_submission(ack, _submission_body(), client, incident_scopes())
 
         assert client.views_update.call_args_list == [
             call(
@@ -492,13 +513,13 @@ class TestHandleReviewSubmissionApproved:
         client.views_update.side_effect = RuntimeError("view_not_found")
 
         with capture_logs() as logs:
-            handle_review_submission(ack, _submission_body(), client)
+            handle_review_submission(ack, _submission_body(), client, incident_scopes())
 
         failures = [entry for entry in logs if entry["event"] == "incident_status_update_approval_update_failed"]
         assert [entry["log_level"] for entry in failures] == ["warning"]
 
     def test_only_updates_the_view(self, ack: MagicMock, client: MagicMock, services: _Services) -> None:
         """The only Slack call is views_update: the approved text is never posted to a channel."""
-        handle_review_submission(ack, _submission_body(), client)
+        handle_review_submission(ack, _submission_body(), client, incident_scopes())
 
         assert _client_method_names(client) == ["views_update"]

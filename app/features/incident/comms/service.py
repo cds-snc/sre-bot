@@ -74,7 +74,6 @@ from features.incident.core.api import (
     TranscriptMessage,
     find_incident_for_conversation,
     get_incident_transcript_reader,
-    get_status_update_store,
 )
 
 logger = structlog.get_logger()
@@ -88,14 +87,14 @@ def get_status_update_overview(
     incidents: IncidentStore,
     conversation: ConversationReference,
     *,
-    store: StatusUpdateStore | None = None,
+    store: StatusUpdateStore,
 ) -> OperationResult[StatusUpdateOverview]:
     """Return the incident's pending draft and approved updates, without drafting anything.
 
     Args:
         incidents: Reads the incident records.
         conversation: The incident conversation the command ran in.
-        store: Holds the incident's status updates; core's by default.
+        store: Holds the incident's status updates.
 
     Returns:
         Success with the latest record as ``pending`` when it is a draft, and
@@ -107,7 +106,6 @@ def get_status_update_overview(
     if not incident.is_success or incident.data is None:
         return _failure(incident)
 
-    store = store or get_status_update_store()
     listed = store.list_for_incident(incident.data.id)
     if not listed.is_success or listed.data is None:
         return _failure(listed)
@@ -121,14 +119,14 @@ def get_pending_status_update(
     incidents: IncidentStore,
     conversation: ConversationReference,
     *,
-    store: StatusUpdateStore | None = None,
+    store: StatusUpdateStore,
 ) -> OperationResult[StatusUpdate | None]:
     """Return the incident's pending draft, without drafting anything.
 
     Args:
         incidents: Reads the incident records.
         conversation: The incident conversation the command ran in.
-        store: Holds the incident's status updates; core's by default.
+        store: Holds the incident's status updates.
 
     Returns:
         Success with the latest record when it is a draft, or ``None`` when
@@ -147,7 +145,7 @@ def start_status_update_draft(
     *,
     author: str,
     reader: IncidentTranscriptReader | None = None,
-    store: StatusUpdateStore | None = None,
+    store: StatusUpdateStore,
     now: datetime | None = None,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
     """Return the pending draft, or start the next draft for the responder to write by hand.
@@ -160,7 +158,7 @@ def start_status_update_draft(
         conversation: The incident conversation the modal was opened from.
         author: Platform user id of the responder starting the update.
         reader: Reads the conversation; core's by default.
-        store: Holds the incident's status updates; core's by default.
+        store: Holds the incident's status updates.
         now: The current time; injected in tests.
 
     Returns:
@@ -182,7 +180,6 @@ def start_status_update_draft(
     incident_id = incident.data.id
     log = log.bind(incident_id=incident_id)
 
-    store = store or get_status_update_store()
     listed = store.list_for_incident(incident_id)
     if not listed.is_success or listed.data is None:
         return _failure(listed)
@@ -225,7 +222,7 @@ def save_status_update_draft(
     *,
     edit: StatusUpdateEdit,
     author: str,
-    store: StatusUpdateStore | None = None,
+    store: StatusUpdateStore,
     now: datetime | None = None,
 ) -> OperationResult[StatusUpdate]:
     """Store the responder's stage and fields as the next draft, written by hand.
@@ -240,7 +237,7 @@ def save_status_update_draft(
         sequence: The pending draft's sequence the responder is editing.
         edit: The responder's stage and both languages' fields.
         author: Platform user id of the saving responder.
-        store: Holds the incident's status updates; core's by default.
+        store: Holds the incident's status updates.
         now: The current time; injected in tests.
 
     Returns:
@@ -260,7 +257,6 @@ def save_status_update_draft(
         return _failure(incident)
     log = log.bind(incident_id=incident.data.id)
 
-    store = store or get_status_update_store()
     listed = store.list_for_incident(incident.data.id)
     if not listed.is_success or listed.data is None:
         return _failure(listed)
@@ -312,7 +308,7 @@ async def generate_status_update_draft(
     security_confirmed: bool = False,
     on_started: Callable[[], None] | None = None,
     reader: IncidentTranscriptReader | None = None,
-    store: StatusUpdateStore | None = None,
+    store: StatusUpdateStore,
     generator: TextGenerator | None = None,
     now: datetime | None = None,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
@@ -336,7 +332,7 @@ async def generate_status_update_draft(
             incident to the model; the flag is then not read.
         on_started: Called once just before the model call.
         reader: Reads the conversation; core's by default.
-        store: Holds the incident's status updates; core's by default.
+        store: Holds the incident's status updates.
         generator: Fills the fields; the comms provider's by default.
         now: The current time; injected in tests.
 
@@ -367,7 +363,6 @@ async def generate_status_update_draft(
     incident_id = incident.data.id
     log = log.bind(incident_id=incident_id)
 
-    store = store or get_status_update_store()
     listed = store.list_for_incident(incident_id)
     if not listed.is_success or listed.data is None:
         return _failure(listed)

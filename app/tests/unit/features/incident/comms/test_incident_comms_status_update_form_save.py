@@ -26,12 +26,14 @@ from features.incident.comms.form import (
     save_status_update_form,
     start_status_update_form,
 )
+from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import (
     ConversationReference,
     IncidentStore,
     StatusUpdate,
     StatusUpdateStage,
     StatusUpdateState,
+    StatusUpdateStore,
     StatusUpdateText,
 )
 from tests.factories.incident import incident_on, incident_store_with, slack_conversation
@@ -41,6 +43,7 @@ pytestmark = pytest.mark.unit
 _NOW = datetime(2026, 10, 9, 15, 0, tzinfo=UTC)
 _CHANNEL = "C1"
 _CONVERSATION = slack_conversation(_CHANNEL)
+_STORE = InMemoryStatusUpdateStore()
 
 
 def _incidents() -> IncidentStore:
@@ -80,7 +83,7 @@ class _Calls:
         self.saved = saved
         self.read = read
         self.saves: list[dict[str, Any]] = []
-        self.reads: list[tuple[str, int]] = []
+        self.reads: list[tuple[str, int, StatusUpdateStore]] = []
 
     def save(
         self, incidents: IncidentStore, conversation: ConversationReference, sequence: int, **kwargs: Any
@@ -89,8 +92,8 @@ class _Calls:
         self.saves.append({"conversation": conversation, "sequence": sequence, **kwargs})
         return self.saved
 
-    async def get_draft(self, incident_id: str, sequence: int) -> OperationResult[StatusUpdate]:
-        self.reads.append((incident_id, sequence))
+    async def get_draft(self, incident_id: str, sequence: int, *, store: StatusUpdateStore) -> OperationResult[StatusUpdate]:
+        self.reads.append((incident_id, sequence, store))
         return self.read
 
 
@@ -105,11 +108,11 @@ async def test_a_save_returns_the_saved_draft_without_reading_the_stored_one(mon
     calls = _Calls(saved=OperationResult.success(data=_SAVED), read=OperationResult.success(data=_STORED))
     _install(monkeypatch, calls, ai=False)
 
-    result = await save_status_update_form(_incidents(), _CONVERSATION, "inc-1", 4, edit=_EDIT, author="U2")
+    result = await save_status_update_form(_incidents(), _CONVERSATION, "inc-1", 4, edit=_EDIT, author="U2", store=_STORE)
 
     assert result.is_success and result.data is not None
     assert (result.data.update, result.data.kept, result.data.ai_available) == (_SAVED, False, False)
-    assert calls.saves == [{"conversation": _CONVERSATION, "sequence": 4, "edit": _EDIT, "author": "U2"}]
+    assert calls.saves == [{"conversation": _CONVERSATION, "sequence": 4, "edit": _EDIT, "author": "U2", "store": _STORE}]
     assert calls.reads == []
 
 
@@ -119,7 +122,7 @@ async def test_a_stale_sequence_is_an_error(monkeypatch: pytest.MonkeyPatch) -> 
     calls = _Calls(saved=conflict, read=OperationResult.success(data=_STORED))
     _install(monkeypatch, calls)
 
-    result = await save_status_update_form(_incidents(), _CONVERSATION, "inc-1", 4, edit=_EDIT, author="U2")
+    result = await save_status_update_form(_incidents(), _CONVERSATION, "inc-1", 4, edit=_EDIT, author="U2", store=_STORE)
 
     assert not result.is_success
     assert result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT
@@ -132,12 +135,12 @@ async def test_a_failed_save_keeps_the_stored_draft_overlaid_with_the_typed_valu
     calls = _Calls(saved=failed, read=OperationResult.success(data=_STORED))
     _install(monkeypatch, calls)
 
-    result = await save_status_update_form(_incidents(), _CONVERSATION, "inc-1", 4, edit=_EDIT, author="U2")
+    result = await save_status_update_form(_incidents(), _CONVERSATION, "inc-1", 4, edit=_EDIT, author="U2", store=_STORE)
 
     assert result.is_success and result.data is not None
     assert result.data.update == replace(_STORED, stage=_EDIT.stage, en=_EDIT.en, fr=_EDIT.fr)
     assert (result.data.kept, result.data.failure_code) == (True, ErrorCode.RATE_LIMITED)
-    assert calls.reads == [("inc-1", 4)]
+    assert calls.reads == [("inc-1", 4, _STORE)]
 
 
 async def test_a_form_without_a_stage_keeps_the_stored_draft_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -145,7 +148,7 @@ async def test_a_form_without_a_stage_keeps_the_stored_draft_unchanged(monkeypat
     calls = _Calls(saved=OperationResult.success(data=_SAVED), read=OperationResult.success(data=_STORED))
     _install(monkeypatch, calls)
 
-    result = await save_status_update_form(_incidents(), _CONVERSATION, "inc-1", 4, edit=None, author="U2")
+    result = await save_status_update_form(_incidents(), _CONVERSATION, "inc-1", 4, edit=None, author="U2", store=_STORE)
 
     assert result.is_success and result.data is not None
     assert (result.data.update, result.data.kept) == (_STORED, True)
@@ -161,7 +164,7 @@ async def test_an_unreadable_stored_draft_after_a_failed_save_is_an_error(monkey
     )
     _install(monkeypatch, _Calls(saved=failed, read=unreadable))
 
-    result = await save_status_update_form(_incidents(), _CONVERSATION, "inc-1", 4, edit=_EDIT, author="U2")
+    result = await save_status_update_form(_incidents(), _CONVERSATION, "inc-1", 4, edit=_EDIT, author="U2", store=_STORE)
 
     assert not result.is_success
     assert result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT
@@ -173,7 +176,7 @@ async def test_open_returns_the_pending_draft_with_the_ai_flag(monkeypatch: pyte
         monkeypatch, _Calls(saved=OperationResult.success(data=_SAVED), read=OperationResult.success(data=_STORED)), ai=False
     )
 
-    result = await open_status_update_form("inc-1", 4)
+    result = await open_status_update_form("inc-1", 4, store=_STORE)
 
     assert result.is_success and result.data is not None
     assert (result.data.update, result.data.ai_available, result.data.kept) == (_STORED, False, False)
@@ -184,7 +187,7 @@ async def test_open_passes_on_a_read_error(monkeypatch: pytest.MonkeyPatch) -> N
     conflict: OperationResult[Any] = OperationResult.permanent_error(message="stale", error_code=ErrorCode.STATUS_UPDATE_CONFLICT)
     _install(monkeypatch, _Calls(saved=OperationResult.success(data=_SAVED), read=conflict))
 
-    result = await open_status_update_form("inc-1", 4)
+    result = await open_status_update_form("inc-1", 4, store=_STORE)
 
     assert result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT
 
@@ -195,7 +198,7 @@ def test_start_returns_the_started_draft_with_its_kind(monkeypatch: pytest.Monke
     monkeypatch.setattr(form, "start_status_update_draft", lambda *_, **__: OperationResult.success(data=outcome))
     monkeypatch.setattr(form, "text_generation_available", lambda: True)
 
-    result = start_status_update_form(_incidents(), _CONVERSATION, author="U2")
+    result = start_status_update_form(_incidents(), _CONVERSATION, author="U2", store=_STORE)
 
     assert result.is_success and result.data is not None
     assert (result.data.update, result.data.kind, result.data.ai_available) == (_STORED, StatusUpdateOutcomeKind.MANUAL, True)
@@ -206,6 +209,6 @@ def test_start_passes_on_its_error(monkeypatch: pytest.MonkeyPatch) -> None:
     failed: OperationResult[Any] = OperationResult.permanent_error(message="no incident", error_code=ErrorCode.NOT_FOUND)
     monkeypatch.setattr(form, "start_status_update_draft", lambda *_, **__: failed)
 
-    result = start_status_update_form(_incidents(), _CONVERSATION, author="U2")
+    result = start_status_update_form(_incidents(), _CONVERSATION, author="U2", store=_STORE)
 
     assert (result.is_success, result.error_code) == (False, ErrorCode.NOT_FOUND)

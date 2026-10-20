@@ -33,6 +33,11 @@ class IncidentCoreSettings(BaseSettings):
         alias="INCIDENT_CORE__TIMELINE_TABLE",
         description="Records table holding the timeline entries of every incident.",
     )
+    STATUS_UPDATES_TABLE: str = Field(
+        default="sre_bot_incident_status_updates",
+        alias="INCIDENT_CORE__STATUS_UPDATES_TABLE",
+        description="Records table holding every incident's public status updates, each its own item.",
+    )
     NEW_INCIDENT_SYSTEM: WorkplaceSystem | None = Field(
         default=None,
         alias="INCIDENT_CORE__NEW_INCIDENT_SYSTEM",
@@ -42,7 +47,7 @@ class IncidentCoreSettings(BaseSettings):
         ),
     )
 
-    @field_validator("INCIDENTS_TABLE", "TIMELINE_TABLE")
+    @field_validator("INCIDENTS_TABLE", "TIMELINE_TABLE", "STATUS_UPDATES_TABLE")
     @classmethod
     def _require_table_name(cls, value: str) -> str:
         if not value.strip():

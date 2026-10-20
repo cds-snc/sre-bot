@@ -7,11 +7,11 @@ check. Payloads are form-encoded as Slack posts them, with the review form's
 state, and fed to ``App.dispatch`` with listeners run inline; the harness sends
 every payload as user ``USER_ID``. Only edges are stubbed: ``WebClient.api_call``
 records Web API calls, and the entrypoint's ``save_status_update_draft`` and
-``get_draft_for_review`` are the real services bound to a core
-``InMemoryStatusUpdateStore`` with a fixed ``now``. The plugin's service scopes
+``get_draft_for_review`` are the real services over the status-update store the
+handler builds, with a fixed ``now`` for the save. The plugin's service scopes
 resolve an ``InMemoryRecordStore`` holding the channel's incident as a legacy
-item, and Slack configured under one tenant, so the real incident store, legacy
-bridge and command check resolve the incident.
+item and the status updates, and Slack configured under one tenant, so the real
+incident store, legacy bridge and command check resolve the incident.
 Assertions read the exact Web API calls (only ``views.update``, never a channel
 post) and the records left in the store.
 """
@@ -28,7 +28,6 @@ import pytest
 import features.incident.comms as comms_module
 from contracts.operations.codes import ErrorCode
 from features.incident.comms import form
-from features.incident.comms.approval import get_draft_for_review
 from features.incident.comms.domain import StatusUpdateEdit
 from features.incident.comms.entrypoints.slack_views import (
     REVIEW_CALLBACK_ID,
@@ -37,17 +36,17 @@ from features.incident.comms.entrypoints.slack_views import (
     build_review_view,
 )
 from features.incident.comms.service import save_status_update_draft
-from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import (
     StatusUpdate,
     StatusUpdateOrigin,
     StatusUpdateStage,
     StatusUpdateState,
+    StatusUpdateStore,
     StatusUpdateText,
 )
 from features.incident.core.store import incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
-from tests.factories.incident import incident_scopes
+from tests.factories.incident import incident_scopes, status_update_store_in
 from tests.factories.slack_bolt import TRIGGER_ID, USER_ID, Harness, harness_fixture
 
 pytestmark = pytest.mark.integration
@@ -110,22 +109,22 @@ def _records() -> InMemoryRecordStore:
 
 
 @pytest.fixture
-def store(monkeypatch: pytest.MonkeyPatch) -> InMemoryStatusUpdateStore:
-    status_updates = InMemoryStatusUpdateStore()
+def records() -> InMemoryRecordStore:
+    return _records()
+
+
+@pytest.fixture
+def store(monkeypatch: pytest.MonkeyPatch, records: InMemoryRecordStore) -> StatusUpdateStore:
+    status_updates = status_update_store_in(records)
     status_updates.append(_PENDING)
-    monkeypatch.setattr(
-        form,
-        "save_status_update_draft",
-        partial(save_status_update_draft, store=status_updates, now=_NOW),
-    )
-    monkeypatch.setattr(form, "get_draft_for_review", partial(get_draft_for_review, store=status_updates))
+    monkeypatch.setattr(form, "save_status_update_draft", partial(save_status_update_draft, now=_NOW))
     monkeypatch.setattr(form, "text_generation_available", lambda: True)
     return status_updates
 
 
 @pytest.fixture
-def harness(monkeypatch: pytest.MonkeyPatch, store: InMemoryStatusUpdateStore) -> Iterator[Harness]:
-    yield from harness_fixture("incident.comms", lambda: incident_scopes(_records()))(monkeypatch, comms_module)
+def harness(monkeypatch: pytest.MonkeyPatch, records: InMemoryRecordStore, store: StatusUpdateStore) -> Iterator[Harness]:
+    yield from harness_fixture("incident.comms", lambda: incident_scopes(records))(monkeypatch, comms_module)
 
 
 def _save_action(sequence: int = _SEQUENCE) -> dict[str, Any]:
@@ -160,7 +159,7 @@ def test_save_is_acked(harness: Harness) -> None:
     assert response.status == 200
 
 
-def test_save_stores_the_typed_values_as_the_next_hand_written_draft(harness: Harness, store: InMemoryStatusUpdateStore) -> None:
+def test_save_stores_the_typed_values_as_the_next_hand_written_draft(harness: Harness, store: StatusUpdateStore) -> None:
     """The typed fields, a blank one included, are the next draft by the presser; the AI draft stays below it."""
     harness.dispatch(_save_action())
 
@@ -183,7 +182,7 @@ def test_save_shows_the_saved_form_and_posts_nothing(harness: Harness) -> None:
     ]
 
 
-def test_a_stale_form_shows_the_conflict_view_and_stores_nothing(harness: Harness, store: InMemoryStatusUpdateStore) -> None:
+def test_a_stale_form_shows_the_conflict_view_and_stores_nothing(harness: Harness, store: StatusUpdateStore) -> None:
     """A form opened on an older sequence cannot overwrite the newer draft; the modal shows the conflict view."""
     store.append(replace(_PENDING, sequence=_SEQUENCE + 1, author="U0OTHER"))
 
