@@ -6,18 +6,20 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-20 18:35'
-updated_date: '2026-10-20 20:20'
+updated_date: '2026-10-20 23:36'
 labels:
   - security
   - slack
   - phase-4
-dependencies: []
+dependencies:
+  - TASK-111.9
 references:
   - decisions/workplace-systems.md
   - decisions/transport-slack.md
   - decisions/configuration.md
   - 'https://docs.slack.dev/enterprise/developing-for-enterprise-orgs'
   - 'https://openid.net/specs/openid-connect-core-1_0.html'
+  - 'https://github.com/cds-snc/sre-bot/issues/1758'
 ordinal: 406000
 ---
 
@@ -51,3 +53,17 @@ OUT OF SCOPE. Re-stamping stored tenants after a Grid migration (a job planned w
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-20 (TASK-24.5): the Slack tenant entry is SlackTenant (integrations/slack/settings.py), read through SlackSettings.tenant, with team_id and a tenant_id read. Add the optional enterprise_id inside it, make team_id optional, and make tenant_id the enterprise id when set; server/configured_systems.py already reads tenant_id and does not change. Production (2026-10-20): team T2G2S06PM, enterprise_id null, is_enterprise_install false, no SLACK_ENTERPRISE_ID set.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-20 23:27
+---
+2026-10-20 (TASK-111 planning): SLACK_ENTERPRISE_ID lands as a flat env name here (interim, per decisions/configuration.md's tolerated list); TASK-111.9 moves it into [slack.tenant] in the configuration files. In the doc-11 queue this task now runs after TASK-111, so if 111.9 has merged, read it from the files directly.
+---
+
+created: 2026-10-20 23:27
+---
+2026-10-20 correction to the previous comment: the doc-11 queue runs all of TASK-111 first, so TASK-111.9 has merged when this task starts. Add the optional enterprise id as enterprise_id in [slack.tenant] in the configuration files (lower snake_case field, no flat SLACK_ENTERPRISE_ID env name); the inbound guard reads it from the Slack tenant entry.
+---
+<!-- COMMENTS:END -->

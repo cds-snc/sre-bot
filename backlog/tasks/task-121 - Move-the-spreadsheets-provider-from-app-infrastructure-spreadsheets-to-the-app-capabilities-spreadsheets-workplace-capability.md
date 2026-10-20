@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:00'
-updated_date: '2026-10-15 17:49'
+updated_date: '2026-10-20 23:28'
 labels:
   - plugin-architecture
   - capabilities
@@ -50,3 +50,12 @@ Behaviour-preserving. migration.md rule 6: the capability is not widened to repr
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #6 The adapter and the in_memory.py fake explicitly subclass the api.py Protocol; the SpreadsheetProvider line is removed from app/bin/baselines/fake_coverage.txt and make check-fake-coverage passes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-20 23:28
+---
+2026-10-20 (TASK-111 planning): TASK-111 moves this slice's values into the configuration files under a table whose name does not depend on the module path, so this move relocates the settings class only; the files and env names stay as they are.
+---
+<!-- COMMENTS:END -->

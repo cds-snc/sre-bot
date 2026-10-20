@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-20 18:36'
+updated_date: '2026-10-20 23:28'
 labels:
   - incident
   - features
@@ -58,6 +58,7 @@ RECORD SHAPE (human, 2026-10-15; decisions/incident-management.md Migration)
 - [ ] #7 create imports RECORD_VERSION and OPEN_BUCKET from core/store.py and sets record_version, open_bucket and opened_at in the same write; opened_at comes from the core/store.py formatter (fixed-width ISO-8601 UTC, isoformat(timespec="microseconds"), +00:00), tested for width and offset
 - [ ] #8 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #9 The new-incident policy (INCIDENT_CORE__NEW_INCIDENT_SYSTEM) resolves at startup against the configured-systems read (TASK-145.5.9): set, or unset with one configured system; when the named system is unconfigured, none is configured, or the policy is unset with several, the declare path is not registered and one startup event names the key, while every other incident command still works (tested)
+- [ ] #10 The incident handbook id move from the interim [google_resources] table into the incident response slice's table in the configuration files, and GoogleResourcesConfig stops exposing them
 <!-- AC:END -->
 
 ## Implementation Plan

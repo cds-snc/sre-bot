@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-15 17:51'
+updated_date: '2026-10-20 23:28'
 labels:
   - incident
   - features
@@ -43,6 +43,7 @@ THIS SLICE
 - [ ] #3 The meeting reference is stored on the record with system, tenant and event id
 - [ ] #4 The pinned schedule flow passes unchanged
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #6 The SRE calendar id move from the interim [google_resources] table into the incident postmortem slice's table in the configuration files, and GoogleResourcesConfig stops exposing them
 <!-- AC:END -->
 
 ## Implementation Plan

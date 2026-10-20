@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-07 19:56'
-updated_date: '2026-10-15 20:53'
+updated_date: '2026-10-20 23:28'
 labels:
   - migration
   - phase-5
@@ -57,6 +57,8 @@ Targets:
 - [ ] #4 features/talent/adapters/google_drive.py returns frozen domain dataclasses instead of {id, name} dicts (decisions/sdk-typing.md item 3)
 - [ ] #5 Talent-role records are stored through the records contract; no Google Sheet or Doc is read back as their record of truth (decisions/workplace-systems.md rule 5)
 - [ ] #6 No python-i18n import remains in the rebuilt surfaces, and their app/infrastructure/configuration/features/ slices are deleted
+- [ ] #7 Its settings slice follows decisions/configuration.md: lower snake_case fields and TOML keys, case_sensitive=False, extra=forbid, the <SLICE>__ env prefix with no per-field alias, and any remaining secret published as an SSM SecureString in the task definition (as TASK-111.4 does)
+- [ ] #8 The nine talent role folder and template ids move from the interim [google_resources] table into the talent slice's table in the configuration files, and GoogleResourcesConfig stops exposing them
 <!-- AC:END -->
 
 ## Definition of Done

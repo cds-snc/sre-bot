@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-10-20 21:13'
+updated_date: '2026-10-20 23:27'
 labels:
   - plugin-architecture
   - plugins
@@ -14,7 +14,9 @@ labels:
 milestone: m-7
 dependencies:
   - TASK-110
-  - TASK-111
+  - TASK-111.3
+  - TASK-111.9
+  - TASK-111.10
 references:
   - decisions/plugins.md
   - decisions/configuration.md
@@ -32,7 +34,7 @@ decisions/plugins.md and configuration.md: every entry point has an enablement k
 
 Today which features and jobs run is decided by environment variables and ENVIRONMENT checks in code (for example, scheduled tasks gated on ENVIRONMENT == "production"). This ticket moves plugin switches into the files and deletes the corresponding environment-variable switches and ENVIRONMENT checks for plugins. Runtime flags (OpenFeature with flagd) are out of scope and added only when a feature needs one.
 
-Vendor tenant entries (decisions/configuration.md, workplace-systems.md): a vendor client is available when its slice holds a tenant entry carrying the vendor's real tenant id, validated at boot with no network call. The entries move from environment variables into the configuration files here, and the Slack transport gets its enablement key in the files, replacing the interim SLACK_ENABLED (and SLACK_TEAM_ID as its tenant entry). There is no <VENDOR>_ENABLED key.
+Vendor tenant entries (decisions/configuration.md, workplace-systems.md): a vendor client is available when its slice holds a tenant entry carrying the vendor's real tenant id, validated at boot with no network call. TASK-111.9 and TASK-111.10 (2026-10-20) already move the Slack and Google tenant entries into the files. This ticket gives the Slack transport its enablement key in the files, replacing the interim SLACK_ENABLED, so the Slack tenant entry alone says whether the workspace is configured. There is no <VENDOR>_ENABLED key.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

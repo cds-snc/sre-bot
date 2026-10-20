@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-19 15:27'
+updated_date: '2026-10-20 23:28'
 labels:
   - incident
   - features
@@ -42,6 +42,7 @@ THIS SLICE
 - [ ] #3 IncidentTranscriptReader takes a ConversationReference; IncidentReportLinkLookup no longer exists
 - [ ] #4 No user-visible command, reply or log event changes; the legacy_surface suite and the scribe and comms tests pass
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #6 The incident folder id and the incident report template id move from the interim [google_resources] table into the incident core slice's table in the configuration files, and GoogleResourcesConfig stops exposing them
 <!-- AC:END -->
 
 ## Implementation Plan

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:00'
-updated_date: '2026-10-15 17:49'
+updated_date: '2026-10-20 23:28'
 labels:
   - plugin-architecture
   - security
@@ -45,3 +45,12 @@ No behaviour change: issuer, audience, algorithm pinning and the dev-bypass doub
 - [ ] #3 Existing auth tests (issuer, audience, pinned algorithms, dev-bypass double guard, CORS) pass unchanged in behaviour
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-20 23:28
+---
+2026-10-20 (TASK-111 planning): TASK-111 moves this slice's values into the configuration files under a table whose name does not depend on the module path, so this move relocates the settings class only; the files and env names stay as they are.
+---
+<!-- COMMENTS:END -->
