@@ -15,7 +15,7 @@ from infrastructure.drive import DRIVE_SCOPES
 from infrastructure.drive.factory import get_drive_provider
 from infrastructure.drive.models import DriveFile
 from integrations.google_workspace import client as google_workspace_client
-from integrations.google_workspace.resources import get_google_resources_config
+from integrations.google_workspace.settings import get_google_resources_config
 
 if TYPE_CHECKING:
     from googleapiclient._apis.drive.v3 import DriveResource, File  # pyright: ignore[reportMissingModuleSource]

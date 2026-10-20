@@ -4,7 +4,7 @@ title: Add the Google and Slack tenant entries
 status: To Do
 assignee: []
 created_date: '2026-10-19 17:19'
-updated_date: '2026-10-20 14:32'
+updated_date: '2026-10-20 15:06'
 labels:
   - clients
   - phase-3
@@ -29,7 +29,7 @@ Slice 5 of TASK-24 (decisions/configuration.md: vendor enablement is the presenc
 - Google: GOOGLE_WORKSPACE_CUSTOMER_ID loses its my_customer default; a tenant entry (SubModel | None) in integrations/google_workspace/settings.py is present when the service-account key file is set and carries the real customer id; a present entry missing a secret or the id fails boot naming the variable.
 - Slack: SLACK_TEAM_ID becomes the Slack tenant entry; SLACK_ENABLED stays the interim transport switch until TASK-112, and the transport on without a tenant entry fails boot naming the key.
 - server/configured_systems.py reads the tenant entries in its Google and Slack TenantSource rows.
-TASK-24.4 already deleted app/infrastructure/configuration/integrations/. GoogleResourcesConfig (integrations/google_workspace/resources.py) is feature data, not a vendor slice, and stays until TASK-111.
+TASK-24.4 already deleted app/infrastructure/configuration/integrations/. GoogleResourcesConfig (also in integrations/google_workspace/settings.py) is feature data, not a vendor slice, and stays until TASK-111.
 No <VENDOR>_ENABLED key. Env names unchanged (renames in TASK-111); TASK-112 moves the tenant entries into the configuration files.
 
 Merge order (human, 2026-10-19): only after TASK-145.5.5 (Stack K layer 9, the incident cutover) has deployed and been checked, so the cutover runs on the tenant configuration production already has. The cutover is the first real consumer of the configured-systems read. Never in the same deploy.

@@ -10,7 +10,7 @@ import pytest
 from pydantic import ValidationError
 from pydantic_settings import SettingsError
 
-from integrations.google_workspace.resources import GoogleResourcesConfig, get_google_resources_config
+from integrations.google_workspace.settings import GoogleResourcesConfig, get_google_resources_config
 
 pytestmark = pytest.mark.unit
 

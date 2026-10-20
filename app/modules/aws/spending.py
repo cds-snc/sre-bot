@@ -9,7 +9,7 @@ from pandas.core.frame import DataFrame
 
 from contracts.operations import OperationResult
 from infrastructure.spreadsheets import get_spreadsheet_provider
-from integrations.google_workspace.resources import get_google_resources_config
+from integrations.google_workspace.settings import get_google_resources_config
 from packages.aws_platform.adapters.cost_explorer import CostExplorerAdapter, build_cost_explorer_adapter
 from packages.aws_platform.adapters.organizations import OrganizationsAdapter, build_organizations_adapter
 

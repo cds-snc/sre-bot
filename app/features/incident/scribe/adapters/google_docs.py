@@ -28,7 +28,7 @@ from features.incident.scribe.domain import (
 )
 from infrastructure.drive import DRIVE_SCOPES
 from integrations.google_workspace import client as google_workspace_client
-from integrations.google_workspace.resources import get_google_resources_config
+from integrations.google_workspace.settings import get_google_resources_config
 
 if TYPE_CHECKING:
     from googleapiclient._apis.docs.v1 import (  # pyright: ignore[reportMissingModuleSource]

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-10-20 14:30'
+updated_date: '2026-10-20 15:06'
 labels:
   - plugin-architecture
   - configuration
@@ -35,7 +35,7 @@ Scope: the loader, the precedence rules, the file layout, the CI checks, and mov
 
 Feature and capability slices move their values into the files when their package moves (decisions/configuration.md: "Migration rides with the work"). Each package-move ticket carries that acceptance criterion, so no slice is left split between files and environment variables.
 
-GOOGLE_RESOURCES (from TASK-24.4 planning, 2026-10-20): GoogleResourcesConfig sits in integrations/google_workspace/resources.py as a tolerated interim home. It is feature data (inc, tal, aws, cal document IDs) and splits into the owning feature slices (incident, talent, aws, the calendar owner) as non-secret values in the files; the single GOOGLE_RESOURCES variable and resources.py are then deleted.
+GOOGLE_RESOURCES (from TASK-24.4 planning, 2026-10-20): GoogleResourcesConfig sits in integrations/google_workspace/settings.py, the Google vendor module, as a tolerated interim home. It is feature data (inc, tal, aws, cal document IDs) and splits into the owning feature slices (incident, talent, aws, the calendar owner) as non-secret values in the files; the single GOOGLE_RESOURCES variable and GoogleResourcesConfig are then deleted.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

@@ -15,7 +15,6 @@ modules/aws/lambdas.py
 modules/aws/ops_group_assignment.py
 modules/aws/spending.py
 modules/incident/db_operations.py
-modules/incident/incident_folder.py
 modules/provisioning/groups.py
 modules/provisioning/users.py
 modules/slack/webhooks.py
