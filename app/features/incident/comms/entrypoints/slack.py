@@ -109,11 +109,17 @@ from features.incident.comms.form import (
 )
 from features.incident.comms.history import read_published, set_published_and_render
 from features.incident.comms.service import get_status_update_overview
-from features.incident.core.api import ConversationReference, IncidentStore, build_incident_store
+from features.incident.core.api import (
+    ConversationReference,
+    IncidentStore,
+    StatusUpdateStore,
+    build_incident_store,
+    build_status_update_store,
+)
 
 logger = structlog.get_logger()
 
-type _ScopedListener = Callable[[Callable[[], Any], dict[str, Any], Any, ServiceScopeOpener], None]
+type _ScopedListener = Callable[[Callable[..., Any], dict[str, Any], Any, ServiceScopeOpener], None]
 
 
 def register(registrar: SlackCommandRegistrar) -> None:
@@ -150,35 +156,48 @@ def register(registrar: SlackCommandRegistrar) -> None:
     registrar.register_block_action(NEW_ACTION_ID, _with_scopes(handle_new_update_action, scopes))
     registrar.register_block_action(SAVE_ACTION_ID, _with_scopes(handle_save_action, scopes))
     registrar.register_block_action(GENERATE_ACTION_ID, _with_scopes(handle_generate_action, scopes))
-    registrar.register_block_action(REVIEW_ACTION_ID, handle_review_action)
-    registrar.register_block_action(OPEN_ACTION_ID, handle_open_action)
+    registrar.register_block_action(REVIEW_ACTION_ID, _with_scopes(handle_review_action, scopes))
+    registrar.register_block_action(OPEN_ACTION_ID, _with_scopes(handle_open_action, scopes))
     registrar.register_block_action(HISTORY_ACTION_ID, _with_scopes(handle_history_action, scopes))
-    registrar.register_block_action(PUBLISHED_ACTION_ID, handle_published_action)
-    registrar.register_view_submission(REVIEW_CALLBACK_ID, handle_review_submission)
+    registrar.register_block_action(PUBLISHED_ACTION_ID, _with_scopes(handle_published_action, scopes))
+    registrar.register_view_submission(REVIEW_CALLBACK_ID, _with_scopes(handle_review_submission, scopes))
 
 
 def _with_scopes(handler: _ScopedListener, scopes: ServiceScopeOpener) -> Callable[..., None]:
     """Return a Bolt listener, taking Bolt's ``ack``, ``body`` and ``client`` by name, that runs ``handler`` with ``scopes``."""
 
-    def listener(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+    def listener(ack: Callable[..., Any], body: dict[str, Any], client: Any) -> None:
         handler(ack, body, client, scopes)
 
     return listener
 
 
 @contextmanager
-def _incident_scope(scopes: ServiceScopeOpener, channel_id: str) -> Iterator[tuple[IncidentStore, ConversationReference]]:
-    """Open one service scope; yield the incident store built in it and the channel's conversation reference.
+def _incident_scope(
+    scopes: ServiceScopeOpener, channel_id: str
+) -> Iterator[tuple[IncidentStore, ConversationReference, StatusUpdateStore]]:
+    """Open one service scope; yield the stores built in it and the channel's conversation reference.
 
-    The caller makes its service call inside the block, so the resolved
-    services are released once it returns. The Slack tenant is present, since
-    ``register`` registers nothing without it.
+    Yields the incident store, the conversation reference and the
+    status-update store. The caller makes its service call inside the block,
+    so the resolved services are released once it returns. The Slack tenant is
+    present, since ``register`` registers nothing without it.
     """
     with scopes.create_scope() as services:
         systems = services.get(ConfiguredSystems)
-        incidents = build_incident_store(services.get(RecordStore), systems, get_incident_core_settings())
+        records = services.get(RecordStore)
+        settings = get_incident_core_settings()
+        incidents = build_incident_store(records, systems, settings)
         tenant = systems.tenants()[WorkplaceSystem.SLACK]
-        yield incidents, ConversationReference(system=WorkplaceSystem.SLACK, tenant=tenant, vendor_id=channel_id)
+        conversation = ConversationReference(system=WorkplaceSystem.SLACK, tenant=tenant, vendor_id=channel_id)
+        yield incidents, conversation, build_status_update_store(records, settings)
+
+
+@contextmanager
+def _status_update_scope(scopes: ServiceScopeOpener) -> Iterator[StatusUpdateStore]:
+    """Open one service scope; yield the status-update store built in it, for actions naming the incident by id."""
+    with scopes.create_scope() as services:
+        yield build_status_update_store(services.get(RecordStore), get_incident_core_settings())
 
 
 def handle_status_update_command(
@@ -199,7 +218,7 @@ def handle_status_update_command(
         payload: Command payload; ``platform_metadata["trigger_id"]`` opens the view.
         parsed_args: Unused; the command takes no arguments.
         reply: Interface used to open and update the modal.
-        scopes: Opens the service scope the incident store is built in.
+        scopes: Opens the service scope the stores are built in.
 
     Returns:
         An empty ephemeral response once the modal opened; a localized
@@ -222,8 +241,8 @@ def handle_status_update_command(
         return status_update_open_failed(locale)
     view_id = opened.data
 
-    with _incident_scope(scopes, payload.channel_id) as (incidents, conversation):
-        overview = get_status_update_overview(incidents, conversation)
+    with _incident_scope(scopes, payload.channel_id) as (incidents, conversation, updates):
+        overview = get_status_update_overview(incidents, conversation, store=updates)
     if overview.is_success and overview.data is not None:
         view = build_overview_view(overview.data, locale, private_metadata)
     else:
@@ -250,14 +269,14 @@ def handle_new_update_action(ack: Callable[[], Any], body: dict[str, Any], clien
         ack: Bolt ack callable, called first.
         body: Block-actions payload; carries the view id, hash and private metadata.
         client: Bolt Slack web client.
-        scopes: Opens the service scope the incident store is built in.
+        scopes: Opens the service scope the stores are built in.
     """
     ack()
     action = _parse_action(body)
     log = action.bind("incident_status_update_new")
 
-    with _incident_scope(scopes, action.channel_id) as (incidents, conversation):
-        result = start_status_update_form(incidents, conversation, author=action.user_id)
+    with _incident_scope(scopes, action.channel_id) as (incidents, conversation, updates):
+        result = start_status_update_form(incidents, conversation, author=action.user_id, store=updates)
     if result.is_success and result.data is not None:
         update = result.data.update
         metadata = action.review_metadata(update.incident_id, update.sequence)
@@ -367,20 +386,24 @@ def _profile_labels() -> _ProfileLabelArgs:
     return {"labels_en": build_profile_labels("en-US"), "labels_fr": build_profile_labels("fr-FR")}
 
 
-def handle_review_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+def handle_review_action(ack: Callable[[], Any], body: dict[str, Any], client: Any, scopes: ServiceScopeOpener) -> None:
     """Handle a press of the Review button: replace the modal in place with the review form.
 
     Args:
         ack: Bolt ack callable, called first.
         body: Block-actions payload; the button value names the incident and sequence.
         client: Bolt Slack web client.
+        scopes: Opens the service scope the status-update store is built in.
     """
     ack()
     action = _parse_action(body)
     log = action.bind("incident_status_update_review")
     incident_id, sequence = str(action.target.get("incident_id", "")), action.target.get("sequence")
 
-    result = asyncio.run(open_status_update_form(incident_id, sequence)) if isinstance(sequence, int) else None
+    result = None
+    if isinstance(sequence, int):
+        with _status_update_scope(scopes) as updates:
+            result = asyncio.run(open_status_update_form(incident_id, sequence, store=updates))
     if result is not None and result.is_success and result.data is not None:
         metadata = action.review_metadata(incident_id, sequence)
         next_view = build_review_view(result.data.update, action.locale, metadata, with_ai=result.data.ai_available)
@@ -391,13 +414,14 @@ def handle_review_action(ack: Callable[[], Any], body: dict[str, Any], client: A
     action.modal(client, log).update(next_view, failure_event="incident_status_update_review_update_failed")
 
 
-def handle_open_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+def handle_open_action(ack: Callable[[], Any], body: dict[str, Any], client: Any, scopes: ServiceScopeOpener) -> None:
     """Handle a press of Open on an approved update: replace the modal in place with its copy-ready text.
 
     Args:
         ack: Bolt ack callable, called first.
         body: Block-actions payload; the button value names the incident and sequence.
         client: Bolt Slack web client.
+        scopes: Opens the service scope the status-update store is built in.
     """
     ack()
     action = _parse_action(body)
@@ -406,7 +430,8 @@ def handle_open_action(ack: Callable[[], Any], body: dict[str, Any], client: Any
 
     result = None
     if isinstance(sequence, int):
-        result = asyncio.run(read_published(incident_id, sequence, **_profile_labels()))
+        with _status_update_scope(scopes) as updates:
+            result = asyncio.run(read_published(incident_id, sequence, store=updates, **_profile_labels()))
     if result is not None and result.is_success and result.data is not None:
         next_view = build_copy_ready_view(result.data.text, action.locale, action.list_metadata(), update=result.data.update)
     else:
@@ -423,7 +448,7 @@ def handle_history_action(ack: Callable[[], Any], body: dict[str, Any], client: 
         ack: Bolt ack callable, called first.
         body: Block-actions payload; the button value names the channel.
         client: Bolt Slack web client.
-        scopes: Opens the service scope the incident store is built in.
+        scopes: Opens the service scope the stores are built in.
     """
     ack()
     action = _parse_action(body)
@@ -431,8 +456,8 @@ def handle_history_action(ack: Callable[[], Any], body: dict[str, Any], client: 
     log = action.bind("incident_status_update_history", channel_id=channel_id)
     metadata = action.list_metadata(channel_id)
 
-    with _incident_scope(scopes, channel_id) as (incidents, conversation):
-        result = get_status_update_overview(incidents, conversation)
+    with _incident_scope(scopes, channel_id) as (incidents, conversation, updates):
+        result = get_status_update_overview(incidents, conversation, store=updates)
     if result.is_success and result.data is not None:
         next_view = build_overview_view(result.data, action.locale, metadata)
     else:
@@ -441,13 +466,14 @@ def handle_history_action(ack: Callable[[], Any], body: dict[str, Any], client: 
     action.modal(client, log).update(next_view, failure_event="incident_status_update_history_update_failed")
 
 
-def handle_published_action(ack: Callable[[], Any], body: dict[str, Any], client: Any) -> None:
+def handle_published_action(ack: Callable[[], Any], body: dict[str, Any], client: Any, scopes: ServiceScopeOpener) -> None:
     """Handle a press of the published toggle: set the target state, then show the record's copy-ready text.
 
     Args:
         ack: Bolt ack callable, called first.
         body: Block-actions payload; the button value names the incident, sequence and target state.
         client: Bolt Slack web client.
+        scopes: Opens the service scope the status-update store is built in.
     """
     ack()
     action = _parse_action(body)
@@ -457,9 +483,11 @@ def handle_published_action(ack: Callable[[], Any], body: dict[str, Any], client
 
     result = None
     if isinstance(sequence, int) and isinstance(published, bool):
-        result = asyncio.run(
-            set_published_and_render(incident_id, sequence, published=published, actor=action.user_id, **_profile_labels())
-        )
+        with _status_update_scope(scopes) as updates:
+            toggled = set_published_and_render(
+                incident_id, sequence, published=published, actor=action.user_id, store=updates, **_profile_labels()
+            )
+            result = asyncio.run(toggled)
     if result is not None and result.is_success and result.data is not None:
         next_view = build_copy_ready_view(result.data.text, action.locale, action.list_metadata(), update=result.data.update)
     else:
@@ -481,7 +509,7 @@ def handle_generate_action(ack: Callable[[], Any], body: dict[str, Any], client:
         ack: Bolt ack callable, called first.
         body: Block-actions payload; carries the view id, hash, review metadata and form state.
         client: Bolt Slack web client.
-        scopes: Opens the service scope the incident store is built in.
+        scopes: Opens the service scope the stores are built in.
     """
     ack()
     action = _parse_action(body)
@@ -492,7 +520,7 @@ def handle_generate_action(ack: Callable[[], Any], body: dict[str, Any], client:
 
     generating = build_generating_view(action.locale, current_metadata)
     show_generating = modal.updater(generating, failure_event="incident_status_update_generating_update_failed")
-    with _incident_scope(scopes, action.channel_id) as (incidents, conversation):
+    with _incident_scope(scopes, action.channel_id) as (incidents, conversation, updates):
         filled = fill_status_update_form(
             incidents,
             conversation,
@@ -503,6 +531,7 @@ def handle_generate_action(ack: Callable[[], Any], body: dict[str, Any], client:
             wording=build_no_new_information_wording(),
             instructions=instructions,
             security_confirmed=security_confirmed,
+            store=updates,
             on_started=show_generating,
         )
         result = asyncio.run(filled)
@@ -528,16 +557,16 @@ def handle_save_action(ack: Callable[[], Any], body: dict[str, Any], client: Any
         ack: Bolt ack callable, called first.
         body: Block-actions payload; carries the view id, hash, review metadata and form state.
         client: Bolt Slack web client.
-        scopes: Opens the service scope the incident store is built in.
+        scopes: Opens the service scope the stores are built in.
     """
     ack()
     action = _parse_action(body)
     log = action.bind("incident_status_update_save")
     edit = parse_review_submission(action.view)
 
-    with _incident_scope(scopes, action.channel_id) as (incidents, conversation):
+    with _incident_scope(scopes, action.channel_id) as (incidents, conversation, updates):
         saved = save_status_update_form(
-            incidents, conversation, action.incident_id, action.sequence, edit=edit, author=action.user_id
+            incidents, conversation, action.incident_id, action.sequence, edit=edit, author=action.user_id, store=updates
         )
         result = asyncio.run(saved)
     if result.is_success and result.data is not None:
@@ -552,7 +581,7 @@ def handle_save_action(ack: Callable[[], Any], body: dict[str, Any], client: Any
     action.modal(client, log).update(next_view, failure_event="incident_status_update_save_update_failed")
 
 
-def handle_review_submission(ack: Callable[..., Any], body: dict[str, Any], client: Any) -> None:
+def handle_review_submission(ack: Callable[..., Any], body: dict[str, Any], client: Any, scopes: ServiceScopeOpener) -> None:
     """Handle the review modal's submission: validate, approve, then show the copy-ready text.
 
     Blank fields and an unreadable stage ack with field errors and call nothing.
@@ -563,6 +592,7 @@ def handle_review_submission(ack: Callable[..., Any], body: dict[str, Any], clie
         ack: Bolt ack callable, called exactly once.
         body: View-submission payload; carries the view, its state and the submitting user.
         client: Bolt Slack web client.
+        scopes: Opens the service scope the status-update store is built in.
     """
     action = _parse_action(body)
     metadata = action.review_metadata(action.incident_id, action.metadata.get("sequence"))
@@ -574,9 +604,11 @@ def handle_review_submission(ack: Callable[..., Any], body: dict[str, Any], clie
     ack(response_action="update", view=build_saving_view(action.locale, metadata))
 
     log = action.bind("incident_status_update_approval")
-    result = asyncio.run(
-        approve_and_publish(action.incident_id, action.sequence, approver=action.user_id, edit=edit, **_profile_labels())
-    )
+    with _status_update_scope(scopes) as updates:
+        approved = approve_and_publish(
+            action.incident_id, action.sequence, approver=action.user_id, edit=edit, store=updates, **_profile_labels()
+        )
+        result = asyncio.run(approved)
     if result.is_success and result.data is not None:
         next_view = build_copy_ready_view(result.data, action.locale, metadata)
     else:

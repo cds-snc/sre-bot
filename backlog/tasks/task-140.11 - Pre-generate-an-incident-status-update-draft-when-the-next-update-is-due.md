@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-07 18:52'
-updated_date: '2026-10-15 17:50'
+updated_date: '2026-10-20 17:12'
 labels:
   - incident
 dependencies:
@@ -59,7 +59,7 @@ Technical notes from 2026-10-08 research (for the future plan, not decisions):
 - Scheduler: register_interval exists on the BackgroundJobRegistry contract (app/contracts/scheduler/registry.py; used by packages/oncall_sync) through the register_background_jobs hookimpl. The Tier-2 lease is still the private _tier2 wrapper in app/jobs/scheduled_tasks.py, so a package cannot declare it until TASK-64; until then a per-incident claim in the idempotency store (as packages/access/sync does) keeps one periodic draft per approved update across replicas. Scheduled jobs start only in production (server/lifespan.py), so the job cannot be observed in dev or staging.
 - Draft service: draft_status_update (scribe/status_update.py) is async and keyed by conversation id; the sync job body calls it with asyncio.run, a system author and security_confirmed=False (the service itself refuses yes/unknown flags). The state item should hold the channel id so the sweep avoids the legacy channel scan.
 - GSI vs scan: a sparse GSI over items with periodic drafting on is preferred. A filtered Scan bills every EN/FR update item read before filtering, against 2 provisioned RCU, and would throttle as history grows. The GSI needs its attribute, the index, an IAM "<table arn>/index/*" grant (terraform/iam.tf lists table ARNs only) and the .devcontainer/dynamodb-create.sh entry, applied before the code that queries it.
-- Closed status: incident core has no lifecycle-status read; add one beside read_security_flag on the legacy adapter (core/adapters/legacy_incidents.py), replaced by TASK-38.1. Legacy statuses: Open, In Progress, Ready to be Reviewed, Reviewed, Closed.
+- Closed status: the run reads the incident's status through IncidentStore (core/store.py, get), which TASK-145.5.5 put on the records contract; the status-updates table and its RecordTable (status_updates_table) are in core/store.py beside RecordStatusUpdateStore (TASK-145.5.6). Legacy statuses: Open, In Progress, Ready to be Reviewed, Reviewed, Closed.
 
 Over the single-PR size gate: decompose before implementation, for example (1) the Terraform sparse GSI and IAM index grant, (2) the per-incident state item and its store in incident core, with the incident status read, (3) the Start / Pause / Resume control, state display and periodic-draft label in the status-updates modal, (4) the sweep job. Single PRs off main, not a stack (behaviour changes; 3 and 4 are independent).
 <!-- SECTION:DESCRIPTION:END -->
