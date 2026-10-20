@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-14 23:08'
-updated_date: '2026-10-14 23:39'
+updated_date: '2026-10-20 17:27'
 labels:
   - terraform
   - infrastructure
@@ -41,7 +41,7 @@ Bottom layer of Stack K (handoff doc-13).
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 terraform/iam.tf has a separate statement allowing only dynamodb:Query on <table arn>/index/* for sre_bot_audit_trail, sre_bot_retry_records and incidents; the table statement and every other table's indexes are unchanged
-- [ ] #2 After the apply, aws iam simulate-principal-policy for the sre-bot-ecs-role returns allowed for dynamodb:Query on an audit trail index ARN and implicitDeny for an index ARN of a table not in the list; the output is recorded in the notes
+- [x] #2 After the apply, aws iam simulate-principal-policy for the sre-bot-ecs-role returns allowed for dynamodb:Query on an audit trail index ARN and implicitDeny for an index ARN of a table not in the list; the output is recorded in the notes
 - [x] #3 terraform fmt -check passes and tflint reports no finding in iam.tf (baseline on main 2026-10-14: 7 pre-existing warnings, none in iam.tf), and the tf_plan comment on the PR shows only the change to the sre-botSecretsManagerKeyRetrieval policy document
 <!-- AC:END -->
 
@@ -94,6 +94,12 @@ Python gates (no app change, from app/):
 AC 2 waits for the post-apply simulate-principal-policy run (plan step 4).
 
 tf_plan on PR #1595 (2026-10-14): Plan 0 to add, 1 to change, 0 to destroy; the only change is aws_iam_policy.sre-bot_secrets_manager, which gains one statement allowing dynamodb:Query on table/{sre_bot_retry_records,sre_bot_audit_trail,incidents}/index/*. Init, validate, fmt, plan and conftest all succeeded. The plan's deprecation warnings (hash_key) and conftest Missing Common Tags warnings were already there and don't involve iam.tf.
+
+Post-apply simulation (human, 2026-10-20), aws iam simulate-principal-policy for sre-bot-ecs-role, action dynamodb:Query, per-resource decisions (EvaluationResults[0].ResourceSpecificResults):
+- table/sre_bot_audit_trail/index/correlation_id-index: allowed
+- table/incidents/index/by_channel: allowed
+- table/webhooks/index/x: implicitDeny (control: table outside the grant)
+The aggregated top-level decision is implicitDeny because one resource is denied; read the per-resource results.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
