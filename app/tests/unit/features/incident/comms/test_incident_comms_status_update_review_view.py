@@ -40,6 +40,7 @@ from features.incident.comms.entrypoints.slack_views import (
     parse_review_submission,
 )
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from tests.factories.incident import incident_scopes
 from tests.factories.slack import FakeSlackReply
 
 pytestmark = pytest.mark.unit
@@ -114,12 +115,12 @@ def _section_text(view: dict[str, Any]) -> str:
 
 def _pending_view(monkeypatch: pytest.MonkeyPatch, overview: OperationResult[StatusUpdateOverview]) -> dict[str, Any]:
     """Run the status-update command with the overview read stubbed and return the final modal view."""
-    monkeypatch.setattr(slack_entrypoints, "get_status_update_overview", lambda channel_id: overview)
+    monkeypatch.setattr(slack_entrypoints, "get_status_update_overview", lambda incidents, conversation: overview)
     reply = FakeSlackReply()
     payload = CommandPayload(
         text="", user_id="U9", channel_id=_CHANNEL, user_locale="en-US", platform_metadata={"trigger_id": "T1"}
     )
-    handle_status_update_command(payload, {}, reply)
+    handle_status_update_command(payload, {}, reply, incident_scopes())
     view: dict[str, Any] = reply.calls_to("update_view")[-1]["view"]
     return view
 

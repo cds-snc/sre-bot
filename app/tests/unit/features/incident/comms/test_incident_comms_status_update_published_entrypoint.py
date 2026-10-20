@@ -37,14 +37,10 @@ from features.incident.comms.adapters.copy_ready import CopyReadyPublisher
 from features.incident.comms.comms_profile import ProfileLabels
 from features.incident.comms.domain import CopyReadyText
 from features.incident.comms.entrypoints.slack import (
-    handle_generate_action,
-    handle_history_action,
-    handle_new_update_action,
     handle_open_action,
     handle_published_action,
     handle_review_action,
     handle_review_submission,
-    handle_save_action,
     register,
 )
 from features.incident.comms.entrypoints.slack_views import (
@@ -64,6 +60,7 @@ from features.incident.comms.history import set_published
 from features.incident.comms.publisher import render_copy_ready
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from tests.factories.incident import incident_scopes
 from tests.factories.slack import FakeSlackRegistrar
 
 pytestmark = pytest.mark.unit
@@ -224,20 +221,27 @@ def _client_method_names(client: MagicMock) -> list[str]:
 
 class TestRegister:
     def test_registers_the_toggle_beside_the_existing_listeners(self) -> None:
-        """Registration adds the toggle block action and keeps every existing listener."""
-        registrar = FakeSlackRegistrar()
+        """Registration adds the toggle block action and keeps every existing listener.
+
+        New update, Save, Draft with AI and Back are scope-binding wrappers, so
+        only their ids are asserted; the other listeners are the handlers themselves.
+        """
+        registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
 
         register(registrar)
 
-        assert registrar.block_actions == {
-            NEW_ACTION_ID: handle_new_update_action,
-            REVIEW_ACTION_ID: handle_review_action,
-            OPEN_ACTION_ID: handle_open_action,
-            HISTORY_ACTION_ID: handle_history_action,
-            PUBLISHED_ACTION_ID: handle_published_action,
-            GENERATE_ACTION_ID: handle_generate_action,
-            SAVE_ACTION_ID: handle_save_action,
+        assert set(registrar.block_actions) == {
+            NEW_ACTION_ID,
+            REVIEW_ACTION_ID,
+            OPEN_ACTION_ID,
+            HISTORY_ACTION_ID,
+            PUBLISHED_ACTION_ID,
+            GENERATE_ACTION_ID,
+            SAVE_ACTION_ID,
         }
+        assert registrar.block_actions[REVIEW_ACTION_ID] is handle_review_action
+        assert registrar.block_actions[OPEN_ACTION_ID] is handle_open_action
+        assert registrar.block_actions[PUBLISHED_ACTION_ID] is handle_published_action
         assert registrar.view_submissions == {REVIEW_CALLBACK_ID: handle_review_submission}
 
 

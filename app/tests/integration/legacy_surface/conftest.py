@@ -22,7 +22,7 @@ import json
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from types import ModuleType, SimpleNamespace
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlencode
 
 import i18n  # type: ignore
@@ -50,10 +50,12 @@ from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.sentinel import client as sentinel_client
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
+from integrations.slack.settings import SlackSettings
 from modules.slack import webhooks as legacy_webhooks
 from packages.rant.adapters.slack import SlackUserIdentityLookup
 from packages.rant.platforms import slack as rant_slack
 from server.lifespan import _register_legacy_handlers, _register_legacy_slack_commands
+from tests.factories.incident import incident_scopes
 from tests.factories.slack_bolt import FakeSlackClient, InlineExecutor, authorize_single_workspace, unpatched_app_init
 
 SLACK_COMMAND_HOOKIMPLS: tuple[ModuleType, ...] = (
@@ -159,15 +161,21 @@ def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> Slack
     client = FakeSlackClient()
     app = build_bolt_app(monkeypatch)
     settings = SimpleNamespace(ENABLED=True, SOCKET_MODE=True, APP_TOKEN="xapp-test", BOT_TOKEN="xoxb-test")
-    provider = SlackPlatformProvider(settings=settings, formatter=SlackBlockKitFormatter(), command_prefix=command_prefix)
+    provider = SlackPlatformProvider(
+        settings=cast(SlackSettings, settings), formatter=SlackBlockKitFormatter(), command_prefix=command_prefix
+    )
     provider._app = app
     provider._client = client
+    provider.set_scope_opener(incident_scopes())
 
     # Each package's Slack lookups run through its real adapter over the same fake client.
-    monkeypatch.setattr(rant_slack, "get_user_identity_lookup", lambda: SlackUserIdentityLookup(client))
-    monkeypatch.setattr(incident_scribe_service, "get_incident_transcript_reader", lambda: SlackIncidentTranscriptReader(client))
+    web_client = cast(WebClient, client)
+    monkeypatch.setattr(rant_slack, "get_user_identity_lookup", lambda: SlackUserIdentityLookup(web_client))
     monkeypatch.setattr(
-        incident_scribe_providers, "get_incident_report_link_lookup", lambda: SlackIncidentReportLinkLookup(client)
+        incident_scribe_service, "get_incident_transcript_reader", lambda: SlackIncidentTranscriptReader(web_client)
+    )
+    monkeypatch.setattr(
+        incident_scribe_providers, "get_incident_report_link_lookup", lambda: SlackIncidentReportLinkLookup(web_client)
     )
 
     plugin_manager = pluggy.PluginManager(PLUGIN_NAMESPACE)

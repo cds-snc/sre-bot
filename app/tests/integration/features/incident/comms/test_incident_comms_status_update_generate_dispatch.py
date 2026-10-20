@@ -9,9 +9,12 @@ and fed to ``App.dispatch`` with listeners run inline; the harness sends every
 payload as user ``USER_ID``. Only edges are stubbed: ``WebClient.api_call``
 records Web API calls, and the entrypoint's ``generate_status_update_draft`` and
 ``get_draft_for_review`` are the real services bound to a core
-``InMemoryStatusUpdateStore``, a stub incident lookup, a stub transcript reader,
-a stub security flag reader and a stub text generator, with a fixed ``now``;
-text generation is reported available.
+``InMemoryStatusUpdateStore``, a stub transcript reader and a stub text
+generator, with a fixed ``now``; text generation is reported available. The
+plugin's service scopes resolve an ``InMemoryRecordStore`` holding the channel's
+incident as a legacy item without a security attribute, and Slack configured
+under one tenant, so the real incident store, legacy bridge and command check
+resolve the incident and its security flag reads as not set.
 Assertions read the exact Web API calls in order (only ``views.update``, never
 a channel post), the one model call and the records left in the store.
 """
@@ -42,7 +45,6 @@ from features.incident.comms.prompt import INSTRUCTIONS, build_redraft_input, bu
 from features.incident.comms.service import generate_status_update_draft
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import (
-    IncidentSecurityFlag,
     StatusUpdate,
     StatusUpdateOrigin,
     StatusUpdateStage,
@@ -50,6 +52,9 @@ from features.incident.core.api import (
     StatusUpdateText,
     TranscriptMessage,
 )
+from features.incident.core.store import incidents_table
+from infrastructure.records.in_memory import InMemoryRecordStore
+from tests.factories.incident import incident_scopes
 from tests.factories.slack_bolt import TRIGGER_ID, USER_ID, Harness, harness_fixture
 
 pytestmark = pytest.mark.integration
@@ -129,9 +134,19 @@ def _expected_fill(origin: StatusUpdateOrigin = StatusUpdateOrigin.MODEL_INSTRUC
     )
 
 
-class _StubLookup:
-    def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
-        return OperationResult.success(data=_INCIDENT)
+def _records() -> InMemoryRecordStore:
+    """A record store holding the incident of ``_CHANNEL`` as the legacy writers stored it, with no security attribute."""
+    records = InMemoryRecordStore()
+    item = {
+        "id": _INCIDENT,
+        "channel_id": _CHANNEL,
+        "name": "Incident",
+        "user_id": "U0DECLARER",
+        "status": "Open",
+        "created_at": "1760536800.0",
+    }
+    assert records.put(incidents_table("incidents"), item).is_success
+    return records
 
 
 class _StubReader:
@@ -147,11 +162,6 @@ class _StubReader:
         exclude_own_and_system_messages: bool = False,
     ) -> Sequence[TranscriptMessage]:
         return _MESSAGES
-
-
-class _StubSecurityReader:
-    def read_security_flag(self, incident_id: str) -> OperationResult[IncidentSecurityFlag]:
-        return OperationResult.success(data=IncidentSecurityFlag.NO)
 
 
 @dataclass
@@ -184,11 +194,9 @@ def store(monkeypatch: pytest.MonkeyPatch, generator: _StubGenerator) -> InMemor
         "generate_status_update_draft",
         partial(
             generate_status_update_draft,
-            lookup=_StubLookup(),
             reader=_StubReader(),
             store=status_updates,
             generator=generator,
-            security_reader=_StubSecurityReader(),
             now=_NOW,
         ),
     )
@@ -199,7 +207,7 @@ def store(monkeypatch: pytest.MonkeyPatch, generator: _StubGenerator) -> InMemor
 
 @pytest.fixture
 def harness(monkeypatch: pytest.MonkeyPatch, store: InMemoryStatusUpdateStore) -> Iterator[Harness]:
-    yield from harness_fixture("incident.comms")(monkeypatch, comms_module)
+    yield from harness_fixture("incident.comms", lambda: incident_scopes(_records()))(monkeypatch, comms_module)
 
 
 def _generate_action(instructions: str | None) -> dict[str, Any]:

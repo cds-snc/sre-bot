@@ -9,19 +9,32 @@ status-update handler makes one service call and builds no domain value itself.
 import ast
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from structlog.testing import capture_logs
 
 from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
 from contracts.slack.models import CommandPayload
+from contracts.workplace import WorkplaceSystem
 from features.incident.comms.domain import StatusUpdateOverview
 from features.incident.comms.entrypoints import slack as slack_entrypoints
 from features.incident.comms.entrypoints.slack import handle_status_update_command, register
-from features.incident.comms.entrypoints.slack_views import NEW_ACTION_ID, REVIEW_ACTION_ID
+from features.incident.comms.entrypoints.slack_views import (
+    GENERATE_ACTION_ID,
+    HISTORY_ACTION_ID,
+    NEW_ACTION_ID,
+    OPEN_ACTION_ID,
+    PUBLISHED_ACTION_ID,
+    REVIEW_ACTION_ID,
+    REVIEW_CALLBACK_ID,
+    SAVE_ACTION_ID,
+)
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
-from tests.factories.slack import FakeSlackReply
+from tests.factories.incident import incident_scopes
+from tests.factories.slack import FakeSlackRegistrar, FakeSlackReply
 
 pytestmark = pytest.mark.unit
 
@@ -58,17 +71,47 @@ def _pending_update(sequence: int = 1) -> StatusUpdate:
 
 class TestRegisterCommands:
     def test_registers_status_update_under_sre_incident(self):
-        provider = MagicMock()
+        registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
 
-        register(provider)
+        register(registrar)
 
-        status_update_calls = [
-            call.kwargs for call in provider.register_command.call_args_list if call.kwargs.get("command") == "status-update"
-        ]
+        status_update_calls = [kwargs for kwargs in registrar.commands if kwargs.get("command") == "status-update"]
         assert len(status_update_calls) == 1
-        kwargs = status_update_calls[0]
-        assert kwargs["command"] == "status-update"
-        assert kwargs["parent"] == "sre.incident"
+        assert status_update_calls[0]["parent"] == "sre.incident"
+
+    def test_registers_every_listener_when_slack_is_configured(self):
+        registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
+
+        with capture_logs() as logs:
+            register(registrar)
+
+        assert set(registrar.block_actions) == {
+            NEW_ACTION_ID,
+            SAVE_ACTION_ID,
+            GENERATE_ACTION_ID,
+            REVIEW_ACTION_ID,
+            OPEN_ACTION_ID,
+            HISTORY_ACTION_ID,
+            PUBLISHED_ACTION_ID,
+        }
+        assert set(registrar.view_submissions) == {REVIEW_CALLBACK_ID}
+        assert not [log for log in logs if log["event"] == "incident_comms_registration_skipped"]
+
+    def test_registers_nothing_and_names_the_setting_once_when_slack_is_not_configured(self):
+        """Without a Slack tenant no incident can be resolved, so the commands are skipped at startup."""
+        scopes = incident_scopes(tenants={WorkplaceSystem.GOOGLE: "C0GOOGLE"})
+        registrar = FakeSlackRegistrar(service_scopes=scopes)
+
+        with capture_logs() as logs:
+            register(registrar)
+
+        assert registrar.commands == []
+        assert registrar.block_actions == {}
+        assert registrar.view_submissions == {}
+        skipped = [log for log in logs if log["event"] == "incident_comms_registration_skipped"]
+        assert len(skipped) == 1
+        assert skipped[0]["setting"] == "SLACK_TEAM_ID"
+        assert (scopes.opened, scopes.closed) == (1, 1)
 
 
 class TestHandleStatusUpdateCommand:
@@ -83,7 +126,7 @@ class TestHandleStatusUpdateCommand:
                 return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
             ),
         ):
-            handle_status_update_command(payload, {}, reply)
+            handle_status_update_command(payload, {}, reply, incident_scopes())
 
         open_calls = reply.calls_to("open_view")
         assert len(open_calls) >= 1
@@ -100,7 +143,7 @@ class TestHandleStatusUpdateCommand:
                 return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
             ),
         ):
-            handle_status_update_command(payload, {}, reply)
+            handle_status_update_command(payload, {}, reply, incident_scopes())
 
         update_calls = reply.calls_to("update_view")
         assert len(update_calls) >= 1
@@ -125,7 +168,7 @@ class TestHandleStatusUpdateCommand:
             "features.incident.comms.entrypoints.slack.get_status_update_overview",
             new=MagicMock(return_value=OperationResult.success(data=StatusUpdateOverview(pending=None, approved=()))),
         ):
-            handle_status_update_command(payload, {}, reply)
+            handle_status_update_command(payload, {}, reply, incident_scopes())
 
         update_calls = reply.calls_to("update_view")
         assert len(update_calls) >= 1
@@ -135,7 +178,7 @@ class TestHandleStatusUpdateCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id=_CHANNEL)
         reply = FakeSlackReply()
 
-        response = handle_status_update_command(payload, {}, reply)
+        response = handle_status_update_command(payload, {}, reply, incident_scopes())
 
         assert response.ephemeral is True
         assert reply.calls_to("open_view") == []
@@ -155,7 +198,7 @@ class TestHandleStatusUpdateCommand:
                 )
             ),
         ):
-            handle_status_update_command(payload, {}, reply)
+            handle_status_update_command(payload, {}, reply, incident_scopes())
 
         # The view should be updated to the error state
         update_calls = reply.calls_to("update_view")
@@ -175,7 +218,7 @@ class TestHandleStatusUpdateCommand:
                 )
             ),
         ):
-            handle_status_update_command(payload, {}, reply)
+            handle_status_update_command(payload, {}, reply, incident_scopes())
 
         update_calls = reply.calls_to("update_view")
         assert len(update_calls) >= 1
@@ -195,7 +238,7 @@ class TestHandleStatusUpdateCommand:
                 )
             ),
         ):
-            handle_status_update_command(payload, {}, reply)
+            handle_status_update_command(payload, {}, reply, incident_scopes())
 
         update_calls = reply.calls_to("update_view")
         assert len(update_calls) >= 1
@@ -217,7 +260,7 @@ class TestHandleStatusUpdateCommand:
                 return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
             ),
         ):
-            response = handle_status_update_command(payload, {}, reply)
+            response = handle_status_update_command(payload, {}, reply, incident_scopes())
 
         # Should return an ephemeral error since we can't open the view
         assert response.ephemeral is True
@@ -226,15 +269,10 @@ class TestHandleStatusUpdateCommand:
         """When updating the view fails, the error is logged and the loading view is left."""
         payload = CommandPayload(text="", user_id="U9", channel_id=_CHANNEL, platform_metadata={"trigger_id": _TRIGGER})
 
-        class _FailOnUpdateReply:
-            def __init__(self):
-                self.calls = []
+        class _FailOnUpdateReply(FakeSlackReply):
+            """Opens the view, then fails every update as Slack does for an invalid view."""
 
-            def open_view(self, *, trigger_id: str, view: dict) -> OperationResult[None]:
-                self.calls.append(("open_view", {"trigger_id": trigger_id, "view": view}))
-                return OperationResult.success(data="view-id-123")
-
-            def update_view(self, *, view_id: str, view: dict, hash: str | None = None) -> OperationResult[None]:
+            def update_view(self, *, view_id: str, view: dict[str, Any], hash: str | None = None) -> OperationResult[None]:
                 self.calls.append(("update_view", {"view_id": view_id, "view": view, "hash": hash}))
                 return OperationResult.error(
                     OperationStatus.PERMANENT_ERROR,
@@ -242,10 +280,7 @@ class TestHandleStatusUpdateCommand:
                     error_code="invalid_view",
                 )
 
-            def calls_to(self, name: str):
-                return [kwargs for called, kwargs in self.calls if called == name]
-
-        reply = _FailOnUpdateReply()  # type: ignore[assignment]
+        reply = _FailOnUpdateReply(OperationResult.success(data="view-id-123"))
 
         with patch(
             "features.incident.comms.entrypoints.slack.get_status_update_overview",
@@ -253,7 +288,7 @@ class TestHandleStatusUpdateCommand:
                 return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
             ),
         ):
-            handle_status_update_command(payload, {}, reply)
+            handle_status_update_command(payload, {}, reply, incident_scopes())
 
         # Both open and update should have been called
         assert len(reply.calls_to("open_view")) >= 1
@@ -270,7 +305,7 @@ class TestHandleStatusUpdateCommand:
                 return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
             ),
         ):
-            handle_status_update_command(payload, {}, reply)
+            handle_status_update_command(payload, {}, reply, incident_scopes())
 
         assert len(reply.calls_to("post_message")) == 0
         assert len(reply.calls_to("post_ephemeral")) == 0
@@ -290,7 +325,7 @@ class TestOverviewButtonsInViews:
                 return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
             ),
         ):
-            handle_status_update_command(payload, {}, reply)
+            handle_status_update_command(payload, {}, reply, incident_scopes())
 
         update_calls = reply.calls_to("update_view")
         assert len(update_calls) >= 1
@@ -307,7 +342,7 @@ class TestOverviewButtonsInViews:
             "features.incident.comms.entrypoints.slack.get_status_update_overview",
             new=MagicMock(return_value=OperationResult.success(data=StatusUpdateOverview(pending=None, approved=()))),
         ):
-            handle_status_update_command(payload, {}, reply)
+            handle_status_update_command(payload, {}, reply, incident_scopes())
 
         update_calls = reply.calls_to("update_view")
         assert len(update_calls) >= 1
@@ -330,7 +365,7 @@ class TestOverviewButtonsInViews:
                 )
             ),
         ):
-            handle_status_update_command(payload, {}, reply)
+            handle_status_update_command(payload, {}, reply, incident_scopes())
 
         update_calls = reply.calls_to("update_view")
         assert len(update_calls) >= 1

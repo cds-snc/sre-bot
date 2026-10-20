@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterator
 from concurrent.futures import Executor, Future
 from dataclasses import dataclass
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 from urllib.parse import urlencode
 
@@ -23,8 +23,10 @@ from slack_sdk import WebClient
 
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
+from contracts.services import ServiceScopeOpener
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
+from integrations.slack.settings import SlackSettings
 from server.plugins.manager import register_feature_integrations
 
 TEAM_ID = "T0TEAM"
@@ -130,6 +132,7 @@ class Harness:
 
 def harness_fixture(
     plugin_name: str,
+    service_scopes: Callable[[], ServiceScopeOpener] | None = None,
 ) -> Callable[[pytest.MonkeyPatch, Any], Iterator[Harness]]:
     """Build a pytest fixture factory for a Slack Bolt app with a plugin.
 
@@ -139,6 +142,8 @@ def harness_fixture(
 
     Args:
         plugin_name: The dotted entry-point name for the plugin (e.g. ``incident.scribe``).
+        service_scopes: Builds the scope opener the provider hands the plugin's
+            handlers, as the host does at startup; none when the plugin opens no scope.
 
     Returns:
         A pytest fixture function that accepts monkeypatch and yields a Harness.
@@ -161,7 +166,9 @@ def harness_fixture(
 
         app = App(authorize=authorize_single_workspace, request_verification_enabled=False, listener_executor=InlineExecutor())
         settings = SimpleNamespace(ENABLED=True, SOCKET_MODE=True, APP_TOKEN="xapp-test", BOT_TOKEN="xoxb-test")
-        provider = SlackPlatformProvider(settings=settings, formatter=SlackBlockKitFormatter())
+        provider = SlackPlatformProvider(settings=cast(SlackSettings, settings), formatter=SlackBlockKitFormatter())
+        if service_scopes is not None:
+            provider.set_scope_opener(service_scopes())
         monkeypatch.setattr("integrations.slack.provider.LegacySlackBootstrap", lambda: SimpleNamespace(create_app=lambda: app))
         monkeypatch.setattr("integrations.slack.provider.SocketModeHandler", lambda app, token: SimpleNamespace(app=app))
 

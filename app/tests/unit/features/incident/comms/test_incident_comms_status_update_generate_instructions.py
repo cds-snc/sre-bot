@@ -2,8 +2,9 @@
 
 ``generate_status_update_draft`` is called with non-blank instructions, which
 always make one model call with the redraft prompt; the helper returns the
-stored draft so assertions read the record directly. The service runs against the in-memory status-update store and stubs for the
-incident lookup, the transcript reader, the security flag reader and the text
+stored draft so assertions read the record directly. The service runs against
+the in-memory status-update store, an in-memory incident store that counts
+security flag reads, and stubs for the transcript reader and the text
 generator, with a fixed ``now``, so each test controls which records exist,
 which messages are read and what the model answers. Assertions compare the
 exact model call (instructions, input and token cap), the exact stored records
@@ -26,9 +27,8 @@ from contracts.operations.codes import ErrorCode
 from features.incident.comms.domain import NoNewInformationWording, StatusUpdateEdit, StatusUpdateOutcomeKind
 from features.incident.comms.prompt import build_redraft_input, build_redraft_instructions
 from features.incident.comms.service import DRAFT_UNPARSEABLE_CODE, generate_status_update_draft
-from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
+from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
 from features.incident.core.api import (
-    IncidentSecurityFlag,
     StatusUpdate,
     StatusUpdateOrigin,
     StatusUpdateStage,
@@ -36,6 +36,7 @@ from features.incident.core.api import (
     StatusUpdateText,
     TranscriptMessage,
 )
+from tests.factories.incident import incident_on, slack_conversation
 
 pytestmark = pytest.mark.unit
 
@@ -111,24 +112,29 @@ def _fingerprint(*lines: tuple[datetime, str]) -> str:
     return f"v1:sha256:{hashlib.sha256(content.encode()).hexdigest()}"
 
 
-class _StubLookup:
-    def __init__(self, result: OperationResult[str] | None = None) -> None:
-        self._result = result or OperationResult.success(data=_INCIDENT)
+class _CountingIncidents(InMemoryIncidentStore):
+    """Holds an incident on the channel per id in ``incident_ids`` and counts security flag reads.
+
+    No ids leaves the channel outside any incident and two ids make it ambiguous;
+    ``failure`` fails each flag read.
+    """
+
+    def __init__(
+        self,
+        *,
+        incident_ids: tuple[str, ...] = (_INCIDENT,),
+        security_incident: bool = False,
+        failure: OperationResult[bool] | None = None,
+    ) -> None:
+        super().__init__()
+        for incident_id in incident_ids:
+            self.seed(incident_on(_CHANNEL, incident_id, security_incident=security_incident))
+        self._failure = failure
         self.calls: list[str] = []
 
-    def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
-        self.calls.append(conversation_id)
-        return self._result
-
-
-class _StubSecurityReader:
-    def __init__(self, result: OperationResult[IncidentSecurityFlag] | None = None) -> None:
-        self._result = result or OperationResult.success(data=IncidentSecurityFlag.NO)
-        self.calls: list[str] = []
-
-    def read_security_flag(self, incident_id: str) -> OperationResult[IncidentSecurityFlag]:
+    def read_security_flag(self, incident_id: str) -> OperationResult[bool]:
         self.calls.append(incident_id)
-        return self._result
+        return self._failure if self._failure is not None else super().read_security_flag(incident_id)
 
 
 class _StubReader:
@@ -219,14 +225,14 @@ async def _redraft(
     current: StatusUpdateEdit = _CURRENT,
     reader: _StubReader | None = None,
     generator: _StubGenerator | None = None,
-    lookup: _StubLookup | None = None,
-    security_reader: _StubSecurityReader | None = None,
+    incidents: _CountingIncidents | None = None,
     security_confirmed: bool = False,
     on_started: Any = None,
 ) -> OperationResult[StatusUpdate]:
     """Fill with instructions and return the stored draft, or the refusal with its classification."""
     result = await generate_status_update_draft(
-        _CHANNEL,
+        incidents if incidents is not None else _CountingIncidents(),
+        slack_conversation(_CHANNEL),
         sequence,
         current=current,
         author=_REDRAFTER,
@@ -234,11 +240,9 @@ async def _redraft(
         instructions=instructions,
         security_confirmed=security_confirmed,
         on_started=on_started,
-        lookup=lookup or _StubLookup(),
         reader=reader or _StubReader(),
         store=store,
         generator=generator or _StubGenerator(),
-        security_reader=security_reader or _StubSecurityReader(),
         now=_NOW,
     )
     if result.is_success and result.data is not None:
@@ -455,23 +459,27 @@ class TestStageFloor:
 
 class TestRejectedBeforeAnyWork:
     @pytest.mark.parametrize(
-        "refusal",
+        ("incident_ids", "refusal"),
         [
-            OperationResult.error(OperationStatus.NOT_FOUND, message="no incident", error_code=ErrorCode.NOT_AN_INCIDENT),
-            OperationResult.permanent_error(message="two incidents", error_code=ErrorCode.AMBIGUOUS_INCIDENT_CONVERSATION),
+            ((), (OperationStatus.NOT_FOUND, ErrorCode.NOT_AN_INCIDENT)),
+            ((_INCIDENT, "inc-uuid-2"), (OperationStatus.PERMANENT_ERROR, ErrorCode.AMBIGUOUS_INCIDENT_CONVERSATION)),
         ],
         ids=["not-an-incident", "ambiguous"],
     )
     @pytest.mark.asyncio
-    async def test_a_lookup_refusal_passes_through_before_anything_is_read(self, refusal: OperationResult[str]) -> None:
-        """Outside an incident nothing is read, redrafted or stored."""
+    async def test_an_incident_refusal_passes_through_before_anything_is_read(
+        self, incident_ids: tuple[str, ...], refusal: tuple[OperationStatus, ErrorCode]
+    ) -> None:
+        """Outside an incident, or with two incidents on the channel, nothing is read, redrafted or stored."""
         store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         reader = _StubReader([_human("x", 5)])
         generator = _StubGenerator()
 
-        result = await _redraft(store=store, reader=reader, generator=generator, lookup=_StubLookup(refusal))
+        result = await _redraft(
+            store=store, reader=reader, generator=generator, incidents=_CountingIncidents(incident_ids=incident_ids)
+        )
 
-        assert (result.status, result.error_code) == (refusal.status, refusal.error_code)
+        assert (result.status, result.error_code) == refusal
         assert (reader.reads, generator.calls) == ([], [])
         assert _stored(store) == (_PENDING, _APPROVED)
 
@@ -592,29 +600,26 @@ class TestFailuresKeepThePreviousDraft:
 
 class TestSecurityGate:
     @pytest.mark.parametrize(
-        "flag_result",
+        "incident",
         [
-            OperationResult.success(data=IncidentSecurityFlag.YES),
-            OperationResult.success(data=IncidentSecurityFlag.UNKNOWN),
-            OperationResult.transient_error(message="store error", error_code=ErrorCode.RATE_LIMITED),
+            {"security_incident": True},
+            {"failure": OperationResult.transient_error(message="store error", error_code=ErrorCode.RATE_LIMITED)},
         ],
-        ids=["yes", "unknown", "unreadable"],
+        ids=["security-incident", "unreadable"],
     )
     @pytest.mark.asyncio
-    async def test_a_security_unknown_or_unreadable_flag_refuses_before_the_model(
-        self, flag_result: OperationResult[IncidentSecurityFlag]
-    ) -> None:
+    async def test_a_security_incident_or_unreadable_flag_refuses_before_the_model(self, incident: dict[str, Any]) -> None:
         """Without confirmation, a redraft that may expose a security incident never reaches the model or the store."""
         store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         generator = _StubGenerator()
-        security_reader = _StubSecurityReader(flag_result)
+        incidents = _CountingIncidents(**incident)
         started: list[str] = []
 
         result = await _redraft(
             store=store,
             reader=_StubReader([_human("x", 5)]),
             generator=generator,
-            security_reader=security_reader,
+            incidents=incidents,
             on_started=lambda: started.append("started"),
         )
 
@@ -622,7 +627,7 @@ class TestSecurityGate:
             OperationStatus.PERMANENT_ERROR,
             ErrorCode.SECURITY_CONFIRMATION_REQUIRED,
         )
-        assert security_reader.calls == [_INCIDENT]
+        assert incidents.calls == [_INCIDENT]
         assert (generator.calls, started) == ([], [])
         assert _stored(store) == (_PENDING, _APPROVED)
 
@@ -631,35 +636,32 @@ class TestSecurityGate:
         """A flag that says no lets the redraft through without confirmation."""
         store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         generator = _StubGenerator()
-        security_reader = _StubSecurityReader(OperationResult.success(data=IncidentSecurityFlag.NO))
+        incidents = _CountingIncidents(security_incident=False)
 
-        result = await _redraft(
-            store=store, reader=_StubReader([_human("x", 5)]), generator=generator, security_reader=security_reader
-        )
+        result = await _redraft(store=store, reader=_StubReader([_human("x", 5)]), generator=generator, incidents=incidents)
 
         assert result.is_success
-        assert security_reader.calls == [_INCIDENT]
+        assert incidents.calls == [_INCIDENT]
         assert len(generator.calls) == 1
 
-    @pytest.mark.parametrize("flag", [IncidentSecurityFlag.YES, IncidentSecurityFlag.UNKNOWN])
     @pytest.mark.asyncio
-    async def test_confirmation_skips_the_flag_and_redrafts(self, flag: IncidentSecurityFlag) -> None:
+    async def test_confirmation_skips_the_flag_and_redrafts(self) -> None:
         """The responder's confirmation is explicit consent, so the flag is not read and one model call is made."""
         store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         generator = _StubGenerator()
-        security_reader = _StubSecurityReader(OperationResult.success(data=flag))
+        incidents = _CountingIncidents(security_incident=True)
 
         result = await _redraft(
             store=store,
             reader=_StubReader([_human("x", 5)]),
             generator=generator,
-            security_reader=security_reader,
+            incidents=incidents,
             security_confirmed=True,
         )
 
         assert result.data is not None
         assert (result.data.sequence, result.data.state) == (3, StatusUpdateState.DRAFT)
-        assert security_reader.calls == []
+        assert incidents.calls == []
         assert len(generator.calls) == 1
 
 

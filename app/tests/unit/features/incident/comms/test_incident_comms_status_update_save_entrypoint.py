@@ -34,7 +34,16 @@ from features.incident.comms.entrypoints.slack_views import (
     build_review_error_view,
     build_review_view,
 )
-from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from features.incident.core.api import (
+    ConversationReference,
+    IncidentStore,
+    StatusUpdate,
+    StatusUpdateStage,
+    StatusUpdateState,
+    StatusUpdateText,
+)
+from tests.factories.incident import incident_scopes, slack_conversation
+from tests.factories.slack import FakeSlackRegistrar
 
 pytestmark = pytest.mark.unit
 
@@ -116,9 +125,18 @@ class _Services:
     save_calls: list[dict[str, Any]] = field(default_factory=list)
     read_calls: list[tuple[str, int]] = field(default_factory=list)
 
-    def save(self, conversation_id: str, sequence: int, *, edit: StatusUpdateEdit, author: str) -> OperationResult[StatusUpdate]:
+    def save(
+        self,
+        incidents: IncidentStore,
+        conversation: ConversationReference,
+        sequence: int,
+        *,
+        edit: StatusUpdateEdit,
+        author: str,
+    ) -> OperationResult[StatusUpdate]:
+        assert isinstance(incidents, IncidentStore)
         self.events.append("save")
-        self.save_calls.append({"conversation_id": conversation_id, "sequence": sequence, "edit": edit, "author": author})
+        self.save_calls.append({"conversation": conversation, "sequence": sequence, "edit": edit, "author": author})
         return self.saved
 
     async def read(self, incident_id: str, sequence: int) -> OperationResult[StatusUpdate]:
@@ -137,7 +155,12 @@ def _install(monkeypatch: pytest.MonkeyPatch, saved: OperationResult[StatusUpdat
 
 def _client(services: _Services) -> MagicMock:
     client = MagicMock()
-    client.views_update.side_effect = lambda **_: services.events.append("views_update") or {"view": {"hash": "next"}}
+
+    def views_update(**_: Any) -> dict[str, Any]:
+        services.events.append("views_update")
+        return {"view": {"hash": "next"}}
+
+    client.views_update.side_effect = views_update
     return client
 
 
@@ -154,10 +177,12 @@ class TestSaved:
         services = _install(monkeypatch, OperationResult.success(data=_SAVED))
         ack = MagicMock(side_effect=lambda: services.events.append("ack"))
 
-        handle_save_action(ack, _body(), _client(services))
+        handle_save_action(ack, _body(), _client(services), incident_scopes())
 
         assert services.events == ["ack", "save", "views_update"]
-        assert services.save_calls == [{"conversation_id": _CHANNEL, "sequence": _SEQUENCE, "edit": _EDIT, "author": _USER}]
+        assert services.save_calls == [
+            {"conversation": slack_conversation(_CHANNEL), "sequence": _SEQUENCE, "edit": _EDIT, "author": _USER}
+        ]
 
     @pytest.mark.parametrize("locale", ["en-US", "fr-FR"])
     def test_shows_the_saved_draft_form_for_the_new_sequence(self, monkeypatch: pytest.MonkeyPatch, locale: str) -> None:
@@ -165,7 +190,7 @@ class TestSaved:
         services = _install(monkeypatch, OperationResult.success(data=_SAVED))
         client = _client(services)
 
-        handle_save_action(MagicMock(), _body(locale=locale), client)
+        handle_save_action(MagicMock(), _body(locale=locale), client, incident_scopes())
 
         assert _sent_view(client) == build_review_view(
             _SAVED, locale, _metadata(locale, _SEQUENCE + 1), notice=_SAVED_NOTE[locale]
@@ -177,7 +202,7 @@ class TestSaved:
         monkeypatch.setattr(form, "text_generation_available", lambda: False)
         client = _client(services)
 
-        handle_save_action(MagicMock(), _body(), client)
+        handle_save_action(MagicMock(), _body(), client, incident_scopes())
 
         assert not {"instructions", "generate_button"} & {block.get("block_id") for block in _sent_view(client)["blocks"]}
 
@@ -186,7 +211,7 @@ class TestSaved:
         partial = StatusUpdateEdit(stage=_EDIT.stage, en=replace(_EDIT.en, impact="", workaround=""), fr=_EDIT.fr)
         services = _install(monkeypatch, OperationResult.success(data=_SAVED))
 
-        handle_save_action(MagicMock(), _body(partial), _client(services))
+        handle_save_action(MagicMock(), _body(partial), _client(services), incident_scopes())
 
         assert services.save_calls[0]["edit"] == partial
 
@@ -195,7 +220,7 @@ class TestSaved:
         services = _install(monkeypatch, OperationResult.success(data=_SAVED))
         client = _client(services)
 
-        handle_save_action(MagicMock(), _body(), client)
+        handle_save_action(MagicMock(), _body(), client, incident_scopes())
 
         client.chat_postMessage.assert_not_called()
         client.chat_postEphemeral.assert_not_called()
@@ -204,11 +229,13 @@ class TestSaved:
 class TestNotSaved:
     def test_a_stale_sequence_shows_the_conflict_view(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Another draft took the sequence, so the modal says so instead of overwriting it; the stored draft is not read."""
-        conflict = OperationResult.permanent_error(message="stale", error_code=ErrorCode.STATUS_UPDATE_CONFLICT)
+        conflict: OperationResult[Any] = OperationResult.permanent_error(
+            message="stale", error_code=ErrorCode.STATUS_UPDATE_CONFLICT
+        )
         services = _install(monkeypatch, conflict)
         client = _client(services)
 
-        handle_save_action(MagicMock(), _body(), client)
+        handle_save_action(MagicMock(), _body(), client, incident_scopes())
 
         assert _sent_view(client) == build_review_error_view(
             ErrorCode.STATUS_UPDATE_CONFLICT, "en-US", _metadata("en-US", _SEQUENCE)
@@ -218,11 +245,11 @@ class TestNotSaved:
     @pytest.mark.parametrize("locale", ["en-US", "fr-FR"])
     def test_a_store_failure_keeps_the_typed_values(self, monkeypatch: pytest.MonkeyPatch, locale: str) -> None:
         """The form comes back with what the responder typed over the stored draft, and a notice that nothing was saved."""
-        failure = OperationResult.transient_error(message="throttled", error_code=ErrorCode.RATE_LIMITED)
+        failure: OperationResult[Any] = OperationResult.transient_error(message="throttled", error_code=ErrorCode.RATE_LIMITED)
         services = _install(monkeypatch, failure)
         client = _client(services)
 
-        handle_save_action(MagicMock(), _body(locale=locale), client)
+        handle_save_action(MagicMock(), _body(locale=locale), client, incident_scopes())
 
         typed = replace(_DRAFT, stage=_EDIT.stage, en=_EDIT.en, fr=_EDIT.fr)
         assert _sent_view(client) == build_review_view(typed, locale, _metadata(locale, _SEQUENCE), notice=_SAVE_FAILED[locale])
@@ -230,12 +257,12 @@ class TestNotSaved:
 
     def test_a_failed_read_after_a_failed_save_shows_the_error_view(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """With neither the save nor the stored draft available, the modal shows the read's error with Close."""
-        failure = OperationResult.transient_error(message="throttled", error_code=ErrorCode.RATE_LIMITED)
+        failure: OperationResult[Any] = OperationResult.transient_error(message="throttled", error_code=ErrorCode.RATE_LIMITED)
         services = _install(monkeypatch, failure)
         services.stored = OperationResult.transient_error(message="down", error_code=ErrorCode.SERVER_ERROR)
         client = _client(services)
 
-        handle_save_action(MagicMock(), _body(), client)
+        handle_save_action(MagicMock(), _body(), client, incident_scopes())
 
         assert _sent_view(client) == build_review_error_view(ErrorCode.SERVER_ERROR, "en-US", _metadata("en-US", _SEQUENCE))
 
@@ -244,7 +271,7 @@ class TestNotSaved:
         services = _install(monkeypatch, OperationResult.success(data=_SAVED))
         client = _client(services)
 
-        handle_save_action(MagicMock(), _body(None), client)
+        handle_save_action(MagicMock(), _body(None), client, incident_scopes())
 
         assert services.save_calls == []
         assert _sent_view(client) == build_review_view(
@@ -257,16 +284,22 @@ class TestNotSaved:
         client = MagicMock()
         client.views_update.side_effect = RuntimeError("slack down")
 
-        handle_save_action(MagicMock(), _body(), client)
+        handle_save_action(MagicMock(), _body(), client, incident_scopes())
 
         client.views_update.assert_called_once()
 
 
-def test_register_includes_the_save_action() -> None:
-    """The Save draft button is registered as a block action with its own listener."""
-    registrar = MagicMock()
+def test_register_includes_the_save_action(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The Save draft button is registered as a block action whose listener saves the typed values.
+
+    The registered listener wraps the handler with the registrar's scope
+    opener, so it is called with Bolt's arguments and the recorded save proves
+    it reached the Save draft handler.
+    """
+    services = _install(monkeypatch, OperationResult.success(data=_SAVED))
+    registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
 
     register(registrar)
+    registrar.block_actions[SAVE_ACTION_ID](ack=MagicMock(), body=_body(), client=_client(services))
 
-    registered = {call.args[0]: call.args[1] for call in registrar.register_block_action.call_args_list}
-    assert registered[SAVE_ACTION_ID] is handle_save_action
+    assert [call["sequence"] for call in services.save_calls] == [_SEQUENCE]

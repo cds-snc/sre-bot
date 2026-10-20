@@ -8,7 +8,10 @@ state, and fed to ``App.dispatch`` with listeners run inline; the harness sends
 every payload as user ``USER_ID``. Only edges are stubbed: ``WebClient.api_call``
 records Web API calls, and the entrypoint's ``save_status_update_draft`` and
 ``get_draft_for_review`` are the real services bound to a core
-``InMemoryStatusUpdateStore`` and a stub incident lookup, with a fixed ``now``.
+``InMemoryStatusUpdateStore`` with a fixed ``now``. The plugin's service scopes
+resolve an ``InMemoryRecordStore`` holding the channel's incident as a legacy
+item, and Slack configured under one tenant, so the real incident store, legacy
+bridge and command check resolve the incident.
 Assertions read the exact Web API calls (only ``views.update``, never a channel
 post) and the records left in the store.
 """
@@ -23,7 +26,6 @@ from typing import Any
 import pytest
 
 import features.incident.comms as comms_module
-from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.comms import form
 from features.incident.comms.approval import get_draft_for_review
@@ -43,6 +45,9 @@ from features.incident.core.api import (
     StatusUpdateState,
     StatusUpdateText,
 )
+from features.incident.core.store import incidents_table
+from infrastructure.records.in_memory import InMemoryRecordStore
+from tests.factories.incident import incident_scopes
 from tests.factories.slack_bolt import TRIGGER_ID, USER_ID, Harness, harness_fixture
 
 pytestmark = pytest.mark.integration
@@ -89,9 +94,19 @@ _SAVED = replace(
 )
 
 
-class _StubLookup:
-    def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
-        return OperationResult.success(data=_INCIDENT)
+def _records() -> InMemoryRecordStore:
+    """A record store holding the incident of ``_CHANNEL`` as the legacy writers stored it, with no security attribute."""
+    records = InMemoryRecordStore()
+    item = {
+        "id": _INCIDENT,
+        "channel_id": _CHANNEL,
+        "name": "Incident",
+        "user_id": "U0DECLARER",
+        "status": "Open",
+        "created_at": "1760536800.0",
+    }
+    assert records.put(incidents_table("incidents"), item).is_success
+    return records
 
 
 @pytest.fixture
@@ -101,7 +116,7 @@ def store(monkeypatch: pytest.MonkeyPatch) -> InMemoryStatusUpdateStore:
     monkeypatch.setattr(
         form,
         "save_status_update_draft",
-        partial(save_status_update_draft, lookup=_StubLookup(), store=status_updates, now=_NOW),
+        partial(save_status_update_draft, store=status_updates, now=_NOW),
     )
     monkeypatch.setattr(form, "get_draft_for_review", partial(get_draft_for_review, store=status_updates))
     monkeypatch.setattr(form, "text_generation_available", lambda: True)
@@ -110,7 +125,7 @@ def store(monkeypatch: pytest.MonkeyPatch) -> InMemoryStatusUpdateStore:
 
 @pytest.fixture
 def harness(monkeypatch: pytest.MonkeyPatch, store: InMemoryStatusUpdateStore) -> Iterator[Harness]:
-    yield from harness_fixture("incident.comms")(monkeypatch, comms_module)
+    yield from harness_fixture("incident.comms", lambda: incident_scopes(_records()))(monkeypatch, comms_module)
 
 
 def _save_action(sequence: int = _SEQUENCE) -> dict[str, Any]:

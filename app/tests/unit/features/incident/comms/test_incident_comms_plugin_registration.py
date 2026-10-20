@@ -11,6 +11,7 @@ from features.incident.comms.entrypoints.slack import handle_review_submission
 from features.incident.comms.entrypoints.slack_views import REVIEW_CALLBACK_ID
 from infrastructure.i18n.loader import YAMLTranslationLoader
 from infrastructure.i18n.resources import I18nResourceRegistry
+from tests.factories.incident import incident_scopes
 from tests.factories.slack import FakeSlackRegistrar
 
 pytestmark = pytest.mark.unit
@@ -32,10 +33,11 @@ def test_entry_point_targets_the_comms_package_under_features() -> None:
 def test_one_hookimpl_registers_the_status_update_command_under_sre_incident() -> None:
     """The package's single Slack hookimpl registers ``status-update`` as a child of ``sre.incident``, and nothing else.
 
-    A recording fake registrar stands in for the Slack provider, so the
-    assertion is on what the hookimpl asked to be registered.
+    A recording fake registrar stands in for the Slack provider, with a scope
+    opener resolving Slack as configured, so the assertion is on what the
+    hookimpl asked to be registered.
     """
-    registrar = FakeSlackRegistrar()
+    registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
 
     comms_pkg.register_slack_commands(registrar=registrar)
 
@@ -45,7 +47,7 @@ def test_one_hookimpl_registers_the_status_update_command_under_sre_incident() -
 
 def test_block_actions_are_the_status_update_buttons_with_the_plugin_prefix() -> None:
     """The package registers exactly the modal's seven buttons, each once, under ``incident.comms.status_update``."""
-    registrar = FakeSlackRegistrar()
+    registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
 
     comms_pkg.register_slack_commands(registrar=registrar)
 
@@ -62,7 +64,7 @@ def test_hookimpl_registers_the_approval_submission_with_the_command() -> None:
     command that opens the modal never ships without the listener that
     approves from it.
     """
-    registrar = FakeSlackRegistrar()
+    registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
 
     comms_pkg.register_slack_commands(registrar=registrar)
 

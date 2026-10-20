@@ -8,7 +8,9 @@ with listeners run inline. Only two edges are stubbed: ``WebClient.api_call``
 records Web API calls, and the service boundary (``get_draft_for_review`` and
 ``approve_status_update`` in the entrypoint module, the publisher from
 ``providers.get_status_page_publisher``) is replaced by recording fakes that
-return real ``OperationResult`` values. Assertions read the ack body Bolt
+return real ``OperationResult`` values. The plugin's service scopes resolve an
+empty ``InMemoryRecordStore`` and Slack configured under one tenant, which
+registration reads. Assertions read the ack body Bolt
 returns and the exact Web API calls the listeners made.
 """
 
@@ -33,6 +35,7 @@ from features.incident.comms.entrypoints.slack_views import (
     build_saving_view,
 )
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from tests.factories.incident import incident_scopes
 from tests.factories.slack_bolt import TRIGGER_ID, USER_ID, Harness, harness_fixture
 
 pytestmark = pytest.mark.integration
@@ -112,7 +115,7 @@ def fakes(monkeypatch: pytest.MonkeyPatch) -> ServiceFakes:
 
 @pytest.fixture
 def harness(monkeypatch: pytest.MonkeyPatch, fakes: ServiceFakes) -> Iterator[Harness]:
-    yield from harness_fixture("incident.comms")(monkeypatch, comms_module)
+    yield from harness_fixture("incident.comms", incident_scopes)(monkeypatch, comms_module)
 
 
 def _review_action() -> dict[str, Any]:

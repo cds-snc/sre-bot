@@ -29,10 +29,19 @@ from features.incident.comms.domain import (
 )
 from features.incident.comms.form import fill_status_update_form
 from features.incident.comms.service import DRAFT_UNPARSEABLE_CODE
-from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from features.incident.core.api import (
+    ConversationReference,
+    IncidentStore,
+    StatusUpdate,
+    StatusUpdateStage,
+    StatusUpdateState,
+    StatusUpdateText,
+)
+from tests.factories.incident import incident_on, incident_store_with, slack_conversation
 
 pytestmark = pytest.mark.unit
 
+_CHANNEL = "C1"
 _NOW = datetime(2026, 10, 9, 15, 0, tzinfo=UTC)
 _WORDING = NoNewInformationWording(en="No new information.", fr="Aucune nouvelle information.")
 
@@ -72,8 +81,10 @@ class _Calls:
         self.fills: list[dict[str, Any]] = []
         self.reads = 0
 
-    async def fill(self, conversation_id: str, sequence: int, **kwargs: Any) -> OperationResult[StatusUpdateDraftOutcome]:
-        self.fills.append({"conversation_id": conversation_id, "sequence": sequence, **kwargs})
+    async def fill(
+        self, incidents: IncidentStore, conversation: ConversationReference, sequence: int, **kwargs: Any
+    ) -> OperationResult[StatusUpdateDraftOutcome]:
+        self.fills.append({"incidents": incidents, "conversation": conversation, "sequence": sequence, **kwargs})
         return self.filled
 
     async def get_draft(self, incident_id: str, sequence: int) -> OperationResult[StatusUpdate]:
@@ -94,7 +105,15 @@ def _install(
 
 async def _fill(edit: StatusUpdateEdit | None = _EDIT) -> OperationResult[Any]:
     return await fill_status_update_form(
-        "C1", "inc-1", 4, edit=edit, author="U2", wording=_WORDING, instructions="be brief", security_confirmed=True
+        incident_store_with(incident_on(_CHANNEL, "inc-1")),
+        slack_conversation(_CHANNEL),
+        "inc-1",
+        4,
+        edit=edit,
+        author="U2",
+        wording=_WORDING,
+        instructions="be brief",
+        security_confirmed=True,
     )
 
 
@@ -108,6 +127,8 @@ async def test_a_fill_returns_the_new_draft_and_its_kind(monkeypatch: pytest.Mon
     assert result.is_success and result.data is not None
     assert (result.data.update, result.data.kind, result.data.kept, result.data.ai_available) == (_FILLED, kind, False, True)
     assert calls.fills[0]["current"] == _EDIT
+    assert (calls.fills[0]["conversation"], calls.fills[0]["sequence"]) == (slack_conversation(_CHANNEL), 4)
+    assert isinstance(calls.fills[0]["incidents"], IncidentStore)
     assert (calls.fills[0]["instructions"], calls.fills[0]["security_confirmed"]) == ("be brief", True)
     assert calls.reads == 0
 
@@ -138,7 +159,7 @@ async def test_a_refusal_keeps_the_stored_draft_overlaid_with_the_typed_values(
 
 async def test_a_stale_sequence_is_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """A conflicting fill is returned as the conflict error without reading the stored draft."""
-    conflict = OperationResult.permanent_error(message="stale", error_code=ErrorCode.STATUS_UPDATE_CONFLICT)
+    conflict: OperationResult[Any] = OperationResult.permanent_error(message="stale", error_code=ErrorCode.STATUS_UPDATE_CONFLICT)
     calls = _install(monkeypatch, conflict)
 
     result = await _fill()
@@ -149,7 +170,7 @@ async def test_a_stale_sequence_is_an_error(monkeypatch: pytest.MonkeyPatch) -> 
 
 async def test_without_a_stage_the_stored_draft_is_the_model_base(monkeypatch: pytest.MonkeyPatch) -> None:
     """With no readable stage the stored draft is read once, handed to the model, and kept as is on a refusal."""
-    refused = OperationResult.permanent_error(message="refused", error_code=ErrorCode.EMPTY_HISTORY)
+    refused: OperationResult[Any] = OperationResult.permanent_error(message="refused", error_code=ErrorCode.EMPTY_HISTORY)
     calls = _install(monkeypatch, refused)
 
     result = await _fill(edit=None)
@@ -161,7 +182,9 @@ async def test_without_a_stage_the_stored_draft_is_the_model_base(monkeypatch: p
 
 async def test_an_unreadable_base_is_an_error_without_a_fill(monkeypatch: pytest.MonkeyPatch) -> None:
     """When the stored draft that would be the model's base cannot be read, nothing is filled."""
-    unreadable = OperationResult.permanent_error(message="stale", error_code=ErrorCode.STATUS_UPDATE_CONFLICT)
+    unreadable: OperationResult[Any] = OperationResult.permanent_error(
+        message="stale", error_code=ErrorCode.STATUS_UPDATE_CONFLICT
+    )
     calls = _install(monkeypatch, OperationResult.success(data=None), read=unreadable)
 
     result = await _fill(edit=None)
@@ -172,8 +195,8 @@ async def test_an_unreadable_base_is_an_error_without_a_fill(monkeypatch: pytest
 
 async def test_an_unreadable_kept_draft_is_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """When a refusal's kept draft cannot be read back, the read's error is returned."""
-    refused = OperationResult.permanent_error(message="refused", error_code=ErrorCode.EMPTY_HISTORY)
-    unreadable = OperationResult.transient_error(message="throttled", error_code=ErrorCode.RATE_LIMITED)
+    refused: OperationResult[Any] = OperationResult.permanent_error(message="refused", error_code=ErrorCode.EMPTY_HISTORY)
+    unreadable: OperationResult[Any] = OperationResult.transient_error(message="throttled", error_code=ErrorCode.RATE_LIMITED)
     _install(monkeypatch, refused, read=unreadable)
 
     result = await _fill()

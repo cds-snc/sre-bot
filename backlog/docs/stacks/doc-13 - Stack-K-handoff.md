@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: '2026-10-14 22:27'
-updated_date: '2026-10-19 19:19'
+updated_date: '2026-10-20 16:05'
 ---
 # Stack K handoff
 
@@ -30,9 +30,9 @@ updated_date: '2026-10-19 19:19'
 | P2 | Planning edits of 2026-10-15 (GH-issue task sync, ADR refinement, TASK-145.5.4 split) | `stack-k/task-145.5.4-incident-store` | #1721 | merged | Merged 2026-10-19 16:35 UTC (e2ff8ac1 on main). A planning layer despite its branch name (rename failed in `gh stack modify`). |
 | 5 | TASK-145.5.4 IncidentStore end-state reads, incidents RecordTable, fake, full items from index reads | `stack-k/task-145.5.4-end-state-reads` | #1722 | merged | Merged 2026-10-19 17:33 UTC (865b143b on main). Task still In Progress: human sets Done (next action 1). |
 | 6 | TASK-145.5.8 legacy item bridge (`legacy_items.py`), store hook, tenants argument, stored-time formatter | `stack-k/task-145.5.8-legacy-item-bridge` | #1723 | merged | Merged 2026-10-19 18:04 UTC (58fde475 on main; the squash took the title of its handoff-doc commit). Task Done. |
-| 7 | TASK-145.5.9 configured-systems read: ConfiguredSystems Protocol in contracts/workplace, host implementation in server/configured_systems.py, core service, registry fake | `stack-k/task-145.5.5-cutover` | #1728 | in review | Submitted 2026-10-19 (c8a3a1f4); base is now `main`. Branch keeps its pre-split name (rename failed; a PR comment explains it). The remote branch is already rebased onto `main` (same three patches); the local branch is stale until `gh stack sync` after the layer 8 commit (`gh stack view` shows a warning). Merges once layer 8 is submitted above it; TASK-24.4 follows that merge. |
-| 8 | TASK-145.5.10 IncidentStore builder: `build_incident_store(records, systems, settings)` in core/api.py from a resolved RecordStore, the incident core settings and the configured tenants; no policy read | `stack-k/task-145.5.10-incident-store-builder` | - | ready | Plan approved 2026-10-19 (option A: takes the IncidentCoreSettings slice). Implemented 2026-10-19: 4 ACs checked, gates green (5373 passed), 1 prod file (+20/-3 with docstring); tests in `test_incident_core_api_build_incident_store.py` plus the api surface test. Nothing calls it until layer 9 adds the entry-point callers; no behaviour change. Commit and submit pending (next action 1). |
-| 9 | TASK-145.5.5 cutover: entry points build the store and the ConversationReference; comms on IncidentStore and the bool security flag; startup registration check; narrow Protocols, legacy_incidents and IncidentSecurityFlag deleted | - | - | planned | Standalone merge and deploy, only after layers 5 to 8 have merged and with layer 10 submitted above it. TASK-24.5 merges only after this has deployed and been checked. ~200 changed, ~260 deleted, ~28 test files edited; size gate to re-check at planning. |
+| 7 | TASK-145.5.9 configured-systems read: ConfiguredSystems Protocol in contracts/workplace, host implementation in server/configured_systems.py, core service, registry fake | `stack-k/task-145.5.5-cutover` | #1728 | merged | Merged 2026-10-19 20:22 UTC (a59c1da1 on main). Branch keeps its pre-split name. Task still In Progress: human sets Done (next action 1). TASK-24.4 (#1733) later moved the Google settings: `GoogleWorkspaceSettings` and `GoogleResourcesConfig` now come from `integrations.google_workspace.settings`. |
+| 8 | TASK-145.5.10 IncidentStore builder: `build_incident_store(records, systems, settings)` in core/api.py from a resolved RecordStore, the incident core settings and the configured tenants; no policy read | `stack-k/task-145.5.10-incident-store-builder` | #1730 | in review | Commits 3b050f7d (builder) and 99e8ec89 (task Done). Synced onto `main` 1f169b40 after TASK-24.2/24.3/24.4 (#1731 to #1733) merged on 2026-10-20; awaiting re-approval. Merges once layer 9 is submitted above it. No behaviour change. |
+| 9 | TASK-145.5.5 cutover: entry points build the store and the ConversationReference; comms on IncidentStore and the bool security flag; startup registration check; narrow Protocols, legacy_incidents and IncidentSecurityFlag deleted | `stack-k/task-145.5.5-incident-cutover` | - | ready | Plan approved 2026-10-20 (size gate passed: 7 prod files, +200/-330). Implemented 2026-10-20: 10 ACs checked, gates green (make test 4593 + 772 passed, every make check-* OK, 0 mypy errors in touched files). Commit and submit pending (next action 1). Standalone merge and deploy after #1730 merges, with layer 10 submitted above it; the TASK-152 index simulation comes before the deploy; TASK-24.5 waits until the deploy is checked. |
 | 10 | TASK-145.5.6 StatusUpdateStore onto RecordStore | - | - | planned | |
 | 11 | TASK-27.5 bounded full-table read | - | - | planned | First consumer is layer 12. |
 | 12 | TASK-145.5.7 incident legacy upgrade job | - | - | planned | Upgrades every item without record_version through the bridge, sets the open index, unmatched status fails the run with a list. Re-plan at pickup with a size-gate check. |
@@ -42,9 +42,8 @@ A planning-only refinement (ADR text, no code) is normally an earlier commit on 
 
 ## Position
 
-- Checked out: `stack-k/task-145.5.10-incident-store-builder` (layer 8), no commits of its own yet. Uncommitted, all for the layer 8 commit: `app/features/incident/core/api.py`, the two api tests, this doc, and the task files of TASK-145.5.10, TASK-145.5.4 (Done) and TASK-145.5.5 (TASK-24 merge order).
-- Open PRs: #1728 (layer 7) in review, the only open layer; layer 8 must be submitted before it merges.
-- Local branches still carry the pre-squash commits of layers 5 and 6 until `gh stack sync` runs after the layer 8 commit (next action 1).
+- Checked out: `stack-k/task-145.5.5-incident-cutover` (layer 9), no commits of its own yet. Uncommitted, all for the layer 9 commit: `app/features/incident/` (the deletion of `core/adapters/legacy_incidents.py` is already staged), `app/tests/` (new `tests/factories/incident.py`, `tests/factories/services.py` and the entry-point resolution test; two legacy core tests deleted), this doc, and the task files of TASK-145.5.5 (In Progress) and TASK-145.5.9 (Done).
+- Open PRs: #1730 (layer 8), synced onto `main`, awaiting re-approval; it merges once layer 9 is submitted above it.
 - Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-11*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`.
 - Production data facts (scans, 2026-10-15): 323 incident items; status values include 30 `closed` and 1 `reviewed` in lowercase, nothing else outside the five; security_incident absent on 316 items (only stored since #1549, 2026-10-07); every created_at is an epoch string. Production configures Slack (SLACK_TEAM_ID in SSM) and Google (GCP_SRE_SERVICE_ACCOUNT_KEY_FILE, terraform/ecs.tf:30); INCIDENT_CORE__NEW_INCIDENT_SYSTEM is not set anywhere.
 - Local DynamoDB has the incidents GSIs and the timeline table.
@@ -52,22 +51,27 @@ A planning-only refinement (ADR text, no code) is normally an earlier commit on 
 
 ## Next actions
 
-1. **human**: commit layer 8, then sync and submit (sync rebases layers 7 and 8 onto `main`, dropping the pre-squash layer 5 and 6 commits; submit opens the layer 8 PR):
+1. **human**: commit layer 9 and submit (opens its PR on top of #1730):
    ```
-   git add app/features/incident/core/api.py app/tests/unit/features/incident/core/test_incident_core_api_build_incident_store.py app/tests/unit/features/incident/core/test_incident_core_api_surface.py "backlog/docs/stacks/doc-13 - Stack-K-handoff.md" backlog/tasks
-   git commit -m "feat: IncidentStore builder"
-   gh stack sync
+   git add app/features app/tests "backlog/docs/stacks/doc-13 - Stack-K-handoff.md" backlog/tasks
+   git commit -m "feat: comms reads incidents via IncidentStore"
    gh stack submit
    ```
-2. **human**: request review of the layer 8 PR; get #1728 re-approved after the sync push and merge it (layer 8 is then the submitted layer above). TASK-24.4 (doc-11 row 6c) follows that merge.
-3. The stack pauses for the doc-11 P2 side rows (6a TASK-24.2, 6b TASK-24.3, 6c TASK-24.4); layer 8 stays in review.
-4. **human**, when the stack resumes at row 7: `gh stack checkout stack-k/task-145.5.10-incident-store-builder` then `gh stack add stack-k/task-145.5.5-cutover-entry-points` (the old `task-145.5.5-cutover` name is taken by layer 7). **agent**: /plan-task 145.5.5, stopping for approval.
-5. Layer 9 merges and deploys alone after layers 7 and 8 have merged; TASK-24.5 waits for that deploy to be checked.
-6. **human**: run the TASK-152 post-apply simulation and paste the output:
+2. **human**: request review of the layer 9 PR; get #1730 (layer 8) re-approved and merge it (layer 9 is then the submitted layer above), then `gh stack sync` and `gh stack submit`.
+3. **human**, last commit on the layer 9 PR before it merges (it closes the task in its own PR):
    ```
-   aws iam simulate-principal-policy --policy-source-arn <sre-bot-ecs-role ARN> --action-names dynamodb:Query --resource-arns <audit trail table ARN>/index/correlation_id-index <webhooks table ARN>/index/x
+   backlog task edit 145.5.5 --status Done
+   git add backlog/tasks
+   git commit -m "plan: mark task done"
+   gh stack submit
    ```
-   **agent**: record it in the TASK-152 notes and check AC 2 (expect allowed, then implicitDeny).
+4. **human**, next session (doc-11 row 8): `gh stack checkout stack-k/task-145.5.5-incident-cutover` then `gh stack add stack-k/task-145.5.6-status-update-store`. **agent**: /plan-task 145.5.6, stopping for approval.
+5. **human**: layer 9 merges and deploys alone, only once layer 10 is submitted above it and after next action 6. After the deploy, check `/sre incident status-update` in an incident channel and in a non-incident channel; TASK-24.5 (doc-11 row 8a) waits for that check. Rollback: revert the squash commit.
+6. **human**: run the TASK-152 post-apply simulation, now including the incidents index, and paste the output:
+   ```
+   aws iam simulate-principal-policy --policy-source-arn <sre-bot-ecs-role ARN> --action-names dynamodb:Query --resource-arns <audit trail table ARN>/index/correlation_id-index <incidents table ARN>/index/by_channel <webhooks table ARN>/index/x
+   ```
+   **agent**: record it in the TASK-152 notes and check AC 2 (expect allowed, allowed, then implicitDeny).
 7. **human**: confirm the #1597 tf_apply log shows the two GSI creations and `aws dynamodb describe-table --table-name incidents` shows both indexes ACTIVE; paste for the TASK-145.5.1 notes. **agent**: record the evidence (skip if its notes already carry it).
 
 ## Open decisions
@@ -76,5 +80,5 @@ A planning-only refinement (ADR text, no code) is normally an earlier commit on 
 
 ## Planning queue
 
-- TASK-145.5.5: next to plan, on layer 9 (next action 4); the 2026-10-19 decisions and the TASK-24 merge order are in its description; re-check the size gate (~28 test files move to the in-memory store).
-- TASK-145.5.6, TASK-27.5, TASK-145.5.7, TASK-145.6: each planned in turn after the layer below is implemented; re-check the size gate on 145.5.7.
+- TASK-145.5.6: next to plan, on layer 10 (next action 4).
+- TASK-27.5, TASK-145.5.7, TASK-145.6: each planned in turn after the layer below is implemented; re-check the size gate on 145.5.7.

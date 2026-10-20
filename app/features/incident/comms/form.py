@@ -31,20 +31,23 @@ from features.incident.comms.service import (
     start_status_update_draft,
     text_generation_available,
 )
-from features.incident.core.api import StatusUpdate
+from features.incident.core.api import ConversationReference, IncidentStore, StatusUpdate
 
 
-def start_status_update_form(conversation_id: str, *, author: str) -> OperationResult[StatusUpdateFormState]:
+def start_status_update_form(
+    incidents: IncidentStore, conversation: ConversationReference, *, author: str
+) -> OperationResult[StatusUpdateFormState]:
     """Return the form for the pending draft, starting a hand-written draft when none is pending.
 
     Args:
-        conversation_id: The incident conversation the modal was opened from.
+        incidents: Reads the incident records.
+        conversation: The incident conversation the modal was opened from.
         author: Platform user id of the responder who pressed New update.
 
     Returns:
         Success with the draft and how it came to be; otherwise the start's classified error.
     """
-    started = start_status_update_draft(conversation_id, author=author)
+    started = start_status_update_draft(incidents, conversation, author=author)
     if not started.is_success or started.data is None:
         return _failure(started)
     return OperationResult.success(
@@ -66,7 +69,8 @@ async def open_status_update_form(incident_id: str, sequence: int) -> OperationR
 
 
 async def save_status_update_form(
-    conversation_id: str,
+    incidents: IncidentStore,
+    conversation: ConversationReference,
     incident_id: str,
     sequence: int,
     *,
@@ -76,7 +80,8 @@ async def save_status_update_form(
     """Store the typed values as the next draft and return the form to show.
 
     Args:
-        conversation_id: The incident conversation the form was opened from.
+        incidents: Reads the incident records.
+        conversation: The incident conversation the form was opened from.
         incident_id: The incident the draft belongs to.
         sequence: The pending draft's sequence the responder is editing.
         edit: The typed stage and fields; ``None`` when the form had no readable stage.
@@ -90,7 +95,7 @@ async def save_status_update_form(
     if edit is None:
         failure_code: str | None = ErrorCode.STATUS_UPDATE_FIELDS_INVALID
     else:
-        saved = save_status_update_draft(conversation_id, sequence, edit=edit, author=author)
+        saved = save_status_update_draft(incidents, conversation, sequence, edit=edit, author=author)
         if saved.is_success and saved.data is not None:
             return OperationResult.success(
                 data=StatusUpdateFormState(update=saved.data, ai_available=text_generation_available())
@@ -102,7 +107,8 @@ async def save_status_update_form(
 
 
 async def fill_status_update_form(
-    conversation_id: str,
+    incidents: IncidentStore,
+    conversation: ConversationReference,
     incident_id: str,
     sequence: int,
     *,
@@ -119,7 +125,8 @@ async def fill_status_update_form(
     ``None``) or a kept draft needs it.
 
     Args:
-        conversation_id: The incident conversation the form was opened from.
+        incidents: Reads the incident records and its security flag.
+        conversation: The incident conversation the form was opened from.
         incident_id: The incident the draft belongs to.
         sequence: The pending draft's sequence the responder is editing.
         edit: The typed stage and fields; ``None`` when the form had no readable stage.
@@ -144,7 +151,8 @@ async def fill_status_update_form(
     else:
         current = edit
     filled = await generate_status_update_draft(
-        conversation_id,
+        incidents,
+        conversation,
         sequence,
         current=current,
         author=author,

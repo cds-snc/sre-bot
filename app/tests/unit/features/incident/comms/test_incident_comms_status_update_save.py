@@ -1,8 +1,8 @@
 """Tests for saving a responder's status-update draft in the comms service.
 
-The service runs against the in-memory status-update store and a stub incident
-lookup, with a fixed ``now``. No transcript reader, security reader or text
-generator is involved, because saving never reads the conversation or calls a
+The service runs against the in-memory status-update store and an in-memory
+incident store holding one incident on the channel, with a fixed ``now``. No
+transcript reader, security flag read or text generator is involved, because saving never reads the conversation or calls a
 model. Assertions compare the exact stored records and result codes, because a
 save must add one new draft (or none on a replay) and leave every earlier
 record as it was.
@@ -19,7 +19,7 @@ from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
 from features.incident.comms.domain import StatusUpdateEdit
 from features.incident.comms.service import save_status_update_draft
-from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
+from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
 from features.incident.core.api import (
     StatusUpdate,
     StatusUpdateOrigin,
@@ -27,6 +27,7 @@ from features.incident.core.api import (
     StatusUpdateState,
     StatusUpdateText,
 )
+from tests.factories.incident import incident_on, incident_store_with, slack_conversation
 
 pytestmark = pytest.mark.unit
 
@@ -72,14 +73,6 @@ def _record(
 _APPROVED = _record(1, StatusUpdateState.APPROVED, minutes_ago=90)
 _PENDING = _record(2, StatusUpdateState.DRAFT, minutes_ago=40)
 _EDIT = StatusUpdateEdit(stage=StatusUpdateStage.IDENTIFIED, en=_text("en", " edited"), fr=_text("fr", " edited"))
-
-
-class _StubLookup:
-    def __init__(self, result: OperationResult[str] | None = None) -> None:
-        self._result = result or OperationResult.success(data=_INCIDENT)
-
-    def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
-        return self._result
 
 
 class _RacingStore(InMemoryStatusUpdateStore):
@@ -130,15 +123,15 @@ def _save(
     sequence: int = _PENDING.sequence,
     edit: StatusUpdateEdit = _EDIT,
     author: str = _SAVER,
-    lookup: _StubLookup | None = None,
+    incidents: InMemoryIncidentStore | None = None,
     now: datetime = _NOW,
 ) -> OperationResult[StatusUpdate]:
     return save_status_update_draft(
-        _CHANNEL,
+        incidents if incidents is not None else incident_store_with(incident_on(_CHANNEL, _INCIDENT)),
+        slack_conversation(_CHANNEL),
         sequence,
         edit=edit,
         author=author,
-        lookup=lookup or _StubLookup(),
         store=store,
         now=now,
     )
@@ -314,14 +307,11 @@ class TestPassThrough:
             3,
         )
 
-    def test_a_lookup_refusal_passes_through_with_no_write(self) -> None:
-        """Outside an incident nothing is saved."""
+    def test_a_conversation_outside_an_incident_passes_through_with_no_write(self) -> None:
+        """Outside an incident nothing is saved: an incident store with no incident on the channel refuses."""
         store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
-        refusal: OperationResult[str] = OperationResult.error(
-            OperationStatus.NOT_FOUND, message="no incident", error_code=ErrorCode.NOT_AN_INCIDENT
-        )
 
-        result = _save(store=store, lookup=_StubLookup(refusal))
+        result = _save(store=store, incidents=incident_store_with())
 
         assert (result.status, result.error_code) == (OperationStatus.NOT_FOUND, ErrorCode.NOT_AN_INCIDENT)
         assert _stored(store) == (_PENDING, _APPROVED)

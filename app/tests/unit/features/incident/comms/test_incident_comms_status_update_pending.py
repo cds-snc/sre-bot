@@ -1,7 +1,10 @@
 """Tests for retrieving the pending status update draft.
 
-get_pending_status_update looks up the conversation's incident, reads the pending
-draft when it exists, returns None otherwise, and classifies errors.
+get_pending_status_update resolves the conversation's incident through the
+incident store, reads the pending draft when it exists, returns None otherwise,
+and classifies errors. The incident store is an ``InMemoryIncidentStore`` seeded
+with no, one or two incidents on the channel, so a refusal comes from the same
+conversation match the real store applies.
 """
 
 from collections.abc import Sequence
@@ -14,6 +17,7 @@ from contracts.operations.codes import ErrorCode
 from features.incident.comms.service import get_pending_status_update
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
+from tests.factories.incident import incident_on, incident_store_with, slack_conversation
 
 pytestmark = pytest.mark.unit
 
@@ -47,12 +51,7 @@ def _update(sequence: int, state: StatusUpdateState, stage: StatusUpdateStage = 
     )
 
 
-class _StubLookup:
-    def __init__(self, result: OperationResult[str] | None = None) -> None:
-        self._result = result or OperationResult.success(data=_INCIDENT)
-
-    def find_incident_for_conversation(self, conversation_id: str) -> OperationResult[str]:
-        return self._result
+_CONVERSATION = slack_conversation(_CHANNEL)
 
 
 def _store(*updates: StatusUpdate) -> InMemoryStatusUpdateStore:
@@ -68,9 +67,9 @@ def test_returns_the_latest_draft_when_it_exists():
         _update(1, StatusUpdateState.APPROVED),
         _update(2, StatusUpdateState.DRAFT),
     )
-    lookup = _StubLookup()
+    incidents = incident_store_with(incident_on(_CHANNEL, _INCIDENT))
 
-    result = get_pending_status_update(_CHANNEL, lookup=lookup, store=store)
+    result = get_pending_status_update(incidents, _CONVERSATION, store=store)
 
     assert result.is_success
     assert result.data is not None
@@ -84,9 +83,9 @@ def test_returns_none_when_latest_is_approved():
         _update(1, StatusUpdateState.APPROVED),
         _update(2, StatusUpdateState.APPROVED),
     )
-    lookup = _StubLookup()
+    incidents = incident_store_with(incident_on(_CHANNEL, _INCIDENT))
 
-    result = get_pending_status_update(_CHANNEL, lookup=lookup, store=store)
+    result = get_pending_status_update(incidents, _CONVERSATION, store=store)
 
     assert result.is_success
     assert result.data is None
@@ -95,42 +94,31 @@ def test_returns_none_when_latest_is_approved():
 def test_returns_none_when_no_updates_exist():
     """When the incident has no updates at all, None is returned."""
     store = InMemoryStatusUpdateStore()
-    lookup = _StubLookup()
+    incidents = incident_store_with(incident_on(_CHANNEL, _INCIDENT))
 
-    result = get_pending_status_update(_CHANNEL, lookup=lookup, store=store)
+    result = get_pending_status_update(incidents, _CONVERSATION, store=store)
 
     assert result.is_success
     assert result.data is None
 
 
-def test_returns_not_an_incident_when_lookup_fails_with_not_found():
+def test_returns_not_an_incident_when_no_incident_is_on_the_conversation():
     """A conversation with no incident returns NOT_FOUND with NOT_AN_INCIDENT."""
-    lookup = _StubLookup(
-        OperationResult.error(
-            OperationStatus.NOT_FOUND,
-            message="no incident",
-            error_code=ErrorCode.NOT_AN_INCIDENT,
-        )
-    )
+    incidents = incident_store_with()
     store = _store()
 
-    result = get_pending_status_update(_CHANNEL, lookup=lookup, store=store)
+    result = get_pending_status_update(incidents, _CONVERSATION, store=store)
 
     assert result.status == OperationStatus.NOT_FOUND
     assert result.error_code == ErrorCode.NOT_AN_INCIDENT
 
 
-def test_returns_ambiguous_when_lookup_fails_with_ambiguous():
+def test_returns_ambiguous_when_two_incidents_are_on_the_conversation():
     """A conversation that maps to multiple incidents returns PERMANENT_ERROR with AMBIGUOUS_INCIDENT_CONVERSATION."""
-    lookup = _StubLookup(
-        OperationResult.permanent_error(
-            message="multiple incidents",
-            error_code=ErrorCode.AMBIGUOUS_INCIDENT_CONVERSATION,
-        )
-    )
+    incidents = incident_store_with(incident_on(_CHANNEL, _INCIDENT), incident_on(_CHANNEL, "inc-uuid-2"))
     store = _store()
 
-    result = get_pending_status_update(_CHANNEL, lookup=lookup, store=store)
+    result = get_pending_status_update(incidents, _CONVERSATION, store=store)
 
     assert result.status == OperationStatus.PERMANENT_ERROR
     assert result.error_code == ErrorCode.AMBIGUOUS_INCIDENT_CONVERSATION
@@ -138,9 +126,9 @@ def test_returns_ambiguous_when_lookup_fails_with_ambiguous():
 
 def test_returns_store_error_when_list_fails():
     """A store failure is returned to the caller."""
-    lookup = _StubLookup()
+    incidents = incident_store_with(incident_on(_CHANNEL, _INCIDENT))
 
-    class _FailingStore:
+    class _FailingStore(InMemoryStatusUpdateStore):
         def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
             return OperationResult.transient_error(
                 message="throttled",
@@ -148,9 +136,9 @@ def test_returns_store_error_when_list_fails():
                 retry_after=3,
             )
 
-    store = _FailingStore()  # type: ignore[assignment]
+    store = _FailingStore()
 
-    result = get_pending_status_update(_CHANNEL, lookup=lookup, store=store)
+    result = get_pending_status_update(incidents, _CONVERSATION, store=store)
 
     assert result.status == OperationStatus.TRANSIENT_ERROR
     assert result.error_code == ErrorCode.RATE_LIMITED
