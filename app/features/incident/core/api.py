@@ -5,8 +5,8 @@ Subdomains of the incident feature import this module and nothing else from
 provider functions that resolve the default implementations, and
 ``find_incident_for_conversation``, the command check every incident command
 applies first. ``StatusUpdateStore`` keeps each public status update as its own
-record under the incident id. ``IncidentStore`` reads the incident record; no
-provider builds it until TASK-145.5.5.
+record under the incident id. ``IncidentStore`` reads the incident record;
+entry points build it per service scope with ``build_incident_store``.
 """
 
 from collections.abc import Sequence
@@ -15,6 +15,9 @@ from functools import lru_cache
 from typing import Protocol, runtime_checkable
 
 from contracts.operations.result import OperationResult
+from contracts.records import RecordStore
+from contracts.workplace import ConfiguredSystems
+from features.incident.common.settings import IncidentCoreSettings
 from features.incident.common.vocabulary import StatusUpdateStage
 from features.incident.core.adapters.i18n import translate
 from features.incident.core.adapters.legacy_incidents import (
@@ -40,7 +43,7 @@ from features.incident.core.domain import (
     TranscriptMessage,
     VideoCallReference,
 )
-from features.incident.core.store import IncidentStore
+from features.incident.core.store import IncidentStore, RecordIncidentStore, incidents_table
 
 __all__ = [
     "ConversationReference",
@@ -64,6 +67,7 @@ __all__ = [
     "TimelineEntry",
     "TranscriptMessage",
     "VideoCallReference",
+    "build_incident_store",
     "find_incident_for_conversation",
     "get_incident_lookup",
     "get_incident_security_reader",
@@ -187,6 +191,19 @@ class StatusUpdateStore(Protocol):
             ValueError: ``expected_state`` cannot move to ``update.state``.
         """
         ...
+
+
+def build_incident_store(records: RecordStore, systems: ConfiguredSystems, settings: IncidentCoreSettings) -> IncidentStore:
+    """Return the ``IncidentStore`` over the resolved ``RecordStore``.
+
+    A plain function, called by an entry point inside its service scope with the
+    services it resolved there. The table name comes from the incident core
+    settings; the tenants the legacy item bridge needs are copied from the
+    configured-systems read, so a system not configured has no tenant. The
+    new-incident policy is not read: only the declare path resolves it, so
+    reading existing incidents never depends on it.
+    """
+    return RecordIncidentStore(records, incidents_table(settings.INCIDENTS_TABLE), dict(systems.tenants()))
 
 
 @lru_cache(maxsize=1)

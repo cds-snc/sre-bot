@@ -60,6 +60,7 @@ def test_api_exports_exactly_the_public_names() -> None:
         "TimelineEntry",
         "TranscriptMessage",
         "VideoCallReference",
+        "build_incident_store",
         "find_incident_for_conversation",
         "get_incident_lookup",
         "get_incident_security_reader",

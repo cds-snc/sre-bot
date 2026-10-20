@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-14 23:09'
-updated_date: '2026-10-19 15:26'
+updated_date: '2026-10-19 18:11'
 labels:
   - incident
   - features
@@ -44,6 +44,10 @@ THIS SLICE
 - core/adapters/legacy_incidents.py is deleted; in the same PR the IncidentSecurityFlag enum (core/domain.py) and its tests are deleted.
 - The new-incident policy is not read here (decisions/incident-management.md, amended 2026-10-19: resolved only by the declare path, TASK-145.7).
 - Rollback: one revert restores the scan.
+
+MERGE ORDER WITH TASK-24 (human, 2026-10-19)
+- TASK-24.4 (Google settings move, edits server/configured_systems.py) follows the #1728 merge (TASK-145.5.9), so it rebases onto the configured-systems read rather than racing it.
+- TASK-24.5 (Google and Slack tenant entries, deletes infrastructure/configuration/integrations/) merges only after this cutover has deployed and been checked in production; it never ships in the cutover's deploy.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
