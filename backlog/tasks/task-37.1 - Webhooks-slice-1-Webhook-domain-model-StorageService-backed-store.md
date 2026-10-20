@@ -4,7 +4,7 @@ title: 'Webhooks slice 1: Webhook domain model + RecordStore-backed store'
 status: To Do
 assignee: []
 created_date: '2026-07-28 18:39'
-updated_date: '2026-10-13 19:59'
+updated_date: '2026-10-20 17:51'
 labels:
   - migration
   - webhooks
@@ -57,6 +57,12 @@ Verify before/while implementing: DynamoDBRecordStore's TypeSerializer returns D
 - [ ] #4 import-linter is green with no new ignore entry: capabilities/webhooks imports no infrastructure/ or server/ module, and imports integrations only inside adapters/ (none in this slice)
 - [ ] #5 Invocation and acknowledgement counters are written with a single atomic operation exposed by the RecordStore Protocol, never a read-modify-write (decisions/webhooks.md), and the in-memory fake honours the same semantics
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-20 (TASK-27.5 planning): the full-table read is RecordStore.read_all(table, *, max_items), all items or a PERMANENT_ERROR (RECORD_READ_LIMIT_EXCEEDED) past the cap, strongly consistent, no order (decisions/cloud-portability.md contract 4, whole-table reads). list_all and lookup use it with max_items from a documented webhooks package setting with a default; lookup filters client-side, allowed only because the webhooks table is configuration-sized.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
