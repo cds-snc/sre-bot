@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: '2026-10-14 22:27'
-updated_date: '2026-10-20 18:45'
+updated_date: '2026-10-20 19:30'
 ---
 # Stack K handoff
 
@@ -34,8 +34,8 @@ updated_date: '2026-10-20 18:45'
 | 6 | TASK-145.5.8 legacy item bridge | `stack-k/task-145.5.8-legacy-item-bridge` | #1723 | merged | Task Done. |
 | 7 | TASK-145.5.9 configured-systems read | `stack-k/task-145.5.5-cutover` | #1728 | merged | Branch keeps its pre-split name. Task Done. |
 | 8 | TASK-145.5.10 IncidentStore builder | `stack-k/task-145.5.10-incident-store-builder` | #1730 | merged | Merged 2026-10-20 17:18 UTC (fd90c402). Task Done. |
-| 9 | TASK-145.5.5 cutover: entry points build IncidentStore and the ConversationReference; comms on IncidentStore and the bool security flag; legacy_incidents and IncidentSecurityFlag deleted | `stack-k/task-145.5.5-incident-cutover` | #1734 | in review | Commits 627f507d (cutover), 75d5a6bf (human: `make test` without coverage), 1fc5f229 (task Done), then a planning commit answering the review question (Slack tenant ADR edits, TASK-157 and the dependent task edits; next action 1). Review required. Standalone merge and deploy, with layer 10 submitted above it; the TASK-152 index simulation comes before the deploy; TASK-24.5 waits until the deploy is checked. |
-| 10 | TASK-145.5.6 status-update store on RecordStore: Protocol and RecordStatusUpdateStore in core/store.py, item layout in core/adapters/status_updates.py, STATUS_UPDATES_TABLE setting, build_status_update_store in core/api.py, comms `store` required and built in every Slack listener's scope | `stack-k/task-145.5.6-status-update-store` | #1735 | in review | Commits 424846b8 (feature) and d9328900 (task Done). Review required. User-visible behaviour unchanged. Merges after layer 9, with layer 11 submitted above it. |
+| 9 | TASK-145.5.5 cutover: entry points build IncidentStore and the ConversationReference; comms on IncidentStore and the bool security flag; legacy_incidents and IncidentSecurityFlag deleted | `stack-k/task-145.5.5-incident-cutover` | #1734 | merged | Merged 2026-10-20 18:52 UTC (a2b65676), with its planning commit answering the review question (Slack tenant ADR edits, TASK-157). Task Done. Post-deploy check pending (next action 4). |
+| 10 | TASK-145.5.6 status-update store on RecordStore: Protocol and RecordStatusUpdateStore in core/store.py, item layout in core/adapters/status_updates.py, STATUS_UPDATES_TABLE setting, build_status_update_store in core/api.py, comms `store` required and built in every Slack listener's scope | `stack-k/task-145.5.6-status-update-store` | #1735 | in review | Rebased on main after #1734: 339c3d0b (feature), c3a43f9c (task Done), cde5e21e (handoff). Review required. Merges once layer 11 is submitted above it (the stack keeps an open layer). |
 | 11 | TASK-145.5.7 incident legacy upgrade job | - | - | planned | Built on layer 10 after TASK-27.5 and TASK-157 merge (single PRs from main). Re-plan at pickup with a size-gate check. AC6 (2026-10-20): read_all with INCIDENT_CORE__FULL_READ_MAX_ITEMS (default 10000), added in this layer; AC7: auth.test tenant check before apply; AC8: by_channel tenant-drop warning. |
 | 12 | TASK-145.6 core resource interfaces | - | - | planned | 2026-10-09 plan stale; re-plan at pickup. |
 
@@ -43,49 +43,30 @@ A planning-only refinement (ADR text, no code) is normally an earlier commit on 
 
 ## Position
 
-- Checked out: `stack-k/task-145.5.6-status-update-store` (layer 10, committed, #1735). Uncommitted edits, split three ways (next action 1): for #1734 (layer 9), the Slack tenant ADR edits (decisions/workplace-systems.md, incident-management.md, configuration.md, transport-slack.md), TASK-157 (new), TASK-145.5.7 (dep and AC6 to AC8; AC6 is the TASK-27.5 cap), TASK-145.7, TASK-24.5, TASK-112, TASK-145.5.5 and doc-2; for #1735 (layer 10), this doc; for the TASK-27.5 PR, the task files of TASK-27.5, TASK-145.12 and TASK-37.1.
-- Open PRs: #1734 (layer 9, review question answered by its planning commit) and #1735 (layer 10), both review required.
+- Stack K top: `stack-k/task-145.5.6-status-update-store` (layer 10, #1735). Layer 11 (TASK-145.5.7) waits on two single PRs from main: TASK-27.5 (implemented on `task-27.5-records-read-all`, gates green, PR to open) and TASK-157 (to plan). The stack pauses until both merge; #1735 stays open as the top layer (doc-2 pause rule).
+- This doc is updated from the TASK-27.5 session and committed on layer 10 (next action 1).
+- Open PRs: #1735 (layer 10, review required).
 - Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-11*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`.
 - Records contract note (from layer 10): `RecordStore.update` returns NOT_FOUND for a missing item without an error code and for a missing table with the backend's code; RecordStatusUpdateStore relies on that difference. TASK-145.8 (IncidentStore.update_field) meets the same case.
+- Records contract note (TASK-27.5): `RecordStore.read_all(table, *, max_items)` returns every item or PERMANENT_ERROR with RECORD_READ_LIMIT_EXCEEDED; layer 11 passes INCIDENT_CORE__FULL_READ_MAX_ITEMS (its AC6).
 - Production data facts (scans, 2026-10-15): 323 incident items; status values include 30 `closed` and 1 `reviewed` in lowercase; security_incident absent on 316 items; every created_at is an epoch string. Production configures Slack and Google; INCIDENT_CORE__NEW_INCIDENT_SYSTEM is not set anywhere. SLACK_TEAM_ID lives in sre-bot-config-infrastructure.
 - Local DynamoDB has the incidents GSIs and the timeline table.
 - No background agents.
 
 ## Next actions
 
-1. **human**: land the uncommitted edits on the PRs they belong to:
-   ```
-   git stash push -m "task-27.5 planning" -- "backlog/tasks/task-27.5 - Records-bounded-or-paginated-full-table-read-shaped-with-its-first-consumer.md" "backlog/tasks/task-145.12 - Record-cutover-the-incident-list-sheet-becomes-a-write-only-projection-and-the-sheet-import-is-removed.md" "backlog/tasks/task-37.1 - Webhooks-slice-1-Webhook-domain-model-StorageService-backed-store.md"
-   git stash push -m "stack-k handoff" -- "backlog/docs/stacks/doc-13 - Stack-K-handoff.md"
-   gh stack checkout stack-k/task-145.5.5-incident-cutover
-   git add decisions backlog/tasks "backlog/docs/doc-2 - Delivery-Sequence-and-Stacked-Pull-Requests.md"
-   git commit -m "plan: verify the configured Slack tenant"
-   gh stack rebase
-   gh stack checkout stack-k/task-145.5.6-status-update-store
-   git stash pop
-   git add "backlog/docs/stacks/doc-13 - Stack-K-handoff.md"
-   git commit -m "plan: update Stack K handoff"
-   gh stack submit
-   ```
-   Then post the reply to the #1734 review question and request re-approval of #1734 and #1735.
-2. **human**: run `auth.test` with the production bot token and report whether it returns `enterprise_id` (decides whether production sets SLACK_ENTERPRISE_ID under TASK-157).
-3. **human**: merge #1734 (layer 9; layer 10 is submitted above it) once approved and after the TASK-152 simulation (next action 6); then `gh stack sync` and `gh stack submit`.
-4. **human**: approve the TASK-27.5 plan, then cut its branch from an up-to-date main and restore its planning edits:
-   ```
-   git checkout main && git pull
-   git checkout -b task-27.5-records-read-all
-   git stash pop
-   ```
-   **agent**: implement TASK-27.5 (ADR commit first, then TDD), gates, ACs, notes; hand over the commit and PR commands.
-5. **agent** (later session, doc-11 row 10a): plan TASK-157 on its own branch from main.
-6. **human**: run the TASK-152 post-apply simulation and paste the output:
+1. **human**: commit this doc on layer 10 (the file is prepared in the session scratchpad; see the session's hand-over), then `gh stack submit`; request review of #1735.
+2. **human**: TASK-27.5 single PR (commands in the session hand-over): ADR commit, feature commit, open the PR, then its Done commit as the last commit before merge.
+3. **human**: run `auth.test` with the production bot token and report whether it returns `enterprise_id` (decides whether production sets SLACK_ENTERPRISE_ID under TASK-157).
+4. **human**: check `/sre incident status-update` in an incident channel and in a non-incident channel on the #1734 deploy; TASK-24.5 (doc-11 row 8a) waits for that check. Rollback: revert the squash commit.
+5. **agent** (next session, doc-11 row 10a): plan TASK-157 on its own branch from an up-to-date main; stop for approval.
+6. **agent** (after TASK-27.5 and TASK-157 merge): `gh stack checkout stack-k/task-145.5.6-status-update-store`, `gh stack add stack-k/task-145.5.7-legacy-upgrade-job` (human), then re-plan TASK-145.5.7 with a size-gate check.
+7. **human**: run the TASK-152 post-apply simulation and paste the output:
    ```
    aws iam simulate-principal-policy --policy-source-arn <sre-bot-ecs-role ARN> --action-names dynamodb:Query --resource-arns <audit trail table ARN>/index/correlation_id-index <incidents table ARN>/index/by_channel <webhooks table ARN>/index/x
    ```
    **agent**: record it in the TASK-152 notes and check AC 2 (expect allowed, allowed, then implicitDeny).
-7. **human**: after the #1734 deploy, check `/sre incident status-update` in an incident channel and in a non-incident channel; TASK-24.5 (doc-11 row 8a) waits for that check. Rollback: revert the squash commit.
-8. **human**: #1735 (layer 10) already carries its Done commit (d9328900); merge it once layer 11 (TASK-145.5.7) is submitted above it.
-9. **human**: confirm the #1597 tf_apply log shows the two GSI creations and `aws dynamodb describe-table --table-name incidents` shows both indexes ACTIVE; paste for the TASK-145.5.1 notes. **agent**: record the evidence (skip if its notes already carry it).
+8. **human**: confirm the #1597 tf_apply log shows the two GSI creations and `aws dynamodb describe-table --table-name incidents` shows both indexes ACTIVE; paste for the TASK-145.5.1 notes. **agent**: record the evidence (skip if its notes already carry it).
 
 ## Open decisions
 
@@ -94,6 +75,6 @@ A planning-only refinement (ADR text, no code) is normally an earlier commit on 
 
 ## Planning queue
 
-- TASK-27.5 (single PR): plan written, waiting on approval (next action 4).
-- TASK-157 (single PR): created 2026-10-20, to plan (next action 4).
-- TASK-145.5.7 (layer 11), TASK-145.6 (layer 12): each planned in turn; re-check the size gate on 145.5.7.
+- TASK-157 (single PR, doc-11 row 10a): created 2026-10-20, next to plan (next action 5).
+- TASK-145.5.7 (layer 11): re-plan after TASK-27.5 and TASK-157 merge, with a size-gate check (its AC6 to AC8 were added 2026-10-20).
+- TASK-145.6 (layer 12): 2026-10-09 plan stale; re-plan at pickup.
