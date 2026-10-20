@@ -76,7 +76,7 @@ class TestSettingsStructure:
         settings = get_app_settings()
 
         assert hasattr(settings, "ENVIRONMENT")
-        assert settings.ENVIRONMENT in {"local", "ci", "dev", "staging", "production"}
+        assert settings.ENVIRONMENT in {"local", "ci", "production"}
 
     def test_settings_classes_have_proper_base_classes(self):
         """Verify settings classes inherit from appropriate base classes."""

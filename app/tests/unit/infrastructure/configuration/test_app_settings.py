@@ -43,28 +43,28 @@ class TestAppSettings:
 class TestAppSettingsEnvironment:
     """Behavior tests for the ENVIRONMENT setting."""
 
-    def test_environment_default_is_local(self, monkeypatch):
-        """Default environment should be local."""
+    def test_environment_missing_fails_naming_it(self, monkeypatch):
+        """ENVIRONMENT has no default: without it (and with no .env file read), construction fails naming the key."""
         monkeypatch.delenv("ENVIRONMENT", raising=False)
 
-        settings = AppSettings()
+        with pytest.raises(ValidationError) as exc_info:
+            AppSettings(_env_file=None)
 
-        assert settings.ENVIRONMENT == "local"
+        assert exc_info.value.errors()[0]["loc"] == ("ENVIRONMENT",)
+        assert exc_info.value.errors()[0]["type"] == "missing"
 
-    @pytest.mark.parametrize(
-        "value",
-        ["local", "ci", "dev", "staging", "production"],
-    )
+    @pytest.mark.parametrize("value", ["local", "ci", "production"])
     def test_environment_all_valid_values(self, value):
-        """All accepted environment values should construct successfully."""
+        """Each environment the app runs in constructs successfully."""
         settings = AppSettings(ENVIRONMENT=value)
 
         assert value == settings.ENVIRONMENT
 
-    def test_environment_invalid_value_raises_validation_error(self):
-        """Unknown environment values should fail validation at settings construction."""
+    @pytest.mark.parametrize("value", ["uat", "dev", "staging", ""])
+    def test_environment_invalid_value_raises_validation_error(self, value):
+        """Values outside local, ci and production (including the retired dev and staging) fail validation."""
         with pytest.raises(ValidationError):
-            AppSettings(ENVIRONMENT="uat")
+            AppSettings(ENVIRONMENT=value)
 
 
 class TestAppSettingsWebhookMaxBodyBytes:

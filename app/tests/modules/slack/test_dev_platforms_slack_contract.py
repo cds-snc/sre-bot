@@ -3,6 +3,8 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from modules.dev.platforms import slack as dev_slack
 
 
@@ -19,13 +21,14 @@ def test_contract_require_dev_environment_uses_environment_not_prefix():
     assert response is None
 
 
-def test_contract_require_dev_environment_denies_production():
-    """Dev commands must be blocked in production environments."""
+@pytest.mark.parametrize("environment", ["production", "ci"])
+def test_contract_require_dev_environment_denies_non_local(environment):
+    """Dev commands are available only in local development; production and CI are denied."""
     payload = MagicMock()
 
     with patch(
         "modules.dev.platforms.slack.get_app_settings",
-        return_value=SimpleNamespace(ENVIRONMENT="production"),
+        return_value=SimpleNamespace(ENVIRONMENT=environment),
     ):
         response = dev_slack._require_dev_environment(payload)
 

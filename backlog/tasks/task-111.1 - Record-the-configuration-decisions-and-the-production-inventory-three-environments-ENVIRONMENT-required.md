@@ -3,10 +3,11 @@ id: TASK-111.1
 title: >-
   Record the configuration decisions and the production inventory; three
   environments, ENVIRONMENT required
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@me'
 created_date: '2026-10-20 23:25'
-updated_date: '2026-10-20 23:35'
+updated_date: '2026-10-20 23:52'
 labels:
   - configuration
 milestone: m-7
@@ -28,13 +29,13 @@ First slice of TASK-111. Commit 1 amends decisions/configuration.md (casing, env
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 decisions/configuration.md records the 2026-10-20 TASK-111 planning decisions: lower snake_case fields and TOML keys with upper-case <SLICE>__<FIELD> env names and case_sensitive=False (replacing the earlier casing rule); ENVIRONMENT in {local, ci, production}, required, one file per value; identity-first load order with deep-merged base and environment files; the closed list of platform-provided names and the exempt SDK namespaces (AWS_*, UVICORN_*, OTEL_*); the rename protocol (new names published beside old ones, no compatibility code, old ones removed once the deploy is verified); secrets as one SSM SecureString per key through task-definition secrets:; extra=forbid per migrated slice and no unowned table; TASK-111 moves every value production sets; the tolerated list updated
-- [ ] #2 decisions/plugin-architecture.md lets contracts/ import pydantic-settings for the settings-slice base and names server/configuration/ as the loader implementation home
-- [ ] #3 A backlog doc lists every key of the sre-bot-config and sre-bot-config-infrastructure SSM parameters and the terraform task-definition env and secrets, by key with no values, each mapped to its owning slice and to a file table, a renamed secret, a platform-provided name or deletion; it records that production sets AWS_ORG_ACCOUNT_ROLE_ARN and ISSUER_CONFIG and does not set ACCESS_SYNC_ENABLED or DIRECTORY_REQUIRE_STARTUP_WARMUP
-- [ ] #4 ENVIRONMENT accepts only local, ci and production and has no default; boot without it fails naming ENVIRONMENT
-- [ ] #5 Code that checked ENVIRONMENT == 'dev' checks 'local'; the devcontainer sets ENVIRONMENT=local; the pytest env and the CI workflow set ENVIRONMENT=ci
-- [ ] #6 app/bin/entry.sh stops on the first failing command (set -eu), so a failed SSM read no longer starts the app with a partial .env
-- [ ] #7 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [x] #1 decisions/configuration.md records the 2026-10-20 TASK-111 planning decisions: lower snake_case fields and TOML keys with upper-case <SLICE>__<FIELD> env names and case_sensitive=False (replacing the earlier casing rule); ENVIRONMENT in {local, ci, production}, required, one file per value; identity-first load order with deep-merged base and environment files; the closed list of platform-provided names and the exempt SDK namespaces (AWS_*, UVICORN_*, OTEL_*); the rename protocol (new names published beside old ones, no compatibility code, old ones removed once the deploy is verified); secrets as one SSM SecureString per key through task-definition secrets:; extra=forbid per migrated slice and no unowned table; TASK-111 moves every value production sets; the tolerated list updated
+- [x] #2 decisions/plugin-architecture.md lets contracts/ import pydantic-settings for the settings-slice base and names server/configuration/ as the loader implementation home
+- [x] #3 A backlog doc lists every key of the sre-bot-config and sre-bot-config-infrastructure SSM parameters and the terraform task-definition env and secrets, by key with no values, each mapped to its owning slice and to a file table, a renamed secret, a platform-provided name or deletion; it records that production sets AWS_ORG_ACCOUNT_ROLE_ARN and ISSUER_CONFIG and does not set ACCESS_SYNC_ENABLED or DIRECTORY_REQUIRE_STARTUP_WARMUP
+- [x] #4 ENVIRONMENT accepts only local, ci and production and has no default; boot without it fails naming ENVIRONMENT
+- [x] #5 Code that checked ENVIRONMENT == 'dev' checks 'local'; the devcontainer sets ENVIRONMENT=local; the pytest env and the CI workflow set ENVIRONMENT=ci
+- [x] #6 app/bin/entry.sh stops on the first failing command (set -eu), so a failed SSM read no longer starts the app with a partial .env
+- [x] #7 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -87,3 +88,29 @@ Assumptions and doubts
 Blast radius and rollback
 - A production boot needs ENVIRONMENT, which terraform sets; worst case a typo'd ENVIRONMENT fails boot and the circuit breaker rolls back to the previous revision. entry.sh now stops on a failed SSM read, which is the intended change; previously the app started half-configured. One git revert restores both. No terraform, SSM or data change.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+What changed
+- decisions/configuration.md: lower snake_case fields and TOML keys with case_sensitive=False (replaces the 2026-10-20 exact-match rule); ENVIRONMENT local/ci/production, required, one file each; identity-first loading order with deep merge and a table per slice (pydantic-settings >= 2.15); platform-provided names (ENVIRONMENT, GIT_SHA, FORWARDED_ALLOW_IPS) and the exempt AWS_*/UVICORN_*/OTEL_* namespaces; rename protocol (publish new beside old, no alias, remove after the verified deploy); secrets as SSM SecureString parameters through task-definition secrets:, values set outside terraform; extra=forbid and no unowned table; TASK-111 moves every value production sets; tolerated list names its closing tickets (TASK-111, 112, 158, 159); Checks gain the table-ownership, gitleaks, per-environment-file and file-error boot checks. Sources cited inline.
+- decisions/plugin-architecture.md: contracts/ may import pydantic-settings for the settings-slice base; configuration loading is host code in server/configuration/.
+- backlog doc-14 "Production configuration inventory": every key of both SSM parameters and the task definition, no values, mapped to slice, destination and subtask; the AC6 facts; the eleven secrets TASK-111.4 creates (the rename map).
+- app/infrastructure/configuration/app.py: ENVIRONMENT is Literal["local", "ci", "production"] with no default.
+- app/modules/incident/core.py: the incident record is labelled prod only in production, dev otherwise (was dev only when ENVIRONMENT == "dev", so a local run would have stored prod).
+- app/modules/dev/platforms/slack.py: dev commands only under local.
+- .devcontainer/docker-compose.yml: ENVIRONMENT local. app/pyproject.toml: pytest env ENVIRONMENT=ci; mypy plugins = ["pydantic.mypy"] (needed for the now-required field: without it mypy flags AppSettings() as missing ENVIRONMENT; repo-wide errors drop from 49 to 47 — the new one and the existing OpenAISettings() call-arg — and none are added).
+- app/bin/entry.sh: set -eu.
+
+Tests
+- New: tests/unit/bin/test_bin_entry_script_failure.py (failed SSM read stops before uvicorn; successful reads write .env and exec uvicorn); test_incident_core.py::test_initiate_resources_creation_labels_record_environment (production/local/ci).
+- Updated: test_app_settings.py (missing ENVIRONMENT fails naming it; dev, staging, empty rejected), test_dev_platforms_slack_contract.py (ci and production denied), and the environment-value asserts in test_app_state_initialization.py, test_settings_structure.py, test_atip_command_registration.py (legacy test files edited in place).
+- Red first: 6 failed before the code change; green after.
+- cd app && uv run ruff check . → All checks passed!
+- cd app && uv run mypy . → 47 errors in 18 files, 0 in touched files (main had 48).
+- cd app && uv run pytest tests --ignore=tests/smoke → 5442 passed.
+
+Human checks
+- A personal app/.env that sets ENVIRONMENT=dev or staging must change to local (devcontainer's real env var wins, but a bare uvicorn run reads .env); not readable from this session.
+- Production: the task definition sets ENVIRONMENT=production, so the required field cannot fail there; entry.sh now stops on a failed SSM read and the circuit breaker rolls back.
+<!-- SECTION:NOTES:END -->

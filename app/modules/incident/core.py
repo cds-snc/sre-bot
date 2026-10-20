@@ -423,7 +423,7 @@ def initiate_resources_creation(
     """Create an incident and its related resources. If incident Slack channel provided, skips that resource creation"""
 
     # Create channel
-    environment = "dev" if app_settings.ENVIRONMENT == "dev" else "prod"
+    environment = "prod" if app_settings.ENVIRONMENT == "production" else "dev"
 
     oncall = on_call.get_on_call_users_from_folder(client, incident_payload.folder)
 

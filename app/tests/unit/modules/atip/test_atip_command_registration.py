@@ -40,7 +40,7 @@ def test_register_builds_atip_command_names_from_command_prefix(
     monkeypatch.setattr(
         atip,
         "get_app_settings",
-        lambda: SimpleNamespace(PREFIX=legacy_prefix, ENVIRONMENT="dev"),
+        lambda: SimpleNamespace(PREFIX=legacy_prefix, ENVIRONMENT="local"),
     )
 
     bot = MagicMock()
