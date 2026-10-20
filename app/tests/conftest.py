@@ -408,7 +408,7 @@ def make_mock_settings():
         def mock_settings(make_mock_settings):
             return make_mock_settings(
                 **{
-                    'slack.SLACK_TOKEN': 'xoxb-test-token',
+                    'idempotency.IDEMPOTENCY_TTL_SECONDS': 3600,
                     'commands.providers': {},
                 }
             )
@@ -427,7 +427,7 @@ def make_mock_settings():
         # Apply package-specific overrides
         for key, value in overrides.items():
             if "." in key:
-                # Handle nested attributes: 'slack.SLACK_TOKEN' -> settings.slack.SLACK_TOKEN
+                # Handle nested attributes: 'aws.AWS_REGION' -> settings.aws.AWS_REGION
                 parts = key.split(".")
                 obj = settings
                 for part in parts[:-1]:

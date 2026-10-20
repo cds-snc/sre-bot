@@ -104,7 +104,7 @@ def test_app_state_bot_may_be_none_but_exists(app_with_lifespan):
     The bot attribute must exist on app.state even if Slack is not configured.
     This prevents KeyError crashes when routes try to check if bot exists.
     """
-    # bot can be None if SLACK_TOKEN is not set, but the attribute must exist
+    # bot can be None when SLACK_ENABLED is off, but the attribute must exist
     assert hasattr(app_with_lifespan.app.state, "bot"), (
         "app.state.bot attribute missing. Routes cannot safely check getattr(app.state, 'bot', None) if attribute doesn't exist."
     )

@@ -12,12 +12,12 @@ scope: Settings ownership, configuration files, plugin enablement, environment i
 Every setting is read from environment variables today, through about three dozen `BaseSettings` classes with no configuration files.
 
 Current code:
-- AWS settings live only in `integrations/aws/settings.py`. Slack's settings have two homes: `integrations/slack/settings.py` and `infrastructure/configuration/integrations/slack.py`. OpenAI, Trello, MaxMind, Notify, OpsGenie and Sentinel live only in `integrations/<vendor>/settings.py`; Google lives only in `infrastructure/configuration/integrations/`.
+- AWS settings live only in `integrations/aws/settings.py`. Slack settings live only in `integrations/slack/settings.py`. OpenAI, Trello, MaxMind, Notify, OpsGenie and Sentinel live only in `integrations/<vendor>/settings.py`; Google lives only in `infrastructure/configuration/integrations/`.
 - Some feature settings sit with their feature (`packages/access/common`, `incident/scribe`, `oncall_sync`, `user_rotations`); others sit in `infrastructure/configuration/features/` (`atip`, `aws_ops`, `groups`, `incident`, `sre_ops`).
 - Security settings (`ISSUER_CONFIG`, the `CORS_ALLOWED_*` lists, `DEV_BYPASS_ENABLED`, `DEV_BYPASS_TOKEN`) live in one `SecuritySettings` slice in `infrastructure/security/settings.py`, beside the code that reads them; TASK-116 moves both to `server/security/`.
 - `AppSettings.ENVIRONMENT` is typed `Literal["local", "ci", "dev", "staging", "production"]` and drives environment-conditional behaviour. `AppSettings.PREFIX` no longer exists, and the `Settings` aggregator in `infrastructure/configuration/settings.py` is gone.
 - Which features and jobs run is decided by environment variables and `ENVIRONMENT` checks in code.
-- Vendor clients have no enablement rule, because they are clients, not plugins, and the per-entry-point key never reaches them. `SLACK_ENABLED` is an environment variable defined in three slices with three defaults, and it mixes two meanings: run the Slack transport, and have a Slack workspace. Google has no flag: it is in use when `GCP_SRE_SERVICE_ACCOUNT_KEY_FILE` is set, and `GOOGLE_WORKSPACE_CUSTOMER_ID` defaults to the `my_customer` API alias, not a tenant id.
+- Vendor clients have no enablement rule, because they are clients, not plugins, and the per-entry-point key never reaches them. `SLACK_ENABLED` is an environment variable read by one slice, and it mixes two meanings: run the Slack transport, and have a Slack workspace. Google has no flag: it is in use when `GCP_SRE_SERVICE_ACCOUNT_KEY_FILE` is set, and `GOOGLE_WORKSPACE_CUSTOMER_ID` defaults to the `my_customer` API alias, not a tenant id.
 
 The app is promoted as one image through every environment, and plugins are enabled per environment ([plugin-architecture.md](plugin-architecture.md)). Environment variables are a poor home for non-secret, reviewable configuration: they are invisible in the repo and differ silently between environments.
 
@@ -77,7 +77,7 @@ A system reached in more than one role holds one least-privilege credential per 
 Tickets: TASK-24 (single home per vendor, `SecuritySettings` slice), TASK-111 (configuration files and TOML loading, and the environment renames), TASK-112 (tenant entries and the Slack transport key in the configuration files).
 
 Tolerated until closed:
-- dual vendor homes in `infrastructure/configuration/integrations/` and `integrations/<vendor>/settings.py`;
+- Google settings in `infrastructure/configuration/integrations/` instead of `integrations/google/settings.py`;
 - feature slices in `infrastructure/configuration/features/`;
 - all non-secret settings, and feature and job switches, read from environment variables;
 - plain environment-variable secrets;
@@ -91,3 +91,4 @@ Tolerated until closed:
 - 2026-10-15: a vendor client is enabled by a tenant entry in its slice, with no `<VENDOR>_ENABLED` key; an invalid vendor slice fails boot; the Slack transport gets an enablement key in the configuration files (TASK-153).
 - 2026-10-19: environment names mirror the configuration path (`<SLICE>__<FIELD>`, double-underscore nesting, no per-field aliases); the renames ride with TASK-111, once, for the variables that remain.
 - 2026-10-20: the security settings are one `SecuritySettings` slice (TASK-24.2); the split-security tolerance is closed.
+- 2026-10-20: Slack settings have one home, `integrations/slack/settings.py`; the legacy slice in `infrastructure/configuration/integrations/` and `SlackPlatformSettings` are deleted, and only Google is left in the tolerated second home (TASK-24.3).

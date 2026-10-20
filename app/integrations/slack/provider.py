@@ -30,7 +30,7 @@ from integrations.slack.help import (
 )
 from integrations.slack.models import CommandDefinition
 from integrations.slack.parser import CommandArgumentParser
-from integrations.slack.settings import get_slack_settings
+from integrations.slack.settings import SlackSettings, get_slack_settings
 
 logger = structlog.get_logger()
 
@@ -168,17 +168,12 @@ class SlackPlatformProvider:
     - Response formatting using SlackBlockKitFormatter
 
     Example:
-        from infrastructure.configuration import SlackPlatformSettings
         from integrations.slack.formatter import (
             SlackBlockKitFormatter
         )
+        from integrations.slack.settings import get_slack_settings
 
-        settings = SlackPlatformSettings(
-            ENABLED=True,
-            SOCKET_MODE=True,
-            APP_TOKEN="xapp-...",
-            BOT_TOKEN="xoxb-...",
-        )
+        settings = get_slack_settings()
         formatter = SlackBlockKitFormatter()
         provider = SlackPlatformProvider(
             settings=settings,
@@ -196,7 +191,7 @@ class SlackPlatformProvider:
 
     def __init__(
         self,
-        settings,  # SlackPlatformSettings type
+        settings: SlackSettings,
         formatter: SlackBlockKitFormatter | None = None,
         command_prefix: str = "",
         name: str = "slack",
@@ -207,7 +202,7 @@ class SlackPlatformProvider:
         """Initialize Slack platform provider.
 
         Args:
-            settings: SlackPlatformSettings instance with tokens and config
+            settings: SlackSettings instance with tokens and config
             formatter: Optional SlackBlockKitFormatter for response formatting
             name: Provider name (default: "slack")
             version: Provider version (default: "1.0.0")
@@ -784,11 +779,11 @@ class SlackPlatformProvider:
         return self._reply
 
     @property
-    def settings(self):
+    def settings(self) -> SlackSettings:
         """Get Slack platform settings.
 
         Returns:
-            SlackPlatformSettings instance
+            SlackSettings instance
         """
         return self._settings
 

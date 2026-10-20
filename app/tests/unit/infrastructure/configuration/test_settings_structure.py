@@ -33,7 +33,6 @@ from infrastructure.configuration.infrastructure.server import (
 from infrastructure.configuration.integrations import (
     GoogleResourcesConfig,
     GoogleWorkspaceSettings,
-    SlackSettings,
 )
 from infrastructure.configuration.integrations.google import (
     get_google_workspace_settings,
@@ -102,7 +101,7 @@ class TestSettingsStructure:
     def test_settings_classes_have_proper_base_classes(self):
         """Verify settings classes inherit from appropriate base classes."""
         # Check inheritance
-        assert issubclass(SlackSettings, IntegrationSettings)
+        assert issubclass(GoogleWorkspaceSettings, IntegrationSettings)
         assert issubclass(RetrySettings, InfrastructureSettings)
 
     def test_settings_singleton_still_works(self):
@@ -125,7 +124,6 @@ class TestSettingsStructure:
         """Verify all integration settings classes can be instantiated."""
         # Test that all integration settings classes are functional
         instances = [
-            SlackSettings(),
             GoogleWorkspaceSettings(),
             GoogleResourcesConfig(),
         ]
