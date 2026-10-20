@@ -3,11 +3,11 @@ id: TASK-24.6
 title: >-
   Check that no env var is read by two settings classes; boot test for a missing
   vendor credential
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-10-19 17:19'
-updated_date: '2026-10-20 21:24'
+updated_date: '2026-10-20 21:27'
 labels:
   - clients
   - phase-3
