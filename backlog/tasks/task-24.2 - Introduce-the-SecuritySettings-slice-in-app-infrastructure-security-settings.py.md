@@ -3,11 +3,11 @@ id: TASK-24.2
 title: >-
   Introduce the SecuritySettings slice in
   app/infrastructure/security/settings.py
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-10-19 17:18'
-updated_date: '2026-10-20 12:59'
+updated_date: '2026-10-20 13:02'
 labels:
   - clients
   - phase-3
