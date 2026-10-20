@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-10-20 20:20'
+updated_date: '2026-10-20 21:13'
 labels:
   - plugin-architecture
   - configuration
@@ -47,6 +47,7 @@ GOOGLE_RESOURCES (from TASK-24.4 planning, 2026-10-20): GoogleResourcesConfig si
 - [ ] #5 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 - [ ] #6 Before any value moves, the current contents of the sre-bot-config and sre-bot-config-infrastructure SSM parameters (read by app/bin/entry.sh into .env) are inventoried by key, with secret values omitted, and each key is mapped to its owning slice and to a file, a secret or deletion; the inventory records whether production sets ACCESS_SYNC_ENABLED, AWS_ORG_ACCOUNT_ROLE_ARN and DIRECTORY_REQUIRE_STARTUP_WARMUP
 - [ ] #7 Every environment variable that remains (secrets; deployment identity keeps ENVIRONMENT and GIT_SHA) follows decisions/configuration.md's naming rule <SLICE>__<FIELD> (env_prefix plus env_nested_delimiter, no per-field aliases); the old names are read through AliasChoices for one release, then removed
+- [ ] #8 Every slice that still reads environment variables sets case_sensitive=True with upper-case names, AppSettings and AccessSettings included (decisions/configuration.md, TASK-24.6)
 <!-- AC:END -->
 
 ## Definition of Done
@@ -58,6 +59,8 @@ GOOGLE_RESOURCES (from TASK-24.4 planning, 2026-10-20): GoogleResourcesConfig si
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-20 (TASK-24.5): the vendor tenant entries are derived today: SlackSettings.tenant (SlackTenant) and GoogleWorkspaceSettings.tenant (GoogleWorkspaceTenant), frozen sub-models built from the flat fields, read by every consumer. The renames here make each a nested field read as <SLICE>__TENANT__<FIELD> and drop the flat fields (SLACK_TEAM_ID, GOOGLE_WORKSPACE_CUSTOMER_ID, GCP_SRE_SERVICE_ACCOUNT_KEY_FILE); consumers do not change.
+
+2026-10-20 (TASK-24.6 planning): bin/check_settings_key_ownership.py (make check-settings-key-ownership, run in CI) records each key a slice reads as (source kind, key, owning class). Extend it with a config-file claim source for AC #4. It claims literal validation_alias and AliasChoices names, so AC7's one-release old names are checked for collisions too, whichever migration form this task picks; it fails on an AliasPath or a non-literal alias. It compares names case-insensitively across slices. It also fails on os.environ reads outside settings classes (bin/ and tests/ excluded).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

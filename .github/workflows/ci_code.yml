@@ -67,6 +67,10 @@ jobs:
         working-directory: ./app
         run: make check-fake-coverage
 
+      - name: Settings key ownership check
+        working-directory: ./app
+        run: make check-settings-key-ownership
+
       - name: Test
         working-directory: ./app
         run: make test
