@@ -5,11 +5,11 @@ from __future__ import annotations
 from functools import cache, partial
 from typing import TYPE_CHECKING
 
-from infrastructure.configuration.integrations.google import get_google_workspace_settings
 from infrastructure.directory.google import GoogleDirectoryProvider
 from infrastructure.directory.provider import DirectoryProvider
 from infrastructure.directory.settings import get_directory_settings
 from integrations.google_workspace.client import get_admin_directory_service
+from integrations.google_workspace.settings import get_google_workspace_settings
 
 if TYPE_CHECKING:
     from collections.abc import Callable

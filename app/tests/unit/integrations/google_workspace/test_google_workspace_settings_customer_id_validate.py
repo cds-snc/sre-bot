@@ -10,7 +10,7 @@ my_customer API alias. The id is opaque (Google documents no format).
 import pytest
 from pydantic import ValidationError
 
-from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
+from integrations.google_workspace.settings import GoogleWorkspaceSettings
 
 pytestmark = pytest.mark.unit
 

@@ -12,7 +12,7 @@ scope: Settings ownership, configuration files, plugin enablement, environment i
 Every setting is read from environment variables today, through about three dozen `BaseSettings` classes with no configuration files.
 
 Current code:
-- AWS settings live only in `integrations/aws/settings.py`. Slack settings live only in `integrations/slack/settings.py`. OpenAI, Trello, MaxMind, Notify, OpsGenie and Sentinel live only in `integrations/<vendor>/settings.py`; Google lives only in `infrastructure/configuration/integrations/`.
+- AWS settings live only in `integrations/aws/settings.py`. Slack settings live only in `integrations/slack/settings.py`. OpenAI, Trello, MaxMind, Notify, OpsGenie and Sentinel live only in `integrations/<vendor>/settings.py`, and Google in `integrations/google_workspace/settings.py`. `GOOGLE_RESOURCES`, the Google document and folder ids of several features, is read by `GoogleResourcesConfig` in `integrations/google_workspace/resources.py`.
 - Some feature settings sit with their feature (`packages/access/common`, `incident/scribe`, `oncall_sync`, `user_rotations`); others sit in `infrastructure/configuration/features/` (`atip`, `aws_ops`, `groups`, `incident`, `sre_ops`).
 - Security settings (`ISSUER_CONFIG`, the `CORS_ALLOWED_*` lists, `DEV_BYPASS_ENABLED`, `DEV_BYPASS_TOKEN`) live in one `SecuritySettings` slice in `infrastructure/security/settings.py`, beside the code that reads them; TASK-116 moves both to `server/security/`.
 - `AppSettings.ENVIRONMENT` is typed `Literal["local", "ci", "dev", "staging", "production"]` and drives environment-conditional behaviour. `AppSettings.PREFIX` no longer exists, and the `Settings` aggregator in `infrastructure/configuration/settings.py` is gone.
@@ -77,7 +77,7 @@ A system reached in more than one role holds one least-privilege credential per 
 Tickets: TASK-24 (single home per vendor, `SecuritySettings` slice), TASK-111 (configuration files and TOML loading, and the environment renames), TASK-112 (tenant entries and the Slack transport key in the configuration files).
 
 Tolerated until closed:
-- Google settings in `infrastructure/configuration/integrations/` instead of `integrations/google/settings.py`;
+- `GOOGLE_RESOURCES`, feature data, in `integrations/google_workspace/resources.py` instead of the owning feature slices, until TASK-111 splits it;
 - feature slices in `infrastructure/configuration/features/`;
 - all non-secret settings, and feature and job switches, read from environment variables;
 - plain environment-variable secrets;
@@ -92,3 +92,4 @@ Tolerated until closed:
 - 2026-10-19: environment names mirror the configuration path (`<SLICE>__<FIELD>`, double-underscore nesting, no per-field aliases); the renames ride with TASK-111, once, for the variables that remain.
 - 2026-10-20: the security settings are one `SecuritySettings` slice (TASK-24.2); the split-security tolerance is closed.
 - 2026-10-20: Slack settings have one home, `integrations/slack/settings.py`; the legacy slice in `infrastructure/configuration/integrations/` and `SlackPlatformSettings` are deleted, and only Google is left in the tolerated second home (TASK-24.3).
+- 2026-10-20: Google settings have one home, `integrations/google_workspace/settings.py`, and `infrastructure/configuration/integrations/` is deleted; `GOOGLE_RESOURCES` waits in `integrations/google_workspace/resources.py` until TASK-111 splits it into feature slices (TASK-24.4).

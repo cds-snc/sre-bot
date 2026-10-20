@@ -3,9 +3,10 @@ id: TASK-24.4
 title: >-
   Move the Google Workspace settings to
   integrations/google_workspace/settings.py
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-19 17:19'
+updated_date: '2026-10-20 14:39'
 labels:
   - clients
   - phase-3
@@ -22,14 +23,61 @@ ordinal: 402000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Slice 4 of TASK-24. A pure move of app/infrastructure/configuration/integrations/google.py (GoogleWorkspaceSettings with its customer-id validator, and GoogleResourcesConfig) to app/integrations/google_workspace/settings.py. Consumers: infrastructure/directory/factory.py, integrations/google_workspace/client.py, packages/talent/adapters/google_drive.py, features/incident/drive and scribe adapters, server/lifespan.py, server/configured_systems.py (its Google TenantSource row), seven legacy modules/ files, and the import-linter ignore entries in pyproject.toml. Whether GoogleResourcesConfig (GOOGLE_RESOURCES) is vendor or feature configuration is decided at planning. Env names, defaults and validation unchanged.
+Slice 4 of TASK-24. A pure move of app/infrastructure/configuration/integrations/google.py: GoogleWorkspaceSettings (with its customer-id validator) to app/integrations/google_workspace/settings.py, and GoogleResourcesConfig (GOOGLE_RESOURCES, feature resource IDs) to app/integrations/google_workspace/resources.py until TASK-111 splits it into feature slices. Deletes the emptied infrastructure/configuration/integrations/ package and IntegrationSettings. Consumers: infrastructure/directory/factory.py, integrations/google_workspace/client.py, packages/talent/adapters/google_drive.py, features/incident drive and scribe adapters, server/lifespan.py, server/configured_systems.py (its Google TenantSource row), seven legacy modules/ files, and five import-linter ignores in pyproject.toml. Env names, defaults and validation unchanged.
 
-Merge order: after #1722, #1723 and #1728 (Stack K layers 5 to 7, TASK-145.5.4, 145.5.8, 145.5.9) have merged, because server/configured_systems.py (TASK-145.5.9, #1728) imports the old path; moving it first would rebase every open layer (doc-13 approve-latest-push rule). #1728 merges once layer 8 (TASK-145.5.10) is submitted above it. Cut from main after that merge. TASK-145.5.9 is not a recorded dependency only because it exists on the stack branch, not on main; add it with --dep once it is on main.
+Merge order: cut from main after #1722, #1723 and #1728 (Stack K layers 5 to 7) merged, because server/configured_systems.py imports the old path; all three are merged.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 GoogleWorkspaceSettings lives in app/integrations/google_workspace/settings.py and google.py under app/infrastructure/configuration/integrations/ is deleted; GoogleResourcesConfig has one home, recorded in the PR
-- [ ] #2 Every consumer (server/configured_systems.py included), test and import-linter entry points at the new home; env names, defaults and the customer-id validator are unchanged
-- [ ] #3 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [x] #1 GoogleWorkspaceSettings lives in app/integrations/google_workspace/settings.py and GoogleResourcesConfig in app/integrations/google_workspace/resources.py; app/infrastructure/configuration/integrations/ and IntegrationSettings are deleted
+- [x] #2 Every consumer (server/configured_systems.py included) and test points at the new homes; env names, defaults and the customer-id validator are unchanged and covered by tests under tests/unit/integrations/google_workspace/
+- [x] #3 The five import-linter ignores for infrastructure.configuration.integrations.google are removed and lint-imports passes
+- [x] #4 decisions/configuration.md and decisions/outbound-clients.md name the new homes; GOOGLE_RESOURCES in the Google package is recorded as tolerated until TASK-111 splits it into feature slices
+- [x] #5 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Decisions (human, 2026-10-20):
+- GoogleResourcesConfig (GOOGLE_RESOURCES) is feature data (inc/tal/aws/cal document IDs), not vendor config. Interim home: app/integrations/google_workspace/resources.py, beside the vendor slice in settings.py, so features/packages adapters import it under contract (e) and five import-linter ignores go. Recorded as an ADR tolerance; the split into feature slices rides with TASK-111.
+- The emptied app/infrastructure/configuration/integrations/ package is deleted here (it holds only google.py and its barrel); TASK-24.5 drops that item.
+- IntegrationSettings (infrastructure/configuration/base.py) has no other subclass and is deleted. The new modules use BaseSettings with their own SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore"), like integrations/slack and integrations/trello (contract (d): integrations import nothing from infrastructure).
+- Checked and dropped: non-dict GOOGLE_RESOURCES JSON is already rejected with a ValidationError (pydantic-settings decodes the dict field before _parse_resources), so there is no parse bug to fix.
+
+Size gate: about 24 production files, but 17 of them are one-line import rewrites; about 270 LOC moved, net LOC slightly negative; one concern (settings location), no behavior change. Over the ~10-file guideline by mechanical count only; splitting would need a re-export shim that the next slice deletes. Kept as one PR.
+
+Steps (TDD):
+1. Tests first (fail on import):
+   - tests/unit/integrations/google_workspace/test_google_workspace_settings_load.py: provider is a cached singleton; model_config env_file/case_sensitive/extra; reads GOOGLE_DELEGATED_ADMIN_EMAIL, SRE_BOT_EMAIL, GOOGLE_API_NUM_RETRIES, GOOGLE_API_TIMEOUT_SECONDS from env; defaults (customer id my_customer when the key file is unset, retries 3, timeout 10.0); timeout <= 0 rejected. Takes over the google cases of tests/unit/infrastructure/configuration/test_integration_settings_singletons.py and test_settings_structure.py.
+   - tests/unit/integrations/google_workspace/test_google_workspace_settings_customer_id_validate.py: moved from tests/unit/infrastructure/configuration/ (same cases, new import).
+   - tests/unit/integrations/google_workspace/test_google_workspace_resources_load.py: cached singleton; JSON env read maps to properties (incident_drive_id etc.); missing key returns ""; outer-quoted JSON accepted; non-dict JSON rejected.
+2. Create app/integrations/google_workspace/settings.py (GoogleWorkspaceSettings, validator, get_google_workspace_settings) and app/integrations/google_workspace/resources.py (GoogleResourcesConfig, get_google_resources_config). Bodies are moved as they are: same aliases, defaults, validators, properties; docstring examples point at the new path; the stale "TASK-24 migrates" comment is dropped.
+3. Delete app/infrastructure/configuration/integrations/ (google.py, __init__.py) and IntegrationSettings in infrastructure/configuration/base.py.
+4. Repoint consumers: infrastructure/directory/factory.py, server/lifespan.py, server/configured_systems.py, integrations/google_workspace/client.py (sibling import), packages/talent/adapters/google_drive.py, features/incident/drive/adapters/google_drive.py, features/incident/scribe/adapters/google_docs.py, modules/aws/spending.py, modules/dev/incident.py, modules/role/role.py, modules/incident/{incident,incident_folder,schedule_retro,incident_helper,incident_document}.py.
+5. Repoint tests in place: tests/integration/server/test_lifespan_security_settings_validation.py, test_lifespan_vendor_slice_validation.py, tests/unit/server/test_server_configured_systems_read.py, test_server_services_configured_systems_resolve.py, tests/unit/integrations/google_workspace/test_google_workspace_client.py, and monkeypatch string targets in test_factory.py, test_google_spreadsheet_provider.py, test_incident_scribe_draft_adapter.py (test_spending_handler.py patches modules.aws.spending.*, unchanged). Trim test_settings_structure.py of the google and IntegrationSettings cases; delete test_integration_settings_singletons.py and the old validator test.
+6. app/pyproject.toml: remove the five ignores (contracts (a) and (d): integrations.google_workspace.client -> infrastructure.configuration.integrations.google; contract (b): incident drive, incident scribe, talent -> infrastructure.configuration.integrations.google); remove the dead pytest env GOOGLE_WORKSPACE__GCP_SRE_SERVICE_ACCOUNT_KEY_FILE (no slice reads that name).
+7. ADRs: decisions/configuration.md Context (Google lives in integrations/google_workspace/settings.py) and Migration (replace the Google tolerance with: GOOGLE_RESOURCES feature resource IDs in integrations/google_workspace/resources.py until TASK-111 splits them into feature slices; dated Changes line); decisions/outbound-clients.md:75 updated.
+8. Gates: ruff, mypy (0 in touched files), lint-imports, pytest tests --ignore=tests/smoke; rg for "configuration.integrations" and "IntegrationSettings" returns nothing under app/ and decisions/.
+
+AC traceability: #1 -> steps 2-3, tests in step 1; #2 -> steps 4-5, step 1 tests (env names, defaults, validator); #3 -> step 6, lint-imports; #4 -> step 7; #5 -> step 8.
+
+Blast radius and rollback: import-only change. A missed consumer fails at import, which pytest and mypy catch; module-level reads in legacy modules are unchanged. Env names, defaults and validation are unchanged, so no terraform/SSM change. One git revert restores it. Merge order: none beyond main (24.2 and 24.3 merged); TASK-24.5 builds on this.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented as planned, as a pure move; behaviour is unchanged.
+
+- GoogleWorkspaceSettings is in app/integrations/google_workspace/settings.py and GoogleResourcesConfig in app/integrations/google_workspace/resources.py. Both use BaseSettings with their own SettingsConfigDict (env_file .env, case_sensitive, extra ignore), like the other vendor slices. app/infrastructure/configuration/integrations/ and IntegrationSettings (base.py) are deleted.
+- 17 consumers were repointed with one-line import changes. The five import-linter ignores for infrastructure.configuration.integrations.google are removed from contracts (a), (b) and (d); lint-imports: 12 kept, 0 broken.
+- Tests: new test_google_workspace_settings_load.py and test_google_workspace_resources_load.py, and test_google_workspace_settings_customer_id_validate.py moved, all under tests/unit/integrations/google_workspace/. test_integration_settings_singletons.py is deleted (its cases now live in the new files), and the Google cases are removed from test_settings_structure.py.
+- Malformed GOOGLE_RESOURCES JSON fails with a pydantic-settings SettingsError naming the field 'resources', because the variable is decoded before the validator runs. A JSON list fails with a ValidationError naming GOOGLE_RESOURCES. Both are existing behaviour and are now pinned by tests.
+- Dead pytest env entries removed from app/pyproject.toml: GOOGLE_WORKSPACE__GCP_SRE_SERVICE_ACCOUNT_KEY_FILE plus the AWS__*, SENTINEL__*, ATIP__* and TRELLO__* names. No settings class uses those prefixes, and the flat names they map to are still set.
+- ADRs: configuration.md Context, Migration tolerance and a dated Changes line; outbound-clients.md closes the settings divergence.
+- Sibling tasks synced: TASK-24.5 renamed, with the package deletion dropped and AC#4 reworded; TASK-111 now includes the GOOGLE_RESOURCES split.
+
+Gates: ruff check: all checks passed. ruff format --check: 981 files formatted. lint-imports: 12 kept, 0 broken. pytest tests --ignore=tests/smoke: 5375 passed. mypy: 48 errors repo-wide, 0 new in touched files. Two pre-existing errors sit in touched legacy files, away from the changed import line: modules/role/role.py:322 [index] and modules/incident/incident.py:121 [no-any-return]. Both are on HEAD at the same lines and were left as they are.
+<!-- SECTION:NOTES:END -->

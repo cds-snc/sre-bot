@@ -3,20 +3,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class IntegrationSettings(BaseSettings):
-    """Base class for external integration settings.
-
-    All integration settings should inherit from this class to ensure
-    consistent configuration behavior (env file loading, case sensitivity).
-    """
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=True,
-        extra="ignore",
-    )
-
-
 class FeatureSettings(BaseSettings):
     """Base class for feature module settings.
 

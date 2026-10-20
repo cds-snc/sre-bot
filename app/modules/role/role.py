@@ -3,8 +3,8 @@ from slack_bolt import Ack, App, Respond
 from slack_sdk import WebClient
 from structlog import get_logger
 
-from infrastructure.configuration.integrations.google import get_google_resources_config
 from infrastructure.slack.settings import get_slack_transport_settings
+from integrations.google_workspace.resources import get_google_resources_config
 from integrations.slack import commands as slack_commands
 from integrations.slack import users as slack_users
 from packages.talent.adapters import google_drive as talent_drive

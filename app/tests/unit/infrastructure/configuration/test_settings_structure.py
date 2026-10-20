@@ -8,7 +8,6 @@ from infrastructure.configuration.app import get_app_settings
 from infrastructure.configuration.base import (
     FeatureSettings,
     InfrastructureSettings,
-    IntegrationSettings,
 )
 from infrastructure.configuration.features import (
     AtipSettings,
@@ -30,26 +29,12 @@ from infrastructure.configuration.infrastructure.retry import (
 from infrastructure.configuration.infrastructure.server import (
     get_server_settings,
 )
-from infrastructure.configuration.integrations import (
-    GoogleResourcesConfig,
-    GoogleWorkspaceSettings,
-)
-from infrastructure.configuration.integrations.google import (
-    get_google_workspace_settings,
-)
 from infrastructure.coordination.settings import ConditionalWriteSettings
 from infrastructure.logging.settings import LoggingSettings
 
 
 class TestSettingsStructure:
     """Test the new domain-based settings structure."""
-
-    def test_settings_loads_all_integration_sections(self):
-        """Verify integration settings provider loads correctly."""
-        google_workspace_settings = get_google_workspace_settings()
-
-        assert isinstance(google_workspace_settings, GoogleWorkspaceSettings)
-        assert hasattr(google_workspace_settings, "SRE_BOT_EMAIL")
 
     def test_settings_loads_all_feature_sections(self):
         """Verify feature settings provider loads correctly."""
@@ -70,15 +55,10 @@ class TestSettingsStructure:
         """Verify settings values are accessible from narrow providers."""
         aws_feature_settings = get_aws_feature_settings()
         server_settings = get_server_settings()
-        google_workspace_settings = get_google_workspace_settings()
         retry_settings = get_retry_settings()
 
         assert hasattr(aws_feature_settings, "AWS_ADMIN_GROUPS")
         assert hasattr(server_settings, "BACKEND_URL")
-        assert hasattr(
-            google_workspace_settings,
-            "GOOGLE_DELEGATED_ADMIN_EMAIL",
-        )
         assert hasattr(retry_settings, "enabled")
         assert hasattr(retry_settings, "backend")
 
@@ -101,7 +81,6 @@ class TestSettingsStructure:
     def test_settings_classes_have_proper_base_classes(self):
         """Verify settings classes inherit from appropriate base classes."""
         # Check inheritance
-        assert issubclass(GoogleWorkspaceSettings, IntegrationSettings)
         assert issubclass(RetrySettings, InfrastructureSettings)
 
     def test_settings_singleton_still_works(self):
@@ -110,36 +89,12 @@ class TestSettingsStructure:
         retry_settings2 = get_retry_settings()
         server_settings1 = get_server_settings()
         server_settings2 = get_server_settings()
-        google_settings1 = get_google_workspace_settings()
-        google_settings2 = get_google_workspace_settings()
         aws_feature_settings1 = get_aws_feature_settings()
         aws_feature_settings2 = get_aws_feature_settings()
 
         assert retry_settings1 is retry_settings2
         assert server_settings1 is server_settings2
-        assert google_settings1 is google_settings2
         assert aws_feature_settings1 is aws_feature_settings2
-
-    def test_all_integration_settings_classes_instantiable(self):
-        """Verify all integration settings classes can be instantiated."""
-        # Test that all integration settings classes are functional
-        instances = [
-            GoogleWorkspaceSettings(),
-            GoogleResourcesConfig(),
-        ]
-
-        # Verify they are all instances of IntegrationSettings
-        for instance in instances:
-            assert isinstance(instance, IntegrationSettings)
-
-    def test_google_workspace_settings_defaults_customer_id(self, monkeypatch):
-        """Verify the customer ID defaults to the alias while Google is not in use (no service-account key)."""
-        monkeypatch.delenv("GOOGLE_WORKSPACE_CUSTOMER_ID", raising=False)
-        monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "")
-
-        settings = GoogleWorkspaceSettings.model_validate({})
-
-        assert settings.GOOGLE_WORKSPACE_CUSTOMER_ID == "my_customer"
 
     def test_all_feature_settings_classes_instantiable(self):
         """Verify all feature settings classes can be instantiated."""

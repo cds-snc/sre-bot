@@ -16,7 +16,7 @@ from types import MappingProxyType
 import structlog
 
 from contracts.workplace import WorkplaceSystem
-from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings, get_google_workspace_settings
+from integrations.google_workspace.settings import GoogleWorkspaceSettings, get_google_workspace_settings
 from integrations.slack.settings import SlackSettings, get_slack_settings
 
 logger = structlog.get_logger(__name__)

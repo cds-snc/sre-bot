@@ -13,7 +13,7 @@ import pytest
 import svcs
 
 from contracts.workplace import ConfiguredSystems, WorkplaceSystem
-from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
+from integrations.google_workspace.settings import GoogleWorkspaceSettings
 from integrations.slack.settings import SlackSettings
 from server.configured_systems import StaticConfiguredSystems
 from server.services import register_core_services

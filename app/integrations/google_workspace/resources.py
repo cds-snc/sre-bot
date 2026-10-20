@@ -1,78 +1,22 @@
-"""Google Workspace integration settings."""
+"""Google document and folder ids of the features, read from GOOGLE_RESOURCES.
+
+Feature data, not vendor settings: it sits beside the Google Workspace vendor slice
+until TASK-111 splits it into the owning feature slices (decisions/configuration.md).
+Exposes ``GoogleResourcesConfig`` and the cached ``get_google_resources_config()`` provider.
+"""
 
 import json
 from functools import lru_cache
 from typing import Any, cast
 
 import structlog
-from pydantic import Field, field_validator, model_validator
-
-from infrastructure.configuration.base import IntegrationSettings
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = structlog.get_logger().bind(component="config.google")
 
 
-class GoogleWorkspaceSettings(IntegrationSettings):
-    """Google Workspace configuration settings.
-
-    Environment Variables:
-        GOOGLE_DELEGATED_ADMIN_EMAIL: Admin email for domain-wide delegation
-        SRE_BOT_EMAIL: SRE Bot service account email
-        GOOGLE_WORKSPACE_CUSTOMER_ID: Google Workspace customer ID (defaults to "my_customer"
-            while Google is not in use; the real id is required once it is)
-        GCP_SRE_SERVICE_ACCOUNT_KEY_FILE: Path to service account key file
-        GOOGLE_API_NUM_RETRIES: Number of automatic retries for transient Google API failures
-        GOOGLE_API_TIMEOUT_SECONDS: Per-attempt HTTP timeout in seconds for Google API calls (defaults to 10.0)
-
-    Google is in use when GCP_SRE_SERVICE_ACCOUNT_KEY_FILE is set (the interim
-    signal until the Google tenant entry exists, decisions/configuration.md).
-    Then GOOGLE_WORKSPACE_CUSTOMER_ID must be the real customer id: non-blank
-    and not the my_customer API alias. The id is opaque (Google documents no
-    format), so no pattern is checked and no network call is made.
-
-    Example:
-        ```python
-        from infrastructure.configuration.integrations.google import get_google_workspace_settings
-
-        settings = get_google_workspace_settings()
-
-        admin_email = settings.GOOGLE_DELEGATED_ADMIN_EMAIL
-        customer_id = settings.GOOGLE_WORKSPACE_CUSTOMER_ID
-        ```
-    """
-
-    GOOGLE_DELEGATED_ADMIN_EMAIL: str = Field(default="", alias="GOOGLE_DELEGATED_ADMIN_EMAIL")
-    SRE_BOT_EMAIL: str = Field(default="", alias="SRE_BOT_EMAIL")
-    GOOGLE_WORKSPACE_CUSTOMER_ID: str = Field(default="my_customer", alias="GOOGLE_WORKSPACE_CUSTOMER_ID")
-    GCP_SRE_SERVICE_ACCOUNT_KEY_FILE: str = Field(default="", alias="GCP_SRE_SERVICE_ACCOUNT_KEY_FILE")
-    # Interim home until TASK-24 migrates this setting to app/integrations/google_workspace/settings.py.
-    GOOGLE_API_NUM_RETRIES: int = Field(
-        default=3,
-        alias="GOOGLE_API_NUM_RETRIES",
-        description="Number of automatic retries googleapiclient applies to transient (429/5xx) API call failures, configured once at service construction.",
-    )
-    # Move alongside GOOGLE_API_NUM_RETRIES when Google Workspace settings get their own vendor package module.
-    GOOGLE_API_TIMEOUT_SECONDS: float = Field(
-        default=10.0,
-        alias="GOOGLE_API_TIMEOUT_SECONDS",
-        gt=0,
-        description="Per-attempt HTTP timeout in seconds for every Google Workspace API client, configured once at service construction. Defaults to 10.0; must be positive.",
-    )
-
-    @model_validator(mode="after")
-    def _require_real_customer_id_when_in_use(self) -> GoogleWorkspaceSettings:
-        if not self.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE:
-            return self
-        customer_id = self.GOOGLE_WORKSPACE_CUSTOMER_ID.strip()
-        if not customer_id or customer_id == "my_customer":
-            raise ValueError(
-                "GOOGLE_WORKSPACE_CUSTOMER_ID must be the real Google Workspace customer id, not blank or the "
-                "my_customer alias, when GCP_SRE_SERVICE_ACCOUNT_KEY_FILE is set"
-            )
-        return self
-
-
-class GoogleResourcesConfig(IntegrationSettings):
+class GoogleResourcesConfig(BaseSettings):
     """Consolidated Google Drive/Document resources configuration.
 
     Stores all Google resource IDs (folders, documents, sheets) in a
@@ -111,7 +55,7 @@ class GoogleResourcesConfig(IntegrationSettings):
 
     Example:
         ```python
-        from infrastructure.configuration.integrations.google import get_google_resources_config
+        from integrations.google_workspace.resources import get_google_resources_config
 
         settings = get_google_resources_config()
 
@@ -119,6 +63,12 @@ class GoogleResourcesConfig(IntegrationSettings):
         incident_folder = settings.incident_folder_id
         ```
     """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True,
+        extra="ignore",
+    )
 
     resources: dict[str, Any] = Field(
         default_factory=dict,
@@ -236,12 +186,6 @@ class GoogleResourcesConfig(IntegrationSettings):
     def sre_calendar_id(self) -> str:
         """SRE Calendar ID."""
         return self._get_resource("cal", "sre")
-
-
-@lru_cache(maxsize=1)
-def get_google_workspace_settings() -> GoogleWorkspaceSettings:
-    """Singleton provider for Google Workspace integration settings."""
-    return GoogleWorkspaceSettings()
 
 
 @lru_cache(maxsize=1)

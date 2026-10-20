@@ -13,7 +13,7 @@ from features.incident.documents.adapters.google_docs import (
     replace_placeholders,
 )
 from features.incident.drive.adapters import google_drive as incident_drive
-from infrastructure.configuration.integrations.google import get_google_resources_config
+from integrations.google_workspace.resources import get_google_resources_config
 
 google_resources = get_google_resources_config()
 INCIDENT_TEMPLATE = google_resources.incident_template_id

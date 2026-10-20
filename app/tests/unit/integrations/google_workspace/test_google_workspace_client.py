@@ -16,7 +16,7 @@ from googleapiclient.http import HttpRequest
 from pydantic import ValidationError
 
 from contracts.operations.status import OperationStatus
-from infrastructure.configuration.integrations.google import GoogleWorkspaceSettings
+from integrations.google_workspace.settings import GoogleWorkspaceSettings
 
 
 def _http_error(status: int, reason: str = "boom", retry_after: str | None = None) -> HttpError:

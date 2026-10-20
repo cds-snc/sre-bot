@@ -158,18 +158,6 @@ env = [
     "TRELLO_ATIP_BOARD=TRELLO_ATIP_BOARD",
     "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE=GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
     "GOOGLE_WORKSPACE_CUSTOMER_ID=C0test0id",
-    "AWS__AWS_REGION=us-east-1",
-    "SENTINEL__SENTINEL_CUSTOMER_ID=SENTINEL_CUSTOMER_ID",
-    "SENTINEL__SENTINEL_LOG_TYPE=SENTINEL_LOG_TYPE",
-    "SENTINEL__SENTINEL_SHARED_KEY=SENTINEL_SHARED_KEY",
-    "AWS__ORG_ROLE_ARN=AWS_ORG_ACCOUNT_ROLE_ARN",
-    "AWS__LOGGING_ROLE_ARN=AWS_LOGGING_ACCOUNT_ROLE_ARN",
-    "AWS__AUDIT_ROLE_ARN=AWS_AUDIT_ACCOUNT_ROLE_ARN",
-    "ATIP__ATIP_ANNOUNCE_CHANNEL=ATIP_ANNOUNCE_CHANNEL",
-    "TRELLO__TRELLO_APP_KEY=TRELLO_APP_KEY",
-    "TRELLO__TRELLO_TOKEN=TRELLO_TOKEN",
-    "TRELLO__TRELLO_ATIP_BOARD=TRELLO_ATIP_BOARD",
-    "GOOGLE_WORKSPACE__GCP_SRE_SERVICE_ACCOUNT_KEY_FILE=GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
     "GROUP_PROVIDERS={{\"google\": {{\"enabled\": true, \"primary\": true}}}}",
 ]
 norecursedirs = ["tests/smoke"]
@@ -239,7 +227,6 @@ unmatched_ignore_imports_alerting = "error"
 ignore_imports = [
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/plugin-architecture.md Migration and decisions/outbound-clients.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one.
-    "integrations.google_workspace.client -> infrastructure.configuration.integrations.google",
     "integrations.notify.client -> infrastructure.configuration.app",
     "integrations.sentinel.client -> infrastructure.audit.models",
     "integrations.slack.formatter -> infrastructure.i18n",
@@ -289,13 +276,10 @@ ignore_imports = [
     "packages.access.sync.providers -> infrastructure.records",
     "packages.geolocate.platforms.slack -> infrastructure.i18n",
     "features.incident.core.adapters.i18n -> infrastructure.i18n",
-    "features.incident.drive.adapters.google_drive -> infrastructure.configuration.integrations.google",
     "features.incident.drive.adapters.google_drive -> infrastructure.drive",
     "features.incident.drive.adapters.google_drive -> infrastructure.drive.factory",
     "features.incident.drive.adapters.google_drive -> infrastructure.drive.models",
-    "features.incident.scribe.adapters.google_docs -> infrastructure.configuration.integrations.google",
     "features.incident.scribe.adapters.google_docs -> infrastructure.drive",
-    "packages.talent.adapters.google_drive -> infrastructure.configuration.integrations.google",
     "packages.talent.adapters.google_drive -> infrastructure.drive.factory",
 ]
 
@@ -316,7 +300,6 @@ unmatched_ignore_imports_alerting = "error"
 ignore_imports = [
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/outbound-clients.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one.
-    "integrations.google_workspace.client -> infrastructure.configuration.integrations.google",
     "integrations.notify.client -> infrastructure.configuration.app",
     "integrations.sentinel.client -> infrastructure.audit.models",
     "integrations.slack.formatter -> infrastructure.i18n",
